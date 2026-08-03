@@ -23,7 +23,7 @@ Riesgos detectados:
 - Las reglas productivas actuales sólo conocen gran parte del esquema legacy.
 - El vendedor legacy usa etiquetas de pago históricas que deben conservarse mientras convivan ambos sistemas.
 - Algunas métricas leen hasta cientos de ventas; la plataforma integral debe migrar a resúmenes diarios.
-- El proyecto Firebase es compartido con producción, por lo que reglas y datos requieren una migración reversible.
+- El sistema legacy debe continuar en su proyecto Firebase original mientras se define cómo sincronizar nuevas ventas sin conflictos.
 
 ## flor-mia-web-fiel-v3
 
@@ -37,4 +37,5 @@ Límites actuales: precios y stock permanecen pendientes, el checkout no crea pe
 
 ## Diferencias y decisión
 
-La web aporta la base React/Vite y la experiencia pública; Stock y Ventas aporta el dominio transaccional. La nueva aplicación separa ambas superficies por ruta, comparte Firebase y prepara un catálogo maestro. Los dos repositorios originales y sus sitios Netlify quedan intactos.
+La web aporta la base React/Vite y la experiencia pública; Stock y Ventas aporta el dominio transaccional. La nueva aplicación separa ambas superficies por ruta y usa el proyecto Firebase independiente `app-integral-fm`. Los dos repositorios originales, su Firebase y sus sitios Netlify quedan intactos.
+
