@@ -15,14 +15,14 @@
 - Proveedor fiscal/ARCA, certificados y backend seguro.
 - Transportistas y reglas de tarifas/seguimiento.
 - Cuentas o APIs de WhatsApp, Instagram y otros canales.
-- Dominio final y variables de entorno de producción.
+- Dominio personalizado final; el subdominio productivo de Netlify ya está configurado.
 - Decisión sobre notificaciones push/email.
 
 ## Firebase
 
-- Export/backup previo a migración.
-- Validación en emuladores de reglas v2.
-- Publicación controlada de reglas e índices.
+- Definir la sincronización periódica unidireccional de ventas y movimientos desde el sistema legacy.
+- Crear un backup del destino antes de cada futura importación masiva.
 - Plan para generar `dailySummaries` sin obligar Cloud Functions en Spark.
 
 Ningún pendiente se simula como integración activa.
+
