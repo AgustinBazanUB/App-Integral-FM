@@ -1,9 +1,11 @@
 node_modules/
 dist/
 .netlify/
+.firebase-migration-private/
 graphify-out/
 .env
 .env.local
 *.log
 .DS_Store
 Thumbs.db
+

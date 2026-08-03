@@ -15,7 +15,8 @@ Aplicación web única para la tienda pública y la gestión privada de Flor Mí
 - Usuarios: creación en Firebase Authentication con una app secundaria, roles, ubicaciones y baja lógica.
 - Design system Flor Mía: tokens CSS, componentes compartidos, responsive y WCAG 2.2 AA.
 - PWA instalable, SPA de Netlify, cabeceras de seguridad, caché y CI.
-- Reglas e índices integrales de Firestore propuestos, sin desplegarlos automáticamente sobre producción.
+- Firebase independiente para App Integral FM, con datos y usuarios clonados desde el sistema anterior.
+- Reglas e índices integrales desplegados únicamente en la base nueva.
 
 ## Requisitos
 
@@ -45,7 +46,7 @@ Las pruebas cubren catálogo, assets, búsqueda, permisos, pagos, descuentos, ac
 
 La configuración web pública se centraliza en `src/gestion/services/firebase.js` y admite reemplazo por variables `VITE_FIREBASE_*`. El ejemplo está en `.env.example`. No se incluyen claves privadas, cuentas de servicio ni credenciales fiscales.
 
-Las reglas de `firestore.rules` y los índices de `firestore.indexes.json` son la propuesta integral v2. No deben publicarse directamente hasta ejecutar la estrategia de migración y pruebas descrita en `docs/MIGRACION.md`, porque el proyecto Firebase también atiende al sistema de stock actual.
+La plataforma usa el proyecto Firebase separado `app-integral-fm`. El sistema anterior continúa usando `fm-stock-y-venta`; sus reglas, índices, configuración y datos no fueron modificados. Las reglas de `firestore.rules` y los índices de `firestore.indexes.json` están desplegados exclusivamente en la base nueva. La separación y el estado de la copia están documentados en `docs/MIGRACION.md`.
 
 ## Netlify
 
@@ -56,7 +57,7 @@ Las reglas de `firestore.rules` y los índices de `firestore.indexes.json` son l
 - [Auditoría de los proyectos](docs/AUDITORIA.md)
 - [Arquitectura, rutas y permisos](docs/ARQUITECTURA.md)
 - [Modelo de datos Firestore](docs/FIRESTORE-MODEL.md)
-- [Estrategia de migración](docs/MIGRACION.md)
+- [Separación y estrategia de migración](docs/MIGRACION.md)
 - [Manual de administrador](docs/MANUAL-ADMINISTRADOR.md)
 - [Manual de vendedores](docs/MANUAL-VENDEDORES.md)
 - [Datos y credenciales pendientes](docs/PENDIENTES.md)
@@ -68,3 +69,4 @@ Las reglas de `firestore.rules` y los índices de `firestore.indexes.json` son l
 ## Estado honesto de integraciones
 
 La app no procesa pagos online, no emite comprobantes ARCA, no envía mensajes ni automatiza redes. Esas interfaces están preparadas y documentadas; se activarán únicamente al recibir proveedores, credenciales y reglas comerciales reales.
+

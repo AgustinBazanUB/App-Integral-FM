@@ -5,7 +5,7 @@ export default function SettingsPage() {
   const rows = [
     ["Proyecto Firebase", firebaseConfig.projectId, "Conectado"],
     ["Autenticación", "Email y contraseña", "Configurado"],
-    ["Esquema de datos", "Compatibilidad v1 + modelo integral v2", "Migración segura"],
+    ["Esquema de datos", "Base separada + copia legacy verificada", "Configurado"],
     ["Pagos online", "Proveedor pendiente", "No integrado"],
     ["Facturación ARCA", "Backend seguro pendiente", "No integrado"],
     ["Canales sociales", "Carga manual y enlaces directos", "Primera versión"],
@@ -21,3 +21,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

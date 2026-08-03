@@ -1,32 +1,48 @@
-# Estrategia de migración
+# Separación y estrategia de migración
 
-## Principio
+## Entornos independientes
 
-Los repositorios y sitios actuales continúan productivos hasta que la plataforma integral supere pruebas de autenticación, reglas, ventas, stock, concurrencia, responsive y despliegue. No hay iframes ni duplicación deliberada de ventas o stock.
+| Uso | Proyecto Firebase | Región | Estado |
+| --- | --- | --- | --- |
+| FM Stock y Ventas | `fm-stock-y-venta` | `southamerica-east1` | Productivo, sin cambios |
+| App Integral FM | `app-integral-fm` | `southamerica-east1` | Independiente y activo |
 
-## Etapas
+Ambas bases tienen identificadores, reglas, índices, Authentication y configuración web diferentes. Una escritura de App Integral FM no puede modificar la base utilizada por FM Stock y Ventas.
 
-1. Inventario y backup exportable de Firestore; registrar reglas e índices actuales.
-2. Crear usuarios piloto y permisos sin alterar roles legacy.
-3. Ejecutar la plataforma contra emuladores con una copia anonimizada de estructura.
-4. Validar lectura compatible de `users`, `locations`, `products`, `locationStock`, `sales` y `stockMovements`.
-5. Probar ventas concurrentes, falta de stock, corte de red, anulación y restauración.
-6. Publicar reglas integrales en una ventana controlada y ejecutar smoke tests del sistema legacy y el integral.
-7. Activar Ubicaciones para un grupo piloto; mantener el sitio anterior disponible como rollback.
-8. Habilitar colecciones nuevas módulo por módulo.
-9. Conectar catálogo público a Firestore sólo después de cargar precios, stock y reglas comerciales reales.
-10. Retirar el sistema anterior únicamente con aceptación y exportación final.
+## Copia inicial del 3 de agosto de 2026
+
+- Se leyó el proyecto `fm-stock-y-venta` sin realizar escrituras.
+- Se copiaron 3.749 documentos, distribuidos en 17 rutas de colección y subcolección.
+- Se conservaron rutas, IDs, tipos de Firestore y referencias entre documentos, adaptando estas últimas al proyecto nuevo.
+- Una segunda lectura comparó la huella de cada documento: 3.749 de origen y 3.749 de destino, sin faltantes ni diferencias.
+- Se migraron 12 usuarios de Firebase Authentication conservando UID y contraseña.
+- El archivo temporal con hashes de contraseña fue eliminado después de la importación y nunca se agregó a Git.
+- La base nueva tiene protección contra borrado habilitada.
+- Correo electrónico/contraseña está habilitado y `app-integral-fm.netlify.app` es un dominio autorizado.
+
+## Reglas e índices
+
+Las reglas integrales y la unión de índices antiguos+nuevos están desplegadas únicamente en `app-integral-fm`. No se desplegó ningún cambio sobre `fm-stock-y-venta`.
+
+## Operación mientras conviven ambos sistemas
+
+La copia inicial es una fotografía de los datos, no una sincronización en tiempo real. Mientras FM Stock y Ventas continúe siendo el sistema donde se registran ventas, sus nuevas ventas no aparecerán automáticamente en App Integral FM.
+
+Antes de hacer una segunda importación se debe definir una estrategia unidireccional y sin conflictos. La recomendación es copiar sólo documentos nuevos de `sales` y `stockMovements`, y luego recalcular stock en el destino. No se debe sobrescribir de forma indiscriminada `users`, permisos, configuraciones o documentos modificados desde App Integral FM.
+
+El script `scripts/clone-firestore.mjs` está diseñado para la carga inicial sobre una base vacía: usa la condición `exists: false`, no elimina documentos y se detiene si encuentra datos previos. Esta protección evita sobrescrituras accidentales y no debe retirarse para una sincronización periódica.
 
 ## Rollback
 
-Restaurar reglas e índices versionados, volver el tráfico al sitio anterior y detener escrituras integrales nuevas. Las colecciones nuevas son aditivas; no cambian IDs legacy ni eliminan documentos existentes.
+El rollback consiste en mantener FM Stock y Ventas operativo y detener escrituras en App Integral FM. Como los proyectos están separados, no es necesario restaurar reglas ni datos del sistema anterior.
 
-## Validaciones obligatorias
+## Validaciones realizadas
 
-- Regla denegada para usuario sin módulo/ubicación.
-- Vendedor sin capacidad de crear ubicaciones o leer finanzas.
-- Stock nunca negativo bajo dos ventas simultáneas.
-- Anulación con devolución completa y movimiento.
-- DNI y contacto no visibles sin permiso sensible.
-- Navegación mobile sin scroll horizontal.
-- Preview Deploy de Netlify antes de producción.
+- Igualdad de conteos y contenido para documentos y subcolecciones.
+- Reglas denegadas para usuarios sin módulo o ubicación.
+- Vendedor sin capacidad de administrar ubicaciones ni leer finanzas.
+- Stock negativo bloqueado.
+- Reglas e índices compilados y desplegados en el destino.
+- Usuarios migrados y proveedor de correo/contraseña habilitado.
+- Dominio productivo de Netlify autorizado.
+
