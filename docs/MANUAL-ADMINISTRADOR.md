@@ -9,11 +9,12 @@
 ## Orden recomendado
 
 1. Revisar Configuración y el proyecto Firebase indicado.
-2. Crear ubicaciones con nombre, tipo, prefijo y regla de DNI.
-3. Confirmar productos y stock de la copia inicial antes de registrar operaciones nuevas.
-4. Crear usuarios y asignar rol/ubicaciones.
-5. Probar una venta controlada y comprobar venta, stock y movimiento.
-6. Revisar los módulos nuevos y asignar permisos explícitos cuando corresponda.
+2. Abrir **Ubicaciones y eventos** y crear el punto operativo con nombre, tipo, prefijo, regla de DNI y fechas si corresponde.
+3. Abrir la ubicación: en **Productos** aparecerá automáticamente el catálogo maestro; “Sin configurar” significa stock local cero, no un producto duplicado.
+4. En **Cargar stock**, elegir entre stock inicial, agregar mercadería o ajustar inventario. Las reducciones requieren confirmación y toda operación deja movimientos auditables.
+5. En **Vendedores**, asignar cuentas existentes. En **Descuentos**, habilitar únicamente definiciones maestras vigentes.
+6. Probar una Venta Rápida controlada y comprobar venta, stock, movimiento y actividad.
+7. Revisar el panel mensual y el análisis ampliado antes de habilitar la operación habitual.
 
 ## Usuarios
 

@@ -18,11 +18,11 @@ Código migrado: autenticación, lectura de perfiles, permisos legacy `admin/sel
 
 Código descartado como interfaz: `admin.js`, `seller.js`, HTML imperativo y `styles.css`. Su lógica acoplada al DOM no era reutilizable en React y su estética no cumple el nuevo JSON visual.
 
-Riesgos detectados:
+Riesgos detectados y tratamiento actual:
 
-- Las reglas productivas actuales sólo conocen gran parte del esquema legacy.
+- Las reglas integrales ya contemplan actividad por ubicación, operaciones de stock idempotentes y permisos locales; los cambios nuevos se mantienen preparados para revisión y no se despliegan antes de aprobarlos.
 - El vendedor legacy usa etiquetas de pago históricas que deben conservarse mientras convivan ambos sistemas.
-- Algunas métricas leen hasta cientos de ventas; la plataforma integral debe migrar a resúmenes diarios.
+- El panel integral ya consulta ventas por rango, estado y ubicaciones autorizadas. `dailySummaries` queda como optimización futura si el volumen crece.
 - El sistema legacy debe continuar en su proyecto Firebase original mientras se define cómo sincronizar nuevas ventas sin conflictos.
 
 ## flor-mia-web-fiel-v3

@@ -19,9 +19,12 @@
 | `/checkout` | Checkout preparado |
 | `/gestion` | Panel privado |
 | `/gestion/locations` | Ubicaciones |
+| `/gestion/locations/:locationId` | Productos, stock, vendedores y descuentos de una ubicación |
 | `/gestion/quick-sales` | Ventas rápidas |
 | `/gestion/loyal-customers` | Clientes fidelizados |
 | `/gestion/metrics` | Métricas |
+| `/gestion/metrics/sales` | Análisis ampliado de ventas |
+| `/gestion/actividad` | Actividad operativa paginada |
 | `/gestion/finance` | Finanzas |
 | `/gestion/warehouse` | Depósito |
 | `/gestion/ecommerce` | Ecommerce administrativo |
@@ -56,7 +59,7 @@ Las plantillas se implementan en `permissions.js`; `permissionAllow`, `permissio
 
 ## Flujo transaccional de venta
 
-La confirmación lee contador y stocks, valida ubicación/stock/pago, incrementa el contador, descuenta cada stock, crea movimientos y guarda la venta dentro de una transacción. Un error revierte el conjunto. Factura, envío y registro financiero quedan como estados posteriores hasta validar el esquema integral y sus reglas.
+La confirmación valida descuentos maestros, lee contador y stocks, valida ubicación/stock/pago, incrementa el contador, descuenta cada stock, crea movimientos, auditoría y guarda la venta dentro de una transacción. Cada stock conserva `lastSaleId`, que las reglas verifican con `getAfter` para impedir ajustes aislados de un vendedor. Un error revierte el conjunto. Factura, envío y registro financiero quedan como estados posteriores hasta validar el esquema integral y sus reglas.
 
 ## Optimización Spark
 
@@ -64,6 +67,6 @@ La confirmación lee contador y stocks, valida ubicación/stock/pago, incrementa
 - Sin listeners globales.
 - Ítems históricos embebidos en ventas y pedidos.
 - Stock como subcolección por ubicación.
-- `dailySummaries` para evitar releer ventas completas.
+- Consultas mensuales por fecha y una caché breve; `dailySummaries` queda preparado para cuando el volumen justifique agregados.
 - Imágenes en Netlify, no Firebase Storage.
 - Índices compuestos documentados y paginación prevista.

@@ -20,6 +20,7 @@ import {
   where,
 } from "firebase/firestore";
 import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
+import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
 import { isLocationActiveNow } from "../../modules/locations/domain/locations";
 import { normalizePayment } from "../../modules/locations/domain/payments";
 import { calculateStockAfterSale } from "../../modules/locations/domain/sales";
@@ -174,13 +175,13 @@ export async function listAuditLogs(pageSize = 50) {
   );
 }
 
-export async function listLocations(profile) {
+export async function listLocations(profile, { includeDeleted = false } = {}) {
   if (!profile) return [];
   const isAdmin = normalizedRole(profile) === "admin";
   if (isAdmin || can(profile, "locations", "viewAllLocations")) {
     return docsToArray(
       await getDocs(query(collection(db, "locations"), orderBy("name"))),
-    ).filter((item) => item.deleted !== true);
+    ).filter((item) => includeDeleted || item.deleted !== true);
   }
   const ids = [...new Set(profile.allowedLocationIds || [])].slice(0, 30);
   const snapshots = await Promise.all(ids.map((id) => getDoc(doc(db, "locations", id))));
@@ -288,8 +289,17 @@ export async function createQuickSale({
   }
   const saleItems = cleanSaleItems(items);
   if (!saleItems.length) throw new Error("La venta está vacía.");
+  const requestedDiscountIds = [...new Set(discounts.map((discount) => discount.discountId || discount.id).filter(Boolean))];
+  const discountSnapshots = await Promise.all(requestedDiscountIds.map((id) => getDoc(doc(db, "discounts", id))));
+  const verifiedDiscounts = discountSnapshots.map((snapshot) => {
+    if (!snapshot.exists()) throw new Error("Uno de los descuentos ya no existe.");
+    return { id: snapshot.id, ...snapshot.data() };
+  });
+  if (verifiedDiscounts.some((discount) => !isDiscountAvailable(discount, location, new Date(), { profile: seller, items: saleItems }))) {
+    throw new Error("Uno de los descuentos no está vigente o no aplica a esta venta.");
+  }
   const subtotal = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountSummary = calculateDiscountSummary(discounts, subtotal);
+  const discountSummary = calculateDiscountSummary(verifiedDiscounts, subtotal);
   const total = discountSummary.total;
   const payment = normalizePayment(
     paymentMethod,
@@ -308,6 +318,7 @@ export async function createQuickSale({
     doc(db, "locationStock", location.id, "items", item.productId),
   );
   const movementRefs = saleItems.map(() => doc(collection(db, "stockMovements")));
+  const auditRef = doc(collection(db, "auditLogs"));
 
   return runTransaction(db, async (transaction) => {
     const counterSnapshot = await transaction.get(counterRef);
@@ -335,6 +346,7 @@ export async function createQuickSale({
       const newStock = calculateStockAfterSale(previousStock, item.qty, item.name);
       transaction.update(stockRefs[index], {
         currentStock: newStock,
+        lastSaleId: saleRef.id,
         updatedAt: serverTimestamp(),
       });
       transaction.set(movementRefs[index], {
@@ -375,6 +387,21 @@ export async function createQuickSale({
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       deletedAt: null,
+    });
+    transaction.set(auditRef, {
+      action: "sale.created",
+      title: "Venta registrada",
+      description: `${saleCode} · ${location.name}`,
+      moduleId: "quick-sales",
+      entityType: "sale",
+      entityId: saleRef.id,
+      locationId: location.id,
+      locationName: location.name,
+      userId: seller.id,
+      userName: seller.name || seller.email || "Vendedor",
+      status: "completed",
+      amount: total,
+      createdAt: serverTimestamp(),
     });
     return { id: saleRef.id, saleCode, total, ...payment, createdAt: new Date() };
   });

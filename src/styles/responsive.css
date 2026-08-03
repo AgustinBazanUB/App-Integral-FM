@@ -23,6 +23,10 @@
   .fm-module-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .fm-sale-layout { grid-template-columns: 1fr; }
   .fm-sale-layout > form { position: static; }
+  .fm-analysis-grid { grid-template-columns: 1fr; }
+  .fm-location-grid { grid-template-columns: 1fr; }
+  .fm-stock-toolbar { grid-template-columns: 1fr 1fr; }
+  .fm-stock-toolbar .fm-search-input { grid-column: 1 / -1; width: 100%; }
   .fm-login { grid-template-columns: minmax(300px, .8fr) minmax(400px, 1.2fr); }
 }
 
@@ -84,6 +88,14 @@
   .fm-data-table td > * { justify-self: end; }
   .fm-activity-list li { grid-template-columns: auto 1fr; }
   .fm-activity-list .fm-badge { grid-column: 2; justify-self: start; }
+  .fm-month-picker { flex-wrap: wrap; justify-content: flex-start; }
+  .fm-month-picker__label { flex: 1; }
+  .fm-month-picker select { flex: 1; }
+  .fm-location-tabs-desktop { display: none; }
+  .fm-location-tabs-mobile { display: grid; gap: 5px; margin-bottom: 14px; color: var(--fm-text-secondary); font-size: 11px; font-weight: 650; }
+  .fm-location-tabs-mobile select { width: 100%; min-height: 48px; border: 1px solid var(--fm-border); border-radius: var(--fm-radius-control); background: #fff; padding-inline: 12px; }
+  .fm-stock-load-row { grid-template-columns: auto 1fr; }
+  .fm-stock-load-row__field { grid-column: 1 / -1; }
   .fm-login { min-height: 100vh; grid-template-columns: 1fr; }
   .fm-login__brand { display: none; }
   .fm-login__form-area { min-height: 100vh; padding: 24px; }
@@ -103,5 +115,17 @@
   .fm-profile-trigger { padding: 0; }
   .fm-profile-trigger .fm-avatar { width: 38px; height: 38px; }
   .fm-bars { gap: 6px; }
+  .fm-month-picker { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; }
+  .fm-month-picker__label { min-width: 0; }
+  .fm-month-picker select,
+  .fm-month-picker .fm-button { grid-column: 1 / -1; width: 100%; }
+  .fm-location-card > header { grid-template-columns: auto 1fr; }
+  .fm-location-card > header .fm-badge { grid-column: 2; justify-self: start; }
+  .fm-location-card footer .fm-button { width: 100%; min-height: 44px; }
+  .fm-stock-toolbar { grid-template-columns: 1fr; }
+  .fm-stock-toolbar .fm-search-input { grid-column: auto; }
+  .fm-choice-list > label { grid-template-columns: auto 1fr; }
+  .fm-choice-list .fm-badge { grid-column: 2; justify-self: start; }
+  .fm-metric-bars { height: 210px; }
   .fm-safe-note { align-items: flex-start; flex-direction: column; }
 }

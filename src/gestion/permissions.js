@@ -12,6 +12,13 @@ export const ACTIONS = [
   "viewFinancial",
   "viewSensitive",
   "viewAllLocations",
+  "viewLocationProducts",
+  "configureLocationProducts",
+  "viewStock",
+  "loadStock",
+  "adjustStock",
+  "assignSellers",
+  "assignDiscounts",
 ];
 
 const everyAction = [...ACTIONS];
@@ -26,16 +33,18 @@ export const ROLE_TEMPLATES = {
   operational_admin: Object.fromEntries(
     businessModules.map(({ id, sensitive }) => [
       id,
-      sensitive ? ["view"] : [...operational, "approve", "viewAllLocations"],
+      sensitive ? ["view"] : id === "locations"
+        ? [...operational, "approve", "viewAllLocations", "viewLocationProducts", "configureLocationProducts", "viewStock", "loadStock", "adjustStock", "assignDiscounts"]
+        : [...operational, "approve", "viewAllLocations"],
     ]),
   ),
   seller: {
-    locations: ["view"],
+    locations: ["view", "viewLocationProducts", "viewStock"],
     "quick-sales": ["view", "create", "edit"],
     alerts: ["view", "edit"],
   },
   location_manager: {
-    locations: [...operational, "approve"],
+    locations: [...operational, "approve", "viewLocationProducts", "configureLocationProducts", "viewStock", "loadStock", "adjustStock"],
     "quick-sales": operational,
     metrics: viewOnly,
     alerts: ["view", "edit"],
@@ -142,10 +151,11 @@ export const visibleBusinessModules = (profile) =>
   businessModules.filter(({ id }) => canAccessModule(profile, id));
 
 export const canAccessAdministration = (profile) =>
-  normalizedRole(profile) === "admin";
+  ["admin", "general_admin"].includes(normalizedRole(profile));
 
 export const canAccessManagementRoute = (profile, routeId) => {
   if (["dashboard", "settings"].includes(routeId)) return Boolean(profile?.active);
+  if (routeId === "actividad") return can(profile, "locations", "view");
   if (["administration", "audit"].includes(routeId)) {
     return canAccessAdministration(profile);
   }
