@@ -14,6 +14,8 @@ import {
   PAYMENT_LABELS,
   PAYMENT_OPTIONS,
 } from "../../modules/locations/domain/payments";
+import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
+import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
 import { useAuth } from "../AuthContext";
 import { formatMoney } from "../formatters";
 import { useAsyncData } from "../hooks";
@@ -22,6 +24,7 @@ import {
   listLocations,
   listLocationStock,
 } from "../services/managementService";
+import { listDiscounts } from "../services/locationManagementService";
 
 const friendlyPayments = {
   credit: "Crédito",
@@ -34,6 +37,7 @@ const friendlyPayments = {
 export default function QuickSalesPage() {
   const { profile } = useAuth();
   const locationsResult = useAsyncData(() => listLocations(profile), [profile.id]);
+  const discountsResult = useAsyncData(() => listDiscounts(profile), [profile.id]);
   const [locationId, setLocationId] = useState("");
   const [stock, setStock] = useState({ status: "idle", data: [] });
   const [quantities, setQuantities] = useState({});
@@ -42,6 +46,7 @@ export default function QuickSalesPage() {
   const [customerDni, setCustomerDni] = useState("");
   const [invoiceRequested, setInvoiceRequested] = useState(false);
   const [deliveryMethod, setDeliveryMethod] = useState("pickup");
+  const [discountIds, setDiscountIds] = useState([]);
   const [submitState, setSubmitState] = useState({ busy: false, error: "", success: "" });
 
   const locations = locationsResult.data || [];
@@ -71,6 +76,10 @@ export default function QuickSalesPage() {
     (sum, item) => sum + Number(item.price || 0) * item.qty,
     0,
   );
+  const selectedLocation = locations.find((item) => item.id === locationId);
+  const availableDiscounts = (discountsResult.data || []).filter((discount) => isDiscountAvailable(discount, selectedLocation, new Date(), { profile, items: cart }));
+  const appliedDiscounts = availableDiscounts.filter((discount) => discountIds.includes(discount.id));
+  const saleSummary = useMemo(() => calculateDiscountSummary(appliedDiscounts, subtotal), [appliedDiscounts, subtotal]);
 
   const changeQty = (item, amount) => {
     setQuantities((current) => {
@@ -86,11 +95,12 @@ export default function QuickSalesPage() {
     event.preventDefault();
     setSubmitState({ busy: true, error: "", success: "" });
     try {
-      const location = locations.find((item) => item.id === locationId);
+      const location = selectedLocation;
       const result = await createQuickSale({
         location,
         seller: profile,
         items: cart,
+        discounts: appliedDiscounts,
         paymentMethod,
         paymentMethodLabel: PAYMENT_LABELS[paymentMethod],
         channel,
@@ -102,6 +112,7 @@ export default function QuickSalesPage() {
       setCustomerDni("");
       setPaymentMethod("");
       setInvoiceRequested(false);
+      setDiscountIds([]);
       setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.` });
       const refreshedStock = await listLocationStock(locationId);
       setStock({ status: "ready", data: refreshedStock });
@@ -116,7 +127,7 @@ export default function QuickSalesPage() {
       <div className="fm-sale-layout">
         <Panel title="1. Elegí los productos" description="Sólo se muestran productos activos de la ubicación seleccionada.">
           <FormField label="Ubicación de salida" required>
-            <Select value={locationId} onChange={(event) => { setLocationId(event.target.value); setQuantities({}); }}>
+              <Select value={locationId} onChange={(event) => { setLocationId(event.target.value); setQuantities({}); setDiscountIds([]); }}>
               <option value="">Elegir ubicación</option>
               {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
             </Select>
@@ -154,8 +165,11 @@ export default function QuickSalesPage() {
               ) : (
                 <p>Agregá productos para continuar.</p>
               )}
-              <div className="fm-cart-summary__total"><span>Total</span><strong>{formatMoney(subtotal)}</strong></div>
+              {appliedDiscounts.length ? <div className="fm-cart-summary__discount"><span>Descuentos</span><strong>− {formatMoney(saleSummary.discountTotal)}</strong></div> : null}
+              <div className="fm-cart-summary__total"><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div>
             </div>
+            {discountsResult.status === "loading" ? <Skeleton lines={2} /> : null}
+            {availableDiscounts.length ? <fieldset className="fm-discount-picker"><legend>Descuentos habilitados en {selectedLocation?.name || "la ubicación"}</legend>{availableDiscounts.map((discount) => <label key={discount.id}><input type="checkbox" checked={discountIds.includes(discount.id)} onChange={() => setDiscountIds((current) => current.includes(discount.id) ? current.filter((id) => id !== discount.id) : [...current, discount.id])} /><span>{discount.name} · {discount.type === "percent" ? `${discount.value}%` : formatMoney(discount.value)}</span></label>)}</fieldset> : null}
             <div className="fm-form-grid">
               <FormField label="Canal de origen" required><Select value={channel} onChange={(event) => setChannel(event.target.value)}><option value="manual">Carga manual</option><option value="whatsapp">WhatsApp</option><option value="instagram">Instagram</option><option value="phone">Teléfono</option><option value="in_person">Presencial</option></Select></FormField>
               <FormField label="Forma de pago" required><Select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}><option value="">Elegir medio</option>{PAYMENT_OPTIONS.filter((option) => option.value !== "multiple").map((option) => <option key={option.value} value={option.value}>{friendlyPayments[option.value]}</option>)}</Select></FormField>

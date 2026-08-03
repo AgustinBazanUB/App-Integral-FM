@@ -1,21 +1,26 @@
 import {saleDiscountList, storedDiscountTotal} from "./discounts.js";
 import {salePaymentParts} from "./payments.js";
+import {argentinaDateFromKey, argentinaMonthKey, argentinaMonthRange, argentinaParts} from "./time.js";
 
 const CANCELLED_STATUSES = new Set(["cancelled","canceled","deleted","anulada","anulado","cancelada","cancelado"]);
 const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
 const pad = value => String(value).padStart(2,"0");
-export const currentMetricsValue = (period, date=new Date()) => period === "day" ? `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}` : period === "year" ? String(date.getFullYear()) : `${date.getFullYear()}-${pad(date.getMonth()+1)}`;
+export const currentMetricsValue = (period, date=new Date()) => {
+  const parts=argentinaParts(date);
+  return period === "day" ? `${parts.year}-${pad(parts.month)}-${pad(parts.day)}` : period === "year" ? String(parts.year) : argentinaMonthKey(date);
+};
 
 export function buildMetricsDateRange(period, value) {
   const type=["day","month","year"].includes(period)?period:"month";
-  const parts=String(value||currentMetricsValue(type)).split("-").map(Number);
+  const selected=String(value||currentMetricsValue(type));
+  const parts=selected.split("-").map(Number);
   const year=parts[0],month=type==="year"?1:parts[1],day=type==="day"?parts[2]:1;
-  if(!Number.isInteger(year)||year<2000||year>2200||!Number.isInteger(month)||month<1||month>12||!Number.isInteger(day)||day<1||day>31)throw new Error("Seleccioná una fecha válida.");
-  const start=new Date(year,month-1,day,0,0,0,0);
-  if(start.getFullYear()!==year||start.getMonth()!==month-1||start.getDate()!==day)throw new Error("Seleccioná una fecha válida.");
-  const end=type==="day"?new Date(year,month-1,day+1):type==="month"?new Date(year,month,1):new Date(year+1,0,1);
-  return {period:type,value:String(value||currentMetricsValue(type)),start,end};
+  if(!Number.isInteger(year)||year<2000||year>2200)throw new Error("Seleccioná una fecha válida.");
+  const monthRange=type==="month"?argentinaMonthRange(selected):null;
+  const start=type==="day"?argentinaDateFromKey(selected):type==="month"?monthRange.start:argentinaDateFromKey(`${year}-01-01`);
+  const end=type==="day"?argentinaDateFromKey(`${new Date(Date.UTC(year,month-1,day+1,12)).toISOString().slice(0,10)}`):type==="month"?monthRange.end:argentinaDateFromKey(`${year+1}-01-01`);
+  return {period:type,value:selected,start,end};
 }
 
 export function saleDate(sale) {
@@ -67,9 +72,9 @@ function sorted(map,field="total"){return [...map.values()].sort((a,b)=>b[field]
 function buildTimeline(active, range) {
   let points=[];
   if(range.period==="day")points=Array.from({length:24},(_,index)=>({key:index,label:`${pad(index)} h`,total:0,sales:0}));
-  else if(range.period==="month"){const days=new Date(range.start.getFullYear(),range.start.getMonth()+1,0).getDate();points=Array.from({length:days},(_,index)=>({key:index+1,label:String(index+1),total:0,sales:0}));}
+  else if(range.period==="month"){const month=argentinaParts(range.start).month,year=argentinaParts(range.start).year,days=new Date(Date.UTC(year,month,0)).getUTCDate();points=Array.from({length:days},(_,index)=>({key:index+1,label:String(index+1),total:0,sales:0}));}
   else points=MONTHS.map((label,index)=>({key:index,label,total:0,sales:0}));
-  active.forEach(sale=>{const date=saleDate(sale);const key=range.period==="day"?date.getHours():range.period==="month"?date.getDate():date.getMonth();const point=points.find(item=>item.key===key);if(point){point.total+=Number(sale.total||0);point.sales++;}});
+  active.forEach(sale=>{const date=saleDate(sale),parts=argentinaParts(date),key=range.period==="day"?Number(new Intl.DateTimeFormat("en-US",{timeZone:"America/Argentina/Buenos_Aires",hour:"2-digit",hourCycle:"h23"}).format(date)):range.period==="month"?parts.day:parts.month-1;const point=points.find(item=>item.key===key);if(point){point.total+=Number(sale.total||0);point.sales++;}});
   return points;
 }
 

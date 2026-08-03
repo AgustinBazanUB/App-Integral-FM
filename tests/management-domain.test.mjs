@@ -13,7 +13,18 @@ import {
   calculateStockAfterSale,
 } from "../src/modules/locations/domain/sales.js";
 import {
+  buildSevenDaySalesSeries,
+  joinMasterProducts,
+  summarizeSales,
+} from "../src/modules/locations/domain/dashboard.js";
+import {
+  argentinaDateKey,
+  argentinaMonthRange,
+  lastSevenArgentinaDays,
+} from "../src/modules/locations/domain/time.js";
+import {
   can,
+  canAccessAdministration,
   visibleBusinessModules,
 } from "../src/gestion/permissions.js";
 
@@ -75,4 +86,59 @@ test("las denegaciones individuales prevalecen sobre la plantilla de rol", () =>
   };
   assert.equal(can(profile, "locations", "view"), true);
   assert.equal(can(profile, "locations", "create"), false);
+});
+
+test("los meses se delimitan a medianoche de Argentina sin corrimiento UTC", () => {
+  const range = argentinaMonthRange("2026-08");
+  assert.equal(range.start.toISOString(), "2026-08-01T03:00:00.000Z");
+  assert.equal(range.end.toISOString(), "2026-09-01T03:00:00.000Z");
+  assert.equal(argentinaDateKey(new Date("2026-08-01T02:59:59.000Z")), "2026-07-31");
+});
+
+test("el resumen mensual excluye anuladas, bajas y ventas duplicadas", () => {
+  const result = summarizeSales([
+    { id: "a", status: "active", total: 100 },
+    { id: "a", status: "active", total: 100 },
+    { id: "b", status: "cancelled", total: 500 },
+    { id: "c", status: "active", total: 300, deleted: true },
+  ]);
+  assert.equal(result.count, 1);
+  assert.equal(result.total, 100);
+  assert.equal(result.average, 100);
+});
+
+test("el ritmo de ventas siempre contiene siete días y completa ceros", () => {
+  const now = new Date("2026-08-03T15:00:00.000Z");
+  const range = lastSevenArgentinaDays(now);
+  const series = buildSevenDaySalesSeries([
+    { id: "a", status: "active", total: 250, createdAt: new Date("2026-08-03T02:30:00.000Z") },
+    { id: "b", status: "active", total: 400, createdAt: new Date("2026-08-03T12:00:00.000Z") },
+  ], now);
+  assert.equal(series.length, 7);
+  assert.equal(range.end.toISOString(), "2026-08-04T03:00:00.000Z");
+  assert.equal(series.at(-1).key, "2026-08-03");
+  assert.equal(series.at(-1).value, 400);
+  assert.equal(series.at(-2).value, 250);
+});
+
+test("el catálogo maestro aparece en una ubicación nueva sin duplicar productos", () => {
+  const joined = joinMasterProducts([
+    { id: "p1", name: "Aceite", active: true, defaultPrice: 1000 },
+    { id: "p2", name: "Aceitunas", active: true, defaultPrice: 500 },
+  ], [{ id: "p1", productId: "p1", currentStock: 4, price: 900, active: true }]);
+  assert.equal(joined.length, 2);
+  assert.equal(joined.find((item) => item.id === "p1").currentStock, 4);
+  assert.equal(joined.find((item) => item.id === "p2").currentStock, 0);
+  assert.equal(joined.find((item) => item.id === "p2").configured, false);
+});
+
+test("el vendedor puede consultar stock pero no cargarlo ni administrar descuentos", () => {
+  const seller = { id: "seller-1", active: true, role: "seller" };
+  assert.equal(can(seller, "locations", "viewStock"), true);
+  assert.equal(can(seller, "locations", "loadStock"), false);
+  assert.equal(can(seller, "locations", "assignDiscounts"), false);
+});
+
+test("el administrador general conserva acceso a la administración", () => {
+  assert.equal(canAccessAdministration({ id: "general-1", active: true, role: "general_admin" }), true);
 });

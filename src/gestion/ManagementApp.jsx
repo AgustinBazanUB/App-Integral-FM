@@ -6,13 +6,16 @@ import ManagementShell from "./ManagementShell";
 import { moduleById } from "./modules";
 import { canAccessManagementRoute } from "./permissions";
 import AdministrationPage from "./pages/AdministrationPage";
+import ActivityPage from "./pages/ActivityPage";
 import AuditPage from "./pages/AuditPage";
 import DashboardPage from "./pages/DashboardPage";
 import GenericModulePage from "./pages/GenericModulePage";
 import LocationsPage from "./pages/LocationsPage";
+import LocationDetailPage from "./pages/LocationDetailPage";
 import LoginPage from "./pages/LoginPage";
 import NotAuthorizedPage from "./pages/NotAuthorizedPage";
 import QuickSalesPage from "./pages/QuickSalesPage";
+import SalesMetricsPage from "./pages/SalesMetricsPage";
 import SettingsPage from "./pages/SettingsPage";
 
 const routeIdFromPath = (pathname) =>
@@ -22,11 +25,12 @@ function ManagementRouter() {
   const location = useLocation();
   const { status, profile, error } = useAuth();
   const routeId = routeIdFromPath(location.pathname);
+  const pathParts = location.pathname.split("/").filter(Boolean);
 
   useEffect(() => {
     document.title = routeId === "dashboard"
       ? "Gestión integral | Flor Mía"
-      : `${moduleById[routeId]?.label || "Gestión"} | Flor Mía`;
+      : `${routeId === "actividad" ? "Actividad" : moduleById[routeId]?.label || "Gestión"} | Flor Mía`;
   }, [routeId]);
 
   if (status === "loading") {
@@ -42,13 +46,17 @@ function ManagementRouter() {
   } else if (routeId === "dashboard") {
     page = <DashboardPage />;
   } else if (routeId === "locations") {
-    page = <LocationsPage />;
+    page = pathParts[2] ? <LocationDetailPage locationId={decodeURIComponent(pathParts[2])} /> : <LocationsPage />;
   } else if (routeId === "quick-sales") {
     page = <QuickSalesPage />;
   } else if (routeId === "administration") {
     page = <AdministrationPage />;
   } else if (routeId === "audit") {
     page = <AuditPage />;
+  } else if (routeId === "actividad") {
+    page = <ActivityPage />;
+  } else if (routeId === "metrics" && pathParts[2] === "sales") {
+    page = <SalesMetricsPage />;
   } else if (routeId === "settings") {
     page = <SettingsPage />;
   } else if (moduleById[routeId]) {

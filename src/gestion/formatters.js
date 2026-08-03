@@ -16,8 +16,9 @@ export const formatDateTime = (value) => {
   const date = toDate(value);
   return date
     ? new Intl.DateTimeFormat("es-AR", {
-        dateStyle: "short",
-        timeStyle: "short",
+      dateStyle: "short",
+      timeStyle: "short",
+      timeZone: "America/Argentina/Buenos_Aires",
       }).format(date)
     : "Pendiente";
 };
@@ -25,7 +26,7 @@ export const formatDateTime = (value) => {
 export const formatDate = (value) => {
   const date = toDate(value);
   return date
-    ? new Intl.DateTimeFormat("es-AR", { dateStyle: "medium" }).format(date)
+    ? new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeZone: "America/Argentina/Buenos_Aires" }).format(date)
     : "Pendiente";
 };
 

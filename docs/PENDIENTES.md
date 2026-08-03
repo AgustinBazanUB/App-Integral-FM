@@ -23,6 +23,8 @@
 - Definir la sincronización periódica unidireccional de ventas y movimientos desde el sistema legacy.
 - Crear un backup del destino antes de cada futura importación masiva.
 - Plan para generar `dailySummaries` sin obligar Cloud Functions en Spark.
+- Ejecutar la suite de reglas en GitHub/Java; en el equipo local no hay Java instalado, aunque la compilación remota en modo `--dry-run` fue correcta.
+- Revisar y aprobar el pull request antes de desplegar reglas, índices o la nueva interfaz en producción.
 
 Ningún pendiente se simula como integración activa.
 

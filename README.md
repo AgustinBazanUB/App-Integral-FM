@@ -10,7 +10,9 @@ Aplicación web única para la tienda pública y la gestión privada de Flor Mí
 
 - Superficie pública en `/`: home, catálogo, buscador, producto, carrito y checkout preparado.
 - Superficie privada en `/gestion`: autenticación real, navegación por permisos y 12 módulos.
-- Ubicaciones: locales/ferias, estado operativo y stock por ubicación.
+- Panel mensual: selector de mes/año, ventas, facturación, ticket promedio, siete días y actividad paginada por permisos.
+- Ubicaciones y eventos: filtros, estados, recuperación y una vista operativa por ubicación con Productos, Cargar stock, Vendedores y Descuentos.
+- Catálogo maestro unido dinámicamente al stock local: los productos nuevos aparecen sin duplicarse y con stock cero hasta configurarlos.
 - Ventas rápidas: carrito táctil, validación de stock y confirmación atómica en Firestore.
 - Usuarios: creación en Firebase Authentication con una app secundaria, roles, ubicaciones y baja lógica.
 - Design system Flor Mía: tokens CSS, componentes compartidos, responsive y WCAG 2.2 AA.
@@ -40,7 +42,13 @@ npm test
 npm run build
 ```
 
-Las pruebas cubren catálogo, assets, búsqueda, permisos, pagos, descuentos, actividad de ubicaciones y prevención de stock negativo.
+Las pruebas cubren catálogo, assets, búsqueda, permisos, pagos, descuentos, períodos en hora argentina, métricas sin duplicados, siete días completos, catálogo maestro y prevención de stock negativo.
+
+Para validar reglas con el emulador (requiere Java 21 o superior):
+
+```bash
+npx firebase-tools emulators:exec --only firestore --project demo-flor-mia-integral "npm run test:rules"
+```
 
 ## Firebase
 
@@ -62,6 +70,7 @@ La plataforma usa el proyecto Firebase separado `app-integral-fm`. El sistema an
 - [Manual de vendedores](docs/MANUAL-VENDEDORES.md)
 - [Datos y credenciales pendientes](docs/PENDIENTES.md)
 - [Decisiones técnicas](docs/DECISIONES.md)
+- [Correcciones del panel y Ubicaciones](docs/CORRECCIONES-PANEL-UBICACIONES.md)
 - [Backlog](docs/BACKLOG.md)
 - [Sistema visual original](docs/FLOR-MIA-DESIGN-SYSTEM.txt)
 - [Especificación funcional original](docs/ESPECIFICACION-FUNCIONAL.txt)
