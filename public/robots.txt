@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://flor-mia-web-fiel-v3.netlify.app/sitemap.xml

@@ -1,0 +1,336 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function activeUser() { return signedIn() && profile().active == true; }
+    function isAdmin() {
+      return activeUser() && (
+        profile().role == "admin"
+        || profile().role == "general_admin"
+        || (("canAccessAdmin" in profile()) && profile().canAccessAdmin == true)
+        || (("isAdmin" in profile()) && profile().isAdmin == true)
+        || (("roles" in profile()) && ("admin" in profile().roles))
+      );
+    }
+    function explicitPermission(moduleId, action) {
+      return activeUser()
+        && ("permissions" in profile())
+        && (moduleId in profile().permissions)
+        && (profile().permissions[moduleId] is list)
+        && (action in profile().permissions[moduleId] || "admin" in profile().permissions[moduleId]);
+    }
+    function roleModule(moduleId) {
+      return activeUser() && (
+        isAdmin()
+        || (profile().role == "seller" && moduleId in ["locations", "quick-sales", "alerts"])
+        || (profile().role == "location_manager" && moduleId in ["locations", "quick-sales", "metrics", "alerts"])
+        || (profile().role == "warehouse_manager" && moduleId in ["locations", "warehouse", "suppliers", "alerts"])
+        || (profile().role == "marketing_manager" && moduleId in ["loyal-customers", "social", "marketing", "metrics"])
+        || (profile().role == "ecommerce_manager" && moduleId in ["ecommerce", "shipping", "loyal-customers", "metrics"])
+        || (profile().role == "shipping_manager" && moduleId in ["shipping", "alerts"])
+        || (profile().role == "supplier_manager" && moduleId in ["suppliers", "warehouse", "finance"])
+        || (profile().role == "financial_manager" && moduleId in ["finance", "metrics"])
+        || (profile().role == "analyst" && moduleId == "metrics")
+        || (profile().role == "operational_admin" && moduleId != "finance")
+      );
+    }
+    function rolePermission(moduleId, action) {
+      return activeUser() && (
+        (action == "view" && roleModule(moduleId))
+        || (profile().role == "seller"
+          && ((moduleId == "quick-sales" && action in ["create", "edit"])
+            || (moduleId == "alerts" && action == "edit")))
+        || (profile().role == "location_manager"
+          && moduleId in ["locations", "quick-sales", "alerts"]
+          && action in ["create", "edit", "export", "approve"])
+        || (profile().role == "warehouse_manager"
+          && moduleId in ["warehouse", "suppliers", "alerts"]
+          && action in ["create", "edit", "export", "approve"])
+        || (profile().role == "marketing_manager"
+          && moduleId in ["social", "marketing"]
+          && action in ["create", "edit", "export"])
+        || (profile().role == "ecommerce_manager"
+          && moduleId in ["ecommerce", "shipping", "loyal-customers"]
+          && action in ["create", "edit", "export"])
+        || (profile().role == "shipping_manager"
+          && moduleId in ["shipping", "alerts"]
+          && action in ["create", "edit", "export"])
+        || (profile().role == "supplier_manager"
+          && moduleId in ["suppliers", "warehouse"]
+          && action in ["create", "edit", "export", "approve"])
+        || (profile().role == "financial_manager"
+          && moduleId == "finance"
+          && action in ["create", "edit", "export", "approve"])
+        || (profile().role == "analyst" && moduleId == "metrics" && action == "export")
+        || (profile().role == "operational_admin"
+          && moduleId != "finance"
+          && action in ["create", "edit", "export", "approve"])
+      );
+    }
+    function canModule(moduleId, action) {
+      return isAdmin() || explicitPermission(moduleId, action) || rolePermission(moduleId, action);
+    }
+    function allowedLocation(locationId) {
+      return isAdmin()
+        || (activeUser()
+          && ("allowedLocationIds" in profile())
+          && locationId in profile().allowedLocationIds);
+    }
+    function locationNotDeleted(location) {
+      return !("deleted" in location) || location.deleted != true;
+    }
+    function locationNotPaused(location) {
+      return !("manualInactiveUntil" in location)
+        || location.manualInactiveUntil == null
+        || location.manualInactiveUntil <= request.time;
+    }
+    function locationScheduleStarted(location) {
+      return !("scheduleStartAt" in location)
+        || location.scheduleStartAt == null
+        || location.scheduleStartAt <= request.time;
+    }
+    function locationScheduleNotEnded(location) {
+      return !("scheduleEndAt" in location)
+        || location.scheduleEndAt == null
+        || location.scheduleEndAt >= request.time;
+    }
+    function activeAllowedLocation(locationId) {
+      let location = get(/databases/$(database)/documents/locations/$(locationId)).data;
+      return allowedLocation(locationId)
+        && locationNotDeleted(location)
+        && locationNotPaused(location)
+        && locationScheduleStarted(location)
+        && locationScheduleNotEnded(location)
+        && location.active == true;
+    }
+    function validPaymentPart(part) {
+      return part is map
+        && part.keys().hasOnly(["method", "label", "amount"])
+        && part.method in ["credit", "debit", "alias", "cash"]
+        && part.amount is int
+        && part.amount > 0;
+    }
+    function validSinglePayment(data) {
+      return data.paymentMethod in ["credit", "debit", "alias", "cash"]
+        && data.paymentMethodLabel is string;
+    }
+    function validMultiplePayment(data) {
+      let size = data.payments.size();
+      return data.paymentMethod == "multiple"
+        && data.payments is list
+        && size >= 2
+        && size <= 4
+        && validPaymentPart(data.payments[0])
+        && validPaymentPart(data.payments[1])
+        && (size < 3 || validPaymentPart(data.payments[2]))
+        && (size < 4 || validPaymentPart(data.payments[3]));
+    }
+    function validSale(data) {
+      return data.sellerId == request.auth.uid
+        && data.locationId is string
+        && data.status == "active"
+        && data.total is int
+        && data.total >= 0
+        && data.items is list
+        && data.items.size() > 0
+        && (validSinglePayment(data) || validMultiplePayment(data));
+    }
+    function ownsNewRecord() {
+      return request.resource.data.createdBy == request.auth.uid;
+    }
+    function logicalMutation() {
+      return !("deleted" in request.resource.data)
+        || request.resource.data.deleted is bool;
+    }
+
+    match /users/{uid} {
+      allow get: if isAdmin() || (activeUser() && request.auth.uid == uid);
+      allow list, create, update: if isAdmin();
+      allow delete: if false;
+    }
+    match /roles/{roleId} {
+      allow read, create, update: if isAdmin();
+      allow delete: if false;
+    }
+    match /permissions/{permissionId} {
+      allow read, create, update: if isAdmin();
+      allow delete: if false;
+    }
+    match /locations/{locationId} {
+      allow read: if isAdmin() || (canModule("locations", "view") && allowedLocation(locationId));
+      allow create, update: if canModule("locations", "edit");
+      allow delete: if false;
+    }
+    match /products/{productId} {
+      allow read: if activeUser() && (isAdmin() || resource.data.active == true);
+      allow create, update: if isAdmin() || canModule("ecommerce", "edit");
+      allow delete: if false;
+    }
+    match /productCategories/{categoryId} {
+      allow read: if activeUser() && (isAdmin() || resource.data.active == true);
+      allow create, update: if isAdmin() || canModule("ecommerce", "edit");
+      allow delete: if false;
+    }
+    match /discounts/{discountId} {
+      allow read: if activeUser() && (isAdmin() || resource.data.active == true);
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+    match /settings/{settingId} {
+      allow get: if activeUser();
+      allow list, create, update: if isAdmin();
+      allow delete: if false;
+    }
+    match /locationStock/{locationId} {
+      allow read, write: if isAdmin();
+      match /items/{productId} {
+        allow read: if activeUser() && allowedLocation(locationId);
+        allow create, delete: if isAdmin() || canModule("warehouse", "edit");
+        allow update: if isAdmin()
+          || canModule("warehouse", "edit")
+          || (activeAllowedLocation(locationId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["currentStock", "updatedAt"])
+            && request.resource.data.currentStock is int
+            && request.resource.data.currentStock >= 0);
+      }
+    }
+    match /sales/{saleId} {
+      allow get: if isAdmin()
+        || (activeUser() && resource.data.sellerId == request.auth.uid)
+        || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
+      allow list: if isAdmin()
+        || (activeUser() && resource.data.sellerId == request.auth.uid)
+        || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
+      allow create: if isAdmin()
+        || (canModule("quick-sales", "create")
+          && activeAllowedLocation(request.resource.data.locationId)
+          && validSale(request.resource.data));
+      allow update: if isAdmin()
+        || (canModule("quick-sales", "edit")
+          && resource.data.sellerId == request.auth.uid
+          && request.resource.data.sellerId == resource.data.sellerId
+          && request.resource.data.locationId == resource.data.locationId
+          && activeAllowedLocation(resource.data.locationId)
+          && resource.data.status == "active"
+          && request.resource.data.status in ["active", "cancelled"]);
+      allow delete: if false;
+    }
+    match /stockMovements/{movementId} {
+      allow read: if isAdmin() || canModule("warehouse", "view") || canModule("locations", "view");
+      allow create: if activeUser()
+        && request.resource.data.userId == request.auth.uid
+        && allowedLocation(request.resource.data.locationId);
+      allow update, delete: if false;
+    }
+    match /stockTransfers/{transferId} {
+      allow read: if canModule("warehouse", "view");
+      allow create: if canModule("warehouse", "create") && ownsNewRecord();
+      allow update: if canModule("warehouse", "edit") && logicalMutation();
+      allow delete: if false;
+    }
+    match /counters/{counterId} {
+      allow get: if activeUser();
+      allow list: if isAdmin();
+      allow create: if activeUser()
+        && allowedLocation(request.resource.data.locationId)
+        && request.resource.data.lastNumber == 1;
+      allow update: if activeUser()
+        && allowedLocation(resource.data.locationId)
+        && request.resource.data.locationId == resource.data.locationId
+        && request.resource.data.lastNumber == resource.data.lastNumber + 1;
+      allow delete: if false;
+    }
+    match /customers/{customerId} {
+      allow read: if canModule("loyal-customers", "view");
+      allow create: if canModule("loyal-customers", "create") && ownsNewRecord();
+      allow update: if canModule("loyal-customers", "edit") && logicalMutation();
+      allow delete: if false;
+      match /interactions/{interactionId} {
+        allow read: if canModule("loyal-customers", "view");
+        allow create, update: if canModule("loyal-customers", "edit");
+        allow delete: if false;
+      }
+    }
+    match /orders/{orderId} {
+      allow read: if canModule("ecommerce", "view");
+      allow create: if canModule("ecommerce", "create") && ownsNewRecord();
+      allow update: if canModule("ecommerce", "edit") && logicalMutation();
+      allow delete: if false;
+    }
+    match /shipments/{shipmentId} {
+      allow read: if canModule("shipping", "view");
+      allow create: if canModule("shipping", "create") && ownsNewRecord();
+      allow update: if canModule("shipping", "edit") && logicalMutation();
+      allow delete: if false;
+    }
+    match /invoices/{invoiceId} {
+      allow read: if canModule("finance", "view");
+      allow create, update: if canModule("finance", "edit");
+      allow delete: if false;
+    }
+    match /financialEntries/{entryId} {
+      allow read: if canModule("finance", "view");
+      allow create: if canModule("finance", "create") && ownsNewRecord();
+      allow update: if canModule("finance", "edit") && logicalMutation();
+      allow delete: if false;
+    }
+    match /cashSessions/{sessionId} {
+      allow read: if canModule("finance", "view");
+      allow create, update: if canModule("finance", "edit");
+      allow delete: if false;
+    }
+    match /suppliers/{supplierId} {
+      allow read: if canModule("suppliers", "view");
+      allow create: if canModule("suppliers", "create") && ownsNewRecord();
+      allow update: if canModule("suppliers", "edit") && logicalMutation();
+      allow delete: if false;
+    }
+    match /purchases/{purchaseId} {
+      allow read: if canModule("suppliers", "view");
+      allow create: if canModule("suppliers", "create") && ownsNewRecord();
+      allow update: if canModule("suppliers", "edit") && logicalMutation();
+      allow delete: if false;
+    }
+    match /campaigns/{campaignId} {
+      allow read: if canModule("marketing", "view");
+      allow create: if canModule("marketing", "create") && ownsNewRecord();
+      allow update: if canModule("marketing", "edit") && logicalMutation();
+      allow delete: if false;
+    }
+    match /contentItems/{contentId} {
+      allow read: if canModule("marketing", "view");
+      allow create, update: if canModule("marketing", "edit");
+      allow delete: if false;
+    }
+    match /socialLeads/{leadId} {
+      allow read: if canModule("social", "view");
+      allow create: if canModule("social", "create") && ownsNewRecord();
+      allow update: if canModule("social", "edit") && logicalMutation();
+      allow delete: if false;
+    }
+    match /alerts/{alertId} {
+      allow read: if canModule("alerts", "view")
+        && (!("responsibleId" in resource.data) || resource.data.responsibleId == request.auth.uid || isAdmin());
+      allow create: if canModule("alerts", "create") && ownsNewRecord();
+      allow update: if canModule("alerts", "edit") && logicalMutation();
+      allow delete: if false;
+    }
+    match /dailySummaries/{summaryId} {
+      allow read: if canModule("metrics", "view");
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if activeUser()
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

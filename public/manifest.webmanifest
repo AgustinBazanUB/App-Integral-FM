@@ -1,0 +1,18 @@
+{
+  "name": "Flor Mía · Gestión Integral",
+  "short_name": "Flor Mía",
+  "description": "Plataforma integral de ventas, stock y gestión de Flor Mía.",
+  "start_url": "/gestion",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FBFAF8",
+  "theme_color": "#4A3422",
+  "icons": [
+    {
+      "src": "/images/flor-mia/logo-flor-mia.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

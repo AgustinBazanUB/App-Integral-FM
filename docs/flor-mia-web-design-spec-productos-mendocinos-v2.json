@@ -1,0 +1,1690 @@
+{
+  "schema_version": "2.0.0",
+  "document_type": "visual_and_conversion_web_specification",
+  "language": "es-AR",
+  "project": {
+    "name": "Flor Mía — Ecommerce Premium de Productos Regionales Mendocinos",
+    "brand": "Flor Mía",
+    "primary_goal": "Diseñar y desarrollar una tienda online premium que represente fielmente el local Flor Mía como una selección de productos regionales originarios de Mendoza, manteniendo al aceite de oliva virgen extra como producto estrella y principal puerta de entrada a la marca.",
+    "secondary_goals": [
+      "Permitir descubrir productos por categoría, sabor, intensidad, ocasión y uso.",
+      "Dar protagonismo editorial a los varietales de aceite de oliva sin presentar a Flor Mía como una marca que vende únicamente aceite.",
+      "Impulsar la compra combinada entre aceites, frutos secos, aceitunas, mermeladas, sales y regalos.",
+      "Transmitir origen mendocino, calidad, selección, cercanía y experiencia de local.",
+      "Generar confianza antes del checkout mediante información clara y contenido real.",
+      "Reducir el abandono del carrito y permitir su recuperación con consentimiento."
+    ],
+    "target_audience": [
+      "Personas que buscan productos regionales premium de Mendoza.",
+      "Clientes interesados en aceite de oliva virgen extra y sus varietales.",
+      "Personas que compran frutos secos, aceitunas, mermeladas, sales y productos gourmet.",
+      "Clientes que desean armar regalos, picadas, desayunos, mesas o experiencias mendocinas.",
+      "Clientes del local físico de Flor Mía que quieren volver a comprar online.",
+      "Clientes de CABA y del resto de Argentina, sujeto a la cobertura real de envíos."
+    ],
+    "positioning_statement": "Flor Mía acerca a la mesa una selección cuidada de sabores mendocinos. El aceite de oliva es su gran protagonista, acompañado por frutos secos, aceitunas, mermeladas, sales condimentadas y otros productos regionales.",
+    "implementation_intent": "Este JSON debe ser utilizado por Codex como fuente de verdad visual, estructural, funcional y comercial para construir la experiencia web."
+  },
+  "source_interpretation": {
+    "instagram_reel": {
+      "url": "https://www.instagram.com/reel/DbBnA63RtBE/",
+      "usage_rule": "Tomar del reel el contenido hablado y sus principios de conversión, no copiar su diseño visual.",
+      "transcription_status": "Reconstrucción casi completa a partir de fragmentos indexados del mismo reel; revisar contra el audio original si se necesita literalidad palabra por palabra.",
+      "reconstructed_transcript": "Te cuento los tres imprescindibles que necesita tu tienda online para vender más, sin depender solo de tener más tráfico. Porque el problema no suele ser la cantidad de visitas, sino lo que pasa cuando alguien entra. El primero es el descubrimiento: que tu cliente encuentre el producto antes de cansarse. Más de la mitad de las tiendas online tienen una búsqueda mediocre y, si no encuentran lo que buscan, se van. El segundo es la confianza. Sin reseñas reales, sin fotos de clientes y sin una política de envíos clara, tu cliente duda. Y si duda, no compra. El tercero es la recuperación. La tasa media de abandono de un carrito puede llegar aproximadamente al 70%, pero se puede recuperar un porcentaje importante con un buen checkout y una secuencia de emails correcta. Antes de invertir más dinero en publicidad, revisá estos tres puntos. Si falla uno, da igual cuánto tráfico llegue.",
+      "conversion_pillars": [
+        {
+          "id": "discovery",
+          "name": "Descubrimiento",
+          "design_translation": [
+            "Navegación visible por categorías de productos mendocinos.",
+            "Buscador global por producto, categoría, sabor, intensidad, uso y ocasión.",
+            "Accesos rápidos a aceites, frutos secos, aceitunas, mermeladas, sales y regalos.",
+            "Productos más vendidos de distintas categorías visibles sin scroll excesivo.",
+            "Filtros comprensibles para personas que no conocen los varietales o los productos regionales.",
+            "Descubrimiento editorial específico para los aceites de oliva.",
+            "Recomendaciones cruzadas entre categorías."
+          ]
+        },
+        {
+          "id": "trust",
+          "name": "Confianza",
+          "design_translation": [
+            "Reseñas reales con producto comprado.",
+            "Fotografías reales del local, los productos y los clientes cuando estén disponibles.",
+            "Información clara de origen, envío, retiro, medios de pago y cambios.",
+            "Explicación de la selección de productores y productos mendocinos, solamente con datos verificables.",
+            "Pruebas de calidad específicas para cada categoría cuando existan.",
+            "Nada de testimonios, premios, productores, certificaciones o procedencias inventadas."
+          ]
+        },
+        {
+          "id": "recovery",
+          "name": "Recuperación",
+          "design_translation": [
+            "Carrito lateral persistente para compras de varias categorías.",
+            "Checkout corto, con progreso visible y sin pasos innecesarios.",
+            "Persistencia local del carrito y de sus variantes o tamaños.",
+            "Recuperación por email y, opcionalmente, WhatsApp con consentimiento.",
+            "Mensajes de error claros y conservación de los datos ya ingresados.",
+            "Sugerencias de productos complementarios no invasivas antes del checkout."
+          ]
+        }
+      ]
+    },
+    "visual_template": {
+      "name": "Kero — AI Framer Landing Page Template",
+      "reference_url": "https://land-book.com/websites/91876-kero-ai-framer-landing-page-template",
+      "adaptation_rule": "Inspirarse en su composición editorial, contraste, ritmo, tarjetas, fotografía atmosférica y tipografía serif; no copiar la página literalmente.",
+      "visual_traits_to_keep": [
+        "Hero fotográfico de gran impacto con navegación superpuesta.",
+        "Fondo general oscuro y elegante.",
+        "Títulos serif grandes y editoriales.",
+        "Texto secundario sobrio en sans serif.",
+        "Secciones amplias con mucho aire.",
+        "Tarjetas oscuras con bordes finos y esquinas redondeadas.",
+        "Composición alternada entre imagen y contenido.",
+        "Testimonios en mosaico.",
+        "Llamado final sobre imagen atmosférica.",
+        "Footer grande con marca tipográfica sobredimensionada."
+      ],
+      "traits_to_replace": [
+        "Eliminar el lenguaje y los componentes propios de SaaS o inteligencia artificial.",
+        "Reemplazar montañas genéricas por el local Flor Mía, fincas, olivares, producto, gastronomía y paisajes mendocinos.",
+        "Reemplazar tablas de precios SaaS por categorías, catálogo, packs y descubrimiento de productos.",
+        "Reemplazar mockups tecnológicos por botellas, frascos, bolsas, texturas de alimentos y escenas de mesa.",
+        "No presentar toda la experiencia como una web dedicada únicamente al aceite."
+      ]
+    },
+    "brand_reference": {
+      "instagram_url": "https://www.instagram.com/flormia.mdz/",
+      "brand_keywords": [
+        "mendocino",
+        "regional",
+        "premium",
+        "elegante",
+        "natural",
+        "sensorial",
+        "contemporáneo",
+        "cálido",
+        "sobrio",
+        "gourmet",
+        "artesanal sin verse rústico"
+      ],
+      "core_products": [
+        "Aceites de oliva: Arbequina, Arbosana, Blend, Coratina, Picual y Arauco",
+        "Almendras naturales",
+        "Almendras tostadas y saladas",
+        "Pistachos con cáscara",
+        "Pistachos pelados",
+        "Pasas de uva",
+        "Aceitunas griegas",
+        "Aceitunas verdes con carozo",
+        "Aceitunas verdes descarozadas",
+        "Aceitunas negras con carozo",
+        "Aceitunas negras descarozadas",
+        "Mermeladas en sabores reales del catálogo",
+        "Sales condimentadas, incluyendo Malbec y ajo",
+        "Packs y regalos reales"
+      ],
+      "core_messages": [
+        "Una selección de sabores originarios de Mendoza.",
+        "Aceite de oliva virgen extra como producto estrella.",
+        "Frutos secos, aceitunas, mermeladas, sales y productos regionales.",
+        "De Mendoza a tu mesa.",
+        "Productos elegidos para disfrutar, compartir y regalar."
+      ],
+      "legal_content_rule": "Toda cifra de acidez, certificación, procedencia específica, productor, beneficio de salud, premio, descuento o afirmación técnica debe cargarse desde contenido verificado por Flor Mía."
+    }
+  },
+  "codex_execution_directives": {
+    "priority_order": [
+      "Respetar la estructura, jerarquía y catálogo definidos en este JSON.",
+      "Presentar Flor Mía como tienda de productos regionales mendocinos.",
+      "Mantener al aceite de oliva como categoría estrella y experiencia educativa principal.",
+      "Implementar correctamente descubrimiento, confianza, compra cruzada y recuperación.",
+      "Crear una experiencia mobile-first, rápida y accesible.",
+      "Usar placeholders descriptivos, no imágenes aleatorias definitivas."
+    ],
+    "recommended_stack": {
+      "framework": "Usar el stack existente del repositorio. Si no existe, preferir React con Vite o Next.js.",
+      "styling": "CSS Modules, Tailwind CSS o el sistema existente; evitar agregar dos sistemas de estilos en paralelo.",
+      "icons": "Lucide o la librería ya instalada.",
+      "animations": "CSS y Framer Motion solamente si ya está instalado o su incorporación está justificada.",
+      "state": "Mantener el carrito en estado global y localStorage."
+    },
+    "non_destructive_rules": [
+      "No romper rutas, autenticación, carrito, checkout, Firebase, Netlify ni integraciones existentes.",
+      "Antes de modificar, inspeccionar la arquitectura del proyecto y reutilizar componentes.",
+      "No eliminar código funcional por razones estéticas.",
+      "No incorporar dependencias pesadas sin necesidad.",
+      "No insertar claves, tokens ni secretos en el frontend."
+    ],
+    "placeholder_rule": {
+      "required": true,
+      "implementation": "Crear archivos placeholder locales o bloques visuales con proporción fija, fondo neutro y etiqueta interna.",
+      "forbidden": [
+        "Hotlinking de imágenes externas como solución final.",
+        "Imágenes aleatorias que no representen la fotografía real requerida.",
+        "Texto genérico como image1.jpg sin una descripción semántica."
+      ]
+    }
+  },
+  "brand_system": {
+    "logo": {
+      "preferred_variant": "Logo Flor Mía dorado o marfil sobre fondo oscuro.",
+      "fallback_text_mark": "flor mía",
+      "clear_space": "Al menos la altura de la letra x alrededor del logo.",
+      "header_height_desktop_px": 84,
+      "header_height_mobile_px": 68
+    },
+    "colors": {
+      "background_primary": "#090A08",
+      "background_secondary": "#11130F",
+      "surface_primary": "#151812",
+      "surface_elevated": "#1B1F17",
+      "olive_deep": "#26311F",
+      "olive": "#556B3D",
+      "olive_light": "#87956B",
+      "gold_primary": "#C7A35A",
+      "gold_soft": "#D9C28C",
+      "ivory": "#F4F0E6",
+      "white": "#FFFFFF",
+      "text_primary": "#F5F1E8",
+      "text_secondary": "#B7B7AD",
+      "text_muted": "#84867C",
+      "border_subtle": "rgba(244, 240, 230, 0.12)",
+      "border_gold": "rgba(199, 163, 90, 0.42)",
+      "overlay_dark": "rgba(5, 7, 5, 0.62)",
+      "success": "#6F8A58",
+      "error": "#B66C5B"
+    },
+    "color_usage": {
+      "rule": "Predominio negro y marfil; usar dorado como acento premium y verde oliva como acento natural.",
+      "max_gold_usage": "No más del 12% de la superficie visible de una pantalla.",
+      "avoid": [
+        "Verde saturado brillante.",
+        "Dorado amarillo metálico excesivo.",
+        "Gradientes neón.",
+        "Fondos beige rústicos en toda la página."
+      ]
+    },
+    "typography": {
+      "heading_font": {
+        "preferred": "Cormorant Garamond",
+        "fallbacks": [
+          "Georgia",
+          "Times New Roman",
+          "serif"
+        ],
+        "weights": [
+          500,
+          600
+        ],
+        "style": "Editorial, elegante, alto contraste."
+      },
+      "body_font": {
+        "preferred": "Manrope",
+        "fallbacks": [
+          "Inter",
+          "Arial",
+          "sans-serif"
+        ],
+        "weights": [
+          400,
+          500,
+          600,
+          700
+        ],
+        "style": "Limpia, contemporánea y muy legible."
+      },
+      "scales": {
+        "display_desktop": "clamp(64px, 7vw, 112px)",
+        "display_mobile": "clamp(44px, 13vw, 66px)",
+        "h2": "clamp(38px, 5vw, 72px)",
+        "h3": "clamp(26px, 3vw, 40px)",
+        "body_large": "clamp(18px, 1.5vw, 22px)",
+        "body": "16px",
+        "small": "14px",
+        "eyebrow": "12px"
+      },
+      "heading_line_height": 0.94,
+      "body_line_height": 1.6,
+      "letter_spacing": {
+        "display": "-0.035em",
+        "body": "-0.01em",
+        "eyebrow": "0.16em"
+      }
+    },
+    "shape_language": {
+      "card_radius_px": 24,
+      "button_radius_px": 999,
+      "image_radius_px": 28,
+      "input_radius_px": 999,
+      "border_width_px": 1,
+      "shadow": "0 24px 70px rgba(0, 0, 0, 0.34)"
+    },
+    "spacing": {
+      "page_max_width_px": 1440,
+      "content_max_width_px": 1240,
+      "desktop_gutter_px": 48,
+      "tablet_gutter_px": 28,
+      "mobile_gutter_px": 18,
+      "section_padding_desktop": "120px 0",
+      "section_padding_mobile": "72px 0",
+      "grid_gap_desktop_px": 24,
+      "grid_gap_mobile_px": 14
+    }
+  },
+  "global_experience": {
+    "theme": "Oscuro editorial premium con fotografía cálida, textura natural y acentos dorados.",
+    "header": {
+      "position": "absolute sobre el hero al inicio; sticky con fondo oscuro translúcido después del primer scroll",
+      "desktop_layout": {
+        "left": "Logo",
+        "center": [
+          "Aceites",
+          "Frutos secos",
+          "Aceitunas",
+          "Mermeladas y sales",
+          "Regalos",
+          "Nuestra historia"
+        ],
+        "right": [
+          "Buscar",
+          "Cuenta opcional",
+          "Carrito",
+          "Comprar"
+        ]
+      },
+      "mobile_layout": {
+        "left": "Logo",
+        "right": [
+          "Buscar",
+          "Carrito",
+          "Menú"
+        ]
+      },
+      "behavior": [
+        "El carrito debe mostrar la cantidad total de unidades.",
+        "El botón Comprar debe abrir el catálogo o hacer scroll a categorías.",
+        "El menú debe permitir navegar por categoría y volver a la home.",
+        "En mobile, las subcategorías deben abrirse sin crear menús profundos difíciles de usar."
+      ]
+    },
+    "background_details": [
+      "Grano muy sutil opcional, opacidad menor al 4%.",
+      "Separadores finos y discretos.",
+      "Sin patrones repetitivos evidentes.",
+      "Las fotografías deben fundirse suavemente con el fondo oscuro."
+    ],
+    "buttons": {
+      "primary": {
+        "background": "#F4F0E6",
+        "text": "#090A08",
+        "hover": "Leve elevación, fondo blanco y flecha desplazada 3px."
+      },
+      "secondary": {
+        "background": "transparent",
+        "text": "#F4F0E6",
+        "border": "1px solid rgba(244, 240, 230, 0.24)",
+        "hover": "Borde dorado suave."
+      },
+      "gold": {
+        "background": "#C7A35A",
+        "text": "#090A08",
+        "hover": "Oscurecer 6% sin brillo artificial."
+      }
+    },
+    "motion": {
+      "principles": [
+        "Movimiento lento, natural y premium.",
+        "Nada debe distraer de la compra.",
+        "Respetar prefers-reduced-motion."
+      ],
+      "hero": "Parallax extremadamente leve o zoom de 1.00 a 1.04 durante 12 segundos.",
+      "reveal": "Fade y desplazamiento vertical de 16px, entre 450 y 650 ms.",
+      "cards": "Elevación de 4px y borde dorado muy tenue al hover.",
+      "carousel": "Arrastre táctil, flechas, indicadores y sin autoplay agresivo."
+    }
+  },
+  "page_architecture": {
+    "page_id": "home",
+    "route": "/",
+    "sections_order": [
+      "announcement_bar",
+      "hero",
+      "trust_logos_or_proof",
+      "category_navigation",
+      "guided_discovery",
+      "best_sellers",
+      "olive_oil_feature",
+      "variety_explorer",
+      "regional_categories_showcase",
+      "mendoza_table_builder",
+      "regional_story",
+      "sensory_comparison",
+      "customer_reviews",
+      "customer_gallery",
+      "shipping_and_purchase_clarity",
+      "cart_recovery_value",
+      "faq",
+      "final_cta",
+      "footer"
+    ]
+  },
+  "sections": [
+    {
+      "id": "announcement_bar",
+      "type": "utility_bar",
+      "conversion_pillar": "trust",
+      "content": {
+        "primary_text": "Productos regionales de Mendoza · Aceites, frutos secos y sabores seleccionados",
+        "secondary_items": [
+          "Envíos y retiros informados antes de pagar",
+          "Compra segura",
+          "Atención personalizada"
+        ]
+      },
+      "design": {
+        "height_px": 32,
+        "background": "#C7A35A",
+        "text": "#090A08",
+        "behavior": "En mobile mostrar un mensaje por vez con transición suave."
+      }
+    },
+    {
+      "id": "hero",
+      "type": "full_bleed_editorial_hero",
+      "conversion_pillar": "discovery",
+      "min_height": "min(920px, 100svh)",
+      "content": {
+        "eyebrow": "PRODUCTOS REGIONALES · MENDOZA",
+        "headline": "Los sabores de Mendoza, en un solo lugar.",
+        "subheadline": "Aceites de oliva premium, frutos secos, aceitunas, mermeladas, sales y productos seleccionados para disfrutar, compartir y regalar.",
+        "primary_cta": {
+          "label": "Explorar productos",
+          "action": "scroll_to",
+          "target": "#categories"
+        },
+        "secondary_cta": {
+          "label": "Descubrir nuestros aceites",
+          "action": "scroll_to",
+          "target": "#olive-oil-feature"
+        },
+        "microproof": [
+          "Origen mendocino",
+          "Aceites de oliva seleccionados",
+          "Productos para tu mesa y regalos"
+        ]
+      },
+      "image": {
+        "placeholder_src": "/images/placeholders/hero-flor-mia-productos-mendoza.webp",
+        "future_asset_name": "hero-flor-mia-productos-mendoza.webp",
+        "alt": "Selección de productos Flor Mía de Mendoza con una botella de aceite de oliva como protagonista",
+        "expected_real_image": "Fotografía horizontal cinematográfica. Botella Flor Mía como elemento central y de mayor jerarquía, acompañada de almendras, pistachos, aceitunas, un frasco de mermelada y una sal condimentada. Fondo oscuro cálido, materiales nobles y alguna referencia sutil a Mendoza.",
+        "aspect_ratio": "16:9",
+        "focal_point": "58% 48%",
+        "overlay": "Gradiente vertical oscuro, más intenso abajo y en los laterales."
+      },
+      "design": {
+        "content_alignment": "center",
+        "headline_max_width_px": 980,
+        "subheadline_max_width_px": 760,
+        "navigation_over_image": true,
+        "product_hierarchy": "La botella de aceite debe dominar la composición, pero deben verse otras categorías."
+      }
+    },
+    {
+      "id": "trust_logos_or_proof",
+      "type": "proof_strip",
+      "conversion_pillar": "trust",
+      "content": {
+        "heading": "Una selección mendocina para tu mesa",
+        "items_mode": "Usar únicamente productores, eventos, puntos de venta, notas o certificaciones reales.",
+        "fallback_items": [
+          "Origen Mendoza",
+          "Aceite de oliva virgen extra",
+          "Productos regionales seleccionados",
+          "Atención personalizada"
+        ]
+      },
+      "design": {
+        "layout": "Fila horizontal monocromática con opacidad baja.",
+        "mobile": "Scroll horizontal sin barra visible.",
+        "rule": "No inventar logos, productores ni avales."
+      }
+    },
+    {
+      "id": "category_navigation",
+      "html_anchor": "categories",
+      "type": "category_gateway",
+      "conversion_pillar": "discovery",
+      "content": {
+        "eyebrow": "TODO MENDOZA EN FLOR MÍA",
+        "heading": "Elegí por categoría.",
+        "body": "Entrá directo a lo que buscás o recorré una selección pensada para combinar productos.",
+        "categories_source": "catalog_strategy.categories",
+        "cards": [
+          {
+            "category_id": "olive_oil",
+            "title": "Aceites de oliva",
+            "subtitle": "La gran especialidad de Flor Mía",
+            "placeholder_src": "/images/placeholders/categoria-aceites-de-oliva.webp",
+            "expected_real_image": "Composición de botellas Flor Mía con distintas variedades."
+          },
+          {
+            "category_id": "nuts",
+            "title": "Frutos secos",
+            "subtitle": "Almendras, pistachos y pasas",
+            "placeholder_src": "/images/placeholders/categoria-frutos-secos.webp",
+            "expected_real_image": "Almendras, pistachos y pasas en recipientes premium o packaging real."
+          },
+          {
+            "category_id": "olives",
+            "title": "Aceitunas",
+            "subtitle": "Verdes, negras, griegas y descarozadas",
+            "placeholder_src": "/images/placeholders/categoria-aceitunas.webp",
+            "expected_real_image": "Selección real de aceitunas en frascos o cuencos."
+          },
+          {
+            "category_id": "jams",
+            "title": "Mermeladas",
+            "subtitle": "Sabores para desayunos, tablas y regalos",
+            "placeholder_src": "/images/placeholders/categoria-mermeladas.webp",
+            "expected_real_image": "Frascos reales de distintos sabores de mermelada."
+          },
+          {
+            "category_id": "seasoned_salts",
+            "title": "Sales condimentadas",
+            "subtitle": "Malbec, ajo y variedades reales",
+            "placeholder_src": "/images/placeholders/categoria-sales-condimentadas.webp",
+            "expected_real_image": "Sales condimentadas reales con textura visible y packaging."
+          },
+          {
+            "category_id": "gifts",
+            "title": "Regalos y combinaciones",
+            "subtitle": "Sabores mendocinos para compartir",
+            "placeholder_src": "/images/placeholders/categoria-regalos-mendocinos.webp",
+            "expected_real_image": "Pack real o composición de regalo Flor Mía."
+          }
+        ]
+      },
+      "design": {
+        "desktop": "Grid editorial de seis tarjetas, con la categoría Aceites ocupando mayor superficie.",
+        "mobile": "Carrusel táctil con la primera tarjeta parcialmente visible.",
+        "card_style": "Fotografía dominante, overlay oscuro, título serif y CTA discreto.",
+        "priority_rule": "Aceites debe ser visualmente la categoría principal, no la única."
+      }
+    },
+    {
+      "id": "guided_discovery",
+      "html_anchor": "guided-discovery",
+      "type": "guided_product_finder",
+      "conversion_pillar": "discovery",
+      "content": {
+        "eyebrow": "ENCONTRÁ LO QUE BUSCÁS",
+        "heading": "Un sabor mendocino para cada momento.",
+        "body": "Buscá por producto, categoría, sabor, intensidad, uso u ocasión. No hace falta conocer todos los productos para encontrar el indicado.",
+        "search": {
+          "label": "Buscar productos",
+          "placeholder": "Buscá aceite, pistachos, aceitunas, mermeladas…",
+          "searchable_fields": [
+            "name",
+            "category",
+            "subcategory",
+            "variety",
+            "flavor",
+            "intensity",
+            "use",
+            "occasion",
+            "size",
+            "tags"
+          ],
+          "suggestions": [
+            "Aceite suave",
+            "Aceite intenso",
+            "Pistachos",
+            "Almendras",
+            "Aceitunas descarozadas",
+            "Mermeladas",
+            "Para una picada",
+            "Para regalar"
+          ],
+          "behavior": [
+            "Resultados instantáneos agrupados por categoría.",
+            "Tolerar errores comunes de escritura.",
+            "Mostrar producto, categoría, tamaño y uso sugerido.",
+            "Tecla Escape cierra resultados.",
+            "No mostrar una categoría vacía."
+          ]
+        },
+        "quick_filters": [
+          {
+            "label": "Aceites",
+            "filter_key": "category",
+            "filter_value": "olive_oil"
+          },
+          {
+            "label": "Frutos secos",
+            "filter_key": "category",
+            "filter_value": "nuts"
+          },
+          {
+            "label": "Aceitunas",
+            "filter_key": "category",
+            "filter_value": "olives"
+          },
+          {
+            "label": "Mermeladas",
+            "filter_key": "category",
+            "filter_value": "jams"
+          },
+          {
+            "label": "Para una picada",
+            "filter_key": "occasion",
+            "filter_value": "picada"
+          },
+          {
+            "label": "Para regalar",
+            "filter_key": "occasion",
+            "filter_value": "gift"
+          }
+        ]
+      },
+      "design": {
+        "layout": "Bloque centrado con buscador grande tipo píldora y filtros debajo.",
+        "background": "#090A08",
+        "search_max_width_px": 920,
+        "result_panel": "Panel oscuro elevado, borde sutil, categorías y miniaturas placeholder."
+      }
+    },
+    {
+      "id": "best_sellers",
+      "html_anchor": "best-sellers",
+      "type": "mixed_category_product_carousel",
+      "conversion_pillar": "discovery",
+      "content": {
+        "eyebrow": "LOS MÁS ELEGIDOS",
+        "heading": "Favoritos de toda la tienda.",
+        "body": "Una selección rápida que combina las principales categorías de Flor Mía.",
+        "products_source": "Usar ventas, destacados o selección editorial real. No asumir automáticamente cuáles son los más vendidos.",
+        "category_balance_rule": "Incluir aceite de oliva y, cuando existan datos, productos de al menos tres categorías adicionales.",
+        "product_card_fields": [
+          "badge",
+          "image",
+          "name",
+          "category",
+          "short_description",
+          "size_or_format",
+          "price",
+          "installments_or_payment_info",
+          "rating_if_real",
+          "stock_state",
+          "add_to_cart"
+        ],
+        "initial_mock_products": [
+          {
+            "name": "Aceite Blend",
+            "category": "Aceites",
+            "badge": "Producto estrella",
+            "price": null
+          },
+          {
+            "name": "Pistachos",
+            "category": "Frutos secos",
+            "badge": null,
+            "price": null
+          },
+          {
+            "name": "Almendras",
+            "category": "Frutos secos",
+            "badge": null,
+            "price": null
+          },
+          {
+            "name": "Aceitunas",
+            "category": "Aceitunas",
+            "badge": null,
+            "price": null
+          },
+          {
+            "name": "Mermelada",
+            "category": "Mermeladas",
+            "badge": "Sabor pendiente",
+            "price": null
+          },
+          {
+            "name": "Sal con Malbec",
+            "category": "Sales condimentadas",
+            "badge": null,
+            "price": null
+          }
+        ]
+      },
+      "image_pattern": {
+        "placeholder_src_pattern": "/images/placeholders/producto-{category}-{slug}.webp",
+        "expected_real_image": "Foto real del producto o packaging sobre fondo controlado, con etiqueta legible y escala visual coherente entre categorías.",
+        "aspect_ratio": "4:5",
+        "object_fit": "contain"
+      },
+      "design": {
+        "cards_per_view": {
+          "desktop": 3.3,
+          "tablet": 2.2,
+          "mobile": 1.15
+        },
+        "card_background": "#151812",
+        "image_background": "#EDE8DD",
+        "show_arrows": true,
+        "show_progress": true,
+        "category_label": "Mostrar una etiqueta pequeña con la categoría."
+      }
+    },
+    {
+      "id": "olive_oil_feature",
+      "html_anchor": "olive-oil-feature",
+      "type": "hero_category_feature",
+      "conversion_pillar": "discovery",
+      "content": {
+        "eyebrow": "NUESTRO PRODUCTO ESTRELLA",
+        "heading": "Aceites de oliva para distintas formas de disfrutar.",
+        "body": "El aceite de oliva ocupa un lugar central en Flor Mía. Conocé sus varietales, perfiles e intensidades para elegir con mayor claridad.",
+        "primary_cta": {
+          "label": "Ver todos los aceites",
+          "target": "/productos?categoria=aceites"
+        },
+        "secondary_cta": {
+          "label": "Encontrar mi variedad",
+          "target": "#variety-explorer"
+        },
+        "proof_points": [
+          "Aceite de oliva virgen extra",
+          "Primera extracción en frío",
+          "Variedades con perfiles diferentes",
+          "Origen y datos técnicos sujetos a verificación real"
+        ]
+      },
+      "image": {
+        "placeholder_src": "/images/placeholders/destacado-aceites-flor-mia.webp",
+        "alt": "Botellas de distintas variedades de aceite de oliva Flor Mía",
+        "expected_real_image": "Fotografía editorial de varias botellas Flor Mía, con aceite servido y elementos gastronómicos. Debe ser la imagen de categoría más cuidada de toda la web.",
+        "aspect_ratio": "16:10"
+      },
+      "design": {
+        "layout": "Bloque ancho con imagen dominante y contenido superpuesto o lateral.",
+        "background": "#26311F",
+        "accent": "#D9C28C"
+      }
+    },
+    {
+      "id": "variety_explorer",
+      "html_anchor": "variety-explorer",
+      "type": "editorial_feature_cards",
+      "conversion_pillar": "discovery",
+      "content": {
+        "eyebrow": "VARIETALES DE ACEITE",
+        "heading": "Distintos perfiles. La misma búsqueda de excelencia.",
+        "intro": "Cada variedad expresa una combinación diferente de frutado, amargor y picor. Esta sección pertenece únicamente a la categoría Aceites.",
+        "items": [
+          {
+            "name": "Arbequina",
+            "descriptor": "Suave y armónica",
+            "short_text": "Perfil delicado, ideal para quienes prefieren sabores amables.",
+            "placeholder_src": "/images/placeholders/variedad-arbequina-contexto.webp",
+            "expected_real_image": "Botella Arbequina con ensalada, verduras asadas o mesa clara."
+          },
+          {
+            "name": "Arbosana",
+            "descriptor": "Frutada y fresca",
+            "short_text": "Una expresión fresca para preparaciones livianas y uso diario.",
+            "placeholder_src": "/images/placeholders/variedad-arbosana-contexto.webp",
+            "expected_real_image": "Botella Arbosana con hojas verdes, pan artesanal o plato fresco."
+          },
+          {
+            "name": "Blend",
+            "descriptor": "Completa y versátil",
+            "short_text": "Equilibrio y carácter para acompañar una gran variedad de platos.",
+            "placeholder_src": "/images/placeholders/variedad-blend-contexto.webp",
+            "expected_real_image": "Botella Blend en mesa oscura con pasta, carnes o pan."
+          },
+          {
+            "name": "Coratina",
+            "descriptor": "Intensa y persistente",
+            "short_text": "Para quienes buscan personalidad, amargor y picor más presentes.",
+            "placeholder_src": "/images/placeholders/variedad-coratina-contexto.webp",
+            "expected_real_image": "Botella Coratina con plato intenso, fondo oscuro y luz dramática."
+          },
+          {
+            "name": "Picual",
+            "descriptor": "Con carácter",
+            "short_text": "Perfil firme y expresivo para cocina y terminaciones.",
+            "placeholder_src": "/images/placeholders/variedad-picual-contexto.webp",
+            "expected_real_image": "Botella Picual con preparación caliente y elementos verdes."
+          },
+          {
+            "name": "Arauco",
+            "descriptor": "Identidad argentina",
+            "short_text": "Una variedad emblemática con presencia y personalidad.",
+            "placeholder_src": "/images/placeholders/variedad-arauco-contexto.webp",
+            "expected_real_image": "Botella Arauco con olivares o elementos mendocinos."
+          }
+        ]
+      },
+      "design": {
+        "layout": "Tres bloques editoriales alternados imagen/texto en desktop; carrusel en mobile.",
+        "card_style": "Imagen dominante, etiqueta pequeña, título serif grande y CTA discreto."
+      }
+    },
+    {
+      "id": "regional_categories_showcase",
+      "type": "category_story_grid",
+      "conversion_pillar": "discovery",
+      "content": {
+        "eyebrow": "MÁS SABORES DE MENDOZA",
+        "heading": "Mucho más que aceite de oliva.",
+        "body": "Completá tu compra con frutos secos, aceitunas, mermeladas y sales seleccionadas.",
+        "items": [
+          {
+            "category_id": "nuts",
+            "title": "Frutos secos",
+            "summary": "Almendras, pistachos y pasas en distintos formatos reales.",
+            "product_examples": [
+              "Almendras naturales",
+              "Almendras tostadas y saladas",
+              "Pistachos con cáscara",
+              "Pistachos pelados",
+              "Pasas de uva"
+            ],
+            "placeholder_src": "/images/placeholders/editorial-frutos-secos-mendoza.webp"
+          },
+          {
+            "category_id": "olives",
+            "title": "Aceitunas",
+            "summary": "Opciones verdes, negras, griegas, con carozo y descarozadas.",
+            "product_examples": [
+              "Griegas",
+              "Verdes",
+              "Verdes descarozadas",
+              "Negras",
+              "Negras descarozadas"
+            ],
+            "placeholder_src": "/images/placeholders/editorial-aceitunas-mendoza.webp"
+          },
+          {
+            "category_id": "jams",
+            "title": "Mermeladas",
+            "summary": "Una variedad amplia de sabores para desayunos, tablas y regalos.",
+            "product_examples": [
+              "Cargar los aproximadamente diez sabores reales desde el catálogo."
+            ],
+            "placeholder_src": "/images/placeholders/editorial-mermeladas-mendoza.webp"
+          },
+          {
+            "category_id": "seasoned_salts",
+            "title": "Sales condimentadas",
+            "summary": "Detalles mendocinos para transformar preparaciones simples.",
+            "product_examples": [
+              "Sal con Malbec",
+              "Sal con ajo",
+              "Otras variedades reales"
+            ],
+            "placeholder_src": "/images/placeholders/editorial-sales-mendoza.webp"
+          }
+        ]
+      },
+      "design": {
+        "layout": "Grid asimétrico de cuatro bloques; frutos secos y aceitunas pueden ocupar mayor espacio.",
+        "mobile": "Tarjetas verticales con CTA a la categoría.",
+        "rule": "Las categorías deben verse premium y parte de una misma marca, no como tiendas separadas."
+      }
+    },
+    {
+      "id": "mendoza_table_builder",
+      "type": "occasion_and_bundle_discovery",
+      "conversion_pillar": "discovery",
+      "content": {
+        "eyebrow": "ARMÁ TU SELECCIÓN",
+        "heading": "Productos que se disfrutan mejor juntos.",
+        "body": "Ayudá al usuario a descubrir combinaciones por ocasión sin obligarlo a conocer el catálogo.",
+        "occasions": [
+          {
+            "id": "picada",
+            "label": "Para una picada",
+            "suggested_categories": [
+              "Aceites",
+              "Aceitunas",
+              "Frutos secos",
+              "Sales"
+            ],
+            "rule": "Mostrar productos reales y permitir agregarlos individualmente."
+          },
+          {
+            "id": "breakfast",
+            "label": "Para desayuno o merienda",
+            "suggested_categories": [
+              "Mermeladas",
+              "Frutos secos"
+            ],
+            "rule": "No sumar productos no disponibles."
+          },
+          {
+            "id": "gift",
+            "label": "Para regalar",
+            "suggested_categories": [
+              "Aceites",
+              "Frutos secos",
+              "Mermeladas",
+              "Packs reales"
+            ],
+            "rule": "No inventar packaging, descuentos o disponibilidad."
+          },
+          {
+            "id": "everyday",
+            "label": "Para todos los días",
+            "suggested_categories": [
+              "Aceites",
+              "Aceitunas",
+              "Frutos secos"
+            ],
+            "rule": "Priorizar formatos reales de compra frecuente."
+          }
+        ],
+        "interaction": "El usuario elige una ocasión y recibe una selección configurable. Puede agregar productos por separado; no crear un bundle comercial inexistente."
+      },
+      "image": {
+        "placeholder_src": "/images/placeholders/mesa-mendocina-flor-mia.webp",
+        "alt": "Mesa con una selección de productos mendocinos Flor Mía",
+        "expected_real_image": "Mesa editorial con aceite, aceitunas, frutos secos, mermelada, sal y pan. Debe representar una compra combinada posible en Flor Mía.",
+        "aspect_ratio": "16:10"
+      },
+      "design": {
+        "layout": "Imagen a un lado y selector de ocasiones al otro.",
+        "selected_state": "Dorado suave con fondo oliva profundo.",
+        "mobile": "Selector horizontal y lista de productos debajo."
+      }
+    },
+    {
+      "id": "regional_story",
+      "type": "split_story_section",
+      "conversion_pillar": "trust",
+      "content": {
+        "eyebrow": "DE MENDOZA A TU MESA",
+        "heading": "Una selección que representa nuestro origen.",
+        "body": "Flor Mía reúne productos regionales mendocinos elegidos para acercar sabores de la provincia a la vida cotidiana, al local y a cada compra online.",
+        "proof_points": [
+          "Productos originarios de Mendoza",
+          "Selección cuidada",
+          "Aceite de oliva como especialidad",
+          "Atención y degustación en el local cuando corresponda"
+        ],
+        "cta": {
+          "label": "Conocer Flor Mía",
+          "target": "/nosotros"
+        },
+        "content_rule": "Explicar la relación real de Flor Mía con productores, finca, elaboración y selección. No inventar integración vertical ni producción propia para categorías donde no esté verificado."
+      },
+      "image": {
+        "placeholder_src": "/images/placeholders/local-flor-mia-productos-mendocinos.webp",
+        "future_asset_name": "local-flor-mia-productos-mendocinos.webp",
+        "alt": "Interior del local Flor Mía con productos regionales de Mendoza",
+        "expected_real_image": "Fotografía real del local mostrando variedad de productos, estanterías y experiencia de marca. Debe ayudar a que la web represente fielmente el espacio físico.",
+        "aspect_ratio": "4:5"
+      },
+      "design": {
+        "layout": "Imagen 52%, texto 48%; usar fotografía real del local como prioridad.",
+        "background": "#11130F",
+        "image_radius_px": 28
+      }
+    },
+    {
+      "id": "sensory_comparison",
+      "type": "interactive_comparison",
+      "conversion_pillar": "discovery",
+      "scope": "Solo aceites de oliva",
+      "content": {
+        "eyebrow": "ELEGÍ TU ACEITE POR PERFIL",
+        "heading": "Compará los varietales antes de decidir.",
+        "dimensions": [
+          "Frutado",
+          "Amargor",
+          "Picor",
+          "Intensidad general",
+          "Uso sugerido"
+        ],
+        "interaction": "El usuario puede seleccionar hasta tres aceites para compararlos.",
+        "data_rule": "Los valores deben ser validados por Flor Mía; no inventar perfiles técnicos definitivos.",
+        "context_note": "Esta herramienta es una experiencia especializada dentro de la categoría Aceites y no debe presentarse como el único modo de recorrer la tienda."
+      },
+      "design": {
+        "desktop": "Tabla visual premium con barras horizontales doradas y verdes.",
+        "mobile": "Tarjetas apiladas con selector superior.",
+        "accessibility": "No depender solo del color; mostrar valores textuales."
+      }
+    },
+    {
+      "id": "customer_reviews",
+      "type": "testimonial_masonry",
+      "conversion_pillar": "trust",
+      "content": {
+        "eyebrow": "OPINIONES REALES",
+        "heading": "Lo que dicen quienes ya eligieron Flor Mía.",
+        "body": "Mostrar opiniones sobre el local, la atención y productos de distintas categorías.",
+        "card_fields": [
+          "rating",
+          "review_text",
+          "customer_first_name",
+          "city_optional",
+          "purchased_product",
+          "product_category",
+          "verified_badge_if_true",
+          "customer_photo_optional"
+        ],
+        "category_mix_rule": "Cuando existan suficientes reseñas, no mostrar únicamente opiniones de aceite.",
+        "empty_state": "No publicar testimonios de relleno. Durante el desarrollo usar textos marcados como DEMO."
+      },
+      "image_pattern": {
+        "placeholder_src_pattern": "/images/placeholders/cliente-resena-{index}.webp",
+        "expected_real_image": "Foto real autorizada del cliente, el producto o la experiencia en el local."
+      },
+      "design": {
+        "layout": "Mosaico de tarjetas de distintos tamaños.",
+        "card_background": "#151812",
+        "featured_card": "Una reseña principal con fotografía y texto grande.",
+        "rating_color": "#C7A35A"
+      }
+    },
+    {
+      "id": "customer_gallery",
+      "type": "ugc_and_store_gallery",
+      "conversion_pillar": "trust",
+      "content": {
+        "eyebrow": "FLOR MÍA EN TU MESA",
+        "heading": "El local, los productos y las formas de disfrutarlos.",
+        "items": 8,
+        "expected_content_mix": [
+          "Interior y frente del local",
+          "Degustación de aceite",
+          "Botellas de aceite",
+          "Almendras y pistachos",
+          "Aceitunas",
+          "Mermeladas",
+          "Sales condimentadas",
+          "Regalos o mesas armadas"
+        ],
+        "caption_rule": "Agregar nombre o usuario solo con autorización.",
+        "cta": {
+          "label": "Ver Instagram",
+          "url": "https://www.instagram.com/flormia.mdz/"
+        }
+      },
+      "image_pattern": {
+        "placeholder_src_pattern": "/images/placeholders/galeria-flor-mia-{index}.webp",
+        "aspect_ratios": [
+          "1:1",
+          "4:5",
+          "3:4"
+        ]
+      },
+      "design": {
+        "layout": "Grid editorial asimétrico, con mezcla de local, producto y uso.",
+        "hover": "Mostrar categoría o contexto y acceso al contenido real cuando exista."
+      }
+    },
+    {
+      "id": "shipping_and_purchase_clarity",
+      "type": "trust_information_cards",
+      "conversion_pillar": "trust",
+      "content": {
+        "eyebrow": "COMPRA CLARA",
+        "heading": "Toda la información antes de pagar.",
+        "cards": [
+          {
+            "icon": "truck",
+            "title": "Envíos",
+            "text": "Mostrar zonas, costos, plazos y restricciones por peso o tipo de producto.",
+            "link_label": "Ver envíos"
+          },
+          {
+            "icon": "store",
+            "title": "Retiro en el local",
+            "text": "Informar dirección, horarios y tiempo de preparación cuando esté habilitado.",
+            "link_label": "Ver retiro"
+          },
+          {
+            "icon": "credit-card",
+            "title": "Medios de pago",
+            "text": "Mostrar medios y cuotas reales sin sorpresas en el último paso.",
+            "link_label": "Ver medios de pago"
+          },
+          {
+            "icon": "package-check",
+            "title": "Estado y cuidado",
+            "text": "Explicar cambios, roturas, faltantes y condiciones aplicables a alimentos.",
+            "link_label": "Ver ayuda"
+          }
+        ]
+      },
+      "design": {
+        "layout": "Cuatro tarjetas en desktop, dos en tablet, una en mobile.",
+        "icon_style": "Línea fina dorada.",
+        "background": "#090A08"
+      }
+    },
+    {
+      "id": "cart_recovery_value",
+      "type": "checkout_reassurance",
+      "conversion_pillar": "recovery",
+      "content": {
+        "eyebrow": "TU SELECCIÓN QUEDA GUARDADA",
+        "heading": "Combiná productos con calma. Tu carrito te espera.",
+        "body": "Guardar aceites, frutos secos, aceitunas, mermeladas y sales en el dispositivo para que el cliente continúe sin empezar de nuevo.",
+        "features": [
+          "Persistencia del carrito en localStorage.",
+          "Conservación de producto, categoría, tamaño, variante y cantidad.",
+          "Checkout con progreso visible.",
+          "No borrar campos ante un error.",
+          "Recuperación por email con consentimiento.",
+          "WhatsApp opcional, sujeto a consentimiento.",
+          "Sugerencias complementarias discretas y reales."
+        ]
+      },
+      "image": {
+        "placeholder_src": "/images/placeholders/pack-flor-mia-regionales.webp",
+        "alt": "Selección de productos regionales Flor Mía",
+        "expected_real_image": "Pack o bolsa real con aceite de oliva, frutos secos, aceitunas, mermelada o sal. No simular un pack comercial que no exista.",
+        "aspect_ratio": "16:10"
+      },
+      "design": {
+        "layout": "Tarjeta horizontal grande, imagen a la derecha y texto a la izquierda.",
+        "background": "#26311F",
+        "accent": "#D9C28C"
+      }
+    },
+    {
+      "id": "faq",
+      "type": "accordion",
+      "conversion_pillar": "trust",
+      "content": {
+        "eyebrow": "PREGUNTAS FRECUENTES",
+        "heading": "Antes de elegir.",
+        "items": [
+          "¿Qué tipo de productos vende Flor Mía?",
+          "¿Todos los productos son originarios de Mendoza?",
+          "¿Qué diferencia hay entre los varietales de aceite?",
+          "¿Cuál es el aceite más suave o más intenso?",
+          "¿Qué frutos secos y tamaños están disponibles?",
+          "¿Qué tipos de aceitunas tienen?",
+          "¿Qué sabores de mermelada están disponibles?",
+          "¿Qué sales condimentadas tienen?",
+          "¿Cómo conservar cada producto una vez abierto?",
+          "¿Puedo armar una selección para regalo o una picada?",
+          "¿Cómo funcionan los envíos y el retiro?",
+          "¿Qué medios de pago aceptan?",
+          "¿Realizan ventas corporativas o mayoristas?"
+        ],
+        "answer_rule": "Cargar respuestas reales y verificadas desde configuración o CMS."
+      },
+      "design": {
+        "max_width_px": 920,
+        "accordion_style": "Bordes inferiores sutiles, ícono más/menos y apertura suave."
+      }
+    },
+    {
+      "id": "final_cta",
+      "type": "image_cta",
+      "conversion_pillar": "discovery",
+      "content": {
+        "eyebrow": "DESCUBRÍ FLOR MÍA",
+        "heading": "Llevá los sabores de Mendoza a tu mesa.",
+        "primary_cta": {
+          "label": "Explorar productos",
+          "target": "/productos"
+        },
+        "secondary_cta": {
+          "label": "Hablar por WhatsApp",
+          "target": "{{WHATSAPP_URL}}"
+        }
+      },
+      "image": {
+        "placeholder_src": "/images/placeholders/cta-mesa-productos-mendoza.webp",
+        "alt": "Mesa con productos regionales mendocinos Flor Mía",
+        "expected_real_image": "Imagen panorámica con aceite como protagonista y presencia equilibrada de frutos secos, aceitunas, mermeladas y sales.",
+        "aspect_ratio": "21:9",
+        "overlay": "Oscuro 58% con degradado inferior."
+      },
+      "design": {
+        "height_desktop_px": 560,
+        "height_mobile_px": 520,
+        "content_alignment": "center"
+      }
+    },
+    {
+      "id": "footer",
+      "type": "big_type_footer",
+      "conversion_pillar": "trust",
+      "content": {
+        "tagline": "De Mendoza a tu mesa.",
+        "columns": {
+          "Comprar": [
+            "Todos los productos",
+            "Aceites de oliva",
+            "Frutos secos",
+            "Aceitunas",
+            "Mermeladas y sales",
+            "Regalos"
+          ],
+          "Flor Mía": [
+            "Nuestra historia",
+            "El local",
+            "Origen y selección",
+            "Opiniones",
+            "Contacto"
+          ],
+          "Ayuda": [
+            "Envíos y retiros",
+            "Medios de pago",
+            "Cambios",
+            "Preguntas frecuentes"
+          ]
+        },
+        "contact_placeholders": {
+          "whatsapp": "{{WHATSAPP}}",
+          "email": "{{EMAIL}}",
+          "address": "{{ADDRESS}}",
+          "opening_hours": "{{OPENING_HOURS}}"
+        },
+        "legal_links": [
+          "Términos y condiciones",
+          "Privacidad",
+          "Botón de arrepentimiento",
+          "Defensa del consumidor"
+        ],
+        "social_links": [
+          "Instagram"
+        ],
+        "newsletter": {
+          "heading": "Novedades, productos y sabores de Mendoza.",
+          "placeholder": "Tu email",
+          "button": "Suscribirme",
+          "consent_text": "Acepto recibir novedades de Flor Mía."
+        }
+      },
+      "design": {
+        "background": "#090A08",
+        "top_border": "1px solid rgba(244, 240, 230, 0.12)",
+        "oversized_wordmark": "FLOR MÍA",
+        "oversized_wordmark_size": "clamp(88px, 19vw, 280px)",
+        "oversized_wordmark_color": "rgba(244, 240, 230, 0.06)"
+      }
+    }
+  ],
+  "product_card_specification": {
+    "required_states": [
+      "default",
+      "hover",
+      "focus",
+      "loading",
+      "out_of_stock",
+      "added_to_cart",
+      "error"
+    ],
+    "visual_hierarchy": [
+      "Imagen",
+      "Categoría",
+      "Badge opcional",
+      "Nombre",
+      "Descripción corta",
+      "Variedad o sabor si corresponde",
+      "Tamaño o formato",
+      "Precio",
+      "Información de pago",
+      "Botón agregar"
+    ],
+    "interaction_rules": [
+      "Agregar al carrito sin recargar la página.",
+      "Mostrar confirmación visual y anunciarla a lectores de pantalla.",
+      "Permitir cambiar cantidad, tamaño o variante cuando corresponda.",
+      "Mostrar categoría y presentación con claridad.",
+      "No ocultar el precio hasta el checkout.",
+      "No usar urgencia falsa ni contadores inventados.",
+      "Mostrar recomendaciones cruzadas únicamente con productos reales."
+    ]
+  },
+  "cart_and_checkout": {
+    "cart_drawer": {
+      "position": "right",
+      "width_desktop_px": 440,
+      "width_mobile": "100vw",
+      "content": [
+        "Productos de distintas categorías",
+        "Categoría",
+        "Variante, sabor o tamaño",
+        "Cantidad",
+        "Subtotal",
+        "Costo de envío a calcular o estimar",
+        "Beneficio o promoción real",
+        "Sugerencias complementarias discretas",
+        "CTA ir al checkout",
+        "CTA seguir comprando",
+        "Información breve de seguridad y retiro"
+      ],
+      "persistence": "localStorage con manejo seguro de cambios de versión."
+    },
+    "checkout": {
+      "steps": [
+        "Datos y contacto",
+        "Entrega o retiro",
+        "Pago",
+        "Confirmación"
+      ],
+      "requirements": [
+        "Barra de progreso.",
+        "Compra como invitado.",
+        "Autocompletado correcto.",
+        "Validación en línea no agresiva.",
+        "Resumen siempre visible.",
+        "Errores junto al campo.",
+        "No reiniciar el formulario por fallos.",
+        "Consentimiento independiente para comunicaciones comerciales."
+      ]
+    },
+    "recovery_hooks": {
+      "email": "Preparar integración desacoplada para carrito abandonado, solamente con email válido y consentimiento aplicable.",
+      "whatsapp": "Opcional; requerir acción o consentimiento explícito del usuario.",
+      "analytics_events": [
+        "view_item",
+        "search",
+        "select_item",
+        "add_to_cart",
+        "view_cart",
+        "begin_checkout",
+        "add_shipping_info",
+        "add_payment_info",
+        "purchase"
+      ]
+    }
+  },
+  "responsive_rules": {
+    "breakpoints": {
+      "mobile": "0-767px",
+      "tablet": "768-1099px",
+      "desktop": "1100px+",
+      "wide": "1440px+"
+    },
+    "mobile_first_priorities": [
+      "Hero legible sin tapar el producto.",
+      "Botón de carrito siempre accesible.",
+      "Buscador fácil de tocar.",
+      "Carruseles con scroll-snap.",
+      "CTA de compra sticky solo en producto o carrito, no durante toda la home.",
+      "Texto mínimo de 16px en inputs.",
+      "Áreas táctiles mínimas de 44x44px."
+    ],
+    "layout_adjustments": [
+      "Convertir grids de cuatro columnas en carrusel o una columna.",
+      "Evitar títulos de más de cuatro líneas.",
+      "Desactivar parallax pesado.",
+      "No cargar imágenes desktop en mobile.",
+      "Mantener el orden lógico del DOM aunque cambie el layout."
+    ]
+  },
+  "image_placeholders_manifest": [
+    {
+      "path": "/images/placeholders/hero-flor-mia-productos-mendoza.webp",
+      "aspect_ratio": "16:9",
+      "label_inside_placeholder": "HERO: aceite protagonista + selección regional mendocina"
+    },
+    {
+      "path": "/images/placeholders/categoria-aceites-de-oliva.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "CATEGORÍA: botellas reales de aceite Flor Mía"
+    },
+    {
+      "path": "/images/placeholders/categoria-frutos-secos.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "CATEGORÍA: almendras, pistachos y pasas reales"
+    },
+    {
+      "path": "/images/placeholders/categoria-aceitunas.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "CATEGORÍA: aceitunas verdes, negras y griegas"
+    },
+    {
+      "path": "/images/placeholders/categoria-mermeladas.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "CATEGORÍA: frascos reales de mermeladas"
+    },
+    {
+      "path": "/images/placeholders/categoria-sales-condimentadas.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "CATEGORÍA: sales con Malbec, ajo y variedades reales"
+    },
+    {
+      "path": "/images/placeholders/categoria-regalos-mendocinos.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "CATEGORÍA: regalo o combinación real Flor Mía"
+    },
+    {
+      "path": "/images/placeholders/producto-{category}-{slug}.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "PRODUCTO REAL: {category} · {product}"
+    },
+    {
+      "path": "/images/placeholders/destacado-aceites-flor-mia.webp",
+      "aspect_ratio": "16:10",
+      "label_inside_placeholder": "DESTACADO: colección de aceites Flor Mía"
+    },
+    {
+      "path": "/images/placeholders/variedad-{slug}-contexto.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "ACEITE: {variedad} + uso gastronómico"
+    },
+    {
+      "path": "/images/placeholders/editorial-frutos-secos-mendoza.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "EDITORIAL: frutos secos reales"
+    },
+    {
+      "path": "/images/placeholders/editorial-aceitunas-mendoza.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "EDITORIAL: selección real de aceitunas"
+    },
+    {
+      "path": "/images/placeholders/editorial-mermeladas-mendoza.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "EDITORIAL: sabores reales de mermelada"
+    },
+    {
+      "path": "/images/placeholders/editorial-sales-mendoza.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "EDITORIAL: sales condimentadas reales"
+    },
+    {
+      "path": "/images/placeholders/mesa-mendocina-flor-mia.webp",
+      "aspect_ratio": "16:10",
+      "label_inside_placeholder": "OCASIÓN: mesa con combinación de productos Flor Mía"
+    },
+    {
+      "path": "/images/placeholders/local-flor-mia-productos-mendocinos.webp",
+      "aspect_ratio": "4:5",
+      "label_inside_placeholder": "LOCAL REAL: estanterías y productos Flor Mía"
+    },
+    {
+      "path": "/images/placeholders/cliente-resena-{index}.webp",
+      "aspect_ratio": "1:1",
+      "label_inside_placeholder": "RESEÑA REAL: cliente o producto autorizado"
+    },
+    {
+      "path": "/images/placeholders/galeria-flor-mia-{index}.webp",
+      "aspect_ratio": "variable",
+      "label_inside_placeholder": "GALERÍA REAL: local, categoría o uso"
+    },
+    {
+      "path": "/images/placeholders/pack-flor-mia-regionales.webp",
+      "aspect_ratio": "16:10",
+      "label_inside_placeholder": "PACK REAL: combinación disponible de productos"
+    },
+    {
+      "path": "/images/placeholders/cta-mesa-productos-mendoza.webp",
+      "aspect_ratio": "21:9",
+      "label_inside_placeholder": "CTA: mesa regional mendocina con aceite protagonista"
+    }
+  ],
+  "placeholder_visual_style": {
+    "background": "linear-gradient(135deg, #1B1F17, #26311F)",
+    "border": "1px dashed rgba(199, 163, 90, 0.45)",
+    "text_color": "#D9C28C",
+    "text_style": "12px Manrope, uppercase, letter-spacing 0.12em",
+    "icon": "image",
+    "rule": "Los placeholders deben verse intencionales y elegantes durante el desarrollo, pero dejar claro qué fotografía real debe reemplazarlos."
+  },
+  "accessibility": {
+    "contrast": "Cumplir WCAG AA como mínimo.",
+    "keyboard": [
+      "Navegación completa por teclado.",
+      "Focus visible dorado o marfil.",
+      "Escape cierra menú, buscador y carrito.",
+      "Orden de tabulación lógico."
+    ],
+    "screen_reader": [
+      "Alt descriptivo en imágenes.",
+      "Anuncios aria-live al agregar al carrito.",
+      "Labels reales en inputs.",
+      "Botones con nombres accesibles."
+    ],
+    "motion": "Respetar prefers-reduced-motion.",
+    "forms": "No usar placeholders como única etiqueta."
+  },
+  "performance": {
+    "targets": {
+      "lcp_mobile": "< 2.5 s en conexión razonable",
+      "cls": "< 0.1",
+      "inp": "< 200 ms"
+    },
+    "rules": [
+      "Hero con srcset, sizes y preload solo de la variante necesaria.",
+      "WebP o AVIF con fallback.",
+      "Lazy load debajo del primer viewport.",
+      "Reservar dimensiones para evitar saltos.",
+      "No usar videos de fondo por defecto.",
+      "Limitar fuentes a los pesos usados.",
+      "Evitar librerías de carrusel pesadas."
+    ]
+  },
+  "seo_and_metadata": {
+    "title_template": "Flor Mía | Productos Regionales de Mendoza",
+    "meta_description": "Descubrí aceites de oliva, frutos secos, aceitunas, mermeladas, sales y productos regionales seleccionados de Mendoza en Flor Mía.",
+    "structured_data": [
+      "Organization",
+      "LocalBusiness cuando los datos reales estén disponibles",
+      "WebSite con SearchAction",
+      "CollectionPage para categorías",
+      "Product",
+      "BreadcrumbList",
+      "Review solamente para reseñas reales",
+      "FAQPage con respuestas visibles"
+    ],
+    "open_graph_placeholder": "/images/placeholders/og-flor-mia-productos-mendoza.webp"
+  },
+  "content_tone": {
+    "voice": "Cálida, segura, sensorial y sofisticada.",
+    "regional_style": "Español natural de Argentina, con voseo moderado.",
+    "sentence_style": "Frases cortas, claras y elegantes.",
+    "avoid": [
+      "Exceso de adjetivos grandilocuentes.",
+      "Lenguaje técnico sin explicación.",
+      "Promesas de salud no verificadas.",
+      "Clichés de lujo como exclusivo para pocos.",
+      "Urgencia o escasez inventada."
+    ]
+  },
+  "anti_patterns": [
+    "No clonar Kero pixel por pixel.",
+    "No convertir la marca en una estética tecnológica.",
+    "No presentar Flor Mía como una tienda dedicada únicamente al aceite de oliva.",
+    "No quitar protagonismo al aceite dentro de la propuesta regional.",
+    "No usar una paleta completamente verde.",
+    "No saturar la home con todos los productos sin jerarquía.",
+    "No crear una categoría visual distinta e inconexa para cada producto.",
+    "No inventar sabores de mermelada, variedades de sal, productores o procedencias.",
+    "No ocultar envíos, pagos o devoluciones.",
+    "No usar reseñas falsas.",
+    "No insertar sliders automáticos rápidos.",
+    "No usar popups inmediatos al cargar.",
+    "No reproducir audio automáticamente.",
+    "No aplicar animaciones a cada elemento.",
+    "No cargar imágenes de stock definitivas que no representen Flor Mía."
+  ],
+  "acceptance_criteria": [
+    "La página se reconoce como Flor Mía y como tienda premium de productos regionales mendocinos.",
+    "En menos de diez segundos se entiende que el aceite de oliva es el producto estrella, pero que también se venden otras categorías.",
+    "La navegación permite entrar directamente a aceites, frutos secos, aceitunas, mermeladas, sales y regalos.",
+    "El usuario puede buscar por producto, categoría, sabor, intensidad, uso u ocasión.",
+    "La categoría Aceites tiene una experiencia editorial y educativa más profunda con varietales y comparación sensorial.",
+    "Los productos destacados representan distintas categorías cuando existen datos reales.",
+    "La página facilita compras combinadas sin inventar packs o promociones.",
+    "La página muestra espacios definidos para reseñas reales, fotografías del local, clientes e información de compra.",
+    "El carrito conserva categoría, producto, tamaño, variante y cantidad al recargar.",
+    "Todos los placeholders indican claramente la fotografía real necesaria.",
+    "Desktop, tablet y mobile tienen diseños intencionales.",
+    "La interfaz es accesible por teclado y tiene contraste suficiente.",
+    "No se inventan precios, sabores, reseñas, productores, certificaciones, beneficios ni políticas.",
+    "El resultado mantiene un lenguaje visual oscuro, editorial, gastronómico y premium."
+  ],
+  "codex_final_output_request": {
+    "required_deliverables": [
+      "Código completo de la página.",
+      "Componentes reutilizables por categoría y tipo de producto.",
+      "Datos reales o mocks claramente separados del componente visual.",
+      "Taxonomía editable de categorías, productos, tamaños, sabores y varietales.",
+      "Carpeta de placeholders con nombres definidos en este JSON.",
+      "README breve indicando dónde reemplazar imágenes y contenido real.",
+      "Lista de archivos creados y modificados.",
+      "Pruebas manuales realizadas en desktop y mobile."
+    ],
+    "completion_message": "Al finalizar, explicar qué se implementó, qué quedó como placeholder, qué categorías o datos reales faltan, cómo reemplazar cada imagen y cómo agregar productos futuros sin modificar el layout."
+  },
+  "catalog_strategy": {
+    "store_definition": "Tienda premium de productos regionales mendocinos.",
+    "hero_category": {
+      "id": "olive_oil",
+      "name": "Aceites de oliva",
+      "role": "Categoría estrella y principal elemento narrativo de la marca.",
+      "catalog_share_rule": "Debe recibir mayor profundidad editorial y educativa que las demás categorías, pero no debe ocupar toda la página ni hacer creer que Flor Mía vende únicamente aceite."
+    },
+    "categories": [
+      {
+        "id": "olive_oil",
+        "name": "Aceites de oliva",
+        "short_name": "Aceites",
+        "status": "principal",
+        "featured_products_or_groups": [
+          "Arbequina",
+          "Arbosana",
+          "Blend",
+          "Coratina",
+          "Picual",
+          "Arauco",
+          "Presentaciones y tamaños reales disponibles"
+        ],
+        "discovery_facets": [
+          "Variedad",
+          "Intensidad",
+          "Frutado",
+          "Amargor",
+          "Picor",
+          "Uso gastronómico",
+          "Tamaño"
+        ]
+      },
+      {
+        "id": "nuts",
+        "name": "Frutos secos",
+        "short_name": "Frutos secos",
+        "status": "principal",
+        "featured_products_or_groups": [
+          "Almendras naturales",
+          "Almendras tostadas y saladas",
+          "Pistachos con cáscara",
+          "Pistachos pelados",
+          "Pasas de uva",
+          "Otros formatos reales disponibles"
+        ],
+        "discovery_facets": [
+          "Tipo de fruto",
+          "Natural o tostado",
+          "Con sal o sin sal",
+          "Con cáscara o pelado",
+          "Tamaño",
+          "Uso",
+          "Formato"
+        ]
+      },
+      {
+        "id": "olives",
+        "name": "Aceitunas",
+        "short_name": "Aceitunas",
+        "status": "principal",
+        "featured_products_or_groups": [
+          "Aceitunas griegas",
+          "Aceitunas verdes con carozo",
+          "Aceitunas verdes descarozadas",
+          "Aceitunas negras con carozo",
+          "Aceitunas negras descarozadas"
+        ],
+        "discovery_facets": [
+          "Variedad",
+          "Color",
+          "Con carozo o descarozada",
+          "Sabor",
+          "Tamaño",
+          "Uso"
+        ]
+      },
+      {
+        "id": "jams",
+        "name": "Mermeladas",
+        "short_name": "Mermeladas",
+        "status": "principal",
+        "featured_products_or_groups": [
+          "Aproximadamente diez sabores reales",
+          "Sabores clásicos",
+          "Sabores regionales o especiales"
+        ],
+        "data_rule": "No inventar los sabores. Cargarlos desde el catálogo real o mantener tarjetas claramente marcadas como pendientes.",
+        "discovery_facets": [
+          "Sabor",
+          "Dulzor",
+          "Fruta",
+          "Uso",
+          "Tamaño"
+        ]
+      },
+      {
+        "id": "seasoned_salts",
+        "name": "Sales condimentadas",
+        "short_name": "Sales",
+        "status": "complementaria",
+        "featured_products_or_groups": [
+          "Sal condimentada con Malbec",
+          "Sal condimentada con ajo",
+          "Otras variedades reales disponibles"
+        ],
+        "data_rule": "No inventar variedades adicionales.",
+        "discovery_facets": [
+          "Sabor",
+          "Uso",
+          "Intensidad",
+          "Tamaño"
+        ]
+      },
+      {
+        "id": "gifts",
+        "name": "Regalos y combinaciones",
+        "short_name": "Regalos",
+        "status": "estratégica",
+        "featured_products_or_groups": [
+          "Packs reales",
+          "Combinaciones de productos",
+          "Regalos corporativos si están disponibles",
+          "Mesa mendocina o picada sugerida"
+        ],
+        "data_rule": "No publicar packs, descuentos ni precios que no existan realmente."
+      }
+    ],
+    "cross_sell_logic": [
+      "Desde un aceite, sugerir aceitunas, frutos secos, sales o un pack compatible.",
+      "Desde frutos secos, sugerir mermeladas, aceite o productos para regalo.",
+      "Desde aceitunas, sugerir aceite, sales o frutos secos para una picada.",
+      "Desde mermeladas, sugerir frutos secos o packs de desayuno y regalo si son reales.",
+      "Las sugerencias deben basarse en datos configurables y nunca en promociones inventadas."
+    ],
+    "taxonomy_rules": [
+      "La navegación principal debe reflejar categorías y no solamente varietales.",
+      "Los varietales de aceite deben vivir dentro de Aceites y en una sección editorial destacada.",
+      "Las categorías deben soportar futuros productos sin rediseñar la home.",
+      "Usar lenguaje comprensible para el público general.",
+      "No duplicar un producto en múltiples categorías sin una razón comercial explícita."
+    ]
+  }
+}

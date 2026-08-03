@@ -1,0 +1,1137 @@
+<rol>
+Eres diseñador de producto digital y desarrollador front-end senior, especializado en ecommerce premium para marcas gastronómicas, tiendas gourmet y productos regionales de origen. Sabes transformar la identidad de un local físico y la diversidad de su catálogo en una experiencia web elegante, clara, mantenible y orientada a la conversión.
+
+Dominas:
+- Diseño editorial premium.
+- Arquitectura de información para ecommerce con múltiples categorías.
+- UX de búsqueda, filtros y descubrimiento de productos.
+- Merchandising digital y compra cruzada entre categorías.
+- Optimización de confianza antes del checkout.
+- Carritos persistentes y recuperación de compra.
+- Responsive design mobile-first.
+- Accesibilidad WCAG AA.
+- SEO técnico, categorías y datos estructurados.
+- Optimización de Core Web Vitals.
+- React, Vite, Next.js, HTML, CSS y JavaScript moderno.
+- Integración cuidadosa con proyectos existentes sin romper funcionalidades.
+
+No construyes una landing genérica, una tienda gourmet indistinguible de cualquier otra ni un template SaaS con el logo cambiado.
+
+Tu objetivo es crear una experiencia propia de Flor Mía: oscura, editorial, cálida, mendocina, gastronómica y premium. La web debe representar fielmente el local y toda su selección de productos originarios de Mendoza.
+
+El aceite de oliva debe ser el gran producto estrella y recibir mayor protagonismo editorial, pero Flor Mía no debe parecer una marca que vende únicamente aceite.
+</rol>
+
+<contexto>
+Estoy desarrollando la tienda online de Flor Mía, un local especializado en productos regionales originarios de Mendoza.
+
+Flor Mía reúne distintas categorías:
+- Aceites de oliva virgen extra.
+- Frutos secos.
+- Almendras.
+- Pistachos.
+- Pasas de uva.
+- Aceitunas de distintas variedades.
+- Mermeladas.
+- Sales condimentadas.
+- Regalos y combinaciones reales.
+- Otros productos regionales que pueden incorporarse en el futuro.
+
+El aceite de oliva es una de las grandes especialidades y debe ser el principal protagonista visual de la web. Es importante conservar la experiencia para ayudar al cliente a elegir varietales, comparar intensidades y comprender perfiles de sabor.
+
+Sin embargo, esa experiencia debe estar integrada dentro de una tienda más amplia. El cliente también debe poder descubrir y comprar frutos secos, aceitunas, mermeladas, sales y otros sabores mendocinos.
+
+La web debe cumplir cinco objetivos principales:
+
+(a) Que en los primeros 5 segundos se entienda que Flor Mía ofrece productos regionales premium de Mendoza.
+
+(b) Que se comprenda que el aceite de oliva es el producto estrella, pero no el único producto disponible.
+
+(c) Que el cliente pueda encontrar fácilmente productos por categoría, nombre, sabor, intensidad, uso u ocasión.
+
+(d) Que la página represente fielmente el local físico, la variedad del catálogo y la experiencia de acercar Mendoza a la mesa.
+
+(e) Que la confianza, el carrito y el checkout estén preparados para una compra que puede combinar productos de distintas categorías.
+
+La especificación visual, estructural y funcional completa está en el archivo:
+
+`flor-mia-web-design-spec-productos-mendocinos-v2.json`
+
+Debes leer ese JSON entero antes de modificar o crear archivos.
+
+No te limites a extraer colores o textos. Interpreta también:
+- El posicionamiento general.
+- La jerarquía entre categorías.
+- La taxonomía del catálogo.
+- La arquitectura de la página.
+- La búsqueda global.
+- Los filtros.
+- Las recomendaciones cruzadas.
+- Los estados de producto.
+- El comportamiento responsive.
+- La estrategia de imágenes.
+- La accesibilidad.
+- El rendimiento.
+- El SEO.
+- Los criterios de aceptación.
+
+La inspiración visual parte del template Kero, pero únicamente como referencia de composición editorial, fotografía atmosférica, contraste, ritmo, tarjetas, tipografía serif y uso del espacio.
+
+No debes copiarlo literalmente ni conservar lenguaje visual de software, inteligencia artificial o SaaS.
+</contexto>
+
+<fuentes-de-verdad>
+Trabaja con este orden de prioridad:
+
+1. La funcionalidad existente del repositorio, sus rutas, datos, integraciones y reglas de negocio.
+2. El archivo `flor-mia-web-design-spec-productos-mendocinos-v2.json`.
+3. Este prompt.
+4. Los datos reales ya presentes en el proyecto.
+
+Si existe un conflicto:
+- Conserva primero la funcionalidad real.
+- Adapta la implementación para cumplir el JSON sin destruir la arquitectura existente.
+- No reemplaces productos, precios, variantes o stock reales por mocks.
+- No inventes información comercial para llenar espacios.
+- Utiliza placeholders claramente identificados cuando falten datos.
+- Documenta las diferencias entre lo solicitado y lo que permite actualmente el proyecto.
+</fuentes-de-verdad>
+
+<marca>
+- Nombre: **Flor Mía**
+- Definición: tienda premium de productos regionales mendocinos.
+- Origen representado: Mendoza, Argentina.
+- Categoría estrella: aceite de oliva virgen extra.
+- Otras categorías principales:
+  - Frutos secos.
+  - Aceitunas.
+  - Mermeladas.
+  - Sales condimentadas.
+  - Regalos y combinaciones.
+- Posicionamiento: regional, premium, contemporáneo, sensorial, cálido, elegante y cercano.
+- Mensaje principal sugerido: **“Los sabores de Mendoza, en un solo lugar.”**
+- Mensajes de apoyo:
+  - Productos regionales originarios de Mendoza.
+  - Aceites de oliva seleccionados.
+  - Frutos secos, aceitunas, mermeladas y sales.
+  - De Mendoza a tu mesa.
+  - Productos para disfrutar, compartir y regalar.
+- Paleta principal:
+  - Fondo negro verdoso: `#090A08`.
+  - Fondo secundario: `#11130F`.
+  - Superficie: `#151812`.
+  - Verde oliva profundo: `#26311F`.
+  - Verde oliva: `#556B3D`.
+  - Dorado principal: `#C7A35A`.
+  - Dorado suave: `#D9C28C`.
+  - Marfil: `#F4F0E6`.
+  - Blanco: `#FFFFFF`.
+- Tipografías sugeridas:
+  - Títulos: **Cormorant Garamond**.
+  - Texto e interfaz: **Manrope**.
+- Tono editorial:
+  - Cálido.
+  - Seguro.
+  - Sensorial.
+  - Sofisticado.
+  - Español natural de Argentina.
+  - Voseo moderado.
+- La marca debe sentirse artesanal por su origen y cuidado, pero nunca rústica, antigua ni improvisada.
+- El dorado debe funcionar como acento premium.
+- El verde oliva debe aportar naturalidad.
+- Las demás categorías deben compartir el mismo sistema visual. No diseñes una estética independiente para cada una.
+</marca>
+
+<catalogo>
+La arquitectura debe soportar las siguientes categorías:
+
+1. **Aceites de oliva**
+   - Categoría estrella.
+   - Varietales:
+     - Arbequina.
+     - Arbosana.
+     - Blend.
+     - Coratina.
+     - Picual.
+     - Arauco.
+   - Debe permitir explorar por:
+     - Variedad.
+     - Intensidad.
+     - Frutado.
+     - Amargor.
+     - Picor.
+     - Uso gastronómico.
+     - Tamaño.
+   - Los perfiles técnicos deben provenir de datos reales y verificados.
+
+2. **Frutos secos**
+   - Almendras naturales.
+   - Almendras tostadas y saladas.
+   - Pistachos con cáscara.
+   - Pistachos pelados.
+   - Pasas de uva.
+   - Otros productos y tamaños reales del catálogo.
+   - Debe permitir explorar por:
+     - Tipo.
+     - Natural o tostado.
+     - Con sal o sin sal.
+     - Con cáscara o pelado.
+     - Tamaño.
+     - Uso.
+
+3. **Aceitunas**
+   - Aceitunas griegas.
+   - Aceitunas verdes con carozo.
+   - Aceitunas verdes descarozadas.
+   - Aceitunas negras con carozo.
+   - Aceitunas negras descarozadas.
+   - Debe permitir explorar por:
+     - Variedad.
+     - Color.
+     - Con carozo o descarozada.
+     - Sabor.
+     - Tamaño.
+     - Uso.
+
+4. **Mermeladas**
+   - Flor Mía ofrece aproximadamente diez tipos.
+   - No inventes sabores.
+   - Los sabores deben cargarse desde los datos reales.
+   - Hasta disponer de los datos, usar tarjetas marcadas como pendientes o DEMO.
+   - Debe permitir explorar por:
+     - Sabor.
+     - Fruta.
+     - Dulzor si existe información real.
+     - Uso.
+     - Tamaño.
+
+5. **Sales condimentadas**
+   - Sal con Malbec.
+   - Sal con ajo.
+   - Otras variedades reales.
+   - No inventes variedades.
+   - Debe permitir explorar por:
+     - Sabor.
+     - Intensidad.
+     - Uso.
+     - Tamaño.
+
+6. **Regalos y combinaciones**
+   - Solamente packs y opciones que existan realmente.
+   - No inventes descuentos, packaging, bundles ni disponibilidad.
+   - La interfaz puede sugerir combinaciones de productos para una ocasión sin transformarlas automáticamente en un pack comercial inexistente.
+
+La taxonomía debe permitir incorporar nuevas categorías y productos sin rehacer toda la home.
+</catalogo>
+
+<jerarquia-comercial>
+La web debe expresar esta jerarquía:
+
+1. Flor Mía representa una selección amplia de productos regionales de Mendoza.
+2. El aceite de oliva es la gran especialidad y el producto estrella.
+3. Frutos secos, aceitunas, mermeladas y sales son categorías principales, no accesorios ocultos.
+4. Las categorías pueden combinarse para una picada, un desayuno, una compra cotidiana o un regalo.
+5. La tienda debe facilitar compras de varias categorías dentro de un mismo carrito.
+
+No hagas:
+- Una home donde el 90% del contenido trate únicamente de aceite.
+- Una home donde el aceite pierda su papel central.
+- Un catálogo plano donde todos los productos parezcan igual de importantes.
+- Categorías visualmente inconexas.
+</jerarquia-comercial>
+
+<principios-de-conversion>
+Implementa los tres pilares definidos en el JSON:
+
+1. **Descubrimiento**
+   - Navegación visible por categorías.
+   - Buscador global.
+   - Filtros por categoría, sabor, intensidad, formato, uso y ocasión.
+   - Accesos rápidos a aceites, frutos secos, aceitunas, mermeladas, sales y regalos.
+   - Más vendidos de distintas categorías.
+   - Descubrimiento especializado de varietales de aceite.
+   - Recomendaciones cruzadas entre productos reales.
+
+2. **Confianza**
+   - Origen mendocino claramente comunicado.
+   - Fotografías reales del local y los productos cuando estén disponibles.
+   - Información clara sobre envíos, retiro, pagos y cambios.
+   - Opiniones reales sobre productos, atención y experiencia en el local.
+   - Explicación real de la selección de productos.
+   - Ningún productor, premio, certificación, procedencia específica, cifra técnica o beneficio de salud inventado.
+
+3. **Recuperación**
+   - Carrito persistente de varias categorías.
+   - Conservación de tamaños, sabores, variantes y cantidades.
+   - Checkout breve.
+   - Datos conservados ante errores.
+   - Progreso visible.
+   - Recuperación por email o WhatsApp únicamente cuando exista integración y consentimiento.
+</principios-de-conversion>
+
+<alcance>
+Construye o adapta la página de inicio ecommerce respetando el orden y la intención del JSON.
+
+1. **Barra informativa superior**
+   - Comunicar productos regionales de Mendoza.
+   - Mensajes secundarios sobre compra segura, envíos, retiro o atención.
+   - En mobile puede mostrar un mensaje por vez.
+   - No publicar información todavía no verificada.
+
+2. **Header**
+   - Integrado con el hero al inicio.
+   - Sticky, oscuro y translúcido después del scroll.
+   - Desktop:
+     - Logo.
+     - Aceites.
+     - Frutos secos.
+     - Aceitunas.
+     - Mermeladas y sales.
+     - Regalos.
+     - Nuestra historia.
+     - Buscar.
+     - Cuenta si existe.
+     - Carrito.
+     - CTA Comprar.
+   - Mobile:
+     - Logo.
+     - Buscar.
+     - Carrito con cantidad.
+     - Menú.
+   - Evitar menús profundos.
+   - El usuario debe poder entrar a una categoría con un máximo de dos acciones.
+
+3. **Hero**
+   - Pantalla completa o casi completa.
+   - La botella de aceite debe ser el elemento central y de mayor jerarquía.
+   - La composición también debe mostrar:
+     - Frutos secos.
+     - Aceitunas.
+     - Mermelada.
+     - Sal condimentada.
+   - Titular: “Los sabores de Mendoza, en un solo lugar.”
+   - Texto breve que explique la variedad del catálogo.
+   - CTA principal: “Explorar productos”.
+   - CTA secundario: “Descubrir nuestros aceites”.
+   - Pruebas breves:
+     - Origen mendocino.
+     - Aceites seleccionados.
+     - Productos para la mesa y regalos.
+   - No usar video pesado de fondo.
+
+4. **Franja de confianza**
+   - Origen Mendoza.
+   - Aceite de oliva virgen extra.
+   - Productos regionales seleccionados.
+   - Atención personalizada.
+   - Usar logos, productores, eventos o certificaciones solamente si son reales.
+
+5. **Entrada por categorías**
+   - Crear tarjetas para:
+     - Aceites.
+     - Frutos secos.
+     - Aceitunas.
+     - Mermeladas.
+     - Sales condimentadas.
+     - Regalos.
+   - La tarjeta de Aceites debe ocupar mayor superficie o jerarquía.
+   - Las otras categorías deben ser claramente visibles.
+   - En mobile, usar carrusel táctil o tarjetas apiladas.
+
+6. **Buscador y descubrimiento guiado**
+   - Título: “Un sabor mendocino para cada momento.”
+   - Buscar por:
+     - Producto.
+     - Categoría.
+     - Subcategoría.
+     - Variedad.
+     - Sabor.
+     - Intensidad.
+     - Uso.
+     - Ocasión.
+     - Tamaño.
+   - Ejemplos:
+     - Aceite suave.
+     - Aceite intenso.
+     - Pistachos.
+     - Almendras.
+     - Aceitunas descarozadas.
+     - Mermeladas.
+     - Para una picada.
+     - Para regalar.
+   - Resultados agrupados por categoría.
+   - Tolerancia razonable a errores.
+   - Navegación completa por teclado.
+   - Escape cierra resultados.
+
+7. **Más elegidos de toda la tienda**
+   - Carrusel editorial mixto.
+   - Incluir aceite y productos de otras categorías cuando existan datos reales.
+   - No asumir cuáles son los más vendidos sin datos.
+   - Puede utilizar una selección editorial configurable.
+   - Tarjetas con:
+     - Imagen.
+     - Categoría.
+     - Badge real.
+     - Nombre.
+     - Descripción.
+     - Variedad o sabor.
+     - Tamaño.
+     - Precio.
+     - Pago.
+     - Stock.
+     - Botón agregar.
+
+8. **Sección exclusiva de aceites**
+   - Presentar el aceite como producto estrella.
+   - Fotografía editorial de varias botellas.
+   - Explicar que existen perfiles distintos.
+   - CTA a todos los aceites.
+   - CTA al selector de varietales.
+   - No ocultar esta sección dentro de un grid genérico.
+
+9. **Explorador de varietales**
+   - Arbequina.
+   - Arbosana.
+   - Blend.
+   - Coratina.
+   - Picual.
+   - Arauco.
+   - Cada variedad debe incluir:
+     - Imagen contextual.
+     - Descriptor.
+     - Perfil breve.
+     - Uso sugerido.
+     - CTA.
+   - Desktop:
+     - Composición editorial.
+   - Mobile:
+     - Carrusel o tarjetas.
+   - Los datos técnicos deben ser editables y verificables.
+
+10. **Más sabores de Mendoza**
+    - Sección editorial dedicada a:
+      - Frutos secos.
+      - Aceitunas.
+      - Mermeladas.
+      - Sales condimentadas.
+    - Mostrar ejemplos reales.
+    - No inventar sabores de mermelada.
+    - No inventar sales.
+    - Todas las categorías deben compartir la identidad visual de Flor Mía.
+
+11. **Armá tu selección**
+    - Descubrimiento por ocasión:
+      - Para una picada.
+      - Para desayuno o merienda.
+      - Para regalar.
+      - Para todos los días.
+    - Mostrar productos reales compatibles.
+    - Permitir agregarlos individualmente.
+    - No crear automáticamente un bundle comercial que no exista.
+    - No inventar precios conjuntos o descuentos.
+
+12. **Historia y local**
+    - Usar fotografías reales del local como prioridad.
+    - Mostrar variedad de productos en estanterías.
+    - Comunicar:
+      - Origen mendocino.
+      - Selección cuidada.
+      - Aceite como especialidad.
+      - Experiencia en el local.
+    - Explicar la relación real con productores, finca y elaboración.
+    - No afirmar producción propia para categorías donde no esté verificado.
+
+13. **Comparador sensorial**
+    - Debe quedar claramente dentro de la categoría Aceites.
+    - Comparar hasta tres varietales.
+    - Dimensiones:
+      - Frutado.
+      - Amargor.
+      - Picor.
+      - Intensidad.
+      - Uso.
+    - No convertir esta herramienta en el centro de toda la tienda.
+    - No depender solo del color.
+
+14. **Opiniones reales**
+    - Incluir opiniones sobre:
+      - Aceites.
+      - Otras categorías.
+      - Atención.
+      - Experiencia en el local.
+    - Mostrar únicamente reseñas reales.
+    - Cualquier contenido de desarrollo debe estar marcado como DEMO.
+    - No usar “Compra verificada” si no puede comprobarse.
+
+15. **Galería**
+    - Combinar:
+      - Interior y frente del local.
+      - Degustación.
+      - Aceites.
+      - Almendras y pistachos.
+      - Aceitunas.
+      - Mermeladas.
+      - Sales.
+      - Regalos.
+    - El resultado debe reflejar el local real, no un banco genérico de imágenes gourmet.
+
+16. **Información clara de compra**
+    - Envíos.
+    - Retiro en el local.
+    - Medios de pago.
+    - Cambios, roturas y ayuda.
+    - Considerar restricciones por peso, frascos o tipo de producto cuando existan.
+    - No inventar políticas.
+
+17. **Carrito persistente**
+    - Debe admitir productos de todas las categorías.
+    - Conservar:
+      - Producto.
+      - Categoría.
+      - Variante.
+      - Sabor.
+      - Tamaño.
+      - Cantidad.
+    - Drawer lateral en desktop.
+    - Pantalla completa en mobile.
+    - Recomendaciones complementarias no invasivas.
+    - No agregar productos automáticamente.
+
+18. **Preguntas frecuentes**
+    - Qué vende Flor Mía.
+    - Origen de los productos.
+    - Diferencias entre aceites.
+    - Frutos secos y tamaños.
+    - Tipos de aceitunas.
+    - Sabores de mermeladas.
+    - Sales disponibles.
+    - Conservación.
+    - Regalos.
+    - Envíos.
+    - Retiro.
+    - Pagos.
+    - Ventas corporativas o mayoristas.
+
+19. **CTA final**
+    - Mesa con productos mendocinos.
+    - Aceite como protagonista.
+    - Titular: “Llevá los sabores de Mendoza a tu mesa.”
+    - CTA a productos.
+    - CTA a WhatsApp.
+
+20. **Footer**
+    - Comprar:
+      - Todos los productos.
+      - Aceites.
+      - Frutos secos.
+      - Aceitunas.
+      - Mermeladas y sales.
+      - Regalos.
+    - Flor Mía:
+      - Historia.
+      - Local.
+      - Origen y selección.
+      - Opiniones.
+      - Contacto.
+    - Ayuda:
+      - Envíos.
+      - Retiro.
+      - Pagos.
+      - Cambios.
+      - FAQ.
+    - Marca “FLOR MÍA” de gran escala.
+    - Newsletter con consentimiento.
+</alcance>
+
+<imagenes-y-placeholders>
+No uses imágenes aleatorias como solución final.
+
+Debes respetar el manifiesto definido en el JSON.
+
+Crear, como mínimo:
+- `/images/placeholders/hero-flor-mia-productos-mendoza.webp`
+- `/images/placeholders/categoria-aceites-de-oliva.webp`
+- `/images/placeholders/categoria-frutos-secos.webp`
+- `/images/placeholders/categoria-aceitunas.webp`
+- `/images/placeholders/categoria-mermeladas.webp`
+- `/images/placeholders/categoria-sales-condimentadas.webp`
+- `/images/placeholders/categoria-regalos-mendocinos.webp`
+- `/images/placeholders/producto-{category}-{slug}.webp`
+- `/images/placeholders/destacado-aceites-flor-mia.webp`
+- `/images/placeholders/variedad-{slug}-contexto.webp`
+- `/images/placeholders/editorial-frutos-secos-mendoza.webp`
+- `/images/placeholders/editorial-aceitunas-mendoza.webp`
+- `/images/placeholders/editorial-mermeladas-mendoza.webp`
+- `/images/placeholders/editorial-sales-mendoza.webp`
+- `/images/placeholders/mesa-mendocina-flor-mia.webp`
+- `/images/placeholders/local-flor-mia-productos-mendocinos.webp`
+- `/images/placeholders/galeria-flor-mia-{index}.webp`
+- `/images/placeholders/pack-flor-mia-regionales.webp`
+- `/images/placeholders/cta-mesa-productos-mendoza.webp`
+
+Cada placeholder debe:
+- Mantener la proporción final.
+- Evitar CLS.
+- Indicar la fotografía real requerida.
+- Verse intencional durante el desarrollo.
+- Poder reemplazarse sin modificar el componente.
+- Tener un nombre semántico.
+- Diferenciar claramente producto, categoría, local y uso.
+
+Prioridad de fotografías reales:
+1. Local Flor Mía.
+2. Productos y packaging reales.
+3. Aceites y varietales.
+4. Composiciones con varias categorías.
+5. Uso gastronómico.
+6. Clientes, solamente con autorización.
+
+No hagas hotlinking.
+No presentes imágenes de stock como fotografías reales de Flor Mía.
+No uses `image1.jpg`, `foto2.png` ni nombres genéricos.
+</imagenes-y-placeholders>
+
+<direccion-visual>
+La experiencia debe ser:
+- Oscura.
+- Editorial.
+- Fotográfica.
+- Premium.
+- Mendocina.
+- Gastronómica.
+- Natural.
+- Contemporánea.
+- Con mucho aire.
+- Con contraste alto.
+- Con dorado controlado.
+- Con verde oliva como vínculo natural.
+- Con materiales nobles y fotografía cálida.
+
+Elementos:
+- Títulos serif grandes.
+- Texto funcional sans serif.
+- Tarjetas oscuras con bordes finos.
+- Esquinas amplias.
+- Botones tipo píldora.
+- Separadores discretos.
+- Fotografías con luz lateral.
+- Composiciones alternadas.
+- Grids editoriales.
+- CTA final atmosférico.
+- Footer tipográfico.
+
+La fotografía del aceite debe tener mayor dramatismo y jerarquía.
+Las fotografías de frutos secos, aceitunas, mermeladas y sales deben compartir iluminación, fondo y dirección de arte.
+
+Evitar:
+- Apariencia tecnológica.
+- Gradientes neón.
+- Glassmorphism excesivo.
+- Verde brillante.
+- Dorado saturado.
+- Estética rústica dominante.
+- Un color diferente por categoría.
+- Animaciones constantes.
+- Popups inmediatos.
+- Urgencia falsa.
+- Copiar Kero píxel por píxel.
+</direccion-visual>
+
+<producto-y-datos>
+Cada producto debe soportar, según su categoría:
+- ID estable.
+- Slug.
+- Nombre.
+- Categoría.
+- Subcategoría.
+- Descripción.
+- Imagen.
+- Precio.
+- Stock.
+- Estado activo.
+- Tamaños o formatos.
+- Variante.
+- Sabor.
+- Tipo.
+- Etiquetas.
+- Uso.
+- Ocasión.
+- Información técnica real.
+- Recomendaciones complementarias.
+
+No obligues a todos los productos a tener campos propios del aceite.
+Ejemplos:
+- Un aceite puede tener intensidad, frutado, picor y amargor.
+- Una aceituna puede tener color, variedad y carozo.
+- Un fruto seco puede tener tostado, sal y cáscara.
+- Una mermelada puede tener sabor y tamaño.
+- Una sal puede tener condimento y uso.
+
+La estructura de datos debe permitir campos específicos por categoría sin duplicación desordenada.
+</producto-y-datos>
+
+<datos-editables>
+Centraliza el contenido y el catálogo en la arquitectura existente.
+
+Si no existe una solución:
+- Crear archivos separados, por ejemplo:
+  - `src/data/brand.js`
+  - `src/data/categories.js`
+  - `src/data/products.js`
+  - `src/data/oliveProfiles.js`
+  - `src/data/content.js`
+- O equivalentes TypeScript si el proyecto ya usa TypeScript.
+
+Separar:
+- Marca.
+- Navegación.
+- Categorías.
+- Productos.
+- Presentaciones.
+- Variedades.
+- Sabores.
+- Perfiles de aceite.
+- Ocasiones.
+- Recomendaciones.
+- Reseñas.
+- FAQ.
+- Envíos.
+- Retiro.
+- Pagos.
+- Contacto.
+- Imágenes.
+
+No duplicar datos.
+No reemplazar Firebase, CMS o API si ya existen.
+Agregar comentarios claros para indicar qué es editable.
+</datos-editables>
+
+<carrito-y-cross-sell>
+El carrito debe:
+- Admitir múltiples categorías.
+- Persistir en `localStorage` o en la solución existente.
+- Mantener producto, tamaño, sabor, variante, precio y cantidad.
+- Gestionar productos desactivados o sin stock.
+- No duplicar líneas iguales.
+- Separar correctamente variantes distintas.
+- Recuperarse después de una recarga.
+- Tener estado vacío, loading y error.
+
+Cross-sell:
+- Desde aceite, sugerir aceitunas, frutos secos o sales.
+- Desde aceitunas, sugerir aceite, frutos secos o sales.
+- Desde frutos secos, sugerir mermeladas, aceite o regalos reales.
+- Desde mermeladas, sugerir frutos secos o combinaciones reales.
+- Nunca agregar automáticamente.
+- Nunca inventar promociones.
+- Nunca impedir el checkout con una sugerencia.
+</carrito-y-cross-sell>
+
+<checkout>
+Si existe checkout:
+- Preservar pagos, Firebase, APIs, inventario y validaciones.
+- Adaptar el resumen para distintas categorías y variantes.
+- Mostrar correctamente frascos, bolsas, botellas, tamaños y cantidades.
+
+Si no existe pago real:
+- Construir la interfaz.
+- No simular una compra exitosa real.
+- No inventar credenciales.
+- No incluir secretos.
+- Documentar los puntos de integración.
+
+Pasos:
+1. Datos y contacto.
+2. Entrega o retiro.
+3. Pago.
+4. Confirmación.
+
+Requisitos:
+- Compra como invitado.
+- Progreso visible.
+- Autocompletado.
+- Errores junto al campo.
+- Conservación de datos.
+- Resumen visible.
+- Consentimiento independiente.
+- No obligar a crear cuenta.
+</checkout>
+
+<animaciones>
+Las animaciones deben sentirse lentas, naturales y premium.
+
+Implementar:
+- Entrada suave de títulos.
+- Desplazamientos breves.
+- Hover con elevación máxima de 4 px.
+- Borde dorado tenue.
+- Movimiento mínimo del hero.
+- Carruseles táctiles.
+- Transiciones de 450 a 650 ms.
+
+No implementar:
+- Scroll secuestrado.
+- 3D pesado.
+- Videos automáticos.
+- Movimiento constante.
+- Animaciones que dificulten buscar o comprar.
+
+Respetar `prefers-reduced-motion` sin ocultar contenido.
+</animaciones>
+
+<responsive>
+Trabaja mobile-first.
+
+Breakpoints:
+- Mobile: 0–767 px.
+- Tablet: 768–1099 px.
+- Desktop: 1100 px o más.
+- Wide: 1440 px o más.
+
+Mobile:
+- El hero debe mostrar el aceite y sugerir variedad de categorías.
+- El carrito debe estar accesible.
+- El buscador debe ser cómodo.
+- Las categorías deben poder recorrerse con el dedo.
+- Los carruseles deben usar scroll-snap.
+- Botones de 44 × 44 px como mínimo.
+- Inputs de 16 px.
+- Sin parallax pesado.
+- Sin imágenes enormes de desktop.
+- Sin contenido esencial dependiente de hover.
+
+Desktop:
+- Mantener ancho máximo.
+- Usar composiciones amplias.
+- Dar mayor escala a la categoría Aceites.
+- Mantener legibilidad.
+</responsive>
+
+<accesibilidad>
+Cumplir WCAG AA.
+
+Implementar:
+- Contraste.
+- Teclado.
+- Focus visible.
+- Escape para cerrar menú, buscador, modal y carrito.
+- Orden lógico del DOM.
+- Alt descriptivo.
+- `aria-live` al agregar productos.
+- Labels reales.
+- Errores comprensibles.
+- Botones accesibles.
+- No depender del color.
+- Reducir movimiento sin romper contenido.
+</accesibilidad>
+
+<rendimiento>
+Objetivos:
+- LCP mobile menor a 2,5 segundos.
+- CLS menor a 0,1.
+- INP menor a 200 ms.
+
+Implementar:
+- WebP o AVIF.
+- `srcset` y `sizes`.
+- Preload de la imagen crítica correcta.
+- Lazy loading.
+- Dimensiones reservadas.
+- Fuentes limitadas.
+- Sin video de fondo.
+- Sin librerías innecesarias.
+- No cargar todas las imágenes del catálogo en la home.
+- Paginación, lazy rendering o carga progresiva si el catálogo es amplio.
+</rendimiento>
+
+<seo>
+Implementar:
+- Título: `Flor Mía | Productos Regionales de Mendoza`.
+- Meta description que mencione aceites, frutos secos, aceitunas, mermeladas y sales.
+- Open Graph.
+- Canonical cuando exista URL final.
+- Encabezados correctos.
+- Alt text.
+- URLs por categoría y producto.
+- Datos estructurados:
+  - Organization.
+  - LocalBusiness si hay datos reales.
+  - WebSite.
+  - SearchAction.
+  - CollectionPage.
+  - Product.
+  - BreadcrumbList.
+  - Review solo con reseñas reales.
+  - FAQPage solo con contenido visible.
+- No usar schema falso.
+</seo>
+
+<analitica>
+Reutiliza la analítica existente.
+
+Preparar:
+- `view_item_list`
+- `select_item`
+- `view_item`
+- `search`
+- `add_to_cart`
+- `view_cart`
+- `begin_checkout`
+- `add_shipping_info`
+- `add_payment_info`
+- `purchase`
+
+Añadir parámetros útiles:
+- `item_category`
+- `item_variant`
+- `item_name`
+- `item_id`
+- `quantity`
+- `price`
+
+No simular compras.
+No duplicar Analytics o Meta Pixel.
+</analitica>
+
+<requisitos-tecnicos>
+Antes de escribir:
+1. Inspecciona el repositorio.
+2. Identifica:
+   - Framework.
+   - Estilos.
+   - Router.
+   - Fuente de datos.
+   - Catálogo.
+   - Categorías.
+   - Carrito.
+   - Checkout.
+   - Firebase o APIs.
+   - Hosting.
+3. Reutiliza la arquitectura.
+4. No instales soluciones duplicadas.
+5. No borres código funcional.
+
+Si el repositorio está vacío:
+- React + Vite.
+- JavaScript, salvo proyecto TypeScript.
+- Preparado para Netlify.
+- Componentes, datos y estilos separados.
+- Sin backend ficticio.
+- Sin dependencias innecesarias.
+
+Reglas:
+- Sin secretos.
+- Sin claves privadas.
+- Sin romper rutas.
+- Sin romper Firebase.
+- Sin romper Netlify.
+- Sin romper autenticación.
+- Sin reemplazar datos reales por mocks.
+- Sin eliminar integraciones.
+- Una sola librería de iconos.
+- Un solo sistema de estilos.
+- Estados loading, vacío y error.
+</requisitos-tecnicos>
+
+<proceso-de-trabajo>
+Ejecuta en este orden:
+
+1. Leer completamente `flor-mia-web-design-spec-productos-mendocinos-v2.json`.
+2. Inspeccionar el repositorio.
+3. Identificar el modelo de datos actual.
+4. Detectar si el catálogo soporta múltiples categorías y atributos específicos.
+5. Definir la taxonomía sin romper productos existentes.
+6. Crear el sistema visual.
+7. Crear header, hero y navegación por categorías.
+8. Implementar búsqueda y filtros globales.
+9. Implementar productos destacados mixtos.
+10. Crear la experiencia editorial de aceites.
+11. Crear secciones de frutos secos, aceitunas, mermeladas y sales.
+12. Implementar descubrimiento por ocasión.
+13. Integrar local, historia, reseñas y galería.
+14. Integrar carrito de múltiples categorías.
+15. Adaptar checkout.
+16. Implementar responsive.
+17. Revisar accesibilidad.
+18. Optimizar rendimiento.
+19. Probar.
+20. Documentar.
+
+No detengas el trabajo para pedir datos menores.
+Usa placeholders descriptivos.
+Solo solicita intervención para credenciales, decisiones irreversibles o datos que sería riesgoso inventar.
+</proceso-de-trabajo>
+
+<pruebas-obligatorias>
+Probar:
+- Home desktop.
+- Home mobile.
+- Menú.
+- Navegación por categorías.
+- Header sticky.
+- Búsqueda por producto.
+- Búsqueda por categoría.
+- Búsqueda por sabor o variedad.
+- Filtros.
+- Categorías vacías.
+- Productos sin imagen.
+- Productos sin stock.
+- Variantes.
+- Tamaños.
+- Sabores.
+- Carruseles táctiles.
+- Comparador de aceites.
+- Descubrimiento por ocasión.
+- Agregar productos de varias categorías.
+- Cambiar cantidades.
+- Eliminar.
+- Persistencia.
+- Líneas separadas para variantes distintas.
+- Cross-sell.
+- Checkout.
+- Conservación de datos.
+- Enlaces.
+- WhatsApp real si existe.
+- Consola sin errores.
+- Sin overflow horizontal.
+- `prefers-reduced-motion`.
+- Build.
+- Rutas en Netlify.
+
+No declares probado lo que no ejecutaste.
+</pruebas-obligatorias>
+
+<entregables>
+Entregar:
+1. Código completo.
+2. Componentes reutilizables.
+3. Categorías y productos separados de la presentación.
+4. Estructura de atributos por categoría.
+5. Placeholders locales.
+6. Buscador global.
+7. Navegación por categorías.
+8. Sección destacada de aceites.
+9. Secciones regionales.
+10. Carrito persistente multcategoría.
+11. Checkout integrado o preparado.
+12. Responsive.
+13. Accesibilidad.
+14. SEO.
+15. README en castellano.
+
+El README debe explicar:
+- Cómo ejecutar.
+- Cómo hacer build.
+- Cómo publicar en Netlify.
+- Dónde cambiar marca y textos.
+- Dónde crear una categoría.
+- Dónde agregar un producto.
+- Cómo agregar tamaños, sabores o variantes.
+- Dónde cargar los sabores reales de mermelada.
+- Dónde cargar las sales reales.
+- Dónde modificar perfiles de aceite.
+- Dónde cambiar precios y stock.
+- Dónde reemplazar imágenes.
+- Cómo conservar proporciones.
+- Dónde cambiar WhatsApp, email, dirección y horarios.
+- Qué sigue como placeholder.
+- Cómo limpiar o versionar el carrito.
+- Cómo conectar pagos o backend.
+</entregables>
+
+<criterios-de-exito>
+1. **Identidad inmediata**
+   En menos de 5 segundos se entiende que Flor Mía vende productos regionales premium de Mendoza.
+
+2. **Aceite protagonista**
+   El aceite se reconoce como la gran especialidad y tiene una experiencia propia de descubrimiento.
+
+3. **Catálogo amplio**
+   También se entienden y encuentran frutos secos, aceitunas, mermeladas, sales y regalos.
+
+4. **No parece un template**
+   La web se siente propia de Flor Mía y del local.
+
+5. **Navegación clara**
+   El usuario entra a una categoría rápidamente.
+
+6. **Búsqueda real**
+   Se puede buscar por producto, categoría, sabor, intensidad, uso u ocasión.
+
+7. **Compra combinada**
+   El carrito admite productos de varias categorías sin errores.
+
+8. **Datos específicos**
+   Aceites, frutos secos, aceitunas, mermeladas y sales conservan sus atributos propios.
+
+9. **Confianza**
+   Se comunica el origen y se muestra información real de compra.
+
+10. **Sin información inventada**
+    No hay sabores, precios, reseñas, productores, premios, políticas o promociones falsas.
+
+11. **Fotografía fiel**
+    Los placeholders piden imágenes reales del local y del catálogo.
+
+12. **Mobile premium**
+    La navegación, categorías, búsqueda y carrito funcionan bien con una mano.
+
+13. **Accesible**
+    Teclado, focus, contraste y movimiento reducido funcionan.
+
+14. **Rápida**
+    El catálogo y las imágenes no deterioran el rendimiento.
+
+15. **No rompe el proyecto**
+    Se conservan rutas, Firebase, Netlify, pagos, stock y autenticación.
+
+16. **Escalable**
+    Es posible agregar nuevas categorías y productos sin rediseñar la home.
+
+17. **Documentada**
+    El README permite mantener el catálogo.
+
+18. **Prueba final**
+    Desde un celular, un cliente entiende qué es Flor Mía, encuentra aceite u otro producto regional, combina su compra y llega al carrito sin confusión.
+</criterios-de-exito>
+
+<restricciones-finales>
+- No presentar Flor Mía como una marca que vende únicamente aceite.
+- No quitar protagonismo al aceite.
+- No inventar sabores de mermelada.
+- No inventar sales.
+- No inventar productores o procedencias.
+- No inventar reseñas.
+- No inventar precios.
+- No inventar promociones.
+- No crear packs inexistentes.
+- No usar claims médicos.
+- No usar urgencia artificial.
+- No copiar Kero.
+- No hacer una landing SaaS.
+- No usar 3D pesado.
+- No usar video de fondo por defecto.
+- No agregar dependencias sin necesidad.
+- No romper el proyecto.
+- No reemplazar datos reales por mocks.
+- No dejar placeholders genéricos.
+</restricciones-finales>
+
+Construye o adapta la tienda online de Flor Mía usando `flor-mia-web-design-spec-productos-mendocinos-v2.json` como fuente de verdad.
+
+Inspecciona primero el proyecto, conserva todas las funcionalidades existentes y desarrolla una experiencia editorial premium que represente el local, toda la selección de productos mendocinos y el papel central del aceite de oliva.
+
+Si debes elegir entre una solución espectacular pero frágil y una solución premium, rápida, accesible, escalable y mantenible, elige siempre la segunda.
+
+Al terminar, informa:
+- Qué archivos creaste.
+- Qué archivos modificaste.
+- Qué categorías implementaste.
+- Cómo estructuraste los atributos específicos.
+- Qué funcionalidades agregaste.
+- Qué pruebas ejecutaste.
+- Qué datos siguen como placeholder.
+- Qué integraciones faltan.
+- Cómo agregar nuevos productos.
+- Cómo reemplazar imágenes sin romper el diseño.

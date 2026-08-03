@@ -1,0 +1,17 @@
+{
+  "indexes": [
+    {"collectionGroup":"sales","queryScope":"COLLECTION","fields":[{"fieldPath":"locationId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"sales","queryScope":"COLLECTION","fields":[{"fieldPath":"sellerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"sales","queryScope":"COLLECTION","fields":[{"fieldPath":"locationId","order":"ASCENDING"},{"fieldPath":"sellerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"sales","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"orders","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"shipments","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"scheduledAt","order":"ASCENDING"}]},
+    {"collectionGroup":"alerts","queryScope":"COLLECTION","fields":[{"fieldPath":"responsibleId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"dueAt","order":"ASCENDING"}]},
+    {"collectionGroup":"customers","queryScope":"COLLECTION","fields":[{"fieldPath":"segment","order":"ASCENDING"},{"fieldPath":"lastPurchaseAt","order":"DESCENDING"}]},
+    {"collectionGroup":"stockTransfers","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
+    {"collectionGroup":"purchases","queryScope":"COLLECTION","fields":[{"fieldPath":"supplierId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"campaigns","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"startAt","order":"DESCENDING"}]},
+    {"collectionGroup":"financialEntries","queryScope":"COLLECTION","fields":[{"fieldPath":"type","order":"ASCENDING"},{"fieldPath":"occurredAt","order":"DESCENDING"}]}
+  ],
+  "fieldOverrides": []
+}

@@ -1,0 +1,1794 @@
+<rol>
+Actúa como arquitecto de software, analista funcional, diseñador UX/UI y desarrollador full-stack senior especializado en aplicaciones web empresariales modulares.
+
+Debes trabajar como líder técnico de un proyecto real, no como generador de una demostración visual.
+
+Tus responsabilidades incluyen:
+
+* Analizar aplicaciones existentes.
+* Diseñar una arquitectura modular y escalable.
+* Integrar código existente sin romper funcionalidades comprobadas.
+* Diseñar una experiencia sencilla e intuitiva.
+* Implementar autenticación, roles y permisos.
+* Diseñar correctamente Firestore y sus reglas de seguridad.
+* Optimizar lecturas y escrituras para comenzar utilizando Firebase Spark.
+* Preparar despliegue automático con GitHub y Netlify.
+* Documentar el sistema para que pueda seguir ampliándose.
+* Priorizar seguridad, integridad de datos, trazabilidad y facilidad de uso.
+
+No debes limitarte a entregar una maqueta ni pantallas estáticas. Debes construir una aplicación funcional, conectada y preparada para crecer.
+</rol>
+
+<objetivo-general>
+Construir una aplicación web integral para administrar Flor Mía desde una única plataforma.
+
+La aplicación debe reunir 12 módulos de negocio dentro de un mismo sistema:
+
+1. Ubicaciones.
+2. Ventas rápidas.
+3. Clientes fidelizados.
+4. Métricas generales.
+5. Administración financiera.
+6. Depósito.
+7. Página web y ecommerce.
+8. Redes sociales.
+9. Marketing.
+10. Gestión de envíos.
+11. Alertas.
+12. Gestión de proveedores.
+
+Además, debe existir una capa transversal para:
+
+* Autenticación.
+* Administración general.
+* Usuarios.
+* Roles.
+* Permisos.
+* Auditoría.
+* Notificaciones.
+* Configuración.
+* Datos compartidos entre módulos.
+
+Cada persona debe ver únicamente los módulos, ubicaciones, datos y acciones que el administrador le haya autorizado.
+</objetivo-general>
+
+<contexto-del-negocio>
+Flor Mía es un negocio que comercializa productos regionales mendocinos, principalmente:
+
+* Aceite de oliva.
+* Frutos secos.
+* Pistachos.
+* Almendras.
+* Aceitunas.
+* Mermeladas.
+* Sales.
+* Vinos.
+* Otros productos regionales.
+
+El negocio vende mediante diferentes canales:
+
+* Locales físicos.
+* Ferias.
+* Eventos.
+* WhatsApp.
+* Instagram.
+* Página web.
+* Ventas directas o manuales.
+* Futuras suscripciones o ventas recurrentes.
+
+El sistema debe registrar y relacionar la mayor cantidad posible de operaciones del negocio, evitando datos duplicados y permitiendo analizar toda la información desde una sola aplicación.
+
+Debe poder utilizarse desde Google Chrome en:
+
+* Computadoras.
+* Tablets.
+* Celulares Android.
+* iPhone.
+
+La interfaz debe ser especialmente rápida y sencilla para vendedores que trabajan desde un celular o con una botonera Bluetooth.
+</contexto-del-negocio>
+
+<repositorios-existentes>
+Antes de escribir código, inspecciona completamente estos dos repositorios:
+
+### Sistema existente de stock y ventas
+
+Repositorio:
+
+https://github.com/AgustinBazanUB/FM-stock-y-ventas
+
+Este proyecto debe utilizarse como fuente funcional principal para el módulo de Ubicaciones.
+
+Actualmente contiene funcionalidades valiosas que deben conservarse o migrarse correctamente:
+
+* Firebase Authentication.
+* Firestore.
+* Administradores.
+* Vendedores.
+* Roles combinados.
+* Ubicaciones.
+* Locales y ferias.
+* Fechas de actividad.
+* Asignación de vendedores.
+* Productos.
+* Categorías.
+* Stock por ubicación.
+* Stock inicial.
+* Ingreso de mercadería.
+* Alertas amarillas y rojas.
+* Registro de ventas.
+* Descuentos múltiples.
+* Pagos simples y múltiples.
+* Crédito.
+* Débito.
+* Transferencia o alias.
+* Efectivo.
+* Botonera Bluetooth.
+* Atajos de teclado.
+* Ventas por vendedor.
+* Ventas por ubicación.
+* Edición y anulación de ventas.
+* Devolución automática del stock al anular.
+* Métricas.
+* Exportación CSV.
+* Bajas lógicas.
+* Historial.
+* PWA.
+* Diseño responsive.
+* Despliegue en Netlify.
+
+No reescribas arbitrariamente esta lógica desde cero.
+
+Primero identifica:
+
+* Qué partes pueden reutilizarse directamente.
+* Qué servicios deben extraerse.
+* Qué componentes deben migrarse.
+* Qué datos ya existen en Firestore.
+* Qué reglas e índices ya están configurados.
+* Qué funciones tienen dependencias con la interfaz actual.
+* Qué partes necesitan refactorización para incorporarse al sistema general.
+
+### Página web y ecommerce existente
+
+Repositorio:
+
+https://github.com/AgustinBazanUB/flor-mia-web-fiel-v3
+
+Este proyecto debe utilizarse como fuente visual y funcional principal para:
+
+* Página pública.
+* Catálogo.
+* Carrito.
+* Checkout.
+* Diseño responsive.
+* Identidad visual.
+* Datos comerciales.
+* Imágenes de productos.
+* Contenido editorial.
+* Navegación mobile.
+* Despliegue en Netlify.
+
+El proyecto está construido con React y Vite.
+
+No reemplaces su diseño por un template genérico.
+
+Debes conservar:
+
+* Identidad visual.
+* Paleta.
+* Tipografías.
+* Composición editorial.
+* Imágenes reales.
+* Diseño responsive.
+* Catálogo existente.
+* Carrito.
+* Navegación.
+* Estructura de datos comerciales que resulte reutilizable.
+
+Actualmente el checkout es una interfaz preparada, pero todavía no procesa pedidos, pagos ni stock real. Debes integrarlo progresivamente con el sistema central.
+
+### Estrategia de integración
+
+No mezcles ambos repositorios directamente sobre sus ramas principales.
+
+La estrategia preferida es:
+
+1. Mantener intactos los dos sistemas actuales hasta validar la migración.
+2. Crear un repositorio nuevo para la plataforma integral o una rama de integración claramente separada.
+3. Utilizar la web React/Vite como base tecnológica visual.
+4. Migrar al nuevo sistema la lógica comprobada de stock, ubicaciones y ventas.
+5. Extraer la comunicación con Firestore a una capa de servicios independiente de la interfaz.
+6. Evitar duplicar usuarios, productos, ventas, stock o configuraciones.
+7. Preparar una migración segura de los datos existentes.
+8. Validar cada módulo antes de retirar los sistemas anteriores.
+
+No utilices iframes para simular una integración.
+
+La integración debe ser real a nivel de:
+
+* Autenticación.
+* Datos.
+* Navegación.
+* Permisos.
+* Operaciones.
+* Métricas.
+
+<arquitectura-preferida>
+Construye una única aplicación web con dos superficies claramente diferenciadas:
+
+### Superficie pública
+
+Ruta sugerida:
+
+/
+
+Debe contener:
+
+* Página web pública.
+* Catálogo.
+* Productos.
+* Promociones.
+* Carrito.
+* Checkout.
+* Información del negocio.
+* Seguimiento futuro de pedidos.
+
+### Superficie privada
+
+Ruta sugerida:
+
+/gestion
+
+Debe requerir autenticación y contener:
+
+* Panel general.
+* Los 12 módulos.
+* Usuarios.
+* Roles.
+* Permisos.
+* Configuración.
+* Auditoría.
+* Alertas.
+* Acciones rápidas.
+
+La solución debe poder desplegarse desde un único repositorio conectado a Netlify.
+
+Arquitectura sugerida:
+
+src/
+app/
+auth/
+components/
+layouts/
+modules/
+locations/
+quick-sales/
+loyal-customers/
+metrics/
+finance/
+warehouse/
+ecommerce/
+social/
+marketing/
+shipping/
+alerts/
+suppliers/
+services/
+firebase/
+auth/
+permissions/
+products/
+sales/
+stock/
+customers/
+orders/
+invoices/
+shipments/
+metrics/
+data/
+hooks/
+utils/
+styles/
+
+Esta estructura es orientativa. Ajusta los nombres si el análisis del código existente demuestra una alternativa mejor, pero conserva la separación modular.
+</arquitectura-preferida>
+
+<administracion-usuarios-y-permisos>
+La administración de usuarios y permisos es una capa transversal de toda la aplicación.
+
+### Administrador general
+
+Debe poder:
+
+* Acceder a todos los módulos.
+* Crear usuarios.
+* Editar usuarios.
+* Desactivar usuarios.
+* Crear roles.
+* Asignar roles.
+* Asignar módulos.
+* Asignar ubicaciones.
+* Asignar permisos específicos.
+* Ver actividad de los usuarios.
+* Ver registros de auditoría.
+* Configurar reglas generales.
+* Aprobar operaciones sensibles.
+
+### Permisos por módulo
+
+Cada usuario puede recibir permisos diferentes en cada módulo:
+
+* Ver.
+* Crear.
+* Editar.
+* Eliminar mediante baja lógica.
+* Restaurar.
+* Exportar.
+* Aprobar.
+* Administrar.
+* Ver datos financieros.
+* Ver datos sensibles.
+* Ver todas las ubicaciones.
+* Ver solamente ubicaciones asignadas.
+
+### Roles iniciales sugeridos
+
+* Administrador general.
+* Administrador operativo.
+* Encargado de ubicación.
+* Vendedor.
+* Responsable de depósito.
+* Responsable de marketing.
+* Responsable de redes sociales.
+* Responsable de ecommerce.
+* Responsable de envíos.
+* Responsable de proveedores.
+* Responsable financiero.
+* Analista de métricas.
+
+Los roles deben ser configurables.
+
+El administrador debe poder:
+
+* Utilizar una plantilla de rol.
+* Personalizar sus permisos.
+* Agregar excepciones por usuario.
+* Limitar el acceso a ubicaciones concretas.
+
+### Navegación según permisos
+
+El menú debe mostrar únicamente:
+
+* Módulos permitidos.
+* Secciones permitidas.
+* Acciones autorizadas.
+
+No alcanza con ocultar botones en la interfaz.
+
+Las reglas de Firestore también deben impedir accesos o escrituras no autorizadas.
+</administracion-usuarios-y-permisos>
+
+<experiencia-de-usuario>
+La aplicación debe ser muy intuitiva.
+
+### Panel inicial
+
+Cada usuario debe entrar a un panel adaptado a su trabajo.
+
+Ejemplos:
+
+Un vendedor debe ver:
+
+* Ubicación activa.
+* Nueva venta.
+* Ventas de hoy.
+* Stock restante.
+* Alertas importantes.
+
+Un responsable de envíos debe ver:
+
+* Envíos pendientes.
+* Envíos para preparar.
+* Envíos atrasados.
+* Entregas del día.
+
+Un responsable de marketing debe ver:
+
+* Campañas activas.
+* Publicaciones pendientes.
+* Calendario.
+* Resultados recientes.
+
+Un administrador debe ver:
+
+* Resumen general.
+* Ventas.
+* Stock.
+* Envíos.
+* Alertas.
+* Finanzas.
+* Clientes.
+* Acciones rápidas.
+* Actividad reciente.
+
+### Principios de diseño
+
+* Mobile first.
+* Pocas acciones por pantalla.
+* Lenguaje claro.
+* Botones grandes.
+* Formularios cortos.
+* Confirmaciones claras.
+* Navegación consistente.
+* Búsqueda global.
+* Filtros simples.
+* Estados vacíos explicativos.
+* Indicadores de guardado.
+* Indicadores de conexión.
+* Mensajes de error comprensibles.
+* Accesibilidad mediante teclado.
+* Buen contraste.
+* Sin información innecesaria para el rol conectado.
+
+### Acciones rápidas globales
+
+Incluir un botón o menú de acciones rápidas para:
+
+* Nueva venta rápida.
+* Nueva factura manual.
+* Nuevo envío.
+* Ingreso de mercadería.
+* Transferencia de stock.
+* Nuevo cliente.
+* Nueva compra a proveedor.
+* Nuevo gasto.
+
+<modulo-01-ubicaciones>
+Este módulo debe reutilizar e integrar el sistema existente de stock y ventas.
+
+Una ubicación puede representar:
+
+* Local.
+* Feria.
+* Evento.
+* Depósito con venta.
+* Punto de venta temporal.
+* Otro canal físico configurable.
+
+### Panel administrador de ubicaciones
+
+El administrador debe poder:
+
+* Crear una ubicación.
+* Editarla.
+* Activarla.
+* Pausarla.
+* Cerrar temporalmente.
+* Definir fecha inicial.
+* Definir fecha final.
+* Definir horarios.
+* Asignar vendedores.
+* Asignar encargados.
+* Cargar stock.
+* Transferir stock.
+* Configurar alertas.
+* Configurar métodos de pago.
+* Configurar si se solicita DNI.
+* Ver ventas.
+* Ver stock.
+* Ver caja.
+* Ver métricas.
+* Cerrar una jornada.
+* Realizar una baja lógica.
+
+### Configuración de DNI por ubicación
+
+Cada ubicación debe permitir elegir:
+
+* DNI desactivado.
+* DNI opcional.
+* DNI recomendado.
+* DNI obligatorio.
+
+Ejemplos:
+
+* Local físico: DNI recomendado u obligatorio.
+* Feria con mucha concurrencia: DNI desactivado u opcional.
+
+El DNI debe solicitarse al finalizar la venta para no frenar el ingreso de productos al carrito.
+
+### Panel del vendedor
+
+El vendedor debe poder:
+
+* Ver solamente ubicaciones asignadas.
+* Seleccionar una ubicación activa.
+* Registrar ventas.
+* Utilizar la botonera Bluetooth.
+* Aplicar descuentos autorizados.
+* Registrar uno o varios métodos de pago.
+* Ver stock disponible.
+* Ver ventas propias.
+* Editar ventas dentro de las reglas permitidas.
+* Anular ventas si tiene permiso.
+* Registrar DNI si la ubicación lo permite.
+* Ver alertas operativas.
+
+### Venta física
+
+Al confirmar una venta:
+
+* Validar productos.
+* Validar stock.
+* Descontar stock mediante transacción.
+* Registrar vendedor.
+* Registrar ubicación.
+* Registrar fecha y hora.
+* Registrar pagos.
+* Registrar descuentos.
+* Registrar cliente cuando corresponda.
+* Crear movimientos de stock.
+* Crear registro financiero.
+* Actualizar métricas.
+* Registrar auditoría.
+* Preparar una solicitud de facturación si corresponde.
+
+La operación debe ser atómica siempre que Firestore lo permita.
+</modulo-01-ubicaciones>
+
+<modulo-02-ventas-rapidas>
+Este módulo debe permitir cargar operaciones externas o excepcionales sin entrar al flujo completo de una ubicación.
+
+Casos habituales:
+
+* Venta por WhatsApp.
+* Venta por Instagram.
+* Venta telefónica.
+* Venta a un conocido.
+* Pedido recibido personalmente.
+* Venta manual desde un local.
+* Corrección autorizada.
+* Venta que no nació en el ecommerce.
+
+### Flujo principal
+
+1. Elegir ubicación desde la que sale el stock.
+2. Elegir o crear cliente.
+3. Agregar productos.
+4. Definir cantidades.
+5. Aplicar descuento autorizado.
+6. Elegir uno o varios medios de pago.
+7. Elegir canal de origen.
+8. Elegir si requiere envío o retiro.
+9. Elegir si requiere factura.
+10. Confirmar.
+
+### Acciones posteriores
+
+Al confirmar:
+
+* Registrar venta.
+* Descontar stock.
+* Actualizar historial del cliente.
+* Crear movimiento financiero.
+* Crear envío si corresponde.
+* Crear solicitud o borrador de factura.
+* Actualizar métricas.
+* Registrar auditoría.
+
+### Facturación manual rápida
+
+Dentro de este módulo debe existir una acción:
+
+“Venta rápida + factura”
+
+También debe poder utilizarse:
+
+* Factura para venta ya registrada.
+* Factura manual con selección de venta.
+* Registro de comprobante emitido fuera del sistema.
+
+Estados sugeridos:
+
+* No solicitada.
+* Pendiente.
+* Borrador.
+* Emitida.
+* Entregada.
+* Anulada.
+* Error.
+
+Datos posibles:
+
+* Tipo de comprobante.
+* Punto de venta.
+* Número.
+* Fecha.
+* Cliente.
+* Condición fiscal.
+* Importe neto.
+* IVA.
+* Total.
+* CAE.
+* Vencimiento del CAE.
+* Archivo o enlace.
+* Usuario que la emitió.
+
+No implementes una integración fiscal real desde el navegador sin un backend seguro.
+
+Prepara una interfaz de integración para incorporar ARCA o un proveedor fiscal posteriormente. Las credenciales fiscales y claves privadas nunca deben quedar en React, GitHub ni Firestore público.
+</modulo-02-ventas-rapidas>
+
+<modulo-03-clientes-fidelizados>
+Este módulo debe crear una base de conocimiento sobre clientes recurrentes.
+
+Los clientes pueden ingresar desde:
+
+* DNI cargado por un vendedor.
+* Página web.
+* Venta rápida.
+* WhatsApp.
+* Instagram.
+* Carga administrativa.
+* Importación futura.
+
+### Registro progresivo
+
+Primera etapa:
+
+* DNI.
+* Historial de compras.
+
+Cuando el cliente vuelve a comprar:
+
+* Nombre.
+* Apellido.
+* Teléfono.
+* WhatsApp.
+* Email.
+* Dirección.
+* Localidad.
+* Preferencias.
+* Observaciones.
+
+No obligar a cargar todos los datos en la primera venta.
+
+### Perfil de cliente
+
+Mostrar:
+
+* Datos personales autorizados.
+* Historial de compras.
+* Productos comprados.
+* Categorías preferidas.
+* Monto acumulado.
+* Ticket promedio.
+* Última compra.
+* Frecuencia de compra.
+* Ubicaciones donde compra.
+* Canales utilizados.
+* Reclamos.
+* Sugerencias.
+* Notas internas.
+* Etiquetas.
+* Promociones recibidas.
+* Respuestas a promociones.
+* Consentimientos de contacto.
+
+### Fidelización
+
+Los criterios deben ser configurables.
+
+Ejemplos:
+
+* Tres compras en tres meses.
+* Una compra mensual.
+* Monto acumulado.
+* Ticket promedio.
+* Compra de productos determinados.
+* Alta frecuencia.
+* Alta antigüedad.
+* Marcación manual.
+
+Segmentos sugeridos:
+
+* Nuevo.
+* Recurrente.
+* Fidelizado.
+* Alto valor.
+* Mayorista potencial.
+* En riesgo.
+* Inactivo.
+* Suscripción potencial.
+
+### Seguimiento
+
+Permitir:
+
+* Crear tareas.
+* Registrar llamadas.
+* Registrar mensajes.
+* Registrar reclamos.
+* Registrar intereses.
+* Programar próximo contacto.
+* Preparar promoción.
+* Marcar atención prioritaria.
+
+Preparar el módulo para futuras:
+
+* Suscripciones.
+* Beneficios.
+* Club de clientes.
+* Recomendaciones con inteligencia artificial.
+* Segmentación automática.
+
+No depender inicialmente de una API de inteligencia artificial paga. Los datos deben poder analizarse mediante filtros, reglas y exportación.
+</modulo-03-clientes-fidelizados>
+
+<modulo-04-metricas-generales>
+Este módulo debe consolidar información de todo el negocio.
+
+### Filtros globales
+
+* Fecha.
+* Rango de fechas.
+* Día.
+* Semana.
+* Mes.
+* Año.
+* Ubicación.
+* Varias ubicaciones.
+* Vendedor.
+* Canal.
+* Producto.
+* Categoría.
+* Cliente.
+* Forma de pago.
+* Estado.
+* Campaña.
+
+### Métricas de ventas
+
+* Facturación.
+* Cantidad de ventas.
+* Productos vendidos.
+* Ticket promedio.
+* Venta por hora.
+* Venta por vendedor.
+* Venta por ubicación.
+* Venta por canal.
+* Venta por forma de pago.
+* Descuentos.
+* Anulaciones.
+* Comparación entre períodos.
+
+### Métricas de productos y stock
+
+* Productos más vendidos.
+* Productos menos vendidos.
+* Rotación.
+* Stock actual.
+* Stock inmovilizado.
+* Quiebres de stock.
+* Mermas.
+* Transferencias.
+* Días estimados de stock.
+* Rentabilidad por producto.
+
+### Métricas de clientes
+
+* Clientes registrados.
+* Clientes nuevos.
+* Clientes recurrentes.
+* Clientes fidelizados.
+* Clientes inactivos.
+* Frecuencia de recompra.
+* Días entre compras.
+* Monto acumulado.
+* Ticket promedio por cliente.
+* Clientes que más compran.
+* Clientes que dejaron de comprar.
+* Productos que generan recompra.
+* Ubicaciones que generan más recurrencia.
+
+### Métricas de otros módulos
+
+* Rendimiento de campañas.
+* Conversión desde redes.
+* Pedidos web.
+* Envíos atrasados.
+* Cumplimiento de entregas.
+* Compras a proveedores.
+* Evolución de costos.
+* Alertas abiertas y resueltas.
+* Rentabilidad.
+* Impuestos configurados.
+* Caja.
+
+### Rendimiento técnico
+
+No realizar lecturas completas de colecciones grandes cada vez que se abre el panel.
+
+Utilizar:
+
+* Consultas filtradas.
+* Paginación.
+* Índices.
+* Resúmenes diarios.
+* Documentos agregados.
+* Caché.
+* Procesamiento incremental.
+
+<modulo-05-administracion-financiera>
+Este módulo debe ofrecer una visión económica y financiera del negocio.
+
+### Ingresos
+
+* Ventas físicas.
+* Ventas rápidas.
+* Ventas web.
+* Otros ingresos.
+* Cobros pendientes.
+* Cobros realizados.
+
+### Egresos
+
+* Compras a proveedores.
+* Gastos operativos.
+* Alquiler.
+* Sueldos.
+* Servicios.
+* Comisiones.
+* Marketing.
+* Envíos.
+* Impuestos.
+* Otros gastos.
+
+### Caja
+
+* Caja por ubicación.
+* Apertura.
+* Cierre.
+* Efectivo esperado.
+* Efectivo declarado.
+* Diferencias.
+* Retiros.
+* Ingresos manuales.
+* Gastos de caja.
+* Responsable.
+
+### Rentabilidad
+
+* Costo por producto.
+* Precio de venta.
+* Margen bruto.
+* Comisiones de cobro.
+* Costos de envío.
+* Descuentos.
+* Impuestos configurados.
+* Margen estimado.
+* Rentabilidad por ubicación.
+* Rentabilidad por producto.
+* Rentabilidad por canal.
+* Rentabilidad por período.
+
+### Facturación
+
+Mostrar:
+
+* Ventas facturadas.
+* Ventas pendientes de facturación.
+* Comprobantes emitidos.
+* Comprobantes anulados.
+* Impuestos estimados.
+* Total facturado.
+* Diferencias entre ventas y facturación.
+
+Los cálculos fiscales deben ser configurables y no deben asumir automáticamente reglas tributarias sin validación.
+
+Separación de responsabilidades:
+
+* Ventas rápidas genera o solicita la factura.
+
+<modulo-06-deposito>
+Este módulo administra el stock central y los movimientos logísticos internos.
+
+### Funcionalidades
+
+* Stock por depósito.
+* Varios depósitos futuros.
+* Ingreso de mercadería.
+* Salida.
+* Transferencia.
+* Ajuste.
+* Merma.
+* Rotura.
+* Pérdida.
+* Devolución.
+* Reserva.
+* Preparación.
+* Recepción de proveedor.
+* Conteo físico.
+* Diferencia de inventario.
+* Historial de movimientos.
+
+### Transferencias
+
+Permitir movimientos entre:
+
+* Depósito y local.
+* Depósito y feria.
+* Local y depósito.
+* Local y local.
+* Feria y depósito.
+* Cualquier ubicación autorizada.
+
+Estados:
+
+* Borrador.
+* Preparando.
+* Enviado.
+* Recibido.
+* Recibido con diferencias.
+* Cancelado.
+
+Toda modificación debe conservar:
+
+* Stock anterior.
+* Cantidad modificada.
+* Stock posterior.
+* Motivo.
+* Usuario.
+* Fecha.
+* Ubicación de origen.
+
+<modulo-07-pagina-web-ecommerce>
+Integrar el proyecto:
+
+https://github.com/AgustinBazanUB/flor-mia-web-fiel-v3
+
+### Parte pública
+
+Conservar y ampliar:
+
+* Home.
+* Catálogo.
+* Categorías.
+* Productos.
+* Buscador.
+* Promociones.
+* Carrito.
+* Checkout.
+* Contacto.
+* Diseño responsive.
+* SEO.
+* Imágenes reales.
+
+### Parte administrativa
+
+Crear dentro de la aplicación privada:
+
+* Gestión de productos publicados.
+* Gestión de precios.
+* Gestión de variantes.
+* Gestión de stock visible.
+* Gestión de promociones.
+* Gestión de categorías.
+* Gestión de imágenes.
+* Gestión de contenido.
+* Gestión de pedidos.
+* Estados de pedido.
+* Configuración de envío.
+* Configuración de retiro.
+* Configuración de medios de pago.
+
+### Catálogo compartido
+
+No crear dos catálogos independientes.
+
+Debe existir un catálogo maestro que alimente:
+
+* Ubicaciones.
+* Depósito.
+* Ventas rápidas.
+* Página web.
+* Proveedores.
+* Métricas.
+
+Cada producto debe poder indicar:
+
+* Activo internamente.
+* Disponible en una ubicación.
+* Publicado en web.
+* Disponible para envío.
+* Disponible para retiro.
+* Precio por canal.
+* Stock.
+* Categoría.
+* Formato.
+* Variante.
+* Imagen.
+* Estado.
+
+### Pedido web
+
+Al confirmarse un pedido real:
+
+* Crear pedido.
+* Registrar cliente.
+* Reservar o descontar stock según la regla elegida.
+* Registrar pago.
+* Crear registro financiero.
+* Crear solicitud de factura.
+* Crear envío o retiro.
+* Actualizar métricas.
+* Registrar auditoría.
+
+No simular pagos reales si no existe una integración.
+</modulo-07-pagina-web-ecommerce>
+
+<modulo-08-redes-sociales>
+Este módulo debe organizar las consultas, oportunidades y ventas provenientes de redes.
+
+Canales iniciales:
+
+* WhatsApp.
+* Instagram.
+* Facebook.
+* TikTok.
+* Otro canal configurable.
+
+### Funcionalidades
+
+* Registrar contacto.
+* Registrar consulta.
+* Registrar producto de interés.
+* Registrar responsable.
+* Registrar fecha.
+* Registrar próxima acción.
+* Registrar conversación resumida.
+* Crear cliente.
+* Crear venta rápida.
+* Crear pedido.
+* Crear envío.
+* Marcar conversión.
+* Marcar oportunidad perdida.
+* Etiquetar contacto.
+
+### Estados
+
+* Nuevo.
+* Respondido.
+* Esperando cliente.
+* Seguimiento.
+* Interesado.
+* Venta realizada.
+* No interesado.
+* Cerrado.
+
+Las integraciones automáticas con APIs de redes pueden incorporarse en el futuro.
+
+La primera versión debe funcionar mediante carga manual eficiente y enlaces directos.
+</modulo-08-redes-sociales>
+
+<modulo-09-marketing>
+Este módulo administra la planificación y los resultados de marketing.
+
+### Campañas
+
+* Nombre.
+* Objetivo.
+* Canal.
+* Público.
+* Fecha inicial.
+* Fecha final.
+* Presupuesto.
+* Responsable.
+* Estado.
+* Productos.
+* Promoción.
+* Contenido asociado.
+* Resultados.
+
+### Calendario
+
+* Publicaciones.
+* Reels.
+* Historias.
+* Campañas.
+* Promociones.
+* Fechas comerciales.
+* Eventos.
+* Seguimientos.
+
+### Contenido
+
+* Idea.
+* Guion.
+* Texto.
+* Estado.
+* Responsable.
+* Archivos.
+* Canal.
+* Fecha de publicación.
+* Resultado.
+
+### Relación con clientes
+
+Permitir crear campañas para:
+
+* Clientes fidelizados.
+* Clientes inactivos.
+* Clientes de alto valor.
+* Clientes interesados en un producto.
+* Clientes de una ubicación.
+* Clientes que compran mensualmente.
+
+### Métricas
+
+* Alcance cargado o integrado.
+* Interacciones.
+* Consultas.
+* Ventas atribuidas.
+* Ingreso.
+* Costo.
+* Retorno estimado.
+* Clientes nuevos.
+
+<modulo-10-gestion-de-envios>
+Este módulo debe centralizar todos los envíos del negocio.
+
+Un envío puede originarse en:
+
+* Página web.
+* WhatsApp.
+* Instagram.
+* Venta rápida.
+* Local.
+* Feria.
+* Pedido manual.
+
+### Datos
+
+* Código.
+* Pedido o venta relacionada.
+* Cliente.
+* Teléfono.
+* Dirección.
+* Localidad.
+* Referencia.
+* Ubicación de preparación.
+* Productos.
+* Cantidades.
+* Transportista.
+* Modalidad.
+* Costo.
+* Fecha acordada.
+* Franja horaria.
+* Seguimiento.
+* Observaciones.
+* Responsable.
+
+### Estados
+
+* Pendiente.
+* Confirmado.
+* Preparando.
+* Listo.
+* Asignado.
+* Retirado.
+* En camino.
+* Entregado.
+* Entrega fallida.
+* Reprogramado.
+* Cancelado.
+* Devuelto.
+
+### Funcionalidades
+
+* Panel de envíos del día.
+* Vista por estado.
+* Filtros.
+* Historial.
+* Etiqueta.
+* Link de Google Maps.
+* Contacto por WhatsApp.
+* Asignación de responsable.
+* Registro de novedades.
+* Prueba de entrega futura.
+* Control de costo.
+* Alertas de atraso.
+
+El sistema debe permitir saber rápidamente:
+
+* Qué falta preparar.
+* Qué está en camino.
+* Qué se atrasó.
+
+<modulo-11-alertas>
+Este módulo debe centralizar alertas automáticas y manuales.
+
+### Tipos
+
+* Stock bajo.
+* Sin stock.
+* Venta sin facturar.
+* Pedido pendiente.
+* Envío atrasado.
+* Pago pendiente.
+* Compra pendiente.
+* Proveedor demorado.
+* Diferencia de caja.
+* Transferencia sin recibir.
+* Cliente fiel inactivo.
+* Campaña pendiente.
+* Error del sistema.
+* Tarea administrativa.
+
+### Propiedades
+
+* Tipo.
+* Severidad.
+* Módulo.
+* Mensaje.
+* Fecha.
+* Vencimiento.
+* Responsable.
+* Ubicación.
+* Entidad relacionada.
+* Estado.
+* Historial.
+
+### Severidades
+
+* Informativa.
+* Baja.
+* Media.
+* Alta.
+* Crítica.
+
+### Estados
+
+* Nueva.
+* Vista.
+* En proceso.
+* Resuelta.
+* Descartada.
+
+Cada usuario debe ver solamente alertas relacionadas con sus permisos y responsabilidades.
+</modulo-11-alertas>
+
+<modulo-12-gestion-de-proveedores>
+Este módulo debe administrar proveedores, compras y reposiciones.
+
+### Proveedor
+
+* Razón social.
+* Nombre comercial.
+* CUIT.
+* Contactos.
+* Teléfono.
+* Email.
+* Dirección.
+* Productos.
+* Condiciones.
+* Plazo de entrega.
+* Forma de pago.
+* Observaciones.
+* Estado.
+
+### Compras
+
+* Orden de compra.
+* Productos.
+* Cantidades.
+* Costos.
+* IVA.
+* Total.
+* Fecha.
+* Entrega prevista.
+* Ubicación de recepción.
+* Estado.
+* Factura de proveedor.
+* Pago.
+* Observaciones.
+
+### Estados
+
+* Borrador.
+* Solicitada.
+* Confirmada.
+* En preparación.
+* En tránsito.
+* Recibida.
+* Recibida parcialmente.
+* Cancelada.
+
+### Reposición
+
+El sistema debe poder sugerir reposición considerando:
+
+* Stock actual.
+* Stock mínimo.
+* Ventas recientes.
+* Velocidad de venta.
+* Pedidos pendientes.
+* Tiempo de entrega.
+* Eventos futuros.
+* Ferias.
+* Cantidad mínima de compra.
+
+Al recibir mercadería:
+
+* Actualizar depósito.
+* Crear movimientos de stock.
+* Registrar costo.
+* Actualizar historial.
+* Crear egreso financiero.
+
+<relaciones-entre-modulos>
+Los módulos no deben funcionar como sistemas aislados.
+
+### Venta física o rápida
+
+Venta
+→ descuenta stock
+→ registra movimiento
+→ actualiza cliente
+→ registra ingreso financiero
+→ solicita factura
+→ crea envío si corresponde
+→ actualiza métricas
+→ genera alertas si corresponde.
+
+### Pedido web
+
+Pedido
+→ registra cliente
+→ verifica stock
+→ registra pago
+→ reserva o descuenta stock
+→ solicita factura
+→ crea envío o retiro
+→ actualiza métricas.
+
+### Compra a proveedor
+
+Compra
+→ registra egreso
+→ recibe mercadería
+→ aumenta stock de depósito
+→ registra movimiento
+→ actualiza costo
+→ resuelve alerta de reposición.
+
+### Cliente fidelizado
+
+Compra
+→ actualiza frecuencia
+→ actualiza segmento
+→ habilita seguimiento
+→ puede ingresar en una campaña
+→ genera métricas de recurrencia.
+</relaciones-entre-modulos>
+
+<modelo-de-datos-compartido>
+Diseña un modelo normalizado y documentado para entidades como:
+
+* users
+* roles
+* permissions
+* locations
+* products
+* productCategories
+* locationStock
+* stockMovements
+* stockTransfers
+* sales
+* saleItems
+* payments
+* customers
+* customerInteractions
+* customerSegments
+* orders
+* orderItems
+* shipments
+* invoices
+* suppliers
+* supplierProducts
+* purchases
+* purchaseItems
+* financialEntries
+* cashSessions
+* campaigns
+* contentItems
+* socialLeads
+* alerts
+* auditLogs
+* settings
+* dailySummaries
+
+No es obligatorio que cada nombre sea una colección independiente.
+
+Decide qué debe ser:
+
+* Colección.
+* Subcolección.
+* Documento embebido.
+* Documento resumido.
+* Referencia.
+
+Justifica las decisiones según:
+
+* Seguridad.
+* Consultas.
+* Escalabilidad.
+* Costos de Firestore.
+* Integridad.
+
+<firebase-y-firestore>
+Utilizar:
+
+* Firebase Authentication.
+* Cloud Firestore.
+* Firebase Hosting solamente si fuera necesario; el despliegue principal debe ser Netlify.
+* Configuración pública de Firebase separada.
+* Reglas de seguridad.
+* Índices.
+* Transacciones.
+* Escrituras por lote.
+* Timestamps del servidor.
+
+### Restricciones iniciales
+
+La primera versión debe intentar funcionar dentro de Firebase Spark.
+
+Evitar inicialmente:
+
+* Firebase Storage cuando las imágenes puedan publicarse con Netlify.
+* Cloud Functions obligatorias.
+* Analytics innecesario.
+* Listeners globales.
+* Lecturas completas constantes.
+* Datos duplicados sin propósito.
+
+### Seguridad
+
+* Nunca guardar claves privadas en GitHub.
+* Nunca guardar credenciales fiscales en el cliente.
+* Nunca confiar únicamente en permisos visuales.
+* Validar permisos en Firestore.
+* Aplicar mínimo privilegio.
+* Proteger información financiera.
+* Proteger datos personales.
+* Registrar operaciones sensibles.
+* Utilizar bajas lógicas cuando sea necesario.
+* Mantener auditoría de cambios.
+
+### Datos personales
+
+El DNI, teléfono, dirección y preferencias deben manejarse como datos sensibles.
+
+Incluir:
+
+* Consentimiento de contacto.
+* Restricción de acceso.
+* Trazabilidad.
+* Posibilidad de corrección.
+
+<github-netlify-y-despliegue>
+Todo el código debe quedar almacenado en GitHub.
+
+### Flujo
+
+* Rama principal protegida.
+* Ramas de funcionalidad.
+* Pull requests.
+* Commits descriptivos.
+* Preview Deploys de Netlify.
+* Producción desde la rama principal.
+* Variables de entorno en Netlify.
+* README actualizado.
+
+### Netlify
+
+Configurar:
+
+* Build de Vite.
+* SPA redirects.
+* Encabezados de seguridad.
+* Caché.
+* Variables de entorno.
+* Preview Deploys.
+* Manejo de errores.
+* Página 404.
+* No incluir secretos en el repositorio.
+
+### Protección de producción
+
+No modificar directamente los sitios productivos existentes hasta comprobar:
+
+* Migración.
+* Autenticación.
+* Roles.
+* Ventas.
+* Stock.
+* Seguridad.
+* Responsive.
+* Deploy.
+
+<json-de-diseno>
+El usuario proporcionará un archivo JSON que describe el diseño visual de la aplicación.
+
+JSON visu
+
+Debes tratar ese JSON como fuente principal para:
+
+* Paleta.
+* Tipografías.
+* Espaciado.
+* Bordes.
+* Sombras.
+* Componentes.
+* Jerarquía.
+* Menús.
+* Cards.
+* Tablas.
+* Formularios.
+* Modales.
+* Dashboards.
+* Responsive.
+* Estados.
+* Microinteracciones.
+
+### Integración del JSON
+
+Antes de construir las pantallas:
+
+1. Analiza el JSON.
+2. Extrae design tokens.
+3. Crea variables globales.
+4. Crea componentes reutilizables.
+5. Define comportamiento desktop, tablet y mobile.
+6. Aplica el mismo lenguaje visual a todos los módulos.
+
+No interpretes el JSON como una imagen decorativa.
+
+Debe utilizarse para construir un sistema visual consistente.
+
+Si el JSON entra en conflicto con un requisito funcional o de accesibilidad:
+
+* Conserva la funcionalidad.
+* Conserva la accesibilidad.
+* Explica el ajuste.
+* Mantén la mayor fidelidad visual posible.
+
+Si se entrega una carpeta de imágenes:
+
+* Utiliza las imágenes reales proporcionadas.
+* Respeta nombres y relaciones.
+* No reemplaces recursos reales por imágenes genéricas.
+
+<requisitos-tecnicos-no-negociables>
+- React y Vite como base preferida de la plataforma integral.
+- Firebase Authentication.
+- Firestore.
+- Netlify.
+- GitHub.
+- Diseño mobile first.
+- Componentes reutilizables.
+- Separación por módulos.
+- Capa de servicios independiente de la UI.
+- Permisos por módulo y acción.
+- Reglas Firestore coherentes con los permisos.
+- Manejo de errores.
+- Estados de carga.
+- Estados vacíos.
+- Auditoría.
+- Bajas lógicas.
+- Validación de formularios.
+- Operaciones críticas mediante transacciones.
+- Consultas paginadas.
+- Índices documentados.
+- Pruebas de funciones críticas.
+- Sin secretos en el frontend.
+- Sin datos fiscales privados en GitHub.
+- Sin dependencias innecesarias.
+- Sin duplicar el catálogo de productos.
+- Sin duplicar ventas ni stock.
+- Sin romper el sistema existente durante la migración.
+- Sin utilizar iframes para integrar módulos.
+- Sin mostrar módulos no autorizados.
+- Sin depender solamente del frontend para seguridad.
+</requisitos-tecnicos-no-negociables>
+
+<metodologia-de-trabajo>
+No empieces creando todas las pantallas a la vez.
+
+Trabaja en estas fases:
+
+### Fase 1: auditoría
+
+Analiza ambos repositorios y entrega:
+
+* Tecnologías.
+* Estructura.
+* Funcionalidades existentes.
+* Modelo de datos actual.
+* Reglas de Firestore.
+* Dependencias.
+* Riesgos.
+* Código reutilizable.
+* Código que debe migrarse.
+* Código que debe descartarse.
+* Diferencias entre ambos proyectos.
+
+### Fase 2: arquitectura
+
+Entrega:
+
+* Arquitectura propuesta.
+* Rutas.
+* Módulos.
+* Roles.
+* Matriz de permisos.
+* Modelo de datos.
+* Relaciones.
+* Estrategia de migración.
+* Estrategia de despliegue.
+* Optimización de Firestore.
+
+### Fase 3: base del sistema
+
+Implementa:
+
+* Repositorio de integración.
+* React/Vite.
+* Firebase.
+* Autenticación.
+* Layout.
+* Menú dinámico.
+* Roles.
+* Permisos.
+* Auditoría.
+* Design tokens derivados del JSON.
+* Componentes base.
+
+### Fase 4: integración de Ubicaciones
+
+Migra y valida:
+
+* Administrador.
+* Vendedores.
+* Ubicaciones.
+* Productos.
+* Categorías.
+* Stock.
+* Ventas.
+* Pagos.
+* Descuentos.
+* Alertas.
+* Métricas.
+* Botonera.
+* PWA.
+
+### Fase 5: integración de ecommerce
+
+Migra y conecta:
+
+* Página pública.
+* Catálogo.
+* Carrito.
+* Checkout.
+* Clientes.
+* Pedidos.
+* Stock.
+* Envíos.
+* Facturación pendiente.
+* Métricas.
+
+### Fase 6: módulos adicionales
+
+Implementa progresivamente:
+
+* Ventas rápidas.
+* Clientes fidelizados.
+* Depósito.
+* Proveedores.
+* Envíos.
+* Finanzas.
+* Redes sociales.
+* Marketing.
+* Alertas.
+* Métricas globales.
+
+### Fase 7: pruebas y publicación
+
+Realiza:
+
+* Pruebas funcionales.
+* Pruebas de permisos.
+* Pruebas de reglas Firestore.
+* Pruebas mobile.
+* Pruebas de stock.
+* Pruebas de ventas.
+* Pruebas de concurrencia.
+* Pruebas de anulación.
+* Pruebas de despliegue.
+
+<entregables>
+Debes entregar:
+
+1. Auditoría de ambos repositorios.
+2. Arquitectura final.
+3. Mapa de rutas.
+4. Mapa de módulos.
+5. Matriz de roles y permisos.
+6. Modelo de datos Firestore.
+7. Reglas de seguridad.
+8. Índices.
+9. Estrategia de migración.
+10. Código funcional.
+11. Componentes responsive.
+12. Pruebas.
+13. Configuración de Netlify.
+14. Integración con GitHub.
+15. README en castellano.
+16. Manual de administrador.
+17. Manual breve para vendedores.
+18. Lista de datos o credenciales pendientes.
+19. Registro de decisiones técnicas.
+20. Backlog de integraciones futuras.
+
+No entregues únicamente explicaciones o fragmentos aislados.
+
+El resultado debe poder instalarse, probarse y desplegarse.
+</entregables>
+
+<criterios-de-exito>
+1. Existe una sola plataforma coherente.
+2. Los 12 módulos están definidos e integrados.
+3. Cada usuario ve solamente lo autorizado.
+4. El administrador puede asignar módulos, acciones y ubicaciones.
+5. El sistema existente de stock y ventas conserva sus funciones importantes.
+6. La página pública mantiene su diseño aprobado.
+7. El catálogo de productos es compartido.
+8. Las ventas descuentan el stock correcto.
+9. Las anulaciones restauran stock y conservan auditoría.
+10. Los clientes registrados alimentan fidelización y métricas.
+11. Los envíos pueden seguirse de principio a fin.
+12. Las compras a proveedores actualizan depósito y finanzas.
+13. Las alertas llegan al responsable adecuado.
+14. Las métricas no provocan lecturas descontroladas.
+15. Firestore aplica seguridad real.
+16. La aplicación funciona correctamente en celulares.
+17. El menú es sencillo e intuitivo.
+18. GitHub publica automáticamente mediante Netlify.
+19. La primera versión puede operar con costos mínimos.
+20. El sistema queda preparado para pagos, ARCA, suscripciones e inteligencia artificial futuras sin simular que ya están integradas.
+</criterios-de-exito>
+
+<instruccion-final>
+Construye la plataforma integral de Flor Mía siguiendo este documento.
+
+Antes de modificar código:
+
+1. Inspecciona los dos repositorios.
+2. Presenta la auditoría.
+3. Define la estrategia de integración.
+4. Identifica riesgos y decisiones pendientes.
+5. Crea una rama o repositorio de integración.
+6. Conserva intactas las versiones productivas.
+7. Comienza por la base de autenticación, permisos y navegación.
+8. Integra primero el módulo de Ubicaciones.
+9. Avanza por etapas verificables.
+
+No inventes datos comerciales, fiscales, precios, productos, credenciales, permisos ni integraciones.
+
+Cuando falte información menor, utiliza una configuración editable o un estado “pendiente”.
+
+Cuando falte información crítica para una integración externa, deja preparada la interfaz técnica, documenta lo necesario y continúa con el resto de la aplicación.
+
+El resultado debe ser una aplicación real, segura, intuitiva, modular, responsive y preparada para convertirse en el sistema central del negocio.
+</instruccion-final>
