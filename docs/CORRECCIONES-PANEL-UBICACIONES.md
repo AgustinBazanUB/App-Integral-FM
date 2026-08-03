@@ -47,7 +47,7 @@ Las reglas nuevas:
 
 ## Validación
 
-- `npm test`: 35 pruebas aprobadas.
+- `npm test`: 36 pruebas aprobadas.
 - `npm run build`: build Vite aprobado.
 - Firebase `--dry-run`: reglas compiladas e índices aceptados para `app-integral-fm`.
 - Responsive público: sin scroll horizontal en 1440, 1200, 1024, 768, 480, 390 y 320 px; controles principales de 44 px o más.

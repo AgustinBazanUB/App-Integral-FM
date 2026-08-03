@@ -6,8 +6,8 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     function activeUser() { return signedIn() && profile().active == true; }
-    function isAdmin() {
-      return activeUser() && (
+    function adminRole() {
+      return (
         profile().role == "admin"
         || profile().role == "general_admin"
         || (("canAccessAdmin" in profile()) && profile().canAccessAdmin == true)
@@ -15,17 +15,16 @@ service cloud.firestore {
         || (("roles" in profile()) && ("admin" in profile().roles))
       );
     }
+    function isAdmin() { return activeUser() && adminRole(); }
     function explicitPermission(moduleId, action) {
-      return activeUser()
-        && ("permissions" in profile())
+      return ("permissions" in profile())
         && (moduleId in profile().permissions)
         && (profile().permissions[moduleId] is list)
         && (action in profile().permissions[moduleId] || "admin" in profile().permissions[moduleId]);
     }
     function roleModule(moduleId) {
-      return activeUser() && (
-        isAdmin()
-        || (profile().role == "seller" && moduleId in ["locations", "quick-sales", "alerts"])
+      return (
+        (profile().role == "seller" && moduleId in ["locations", "quick-sales", "alerts"])
         || (profile().role == "location_manager" && moduleId in ["locations", "quick-sales", "metrics", "alerts"])
         || (profile().role == "warehouse_manager" && moduleId in ["locations", "warehouse", "suppliers", "alerts"])
         || (profile().role == "marketing_manager" && moduleId in ["loyal-customers", "social", "marketing", "metrics"])
@@ -38,14 +37,19 @@ service cloud.firestore {
       );
     }
     function rolePermission(moduleId, action) {
-      return activeUser() && (
+      return (
         (action == "view" && roleModule(moduleId))
         || (profile().role == "seller"
           && ((moduleId == "quick-sales" && action in ["create", "edit"])
             || (moduleId == "alerts" && action == "edit")))
         || (profile().role == "location_manager"
-          && moduleId in ["locations", "quick-sales", "alerts"]
-          && action in ["create", "edit", "export", "approve"])
+          && ((moduleId == "locations"
+              && action in [
+                "create", "edit", "export", "approve", "viewLocationProducts",
+                "configureLocationProducts", "viewStock", "loadStock", "adjustStock"
+              ])
+            || (moduleId in ["quick-sales", "alerts"]
+              && action in ["create", "edit", "export", "approve"])))
         || (profile().role == "warehouse_manager"
           && moduleId in ["warehouse", "suppliers", "alerts"]
           && action in ["create", "edit", "export", "approve"])
@@ -67,18 +71,24 @@ service cloud.firestore {
         || (profile().role == "analyst" && moduleId == "metrics" && action == "export")
         || (profile().role == "operational_admin"
           && moduleId != "finance"
-          && action in ["create", "edit", "export", "approve"])
+          && action in [
+            "create", "edit", "export", "approve", "viewAllLocations",
+            "viewLocationProducts", "configureLocationProducts", "viewStock",
+            "loadStock", "adjustStock", "assignDiscounts"
+          ])
       );
     }
     function canModule(moduleId, action) {
-      return isAdmin() || explicitPermission(moduleId, action) || rolePermission(moduleId, action);
+      return activeUser()
+        && (adminRole() || explicitPermission(moduleId, action) || rolePermission(moduleId, action));
     }
     function allowedLocation(locationId) {
-      return isAdmin()
-        || canModule("locations", "viewAllLocations")
-        || (activeUser()
-          && ("allowedLocationIds" in profile())
-          && locationId in profile().allowedLocationIds);
+      return activeUser() && (
+        adminRole()
+        || explicitPermission("locations", "viewAllLocations")
+        || profile().role == "operational_admin"
+        || (("allowedLocationIds" in profile()) && locationId in profile().allowedLocationIds)
+      );
     }
     function locationNotDeleted(location) {
       return !("deleted" in location) || location.deleted != true;
