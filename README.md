@@ -2,6 +2,10 @@
 
 Aplicación web única para la tienda pública y la gestión privada de Flor Mía. Integra el diseño y contenido aprobado de `flor-mia-web-fiel-v3` con la lógica comprobada de `FM-stock-y-ventas`, sin modificar ninguno de esos dos sistemas productivos.
 
+- Producción: <https://app-integral-fm.netlify.app/>
+- Gestión: <https://app-integral-fm.netlify.app/gestion>
+- Repositorio: <https://github.com/AgustinBazanUB/App-Integral-FM>
+
 ## Qué incluye
 
 - Superficie pública en `/`: home, catálogo, buscador, producto, carrito y checkout preparado.
