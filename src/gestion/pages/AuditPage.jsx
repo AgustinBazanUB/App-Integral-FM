@@ -18,7 +18,7 @@ export default function AuditPage() {
       <PageHeader eyebrow="Capa transversal" title="Auditoría" description="Operaciones sensibles, usuario, fecha y entidad relacionada, sin borrar el historial." />
       <Panel title="Registro reciente" description="La consulta está limitada a los 50 eventos más nuevos.">
         {result.status === "loading" ? <Skeleton lines={6} /> : null}
-        {result.status === "error" ? <EmptyState icon="ShieldCheck" title="Auditoría preparada, pendiente de reglas integrales" description="La colección permanece bloqueada por las reglas productivas actuales hasta validar la migración." action={<Button variant="secondary" onClick={result.refresh}>Reintentar</Button>} /> : null}
+        {result.status === "error" ? <EmptyState icon="ShieldCheck" title="No se pudo consultar la auditoría" description="Revisá que el perfil tenga permisos de administración y que la colección esté disponible en App Integral FM." action={<Button variant="secondary" onClick={result.refresh}>Reintentar</Button>} /> : null}
         {result.status === "ready" ? <DataTable rows={result.data} columns={[
           { key: "action", label: "Acción", render: (log) => <Badge tone="neutral">{log.action || "Operación"}</Badge> },
           { key: "entity", label: "Entidad", render: (log) => log.entityType || log.moduleId || "Sistema" },
@@ -29,3 +29,4 @@ export default function AuditPage() {
     </div>
   );
 }
+
