@@ -130,7 +130,7 @@ export default function GenericModulePage({ moduleId }) {
           <EmptyState
             icon="ShieldCheck"
             title="La colección todavía no está habilitada para este perfil"
-            description="La interfaz está lista, pero las reglas integrales de Firestore deben validarse antes de publicarse sobre el sistema productivo existente."
+            description="La colección no existe todavía o este perfil no tiene permiso para consultarla en la base independiente de App Integral FM."
             action={<Button variant="secondary" onClick={result.refresh}>Reintentar</Button>}
           />
         ) : null}
@@ -159,3 +159,4 @@ export default function GenericModulePage({ moduleId }) {
     </div>
   );
 }
+
