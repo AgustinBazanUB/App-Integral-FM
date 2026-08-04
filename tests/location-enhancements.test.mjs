@@ -44,7 +44,8 @@ test("la vista de productos está agrupada por categoría", () => {
 test("el catálogo de imágenes es local y Firestore guarda rutas", () => {
   assert.match(images, /\/images\/flor-mia\/logo-flor-mia\.svg/);
   assert.match(images, /product\.image/);
-  assert.doesNotMatch(service, /base64/i);
+  assert.match(service, /path\.startsWith\("data:"\)/);
+  assert.match(service, /path\.startsWith\("blob:"\)/);
   assert.match(service, /path\.startsWith\("\/images\/"\)/);
   assert.match(productForm, /Imagen del catálogo local/);
 });
