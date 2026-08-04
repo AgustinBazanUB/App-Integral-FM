@@ -11,7 +11,7 @@ export default function NotFoundPage() {
           <h1>Este camino no lleva a la tienda.</h1>
           <p>Volvé al inicio o recorré la selección de productos.</p>
           <div className="button-row">
-            <Link className="button" to="/">
+            <Link className="button" to="/tienda">
               Ir al inicio
             </Link>
             <Link className="button button--secondary" to="/productos">
