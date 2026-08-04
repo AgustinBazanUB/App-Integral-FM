@@ -106,7 +106,16 @@ export default function ManagementShell({ children }) {
         <div className="fm-sidebar__botanical" aria-hidden="true">
           <svg viewBox="0 0 240 100"><path d="M8 88c38-37 77-37 115 0m-92 0c28-52 62-68 99-48m-16 7c4-25 18-38 42-40m-30 53c22-28 48-34 78-18m-79 18c6-18 6-34-1-49" /></svg>
         </div>
-        <Link to="/" className="fm-sidebar__public-link"><Icon name="Store" /><span>Ver tienda pública</span></Link>
+        {normalizedRole(profile) === "admin" ? (
+          <Link
+            to="/tienda"
+            target="_blank"
+            rel="noreferrer"
+            className="fm-sidebar__public-link"
+          >
+            <Icon name="Store" /><span>Ver tienda pública</span>
+          </Link>
+        ) : null}
       </div>
     </>
   );
