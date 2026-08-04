@@ -13,7 +13,10 @@ Aplicación web única para la tienda y la gestión privada de Flor Mía. Integr
 - Superficie de tienda en `/tienda`: home, catálogo, buscador, producto, carrito y checkout preparado; su vista requiere una sesión de administrador.
 - Superficie privada en `/gestion`: autenticación real, navegación por permisos y 12 módulos.
 - Panel mensual: selector de mes/año, ventas, facturación, ticket promedio, siete días y actividad paginada por permisos.
-- Ubicaciones y eventos: filtros, estados, recuperación y una vista operativa por ubicación con Productos, Cargar stock, Vendedores y Descuentos.
+- Ubicaciones y eventos: hasta cuatro ubicaciones fijadas, acceso rápido a stock y una vista operativa con Productos, Cargar stock, Vendedores y Descuentos.
+- Productos por ubicación: creación desde el catálogo maestro, alcance local o global, categorías expandibles, configuración local y selector de imágenes incluidas en el proyecto.
+- Stock por ubicación: validación de actividad, movimientos auditados, confirmación de reducciones y valores numéricos con contraste reforzado.
+- Vendedores y descuentos: lista de asignados separada de disponibles, avatares e IDs de descuentos globales habilitados por ubicación.
 - Catálogo maestro unido dinámicamente al stock local: los productos nuevos aparecen sin duplicarse y con stock cero hasta configurarlos.
 - Ventas rápidas: carrito táctil, validación de stock y confirmación atómica en Firestore.
 - Usuarios: creación en Firebase Authentication con una app secundaria, roles, ubicaciones y baja lógica.
@@ -44,7 +47,7 @@ npm test
 npm run build
 ```
 
-Las pruebas cubren catálogo, assets, búsqueda, permisos, pagos, descuentos, períodos en hora argentina, métricas sin duplicados, siete días completos, catálogo maestro, prevención de stock negativo y el acceso inicial con sesión persistente.
+Las pruebas cubren catálogo, assets, búsqueda, permisos, pagos, descuentos, períodos en hora argentina, métricas sin duplicados, siete días completos, catálogo maestro, prevención de stock negativo, acceso inicial persistente y mejoras operativas de Ubicaciones.
 
 Para validar reglas con el emulador (requiere Java 21 o superior):
 
@@ -73,7 +76,8 @@ La plataforma usa el proyecto Firebase separado `app-integral-fm`. El sistema an
 - [Datos y credenciales pendientes](docs/PENDIENTES.md)
 - [Decisiones técnicas](docs/DECISIONES.md)
 - [Correcciones del panel y Ubicaciones](docs/CORRECCIONES-PANEL-UBICACIONES.md)
-- [Versión 1.1: acceso inicial y sesión](docs/versions/V1.1-LOGIN-INICIAL.md)
+- [Versión 1.1 · Envío 1: acceso inicial y sesión](docs/versions/V1.1-LOGIN-INICIAL.md)
+- [Versión 1.1 · Envío 2: mejoras de Ubicaciones](docs/versions/V1.1-MEJORAS-UBICACIONES.md)
 - [Backlog](docs/BACKLOG.md)
 - [Sistema visual original](docs/FLOR-MIA-DESIGN-SYSTEM.txt)
 - [Especificación funcional original](docs/ESPECIFICACION-FUNCIONAL.txt)
