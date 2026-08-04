@@ -10,6 +10,7 @@ import CheckoutPage from "./pages/CheckoutPage";
 import HomePage from "./pages/HomePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ProductPage from "./pages/ProductPage";
+import StorePreviewGate from "./gestion/StorePreviewGate";
 
 const ManagementApp = lazy(() => import("./gestion/ManagementApp"));
 
@@ -31,24 +32,14 @@ function ScrollManager() {
   return null;
 }
 
-export default function App() {
-  const location = useLocation();
-
-  if (location.pathname === "/gestion" || location.pathname.startsWith("/gestion/")) {
-    return (
-      <Suspense fallback={<main className="fm-auth-loading" id="main-content"><span>Cargando gestión…</span></main>}>
-        <ManagementApp />
-      </Suspense>
-    );
-  }
-
+function Storefront() {
   return (
     <>
       <ScrollManager />
       <AnnouncementBar />
       <Header />
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/tienda" element={<HomePage />} />
         <Route path="/productos" element={<CatalogPage />} />
         <Route path="/producto/:slug" element={<ProductPage />} />
         <Route path="/nosotros" element={<AboutPage />} />
@@ -58,5 +49,27 @@ export default function App() {
       <Footer />
       <CartDrawer />
     </>
+  );
+}
+
+export default function App() {
+  const location = useLocation();
+  const isManagementPath =
+    location.pathname === "/" ||
+    location.pathname === "/gestion" ||
+    location.pathname.startsWith("/gestion/");
+
+  if (isManagementPath) {
+    return (
+      <Suspense fallback={<main className="fm-auth-loading" id="main-content"><span>Cargando gestión…</span></main>}>
+        <ManagementApp />
+      </Suspense>
+    );
+  }
+
+  return (
+    <StorePreviewGate>
+      <Storefront />
+    </StorePreviewGate>
   );
 }
