@@ -17,7 +17,7 @@ export default function Footer() {
         <div className="footer-intro">
           <Link
             className="wordmark footer-logo"
-            to="/"
+            to="/tienda"
             aria-label="Flor Mía - Inicio"
           >
             <img
