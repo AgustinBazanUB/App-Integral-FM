@@ -19,6 +19,7 @@ import "./styles-responsive-mobile.css";
 import "./styles/tokens.css";
 import "./styles/theme.css";
 import "./styles/management.css";
+import "./styles/location-enhancements.css";
 import "./styles/responsive.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
