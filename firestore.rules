@@ -149,6 +149,28 @@ service cloud.firestore {
         && data.items.size() > 0
         && (validSinglePayment(data) || validMultiplePayment(data));
     }
+    function validSellerStockMutation(locationId, productId) {
+      let sale = getAfter(/databases/$(database)/documents/sales/$(request.resource.data.lastSaleId)).data;
+      let movement = getAfter(/databases/$(database)/documents/stockMovements/$(request.resource.data.lastMovementId)).data;
+      return canModule("quick-sales", "edit")
+        && allowedLocation(locationId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "currentStock", "lastSaleId", "lastMovementId", "updatedAt"
+        ])
+        && request.resource.data.currentStock is int
+        && request.resource.data.currentStock >= 0
+        && request.resource.data.lastSaleId is string
+        && request.resource.data.lastMovementId is string
+        && sale.sellerId == request.auth.uid
+        && sale.locationId == locationId
+        && sale.status in ["active", "cancelled"]
+        && movement.userId == request.auth.uid
+        && movement.locationId == locationId
+        && movement.productId == productId
+        && movement.saleId == request.resource.data.lastSaleId
+        && movement.previousStock == resource.data.currentStock
+        && movement.newStock == request.resource.data.currentStock;
+    }
     function ownsNewRecord() {
       return request.resource.data.createdBy == request.auth.uid;
     }
@@ -256,14 +278,7 @@ service cloud.firestore {
             ])
             && request.resource.data.currentStock is int
             && request.resource.data.currentStock >= 0)
-          || (activeAllowedLocation(locationId)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["currentStock", "lastSaleId", "updatedAt"])
-            && request.resource.data.currentStock is int
-            && request.resource.data.currentStock >= 0
-            && request.resource.data.lastSaleId is string
-            && getAfter(/databases/$(database)/documents/sales/$(request.resource.data.lastSaleId)).data.sellerId == request.auth.uid
-            && getAfter(/databases/$(database)/documents/sales/$(request.resource.data.lastSaleId)).data.locationId == locationId
-            && getAfter(/databases/$(database)/documents/sales/$(request.resource.data.lastSaleId)).data.status == "active");
+          || validSellerStockMutation(locationId, productId);
         allow delete: if false;
       }
     }
@@ -283,9 +298,10 @@ service cloud.firestore {
           && resource.data.sellerId == request.auth.uid
           && request.resource.data.sellerId == resource.data.sellerId
           && request.resource.data.locationId == resource.data.locationId
-          && activeAllowedLocation(resource.data.locationId)
           && resource.data.status == "active"
-          && request.resource.data.status in ["active", "cancelled"]);
+          && request.resource.data.status in ["active", "cancelled"]
+          && ((request.resource.data.status == "active" && activeAllowedLocation(resource.data.locationId))
+            || (request.resource.data.status == "cancelled" && allowedLocation(resource.data.locationId))));
       allow delete: if false;
     }
     match /stockMovements/{movementId} {
@@ -294,7 +310,10 @@ service cloud.firestore {
           && allowedLocation(resource.data.locationId));
       allow create: if activeUser()
         && request.resource.data.userId == request.auth.uid
-        && allowedLocation(request.resource.data.locationId);
+        && allowedLocation(request.resource.data.locationId)
+        && request.resource.data.previousStock is int
+        && request.resource.data.newStock is int
+        && request.resource.data.saleId is string;
       allow update, delete: if false;
     }
     match /stockOperations/{operationId} {
