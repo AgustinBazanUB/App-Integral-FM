@@ -1,29 +1,26 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Button,
   ChartContainer,
   EmptyState,
   HeroBanner,
-  IconButton,
   Panel,
-  Select,
   Skeleton,
   StatCard,
 } from "../../design-system";
 import {
-  buildSevenDaySalesSeries,
+  buildPeriodSalesSeries,
   summarizeSales,
 } from "../../modules/locations/domain/dashboard";
 import {
-  argentinaMonthKey,
-  argentinaMonthLabel,
-  argentinaMonthRange,
-  lastSevenArgentinaDays,
-  shiftMonthKey,
+  argentinaDateKey,
+  argentinaPeriodLabel,
+  argentinaPeriodRange,
 } from "../../modules/locations/domain/time";
 import { Link } from "../../router";
 import { useAuth } from "../AuthContext";
+import DashboardFilters from "../components/DashboardFilters";
 import { Icon } from "../components/icons";
 import { formatDateTime, formatMoney } from "../formatters";
 import { useAsyncData } from "../hooks";
@@ -35,15 +32,13 @@ import {
 } from "../services/dashboardService";
 import { listLocations } from "../services/managementService";
 
-const MONTHS = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
+const SESSION_FORMAT_KEY = "fm-dashboard-period-format";
+const VALID_FORMATS = new Set(["year", "month", "week", "day"]);
 
 function SalesBars({ data }) {
   const max = Math.max(...data.map((item) => item.value), 1);
   return (
-    <div className="fm-bars">
+    <div className={`fm-bars ${data.length > 16 ? "fm-bars--dense" : ""}`}>
       {data.map((item) => (
         <div key={item.key} className="fm-bars__item">
           <span
@@ -54,38 +49,6 @@ function SalesBars({ data }) {
           <span>{item.label}</span>
         </div>
       ))}
-    </div>
-  );
-}
-
-function MonthSelector({ value, onChange, busy }) {
-  const current = argentinaMonthKey();
-  const [selectedYear, selectedMonth] = value.split("-").map(Number);
-  const currentYear = Number(current.slice(0, 4));
-  const oldestYear = Math.min(currentYear - 7, selectedYear);
-  const years = Array.from({ length: currentYear - oldestYear + 1 }, (_, index) => currentYear - index);
-  const choose = (year, month) => {
-    const candidate = `${year}-${String(month).padStart(2, "0")}`;
-    onChange(candidate > current ? current : candidate);
-  };
-  return (
-    <div className="fm-month-picker" aria-label="Período de las métricas" aria-busy={busy || undefined}>
-      <IconButton label="Mes anterior" icon="ChevronLeft" onClick={() => onChange(shiftMonthKey(value, -1))} />
-      <div className="fm-month-picker__label">
-        <Icon name="CalendarDays" />
-        <strong>{argentinaMonthLabel(value)}</strong>
-      </div>
-      <IconButton label="Mes siguiente" icon="ChevronRight" disabled={value >= current} onClick={() => onChange(shiftMonthKey(value, 1))} />
-      <Select aria-label="Mes" value={selectedMonth} onChange={(event) => choose(selectedYear, Number(event.target.value))}>
-        {MONTHS.map((month, index) => {
-          const disabled = selectedYear === currentYear && index + 1 > Number(current.slice(5));
-          return <option key={month} value={index + 1} disabled={disabled}>{month}</option>;
-        })}
-      </Select>
-      <Select aria-label="Año" value={selectedYear} onChange={(event) => choose(Number(event.target.value), selectedMonth)}>
-        {years.map((year) => <option key={year} value={year}>{year}</option>)}
-      </Select>
-      {value !== current ? <Button variant="ghost" icon="RotateCcw" onClick={() => onChange(current)}>Mes actual</Button> : null}
     </div>
   );
 }
@@ -110,34 +73,89 @@ function ActivityList({ activities }) {
   );
 }
 
+function DashboardMetricsSkeleton() {
+  return (
+    <div className="fm-dashboard-metrics-loading" role="status" aria-live="polite">
+      <span className="sr-only">Actualizando métricas del panel</span>
+      <section className="fm-stat-grid" aria-hidden="true">
+        {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} lines={3} />)}
+      </section>
+      <section className="fm-two-column-grid" aria-hidden="true">
+        <Panel><Skeleton lines={6} /></Panel>
+        <Panel><Skeleton lines={6} /></Panel>
+      </section>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { profile } = useAuth();
-  const [monthKey, setMonthKey] = useState(() => argentinaMonthKey());
+  const [format, setFormat] = useState(() => {
+    const saved = window.sessionStorage.getItem(SESSION_FORMAT_KEY);
+    return VALID_FORMATS.has(saved) ? saved : "month";
+  });
+  const [referenceKey, setReferenceKey] = useState(() => argentinaDateKey());
+  const [selectedLocationIds, setSelectedLocationIds] = useState(null);
+
+  useEffect(() => {
+    window.sessionStorage.setItem(SESSION_FORMAT_KEY, format);
+  }, [format]);
+
   const locationsResult = useAsyncData(() => listLocations(profile), [profile.id]);
   const locations = locationsResult.data || [];
-  const locationIdsKey = locations.map((location) => location.id).sort().join(",");
-  const scopedLocationIds = can(profile, "locations", "viewAllLocations") ? undefined : locations.map((location) => location.id);
-  const monthResult = useAsyncData(async () => {
-    if (!locationsResult.data) return [];
-    const range = argentinaMonthRange(monthKey);
-    return listSalesByRange({ profile, locationIds: scopedLocationIds, ...range });
-  }, [profile.id, locationIdsKey, monthKey]);
-  const weekResult = useAsyncData(async () => {
-    if (!locationsResult.data) return [];
-    const range = lastSevenArgentinaDays();
-    return listSalesByRange({ profile, locationIds: scopedLocationIds, ...range });
-  }, [profile.id, locationIdsKey]);
+  const allowedLocationIds = useMemo(() => locations.map((location) => location.id), [locations]);
+  const allowedLocationIdsKey = allowedLocationIds.slice().sort().join(",");
+
+  useEffect(() => {
+    if (selectedLocationIds == null) return;
+    const allowed = new Set(allowedLocationIds);
+    setSelectedLocationIds((current) => {
+      const cleaned = (current || []).filter((id) => allowed.has(id));
+      return cleaned.length === (current || []).length ? current : cleaned;
+    });
+  }, [allowedLocationIdsKey]);
+
+  const effectiveLocationIds = useMemo(() => {
+    if (selectedLocationIds == null) return allowedLocationIds;
+    const allowed = new Set(allowedLocationIds);
+    return selectedLocationIds.filter((id) => allowed.has(id));
+  }, [allowedLocationIdsKey, selectedLocationIds]);
+  const selectedLocationIdsKey = effectiveLocationIds.slice().sort().join(",");
+  const range = useMemo(() => argentinaPeriodRange(format, referenceKey), [format, referenceKey]);
+  const periodLabel = useMemo(() => argentinaPeriodLabel(format, referenceKey), [format, referenceKey]);
+
+  const salesResult = useAsyncData(async () => {
+    if (!locationsResult.data || !effectiveLocationIds.length) return [];
+    return listSalesByRange({
+      profile,
+      locationIds: effectiveLocationIds,
+      start: range.start,
+      end: range.end,
+    });
+  }, [profile.id, allowedLocationIdsKey, selectedLocationIdsKey, format, referenceKey]);
+
   const activityResult = useAsyncData(async () => {
-    if (!locationsResult.data) return [];
-    const page = await listActivityPage({ profile, locationIds: scopedLocationIds, pageSize: 6 });
+    if (!locationsResult.data || !effectiveLocationIds.length) return [];
+    const page = await listActivityPage({
+      profile,
+      locationIds: effectiveLocationIds,
+      from: range.start,
+      to: range.end,
+      pageSize: 6,
+    });
     return page.items;
-  }, [profile.id, locationIdsKey]);
+  }, [profile.id, allowedLocationIdsKey, selectedLocationIdsKey, format, referenceKey]);
+
   const modules = visibleBusinessModules(profile);
-  const summary = useMemo(() => summarizeSales(monthResult.data || []), [monthResult.data]);
-  const chart = useMemo(() => buildSevenDaySalesSeries(weekResult.data || []), [weekResult.data]);
-  const weekSummary = useMemo(() => summarizeSales(weekResult.data || []), [weekResult.data]);
-  const initialLoading = locationsResult.status === "loading" || (monthResult.status === "loading" && !monthResult.data);
-  const hasError = locationsResult.status === "error" || monthResult.status === "error" || weekResult.status === "error" || activityResult.status === "error";
+  const summary = useMemo(() => summarizeSales(salesResult.data || []), [salesResult.data]);
+  const chart = useMemo(() => buildPeriodSalesSeries(salesResult.data || [], range, format), [salesResult.data, range, format]);
+  const metricsLoading = locationsResult.status === "loading" || salesResult.status === "loading";
+  const hasError = locationsResult.status === "error" || salesResult.status === "error" || activityResult.status === "error";
+
+  const handleFormatChange = (nextFormat) => {
+    if (!VALID_FORMATS.has(nextFormat)) return;
+    setFormat(nextFormat);
+  };
 
   return (
     <div className="fm-page-enter">
@@ -158,58 +176,68 @@ export default function DashboardPage() {
         </div>
       </HeroBanner>
 
-      <Panel className="fm-period-panel">
-        <MonthSelector value={monthKey} onChange={setMonthKey} busy={monthResult.status === "loading"} />
+      <Panel className="fm-period-panel fm-dashboard-filter-panel">
+        <DashboardFilters
+          format={format}
+          referenceKey={referenceKey}
+          locations={locations}
+          selectedLocationIds={selectedLocationIds}
+          onFormatChange={handleFormatChange}
+          onReferenceChange={setReferenceKey}
+          onLocationsChange={setSelectedLocationIds}
+          busy={metricsLoading}
+        />
       </Panel>
 
-      {initialLoading ? <Skeleton lines={4} /> : null}
       {hasError ? (
         <Panel>
           <EmptyState
             icon="WifiOff"
             title="No pudimos actualizar todo el panel"
             description="La sesión sigue activa. Reintentá las consultas cuando tengas conexión o revisá tus permisos."
-            action={<Button variant="secondary" onClick={() => { locationsResult.refresh(); monthResult.refresh(); weekResult.refresh(); activityResult.refresh(); }}>Reintentar</Button>}
+            action={<Button variant="secondary" onClick={() => { locationsResult.refresh(); salesResult.refresh(); activityResult.refresh(); }}>Reintentar</Button>}
           />
         </Panel>
       ) : null}
 
-      {locationsResult.data ? (
+      {metricsLoading ? <DashboardMetricsSkeleton /> : null}
+
+      {locationsResult.status === "ready" && salesResult.status === "ready" ? (
         <>
-          <section className="fm-stat-grid" aria-label={`Resumen de ${argentinaMonthLabel(monthKey)}`} aria-live="polite" aria-busy={monthResult.status === "loading" || undefined}>
-            <StatCard label="Ventas del mes" value={summary.count} hint={summary.count ? argentinaMonthLabel(monthKey) : "Sin ventas activas"} icon="ReceiptText" />
-            <StatCard label="Facturación del mes" value={formatMoney(summary.total)} hint="Total vendido, con descuentos" icon="CircleDollarSign" tone="olive" />
+          <section className="fm-stat-grid" aria-label={`Resumen de ${periodLabel}`} aria-live="polite">
+            <StatCard label="Ventas" value={summary.count} hint={summary.count ? periodLabel : "Sin ventas activas"} icon="ReceiptText" />
+            <StatCard label="Facturación" value={formatMoney(summary.total)} hint="Total vendido, con descuentos" icon="CircleDollarSign" tone="olive" />
             <StatCard label="Ticket promedio" value={formatMoney(summary.average)} hint={summary.count ? `${summary.count} ventas activas` : "Sin división por cero"} icon="ChartNoAxesCombined" tone="wood" />
-            <StatCard label="Ubicaciones visibles" value={locations.length} hint="Según tus permisos" icon="MapPin" tone="gold" />
+            <StatCard label="Ubicaciones incluidas" value={effectiveLocationIds.length} hint={`${allowedLocationIds.length} permitidas para tu usuario`} icon="MapPin" tone="gold" />
           </section>
-          {monthResult.status === "loading" && monthResult.data ? <p className="fm-refresh-note" role="status"><Icon name="RefreshCw" className="fm-spinner" /> Actualizando {argentinaMonthLabel(monthKey)}…</p> : null}
 
           <section className="fm-two-column-grid">
             <Panel
               title="Ritmo de ventas"
-              description="Facturación total de los últimos siete días, incluido hoy."
+              description={`Facturación del período seleccionado: ${periodLabel}.`}
               action={can(profile, "metrics", "view") ? <Link className="fm-button fm-button--secondary" to="/gestion/metrics/sales"><Icon name="Maximize2" /><span>Ver análisis completo</span></Link> : null}
             >
-              {weekResult.status === "loading" && !weekResult.data ? <Skeleton lines={4} /> : null}
-              {weekResult.data ? (
-                <ChartContainer
-                  title="Ventas de los últimos siete días"
-                  summary={`Siete días, ${weekSummary.count} ventas activas y ${formatMoney(weekSummary.total)} vendidos. Los días sin ventas tienen valor cero.`}
-                >
-                  <SalesBars data={chart} />
-                </ChartContainer>
-              ) : null}
+              <ChartContainer
+                title={`Ritmo de ventas de ${periodLabel}`}
+                summary={`${summary.count} ventas activas y ${formatMoney(summary.total)} vendidos. Los intervalos sin ventas tienen valor cero.`}
+              >
+                <SalesBars data={chart} />
+              </ChartContainer>
             </Panel>
             <Panel
-              title="Actividad reciente"
-              description="Operaciones más nuevas dentro de tus permisos."
+              title="Actividad del período"
+              description="Operaciones dentro del período y las ubicaciones seleccionadas."
               action={<Link className="fm-button fm-button--secondary" to="/gestion/actividad"><Icon name="Activity" /><span>Ver toda la actividad</span></Link>}
             >
               {activityResult.status === "loading" ? <Skeleton lines={5} /> : null}
               {activityResult.data?.length ? <ActivityList activities={activityResult.data} /> : null}
-              {activityResult.status === "ready" && !activityResult.data?.length ? <EmptyState icon="Activity" title="Sin actividad reciente" description="Las nuevas ventas, cargas de stock y acciones administrativas aparecerán aquí." /> : null}
+              {activityResult.status === "ready" && !activityResult.data?.length ? <EmptyState icon="Activity" title="Sin actividad en este período" description="Cambiá el período o las ubicaciones para consultar otras operaciones." /> : null}
             </Panel>
           </section>
+
+          {!effectiveLocationIds.length ? (
+            <Panel><EmptyState icon="MapPin" title="No hay ubicaciones seleccionadas" description="Abrí el filtro de Ubicaciones y elegí al menos una para actualizar las métricas." /></Panel>
+          ) : null}
 
           <Panel title="Tus módulos" description="El menú y estos accesos se generan desde los permisos de tu perfil.">
             <div className="fm-module-grid">
