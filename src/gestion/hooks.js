@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useAsyncData(loader, dependencies = []) {
   const [state, setState] = useState({
@@ -6,12 +6,16 @@ export function useAsyncData(loader, dependencies = []) {
     data: null,
     error: null,
   });
+  const requestSequence = useRef(0);
   const refresh = useCallback(async () => {
+    const requestId = ++requestSequence.current;
     setState((current) => ({ ...current, status: "loading", error: null }));
     try {
       const data = await loader();
+      if (requestSequence.current !== requestId) return;
       setState({ status: "ready", data, error: null });
     } catch (error) {
+      if (requestSequence.current !== requestId) return;
       setState({ status: "error", data: null, error });
     }
   // El llamador declara las dependencias que hacen estable al loader.
@@ -20,6 +24,9 @@ export function useAsyncData(loader, dependencies = []) {
 
   useEffect(() => {
     refresh();
+    return () => {
+      requestSequence.current += 1;
+    };
   }, [refresh]);
 
   return { ...state, refresh };
