@@ -11,11 +11,18 @@ test("el panel usa Venta Rápida y enlaza el flujo existente", async () => {
   assert.doesNotMatch(source, />Nueva venta</);
 });
 
-test("el panel incluye período mensual, análisis y actividad ampliable", async () => {
+test("el panel incluye selector temporal único, análisis y actividad ampliable", async () => {
   const source = await read("../src/gestion/pages/DashboardPage.jsx");
-  assert.match(source, /MonthSelector/);
-  assert.match(source, /Ventas del mes/);
-  assert.match(source, /Facturación del mes/);
+  const filters = await read("../src/gestion/components/DashboardFilters.jsx");
+  assert.match(source, /<DashboardFilters/);
+  assert.doesNotMatch(source, /MonthSelector/);
+  assert.match(source, /label="Ventas"/);
+  assert.match(source, /label="Facturación"/);
+  assert.match(filters, /Año/);
+  assert.match(filters, /Mes/);
+  assert.match(filters, /Semana/);
+  assert.match(filters, /Día/);
+  assert.match(filters, /Ubicaciones/);
   assert.match(source, /\/gestion\/metrics\/sales/);
   assert.match(source, /\/gestion\/actividad/);
 });
