@@ -1,24 +1,29 @@
 # Flor Mía · Plataforma integral
 
-Aplicación web única para la tienda y la gestión privada de Flor Mía. Integra el diseño y contenido aprobado de `flor-mia-web-fiel-v3` con la lógica comprobada de `FM-stock-y-ventas`, sin modificar ninguno de esos dos sistemas productivos.
+Aplicación web única para la tienda, el Panel Administrador y el Panel Vendedor de Flor Mía. Integra el diseño y contenido aprobado de `flor-mia-web-fiel-v3` con la lógica comprobada de `FM-stock-y-ventas`, sin modificar esos sistemas productivos anteriores.
 
 - Acceso inicial: <https://app-integral-fm.netlify.app/>
 - Gestión: <https://app-integral-fm.netlify.app/gestion>
+- Panel Vendedor: <https://app-integral-fm.netlify.app/vendedor>
 - Vista de tienda para administradores: <https://app-integral-fm.netlify.app/tienda>
 - Repositorio: <https://github.com/AgustinBazanUB/App-Integral-FM>
 
 ## Qué incluye
 
-- Acceso inicial privado en `/`, con autenticación persistente y navegación según permisos.
+- Acceso inicial privado en `/`, con autenticación persistente y navegación según rol y permisos.
 - Superficie de tienda en `/tienda`: home, catálogo, buscador, producto, carrito y checkout preparado; su vista requiere una sesión de administrador.
-- Superficie privada en `/gestion`: autenticación real, navegación por permisos y 12 módulos.
+- Panel Administrador en `/gestion`: autenticación real, navegación por permisos y 12 módulos.
+- Panel Vendedor en `/vendedor`: acceso automático para vendedores puros y cambio de panel para administradores sin cerrar sesión.
+- Panel Vendedor conectado a las ubicaciones reales: productos por categoría, stock local, precios, descuentos habilitados, carrito, botonera Bluetooth y ventas del día.
+- Pagos simples y `+2 pagos`, con validación exacta de importes enteros y al menos dos medios.
+- Ventas pendientes en IndexedDB, sincronización idempotente, estados de error y reserva local de unidades en el dispositivo.
+- Alta, edición y anulación de ventas mediante transacciones que actualizan venta, stock, movimientos y auditoría.
 - Panel general con un único selector de período, formatos Año/Mes/Semana/Día, calendario adaptativo, filtro multiselección de ubicaciones y métricas sincronizadas.
 - Ubicaciones y eventos: hasta cuatro ubicaciones fijadas, acceso rápido a stock y una vista operativa con Productos, Cargar stock, Vendedores y Descuentos.
 - Productos por ubicación: creación desde el catálogo maestro, alcance local o global, categorías expandibles, configuración local y selector de imágenes incluidas en el proyecto.
 - Stock por ubicación: validación de actividad, movimientos auditados, confirmación de reducciones y valores numéricos con contraste reforzado.
 - Vendedores y descuentos: lista de asignados separada de disponibles, avatares e IDs de descuentos globales habilitados por ubicación.
 - Catálogo maestro unido dinámicamente al stock local: los productos nuevos aparecen sin duplicarse y con stock cero hasta configurarlos.
-- Ventas rápidas: carrito táctil, validación de stock y confirmación atómica en Firestore.
 - Usuarios: creación en Firebase Authentication con una app secundaria, roles, ubicaciones y baja lógica.
 - Design system Flor Mía: tokens CSS, componentes compartidos, responsive y WCAG 2.2 AA.
 - PWA instalable, SPA de Netlify, cabeceras de seguridad, caché y CI.
@@ -38,7 +43,7 @@ npm install
 npm run dev
 ```
 
-El acceso inicial se abre en `http://localhost:5173/`, la gestión en `http://localhost:5173/gestion` y la vista de tienda para administradores en `http://localhost:5173/tienda`.
+El acceso inicial se abre en `http://localhost:5173/`, la gestión en `http://localhost:5173/gestion`, el Panel Vendedor en `http://localhost:5173/vendedor` y la vista de tienda para administradores en `http://localhost:5173/tienda`.
 
 ## Verificar
 
@@ -47,7 +52,7 @@ npm test
 npm run build
 ```
 
-Las pruebas cubren catálogo, assets, búsqueda, permisos, pagos, descuentos, períodos en hora argentina, métricas sin duplicados, siete días completos, catálogo maestro, prevención de stock negativo, acceso inicial persistente, mejoras operativas de Ubicaciones, selector anual/mensual/semanal/diario, semanas de lunes a domingo y filtros de ubicaciones autorizadas.
+Las pruebas cubren catálogo, assets, búsqueda, permisos, pagos, descuentos, períodos en hora argentina, métricas sin duplicados, siete días completos, catálogo maestro, prevención de stock negativo, acceso inicial persistente, mejoras de Ubicaciones, filtros del Panel General, acceso por rol al Panel Vendedor, ubicaciones efectivas, carrito, botonera, pagos múltiples, offline, idempotencia, transacciones de venta, edición, anulación y responsive.
 
 Para validar reglas con el emulador (requiere Java 21 o superior):
 
@@ -79,10 +84,11 @@ La plataforma usa el proyecto Firebase separado `app-integral-fm`. El sistema an
 - [Versión 1.1 · Envío 1: acceso inicial y sesión](docs/versions/V1.1-LOGIN-INICIAL.md)
 - [Versión 1.1 · Envío 2: mejoras de Ubicaciones](docs/versions/V1.1-MEJORAS-UBICACIONES.md)
 - [Versión 1.1 · Envío 3: filtros del Panel General](docs/versions/V1.1-FILTROS-PANEL-GENERAL.md)
+- [Versión 1.1 · Envío 4: Panel Vendedor](docs/versions/V1.1-PANEL-VENDEDOR.md)
 - [Backlog](docs/BACKLOG.md)
 - [Sistema visual original](docs/FLOR-MIA-DESIGN-SYSTEM.txt)
 - [Especificación funcional original](docs/ESPECIFICACION-FUNCIONAL.txt)
 
 ## Estado honesto de integraciones
 
-La app no procesa pagos online, no emite comprobantes ARCA, no envía mensajes ni automatiza redes. Esas interfaces están preparadas y documentadas; se activarán únicamente al recibir proveedores, credenciales y reglas comerciales reales.
+La app no procesa pagos online, no emite comprobantes ARCA, no envía mensajes ni automatiza redes. El recibo del Panel Vendedor es interno y no reemplaza un comprobante fiscal. Esas integraciones se activarán únicamente al recibir proveedores, credenciales y reglas comerciales reales.
