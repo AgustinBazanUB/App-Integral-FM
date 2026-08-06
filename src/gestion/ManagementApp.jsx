@@ -1,10 +1,15 @@
 import { useEffect } from "react";
 import { Skeleton } from "../design-system";
-import { useLocation } from "../router";
+import { useLocation, useNavigate } from "../router";
 import { AuthProvider, useAuth } from "./AuthContext";
 import ManagementShell from "./ManagementShell";
 import { moduleById } from "./modules";
-import { canAccessManagementRoute } from "./permissions";
+import {
+  canAccessAdminPanel,
+  canAccessManagementRoute,
+  canAccessSellerPanel,
+  isPureSeller,
+} from "./permissions";
 import AdministrationPage from "./pages/AdministrationPage";
 import ActivityPage from "./pages/ActivityPage";
 import AuditPage from "./pages/AuditPage";
@@ -17,27 +22,51 @@ import NotAuthorizedPage from "./pages/NotAuthorizedPage";
 import QuickSalesPage from "./pages/QuickSalesPage";
 import SalesMetricsPage from "./pages/SalesMetricsPage";
 import SettingsPage from "./pages/SettingsPage";
+import SellerPanel from "./seller/SellerPanel";
 
 const routeIdFromPath = (pathname) =>
   pathname.split("/").filter(Boolean)[1] || "dashboard";
 
 function ManagementRouter() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { status, profile, error } = useAuth();
   const routeId = routeIdFromPath(location.pathname);
   const pathParts = location.pathname.split("/").filter(Boolean);
+  const sellerPath =
+    location.pathname === "/vendedor" ||
+    location.pathname.startsWith("/vendedor/");
 
   useEffect(() => {
+    if (status !== "ready") return;
+    if (isPureSeller(profile) && !sellerPath) {
+      navigate("/vendedor", { replace: true });
+      return;
+    }
+    if (sellerPath && !canAccessSellerPanel(profile) && canAccessAdminPanel(profile)) {
+      navigate("/gestion", { replace: true });
+    }
+  }, [status, profile, sellerPath, navigate]);
+
+  useEffect(() => {
+    if (sellerPath) {
+      document.title = "Panel Vendedor | Flor Mía";
+      return;
+    }
     document.title = routeId === "dashboard"
       ? "Gestión integral | Flor Mía"
       : `${routeId === "actividad" ? "Actividad" : moduleById[routeId]?.label || "Gestión"} | Flor Mía`;
-  }, [routeId]);
+  }, [routeId, sellerPath]);
 
   if (status === "loading") {
     return <main className="fm-auth-loading" id="main-content"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><Skeleton lines={3} /></main>;
   }
   if (status === "signed-out" || status === "error") {
     return <LoginPage sessionError={status === "error" ? error : null} />;
+  }
+
+  if (sellerPath || isPureSeller(profile)) {
+    return canAccessSellerPanel(profile) ? <SellerPanel /> : <NotAuthorizedPage />;
   }
 
   let page;
