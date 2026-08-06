@@ -54,14 +54,16 @@ function Storefront() {
 
 export default function App() {
   const location = useLocation();
-  const isManagementPath =
+  const isPrivatePath =
     location.pathname === "/" ||
     location.pathname === "/gestion" ||
-    location.pathname.startsWith("/gestion/");
+    location.pathname.startsWith("/gestion/") ||
+    location.pathname === "/vendedor" ||
+    location.pathname.startsWith("/vendedor/");
 
-  if (isManagementPath) {
+  if (isPrivatePath) {
     return (
-      <Suspense fallback={<main className="fm-auth-loading" id="main-content"><span>Cargando gestión…</span></main>}>
+      <Suspense fallback={<main className="fm-auth-loading" id="main-content"><span>Cargando plataforma…</span></main>}>
         <ManagementApp />
       </Suspense>
     );
