@@ -6,8 +6,13 @@ const formatter = new Intl.DateTimeFormat("en-CA", {
   month: "2-digit",
   day: "2-digit",
 });
-
+const hourFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: ARGENTINA_TIME_ZONE,
+  hour: "2-digit",
+  hourCycle: "h23",
+});
 const pad = (value) => String(value).padStart(2, "0");
+const validFormats = new Set(["year", "month", "week", "day"]);
 
 export function argentinaParts(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
@@ -18,6 +23,10 @@ export function argentinaParts(value = new Date()) {
       .map((part) => [part.type, Number(part.value)]),
   );
   return { year: parts.year, month: parts.month, day: parts.day };
+}
+
+export function argentinaHour(value = new Date()) {
+  return Number(hourFormatter.format(value instanceof Date ? value : new Date(value)));
 }
 
 export function argentinaDateKey(value = new Date()) {
@@ -80,12 +89,121 @@ export function argentinaMonthLabel(monthKey) {
 }
 
 export function lastSevenArgentinaDays(now = new Date()) {
-  const today = argentinaStartOfDay(
-    argentinaParts(now).year,
-    argentinaParts(now).month,
-    argentinaParts(now).day,
-  );
+  const todayParts = argentinaParts(now);
+  const today = argentinaStartOfDay(todayParts.year, todayParts.month, todayParts.day);
   const start = addArgentinaDays(today, -6);
   const end = addArgentinaDays(today, 1);
   return { start, end };
+}
+
+function asArgentinaDate(value = new Date()) {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.valueOf())) throw new Error("Seleccioná una fecha válida.");
+    return value;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return argentinaDateFromKey(value);
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) throw new Error("Seleccioná una fecha válida.");
+  return date;
+}
+
+function assertPeriodFormat(format) {
+  if (!validFormats.has(format)) throw new Error("Elegí un formato temporal válido.");
+}
+
+function daysInMonth(year, month) {
+  return new Date(Date.UTC(year, month, 0, 12)).getUTCDate();
+}
+
+export function argentinaStartOfWeek(value = new Date()) {
+  const date = asArgentinaDate(value);
+  const parts = argentinaParts(date);
+  const dayStart = argentinaStartOfDay(parts.year, parts.month, parts.day);
+  const mondayOffset = (dayStart.getUTCDay() + 6) % 7;
+  return addArgentinaDays(dayStart, -mondayOffset);
+}
+
+export function argentinaPeriodRange(format, reference = new Date()) {
+  assertPeriodFormat(format);
+  const date = asArgentinaDate(reference);
+  const { year, month, day } = argentinaParts(date);
+  let start;
+  let end;
+  if (format === "year") {
+    start = argentinaStartOfDay(year, 1, 1);
+    end = argentinaStartOfDay(year + 1, 1, 1);
+  } else if (format === "month") {
+    ({ start, end } = argentinaMonthRange(`${year}-${pad(month)}`));
+  } else if (format === "week") {
+    start = argentinaStartOfWeek(date);
+    end = addArgentinaDays(start, 7);
+  } else {
+    start = argentinaStartOfDay(year, month, day);
+    end = addArgentinaDays(start, 1);
+  }
+  return {
+    format,
+    referenceKey: argentinaDateKey(date),
+    start,
+    end,
+  };
+}
+
+export function shiftArgentinaPeriodReference(format, reference, amount) {
+  assertPeriodFormat(format);
+  const date = asArgentinaDate(reference);
+  const { year, month, day } = argentinaParts(date);
+  const delta = Number(amount || 0);
+  if (format === "day" || format === "week") {
+    return argentinaDateKey(addArgentinaDays(date, delta * (format === "week" ? 7 : 1)));
+  }
+  if (format === "year") {
+    const nextYear = year + delta;
+    return argentinaDateKey(argentinaStartOfDay(nextYear, month, Math.min(day, daysInMonth(nextYear, month))));
+  }
+  const absoluteMonth = year * 12 + (month - 1) + delta;
+  const nextYear = Math.floor(absoluteMonth / 12);
+  const nextMonth = ((absoluteMonth % 12) + 12) % 12 + 1;
+  return argentinaDateKey(argentinaStartOfDay(nextYear, nextMonth, Math.min(day, daysInMonth(nextYear, nextMonth))));
+}
+
+const capitalize = (value) => value.charAt(0).toUpperCase() + value.slice(1);
+const fullDateLabel = (value) => new Intl.DateTimeFormat("es-AR", {
+  timeZone: ARGENTINA_TIME_ZONE,
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+}).format(value);
+
+export function argentinaPeriodLabel(format, reference = new Date()) {
+  const range = argentinaPeriodRange(format, reference);
+  if (format === "year") return String(argentinaParts(range.start).year);
+  if (format === "month") return argentinaMonthLabel(argentinaMonthKey(range.start));
+  if (format === "day") return capitalize(fullDateLabel(range.start));
+  const lastDay = addArgentinaDays(range.end, -1);
+  const startParts = argentinaParts(range.start);
+  const endParts = argentinaParts(lastDay);
+  const monthName = (date) => new Intl.DateTimeFormat("es-AR", {
+    timeZone: ARGENTINA_TIME_ZONE,
+    month: "long",
+  }).format(date);
+  if (startParts.year === endParts.year && startParts.month === endParts.month) {
+    return `${startParts.day} al ${endParts.day} de ${monthName(lastDay)} de ${endParts.year}`;
+  }
+  if (startParts.year === endParts.year) {
+    return `${startParts.day} de ${monthName(range.start)} al ${endParts.day} de ${monthName(lastDay)} de ${endParts.year}`;
+  }
+  return `${fullDateLabel(range.start)} al ${fullDateLabel(lastDay)}`;
+}
+
+export function isArgentinaPeriodFuture(format, reference, now = new Date()) {
+  const range = argentinaPeriodRange(format, reference);
+  const todayParts = argentinaParts(now);
+  const today = argentinaStartOfDay(todayParts.year, todayParts.month, todayParts.day);
+  return range.start > today;
+}
+
+export function canAdvanceArgentinaPeriod(format, reference, now = new Date()) {
+  const nextReference = shiftArgentinaPeriodReference(format, reference, 1);
+  return !isArgentinaPeriodFuture(format, nextReference, now);
 }
