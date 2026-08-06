@@ -16,6 +16,7 @@ import {
 } from "./modules";
 import {
   canAccessManagementRoute,
+  canAccessSellerPanel,
   normalizedRole,
 } from "./permissions";
 
@@ -149,7 +150,10 @@ export default function ManagementShell({ children }) {
           <Badge tone={online ? "success" : "warning"} icon={online ? "Wifi" : "WifiOff"}>{online ? "En línea" : "Sin conexión"}</Badge>
           <Dropdown label={<span className="fm-profile-trigger"><span className="fm-avatar">{(profile.name || profile.email || "F").slice(0, 1).toUpperCase()}</span><span><strong>{profile.name || "Usuario"}</strong><small>{roleLabels[normalizedRole(profile)] || normalizedRole(profile)}</small></span><Icon name="ChevronDown" /></span>}>
             <div className="fm-profile-menu">
-              <Link to="/gestion/settings"><Icon name="Settings2" />Configuración</Link>
+              <Link to="/gestion/settings"><Icon name="UserRound" />Mi perfil</Link>
+              {canAccessSellerPanel(profile) ? (
+                <Link to="/vendedor" onClick={() => localStorage.setItem(`flor-mia-preferred-panel-${profile.id}`, "seller")}><Icon name="ShoppingCart" />Ver Panel Vendedor</Link>
+              ) : null}
               <button type="button" onClick={logout}><Icon name="LogOut" />Cerrar sesión</button>
             </div>
           </Dropdown>
