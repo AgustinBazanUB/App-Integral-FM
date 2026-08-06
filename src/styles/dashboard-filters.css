@@ -1,0 +1,95 @@
+.fm-dashboard-filter-panel .fm-panel__body { padding-block: 12px; }
+.fm-dashboard-filter-bar { display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; }
+.fm-dashboard-period-control { display: grid; grid-template-columns: 44px minmax(250px, 1fr) 44px; align-items: center; gap: 8px; min-width: 0; }
+.fm-dashboard-period-control .fm-icon-button { min-width: 44px; min-height: 44px; }
+.fm-dashboard-period-trigger { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; min-height: 48px; align-items: center; gap: 10px; border: 1px solid #e8e2da; border-radius: 11px; background: #f7f1e8; padding: 0 15px; color: #2f2924; cursor: pointer; font: inherit; text-align: left; box-shadow: 0 2px 8px rgb(72 57 37 / 5%); transition: border-color var(--fm-duration-standard), box-shadow var(--fm-duration-standard), background var(--fm-duration-standard); }
+.fm-dashboard-period-trigger:hover { border-color: #c9a65b; background: #f3e8cf; }
+.fm-dashboard-period-trigger:focus-visible,
+.fm-dashboard-calendar button:focus-visible,
+.fm-dashboard-location-group label:has(input:focus-visible) { outline: 3px solid rgb(184 138 45 / 28%); outline-offset: 2px; }
+.fm-dashboard-period-trigger > svg:first-child { width: 20px; color: #b88a2d; }
+.fm-dashboard-period-trigger > svg:last-child { width: 16px; color: #76510f; }
+.fm-dashboard-period-trigger span { overflow: hidden; color: #2f2924; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.fm-dashboard-select-control { display: grid; grid-template-columns: auto auto minmax(92px, 1fr); min-height: 48px; align-items: center; gap: 7px; border: 1px solid var(--fm-border); border-radius: 11px; background: #fff; padding: 0 8px 0 12px; color: #4a433c; font-size: 11px; font-weight: 700; }
+.fm-dashboard-select-control svg { width: 17px; color: #76510f; }
+.fm-dashboard-select-control select { min-height: 36px; border: 0; background: transparent; color: #2f2924; font: inherit; cursor: pointer; }
+.fm-dashboard-locations-trigger { min-height: 48px; max-width: 230px; justify-content: flex-start; }
+.fm-dashboard-locations-trigger > span { display: grid; min-width: 0; text-align: left; }
+.fm-dashboard-locations-trigger__label { color: var(--fm-text-muted); font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.fm-dashboard-locations-trigger strong { overflow: hidden; color: #2f2924; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.fm-dashboard-calendar { width: min(650px, calc(100vw - 72px)); max-width: 100%; }
+.fm-dashboard-calendar__navigation { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 10px; margin-bottom: 16px; }
+.fm-dashboard-calendar__navigation strong { color: #2f2924; font-family: var(--fm-font-display); font-size: 22px; text-align: center; }
+.fm-dashboard-year-grid,
+.fm-dashboard-month-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+.fm-dashboard-year-grid button,
+.fm-dashboard-month-grid button { min-height: 52px; border: 1px solid #e8e2da; border-radius: 10px; background: #fff; color: #2f2924; cursor: pointer; font: inherit; font-weight: 650; }
+.fm-dashboard-year-grid button:hover:not(:disabled),
+.fm-dashboard-month-grid button:hover:not(:disabled) { border-color: #b88a2d; background: #f7f1e8; }
+.fm-dashboard-calendar button.is-selected { border-color: #9d721d; background: #f3e8cf; color: #5e430f; box-shadow: inset 0 0 0 1px #cda852; }
+.fm-dashboard-calendar button:disabled { cursor: not-allowed; opacity: .42; }
+.fm-dashboard-weekdays,
+.fm-dashboard-day-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.fm-dashboard-weekdays { margin-bottom: 6px; }
+.fm-dashboard-weekdays span { color: #6d655e; font-size: 10px; font-weight: 750; text-align: center; text-transform: uppercase; }
+.fm-dashboard-day-grid button { position: relative; min-width: 44px; min-height: 44px; border: 1px solid transparent; border-radius: 9px; background: #fff; color: #2f2924; cursor: pointer; font: inherit; font-weight: 650; }
+.fm-dashboard-day-grid button:hover:not(:disabled) { border-color: #c9a65b; background: #f7f1e8; }
+.fm-dashboard-day-grid button.is-outside { color: #968f88; background: #fbfaf8; }
+.fm-dashboard-day-grid button.is-today::after { position: absolute; right: 50%; bottom: 4px; width: 5px; height: 5px; border-radius: 50%; background: #76510f; content: ""; transform: translateX(50%); }
+.fm-dashboard-location-selector { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; width: min(700px, calc(100vw - 72px)); max-width: 100%; }
+.fm-dashboard-location-group { min-width: 0; max-height: 390px; overflow-y: auto; border: 1px solid #e8e2da; border-radius: 12px; background: #fbfaf8; padding: 12px; }
+.fm-dashboard-location-group h3 { position: sticky; z-index: 1; top: -12px; margin: -12px -12px 8px; border-bottom: 1px solid #e8e2da; background: #f7f1e8; padding: 12px; color: #76510f; font-size: 12px; }
+.fm-dashboard-location-group label { display: grid; grid-template-columns: auto 1fr; min-height: 48px; align-items: center; gap: 10px; border-radius: 9px; padding: 6px 8px; cursor: pointer; }
+.fm-dashboard-location-group label:hover { background: #f3e8cf; }
+.fm-dashboard-location-group input { width: 18px; height: 18px; accent-color: #9d721d; }
+.fm-dashboard-location-group strong,
+.fm-dashboard-location-group small { display: block; }
+.fm-dashboard-location-group strong { color: #2f2924; font-size: 12px; }
+.fm-dashboard-location-group small,
+.fm-dashboard-location-group p { color: #6d655e; font-size: 10px; }
+.fm-dashboard-location-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.fm-dashboard-location-actions > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.fm-dashboard-metrics-loading .fm-stat-grid > .fm-skeleton { min-height: 130px; border: 1px solid var(--fm-border); border-radius: var(--fm-radius-card); background: #fff; padding: 18px; }
+.fm-bars--dense { gap: clamp(2px, .35vw, 7px); }
+.fm-bars--dense .fm-bars__item > span:last-child { overflow: hidden; width: 100%; font-size: 8px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1100px) {
+  .fm-dashboard-filter-bar { flex-wrap: wrap; }
+  .fm-dashboard-period-control { flex: 1 1 100%; max-width: 620px; }
+  .fm-dashboard-select-control,
+  .fm-dashboard-locations-trigger { flex: 1 1 220px; max-width: 310px; }
+}
+@media (max-width: 768px) {
+  .fm-dashboard-filter-bar { align-items: stretch; }
+  .fm-dashboard-period-control { width: 100%; grid-template-columns: 44px minmax(0, 1fr) 44px; }
+  .fm-dashboard-period-trigger { padding-inline: 10px; }
+  .fm-dashboard-period-trigger span { font-size: 12px; }
+  .fm-dashboard-select-control,
+  .fm-dashboard-locations-trigger { width: calc(50% - 6px); max-width: none; flex: 1 1 calc(50% - 6px); }
+  .fm-dashboard-calendar,
+  .fm-dashboard-location-selector { width: 100%; }
+  .fm-dashboard-location-selector { grid-template-columns: 1fr; }
+  .fm-dashboard-location-group { max-height: 230px; }
+}
+@media (max-width: 480px) {
+  .fm-dashboard-select-control,
+  .fm-dashboard-locations-trigger { width: 100%; flex-basis: 100%; }
+  .fm-dashboard-year-grid,
+  .fm-dashboard-month-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fm-dashboard-calendar__navigation strong { font-size: 19px; }
+  .fm-dashboard-day-grid { gap: 2px; }
+  .fm-dashboard-day-grid button { min-width: 0; min-height: 44px; padding: 0; }
+  .fm-dashboard-location-actions,
+  .fm-dashboard-location-actions > div { width: 100%; }
+  .fm-dashboard-location-actions > div:last-child .fm-button { flex: 1; }
+}
+@media (max-width: 360px) {
+  .fm-dashboard-period-control { gap: 4px; }
+  .fm-dashboard-period-trigger { gap: 6px; padding-inline: 8px; }
+  .fm-dashboard-period-trigger span { font-size: 11px; }
+  .fm-dashboard-year-grid,
+  .fm-dashboard-month-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fm-dashboard-period-trigger,
+  .fm-dashboard-calendar button { transition: none; }
+}
