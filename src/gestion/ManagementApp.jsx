@@ -13,6 +13,7 @@ import {
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import NotAuthorizedPage from "./pages/NotAuthorizedPage";
+import { listLocationsShared } from "./services/sharedResources";
 
 const loadSellerPanel = () => import("./seller/SellerPanel");
 const SellerPanel = lazy(loadSellerPanel);
@@ -74,8 +75,8 @@ function ManagementRouter() {
     return scheduleIdle(() => {
       Promise.all([
         loadSellerPanel(),
-        import("./services/sharedResources"),
-      ]).then(([, resources]) => resources.listLocationsShared(profile)).catch(() => {});
+        listLocationsShared(profile),
+      ]).catch(() => {});
     });
   }, [status, profile?.id, sellerPath]);
 
