@@ -1,4 +1,4 @@
-const CACHE_NAME = "flor-mia-integral-v3";
+const CACHE_NAME = "flor-mia-integral-v2";
 const APP_SHELL = [
   "/",
   "/gestion",
@@ -23,42 +23,28 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-function cacheResponse(request, response) {
-  if (!response?.ok) return response;
-  const copy = response.clone();
-  caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-  return response;
-}
-
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => cacheResponse(event.request, response))
-        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/"))),
+      fetch(event.request).catch(() => caches.match("/")),
     );
     return;
   }
-
-  if (["script", "style"].includes(event.request.destination)) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => cacheResponse(event.request, response))
-        .catch(() => caches.match(event.request)),
-    );
-    return;
-  }
-
-  if (!["font", "image"].includes(event.request.destination)) return;
+  if (!["style", "script", "font", "image"].includes(event.request.destination)) return;
   event.respondWith(
     caches.match(event.request).then(
       (cached) =>
         cached ||
-        fetch(event.request).then((response) => cacheResponse(event.request, response)),
+        fetch(event.request).then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        }),
     ),
   );
 });

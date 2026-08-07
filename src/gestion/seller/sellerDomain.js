@@ -12,7 +12,6 @@ export const SELLER_ACTION_SHORTCUTS = [
   { id: "paymentDebit", label: "Pago débito", paymentMethod: "debit" },
   { id: "paymentAlias", label: "Pago alias", paymentMethod: "alias" },
   { id: "paymentCash", label: "Pago efectivo", paymentMethod: "cash" },
-  { id: "generateTicket", label: "Agregar ticket", action: "ticket" },
 ];
 
 export const sellerImage = (item = {}) =>

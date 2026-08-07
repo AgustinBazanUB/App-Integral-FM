@@ -27,7 +27,6 @@ import "./styles/seller-stage2-mobile.css";
 import "./styles/responsive.css";
 import "./styles/performance-optimizations.css";
 import "./styles/metrics-fixes.css";
-import "./styles/seller-stage2-production.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -41,11 +40,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/service-worker.js", { updateViaCache: "none" })
-      .then((registration) => registration.update().catch(() => {}))
-      .catch(() => {
-        // La app sigue operativa en navegadores que bloquean el service worker.
-      });
+    navigator.serviceWorker.register("/service-worker.js").catch(() => {
+      // La app sigue operativa en navegadores que bloquean el service worker.
+    });
   });
 }

@@ -1,23 +1,14 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { locationActivity } from "../../modules/locations/domain/locations";
-import { SINGLE_PAYMENT_METHODS } from "../../modules/locations/domain/payments";
 import { argentinaDateKey, argentinaMonthKey, argentinaParts } from "../../modules/locations/domain/time";
 import { Icon } from "./icons";
 
-const paymentLabels = {
-  cash: "Efectivo",
-  debit: "Débito",
-  credit: "Crédito",
-  alias: "Alias / transferencia",
-};
-const paymentOptions = SINGLE_PAYMENT_METHODS.map((id) => [id, paymentLabels[id] || id]);
+const paymentOptions = [
+  ["cash", "Efectivo"],
+  ["debit", "Débito"],
+  ["credit", "Crédito"],
+  ["alias", "Alias / transferencia"],
+];
 
 const filterKeys = {
   locations: ["locationIds"],
@@ -50,8 +41,6 @@ function MultiSection({
   open,
   disabled,
   triggerRef,
-  layerRef,
-  layerStyle,
   onToggle,
   onApply,
   onCancel,
@@ -61,30 +50,6 @@ function MultiSection({
   const selectionLabel = values.length
     ? `${values.length} seleccionado${values.length === 1 ? "" : "s"}`
     : allLabel;
-  const layer = open && typeof document !== "undefined" ? createPortal(
-    <div
-      ref={layerRef}
-      id={bodyId}
-      className="fm-metrics-filter-group__body fm-metrics-filter-layer"
-      role="dialog"
-      aria-label={`Filtro ${title}`}
-      data-metrics-filter-body={id}
-      style={layerStyle || undefined}
-    >
-      <header className="fm-metrics-filter-layer__header">
-        <span><Icon name={icon} /><strong>{title}</strong></span>
-        <button type="button" aria-label={`Cerrar filtro ${title}`} onClick={onCancel}><Icon name="X" /></button>
-      </header>
-      <div className="fm-metrics-filter-group__options">
-        {children}
-      </div>
-      <div className="fm-metrics-filter-group__actions">
-        <button type="button" className="fm-button fm-button--text" onClick={onCancel}>Cancelar</button>
-        <button type="button" className="fm-button fm-button--primary" onClick={onApply}>Aplicar</button>
-      </div>
-    </div>,
-    document.body,
-  ) : null;
 
   return (
     <div className={`fm-metrics-filter-group ${open ? "is-open" : ""}`}>
@@ -103,7 +68,23 @@ function MultiSection({
         <small title={selectionLabel}>{selectionLabel}</small>
         <Icon name="ChevronDown" />
       </button>
-      {layer}
+      {open ? (
+        <div
+          id={bodyId}
+          className="fm-metrics-filter-group__body"
+          role="dialog"
+          aria-label={`Filtro ${title}`}
+          data-metrics-filter-body={id}
+        >
+          <div className="fm-metrics-filter-group__options">
+            {children}
+          </div>
+          <div className="fm-metrics-filter-group__actions">
+            <button type="button" className="fm-button fm-button--text" onClick={onCancel}>Cancelar</button>
+            <button type="button" className="fm-button fm-button--primary" onClick={onApply}>Aplicar</button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -125,9 +106,7 @@ export default function MetricsFiltersPanel({
   const inactiveLocations = locations.filter((location) => !locationActivity(location).active);
   const [openFilter, setOpenFilter] = useState(null);
   const [draft, setDraft] = useState(state);
-  const [layerStyle, setLayerStyle] = useState(null);
   const rootRef = useRef(null);
-  const layerRef = useRef(null);
   const triggerRefs = useRef({});
 
   const restoreTriggerFocus = useCallback((filterId) => {
@@ -138,83 +117,23 @@ export default function MetricsFiltersPanel({
   const closeFilter = useCallback((restoreFocus = true) => {
     const current = openFilter;
     setOpenFilter(null);
-    setLayerStyle(null);
     if (restoreFocus) restoreTriggerFocus(current);
   }, [openFilter, restoreTriggerFocus]);
-
-  const updateLayerPosition = useCallback(() => {
-    if (!openFilter || typeof window === "undefined") return;
-    if (window.matchMedia("(max-width: 768px)").matches) {
-      setLayerStyle(null);
-      return;
-    }
-    const trigger = triggerRefs.current[openFilter];
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    const margin = 12;
-    const gap = 8;
-    const width = Math.min(360, Math.max(280, window.innerWidth - margin * 2));
-    const left = Math.min(
-      Math.max(margin, rect.left),
-      Math.max(margin, window.innerWidth - width - margin),
-    );
-    const spaceBelow = Math.max(0, window.innerHeight - rect.bottom - gap - margin);
-    const spaceAbove = Math.max(0, rect.top - gap - margin);
-    const placeAbove = spaceBelow < 260 && spaceAbove > spaceBelow;
-    const availableHeight = Math.max(180, Math.min(430, placeAbove ? spaceAbove : spaceBelow));
-    const next = {
-      width: `${Math.round(width)}px`,
-      left: `${Math.round(left)}px`,
-      maxHeight: `${Math.round(availableHeight)}px`,
-    };
-    if (placeAbove) {
-      next.bottom = `${Math.round(window.innerHeight - rect.top + gap)}px`;
-    } else {
-      next.top = `${Math.round(rect.bottom + gap)}px`;
-    }
-    setLayerStyle(next);
-  }, [openFilter]);
-
-  useLayoutEffect(() => {
-    if (!openFilter) return undefined;
-    updateLayerPosition();
-    window.addEventListener("resize", updateLayerPosition);
-    window.addEventListener("scroll", updateLayerPosition, true);
-    return () => {
-      window.removeEventListener("resize", updateLayerPosition);
-      window.removeEventListener("scroll", updateLayerPosition, true);
-    };
-  }, [openFilter, updateLayerPosition]);
 
   useEffect(() => {
     if (!openFilter) return undefined;
     const frame = window.requestAnimationFrame(() => {
-      layerRef.current?.querySelector("input, button, summary, [tabindex]:not([tabindex='-1'])")?.focus?.();
+      rootRef.current
+        ?.querySelector(`[data-metrics-filter-body="${openFilter}"] input, [data-metrics-filter-body="${openFilter}"] button`)
+        ?.focus?.();
     });
     const onPointerDown = (event) => {
-      if (rootRef.current?.contains(event.target) || layerRef.current?.contains(event.target)) return;
-      closeFilter(true);
+      if (!rootRef.current?.contains(event.target)) closeFilter(true);
     };
     const onKeyDown = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeFilter(true);
-        return;
-      }
-      if (event.key !== "Tab" || !layerRef.current?.contains(document.activeElement)) return;
-      const focusable = [...layerRef.current.querySelectorAll(
-        "button:not(:disabled), input:not(:disabled), summary, [href], [tabindex]:not([tabindex='-1'])",
-      )].filter((element) => element.offsetParent !== null);
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeFilter(true);
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -256,16 +175,12 @@ export default function MetricsFiltersPanel({
   };
 
   const setImmediate = (key, value) => {
-    if (openFilter) {
-      setOpenFilter(null);
-      setLayerStyle(null);
-    }
+    if (openFilter) setOpenFilter(null);
     onChange({ ...state, [key]: value });
   };
 
   const setDraftField = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
   const productSelectionCount = state.categoryIds.length + state.productIds.length;
-  const commonLayerProps = { layerRef, layerStyle };
 
   return (
     <div ref={rootRef} className="fm-metrics-filters" aria-busy={busy || undefined}>
@@ -289,7 +204,6 @@ export default function MetricsFiltersPanel({
 
       <div className="fm-metrics-filter-grid">
         <MultiSection
-          {...commonLayerProps}
           id="locations"
           title="Ubicaciones"
           icon="MapPin"
@@ -310,7 +224,6 @@ export default function MetricsFiltersPanel({
         </MultiSection>
 
         <MultiSection
-          {...commonLayerProps}
           id="sellers"
           title="Vendedores"
           icon="UsersRound"
@@ -328,7 +241,6 @@ export default function MetricsFiltersPanel({
         </MultiSection>
 
         <MultiSection
-          {...commonLayerProps}
           id="products"
           title="Productos"
           icon="Boxes"
@@ -358,7 +270,6 @@ export default function MetricsFiltersPanel({
         </MultiSection>
 
         <MultiSection
-          {...commonLayerProps}
           id="discounts"
           title="Descuentos"
           icon="Percent"
@@ -377,7 +288,6 @@ export default function MetricsFiltersPanel({
         </MultiSection>
 
         <MultiSection
-          {...commonLayerProps}
           id="payments"
           title="Forma de pago"
           icon="CircleDollarSign"

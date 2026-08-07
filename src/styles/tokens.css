@@ -76,7 +76,6 @@
   --fm-duration-medium: 280ms;
   --fm-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --fm-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
-  --fm-z-popover: 80;
   --fm-sidebar-width: 272px;
   --fm-sidebar-collapsed: 84px;
   --fm-header-height: 72px;

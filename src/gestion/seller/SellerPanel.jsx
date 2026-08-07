@@ -459,15 +459,6 @@ export default function SellerPanel() {
         if (shortcut.paymentMethod === "multiple" && !multiplePaymentAllowed) return;
         setPaymentMethod(shortcut.paymentMethod);
         setPayments([]);
-        return;
-      }
-      if (shortcut.action === "ticket") {
-        if (!ticketAllowed) {
-          setSubmitState({ busy: false, tone: "error", message: "Tu perfil no puede solicitar ticket." });
-          return;
-        }
-        setTicketRequested((current) => !current);
-        setSubmitState({ busy: false, tone: "info", message: "La botonera actualizó la solicitud de ticket. No se emite ningún comprobante fiscal en esta etapa." });
       }
     },
     onContinue: submitSale,
