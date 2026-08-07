@@ -260,7 +260,10 @@ test("stock, navegación y venta actual tienen reglas responsive compactas", asy
 test("las reglas vinculan stock con venta y movimiento de la misma transacción", async () => {
   const rules = await read("../firestore.rules");
   assert.match(rules, /validSellerStockMutation/);
-  assert.match(rules, /getAfter\(\/databases\/\$\(database\)\/documents\/stockMovements/);
+  assert.match(rules, /let movementPath = \/databases\/\$\(database\)\/documents\/stockMovements/);
+  assert.match(rules, /getAfter\(movementPath\)/);
+  assert.match(rules, /!exists\(movementPath\)/);
+  assert.match(rules, /existsAfter\(movementPath\)/);
   assert.match(rules, /movement\.previousStock == resource\.data\.currentStock/);
   assert.match(rules, /movement\.newStock == request\.resource\.data\.currentStock/);
 });
