@@ -36,7 +36,7 @@ test("la venta no puede dejar stock negativo", () => {
   );
 });
 
-test("los descuentos múltiples se aplican de forma secuencial", () => {
+test("los descuentos múltiples aplican primero los fijos y después los porcentuales", () => {
   const result = calculateDiscountSummary(
     [
       { id: "porcentaje", name: "Autorizado", type: "percent", value: 10 },
@@ -44,8 +44,10 @@ test("los descuentos múltiples se aplican de forma secuencial", () => {
     ],
     1000,
   );
-  assert.equal(result.total, 800);
-  assert.equal(result.discountTotal, 200);
+  assert.equal(result.fixedDiscountTotal, 100);
+  assert.equal(result.percentageDiscountTotal, 90);
+  assert.equal(result.total, 810);
+  assert.equal(result.discountTotal, 190);
 });
 
 test("el pago simple conserva las etiquetas compatibles con las reglas existentes", () => {
