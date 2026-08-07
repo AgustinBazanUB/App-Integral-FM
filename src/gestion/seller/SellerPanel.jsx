@@ -215,6 +215,11 @@ export default function SellerPanel() {
   const [syncing, setSyncing] = useState(false);
   const autoSyncAttempted = useRef(false);
 
+  const closeCancelDialog = useCallback(() => {
+    setCancelTarget(null);
+    setCancelReason("");
+  }, []);
+
   const locations = locationsResult.data || [];
   const selectedLocation = locations.find((location) => location.id === locationId) || null;
   const stockResult = useSellerLocationStock(profile, locationId);
@@ -555,11 +560,10 @@ export default function SellerPanel() {
     setSubmitState({ busy: true, tone: "info", message: "Anulando venta…" });
     try {
       await cancelSellerSale({ profile, saleId: cancelTarget.id, reason: cancelReason });
-      setCancelTarget(null);
-      setCancelReason("");
+      closeCancelDialog();
       setDetailSale(null);
       await dailySales.refresh();
-      setSubmitState({ busy: false, tone: "success", message: "Venta anulada y stock devuelto." });
+      setSubmitState({ busy: false, tone: "success", message: "Venta anulada y stock restituido." });
     } catch (error) {
       setSubmitState({ busy: false, tone: "error", message: error.message });
     }
@@ -703,8 +707,20 @@ export default function SellerPanel() {
       <ConfirmationDialog open={Boolean(editRequested)} title="Editar otra venta" description="La venta actual se descartará para cargar la operación seleccionada." onClose={() => setEditRequested(null)} onConfirm={() => { startEdit(editRequested); setEditRequested(null); }} />
       <ConfirmationDialog open={Boolean(deletePendingTarget)} title="Eliminar venta pendiente" description="Esta operación se borrará solamente de este dispositivo y no podrá recuperarse." onClose={() => setDeletePendingTarget(null)} onConfirm={async () => { await deleteSellerPendingSale(deletePendingTarget.localId); setDeletePendingTarget(null); await pendingSales.refresh(); }} />
       <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Venta registrada"><div className="fm-seller-receipt"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><strong>{receipt?.saleCode}</strong><span>{formatMoney(receipt?.total)}</span><p>{receipt?.paymentMethodLabel}</p>{receipt?.ticketRequested ? <Badge tone="warning">Ticket solicitado · pendiente</Badge> : null}<Button onClick={() => setReceipt(null)}>Nueva venta</Button></div></Modal>
-      <Modal open={Boolean(detailSale)} onClose={() => setDetailSale(null)} title={detailSale?.saleCode || "Detalle de venta"} footer={detailSale?.status === "active" ? <div className="fm-dialog-actions"><Button variant="destructive" onClick={() => { setCancelTarget(detailSale); setCancelReason(""); }}>Anular</Button><Button variant="secondary" onClick={() => currentItems.length ? setEditRequested(detailSale) : startEdit(detailSale)}>Editar</Button></div> : null}><div className="fm-seller-sale-detail"><p>{formatDateTime(detailSale?.createdAt)} · {detailSale?.paymentMethodLabel}</p>{(detailSale?.items || []).map((item) => <div key={item.productId}><span>{item.qty} × {item.name}</span><strong>{formatMoney(item.subtotal)}</strong></div>)}{(detailSale?.discounts || []).map((discount, index) => <div key={`${discount.discountId}-${index}`}><span>{discount.name}</span><strong>− {formatMoney(discount.amountApplied)}</strong></div>)}<div className="is-total"><span>Total</span><strong>{formatMoney(detailSale?.total)}</strong></div>{detailSale?.ticketRequested ? <div><span>Ticket</span><strong>{detailSale.ticketStatus || "pending"}</strong></div> : null}</div></Modal>
-      <Modal open={Boolean(cancelTarget)} onClose={() => setCancelTarget(null)} title="Anular venta" description="Las unidades volverán al stock y la venta conservará su historial." footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={() => setCancelTarget(null)}>Cancelar</Button><Button variant="destructive" disabled={cancelReason.trim().length < 3} loading={submitState.busy} onClick={confirmCancelSale}>Anular y devolver stock</Button></div>}><label className="fm-field"><span>Motivo *</span><textarea rows="3" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Ej.: error de carga o devolución inmediata" /></label></Modal>
+      <Modal open={Boolean(detailSale)} onClose={() => setDetailSale(null)} title={detailSale?.saleCode || "Detalle de venta"} footer={detailSale?.status === "active" ? <div className="fm-dialog-actions"><Button variant="destructive" onClick={() => { const sale = detailSale; setDetailSale(null); setCancelReason(""); setCancelTarget(sale); }}>Anular</Button><Button variant="secondary" onClick={() => currentItems.length ? setEditRequested(detailSale) : startEdit(detailSale)}>Editar</Button></div> : null}><div className="fm-seller-sale-detail"><p>{formatDateTime(detailSale?.createdAt)} · {detailSale?.paymentMethodLabel}</p>{(detailSale?.items || []).map((item) => <div key={item.productId}><span>{item.qty} × {item.name}</span><strong>{formatMoney(item.subtotal)}</strong></div>)}{(detailSale?.discounts || []).map((discount, index) => <div key={`${discount.discountId}-${index}`}><span>{discount.name}</span><strong>− {formatMoney(discount.amountApplied)}</strong></div>)}<div className="is-total"><span>Total</span><strong>{formatMoney(detailSale?.total)}</strong></div>{detailSale?.ticketRequested ? <div><span>Ticket</span><strong>{detailSale.ticketStatus || "pending"}</strong></div> : null}</div></Modal>
+      <Modal
+        open={Boolean(cancelTarget)}
+        onClose={closeCancelDialog}
+        title="Anular venta"
+        description="Las unidades volverán al stock y la venta conservará su historial."
+        footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={closeCancelDialog}>Cancelar</Button><Button variant="destructive" icon="Trash2" loading={submitState.busy} onClick={confirmCancelSale}>Anular venta</Button></div>}
+      >
+        <label className="fm-field">
+          <span>Motivo de anulación (opcional)</span>
+          <textarea rows="3" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Ej.: cliente cambió el producto" />
+          <small className="fm-field__hint">Si es posible, indicá brevemente por qué se anula la venta.</small>
+        </label>
+      </Modal>
     </div>
   );
 }
