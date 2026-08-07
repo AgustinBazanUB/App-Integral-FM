@@ -5,6 +5,7 @@ import {
   ChartContainer,
   EmptyState,
   HeroBanner,
+  Modal,
   Panel,
   Skeleton,
   StatCard,
@@ -13,12 +14,13 @@ import {
   buildPeriodSalesSeries,
   summarizeSales,
 } from "../../modules/locations/domain/dashboard";
+import { locationActivity } from "../../modules/locations/domain/locations";
 import {
   argentinaDateKey,
   argentinaPeriodLabel,
   argentinaPeriodRange,
 } from "../../modules/locations/domain/time";
-import { Link } from "../../router";
+import { Link, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
 import DashboardFilters from "../components/DashboardFilters";
 import { Icon } from "../components/icons";
@@ -30,7 +32,7 @@ import {
   listActivityPage,
   listSalesByRange,
 } from "../services/dashboardService";
-import { listLocations } from "../services/managementService";
+import { listLocationsShared } from "../services/sharedResources";
 
 const SESSION_FORMAT_KEY = "fm-dashboard-period-format";
 const VALID_FORMATS = new Set(["year", "month", "week", "day"]);
@@ -90,19 +92,25 @@ function DashboardMetricsSkeleton() {
 
 export default function DashboardPage() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [format, setFormat] = useState(() => {
     const saved = window.sessionStorage.getItem(SESSION_FORMAT_KEY);
     return VALID_FORMATS.has(saved) ? saved : "month";
   });
   const [referenceKey, setReferenceKey] = useState(() => argentinaDateKey());
   const [selectedLocationIds, setSelectedLocationIds] = useState(null);
+  const [stockPickerOpen, setStockPickerOpen] = useState(false);
 
   useEffect(() => {
     window.sessionStorage.setItem(SESSION_FORMAT_KEY, format);
   }, [format]);
 
-  const locationsResult = useAsyncData(() => listLocations(profile), [profile.id]);
+  const locationsResult = useAsyncData(() => listLocationsShared(profile), [profile.id]);
   const locations = locationsResult.data || [];
+  const activeLocations = useMemo(
+    () => locations.filter((location) => locationActivity(location).active),
+    [locations],
+  );
   const allowedLocationIds = useMemo(() => locations.map((location) => location.id), [locations]);
   const allowedLocationIdsKey = allowedLocationIds.slice().sort().join(",");
 
@@ -157,17 +165,35 @@ export default function DashboardPage() {
     setFormat(nextFormat);
   };
 
+  const openStockLocation = (locationId) => {
+    setStockPickerOpen(false);
+    navigate(`/gestion/locations/${encodeURIComponent(locationId)}/stock`);
+  };
+
+  const canQuickSale = modules.some((module) => module.id === "quick-sales");
+  const canLoadStock = can(profile, "locations", "loadStock") || can(profile, "locations", "adjustStock");
+
   return (
     <div className="fm-page-enter">
       <HeroBanner
         eyebrow="Panel general"
         title={`Buen día, ${profile.name?.split(" ")[0] || "equipo"}.`}
         description="Resumen del negocio para las ubicaciones que podés consultar. Los períodos respetan la hora operativa de Argentina."
-        action={modules.some((module) => module.id === "quick-sales") ? (
-          <Link className="fm-button fm-button--primary" to="/gestion/quick-sales">
-            <Icon name="Zap" />
-            <span>Venta Rápida</span>
-          </Link>
+        action={(canQuickSale || canLoadStock) ? (
+          <div className="fm-dashboard-hero-actions">
+            {canQuickSale ? (
+              <Link className="fm-button fm-button--primary" to="/gestion/quick-sales">
+                <Icon name="Zap" />
+                <span>Venta Rápida</span>
+              </Link>
+            ) : null}
+            {canLoadStock ? (
+              <button type="button" className="fm-button fm-button--secondary" onClick={() => setStockPickerOpen(true)}>
+                <Icon name="PackagePlus" />
+                <span>Cargar Stock</span>
+              </button>
+            ) : null}
+          </div>
         ) : null}
       >
         <div className="fm-hero-banner__quote">
@@ -215,7 +241,7 @@ export default function DashboardPage() {
             <Panel
               title="Ritmo de ventas"
               description={`Facturación del período seleccionado: ${periodLabel}.`}
-              action={can(profile, "metrics", "view") ? <Link className="fm-button fm-button--secondary" to="/gestion/metrics/sales"><Icon name="Maximize2" /><span>Ver análisis completo</span></Link> : null}
+              action={can(profile, "metrics", "view") ? <Link className="fm-button fm-button--secondary" to="/gestion/metrics/sales"><Icon name="Maximize2" /><span>Ver todas las métricas</span></Link> : null}
             >
               <ChartContainer
                 title={`Ritmo de ventas de ${periodLabel}`}
@@ -251,6 +277,26 @@ export default function DashboardPage() {
           </Panel>
         </>
       ) : null}
+
+      <Modal
+        open={stockPickerOpen}
+        onClose={() => setStockPickerOpen(false)}
+        title="Cargar Stock"
+        description="¿En qué ubicación querés cargar el stock?"
+      >
+        <div className="fm-dashboard-location-picker">
+          {activeLocations.map((location) => (
+            <button key={location.id} type="button" onClick={() => openStockLocation(location.id)}>
+              <Icon name="MapPin" />
+              <span><strong>{location.name}</strong><small>{location.type || "Ubicación activa"}</small></span>
+              <Icon name="ChevronRight" />
+            </button>
+          ))}
+          {!activeLocations.length ? (
+            <EmptyState icon="MapPin" title="No hay ubicaciones activas" description="Activá una ubicación antes de cargar stock." />
+          ) : null}
+        </div>
+      </Modal>
     </div>
   );
 }
