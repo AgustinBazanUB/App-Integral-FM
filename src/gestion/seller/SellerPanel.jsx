@@ -11,7 +11,6 @@ import {
   ConfirmationDialog,
   Dropdown,
   EmptyState,
-  IconButton,
   Modal,
   Panel,
   Skeleton,
@@ -46,6 +45,7 @@ import {
   loadSellerResources,
   updateSellerSale,
 } from "../services/sellerService";
+import DiscountDialog from "./DiscountDialog";
 import {
   deleteSellerPendingSale,
   markSellerPendingError,
@@ -74,7 +74,7 @@ import {
 const friendlyPayment = {
   credit: "Crédito",
   debit: "Débito",
-  alias: "Alias / transferencia",
+  alias: "Alias",
   cash: "Efectivo",
   multiple: "+2 pagos",
 };
@@ -172,12 +172,16 @@ function MultiplePaymentDialog({ open, total, initialPayments, onClose, onConfir
           </label>
         ))}
       </div>
-      <div className={`fm-seller-payment-difference ${valid ? "is-valid" : ""}`}>
+      <div className={`fm-seller-payment-difference ${valid ? "is-valid" : ""}`} aria-live="polite">
         <span>Total cargado: {formatMoney(summary.loaded)}</span>
         <strong>{summary.invalid ? "Hay importes inválidos" : summary.difference > 0 ? `Faltan ${formatMoney(summary.difference)}` : summary.difference < 0 ? `Sobran ${formatMoney(Math.abs(summary.difference))}` : summary.positiveCount < 2 ? "Usá al menos dos medios" : "La suma coincide"}</strong>
       </div>
     </Modal>
   );
+}
+
+function sameManualDiscount(a, b) {
+  return a?.source === "manual" && b?.source === "manual" && a.type === b.type && Number(a.value) === Number(b.value) && a.name === b.name;
 }
 
 export default function SellerPanel() {
@@ -190,8 +194,11 @@ export default function SellerPanel() {
   const [view, setView] = useState("sale");
   const [cart, setCart] = useState({});
   const [discountIds, setDiscountIds] = useState([]);
+  const [manualDiscounts, setManualDiscounts] = useState([]);
+  const [discountOpen, setDiscountOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [payments, setPayments] = useState([]);
+  const [ticketRequested, setTicketRequested] = useState(false);
   const [keyboardActive, setKeyboardActive] = useState(true);
   const [lastProductId, setLastProductId] = useState("");
   const [editSale, setEditSale] = useState(null);
@@ -264,12 +271,18 @@ export default function SellerPanel() {
   const availableDiscounts = useMemo(() => (resources.discounts || []).filter((discount) =>
     isDiscountAvailable(discount, selectedLocation, new Date(), { profile, items: currentItems }),
   ), [resources.discounts, selectedLocation, profile, currentItems]);
-  const appliedDiscounts = availableDiscounts.filter((discount) => discountIds.includes(discount.id));
+  const savedDiscounts = availableDiscounts
+    .filter((discount) => discountIds.includes(discount.id))
+    .map((discount) => ({ ...discount, discountId: discount.id, source: "saved" }));
+  const appliedDiscounts = [...savedDiscounts, ...manualDiscounts];
   const summary = useMemo(
     () => calculateDiscountSummary(appliedDiscounts, subtotal),
     [appliedDiscounts, subtotal],
   );
   const hasStockConflict = currentItems.some((item) => Number(item.qty) > Number(item.stock));
+  const manualDiscountAllowed = can(profile, "quick-sales", "useManualDiscounts");
+  const multiplePaymentAllowed = can(profile, "quick-sales", "useMultiplePayments");
+  const ticketAllowed = can(profile, "quick-sales", "requestTicket");
 
   useEffect(() => {
     setDiscountIds((current) => current.filter((id) => availableDiscounts.some((discount) => discount.id === id)));
@@ -286,8 +299,11 @@ export default function SellerPanel() {
   const resetSale = useCallback(() => {
     setCart({});
     setDiscountIds([]);
+    setManualDiscounts([]);
+    setDiscountOpen(false);
     setPaymentMethod("");
     setPayments([]);
+    setTicketRequested(false);
     setLastProductId("");
     setEditSale(null);
   }, []);
@@ -302,7 +318,7 @@ export default function SellerPanel() {
         return next;
       }
       if (nextQty > Number(product.availableStock || 0)) {
-        setSubmitState({ busy: false, tone: "error", message: `${product.productName}: sólo quedan ${product.availableStock} unidades disponibles.` });
+        setSubmitState({ busy: false, tone: "error", message: `${product.productName || product.name}: sólo quedan ${product.availableStock ?? product.stock} unidades disponibles.` });
         return current;
       }
       return {
@@ -310,13 +326,13 @@ export default function SellerPanel() {
         [product.id]: {
           id: product.id,
           productId: product.id,
-          name: product.productName,
+          name: product.productName || product.name,
           abbreviation: product.abbreviation || "",
           price: Number(product.price || 0),
           unitPrice: Number(product.price || 0),
           qty: nextQty,
-          stock: Number(product.availableStock || 0),
-          imageUrl: sellerImage(product),
+          stock: Number(product.availableStock ?? product.stock ?? 0),
+          imageUrl: product.imageUrl || sellerImage(product),
         },
       };
     });
@@ -328,6 +344,21 @@ export default function SellerPanel() {
     const product = products.find((item) => item.id === lastProductId);
     if (product) changeQuantity(product, -1);
   }, [products, lastProductId, changeQuantity]);
+
+  const removeDiscount = (discount) => {
+    if (discount.source === "manual") {
+      let removed = false;
+      setManualDiscounts((current) => current.filter((candidate) => {
+        if (!removed && sameManualDiscount(candidate, discount)) {
+          removed = true;
+          return false;
+        }
+        return true;
+      }));
+      return;
+    }
+    setDiscountIds((current) => current.filter((id) => id !== discount.discountId));
+  };
 
   const savePending = useCallback(async () => {
     const random = crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -348,11 +379,12 @@ export default function SellerPanel() {
       paymentMethod,
       paymentMethodLabel: PAYMENT_LABELS[paymentMethod],
       payments,
+      ticketRequested,
     });
     await pendingSales.refresh();
     resetSale();
     setSubmitState({ busy: false, tone: "success", message: "Venta guardada en este dispositivo. Todavía no está confirmada en Firestore." });
-  }, [selectedLocation, profile, currentItems, appliedDiscounts, summary.total, paymentMethod, payments, pendingSales, resetSale]);
+  }, [selectedLocation, profile, currentItems, appliedDiscounts, summary.total, paymentMethod, payments, ticketRequested, pendingSales, resetSale]);
 
   const submitSale = useCallback(async () => {
     if (submitState.busy) return;
@@ -372,6 +404,17 @@ export default function SellerPanel() {
       setSubmitState({ busy: false, tone: "error", message: "Elegí una forma de pago." });
       return;
     }
+    if (paymentMethod === "multiple") {
+      const paymentSummary = paymentAllocationSummary(payments, summary.total);
+      if (paymentSummary.invalid || paymentSummary.difference !== 0 || paymentSummary.positiveCount < 2) {
+        setSubmitState({ busy: false, tone: "error", message: "Revisá +2 pagos: la suma debe coincidir exactamente con el total." });
+        return;
+      }
+    }
+    if (ticketRequested && !ticketAllowed) {
+      setSubmitState({ busy: false, tone: "error", message: "Tu perfil no puede solicitar ticket." });
+      return;
+    }
     if (!online && editSale) {
       setSubmitState({ busy: false, tone: "error", message: "Necesitás conexión para editar una venta confirmada." });
       return;
@@ -383,8 +426,8 @@ export default function SellerPanel() {
         return;
       }
       const result = editSale
-        ? await updateSellerSale({ profile, saleId: editSale.id, items: currentItems, discounts: appliedDiscounts, paymentMethod, paymentMethodLabel: PAYMENT_LABELS[paymentMethod], payments })
-        : await createSellerSale({ profile, location: selectedLocation, items: currentItems, discounts: appliedDiscounts, paymentMethod, paymentMethodLabel: PAYMENT_LABELS[paymentMethod], payments });
+        ? await updateSellerSale({ profile, saleId: editSale.id, items: currentItems, discounts: appliedDiscounts, paymentMethod, paymentMethodLabel: PAYMENT_LABELS[paymentMethod], payments, ticketRequested })
+        : await createSellerSale({ profile, location: selectedLocation, items: currentItems, discounts: appliedDiscounts, paymentMethod, paymentMethodLabel: PAYMENT_LABELS[paymentMethod], payments, ticketRequested });
       resetSale();
       await dailySales.refresh();
       setReceipt(result);
@@ -392,7 +435,7 @@ export default function SellerPanel() {
     } catch (error) {
       setSubmitState({ busy: false, tone: "error", message: error.message });
     }
-  }, [submitState.busy, selectedLocation, currentItems, hasStockConflict, paymentMethod, online, editSale, savePending, profile, appliedDiscounts, payments, resetSale, dailySales]);
+  }, [submitState.busy, selectedLocation, currentItems, hasStockConflict, paymentMethod, payments, summary.total, ticketRequested, ticketAllowed, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales]);
 
   const actionShortcuts = useMemo(() => SELLER_ACTION_SHORTCUTS.map((action) => ({
     ...action,
@@ -408,6 +451,7 @@ export default function SellerPanel() {
     onDiscount: (discount) => setDiscountIds((current) => current.includes(discount.id) ? current : [...current, discount.id]),
     onShortcut: (shortcut) => {
       if (shortcut.paymentMethod) {
+        if (shortcut.paymentMethod === "multiple" && !multiplePaymentAllowed) return;
         setPaymentMethod(shortcut.paymentMethod);
         setPayments([]);
       }
@@ -443,6 +487,7 @@ export default function SellerPanel() {
           paymentMethod: sale.paymentMethod,
           paymentMethodLabel: sale.paymentMethodLabel,
           payments: sale.payments,
+          ticketRequested: sale.ticketRequested === true,
           offlineSale: { localId: sale.localId, createdLocallyAt: sale.createdLocallyAt },
         });
         await markSellerPendingSynced(sale.localId, result.id);
@@ -494,9 +539,12 @@ export default function SellerPanel() {
       stock: Number(item.qty || 0),
       imageUrl: "/images/flor-mia/logo-flor-mia.svg",
     }])));
-    setDiscountIds((sale.discounts || []).map((discount) => discount.discountId || discount.id).filter((id) => id && id !== "manual"));
+    const discounts = sale.discounts || [];
+    setDiscountIds(discounts.filter((discount) => discount.source !== "manual" && discount.discountId !== "manual").map((discount) => discount.discountId || discount.id).filter(Boolean));
+    setManualDiscounts(discounts.filter((discount) => discount.source === "manual" || discount.discountId === "manual").map((discount) => ({ ...discount, source: "manual", discountId: "manual" })));
     setPaymentMethod(sale.paymentMethod || "");
     setPayments(salePaymentParts(sale));
+    setTicketRequested(sale.ticketRequested === true);
     setEditSale(sale);
     setDetailSale(null);
     setView("sale");
@@ -576,22 +624,37 @@ export default function SellerPanel() {
         ))}
       </section>
       <aside className="fm-seller-cart">
-        <Panel title="Venta actual" description={`${cartQuantity(cart)} producto${cartQuantity(cart) === 1 ? "" : "s"}`} action={<button type="button" className="fm-text-button" disabled={!currentItems.length} onClick={() => setClearRequested(true)}>Vaciar carrito</button>}>
+        <Panel title="Venta actual" description={`${cartQuantity(cart)} producto${cartQuantity(cart) === 1 ? "" : "s"}`} action={<button type="button" className="fm-text-button" disabled={!currentItems.length} onClick={() => setClearRequested(true)}>Vaciar</button>}>
           <div className="fm-seller-cart-lines">
             {currentItems.length ? currentItems.map((item) => (
               <article key={item.id} className={item.qty > item.stock ? "has-error" : ""}>
                 <img src={item.imageUrl} alt="" />
-                <div><strong>{item.abbreviation || item.name}</strong><small>{formatMoney(item.price)} c/u · disp. {item.stock}</small></div>
-                <div className="fm-quantity-control"><button type="button" aria-label={`Quitar ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, -1)}><Icon name="Minus" /></button><output>{item.qty}</output><button type="button" aria-label={`Agregar ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, 1)} disabled={item.qty >= item.stock}><Icon name="Plus" /></button></div>
+                <div><strong>{item.abbreviation || item.name}</strong><small>{formatMoney(item.price)} c/u · {formatMoney(item.qty * item.price)}</small></div>
+                <div className="fm-quantity-control"><button type="button" aria-label={`Quitar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, -1)}><Icon name="Minus" /></button><output aria-label={`Cantidad de ${item.name}`}>{item.qty}</output><button type="button" aria-label={`Agregar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, 1)} disabled={item.qty >= item.stock}><Icon name="Plus" /></button></div>
+                <button type="button" className="fm-seller-line-remove" aria-label={`Eliminar ${item.name} del carrito`} onClick={() => setCart((current) => { const next = { ...current }; delete next[item.id]; return next; })}><Icon name="X" /></button>
               </article>
             )) : <p className="fm-seller-cart-empty">Tocá un producto o usá la botonera para comenzar.</p>}
           </div>
-          {availableDiscounts.length ? <div className="fm-seller-discounts"><h3>Descuentos disponibles</h3>{availableDiscounts.map((discount) => <label key={discount.id}><input type="checkbox" checked={discountIds.includes(discount.id)} onChange={() => setDiscountIds((current) => current.includes(discount.id) ? current.filter((id) => id !== discount.id) : [...current, discount.id])} /><span>{discount.name}</span><strong>{discount.type === "percent" ? `${discount.value}%` : formatMoney(discount.value)}</strong></label>)}</div> : null}
-          <div className="fm-seller-totals"><div><span>Subtotal</span><strong>{formatMoney(subtotal)}</strong></div><div><span>Descuentos</span><strong>− {formatMoney(summary.discountTotal)}</strong></div><div className="is-grand"><span>Total final</span><strong>{formatMoney(summary.total)}</strong></div></div>
-          <fieldset className="fm-seller-payments"><legend>Forma de pago *</legend>{PAYMENT_OPTIONS.map((option) => <button key={option.value} type="button" className={paymentMethod === option.value ? "is-selected" : ""} onClick={() => option.value === "multiple" ? setMultipleOpen(true) : (setPaymentMethod(option.value), setPayments([]))}>{friendlyPayment[option.value]}</button>)}</fieldset>
+
+          <div className="fm-seller-discount-summary">
+            <div className="fm-seller-section-head"><strong>Descuentos</strong><button type="button" onClick={() => setDiscountOpen(true)}><Icon name="Percent" />Agregar descuento</button></div>
+            {summary.discounts.length ? summary.discounts.map((discount, index) => <div key={`${discount.discountId}-${discount.type}-${discount.value}-${index}`} className="fm-seller-applied-discount"><span><strong>{discount.name}</strong><small>{discount.type === "percent" ? `${discount.value} %` : "Monto fijo"}</small></span><strong>− {formatMoney(discount.amountApplied)}</strong><button type="button" aria-label={`Quitar ${discount.name}`} onClick={() => removeDiscount(discount)}><Icon name="X" /></button></div>) : <span className="fm-seller-no-discount">Sin descuentos aplicados</span>}
+            {summary.discounts.length ? <div className="fm-seller-discount-total"><span>Total descuentos</span><strong>− {formatMoney(summary.discountTotal)}</strong></div> : null}
+          </div>
+
+          <div className="fm-seller-totals"><div><span>Subtotal</span><strong>{formatMoney(subtotal)}</strong></div><div className="is-grand"><span>Total final</span><strong>{formatMoney(summary.total)}</strong></div></div>
+
+          <fieldset className="fm-seller-payments"><legend>Forma de pago *</legend>{PAYMENT_OPTIONS.filter((option) => option.value !== "multiple" || multiplePaymentAllowed).map((option) => { const selected = paymentMethod === option.value; return <button key={option.value} type="button" className={selected ? "is-selected" : ""} aria-pressed={selected} onClick={() => option.value === "multiple" ? setMultipleOpen(true) : (setPaymentMethod(option.value), setPayments([]))}>{selected ? <Icon name="Check" /> : null}<span>{friendlyPayment[option.value]}</span></button>; })}</fieldset>
           {paymentMethod === "multiple" ? <p className="fm-seller-payment-summary">{payments.map((payment) => `${friendlyPayment[payment.method]} ${formatMoney(payment.amount)}`).join(" · ")}</p> : null}
+
+          <label className={`fm-seller-ticket-option ${ticketRequested ? "is-selected" : ""}`}>
+            <input type="checkbox" checked={ticketRequested} disabled={!ticketAllowed} onChange={(event) => setTicketRequested(event.target.checked)} />
+            <Icon name="ReceiptText" />
+            <span><strong>Agregar ticket</strong><small>{ticketRequested ? "Solicitud pendiente al registrar" : "Preparado para futura integración ARCA"}</small></span>
+          </label>
+
           {submitState.message ? <Toast tone={submitState.tone}>{submitState.message}</Toast> : null}
-          <Button icon="Check" loading={submitState.busy} disabled={!currentItems.length || !paymentMethod || hasStockConflict} onClick={submitSale} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Confirmar venta" : "Guardar venta pendiente"}</Button>
+          <div className="fm-seller-sticky-action"><div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div><Button icon="Check" loading={submitState.busy} disabled={!currentItems.length || !paymentMethod || hasStockConflict} onClick={submitSale} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Continuar" : "Guardar pendiente"}</Button></div>
         </Panel>
       </aside>
     </div>
@@ -603,7 +666,7 @@ export default function SellerPanel() {
       {dailySales.status === "loading" ? <Skeleton lines={5} /> : null}
       {dailySales.status === "error" ? <Toast tone="error">{dailySales.error.message}</Toast> : null}
       <div className="fm-seller-sales-summary"><span>Monto activo</span><strong>{formatMoney((dailySales.data || []).filter((sale) => sale.status === "active").reduce((sum, sale) => sum + Number(sale.total || 0), 0))}</strong><small>{(dailySales.data || []).filter((sale) => sale.status === "active").length} ventas activas</small></div>
-      <div className="fm-seller-sale-list">{(dailySales.data || []).map((sale) => <button key={sale.id} type="button" onClick={() => setDetailSale(sale)}><div><strong>{sale.saleCode}</strong><Badge tone={statusTone(sale.status)}>{sale.status === "active" ? "Activa" : "Anulada"}</Badge></div><div><span>{formatDateTime(sale.createdAt)}</span><strong>{formatMoney(sale.total)}</strong></div><small>{sale.totalItems} productos · {sale.paymentMethodLabel || "Sin forma de pago"}</small></button>)}</div>
+      <div className="fm-seller-sale-list">{(dailySales.data || []).map((sale) => <button key={sale.id} type="button" onClick={() => setDetailSale(sale)}><div><strong>{sale.saleCode}</strong><Badge tone={statusTone(sale.status)}>{sale.status === "active" ? "Activa" : "Anulada"}</Badge></div><div><span>{formatDateTime(sale.createdAt)}</span><strong>{formatMoney(sale.total)}</strong></div><small>{sale.totalItems} productos · {sale.paymentMethodLabel || "Sin forma de pago"}{sale.ticketRequested ? ` · Ticket ${sale.ticketStatus || "pending"}` : ""}</small></button>)}</div>
       {dailySales.status === "ready" && !(dailySales.data || []).length ? <EmptyState icon="ReceiptText" title="Todavía no registraste ventas hoy" description="Las ventas confirmadas de esta ubicación aparecerán aquí." /> : null}
     </div>
   );
@@ -612,7 +675,7 @@ export default function SellerPanel() {
     <div className="fm-seller-view">
       <div className="fm-seller-view-head"><div><h1>Ventas pendientes</h1><p>Existen solamente en este dispositivo hasta sincronizarse.</p></div><Button icon="RefreshCw" loading={syncing} disabled={!online || !(pendingSales.data || []).length} onClick={() => syncPending({ manual: true })}>Sincronizar</Button></div>
       {!online ? <div className="fm-seller-offline-note"><Icon name="WifiOff" /><span>La sincronización se habilitará al recuperar internet.</span></div> : null}
-      <div className="fm-seller-pending-list">{(pendingSales.data || []).map((sale) => <article key={sale.localId}><header><strong>{sale.localCode}</strong><Badge tone={sale.status === "sync_error" ? "error" : "warning"}>{sale.status === "sync_error" ? "Error" : "Pendiente"}</Badge></header><div><span>{formatDateTime(sale.createdLocallyAt)}</span><strong>{formatMoney(sale.total)}</strong></div><small>{sale.locationName} · {sale.totalItems} productos</small>{sale.syncError ? <p>{sale.syncError}</p> : null}<button type="button" onClick={() => setDeletePendingTarget(sale)}><Icon name="Trash2" />Eliminar pendiente</button></article>)}</div>
+      <div className="fm-seller-pending-list">{(pendingSales.data || []).map((sale) => <article key={sale.localId}><header><strong>{sale.localCode}</strong><Badge tone={sale.status === "sync_error" ? "error" : "warning"}>{sale.status === "sync_error" ? "Error" : "Pendiente"}</Badge></header><div><span>{formatDateTime(sale.createdLocallyAt)}</span><strong>{formatMoney(sale.total)}</strong></div><small>{sale.locationName} · {sale.totalItems} productos{sale.ticketRequested ? " · Ticket pendiente" : ""}</small>{sale.syncError ? <p>{sale.syncError}</p> : null}<button type="button" onClick={() => setDeletePendingTarget(sale)}><Icon name="Trash2" />Eliminar pendiente</button></article>)}</div>
       {pendingSales.status === "ready" && !(pendingSales.data || []).length ? <EmptyState icon="RefreshCw" title="No hay ventas pendientes" description="Todas las operaciones de este dispositivo están sincronizadas." /> : null}
     </div>
   );
@@ -626,20 +689,21 @@ export default function SellerPanel() {
   );
 
   const helpView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Ayuda rápida</h1><p>Flujo recomendado para registrar una venta.</p></div></div><ol className="fm-seller-help"><li><Icon name="MapPin" /><div><strong>Elegí la ubicación</strong><span>Verificá el local, feria o evento activo.</span></div></li><li><Icon name="ShoppingCart" /><div><strong>Agregá productos</strong><span>Usá las tarjetas táctiles o la botonera Bluetooth.</span></div></li><li><Icon name="Boxes" /><div><strong>Revisá cantidades</strong><span>El sistema vuelve a validar stock al confirmar.</span></div></li><li><Icon name="Tags" /><div><strong>Aplicá descuentos</strong><span>Sólo aparecen los habilitados para la ubicación.</span></div></li><li><Icon name="CreditCard" /><div><strong>Elegí el pago</strong><span>Podés usar un medio o distribuir con +2 pagos.</span></div></li><li><Icon name="Check" /><div><strong>Confirmá</strong><span>Venta, stock, movimientos y auditoría se guardan juntos.</span></div></li></ol></div>
+    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Ayuda rápida</h1><p>Flujo recomendado para registrar una venta.</p></div></div><ol className="fm-seller-help"><li><Icon name="MapPin" /><div><strong>Elegí la ubicación</strong><span>Verificá el local, feria o evento activo.</span></div></li><li><Icon name="ShoppingCart" /><div><strong>Agregá productos</strong><span>Usá las tarjetas táctiles o la botonera Bluetooth.</span></div></li><li><Icon name="Boxes" /><div><strong>Revisá cantidades</strong><span>El sistema vuelve a validar stock al confirmar.</span></div></li><li><Icon name="Percent" /><div><strong>Aplicá descuentos</strong><span>Los montos fijos se calculan antes de los porcentajes.</span></div></li><li><Icon name="CreditCard" /><div><strong>Elegí el pago</strong><span>Podés usar un medio o distribuir con +2 pagos.</span></div></li><li><Icon name="Check" /><div><strong>Continuá</strong><span>Venta, stock, movimientos y auditoría se guardan juntos.</span></div></li></ol></div>
   );
 
   return (
     <div className="fm-seller-shell">
       <SellerHeader profile={profile} location={selectedLocation} online={online} syncing={syncing} pendingCount={(pendingSales.data || []).length} view={view} setView={setView} keyboardActive={keyboardActive} setKeyboardActive={setKeyboardActive} canReturnAdmin={canReturnAdmin} onReturnAdmin={returnAdmin} onLogout={logout} />
       <main className="fm-seller-main" id="main-content">{view === "sale" ? saleView : view === "sales" ? salesView : view === "pending" ? pendingView : view === "stock" ? stockView : view === "prices" ? pricesView : helpView}</main>
+      <DiscountDialog open={discountOpen} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} manualAllowed={manualDiscountAllowed} onClose={() => setDiscountOpen(false)} onSelectSaved={(discount) => setDiscountIds((current) => current.includes(discount.id) ? current.filter((id) => id !== discount.id) : [...current, discount.id])} onAddManual={(discount) => setManualDiscounts((current) => [...current, discount])} />
       <MultiplePaymentDialog open={multipleOpen} total={summary.total} initialPayments={payments} onClose={() => setMultipleOpen(false)} onConfirm={(entries) => { setPayments(entries.filter((entry) => entry.amount > 0)); setPaymentMethod("multiple"); setMultipleOpen(false); }} />
       <ConfirmationDialog open={Boolean(locationToApply)} title="Cambiar ubicación" description="El carrito actual se vaciará para no mezclar productos ni stock entre ubicaciones." onClose={() => setLocationToApply("")} onConfirm={() => { applyLocation(locationToApply); setLocationToApply(""); }} />
-      <ConfirmationDialog open={clearRequested} title="Vaciar carrito" description="Se eliminarán productos, descuentos y forma de pago de la venta actual." onClose={() => setClearRequested(false)} onConfirm={() => { resetSale(); setClearRequested(false); }} />
+      <ConfirmationDialog open={clearRequested} title="Vaciar carrito" description="Se eliminarán productos, descuentos, ticket y forma de pago de la venta actual." onClose={() => setClearRequested(false)} onConfirm={() => { resetSale(); setClearRequested(false); }} />
       <ConfirmationDialog open={Boolean(editRequested)} title="Editar otra venta" description="La venta actual se descartará para cargar la operación seleccionada." onClose={() => setEditRequested(null)} onConfirm={() => { startEdit(editRequested); setEditRequested(null); }} />
       <ConfirmationDialog open={Boolean(deletePendingTarget)} title="Eliminar venta pendiente" description="Esta operación se borrará solamente de este dispositivo y no podrá recuperarse." onClose={() => setDeletePendingTarget(null)} onConfirm={async () => { await deleteSellerPendingSale(deletePendingTarget.localId); setDeletePendingTarget(null); await pendingSales.refresh(); }} />
-      <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Venta registrada"><div className="fm-seller-receipt"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><strong>{receipt?.saleCode}</strong><span>{formatMoney(receipt?.total)}</span><p>{receipt?.paymentMethodLabel}</p><Button onClick={() => setReceipt(null)}>Nueva venta</Button></div></Modal>
-      <Modal open={Boolean(detailSale)} onClose={() => setDetailSale(null)} title={detailSale?.saleCode || "Detalle de venta"} footer={detailSale?.status === "active" ? <div className="fm-dialog-actions"><Button variant="destructive" onClick={() => { setCancelTarget(detailSale); setCancelReason(""); }}>Anular</Button><Button variant="secondary" onClick={() => currentItems.length ? setEditRequested(detailSale) : startEdit(detailSale)}>Editar</Button></div> : null}><div className="fm-seller-sale-detail"><p>{formatDateTime(detailSale?.createdAt)} · {detailSale?.paymentMethodLabel}</p>{(detailSale?.items || []).map((item) => <div key={item.productId}><span>{item.qty} × {item.name}</span><strong>{formatMoney(item.subtotal)}</strong></div>)}<div className="is-total"><span>Total</span><strong>{formatMoney(detailSale?.total)}</strong></div></div></Modal>
+      <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Venta registrada"><div className="fm-seller-receipt"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><strong>{receipt?.saleCode}</strong><span>{formatMoney(receipt?.total)}</span><p>{receipt?.paymentMethodLabel}</p>{receipt?.ticketRequested ? <Badge tone="warning">Ticket solicitado · pendiente</Badge> : null}<Button onClick={() => setReceipt(null)}>Nueva venta</Button></div></Modal>
+      <Modal open={Boolean(detailSale)} onClose={() => setDetailSale(null)} title={detailSale?.saleCode || "Detalle de venta"} footer={detailSale?.status === "active" ? <div className="fm-dialog-actions"><Button variant="destructive" onClick={() => { setCancelTarget(detailSale); setCancelReason(""); }}>Anular</Button><Button variant="secondary" onClick={() => currentItems.length ? setEditRequested(detailSale) : startEdit(detailSale)}>Editar</Button></div> : null}><div className="fm-seller-sale-detail"><p>{formatDateTime(detailSale?.createdAt)} · {detailSale?.paymentMethodLabel}</p>{(detailSale?.items || []).map((item) => <div key={item.productId}><span>{item.qty} × {item.name}</span><strong>{formatMoney(item.subtotal)}</strong></div>)}{(detailSale?.discounts || []).map((discount, index) => <div key={`${discount.discountId}-${index}`}><span>{discount.name}</span><strong>− {formatMoney(discount.amountApplied)}</strong></div>)}<div className="is-total"><span>Total</span><strong>{formatMoney(detailSale?.total)}</strong></div>{detailSale?.ticketRequested ? <div><span>Ticket</span><strong>{detailSale.ticketStatus || "pending"}</strong></div> : null}</div></Modal>
       <Modal open={Boolean(cancelTarget)} onClose={() => setCancelTarget(null)} title="Anular venta" description="Las unidades volverán al stock y la venta conservará su historial." footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={() => setCancelTarget(null)}>Cancelar</Button><Button variant="destructive" disabled={cancelReason.trim().length < 3} loading={submitState.busy} onClick={confirmCancelSale}>Anular y devolver stock</Button></div>}><label className="fm-field"><span>Motivo *</span><textarea rows="3" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Ej.: error de carga o devolución inmediata" /></label></Modal>
     </div>
   );
