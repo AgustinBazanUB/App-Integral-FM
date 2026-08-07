@@ -1,15 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAsyncData } from "../hooks";
+import { effectiveSellerLocations } from "../permissions";
+import { listLocationsShared } from "../services/sharedResources";
 import {
   listSellerDailySales,
-  listSellerLocations,
   subscribeSellerLocationStock,
 } from "../services/sellerService";
 import { listSellerPendingSales } from "./offlineSales";
-import { isEditableTarget, keyMatchesEvent } from "./sellerDomain";
+import {
+  isEditableTarget,
+  keyboardEventKeys,
+  keyboardLookupKeys,
+} from "./sellerDomain";
 
 export function useSellerLocations(profile) {
-  return useAsyncData(() => listSellerLocations(profile), [profile.id]);
+  return useAsyncData(async () => {
+    const locations = await listLocationsShared(profile);
+    return effectiveSellerLocations(profile, locations);
+  }, [profile.id, (profile.allowedLocationIds || []).join(",")]);
 }
 
 export function useSellerLocationStock(profile, locationId) {
@@ -21,7 +29,7 @@ export function useSellerLocationStock(profile, locationId) {
     }
     let disposed = false;
     let unsubscribe = null;
-    setState({ status: "loading", data: [], error: null });
+    setState((current) => ({ ...current, status: "loading", error: null }));
     subscribeSellerLocationStock({
       profile,
       locationId,
@@ -39,7 +47,7 @@ export function useSellerLocationStock(profile, locationId) {
       disposed = true;
       unsubscribe?.();
     };
-  }, [profile, locationId]);
+  }, [profile.id, locationId]);
   return state;
 }
 
@@ -87,6 +95,16 @@ export function useSellerPendingSales(profile) {
   return { ...state, refresh };
 }
 
+function shortcutMap(items) {
+  const lookup = new Map();
+  (items || []).forEach((item) => {
+    keyboardLookupKeys(item).forEach((key) => {
+      if (!lookup.has(key)) lookup.set(key, item);
+    });
+  });
+  return lookup;
+}
+
 export function useSellerKeyboard({
   enabled,
   products,
@@ -99,11 +117,14 @@ export function useSellerKeyboard({
   onAdd,
   onSubtract,
 }) {
+  const productLookup = useMemo(() => shortcutMap(products), [products]);
+  const discountLookup = useMemo(() => shortcutMap(discounts), [discounts]);
+  const actionLookup = useMemo(() => shortcutMap(actionShortcuts), [actionShortcuts]);
   const handlers = useRef({});
   handlers.current = {
-    products,
-    discounts,
-    actionShortcuts,
+    productLookup,
+    discountLookup,
+    actionLookup,
     onProduct,
     onDiscount,
     onShortcut,
@@ -111,6 +132,7 @@ export function useSellerKeyboard({
     onAdd,
     onSubtract,
   };
+
   useEffect(() => {
     if (!enabled) return undefined;
     const onKeyDown = (event) => {
@@ -140,19 +162,21 @@ export function useSellerKeyboard({
         current.onSubtract?.();
         return;
       }
-      const shortcut = current.actionShortcuts?.find((item) => keyMatchesEvent(item, event));
+      const keys = keyboardEventKeys(event);
+      const find = (lookup) => keys.map((key) => lookup.get(key)).find(Boolean);
+      const shortcut = find(current.actionLookup);
       if (shortcut) {
         event.preventDefault();
         current.onShortcut?.(shortcut);
         return;
       }
-      const discount = current.discounts?.find((item) => keyMatchesEvent(item, event));
+      const discount = find(current.discountLookup);
       if (discount) {
         event.preventDefault();
         current.onDiscount?.(discount);
         return;
       }
-      const product = current.products?.find((item) => keyMatchesEvent(item, event));
+      const product = find(current.productLookup);
       if (product) {
         event.preventDefault();
         current.onProduct?.(product);
