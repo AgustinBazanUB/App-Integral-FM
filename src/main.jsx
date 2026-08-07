@@ -40,8 +40,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch(() => {
-      // La app sigue operativa en navegadores que bloquean el service worker.
-    });
+    navigator.serviceWorker
+      .register("/service-worker.js", { updateViaCache: "none" })
+      .then((registration) => registration.update().catch(() => {}))
+      .catch(() => {
+        // La app sigue operativa en navegadores que bloquean el service worker.
+      });
   });
 }
