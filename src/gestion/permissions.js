@@ -27,9 +27,11 @@ export const ACTIONS = [
   "viewOwn",
   "cancelOwn",
   "useDiscounts",
+  "useManualDiscounts",
   "useMultiplePayments",
   "useOfflineSales",
   "useKeyboard",
+  "requestTicket",
 ];
 
 const everyAction = [...ACTIONS];
@@ -42,9 +44,11 @@ const sellerSalesActions = [
   "viewOwn",
   "cancelOwn",
   "useDiscounts",
+  "useManualDiscounts",
   "useMultiplePayments",
   "useOfflineSales",
   "useKeyboard",
+  "requestTicket",
 ];
 
 export const ROLE_TEMPLATES = {
