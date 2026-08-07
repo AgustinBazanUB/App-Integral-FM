@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 const appSource = read("src/App.jsx");
+const storefrontSource = read("src/Storefront.jsx");
 const gateSource = read("src/gestion/StorePreviewGate.jsx");
 const loginSource = read("src/gestion/pages/LoginPage.jsx");
 const firebaseSource = read("src/gestion/services/firebase.js");
@@ -12,8 +13,9 @@ const shellSource = read("src/gestion/ManagementShell.jsx");
 
 test("la raíz abre la gestión y la tienda queda en /tienda", () => {
   assert.match(appSource, /location\.pathname === "\/"/);
-  assert.match(appSource, /path="\/tienda" element=\{<HomePage \/>\}/);
-  assert.match(appSource, /<StorePreviewGate>/);
+  assert.match(appSource, /lazy\(\(\) => import\("\.\/Storefront"\)\)/);
+  assert.match(storefrontSource, /path="\/tienda" element=\{<HomePage \/>\}/);
+  assert.match(storefrontSource, /<StorePreviewGate>/);
 });
 
 test("la vista de tienda requiere un administrador", () => {
