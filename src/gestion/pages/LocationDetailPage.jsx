@@ -23,6 +23,7 @@ import { locationActivity, locationSchedule } from "../../modules/locations/doma
 import { Link, useLocation, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
 import LocationProductForm from "../components/LocationProductForm";
+import LocationSalesPanel from "../components/LocationSalesPanel";
 import { Icon } from "../components/icons";
 import { formatDate, formatMoney } from "../formatters";
 import { useAsyncData } from "../hooks";
@@ -49,6 +50,7 @@ const tabs = [
   { id: "stock", label: "Cargar stock" },
   { id: "sellers", label: "Vendedores" },
   { id: "discounts", label: "Descuentos" },
+  { id: "sales", label: "Ventas" },
 ];
 const tabIds = new Set(tabs.map((tab) => tab.id));
 const emptyConfig = { price: 0, yellowAlertQty: 0, redAlertQty: 0, active: true };
@@ -312,11 +314,7 @@ export default function LocationDetailPage({ locationId }) {
       <label className="fm-location-tabs-mobile"><span>Sección</span><Select value={activeTab} onChange={(event) => changeTab(event.target.value)}>{tabs.map((tab) => <option key={tab.id} value={tab.id}>{tab.label}</option>)}</Select></label>
 
       {activeTab === "products" ? (
-        <Panel
-          title="Productos"
-          description="Catálogo maestro único, organizado por categoría y unido a la configuración local."
-          action={canCreateProducts ? <Button icon="Plus" onClick={openNewProduct}>Agregar nuevo producto</Button> : null}
-        >
+        <Panel title="Productos" description="Catálogo maestro único, organizado por categoría y unido a la configuración local." action={canCreateProducts ? <Button icon="Plus" onClick={openNewProduct}>Agregar nuevo producto</Button> : null}>
           <FilterBar search={<SearchInput label="Buscar producto" value={search} onChange={(event) => setSearch(event.target.value)} />}>
             <Select aria-label="Filtrar por categoría" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="">Todas las categorías</option>{result.data.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select>
             <Select aria-label="Filtrar por estado" value={productStatus} onChange={(event) => setProductStatus(event.target.value)}><option value="all">Todos</option><option value="configured">Con stock configurado</option><option value="unconfigured">Sin configurar</option><option value="active">Activos</option><option value="inactive">Inactivos</option></Select>
@@ -342,9 +340,11 @@ export default function LocationDetailPage({ locationId }) {
           {!state.active ? <Toast tone="error"><span>Esta ubicación debe estar activa para cargar stock.</span>{can(profile, "locations", "edit") ? <Button variant="secondary" loading={lifecycleState.busy} onClick={activateLocation}>Activar ubicación</Button> : null}</Toast> : null}
           {lifecycleState.error ? <Toast tone="error">{lifecycleState.error}</Toast> : null}
           <form onSubmit={handleStockSubmit}>
-            <div className="fm-stock-toolbar">
+            <div className="fm-stock-mode-row">
               <FormField label="Modo de carga" required><Select value={stockMode} onChange={(event) => { setStockMode(event.target.value); setStockState({ busy: false, error: "", success: "", operationId: "" }); }}><option value="initial">Configurar stock inicial</option><option value="add">Agregar mercadería</option><option value="adjust">Ajustar inventario</option></Select></FormField>
-              <FormField label="Motivo" hint={stockMode === "adjust" ? "Obligatorio para justificar el ajuste." : "Quedará registrado en el movimiento."}><input value={stockReason} onChange={(event) => setStockReason(event.target.value)} required={stockMode === "adjust"} placeholder={stockMode === "add" ? "Ingreso de mercadería" : "Motivo de la operación"} /></FormField>
+              <FormField label="Motivo" hint={stockMode === "adjust" ? "Obligatorio para justificar el ajuste." : "Quedará registrado en el movimiento."}><input className="fm-stock-reason-input" value={stockReason} onChange={(event) => setStockReason(event.target.value)} required={stockMode === "adjust"} placeholder={stockMode === "add" ? "Reposición depósito" : "Motivo de la operación"} /></FormField>
+            </div>
+            <div className="fm-stock-filter-row">
               <SearchInput label="Buscar producto para cargar" value={search} onChange={(event) => setSearch(event.target.value)} />
               <Select aria-label="Filtrar stock por categoría" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="">Todas las categorías</option>{result.data.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select>
             </div>
@@ -393,6 +393,12 @@ export default function LocationDetailPage({ locationId }) {
         </Panel>
       ) : null}
 
+      {activeTab === "sales" ? (
+        <Panel title="Ventas" description="Registro operativo de las ventas asociadas a esta ubicación. No se crean copias de los documentos.">
+          <LocationSalesPanel profile={profile} location={location} products={products} />
+        </Panel>
+      ) : null}
+
       <ConfirmationDialog open={Boolean(pendingStock)} onClose={() => !stockState.busy && setPendingStock(null)} onConfirm={() => executeStock(pendingStock)} busy={stockState.busy} title="Confirmar reducción de stock" description="Uno o más productos quedarán con menos unidades. El ajuste se registrará con su cantidad anterior y posterior." />
 
       <Modal open={Boolean(configProduct)} onClose={() => !configState.busy && setConfigProduct(null)} title={`Configurar ${configProduct?.productName || "producto"}`} description={`Los datos maestros no se modifican; estos valores corresponden únicamente a ${location.name}.`}>
@@ -413,15 +419,7 @@ export default function LocationDetailPage({ locationId }) {
         <div className="fm-dialog-actions"><Link className="fm-button fm-button--secondary" to="/gestion/administration">Crear nuevo vendedor</Link><Button loading={sellerState.busy} disabled={!pendingSellerIds.length} onClick={assignSelectedSellers}>Confirmar asignación</Button></div>
       </Modal>
 
-      <LocationProductForm
-        open={productFormOpen}
-        product={editingMasterProduct}
-        categories={result.data.categories}
-        location={location}
-        profile={profile}
-        onClose={() => setProductFormOpen(false)}
-        onSaved={result.refresh}
-      />
+      <LocationProductForm open={productFormOpen} product={editingMasterProduct} categories={result.data.categories} location={location} profile={profile} onClose={() => setProductFormOpen(false)} onSaved={result.refresh} />
     </div>
   );
 }
