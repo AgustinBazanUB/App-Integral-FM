@@ -144,5 +144,10 @@ export const managementRoutes = [
   { id: "settings", label: "Configuración", icon: "Settings2" },
 ];
 
-export const getManagementPath = (moduleId) =>
-  moduleId === "dashboard" ? "/gestion" : `/gestion/${moduleId}`;
+export const SALES_METRICS_PATH = "/gestion/metrics/sales";
+
+export const getManagementPath = (moduleId) => {
+  if (moduleId === "dashboard") return "/gestion";
+  if (moduleId === "metrics") return SALES_METRICS_PATH;
+  return `/gestion/${moduleId}`;
+};
