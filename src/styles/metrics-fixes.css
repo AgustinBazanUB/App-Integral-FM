@@ -3,7 +3,6 @@
 }
 
 .fm-metrics-filter-group.is-open {
-  z-index: 25;
   border-color: var(--fm-gold-soft);
 }
 
@@ -50,18 +49,73 @@
   white-space: nowrap;
 }
 
-.fm-metrics-filter-group__body {
-  z-index: 26;
+.fm-metrics-filter-layer {
+  position: fixed;
+  z-index: var(--fm-z-popover, 80);
   display: grid;
-  width: min(350px, calc(100vw - 24px));
+  width: min(360px, calc(100vw - 24px));
   max-height: min(60vh, 430px);
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
+  border: 1px solid var(--fm-border-strong);
+  border-radius: var(--fm-radius-card);
+  background: var(--fm-surface);
+  box-shadow: var(--fm-shadow-lg);
 }
 
-.fm-metrics-filter-group:nth-child(5n) .fm-metrics-filter-group__body {
-  right: 0;
-  left: auto;
+.fm-metrics-filter-layer__header {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--fm-border-subtle);
+  background: var(--fm-surface-secondary);
+  padding: 7px 8px 7px 12px;
+}
+
+.fm-metrics-filter-layer__header > span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--fm-text);
+}
+
+.fm-metrics-filter-layer__header > span svg {
+  width: 17px;
+  flex: none;
+  color: var(--fm-text-accent);
+}
+
+.fm-metrics-filter-layer__header strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fm-metrics-filter-layer__header > button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--fm-text-secondary);
+  cursor: pointer;
+}
+
+.fm-metrics-filter-layer__header > button:hover,
+.fm-metrics-filter-layer__header > button:focus-visible {
+  background: var(--fm-surface-cream);
+  color: var(--fm-text-accent);
+}
+
+.fm-metrics-filter-layer__header > button svg {
+  width: 18px;
 }
 
 .fm-metrics-filter-group__options {
@@ -71,6 +125,7 @@
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding: 8px;
+  scrollbar-gutter: stable;
 }
 
 .fm-metrics-filter-group__actions {
@@ -83,34 +138,78 @@
 }
 
 .fm-metrics-filter-group__actions .fm-button {
-  min-height: 40px;
+  min-height: 44px;
 }
 
-@media (max-width: 1180px) and (min-width: 769px) {
-  .fm-metrics-filter-group:nth-child(5n) .fm-metrics-filter-group__body {
-    right: auto;
-    left: 0;
-  }
-
-  .fm-metrics-filter-group:nth-child(3n) .fm-metrics-filter-group__body {
-    right: 0;
-    left: auto;
+@media (max-width: 1024px) and (min-width: 769px) {
+  .fm-metrics-filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 768px) {
-  .fm-metrics-filter-group__body,
-  .fm-metrics-filter-group:nth-child(3n) .fm-metrics-filter-group__body,
-  .fm-metrics-filter-group:nth-child(5n) .fm-metrics-filter-group__body {
-    position: fixed;
-    z-index: 90;
-    inset: auto 10px calc(env(safe-area-inset-bottom) + 10px);
-    width: auto;
-    max-height: min(68vh, 560px);
+  .fm-metrics-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fm-metrics-filter-layer {
+    z-index: var(--fm-z-popover, 80);
+    inset: auto 10px calc(env(safe-area-inset-bottom) + 10px) 10px !important;
+    width: auto !important;
+    max-height: min(72vh, 600px) !important;
+    border-radius: 18px;
+    box-shadow: 0 -12px 36px rgb(47 41 36 / 18%);
+  }
+
+  .fm-metrics-filter-layer__header {
+    position: sticky;
+    z-index: 1;
+    top: 0;
   }
 
   .fm-metrics-filter-group__actions {
+    position: sticky;
+    z-index: 1;
+    bottom: 0;
     padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 480px) {
+  .fm-metrics-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fm-metrics-filter-trigger {
+    min-height: 48px;
+  }
+
+  .fm-metrics-filter-trigger small {
+    max-width: min(42vw, 150px);
+  }
+
+  .fm-metrics-filter-layer {
+    inset-inline: 8px !important;
+    bottom: calc(env(safe-area-inset-bottom) + 8px) !important;
+    max-height: min(76vh, 620px) !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .fm-metrics-filter-group__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fm-metrics-filter-group__actions .fm-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 320px) {
+  .fm-metrics-filter-layer {
+    inset-inline: 4px !important;
+    bottom: calc(env(safe-area-inset-bottom) + 4px) !important;
   }
 }
 
