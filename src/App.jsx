@@ -1,54 +1,20 @@
-import { lazy, Suspense, useEffect } from "react";
-import { Route, Routes, useLocation } from "./router";
-import AnnouncementBar from "./components/AnnouncementBar";
-import CartDrawer from "./components/CartDrawer";
-import Footer from "./components/Footer";
-import Header from "./components/Header";
-import AboutPage from "./pages/AboutPage";
-import CatalogPage from "./pages/CatalogPage";
-import CheckoutPage from "./pages/CheckoutPage";
-import HomePage from "./pages/HomePage";
-import NotFoundPage from "./pages/NotFoundPage";
-import ProductPage from "./pages/ProductPage";
-import StorePreviewGate from "./gestion/StorePreviewGate";
+import { lazy, Suspense } from "react";
+import { useLocation } from "./router";
 
 const ManagementApp = lazy(() => import("./gestion/ManagementApp"));
+const Storefront = lazy(() => import("./Storefront"));
 
-function ScrollManager() {
-  const location = useLocation();
-
-  useEffect(() => {
-    if (location.hash) {
-      window.requestAnimationFrame(() => {
-        document
-          .querySelector(location.hash)
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-      return;
-    }
-    window.scrollTo({ top: 0, behavior: "auto" });
-  }, [location.pathname, location.search, location.hash]);
-
-  return null;
-}
-
-function Storefront() {
+function AppShellFallback() {
   return (
-    <>
-      <ScrollManager />
-      <AnnouncementBar />
-      <Header />
-      <Routes>
-        <Route path="/tienda" element={<HomePage />} />
-        <Route path="/productos" element={<CatalogPage />} />
-        <Route path="/producto/:slug" element={<ProductPage />} />
-        <Route path="/nosotros" element={<AboutPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-      <Footer />
-      <CartDrawer />
-    </>
+    <main className="fm-app-loading" id="main-content" aria-live="polite">
+      <img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" width="120" height="70" />
+      <div className="fm-app-loading__skeleton" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+      <span className="sr-only">Cargando plataforma</span>
+    </main>
   );
 }
 
@@ -61,17 +27,9 @@ export default function App() {
     location.pathname === "/vendedor" ||
     location.pathname.startsWith("/vendedor/");
 
-  if (isPrivatePath) {
-    return (
-      <Suspense fallback={<main className="fm-auth-loading" id="main-content"><span>Cargando plataforma…</span></main>}>
-        <ManagementApp />
-      </Suspense>
-    );
-  }
-
   return (
-    <StorePreviewGate>
-      <Storefront />
-    </StorePreviewGate>
+    <Suspense fallback={<AppShellFallback />}>
+      {isPrivatePath ? <ManagementApp /> : <Storefront />}
+    </Suspense>
   );
 }
