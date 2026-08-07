@@ -26,7 +26,7 @@ import DashboardFilters from "../components/DashboardFilters";
 import { Icon } from "../components/icons";
 import { formatDateTime, formatMoney } from "../formatters";
 import { useAsyncData } from "../hooks";
-import { getManagementPath } from "../modules";
+import { getManagementPath, SALES_METRICS_PATH } from "../modules";
 import { can, visibleBusinessModules } from "../permissions";
 import {
   listActivityPage,
@@ -241,7 +241,7 @@ export default function DashboardPage() {
             <Panel
               title="Ritmo de ventas"
               description={`Facturación del período seleccionado: ${periodLabel}.`}
-              action={can(profile, "metrics", "view") ? <Link className="fm-button fm-button--secondary" to="/gestion/metrics/sales"><Icon name="Maximize2" /><span>Ver todas las métricas</span></Link> : null}
+              action={can(profile, "metrics", "view") ? <Link className="fm-button fm-button--secondary" to={SALES_METRICS_PATH}><Icon name="Maximize2" /><span>Ver todas las métricas</span></Link> : null}
             >
               <ChartContainer
                 title={`Ritmo de ventas de ${periodLabel}`}
