@@ -1,163 +1,242 @@
 import { useMemo, useState } from "react";
 import {
-  ChartContainer,
   DataTable,
   EmptyState,
-  FilterBar,
-  FormField,
   PageHeader,
   Panel,
-  Select,
   Skeleton,
   StatCard,
 } from "../../design-system";
-import { calculateMetrics } from "../../modules/locations/domain/metrics";
+import {
+  applyMetricsFilters,
+  buildMetricsCustomRange,
+  buildMetricsDateRange,
+  calculateMetrics,
+} from "../../modules/locations/domain/metrics";
 import {
   addArgentinaDays,
-  argentinaDateFromKey,
   argentinaDateKey,
   argentinaMonthKey,
-  argentinaMonthRange,
   argentinaParts,
-  lastSevenArgentinaDays,
 } from "../../modules/locations/domain/time";
 import { useAuth } from "../AuthContext";
+import MetricsFiltersPanel from "../components/MetricsFiltersPanel";
+import { PaymentDonut, SalesLineChart } from "../components/MetricsVisuals";
 import { formatMoney } from "../formatters";
 import { useAsyncData } from "../hooks";
 import { can } from "../permissions";
 import { listSalesByRange } from "../services/dashboardService";
-import { listLocations } from "../services/managementService";
+import {
+  listDiscountsShared,
+  listLocationsShared,
+  listMasterProductsShared,
+  listProductCategoriesShared,
+} from "../services/sharedResources";
 
-function selectedRange(period, values) {
-  if (period === "seven") return { ...lastSevenArgentinaDays(), period: "custom", label: "Últimos siete días" };
-  if (period === "month") return { ...argentinaMonthRange(values.month), period: "month", label: values.month };
-  if (period === "year") {
-    const year = Number(values.year);
-    return {
-      start: argentinaDateFromKey(`${year}-01-01`),
-      end: argentinaDateFromKey(`${year + 1}-01-01`),
-      period: "year",
-      label: String(year),
-    };
-  }
-  if (!values.from || !values.to) throw new Error("Elegí las fechas desde y hasta.");
-  const start = argentinaDateFromKey(values.from);
-  const end = addArgentinaDays(argentinaDateFromKey(values.to), 1);
-  if (start >= end) throw new Error("La fecha final debe ser posterior a la inicial.");
-  return { start, end, period: "custom", label: `${values.from} a ${values.to}` };
+const initialFilterState = () => {
+  const parts = argentinaParts();
+  return {
+    periodType: "month",
+    day: argentinaDateKey(),
+    month: argentinaMonthKey(),
+    year: String(parts.year),
+    from: argentinaDateKey(addArgentinaDays(new Date(), -29)),
+    to: argentinaDateKey(),
+    locationIds: [],
+    sellerIds: [],
+    categoryIds: [],
+    productIds: [],
+    discountIds: [],
+    paymentMethods: [],
+  };
+};
+
+function rangeFromState(state) {
+  if (state.periodType === "custom") return buildMetricsCustomRange(state.from, state.to);
+  const value = state.periodType === "day" ? state.day : state.periodType === "year" ? state.year : state.month;
+  return buildMetricsDateRange(state.periodType, value);
 }
 
-function salesDate(value) {
-  return value?.toDate?.() || (value ? new Date(value) : null);
-}
-
-function buildDailySeries(sales, range) {
-  const points = [];
-  for (let date = new Date(range.start); date < range.end && points.length < 370; date = addArgentinaDays(date, 1)) {
-    points.push({ key: argentinaDateKey(date), label: new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short", timeZone: "America/Argentina/Buenos_Aires" }).format(date), total: 0, sales: 0 });
-  }
-  const byKey = new Map(points.map((point) => [point.key, point]));
-  sales.forEach((sale) => {
-    const date = salesDate(sale.createdAt);
-    const point = date && byKey.get(argentinaDateKey(date));
-    if (point) { point.total += Number(sale.total || 0); point.sales += 1; }
+function sellerOptions(sales) {
+  const sellers = new Map();
+  (sales || []).forEach((sale) => {
+    if (sale.sellerId) sellers.set(sale.sellerId, sale.sellerName || "Vendedor");
   });
-  return points;
+  return [...sellers].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "es"));
 }
 
-function MetricBars({ points }) {
-  const visible = points.length > 62 ? points.filter((_, index) => index % Math.ceil(points.length / 31) === 0 || index === points.length - 1) : points;
-  const max = Math.max(...visible.map((point) => point.total), 1);
-  return <div className="fm-metric-bars">{visible.map((point) => <div key={point.key}><span style={{ height: `${point.total ? Math.max(5, point.total / max * 100) : 2}%` }} title={`${point.label}: ${formatMoney(point.total)} · ${point.sales} ventas`} /><small>{point.label}</small></div>)}</div>;
+function sortableRows(rows, sortBy) {
+  const field = sortBy === "sales" ? "sales" : sortBy === "items" ? "items" : "total";
+  return [...rows].sort((a, b) => Number(b[field] || 0) - Number(a[field] || 0) || String(a.name).localeCompare(String(b.name), "es"));
 }
 
 export default function SalesMetricsPage() {
   const { profile } = useAuth();
-  const currentParts = argentinaParts();
-  const [period, setPeriod] = useState("seven");
-  const [values, setValues] = useState({
-    month: argentinaMonthKey(),
-    year: String(currentParts.year),
-    from: argentinaDateKey(addArgentinaDays(new Date(), -6)),
-    to: argentinaDateKey(),
-  });
-  const [filters, setFilters] = useState({ locationId: "", sellerId: "", paymentMethod: "" });
+  const [filters, setFilters] = useState(initialFilterState);
+  const [locationSort, setLocationSort] = useState("total");
   const rangeState = useMemo(() => {
-    try { return { range: selectedRange(period, values), error: null }; }
+    try { return { range: rangeFromState(filters), error: null }; }
     catch (error) { return { range: null, error }; }
-  }, [period, values]);
-  const locationsResult = useAsyncData(() => listLocations(profile), [profile.id]);
+  }, [filters.periodType, filters.day, filters.month, filters.year, filters.from, filters.to]);
+
+  const locationsResult = useAsyncData(() => listLocationsShared(profile), [profile.id]);
+  const dimensionsResult = useAsyncData(async () => {
+    const [products, categories, discounts] = await Promise.all([
+      listMasterProductsShared(profile),
+      listProductCategoriesShared(profile),
+      listDiscountsShared(profile),
+    ]);
+    return { products, categories, discounts };
+  }, [profile.id]);
+
   const locations = locationsResult.data || [];
-  const locationIdsKey = locations.map((location) => location.id).join(",");
+  const locationIdsKey = locations.map((location) => location.id).sort().join(",");
+  const selectedLocationKey = filters.locationIds.slice().sort().join(",");
   const salesResult = useAsyncData(async () => {
     if (!locationsResult.data) return [];
     if (!rangeState.range) throw rangeState.error;
-    return listSalesByRange({ profile, locationIds: can(profile, "locations", "viewAllLocations") ? undefined : locations.map((location) => location.id), start: rangeState.range.start, end: rangeState.range.end });
-  }, [profile.id, locationIdsKey, period, values.month, values.year, values.from, values.to]);
-
-  const sellers = useMemo(() => {
-    const map = new Map();
-    (salesResult.data || []).forEach((sale) => { if (sale.sellerId) map.set(sale.sellerId, sale.sellerName || "Vendedor"); });
-    return [...map].sort((a, b) => a[1].localeCompare(b[1], "es"));
-  }, [salesResult.data]);
-  const filteredSales = useMemo(() => (salesResult.data || []).filter((sale) => {
-    if (filters.locationId && sale.locationId !== filters.locationId) return false;
-    if (filters.sellerId && sale.sellerId !== filters.sellerId) return false;
-    if (filters.paymentMethod && sale.paymentMethod !== filters.paymentMethod && !(sale.payments || []).some((payment) => payment.method === filters.paymentMethod)) return false;
-    return true;
-  }), [filters, salesResult.data]);
-  const metrics = useMemo(() => rangeState.range ? calculateMetrics(filteredSales, { ...rangeState.range, period: rangeState.range.period === "custom" ? "year" : rangeState.range.period }) : null, [filteredSales, rangeState.range]);
-  const daily = useMemo(() => rangeState.range ? buildDailySeries(filteredSales, rangeState.range) : [], [filteredSales, rangeState.range]);
-  const monthly = useMemo(() => {
-    const rows = new Map();
-    filteredSales.forEach((sale) => {
-      const date = salesDate(sale.createdAt);
-      if (!date) return;
-      const parts = argentinaParts(date);
-      const key = `${parts.year}-${String(parts.month).padStart(2, "0")}`;
-      if (!rows.has(key)) rows.set(key, { id: key, name: new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric", timeZone: "America/Argentina/Buenos_Aires" }).format(date), total: 0, sales: 0 });
-      const row = rows.get(key); row.total += Number(sale.total || 0); row.sales += 1;
+    const selected = filters.locationIds.length ? filters.locationIds : null;
+    const locationIds = selected || (can(profile, "locations", "viewAllLocations") ? undefined : locations.map((location) => location.id));
+    return listSalesByRange({
+      profile,
+      locationIds,
+      start: rangeState.range.start,
+      end: rangeState.range.end,
     });
-    return [...rows.values()].sort((a, b) => a.id.localeCompare(b.id));
-  }, [filteredSales]);
+  }, [profile.id, locationIdsKey, selectedLocationKey, filters.periodType, filters.day, filters.month, filters.year, filters.from, filters.to]);
 
-  const setValue = (key, value) => setValues((current) => ({ ...current, [key]: value }));
-  const setFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
+  const dimensions = dimensionsResult.data || { products: [], categories: [], discounts: [] };
+  const sellers = useMemo(() => sellerOptions(salesResult.data), [salesResult.data]);
+  const categoryProductIds = useMemo(() => {
+    if (!filters.categoryIds.length) return [];
+    const categories = new Set(filters.categoryIds);
+    return dimensions.products.filter((product) => categories.has(product.categoryId)).map((product) => product.id);
+  }, [filters.categoryIds, dimensions.products]);
+
+  const filteredSales = useMemo(() => {
+    if (!rangeState.range) return [];
+    return applyMetricsFilters(salesResult.data || [], {
+      locationIds: filters.locationIds,
+      sellerIds: filters.sellerIds,
+      productIds: filters.productIds,
+      categoryProductIds,
+      discountIds: filters.discountIds,
+      paymentMethods: filters.paymentMethods,
+    }, rangeState.range);
+  }, [salesResult.data, rangeState.range, filters.locationIds, filters.sellerIds, filters.productIds, categoryProductIds, filters.discountIds, filters.paymentMethods]);
+
+  const metrics = useMemo(
+    () => rangeState.range ? calculateMetrics(filteredSales, rangeState.range) : null,
+    [filteredSales, rangeState.range],
+  );
+  const locationRows = useMemo(() => metrics ? sortableRows(metrics.byLocation, locationSort) : [], [metrics, locationSort]);
+  const productRows = metrics?.byProduct || [];
+  const rankingRows = productRows.slice(0, 10).map((row, index) => ({ ...row, rank: index + 1 }));
+  const loading = locationsResult.status === "loading" || dimensionsResult.status === "loading" || salesResult.status === "loading";
+  const error = rangeState.error || locationsResult.error || dimensionsResult.error || salesResult.error;
 
   return (
-    <div className="fm-page-enter">
-      <PageHeader eyebrow="Métricas generales" title="Análisis completo de ventas" description="Comparaciones por período, ubicación, vendedor y forma de pago sobre ventas reales autorizadas." />
-      <Panel title="Período y filtros" description="Cada cambio realiza una consulta acotada por fecha; nunca se descarga todo el historial.">
-        <FilterBar>
-          <FormField label="Período"><Select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="seven">Últimos siete días</option><option value="month">Mes</option><option value="custom">Rango personalizado</option><option value="year">Año</option></Select></FormField>
-          {period === "month" ? <FormField label="Mes"><input type="month" max={argentinaMonthKey()} value={values.month} onChange={(event) => setValue("month", event.target.value)} /></FormField> : null}
-          {period === "year" ? <FormField label="Año"><input type="number" min="2020" max={currentParts.year} value={values.year} onChange={(event) => setValue("year", event.target.value)} /></FormField> : null}
-          {period === "custom" ? <><FormField label="Desde"><input type="date" max={values.to || argentinaDateKey()} value={values.from} onChange={(event) => setValue("from", event.target.value)} /></FormField><FormField label="Hasta"><input type="date" min={values.from} max={argentinaDateKey()} value={values.to} onChange={(event) => setValue("to", event.target.value)} /></FormField></> : null}
-          <FormField label="Ubicación"><Select value={filters.locationId} onChange={(event) => setFilter("locationId", event.target.value)}><option value="">Todas</option>{locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</Select></FormField>
-          <FormField label="Vendedor"><Select value={filters.sellerId} onChange={(event) => setFilter("sellerId", event.target.value)}><option value="">Todos</option>{sellers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</Select></FormField>
-          <FormField label="Forma de pago"><Select value={filters.paymentMethod} onChange={(event) => setFilter("paymentMethod", event.target.value)}><option value="">Todas</option><option value="cash">Efectivo</option><option value="debit">Débito</option><option value="credit">Crédito</option><option value="alias">Transferencia / alias</option></Select></FormField>
-        </FilterBar>
+    <div className="fm-page-enter fm-metrics-page">
+      <PageHeader
+        eyebrow="Métricas generales"
+        title="Historial y análisis de ventas"
+        description="Todos los paneles reaccionan al mismo conjunto de filtros y se calculan desde una única consulta de ventas acotada por período."
+      />
+
+      <Panel title="Filtros" description="Combiná período, ubicaciones, vendedores, productos, descuentos y formas de pago.">
+        <MetricsFiltersPanel
+          state={filters}
+          onChange={setFilters}
+          locations={locations}
+          sellers={sellers}
+          categories={dimensions.categories}
+          products={dimensions.products}
+          discounts={dimensions.discounts}
+          busy={loading}
+        />
       </Panel>
-      {salesResult.status === "loading" || locationsResult.status === "loading" ? <Skeleton lines={5} /> : null}
-      {salesResult.status === "error" ? <Panel><EmptyState icon="AlertTriangle" title="No se pudo cargar el análisis" description={salesResult.error?.message || "Revisá el período y los permisos."} /></Panel> : null}
-      {salesResult.status === "ready" && metrics ? <>
-        <section className="fm-stat-grid" aria-live="polite">
-          <StatCard label="Ventas activas" value={metrics.salesCount} hint="Sin anuladas ni duplicadas" icon="ReceiptText" />
-          <StatCard label="Total vendido" value={formatMoney(metrics.total)} hint="Total final guardado" icon="CircleDollarSign" tone="olive" />
-          <StatCard label="Ticket promedio" value={formatMoney(metrics.ticket)} hint={metrics.salesCount ? "Sobre ventas activas" : "Sin ventas"} icon="ChartNoAxesCombined" tone="wood" />
-          <StatCard label="Productos vendidos" value={metrics.totalItems} hint="Unidades del período" icon="Boxes" tone="gold" />
-        </section>
-        <Panel title="Evolución de ventas" description="Todos los días del rango aparecen, incluso cuando el total es cero.">
-          {daily.length ? <ChartContainer title="Evolución diaria" summary={`${metrics.salesCount} ventas por ${formatMoney(metrics.total)} en el período seleccionado.`}><MetricBars points={daily} /></ChartContainer> : <EmptyState icon="ChartNoAxesCombined" title="Sin días para graficar" />}
-        </Panel>
-        {!metrics.salesCount ? <Panel><EmptyState icon="ReceiptText" title="No hay ventas activas en este período" description="Las métricas se muestran en cero y no se incluyen operaciones anuladas." /></Panel> : null}
-        <section className="fm-analysis-grid">
-          <Panel title="Comparación por meses"><DataTable rows={monthly} columns={[{ key: "name", label: "Mes" }, { key: "sales", label: "Ventas" }, { key: "total", label: "Total", render: (row) => formatMoney(row.total) }]} empty={<EmptyState icon="CalendarRange" title="Sin meses para comparar" />} /></Panel>
-          <Panel title="Comparación por ubicaciones"><DataTable rows={metrics.byLocation} columns={[{ key: "name", label: "Ubicación" }, { key: "sales", label: "Ventas" }, { key: "total", label: "Total", render: (row) => formatMoney(row.total) }, { key: "ticket", label: "Ticket", render: (row) => formatMoney(row.ticket) }]} empty={<EmptyState icon="MapPin" title="Sin ubicaciones con ventas" />} /></Panel>
-          <Panel title="Comparación por vendedores"><DataTable rows={metrics.bySeller} columns={[{ key: "name", label: "Vendedor" }, { key: "sales", label: "Ventas" }, { key: "total", label: "Total", render: (row) => formatMoney(row.total) }, { key: "ticket", label: "Ticket", render: (row) => formatMoney(row.ticket) }]} empty={<EmptyState icon="UsersRound" title="Sin vendedores con ventas" />} /></Panel>
-          <Panel title="Métodos de pago"><DataTable rows={metrics.byPayment} columns={[{ key: "name", label: "Método" }, { key: "sales", label: "Operaciones" }, { key: "total", label: "Total", render: (row) => formatMoney(row.total) }]} empty={<EmptyState icon="CircleDollarSign" title="Sin pagos para comparar" />} /></Panel>
-        </section>
-      </> : null}
+
+      {loading ? <div className="fm-metrics-loading"><Skeleton lines={5} /><Skeleton lines={6} /></div> : null}
+      {error ? <Panel><EmptyState icon="AlertTriangle" title="No se pudo cargar el análisis" description={error.message || "Revisá el período, la conexión y tus permisos."} /></Panel> : null}
+
+      {!loading && !error && metrics ? (
+        <>
+          <section className="fm-stat-grid fm-metrics-summary" aria-label="Resumen de ventas filtradas" aria-live="polite">
+            <StatCard label="Total vendido" value={formatMoney(metrics.total)} hint="Monto final cobrado" icon="CircleDollarSign" tone="olive" />
+            <StatCard label="Cantidad de ventas" value={metrics.salesCount} hint="Ventas activas filtradas" icon="ReceiptText" />
+            <StatCard label="Unidades vendidas" value={metrics.totalItems} hint="Suma de cantidades" icon="Boxes" tone="gold" />
+            <StatCard label="Ticket promedio" value={formatMoney(metrics.ticket)} hint={metrics.salesCount ? "Total / ventas" : "Sin ventas"} icon="ChartNoAxesCombined" tone="wood" />
+            <StatCard label="Total descuentos" value={formatMoney(metrics.discountTotal)} hint={`${metrics.discountedSales} ventas con descuento`} icon="Percent" tone="gold" />
+          </section>
+
+          <Panel title="Evolución de ventas" description={`Granularidad automática: ${metrics.timelineMode === "hour" ? "hora" : metrics.timelineMode === "day" ? "día" : metrics.timelineMode === "week" ? "semana" : "mes"}.`}>
+            {metrics.timeline.length ? <SalesLineChart points={metrics.timeline} label="Evolución de ventas según los filtros seleccionados" /> : <EmptyState icon="ChartNoAxesCombined" title="Sin puntos para graficar" />}
+          </Panel>
+
+          <section className="fm-analysis-grid fm-metrics-analysis-grid">
+            <Panel title="Productos" description="Unidades vendidas según los filtros seleccionados.">
+              <DataTable rows={productRows} columns={[
+                { key: "name", label: "Producto" },
+                { key: "items", label: "Unidades" },
+                { key: "total", label: "Monto", render: (row) => formatMoney(row.total) },
+              ]} empty={<EmptyState icon="Boxes" title="Sin productos vendidos" />} />
+            </Panel>
+
+            <Panel title="Formas de pago" description="Distribución por monto cobrado; +2 pagos se reparte entre sus partes reales.">
+              {metrics.byPayment.length ? <PaymentDonut rows={metrics.byPayment} total={metrics.total} /> : <EmptyState icon="CircleDollarSign" title="Sin pagos para mostrar" />}
+            </Panel>
+          </section>
+
+          <section className="fm-analysis-grid fm-metrics-analysis-grid">
+            <Panel
+              title="Detalle por ubicación"
+              description="Monto, ventas y unidades por ubicación."
+              action={<div className="fm-metrics-sort" role="group" aria-label="Ordenar ubicaciones">{[["total", "Monto"], ["sales", "Ventas"], ["items", "Unidades"]].map(([id, label]) => <button key={id} type="button" className={locationSort === id ? "is-active" : ""} aria-pressed={locationSort === id} onClick={() => setLocationSort(id)}>{label}</button>)}</div>}
+            >
+              <DataTable rows={locationRows} columns={[
+                { key: "name", label: "Ubicación" },
+                { key: "total", label: "Monto", render: (row) => formatMoney(row.total) },
+                { key: "sales", label: "Ventas" },
+                { key: "items", label: "Unidades" },
+              ]} empty={<EmptyState icon="MapPin" title="Sin ubicaciones con ventas" />} />
+            </Panel>
+
+            <Panel title="Detalle por vendedor" description="Orden inicial por mayor total vendido.">
+              <DataTable rows={metrics.bySeller} columns={[
+                { key: "name", label: "Vendedor" },
+                { key: "total", label: "Total", render: (row) => formatMoney(row.total) },
+                { key: "sales", label: "Ventas" },
+                { key: "items", label: "Unidades" },
+                { key: "ticket", label: "Ticket", render: (row) => formatMoney(row.ticket) },
+              ]} empty={<EmptyState icon="UsersRound" title="Sin vendedores con ventas" />} />
+            </Panel>
+          </section>
+
+          <section className="fm-analysis-grid fm-metrics-analysis-grid">
+            <Panel title="Ranking de productos" description="Reutiliza la misma agregación de Productos, sin volver a procesar las ventas.">
+              <DataTable rows={rankingRows} columns={[
+                { key: "rank", label: "#" },
+                { key: "name", label: "Producto" },
+                { key: "items", label: "Unidades" },
+                { key: "total", label: "Monto", render: (row) => formatMoney(row.total) },
+              ]} empty={<EmptyState icon="Boxes" title="Sin ranking disponible" />} />
+            </Panel>
+
+            <Panel title="Descuentos aplicados" description="Diferencia descuentos configurados y manuales cuando esa información existe en la venta.">
+              <DataTable rows={metrics.byDiscount.map((row) => ({ ...row, percentage: metrics.salesCount ? row.sales / metrics.salesCount * 100 : 0 }))} columns={[
+                { key: "name", label: "Descuento" },
+                { key: "source", label: "Origen", render: (row) => row.source === "manual" ? "Manual" : "Guardado" },
+                { key: "sales", label: "Usos" },
+                { key: "salesTotal", label: "Vendido asociado", render: (row) => formatMoney(row.salesTotal || 0) },
+                { key: "total", label: "Descontado", render: (row) => formatMoney(row.total) },
+                { key: "percentage", label: "% ventas", render: (row) => `${row.percentage.toFixed(1)} %` },
+              ]} empty={<EmptyState icon="Percent" title="Sin descuentos aplicados" />} />
+            </Panel>
+          </section>
+
+          {!metrics.salesCount ? <Panel><EmptyState icon="ReceiptText" title="No hay ventas para estos filtros" description="Modificá el período o alguna dimensión para ampliar el conjunto analizado." /></Panel> : null}
+        </>
+      ) : null}
     </div>
   );
 }
