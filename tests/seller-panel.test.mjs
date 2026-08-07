@@ -183,7 +183,7 @@ test("la interfaz compacta descuentos y prepara ticket sin simular ARCA", async 
   const service = await read("../src/gestion/services/sellerService.js");
   assert.match(panel, />Agregar descuento</);
   assert.match(panel, />Agregar ticket</);
-  assert.match(panel, />Continuar</);
+  assert.match(panel, /"Continuar"/);
   assert.match(panel, /ticketRequested/);
   assert.match(dialog, />Descuentos disponibles</);
   assert.match(dialog, />Descuento manual</);
