@@ -5,44 +5,51 @@ service cloud.firestore {
     function profile() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
-    function activeUser() { return signedIn() && profile().active == true; }
+    function activeUser() {
+      let user = profile();
+      return signedIn() && user.active == true;
+    }
     function adminRole() {
+      let user = profile();
       return (
-        profile().role == "admin"
-        || profile().role == "general_admin"
-        || (("canAccessAdmin" in profile()) && profile().canAccessAdmin == true)
-        || (("isAdmin" in profile()) && profile().isAdmin == true)
-        || (("roles" in profile()) && ("admin" in profile().roles))
+        user.role == "admin"
+        || user.role == "general_admin"
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles))
       );
     }
     function isAdmin() { return activeUser() && adminRole(); }
     function explicitPermission(moduleId, action) {
-      return ("permissions" in profile())
-        && (moduleId in profile().permissions)
-        && (profile().permissions[moduleId] is list)
-        && (action in profile().permissions[moduleId] || "admin" in profile().permissions[moduleId]);
+      let user = profile();
+      return ("permissions" in user)
+        && (moduleId in user.permissions)
+        && (user.permissions[moduleId] is list)
+        && (action in user.permissions[moduleId] || "admin" in user.permissions[moduleId]);
     }
     function roleModule(moduleId) {
+      let role = profile().role;
       return (
-        (profile().role == "seller" && moduleId in ["locations", "quick-sales", "alerts"])
-        || (profile().role == "location_manager" && moduleId in ["locations", "quick-sales", "metrics", "alerts"])
-        || (profile().role == "warehouse_manager" && moduleId in ["locations", "warehouse", "suppliers", "alerts"])
-        || (profile().role == "marketing_manager" && moduleId in ["loyal-customers", "social", "marketing", "metrics"])
-        || (profile().role == "ecommerce_manager" && moduleId in ["ecommerce", "shipping", "loyal-customers", "metrics"])
-        || (profile().role == "shipping_manager" && moduleId in ["shipping", "alerts"])
-        || (profile().role == "supplier_manager" && moduleId in ["suppliers", "warehouse", "finance"])
-        || (profile().role == "financial_manager" && moduleId in ["finance", "metrics"])
-        || (profile().role == "analyst" && moduleId == "metrics")
-        || (profile().role == "operational_admin" && moduleId != "finance")
+        (role == "seller" && moduleId in ["locations", "quick-sales", "alerts"])
+        || (role == "location_manager" && moduleId in ["locations", "quick-sales", "metrics", "alerts"])
+        || (role == "warehouse_manager" && moduleId in ["locations", "warehouse", "suppliers", "alerts"])
+        || (role == "marketing_manager" && moduleId in ["loyal-customers", "social", "marketing", "metrics"])
+        || (role == "ecommerce_manager" && moduleId in ["ecommerce", "shipping", "loyal-customers", "metrics"])
+        || (role == "shipping_manager" && moduleId in ["shipping", "alerts"])
+        || (role == "supplier_manager" && moduleId in ["suppliers", "warehouse", "finance"])
+        || (role == "financial_manager" && moduleId in ["finance", "metrics"])
+        || (role == "analyst" && moduleId == "metrics")
+        || (role == "operational_admin" && moduleId != "finance")
       );
     }
     function rolePermission(moduleId, action) {
+      let role = profile().role;
       return (
         (action == "view" && roleModule(moduleId))
-        || (profile().role == "seller"
+        || (role == "seller"
           && ((moduleId == "quick-sales" && action in ["create", "edit"])
             || (moduleId == "alerts" && action == "edit")))
-        || (profile().role == "location_manager"
+        || (role == "location_manager"
           && ((moduleId == "locations"
               && action in [
                 "create", "edit", "export", "approve", "viewLocationProducts",
@@ -50,26 +57,26 @@ service cloud.firestore {
               ])
             || (moduleId in ["quick-sales", "alerts"]
               && action in ["create", "edit", "export", "approve"])))
-        || (profile().role == "warehouse_manager"
+        || (role == "warehouse_manager"
           && moduleId in ["warehouse", "suppliers", "alerts"]
           && action in ["create", "edit", "export", "approve"])
-        || (profile().role == "marketing_manager"
+        || (role == "marketing_manager"
           && moduleId in ["social", "marketing"]
           && action in ["create", "edit", "export"])
-        || (profile().role == "ecommerce_manager"
+        || (role == "ecommerce_manager"
           && moduleId in ["ecommerce", "shipping", "loyal-customers"]
           && action in ["create", "edit", "export"])
-        || (profile().role == "shipping_manager"
+        || (role == "shipping_manager"
           && moduleId in ["shipping", "alerts"]
           && action in ["create", "edit", "export"])
-        || (profile().role == "supplier_manager"
+        || (role == "supplier_manager"
           && moduleId in ["suppliers", "warehouse"]
           && action in ["create", "edit", "export", "approve"])
-        || (profile().role == "financial_manager"
+        || (role == "financial_manager"
           && moduleId == "finance"
           && action in ["create", "edit", "export", "approve"])
-        || (profile().role == "analyst" && moduleId == "metrics" && action == "export")
-        || (profile().role == "operational_admin"
+        || (role == "analyst" && moduleId == "metrics" && action == "export")
+        || (role == "operational_admin"
           && moduleId != "finance"
           && action in [
             "create", "edit", "export", "approve", "viewAllLocations",
@@ -83,11 +90,31 @@ service cloud.firestore {
         && (adminRole() || explicitPermission(moduleId, action) || rolePermission(moduleId, action));
     }
     function allowedLocation(locationId) {
-      return activeUser() && (
-        adminRole()
-        || explicitPermission("locations", "viewAllLocations")
-        || profile().role == "operational_admin"
-        || (("allowedLocationIds" in profile()) && locationId in profile().allowedLocationIds)
+      let user = profile();
+      return signedIn() && user.active == true && (
+        user.role in ["admin", "general_admin", "operational_admin"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles))
+        || (("permissions" in user)
+          && ("locations" in user.permissions)
+          && (user.permissions.locations is list)
+          && ("viewAllLocations" in user.permissions.locations || "admin" in user.permissions.locations))
+        || (("allowedLocationIds" in user) && locationId in user.allowedLocationIds)
+      );
+    }
+    function quickSalesPermission(action) {
+      let user = profile();
+      return signedIn() && user.active == true && (
+        user.role in ["admin", "general_admin", "operational_admin"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles))
+        || (user.role in ["seller", "location_manager"] && action in ["view", "create", "edit"])
+        || (("permissions" in user)
+          && ("quick-sales" in user.permissions)
+          && (user.permissions["quick-sales"] is list)
+          && (action in user.permissions["quick-sales"] || "admin" in user.permissions["quick-sales"]))
       );
     }
     function locationNotDeleted(location) {
@@ -109,6 +136,15 @@ service cloud.firestore {
         || location.scheduleEndAt >= request.time;
     }
     function activeAllowedLocation(locationId) {
+      let location = get(/databases/$(database)/documents/locations/$(locationId)).data;
+      return allowedLocation(locationId)
+        && locationNotDeleted(location)
+        && locationNotPaused(location)
+        && locationScheduleStarted(location)
+        && locationScheduleNotEnded(location)
+        && location.active == true;
+    }
+    function activeQuickSalesLocation(locationId) {
       let location = get(/databases/$(database)/documents/locations/$(locationId)).data;
       return allowedLocation(locationId)
         && locationNotDeleted(location)
@@ -149,18 +185,12 @@ service cloud.firestore {
         && data.items.size() > 0
         && (validSinglePayment(data) || validMultiplePayment(data));
     }
-    function validSellerStockMutation(locationId, productId) {
+    function linkedSellerStockMutation(locationId, productId) {
       let sale = getAfter(/databases/$(database)/documents/sales/$(request.resource.data.lastSaleId)).data;
-      let movement = getAfter(/databases/$(database)/documents/stockMovements/$(request.resource.data.lastMovementId)).data;
-      return canModule("quick-sales", "edit")
-        && allowedLocation(locationId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          "currentStock", "lastSaleId", "lastMovementId", "updatedAt"
-        ])
-        && request.resource.data.currentStock is int
-        && request.resource.data.currentStock >= 0
-        && request.resource.data.lastSaleId is string
-        && request.resource.data.lastMovementId is string
+      let movementPath = /databases/$(database)/documents/stockMovements/$(request.resource.data.lastMovementId);
+      let movement = getAfter(movementPath).data;
+      return !exists(movementPath)
+        && existsAfter(movementPath)
         && sale.sellerId == request.auth.uid
         && sale.locationId == locationId
         && sale.status in ["active", "cancelled"]
@@ -170,6 +200,18 @@ service cloud.firestore {
         && movement.saleId == request.resource.data.lastSaleId
         && movement.previousStock == resource.data.currentStock
         && movement.newStock == request.resource.data.currentStock;
+    }
+    function validSellerStockMutation(locationId, productId) {
+      return quickSalesPermission("edit")
+        && allowedLocation(locationId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "currentStock", "lastSaleId", "lastMovementId", "updatedAt"
+        ])
+        && request.resource.data.currentStock is int
+        && request.resource.data.currentStock >= 0
+        && request.resource.data.lastSaleId is string
+        && request.resource.data.lastMovementId is string
+        && linkedSellerStockMutation(locationId, productId);
     }
     function ownsNewRecord() {
       return request.resource.data.createdBy == request.auth.uid;
@@ -260,6 +302,7 @@ service cloud.firestore {
             && request.resource.data.currentStock is int
             && request.resource.data.currentStock >= 0);
         allow update: if isAdmin()
+          || validSellerStockMutation(locationId, productId)
           || (canModule("warehouse", "edit") && allowedLocation(locationId))
           || (canModule("locations", "configureLocationProducts")
             && allowedLocation(locationId)
@@ -277,8 +320,7 @@ service cloud.firestore {
               "productDeleted", "updatedAt", "updatedBy"
             ])
             && request.resource.data.currentStock is int
-            && request.resource.data.currentStock >= 0)
-          || validSellerStockMutation(locationId, productId);
+            && request.resource.data.currentStock >= 0);
         allow delete: if false;
       }
     }
@@ -290,17 +332,17 @@ service cloud.firestore {
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
       allow create: if isAdmin()
-        || (canModule("quick-sales", "create")
-          && activeAllowedLocation(request.resource.data.locationId)
+        || (quickSalesPermission("create")
+          && activeQuickSalesLocation(request.resource.data.locationId)
           && validSale(request.resource.data));
       allow update: if isAdmin()
-        || (canModule("quick-sales", "edit")
+        || (quickSalesPermission("edit")
           && resource.data.sellerId == request.auth.uid
           && request.resource.data.sellerId == resource.data.sellerId
           && request.resource.data.locationId == resource.data.locationId
           && resource.data.status == "active"
           && request.resource.data.status in ["active", "cancelled"]
-          && ((request.resource.data.status == "active" && activeAllowedLocation(resource.data.locationId))
+          && ((request.resource.data.status == "active" && activeQuickSalesLocation(resource.data.locationId))
             || (request.resource.data.status == "cancelled" && allowedLocation(resource.data.locationId))));
       allow delete: if false;
     }
@@ -308,7 +350,7 @@ service cloud.firestore {
       allow read: if isAdmin()
         || ((canModule("warehouse", "view") || canModule("locations", "view"))
           && allowedLocation(resource.data.locationId));
-      allow create: if activeUser()
+      allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && allowedLocation(request.resource.data.locationId)
         && request.resource.data.previousStock is int
@@ -338,10 +380,10 @@ service cloud.firestore {
     match /counters/{counterId} {
       allow get: if activeUser();
       allow list: if isAdmin();
-      allow create: if activeUser()
+      allow create: if signedIn()
         && allowedLocation(request.resource.data.locationId)
         && request.resource.data.lastNumber == 1;
-      allow update: if activeUser()
+      allow update: if signedIn()
         && allowedLocation(resource.data.locationId)
         && request.resource.data.locationId == resource.data.locationId
         && request.resource.data.lastNumber == resource.data.lastNumber + 1;
@@ -432,7 +474,7 @@ service cloud.firestore {
         || (canModule("locations", "view")
           && ("locationId" in resource.data)
           && allowedLocation(resource.data.locationId));
-      allow create: if activeUser()
+      allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && (isAdmin()
           || (("locationId" in request.resource.data)
