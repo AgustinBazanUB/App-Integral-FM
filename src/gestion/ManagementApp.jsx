@@ -3,7 +3,7 @@ import { Skeleton } from "../design-system";
 import { useLocation, useNavigate } from "../router";
 import { AuthProvider, useAuth } from "./AuthContext";
 import ManagementShell from "./ManagementShell";
-import { moduleById } from "./modules";
+import { moduleById, SALES_METRICS_PATH } from "./modules";
 import {
   canAccessAdminPanel,
   canAccessManagementRoute,
@@ -71,6 +71,13 @@ function ManagementRouter() {
   }, [status, profile, sellerPath, navigate]);
 
   useEffect(() => {
+    if (status !== "ready" || sellerPath || routeId !== "metrics") return;
+    if (location.pathname !== SALES_METRICS_PATH) {
+      navigate(SALES_METRICS_PATH, { replace: true });
+    }
+  }, [status, sellerPath, routeId, location.pathname, navigate]);
+
+  useEffect(() => {
     if (status !== "ready" || !canAccessSellerPanel(profile) || sellerPath) return undefined;
     return scheduleIdle(() => {
       Promise.all([
@@ -118,7 +125,7 @@ function ManagementRouter() {
     page = <AuditPage />;
   } else if (routeId === "actividad") {
     page = <ActivityPage />;
-  } else if (routeId === "metrics" && pathParts[2] === "sales") {
+  } else if (routeId === "metrics") {
     page = <SalesMetricsPage />;
   } else if (routeId === "settings") {
     page = <SettingsPage />;
