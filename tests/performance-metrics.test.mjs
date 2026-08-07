@@ -112,3 +112,13 @@ test("el estado de conexión es compartido y Reconectar consulta un documento", 
   assert.match(connection, /reconnecting/);
   assert.match(shell, /ConnectionIndicator/);
 });
+
+test("las escrituras del vendedor toleran temporalmente reglas Firestore anteriores", () => {
+  const sellerService = read("src/gestion/services/sellerService.js");
+  assert.match(sellerService, /runStockMutationWithRuleCompatibility/);
+  assert.match(sellerService, /permission-denied/);
+  assert.match(sellerService, /legacy \? \{\} : \{ lastMovementId \}/);
+  assert.match(sellerService, /createSellerSale[\s\S]*runStockMutationWithRuleCompatibility/);
+  assert.match(sellerService, /updateSellerSale[\s\S]*runStockMutationWithRuleCompatibility/);
+  assert.match(sellerService, /cancelSellerSale[\s\S]*runStockMutationWithRuleCompatibility/);
+});

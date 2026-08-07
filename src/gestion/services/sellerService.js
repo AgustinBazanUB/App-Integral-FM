@@ -44,6 +44,27 @@ const wholeNumber = (value, label, minimum = 0) => {
   return number;
 };
 
+const permissionDenied = (error) =>
+  error?.code === "permission-denied" || error?.code === "firestore/permission-denied";
+
+async function runStockMutationWithRuleCompatibility(profile, execute) {
+  try {
+    return await execute(false);
+  } catch (error) {
+    // Compatibilidad temporal durante el despliegue de reglas: los administradores
+    // ya tienen bypass por rol; sólo un vendedor puede necesitar el formato anterior.
+    if (!permissionDenied(error) || canAccessAdministration(profile)) throw error;
+    return execute(true);
+  }
+}
+
+const stockMutationFields = ({ currentStock, lastSaleId, lastMovementId, legacy }) => ({
+  currentStock,
+  lastSaleId,
+  ...(legacy ? {} : { lastMovementId }),
+  updatedAt: serverTimestamp(),
+});
+
 function saleLocalFields(date = new Date()) {
   return {
     saleDate: argentinaDateKey(date),
@@ -262,7 +283,7 @@ export async function createSellerSale({
     throw new Error("La fecha local de la venta pendiente no es válida.");
   }
 
-  return runTransaction(db, async (transaction) => {
+  return runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
     if (refs.localId) {
       const existing = await transaction.get(refs.saleRef);
       if (existing.exists()) {
@@ -304,12 +325,12 @@ export async function createSellerSale({
       const previousStock = Number(snapshot.data().currentStock || 0);
       if (previousStock < item.qty) throw insufficientStockError(item, previousStock);
       const newStock = previousStock - item.qty;
-      transaction.update(refs.stockRefs[index], {
+      transaction.update(refs.stockRefs[index], stockMutationFields({
         currentStock: newStock,
         lastSaleId: refs.saleRef.id,
         lastMovementId: refs.movementRefs[index].id,
-        updatedAt: serverTimestamp(),
-      });
+        legacy: legacyStockMutation,
+      }));
       transaction.set(refs.movementRefs[index], {
         locationId: permittedLocation.id,
         locationName: permittedLocation.name,
@@ -389,7 +410,7 @@ export async function createSellerSale({
       ticketStatus,
       createdAt: new Date(),
     };
-  });
+  }));
 }
 
 export async function updateSellerSale({
@@ -423,7 +444,7 @@ export async function updateSellerSale({
     throw new Error("No tenés permiso para solicitar ticket.");
   }
 
-  return runTransaction(db, async (transaction) => {
+  return runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
     const saleSnapshot = await transaction.get(saleReference);
     if (!saleSnapshot.exists()) throw new Error("La venta ya no existe.");
     const sale = saleSnapshot.data();
@@ -448,12 +469,12 @@ export async function updateSellerSale({
       const previousStock = Number(snapshot.data().currentStock || 0);
       const newStock = previousStock + difference;
       if (newStock < 0) throw insufficientStockError(item, previousStock + (oldQty.get(productId) || 0));
-      transaction.update(stockRefs[index], {
+      transaction.update(stockRefs[index], stockMutationFields({
         currentStock: newStock,
         lastSaleId: saleId,
         lastMovementId: movementRefs[index].id,
-        updatedAt: serverTimestamp(),
-      });
+        legacy: legacyStockMutation,
+      }));
       transaction.set(movementRefs[index], {
         locationId: sale.locationId,
         locationName: sale.locationName,
@@ -517,7 +538,7 @@ export async function updateSellerSale({
       ticketStatus,
       createdAt: sale.createdAt,
     };
-  });
+  }));
 }
 
 export async function cancelSellerSale({ profile, saleId, reason }) {
@@ -527,7 +548,7 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
   const safeReason = String(reason || "").trim();
   if (safeReason.length < 3) throw new Error("Indicá el motivo de la anulación.");
   const saleReference = doc(db, "sales", saleId);
-  return runTransaction(db, async (transaction) => {
+  return runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
     const saleSnapshot = await transaction.get(saleReference);
     if (!saleSnapshot.exists()) throw new Error("La venta ya no existe.");
     const sale = saleSnapshot.data();
@@ -547,12 +568,12 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
       if (!stockSnapshots[index].exists()) throw new Error(`Falta el stock de ${item.name}.`);
       const previousStock = Number(stockSnapshots[index].data().currentStock || 0);
       const newStock = previousStock + Number(item.qty || 0);
-      transaction.update(stockRefs[index], {
+      transaction.update(stockRefs[index], stockMutationFields({
         currentStock: newStock,
         lastSaleId: saleId,
         lastMovementId: movementRefs[index].id,
-        updatedAt: serverTimestamp(),
-      });
+        legacy: legacyStockMutation,
+      }));
       transaction.set(movementRefs[index], {
         locationId: sale.locationId,
         locationName: sale.locationName,
@@ -594,5 +615,5 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
       createdAt: serverTimestamp(),
     });
     return { id: saleId, saleCode: sale.saleCode };
-  });
+  }));
 }
