@@ -68,6 +68,12 @@ export default function LocationSalesPanel({ profile, location, products = [] })
   const [cancelReason, setCancelReason] = useState("");
   const [actionState, setActionState] = useState({ busy: false, error: "", success: "" });
 
+  const closeDetail = useCallback(() => setDetail(null), []);
+  const closeCancelDialog = useCallback(() => {
+    setCancelTarget(null);
+    setCancelReason("");
+  }, []);
+
   const loadFirstPage = useCallback(async () => {
     setState({ status: "loading", items: [], cursor: null, hasMore: false, error: null });
     try {
@@ -134,8 +140,7 @@ export default function LocationSalesPanel({ profile, location, products = [] })
     setActionState({ busy: true, error: "", success: "" });
     try {
       await cancelSellerSale({ profile, saleId: cancelTarget.id, reason: cancelReason });
-      setCancelTarget(null);
-      setCancelReason("");
+      closeCancelDialog();
       setDetail(null);
       setActionState({ busy: false, error: "", success: "Venta anulada y stock devuelto correctamente." });
       await loadFirstPage();
@@ -144,7 +149,10 @@ export default function LocationSalesPanel({ profile, location, products = [] })
     }
   };
 
-  const canCancel = (sale) => sale?.status === "active" && can(profile, "quick-sales", "cancelOwn") && (canAccessAdministration(profile) || sale.sellerId === profile.id);
+  const canCancel = (sale) => sale?.status === "active" && (
+    canAccessAdministration(profile) ||
+    (can(profile, "quick-sales", "cancelOwn") && sale.sellerId === profile.id)
+  );
   const detailDiscounts = saleDiscountList(detail);
   const detailDiscountTotals = storedDiscountTotals(detail || {});
   const detailPayments = salePaymentParts(detail || {});
@@ -193,10 +201,10 @@ export default function LocationSalesPanel({ profile, location, products = [] })
 
       <Modal
         open={Boolean(detail)}
-        onClose={() => setDetail(null)}
+        onClose={closeDetail}
         title={detail?.saleCode || "Detalle de venta"}
         className="fm-location-sale-detail-modal"
-        footer={canCancel(detail) ? <div className="fm-dialog-actions"><Button variant="destructive" onClick={() => { setCancelTarget(detail); setCancelReason(""); }}>Anular venta</Button></div> : null}
+        footer={canCancel(detail) ? <div className="fm-dialog-actions"><Button variant="destructive" onClick={() => { const sale = detail; setDetail(null); setCancelReason(""); setCancelTarget(sale); }}>Anular venta</Button></div> : null}
       >
         {detail ? (
           <div className="fm-location-sale-detail">
@@ -224,19 +232,23 @@ export default function LocationSalesPanel({ profile, location, products = [] })
 
             <section><h3>Ticket</h3><div className="fm-location-sale-detail__ticket"><Icon name="ReceiptText" /><span>{detail.ticketRequested ? "Solicitado" : "No solicitado"}</span><Badge tone={detailTicket.tone}>{detailTicket.label}</Badge></div></section>
 
-            <section><h3>Auditoría</h3><dl className="fm-location-sale-detail__audit"><div><dt>Usuario creador</dt><dd>{detail.createdByName || detail.sellerName || detail.createdBy || detail.sellerId || "Sin dato"}</dd></div><div><dt>Creación</dt><dd>{formatDateTime(detail.createdAt)}</dd></div>{detail.editedAt ? <><div><dt>Última edición</dt><dd>{formatDateTime(detail.editedAt)}</dd></div><div><dt>Editado por</dt><dd>{detail.editedByName || detail.editedBy || "Sin dato"}</dd></div></> : null}{detail.cancelledAt ? <><div><dt>Anulación</dt><dd>{formatDateTime(detail.cancelledAt)}</dd></div><div><dt>Anulada por</dt><dd>{detail.cancelledByName || detail.cancelledBy || "Sin dato"}</dd></div><div><dt>Motivo</dt><dd>{detail.cancelReason || "Sin dato"}</dd></div></> : null}</dl></section>
+            <section><h3>Auditoría</h3><dl className="fm-location-sale-detail__audit"><div><dt>Usuario creador</dt><dd>{detail.createdByName || detail.sellerName || detail.createdBy || detail.sellerId || "Sin dato"}</dd></div><div><dt>Creación</dt><dd>{formatDateTime(detail.createdAt)}</dd></div>{detail.editedAt ? <><div><dt>Última edición</dt><dd>{formatDateTime(detail.editedAt)}</dd></div><div><dt>Editado por</dt><dd>{detail.editedByName || detail.editedBy || "Sin dato"}</dd></div></> : null}{detail.cancelledAt ? <><div><dt>Anulación</dt><dd>{formatDateTime(detail.cancelledAt)}</dd></div><div><dt>Anulada por</dt><dd>{detail.cancelledByName || detail.cancelledBy || "Sin dato"}</dd></div><div><dt>Motivo</dt><dd>{detail.cancelReason || "Sin motivo registrado"}</dd></div></> : null}</dl></section>
           </div>
         ) : null}
       </Modal>
 
       <Modal
         open={Boolean(cancelTarget)}
-        onClose={() => setCancelTarget(null)}
+        onClose={closeCancelDialog}
         title="Anular venta"
         description="Las unidades volverán al stock y el documento de venta conservará su historial."
-        footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={() => setCancelTarget(null)}>Cancelar</Button><Button variant="destructive" loading={actionState.busy} disabled={cancelReason.trim().length < 3} onClick={confirmCancel}>Anular y devolver stock</Button></div>}
+        footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={closeCancelDialog}>Cancelar</Button><Button variant="destructive" loading={actionState.busy} onClick={confirmCancel}>Anular y devolver stock</Button></div>}
       >
-        <label className="fm-field"><span>Motivo *</span><textarea rows="3" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Ej.: error de carga o devolución inmediata" /></label>
+        <label className="fm-field">
+          <span>Motivo de anulación (opcional)</span>
+          <textarea rows="2" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Ej.: error de carga o devolución inmediata" />
+          <small className="fm-field__hint">Si no ingresás un motivo, la anulación igualmente conserva usuario y fecha en auditoría.</small>
+        </label>
       </Modal>
     </div>
   );
