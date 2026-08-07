@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { Button, FormField } from "../../design-system";
-import { Link } from "../../router";
 import { useAuth } from "../AuthContext";
 import { Icon } from "../components/icons";
 
@@ -8,6 +8,7 @@ export default function LoginPage({ sessionError }) {
   const { login, logout } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -66,14 +67,49 @@ export default function LoginPage({ sessionError }) {
                 onChange={(event) => setEmail(event.target.value)}
               />
             </FormField>
-            <FormField label="Contraseña" required>
-              <input
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </FormField>
+            <div className="fm-field">
+              <label htmlFor="login-password">
+                Contraseña <span aria-hidden="true">*</span>
+              </label>
+              <div style={{ position: "relative" }}>
+                <input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  aria-describedby="login-session-note"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  style={{ width: "100%", paddingRight: "48px" }}
+                />
+                <button
+                  type="button"
+                  className="fm-icon-button fm-icon-button--secondary"
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  aria-pressed={showPassword}
+                  title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  onClick={() => setShowPassword((current) => !current)}
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    right: "7px",
+                    width: "34px",
+                    height: "34px",
+                    minHeight: "34px",
+                    transform: "translateY(-50%)",
+                  }}
+                >
+                  {showPassword ? (
+                    <EyeOff width="17" height="17" aria-hidden="true" />
+                  ) : (
+                    <Eye width="17" height="17" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+              <p className="fm-field__hint" id="login-session-note">
+                La sesión quedará iniciada en este dispositivo hasta que cierres sesión.
+              </p>
+            </div>
             {error || sessionError ? (
               <p className="fm-form-error" role="alert">
                 <Icon name="AlertTriangle" />
@@ -84,9 +120,6 @@ export default function LoginPage({ sessionError }) {
               Ingresar a gestión
             </Button>
           </form>
-          <Link className="fm-back-link" to="/">
-            <Icon name="ChevronLeft" /> Volver a la tienda
-          </Link>
         </div>
       </section>
     </main>

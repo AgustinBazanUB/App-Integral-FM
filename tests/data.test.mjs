@@ -83,7 +83,7 @@ test("la navegación de escritorio conserva sus accesos actuales", () => {
   assert.deepEqual(
     navigation.map(({ label, to }) => [label, to]),
     [
-      ["Inicio", "/"],
+      ["Inicio", "/tienda"],
       ["Tienda", "/productos"],
       ["Aceites de oliva", "/productos?categoria=olive_oil"],
       ["Frutos secos", "/productos?categoria=nuts"],
@@ -91,7 +91,7 @@ test("la navegación de escritorio conserva sus accesos actuales", () => {
       ["Mermeladas", "/productos?categoria=jams"],
       ["Regalos", "/productos?categoria=gifts"],
       ["Nosotros", "/nosotros"],
-      ["Contacto", "/#contacto"],
+      ["Contacto", "/tienda#contacto"],
     ],
   );
 });
@@ -100,7 +100,7 @@ test("el menú mobile tiene el orden y destinos solicitados", () => {
   assert.deepEqual(
     mobileNavigation.map(({ label, to }) => [label, to]),
     [
-      ["Inicio", "/"],
+      ["Inicio", "/tienda"],
       ["Tienda", "/productos"],
       ["AOVE", "/productos?categoria=olive_oil"],
       ["Frutos secos", "/productos?categoria=nuts"],
@@ -108,7 +108,7 @@ test("el menú mobile tiene el orden y destinos solicitados", () => {
       ["Productos Regionales Mdz", "/productos?coleccion=regionales"],
       ["Regalos pre-armados", "/productos?categoria=gifts"],
       ["Nosotros", "/nosotros"],
-      ["Contacto", "/#contacto"],
+      ["Contacto", "/tienda#contacto"],
     ],
   );
   assert.equal(

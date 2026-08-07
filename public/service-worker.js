@@ -1,7 +1,8 @@
-const CACHE_NAME = "flor-mia-integral-v1";
+const CACHE_NAME = "flor-mia-integral-v2";
 const APP_SHELL = [
   "/",
   "/gestion",
+  "/tienda",
   "/manifest.webmanifest",
   "/images/flor-mia/logo-flor-mia.svg",
 ];
@@ -28,7 +29,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match("/gestion")),
+      fetch(event.request).catch(() => caches.match("/")),
     );
     return;
   }

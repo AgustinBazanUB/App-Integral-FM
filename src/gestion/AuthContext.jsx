@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { login, logout } from "./services/firebase";
+import { login, logout as firebaseLogout } from "./services/firebase";
 import { observeSession } from "./services/managementService";
+import { clearRuntimeCache } from "./services/runtimeCache";
 
 const AuthContext = createContext(null);
 
@@ -16,6 +17,7 @@ export function AuthProvider({ children }) {
     () =>
       observeSession(({ user, profile, error }) => {
         if (!user) {
+          clearRuntimeCache();
           setSession({ status: "signed-out", user: null, profile: null, error });
           return;
         }
@@ -45,6 +47,11 @@ export function AuthProvider({ children }) {
       }),
     [],
   );
+
+  const logout = async () => {
+    clearRuntimeCache();
+    return firebaseLogout();
+  };
 
   const value = useMemo(
     () => ({ ...session, login, logout }),

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Pin, PinOff } from "lucide-react";
 import {
   Badge,
   Button,
@@ -25,6 +26,7 @@ import { Icon } from "../components/icons";
 import { formatDate } from "../formatters";
 import { useAsyncData } from "../hooks";
 import { can, normalizedRole } from "../permissions";
+import { savePinnedLocationIds } from "../services/locationEnhancementsService";
 import {
   listLocationStockCounts,
   saveManagedLocation,
@@ -40,6 +42,16 @@ const emptyLocation = {
   active: true,
   scheduleStartAt: "",
   scheduleEndAt: "",
+};
+
+const MAX_PINNED_LOCATIONS = 4;
+const statusOrder = {
+  active: 1,
+  upcoming: 2,
+  paused: 3,
+  inactive: 4,
+  finished: 5,
+  deleted: 6,
 };
 
 export const locationTypeLabels = {
@@ -69,18 +81,39 @@ function statusTone(location) {
   return "neutral";
 }
 
-function LocationCard({ location, stockCount, profile, onEdit, onLifecycle }) {
+function LocationCard({
+  location,
+  stockCount,
+  profile,
+  pinned,
+  pinBusy,
+  onPin,
+  onEdit,
+  onLifecycle,
+}) {
   const state = locationActivity(location);
   const schedule = locationSchedule(location);
   const canEdit = can(profile, "locations", "edit") && location.deleted !== true;
   const canArchive = can(profile, "locations", "archive") && location.deleted !== true;
   const canRestore = can(profile, "locations", "restore") && location.deleted === true;
+  const canPin = can(profile, "locations", "pin") && location.deleted !== true;
+  const canLoadStock = can(profile, "locations", "loadStock") && state.active;
+  const stockDisabledReason = state.active
+    ? "Tu perfil no tiene permiso para cargar stock."
+    : "Activá la ubicación para cargar stock.";
+
   return (
-    <article className="fm-location-card">
+    <article className={`fm-location-card ${pinned ? "is-pinned" : ""}`}>
       <header>
         <div className="fm-location-card__icon"><Icon name={location.type === "warehouse_store" ? "Warehouse" : "MapPin"} /></div>
-        <div><h3>{location.name}</h3><p>{locationTypeLabels[location.type] || "Ubicación"}</p></div>
-        <Badge tone={statusTone(location)}>{state.label}</Badge>
+        <div>
+          <h3>{location.name}</h3>
+          <p>{locationTypeLabels[location.type] || "Ubicación"}</p>
+        </div>
+        <div className="fm-location-card__status">
+          {pinned ? <Badge tone="warning" icon="MapPin">Fijada</Badge> : null}
+          <Badge tone={statusTone(location)}>{state.label}</Badge>
+        </div>
       </header>
       <dl>
         <div><dt>Fechas</dt><dd>{schedule.startAt || schedule.endAt ? `${schedule.startAt ? formatDate(schedule.startAt) : "Sin inicio"} — ${schedule.endAt ? formatDate(schedule.endAt) : "Sin fin"}` : "Operación permanente"}</dd></div>
@@ -88,7 +121,33 @@ function LocationCard({ location, stockCount, profile, onEdit, onLifecycle }) {
         <div><dt>Stock</dt><dd>{stockCount > 0 ? `${stockCount} productos configurados` : "Todavía sin configurar"}</dd></div>
       </dl>
       <footer>
-        {location.deleted !== true ? <Link className="fm-button fm-button--primary" to={`/gestion/locations/${encodeURIComponent(location.id)}`}><span>Abrir ubicación</span><Icon name="ChevronRight" /></Link> : null}
+        {location.deleted !== true ? (
+          <Link className="fm-button fm-button--primary" to={`/gestion/locations/${encodeURIComponent(location.id)}/products`}>
+            <span>Abrir ubicación</span><Icon name="ChevronRight" />
+          </Link>
+        ) : null}
+        {canLoadStock ? (
+          <Link className="fm-button fm-button--secondary fm-location-stock-shortcut" to={`/gestion/locations/${encodeURIComponent(location.id)}/stock`}>
+            <Icon name="PackagePlus" /><span>Cargar stock</span>
+          </Link>
+        ) : location.deleted !== true ? (
+          <span className="fm-button fm-button--secondary fm-location-stock-shortcut is-disabled" aria-disabled="true" title={stockDisabledReason}>
+            <Icon name="PackagePlus" /><span>Cargar stock</span>
+          </span>
+        ) : null}
+        {canPin ? (
+          <button
+            type="button"
+            className="fm-location-pin-action"
+            onClick={() => onPin(location)}
+            disabled={pinBusy}
+            aria-label={pinned ? `Desfijar ${location.name}` : `Fijar ${location.name}`}
+            title={pinned ? "Desfijar ubicación" : "Fijar ubicación"}
+          >
+            {pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
+            <span>{pinned ? "Desfijar" : "Fijar"}</span>
+          </button>
+        ) : null}
         {canEdit ? <Button variant="secondary" icon="Settings2" onClick={() => onEdit(location)}>Editar</Button> : null}
         {canEdit && state.active ? <Button variant="ghost" icon="Pause" onClick={() => onLifecycle(location, "pause")}>Pausar</Button> : null}
         {canEdit && !state.active ? <Button variant="ghost" icon="Play" onClick={() => onLifecycle(location, "activate")}>Activar</Button> : null}
@@ -114,20 +173,62 @@ export default function LocationsPage() {
   const [form, setForm] = useState(emptyLocation);
   const [saveState, setSaveState] = useState({ busy: false, error: "", success: "" });
   const [pendingAction, setPendingAction] = useState(null);
+  const [pinnedIds, setPinnedIds] = useState(() => (profile.pinnedLocationIds || []).slice(0, MAX_PINNED_LOCATIONS));
+  const [pinState, setPinState] = useState({ busyId: "", error: "", success: "" });
 
   useEffect(() => {
     if (statusFilter === "deleted" && !canRecover) setStatusFilter("all");
   }, [canRecover, statusFilter]);
 
+  useEffect(() => {
+    if (locationsResult.status !== "ready") return;
+    const visibleIds = new Set(locations.filter((location) => location.deleted !== true).map((location) => location.id));
+    const cleaned = pinnedIds.filter((id) => visibleIds.has(id)).slice(0, MAX_PINNED_LOCATIONS);
+    if (cleaned.join("|") !== pinnedIds.join("|")) {
+      setPinnedIds(cleaned);
+      savePinnedLocationIds(profile, cleaned, [...visibleIds]).catch(() => {});
+    }
+  }, [locationsResult.status, locationIdsKey]);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("es");
-    return locations.filter((location) => {
-      if (term && !`${location.name} ${locationTypeLabels[location.type] || ""}`.toLocaleLowerCase("es").includes(term)) return false;
-      if (statusFilter !== "all" && statusKey(location) !== statusFilter) return false;
-      if (typeFilter !== "all" && location.type !== typeFilter) return false;
-      return true;
-    });
-  }, [locations, search, statusFilter, typeFilter]);
+    const pinOrder = new Map(pinnedIds.map((id, index) => [id, index]));
+    return locations
+      .filter((location) => {
+        if (term && !`${location.name} ${locationTypeLabels[location.type] || ""}`.toLocaleLowerCase("es").includes(term)) return false;
+        if (statusFilter !== "all" && statusKey(location) !== statusFilter) return false;
+        if (typeFilter !== "all" && location.type !== typeFilter) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const aPinned = pinOrder.has(a.id);
+        const bPinned = pinOrder.has(b.id);
+        if (aPinned !== bPinned) return aPinned ? -1 : 1;
+        if (aPinned && bPinned) return pinOrder.get(a.id) - pinOrder.get(b.id);
+        const statusDifference = (statusOrder[statusKey(a)] || 99) - (statusOrder[statusKey(b)] || 99);
+        if (statusDifference) return statusDifference;
+        return String(a.name || "").localeCompare(String(b.name || ""), "es");
+      });
+  }, [locations, pinnedIds, search, statusFilter, typeFilter]);
+
+  const togglePin = async (location) => {
+    const alreadyPinned = pinnedIds.includes(location.id);
+    if (!alreadyPinned && pinnedIds.length >= MAX_PINNED_LOCATIONS) {
+      setPinState({ busyId: "", success: "", error: "Ya tenés cuatro ubicaciones fijadas. Desfijá una antes de agregar otra." });
+      return;
+    }
+    const next = alreadyPinned
+      ? pinnedIds.filter((id) => id !== location.id)
+      : [...pinnedIds, location.id];
+    setPinState({ busyId: location.id, error: "", success: "" });
+    try {
+      const saved = await savePinnedLocationIds(profile, next, locations.filter((item) => item.deleted !== true).map((item) => item.id));
+      setPinnedIds(saved);
+      setPinState({ busyId: "", error: "", success: alreadyPinned ? "Ubicación desfijada." : "Ubicación fijada para este usuario." });
+    } catch (error) {
+      setPinState({ busyId: "", error: error.message, success: "" });
+    }
+  };
 
   const openCreate = (type = "store") => {
     setEditingId("");
@@ -186,19 +287,20 @@ export default function LocationsPage() {
       <PageHeader
         eyebrow="Módulo 01"
         title="Ubicaciones y eventos"
-        description="Abrí el punto operativo que necesitás para gestionar sus productos, stock, vendedores y descuentos."
+        description="Fijá hasta cuatro puntos importantes y accedé directamente a sus productos, stock, vendedores y descuentos."
         actions={can(profile, "locations", "create") ? <><Button variant="secondary" icon="CalendarDays" onClick={() => openCreate("event")}>Crear evento</Button><Button icon="Plus" onClick={() => openCreate("store")}>Crear ubicación</Button></> : null}
       />
-      {saveState.success ? <Toast tone="success">{saveState.success}</Toast> : null}
+      {pinState.error ? <Toast tone="error">{pinState.error}</Toast> : null}
+      {pinState.success ? <Toast tone="success">{pinState.success}</Toast> : null}
       {locationsResult.status === "loading" ? <Skeleton lines={5} /> : null}
       {locationsResult.status === "error" ? <Panel><EmptyState icon="WifiOff" title="No se pudieron leer las ubicaciones" description="Revisá la conexión o los permisos de Firestore." action={<Button variant="secondary" onClick={locationsResult.refresh}>Reintentar</Button>} /></Panel> : null}
-      {locationsResult.status === "ready" ? <Panel title="Puntos de operación" description={`${filtered.length} de ${locations.length} ubicaciones visibles`}>
+      {locationsResult.status === "ready" ? <Panel title="Puntos de operación" description={`${filtered.length} de ${locations.length} ubicaciones visibles · ${pinnedIds.length}/${MAX_PINNED_LOCATIONS} fijadas`}>
         <FilterBar search={<SearchInput label="Buscar por nombre" value={search} onChange={(event) => setSearch(event.target.value)} />}>
           <Select aria-label="Filtrar por estado" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Todos los estados</option><option value="active">Activas</option><option value="upcoming">Próximas</option><option value="paused">Pausadas</option><option value="finished">Finalizadas</option><option value="inactive">Inactivas</option>{canRecover ? <option value="deleted">Bajas para recuperar</option> : null}</Select>
           <Select aria-label="Filtrar por tipo" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Todos los tipos</option>{Object.entries(locationTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select>
         </FilterBar>
         {countsResult.status === "loading" ? <p className="fm-refresh-note"><Icon name="RefreshCw" className="fm-spinner" /> Verificando stock…</p> : null}
-        {filtered.length ? <div className="fm-location-grid">{filtered.map((location) => <LocationCard key={location.id} location={location} stockCount={countsResult.data?.[location.id] || 0} profile={profile} onEdit={openEdit} onLifecycle={requestLifecycle} />)}</div> : <EmptyState icon="MapPin" title="No hay ubicaciones para mostrar" description="Revisá los filtros o creá un nuevo punto de operación." action={can(profile, "locations", "create") ? <Button onClick={() => openCreate()}>Crear ubicación</Button> : null} />}
+        {filtered.length ? <div className="fm-location-grid">{filtered.map((location) => <LocationCard key={location.id} location={location} stockCount={countsResult.data?.[location.id] || 0} profile={profile} pinned={pinnedIds.includes(location.id)} pinBusy={pinState.busyId === location.id} onPin={togglePin} onEdit={openEdit} onLifecycle={requestLifecycle} />)}</div> : <EmptyState icon="MapPin" title="No hay ubicaciones para mostrar" description="Revisá los filtros o creá un nuevo punto de operación." action={can(profile, "locations", "create") ? <Button onClick={() => openCreate()}>Crear ubicación</Button> : null} />}
       </Panel> : null}
 
       <Modal open={modalOpen} onClose={() => !saveState.busy && setModalOpen(false)} title={editingId ? "Editar ubicación" : form.type === "event" ? "Nuevo evento" : "Nueva ubicación"} description="Los datos se guardan sin alterar ventas ni movimientos históricos.">

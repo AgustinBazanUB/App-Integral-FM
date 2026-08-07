@@ -2,6 +2,9 @@ import {
   ARGENTINA_TIME_ZONE,
   addArgentinaDays,
   argentinaDateKey,
+  argentinaHour,
+  argentinaMonthKey,
+  argentinaParts,
   lastSevenArgentinaDays,
 } from "./time.js";
 
@@ -36,6 +39,13 @@ export function summarizeSales(sales = []) {
   };
 }
 
+function saleDate(sale) {
+  const value = sale.createdAt?.toDate?.() || sale.createdAt || sale.date;
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.valueOf()) ? null : date;
+}
+
 export function buildSevenDaySalesSeries(sales = [], now = new Date()) {
   const { start } = lastSevenArgentinaDays(now);
   const days = Array.from({ length: 7 }, (_, index) => {
@@ -53,16 +63,66 @@ export function buildSevenDaySalesSeries(sales = [], now = new Date()) {
   });
   const byKey = new Map(days.map((day) => [day.key, day]));
   uniqueSales(sales).filter(isActiveDashboardSale).forEach((sale) => {
-    const value = sale.createdAt?.toDate?.() || sale.createdAt || sale.date;
-    if (!value) return;
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.valueOf())) return;
-    const day = byKey.get(argentinaDateKey(date));
+    const date = saleDate(sale);
+    const day = date && byKey.get(argentinaDateKey(date));
     if (!day) return;
     day.value += Number(sale.total || 0);
     day.sales += 1;
   });
   return days;
+}
+
+export function buildPeriodSalesSeries(sales = [], range, format = "month") {
+  if (!range?.start || !range?.end) return [];
+  let points = [];
+  if (format === "year") {
+    const year = argentinaParts(range.start).year;
+    points = Array.from({ length: 12 }, (_, index) => {
+      const date = new Date(Date.UTC(year, index, 15, 12));
+      return {
+        key: `${year}-${String(index + 1).padStart(2, "0")}`,
+        label: new Intl.DateTimeFormat("es-AR", { month: "short", timeZone: ARGENTINA_TIME_ZONE }).format(date),
+        value: 0,
+        sales: 0,
+      };
+    });
+  } else if (format === "day") {
+    points = Array.from({ length: 24 }, (_, hour) => ({
+      key: String(hour).padStart(2, "0"),
+      label: `${String(hour).padStart(2, "0")} h`,
+      value: 0,
+      sales: 0,
+    }));
+  } else {
+    for (let date = new Date(range.start); date < range.end && points.length < 40; date = addArgentinaDays(date, 1)) {
+      points.push({
+        key: argentinaDateKey(date),
+        label: new Intl.DateTimeFormat("es-AR", {
+          timeZone: ARGENTINA_TIME_ZONE,
+          weekday: format === "week" ? "short" : undefined,
+          day: "numeric",
+          month: format === "month" ? undefined : "short",
+        }).format(date),
+        value: 0,
+        sales: 0,
+      });
+    }
+  }
+  const byKey = new Map(points.map((point) => [point.key, point]));
+  uniqueSales(sales).filter(isActiveDashboardSale).forEach((sale) => {
+    const date = saleDate(sale);
+    if (!date || date < range.start || date >= range.end) return;
+    const key = format === "year"
+      ? argentinaMonthKey(date)
+      : format === "day"
+        ? String(argentinaHour(date)).padStart(2, "0")
+        : argentinaDateKey(date);
+    const point = byKey.get(key);
+    if (!point) return;
+    point.value += Number(sale.total || 0);
+    point.sales += 1;
+  });
+  return points;
 }
 
 export function joinMasterProducts(products = [], stock = []) {

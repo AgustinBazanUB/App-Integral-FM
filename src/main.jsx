@@ -19,7 +19,13 @@ import "./styles-responsive-mobile.css";
 import "./styles/tokens.css";
 import "./styles/theme.css";
 import "./styles/management.css";
+import "./styles/location-enhancements.css";
+import "./styles/dashboard-filters.css";
+import "./styles/seller-panel.css";
+import "./styles/seller-stage2.css";
+import "./styles/seller-stage2-mobile.css";
 import "./styles/responsive.css";
+import "./styles/performance-optimizations.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

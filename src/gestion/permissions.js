@@ -1,3 +1,4 @@
+import { isLocationActiveNow } from "../modules/locations/domain/locations.js";
 import { businessModules } from "./modules.js";
 
 export const ACTIONS = [
@@ -12,18 +13,43 @@ export const ACTIONS = [
   "viewFinancial",
   "viewSensitive",
   "viewAllLocations",
+  "pin",
   "viewLocationProducts",
   "configureLocationProducts",
+  "createLocationProducts",
+  "editMasterProducts",
+  "assignAllLocationProducts",
   "viewStock",
   "loadStock",
   "adjustStock",
   "assignSellers",
   "assignDiscounts",
+  "viewOwn",
+  "cancelOwn",
+  "useDiscounts",
+  "useManualDiscounts",
+  "useMultiplePayments",
+  "useOfflineSales",
+  "useKeyboard",
+  "requestTicket",
 ];
 
 const everyAction = [...ACTIONS];
 const operational = ["view", "create", "edit", "export"];
 const viewOnly = ["view"];
+const sellerSalesActions = [
+  "view",
+  "create",
+  "edit",
+  "viewOwn",
+  "cancelOwn",
+  "useDiscounts",
+  "useManualDiscounts",
+  "useMultiplePayments",
+  "useOfflineSales",
+  "useKeyboard",
+  "requestTicket",
+];
 
 export const ROLE_TEMPLATES = {
   admin: Object.fromEntries(businessModules.map(({ id }) => [id, everyAction])),
@@ -34,23 +60,43 @@ export const ROLE_TEMPLATES = {
     businessModules.map(({ id, sensitive }) => [
       id,
       sensitive ? ["view"] : id === "locations"
-        ? [...operational, "approve", "viewAllLocations", "viewLocationProducts", "configureLocationProducts", "viewStock", "loadStock", "adjustStock", "assignDiscounts"]
-        : [...operational, "approve", "viewAllLocations"],
+        ? [
+            ...operational,
+            "approve",
+            "viewAllLocations",
+            "viewLocationProducts",
+            "configureLocationProducts",
+            "viewStock",
+            "loadStock",
+            "adjustStock",
+            "assignDiscounts",
+          ]
+        : id === "quick-sales"
+          ? [...operational, ...sellerSalesActions]
+          : [...operational, "approve", "viewAllLocations"],
     ]),
   ),
   seller: {
     locations: ["view", "viewLocationProducts", "viewStock"],
-    "quick-sales": ["view", "create", "edit"],
+    "quick-sales": sellerSalesActions,
     alerts: ["view", "edit"],
   },
   location_manager: {
-    locations: [...operational, "approve", "viewLocationProducts", "configureLocationProducts", "viewStock", "loadStock", "adjustStock"],
-    "quick-sales": operational,
+    locations: [
+      ...operational,
+      "approve",
+      "viewLocationProducts",
+      "configureLocationProducts",
+      "viewStock",
+      "loadStock",
+      "adjustStock",
+    ],
+    "quick-sales": [...operational, ...sellerSalesActions],
     metrics: viewOnly,
     alerts: ["view", "edit"],
   },
   warehouse_manager: {
-    locations: viewOnly,
+    locations: ["view"],
     warehouse: [...operational, "approve"],
     suppliers: operational,
     alerts: ["view", "edit"],
@@ -153,11 +199,43 @@ export const visibleBusinessModules = (profile) =>
 export const canAccessAdministration = (profile) =>
   ["admin", "general_admin"].includes(normalizedRole(profile));
 
+export const canAccessAdminPanel = (profile) =>
+  Boolean(profile?.active) &&
+  (canAccessAdministration(profile) || normalizedRole(profile) !== "seller") &&
+  visibleBusinessModules(profile).length > 0;
+
+export const canAccessSellerPanel = (profile) =>
+  Boolean(profile?.active) &&
+  (can(profile, "quick-sales", "create") || can(profile, "quick-sales", "view"));
+
+export const isPureSeller = (profile) =>
+  normalizedRole(profile) === "seller" && !canAccessAdminPanel(profile);
+
+export function effectiveSellerLocations(profile, locations = [], now = new Date()) {
+  if (!canAccessSellerPanel(profile)) return [];
+  const canSeeAll =
+    canAccessAdministration(profile) ||
+    can(profile, "locations", "viewAllLocations");
+  const allowed = new Set(profile.allowedLocationIds || []);
+  return (locations || [])
+    .filter((location) => location?.deleted !== true)
+    .filter((location) => isLocationActiveNow(location, now))
+    .filter((location) =>
+      canSeeAll ||
+      allowed.has(location.id) ||
+      (location.assignedSellerIds || []).includes(profile.id),
+    )
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "es"));
+}
+
+export const effectiveSellerLocationIds = (profile, locations = [], now = new Date()) =>
+  effectiveSellerLocations(profile, locations, now).map((location) => location.id);
+
 export const canAccessManagementRoute = (profile, routeId) => {
-  if (["dashboard", "settings"].includes(routeId)) return Boolean(profile?.active);
-  if (routeId === "actividad") return can(profile, "locations", "view");
+  if (["dashboard", "settings"].includes(routeId)) return canAccessAdminPanel(profile);
+  if (routeId === "actividad") return canAccessAdminPanel(profile) && can(profile, "locations", "view");
   if (["administration", "audit"].includes(routeId)) {
     return canAccessAdministration(profile);
   }
-  return canAccessModule(profile, routeId);
+  return canAccessAdminPanel(profile) && canAccessModule(profile, routeId);
 };

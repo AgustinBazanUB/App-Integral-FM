@@ -10,7 +10,7 @@ function isCurrentNavigationItem(to, location) {
 
   if (target.pathname !== location.pathname) return false;
   if (target.hash) return target.hash === location.hash;
-  if (target.pathname === "/" && location.hash) return false;
+  if (target.pathname === "/tienda" && location.hash) return false;
   if (target.search) return target.search === location.search;
 
   if (target.pathname === "/productos") {
@@ -95,7 +95,7 @@ export default function Header() {
         <div className="site-header__inner">
           <Link
             className="wordmark header-logo"
-            to="/"
+            to="/tienda"
             aria-label="Flor Mía - Inicio"
           >
             <img

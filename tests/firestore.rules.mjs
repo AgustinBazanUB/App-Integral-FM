@@ -9,6 +9,7 @@ import {
 import {
   doc,
   getDoc,
+  runTransaction,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
@@ -118,8 +119,109 @@ test("el vendedor no puede ajustar stock fuera de una venta válida", async () =
   const stockRef = doc(database, "locationStock", "loc-1", "items", "product-1");
   await assertFails(updateDoc(stockRef, { currentStock: -1, updatedAt: new Date() }));
   await assertFails(updateDoc(stockRef, { currentStock: 4, updatedAt: new Date() }));
+  await assertFails(updateDoc(stockRef, {
+    currentStock: 4,
+    lastSaleId: "sale-inexistente",
+    lastMovementId: "movement-inexistente",
+    updatedAt: new Date(),
+  }));
   const snapshot = await getDoc(stockRef);
   assert.equal(snapshot.data().currentStock, 5);
+});
+
+test("una venta válida actualiza venta, movimiento y stock en la misma transacción", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  const saleRef = doc(database, "sales", "seller-sale-1");
+  const movementRef = doc(database, "stockMovements", "seller-movement-1");
+  const stockRef = doc(database, "locationStock", "loc-1", "items", "product-1");
+
+  await assertSucceeds(runTransaction(database, async (transaction) => {
+    const stock = await transaction.get(stockRef);
+    const previousStock = stock.data().currentStock;
+    const newStock = previousStock - 1;
+    transaction.set(saleRef, {
+      saleCode: "FM-LOC-20260806-0001",
+      sellerId: "seller-1",
+      sellerName: "Vendedor",
+      locationId: "loc-1",
+      locationName: "Ubicación autorizada",
+      status: "active",
+      total: 1000,
+      totalItems: 1,
+      items: [{ productId: "product-1", name: "Producto", qty: 1, unitPrice: 1000, subtotal: 1000 }],
+      paymentMethod: "cash",
+      paymentMethodLabel: "Pago eft",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    transaction.set(movementRef, {
+      locationId: "loc-1",
+      productId: "product-1",
+      type: "sale",
+      qty: -1,
+      previousStock,
+      newStock,
+      reason: "Venta de prueba",
+      userId: "seller-1",
+      userName: "Vendedor",
+      saleId: saleRef.id,
+      createdAt: new Date(),
+    });
+    transaction.update(stockRef, {
+      currentStock: newStock,
+      lastSaleId: saleRef.id,
+      lastMovementId: movementRef.id,
+      updatedAt: new Date(),
+    });
+  }));
+
+  assert.equal((await getDoc(stockRef)).data().currentStock, 4);
+  assert.equal((await getDoc(saleRef)).data().sellerId, "seller-1");
+});
+
+test("la anulación conserva la venta y devuelve el stock de forma atómica", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  const saleRef = doc(database, "sales", "seller-sale-1");
+  const movementRef = doc(database, "stockMovements", "seller-movement-cancel-1");
+  const stockRef = doc(database, "locationStock", "loc-1", "items", "product-1");
+
+  await assertSucceeds(runTransaction(database, async (transaction) => {
+    const stock = await transaction.get(stockRef);
+    const previousStock = stock.data().currentStock;
+    const newStock = previousStock + 1;
+    transaction.update(saleRef, {
+      status: "cancelled",
+      cancelledBy: "seller-1",
+      cancelledByName: "Vendedor",
+      cancelledAt: new Date(),
+      cancelReason: "Error de carga",
+      updatedAt: new Date(),
+    });
+    transaction.set(movementRef, {
+      locationId: "loc-1",
+      productId: "product-1",
+      type: "sale_cancel",
+      qty: 1,
+      previousStock,
+      newStock,
+      reason: "Anulación de prueba",
+      userId: "seller-1",
+      userName: "Vendedor",
+      saleId: saleRef.id,
+      createdAt: new Date(),
+    });
+    transaction.update(stockRef, {
+      currentStock: newStock,
+      lastSaleId: saleRef.id,
+      lastMovementId: movementRef.id,
+      updatedAt: new Date(),
+    });
+  }));
+
+  const sale = await getDoc(saleRef);
+  assert.equal(sale.exists(), true);
+  assert.equal(sale.data().status, "cancelled");
+  assert.equal((await getDoc(stockRef)).data().currentStock, 5);
 });
 
 test("el vendedor no puede leer stock ni actividad de otra ubicación", async () => {

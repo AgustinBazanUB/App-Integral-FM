@@ -31,12 +31,13 @@ export const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseC
 export const auth = getAuth(firebaseApp);
 export const db = getFirestore(firebaseApp);
 
-setPersistence(auth, browserLocalPersistence).catch(() => {
-  // Firebase conserva su persistencia por defecto si el navegador la bloquea.
+const persistenceReady = setPersistence(auth, browserLocalPersistence).catch(() => {
+  // Firebase conserva su persistencia disponible si el navegador bloquea el almacenamiento local.
 });
 
-export const login = (email, password) =>
-  signInWithEmailAndPassword(auth, email.trim(), password);
+export const login = async (email, password) => {
+  await persistenceReady;
+  return signInWithEmailAndPassword(auth, email.trim(), password);
+};
 
 export const logout = () => signOut(auth);
-

@@ -31,7 +31,7 @@ export const announcementMessages = [
 ];
 
 export const navigation = [
-  { label: "Inicio", to: "/" },
+  { label: "Inicio", to: "/tienda" },
   { label: "Tienda", to: "/productos" },
   { label: "Aceites de oliva", to: "/productos?categoria=olive_oil" },
   { label: "Frutos secos", to: "/productos?categoria=nuts" },
@@ -39,11 +39,11 @@ export const navigation = [
   { label: "Mermeladas", to: "/productos?categoria=jams" },
   { label: "Regalos", to: "/productos?categoria=gifts" },
   { label: "Nosotros", to: "/nosotros" },
-  { label: "Contacto", to: "/#contacto" },
+  { label: "Contacto", to: "/tienda#contacto" },
 ];
 
 export const mobileNavigation = [
-  { label: "Inicio", to: "/" },
+  { label: "Inicio", to: "/tienda" },
   { label: "Tienda", to: "/productos" },
   { label: "AOVE", to: "/productos?categoria=olive_oil" },
   { label: "Frutos secos", to: "/productos?categoria=nuts" },
@@ -54,7 +54,7 @@ export const mobileNavigation = [
   },
   { label: "Regalos pre-armados", to: "/productos?categoria=gifts" },
   { label: "Nosotros", to: "/nosotros" },
-  { label: "Contacto", to: "/#contacto" },
+  { label: "Contacto", to: "/tienda#contacto" },
 ];
 
 export const footerNavigation = [
@@ -78,7 +78,7 @@ export const footerNavigation = [
       { label: "Nosotros", to: "/nosotros" },
       { label: "Nuestra historia", to: "/nosotros#origen" },
       { label: "Origen y selección", to: "/nosotros#origen" },
-      { label: "Contacto", to: "/#contacto" },
+      { label: "Contacto", to: "/tienda#contacto" },
     ],
   },
   {
@@ -86,7 +86,7 @@ export const footerNavigation = [
     links: [
       { label: "Envíos y retiros", to: "/checkout" },
       { label: "Medios de pago", to: "/checkout" },
-      { label: "Contacto", to: "/#contacto" },
+      { label: "Contacto", to: "/tienda#contacto" },
     ],
   },
 ];
