@@ -235,6 +235,9 @@ export const DatePicker = forwardRef(function DatePicker(props, ref) {
 function useOverlay(open, onClose, initialFocusRef) {
   const containerRef = useRef(null);
   const returnFocusRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!open) return undefined;
     returnFocusRef.current = document.activeElement;
@@ -247,14 +250,14 @@ function useOverlay(open, onClose, initialFocusRef) {
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose?.();
+        onCloseRef.current?.();
         return;
       }
       if (event.key !== "Tab") return;
       const focusable = [
-        ...containerRef.current.querySelectorAll(
+        ...(containerRef.current?.querySelectorAll(
           "button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])",
-        ),
+        ) || []),
       ];
       if (!focusable.length) return;
       const first = focusable[0];
@@ -275,7 +278,7 @@ function useOverlay(open, onClose, initialFocusRef) {
       document.body.classList.remove("fm-overlay-open");
       window.requestAnimationFrame(() => returnFocusRef.current?.focus?.());
     };
-  }, [initialFocusRef, onClose, open]);
+  }, [initialFocusRef, open]);
   return containerRef;
 }
 
