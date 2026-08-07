@@ -75,10 +75,7 @@ function ManagementRouter() {
       Promise.all([
         loadSellerPanel(),
         import("./services/sharedResources"),
-      ]).then(([, resources]) => Promise.all([
-        resources.listLocationsShared(profile),
-        resources.loadSellerResourcesShared(profile),
-      ])).catch(() => {});
+      ]).then(([, resources]) => resources.listLocationsShared(profile)).catch(() => {});
     });
   }, [status, profile?.id, sellerPath]);
 
