@@ -1,3 +1,4 @@
+import { doc, getDoc } from "firebase/firestore";
 import {
   listLocations,
 } from "./managementService";
@@ -7,6 +8,7 @@ import {
   listMasterProducts,
   listProductCategories,
 } from "./locationManagementService";
+import { db } from "./firebase";
 import { invalidateRuntimeCache, withRuntimeCache } from "./runtimeCache";
 import { normalizedRole } from "../permissions";
 
@@ -46,6 +48,23 @@ export const listAssignableSellersShared = (profile) => withRuntimeCache(
   60_000,
 );
 
+export const loadSellerResourcesShared = (profile) => withRuntimeCache(
+  `seller-resources:${profileScope(profile)}`,
+  async () => {
+    const [categories, discounts, shortcutsSnapshot] = await Promise.all([
+      listProductCategoriesShared(profile),
+      listDiscountsShared(profile),
+      getDoc(doc(db, "settings", "keyboardShortcuts")),
+    ]);
+    return {
+      categories,
+      discounts,
+      shortcuts: shortcutsSnapshot.exists() ? shortcutsSnapshot.data() : { sellerActions: {} },
+    };
+  },
+  60_000,
+);
+
 export function invalidateSharedLocations() {
   invalidateRuntimeCache("locations:");
 }
@@ -56,14 +75,20 @@ export function invalidateSharedProducts() {
 
 export function invalidateSharedCategories() {
   invalidateRuntimeCache("categories:");
+  invalidateRuntimeCache("seller-resources:");
 }
 
 export function invalidateSharedDiscounts() {
   invalidateRuntimeCache("discounts:");
+  invalidateRuntimeCache("seller-resources:");
 }
 
 export function invalidateSharedSellers() {
   invalidateRuntimeCache("sellers:");
+}
+
+export function invalidateSellerResources() {
+  invalidateRuntimeCache("seller-resources:");
 }
 
 export function invalidateSharedResources() {
@@ -72,4 +97,5 @@ export function invalidateSharedResources() {
   invalidateSharedCategories();
   invalidateSharedDiscounts();
   invalidateSharedSellers();
+  invalidateSellerResources();
 }
