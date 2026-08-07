@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { calculateDiscountSummary } from "../src/modules/locations/domain/discounts.js";
 import {
   completeRemainingPayment,
   normalizePayment,
@@ -93,6 +94,38 @@ test("el carrito calcula cantidades y subtotal", () => {
   assert.equal(cartSubtotal(cart), 3900);
 });
 
+test("los descuentos fijos se aplican antes que todos los porcentajes", () => {
+  const summary = calculateDiscountSummary([
+    { id: "percent", name: "Efectivo", type: "percent", value: 10 },
+    { id: "fixed", name: "Promo", type: "fixed", value: 10000 },
+  ], 100000);
+  assert.equal(summary.fixedDiscountTotal, 10000);
+  assert.equal(summary.percentageDiscountTotal, 9000);
+  assert.equal(summary.discountTotal, 19000);
+  assert.equal(summary.total, 81000);
+  assert.deepEqual(summary.discounts.map((discount) => discount.type), ["fixed", "percent"]);
+});
+
+test("varios porcentajes mantienen la aplicación sucesiva sobre el saldo", () => {
+  const summary = calculateDiscountSummary([
+    { id: "fixed", name: "Fijo", type: "fixed", value: 10000 },
+    { id: "p1", name: "P1", type: "percent", value: 10 },
+    { id: "p2", name: "P2", type: "percent", value: 20 },
+  ], 100000);
+  assert.equal(summary.discounts[1].amountApplied, 9000);
+  assert.equal(summary.discounts[2].amountApplied, 16200);
+  assert.equal(summary.total, 64800);
+});
+
+test("los descuentos nunca reducen el total por debajo de cero", () => {
+  const summary = calculateDiscountSummary([
+    { id: "fixed", name: "Fijo", type: "fixed", value: 200000 },
+    { id: "percent", name: "Porcentaje", type: "percent", value: 50 },
+  ], 100000);
+  assert.equal(summary.total, 0);
+  assert.equal(summary.discountTotal, 100000);
+});
+
 test("las ventas pendientes reservan stock local sin afirmarse confirmadas", () => {
   const reserved = pendingReservedQuantities([
     { locationId: "loc-1", status: "pending", items: [{ productId: "p1", qty: 2 }] },
@@ -144,41 +177,82 @@ test("la ruta y el cambio entre paneles conservan la misma sesión", async () =>
   assert.doesNotMatch(shell, /signInWithEmailAndPassword/);
 });
 
-test("los servicios usan una transacción y validan stock real", async () => {
+test("la interfaz compacta descuentos y prepara ticket sin simular ARCA", async () => {
+  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
+  const dialog = await read("../src/gestion/seller/DiscountDialog.jsx");
   const service = await read("../src/gestion/services/sellerService.js");
+  assert.match(panel, />Agregar descuento</);
+  assert.match(panel, />Agregar ticket</);
+  assert.match(panel, />Continuar</);
+  assert.match(panel, /ticketRequested/);
+  assert.match(dialog, />Descuentos disponibles</);
+  assert.match(dialog, />Descuento manual</);
+  assert.match(dialog, />Monto fijo</);
+  assert.match(dialog, />Porcentaje</);
+  assert.match(service, /ticketStatus/);
+  assert.match(service, /"pending"/);
+  assert.doesNotMatch(`${panel}\n${service}`, /CAE ficticio|fiscalReceiptNumber:\s*"FM-|arca.*password/i);
+});
+
+test("la venta guarda creador, fecha local, descuentos desglosados y ticket", async () => {
+  const service = await read("../src/gestion/services/sellerService.js");
+  for (const field of [
+    "createdBy",
+    "createdByName",
+    "saleDate",
+    "saleTime",
+    "fixedDiscountTotal",
+    "percentageDiscountTotal",
+    "discountTotal",
+    "ticketRequested",
+    "ticketStatus",
+  ]) assert.match(service, new RegExp(field));
   assert.match(service, /runTransaction\(db/);
   assert.match(service, /previousStock < item\.qty/);
   assert.match(service, /lastMovementId/);
-  assert.match(service, /offlineLocalId/);
   assert.match(service, /sale\.cancelled/);
   assert.match(service, /sale\.updated/);
 });
 
-test("la cola offline usa IndexedDB e identificadores idempotentes", async () => {
+test("la cola offline conserva descuentos, ticket e idempotencia", async () => {
   const offline = await read("../src/gestion/seller/offlineSales.js");
   const service = await read("../src/gestion/services/sellerService.js");
   assert.match(offline, /indexedDB\.open/);
   assert.match(offline, /keyPath: "localId"/);
+  assert.match(offline, /fixedDiscountTotal/);
+  assert.match(offline, /ticketRequested/);
   assert.match(service, /offline_\$\{seller\.id\}_\$\{localId\}/);
   assert.match(service, /alreadySynced: true/);
 });
 
-test("la interfaz ofrece las vistas operativas y controles táctiles", async () => {
-  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
-  const css = await read("../src/styles/seller-panel.css");
-  for (const text of [
-    "Nueva venta",
-    "Mis ventas",
-    "Pendientes",
-    "Stock",
-    "Precios",
-    "Ayuda",
-    "Vaciar carrito",
-    "+2 pagos",
-    "Confirmar venta",
-  ]) assert.match(panel, new RegExp(text.replace(/[+]/g, "\\+")));
+test("Ubicaciones incorpora Ventas y consulta una sola colección paginada", async () => {
+  const page = await read("../src/gestion/pages/LocationDetailPage.jsx");
+  const component = await read("../src/gestion/components/LocationSalesPanel.jsx");
+  const service = await read("../src/gestion/services/locationSalesService.js");
+  assert.match(page, /id: "sales", label: "Ventas"/);
+  assert.match(page, /<LocationSalesPanel/);
+  assert.match(service, /collection\(db, "sales"\)/);
+  assert.match(service, /where\("locationId", "==", locationId\)/);
+  assert.match(service, /orderBy\("createdAt", "desc"\)/);
+  assert.match(service, /startAfter\(cursor\)/);
+  assert.doesNotMatch(service, /locationSales|salesByLocation/);
+  for (const label of ["Fecha", "Vendedor", "Estado", "Forma de pago", "Productos", "Descuentos", "Pagos", "Ticket", "Auditoría"]) {
+    assert.match(component, new RegExp(label));
+  }
+});
+
+test("stock, navegación y venta actual tienen reglas responsive compactas", async () => {
+  const page = await read("../src/gestion/pages/LocationDetailPage.jsx");
+  const css = await read("../src/styles/seller-stage2.css");
+  assert.match(page, /fm-stock-mode-row/);
+  assert.match(page, /fm-stock-reason-input/);
+  assert.match(css, /grid-template-columns: minmax\(220px/);
+  assert.match(css, /#f7f1e8/i);
+  assert.match(css, /#2f2924/i);
+  assert.match(css, /#b88a2d/i);
   assert.match(css, /@media \(max-width: 768px\)/);
   assert.match(css, /@media \(max-width: 480px\)/);
+  assert.match(css, /@media \(max-width: 360px\)/);
   assert.match(css, /min-height: 44px/);
   assert.doesNotMatch(css, /width:\s*100vw/);
 });
