@@ -64,14 +64,26 @@ export function keyIdentity(item = {}) {
   };
 }
 
-export function keyMatchesEvent(item, event) {
+export function keyboardLookupKeys(item = {}) {
   const identity = keyIdentity(item);
-  if (!identity.key && !identity.code) return false;
-  if (identity.location !== Number(event.location || 0)) return false;
-  return Boolean(
-    (identity.code && identity.code === event.code) ||
-    (identity.key && identity.key === event.key),
-  );
+  const suffix = `@${identity.location}`;
+  return [
+    identity.code ? `code:${identity.code}${suffix}` : "",
+    identity.key ? `key:${identity.key}${suffix}` : "",
+  ].filter(Boolean);
+}
+
+export function keyboardEventKeys(event) {
+  const suffix = `@${Number(event.location || 0)}`;
+  return [
+    event.code ? `code:${event.code}${suffix}` : "",
+    event.key ? `key:${event.key}${suffix}` : "",
+  ].filter(Boolean);
+}
+
+export function keyMatchesEvent(item, event) {
+  const wanted = new Set(keyboardLookupKeys(item));
+  return keyboardEventKeys(event).some((key) => wanted.has(key));
 }
 
 export function cartItems(cart = {}) {
