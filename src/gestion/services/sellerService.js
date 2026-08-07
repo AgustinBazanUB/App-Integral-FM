@@ -545,8 +545,7 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
   if (!can(profile, "quick-sales", "cancelOwn") && !canAccessAdministration(profile)) {
     throw new Error("No tenés permiso para anular ventas.");
   }
-  const safeReason = String(reason || "").trim();
-  if (safeReason.length < 3) throw new Error("Indicá el motivo de la anulación.");
+  const safeReason = String(reason || "").trim() || null;
   const saleReference = doc(db, "sales", saleId);
   return runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
     const saleSnapshot = await transaction.get(saleReference);
@@ -583,7 +582,7 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
         qty: Number(item.qty || 0),
         previousStock,
         newStock,
-        reason: `Anulación ${sale.saleCode}: ${safeReason}`,
+        reason: safeReason ? `Anulación ${sale.saleCode}: ${safeReason}` : `Anulación ${sale.saleCode}`,
         userId: profile.id,
         userName: userName(profile),
         saleId,
@@ -595,14 +594,14 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
       cancelledAt: serverTimestamp(),
       cancelledBy: profile.id,
       cancelledByName: userName(profile),
-      cancelReason: safeReason,
+      ...(safeReason ? { cancelReason: safeReason } : {}),
       ...(sale.ticketRequested ? { ticketStatus: "cancelled" } : {}),
       updatedAt: serverTimestamp(),
     });
     transaction.set(doc(collection(db, "auditLogs")), {
       action: "sale.cancelled",
       title: "Venta anulada",
-      description: `${sale.saleCode} · ${safeReason}`,
+      description: safeReason ? `${sale.saleCode} · ${safeReason}` : sale.saleCode,
       moduleId: "quick-sales",
       entityType: "sale",
       entityId: saleId,
