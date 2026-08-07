@@ -1,3 +1,4 @@
+import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
 import { normalizePayment } from "../../modules/locations/domain/payments";
 
 const DB_NAME = "flor_mia_integral_offline";
@@ -97,8 +98,12 @@ function normalizePendingSale(sale) {
   });
   if (!items.length) throw new Error("La venta pendiente está vacía.");
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+  const discounts = Array.isArray(sale.discounts) ? sale.discounts : [];
+  const discountSummary = calculateDiscountSummary(discounts, subtotal);
   const total = wholeNumber(sale.total, "El total");
-  if (total > subtotal) throw new Error("El total pendiente no es válido.");
+  if (total !== discountSummary.total) {
+    throw new Error("El total pendiente no coincide con los descuentos aplicados.");
+  }
   const payment = normalizePayment(
     requiredText(sale.paymentMethod, "la forma de pago"),
     sale.paymentMethodLabel,
@@ -109,6 +114,7 @@ function normalizePendingSale(sale) {
   if (Number.isNaN(createdLocallyAt.valueOf())) {
     throw new Error("La fecha local de la venta no es válida.");
   }
+  const ticketRequested = sale.ticketRequested === true;
   return {
     localId: requiredText(sale.localId, "el identificador local"),
     localCode: requiredText(sale.localCode || sale.localId, "el código local"),
@@ -126,12 +132,16 @@ function normalizePendingSale(sale) {
     sellerId: requiredText(sale.sellerId, "el vendedor"),
     sellerName: requiredText(sale.sellerName, "el nombre del vendedor"),
     items,
-    discounts: Array.isArray(sale.discounts) ? sale.discounts : [],
+    discounts: discountSummary.discounts,
     subtotal,
-    discountTotal: subtotal - total,
+    fixedDiscountTotal: discountSummary.fixedDiscountTotal,
+    percentageDiscountTotal: discountSummary.percentageDiscountTotal,
+    discountTotal: discountSummary.discountTotal,
     totalItems: items.reduce((sum, item) => sum + item.qty, 0),
     total,
     ...payment,
+    ticketRequested,
+    ticketStatus: ticketRequested ? "pending" : "not_requested",
     clientStatus: "offline_pending",
   };
 }
