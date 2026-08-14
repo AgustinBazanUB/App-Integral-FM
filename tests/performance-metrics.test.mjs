@@ -102,6 +102,7 @@ test("la aplicación separa bundles, mantiene vendedor disponible y conserva off
   assert.match(sellerHooks, /window\.addEventListener\("keydown", onKeyDown, true\)/);
   assert.match(sellerHooks, /keyboardLookupKeys/);
   assert.match(sellerHooks, /new Map\(\)/);
+  assert.match(seller, /if \(!selectedLocation\) return \[\];/);
   assert.match(seller, /saveSellerPendingSale/);
   assert.match(seller, /syncPending/);
 });
