@@ -27,6 +27,7 @@ import "./styles/seller-stage2-mobile.css";
 import "./styles/responsive.css";
 import "./styles/performance-optimizations.css";
 import "./styles/metrics-fixes.css";
+import "./styles/seller-customers.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
