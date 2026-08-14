@@ -82,17 +82,19 @@ test("la granularidad del gráfico se adapta al período", () => {
   assert.equal(calculateMetrics([baseSale], buildMetricsCustomRange("2026-01-01", "2026-06-30")).timelineMode, "month");
 });
 
-test("la aplicación separa bundles, precarga vendedor y conserva offline pendiente", () => {
+test("la aplicación separa bundles, mantiene vendedor disponible y conserva offline pendiente", () => {
   const app = read("src/App.jsx");
   const management = read("src/gestion/ManagementApp.jsx");
   const sellerHooks = read("src/gestion/seller/hooks.js");
   const seller = read("src/gestion/seller/SellerPanel.jsx");
   assert.match(app, /lazy\(\(\) => import\("\.\/Storefront"\)\)/);
-  assert.match(management, /const SellerPanel = lazy\(loadSellerPanel\)/);
+  assert.match(management, /import SellerPanel from "\.\/seller\/SellerPanel"/);
+  assert.doesNotMatch(management, /const SellerPanel = lazy/);
+  assert.doesNotMatch(management, /loadSellerPanel\(\)/);
   assert.match(management, /Promise\.all\(\[/);
-  assert.match(management, /loadSellerPanel\(\)/);
   assert.match(management, /listLocationsShared\(profile\)/);
   assert.match(management, /loadSellerResourcesShared\(profile\)/);
+  assert.match(management, /class ManagementErrorBoundary extends Component/);
   assert.doesNotMatch(management, /requestIdleCallback/);
   assert.match(sellerHooks, /getSellerResourcesSharedCached/);
   assert.match(sellerHooks, /const current = handlers\.current;/);
