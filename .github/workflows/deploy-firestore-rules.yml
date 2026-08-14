@@ -1,0 +1,67 @@
+name: Deploy Firestore Rules
+
+on:
+  push:
+    branches:
+      - ops/firestore-rules-preview
+    paths:
+      - firestore.rules
+      - firebase.json
+      - .firebaserc
+      - .github/workflows/deploy-firestore-rules.yml
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Detect Firebase credentials
+        id: auth
+        shell: bash
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM }}
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM" > "$RUNNER_TEMP/firebase-service-account.json"
+            echo "mode=service_account" >> "$GITHUB_OUTPUT"
+            echo "credential_file=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_OUTPUT"
+          elif [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
+            echo "mode=service_account" >> "$GITHUB_OUTPUT"
+            echo "credential_file=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_OUTPUT"
+          elif [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]; then
+            printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+            echo "mode=service_account" >> "$GITHUB_OUTPUT"
+            echo "credential_file=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_OUTPUT"
+          elif [ -n "$FIREBASE_TOKEN" ]; then
+            echo "mode=token" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Firebase deployment credential is available in repository secrets." >&2
+            exit 1
+          fi
+
+      - name: Deploy Firestore rules with service account
+        if: steps.auth.outputs.mode == 'service_account'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credential_file }}
+        run: npx firebase-tools@14.12.0 deploy --only firestore:rules --project app-integral-fm --non-interactive
+
+      - name: Deploy Firestore rules with CI token
+        if: steps.auth.outputs.mode == 'token'
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: npx firebase-tools@14.12.0 deploy --only firestore:rules --project app-integral-fm --token "$FIREBASE_TOKEN" --non-interactive
