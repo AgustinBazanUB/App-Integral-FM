@@ -220,6 +220,47 @@ service cloud.firestore {
       return !("deleted" in request.resource.data)
         || request.resource.data.deleted is bool;
     }
+    function customerKeyShape(customerId) {
+      return customerId is string
+        && customerId.size() == 49
+        && customerId.matches('customer_[0-9a-f]+');
+    }
+    function linkedSellerCustomer(customerId) {
+      let saleId = request.resource.data.lastSaleId;
+      let salePath = /databases/$(database)/documents/sales/$(saleId);
+      let sale = getAfter(salePath).data;
+      return saleId is string
+        && existsAfter(salePath)
+        && sale.sellerId == request.auth.uid
+        && sale.customerId == customerId
+        && sale.status == "active"
+        && allowedLocation(sale.locationId);
+    }
+    function sellerCustomerCreate(customerId) {
+      return quickSalesPermission("create")
+        && customerKeyShape(customerId)
+        && request.resource.data.customerKey == customerId
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.source == "seller_sale"
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() > 0
+        && request.resource.data.phoneNormalized is string
+        && request.resource.data.phoneNormalized.size() >= 8
+        && request.resource.data.phoneNormalized.size() <= 11
+        && request.resource.data.zoneName is string
+        && request.resource.data.zoneName.size() > 0
+        && request.resource.data.active == true
+        && request.resource.data.deleted == false
+        && linkedSellerCustomer(customerId);
+    }
+    function sellerCustomerUpdate(customerId) {
+      return quickSalesPermission("create")
+        && customerKeyShape(customerId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "lastSaleId", "lastPurchaseAt", "updatedAt"
+        ])
+        && linkedSellerCustomer(customerId);
+    }
 
     match /users/{uid} {
       allow get: if isAdmin() || (activeUser() && request.auth.uid == uid);
@@ -390,15 +431,27 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /customers/{customerId} {
-      allow read: if canModule("loyal-customers", "view");
-      allow create: if canModule("loyal-customers", "create") && ownsNewRecord();
-      allow update: if canModule("loyal-customers", "edit") && logicalMutation();
+      allow get: if canModule("loyal-customers", "view")
+        || (quickSalesPermission("create") && customerKeyShape(customerId));
+      allow list: if canModule("loyal-customers", "view");
+      allow create: if (canModule("loyal-customers", "create") && ownsNewRecord())
+        || sellerCustomerCreate(customerId);
+      allow update: if (canModule("loyal-customers", "edit") && logicalMutation())
+        || sellerCustomerUpdate(customerId);
       allow delete: if false;
       match /interactions/{interactionId} {
         allow read: if canModule("loyal-customers", "view");
         allow create, update: if canModule("loyal-customers", "edit");
         allow delete: if false;
       }
+    }
+    match /customerZones/{zoneId} {
+      allow get: if canModule("loyal-customers", "view")
+        || (quickSalesPermission("create") && resource.data.active == true);
+      allow list: if canModule("loyal-customers", "view")
+        || (quickSalesPermission("create") && resource.data.active == true);
+      allow create, update: if canModule("loyal-customers", "edit");
+      allow delete: if false;
     }
     match /orders/{orderId} {
       allow read: if canModule("ecommerce", "view");
