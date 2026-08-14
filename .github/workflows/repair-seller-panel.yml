@@ -1,0 +1,59 @@
+name: Repair Seller Panel
+
+on:
+  push:
+    branches:
+      - agent/rendimiento-vendedor-clientes
+    paths:
+      - .github/workflows/repair-seller-panel.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rendimiento-vendedor-clientes
+      - name: Restore cancellation modal and add seller startup regression check
+        shell: python
+        run: |
+          from pathlib import Path
+
+          seller_path = Path('src/gestion/seller/SellerPanel.jsx')
+          seller = seller_path.read_text(encoding='utf-8')
+          old = '''      <Modal open={Boolean(cancelTarget)} onClose={closeCancelDialog} title="Anular venta" description="El stock se devolverá automáticamente. La venta no se elimina."><label className="fm-cancel-reason"><span>Motivo opcional</span><textarea value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} rows={3} /></label><div className="fm-dialog-actions"><Button variant="secondary" onClick={closeCancelDialog}>Volver</Button><Button variant="danger" loading={submitState.busy} onClick={confirmCancelSale}>Anular venta</Button></div></Modal>'''
+          new = '''      <Modal
+            open={Boolean(cancelTarget)}
+            onClose={closeCancelDialog}
+            title="Anular venta"
+            description="Las unidades volverán al stock y la venta conservará su historial."
+            footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={closeCancelDialog}>Cancelar</Button><Button variant="destructive" icon="Trash2" loading={submitState.busy} onClick={confirmCancelSale}>Anular venta</Button></div>}
+          >
+            <label className="fm-field">
+              <span>Motivo de anulación (opcional)</span>
+              <textarea rows="3" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Ej.: cliente cambió el producto" />
+              <small className="fm-field__hint">Si es posible, indicá brevemente por qué se anula la venta.</small>
+            </label>
+          </Modal>'''
+          if old not in seller:
+              raise SystemExit('No se encontró el modal de anulación esperado')
+          seller_path.write_text(seller.replace(old, new, 1), encoding='utf-8')
+
+          test_path = Path('tests/performance-metrics.test.mjs')
+          test = test_path.read_text(encoding='utf-8')
+          anchor = '  assert.match(seller, /saveSellerPendingSale/);\n  assert.match(seller, /syncPending/);'
+          replacement = '  assert.match(seller, /if \\(!selectedLocation\\) return \\[\\];/);\n  assert.match(seller, /saveSellerPendingSale/);\n  assert.match(seller, /syncPending/);'
+          if anchor not in test:
+              raise SystemExit('No se encontró el punto de inserción del test')
+          test_path.write_text(test.replace(anchor, replacement, 1), encoding='utf-8')
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/gestion/seller/SellerPanel.jsx tests/performance-metrics.test.mjs
+          git diff --cached --quiet && exit 0
+          git commit -m "Corregir apertura inicial del Panel Vendedor"
+          git push origin HEAD:agent/rendimiento-vendedor-clientes
