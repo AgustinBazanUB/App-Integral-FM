@@ -215,7 +215,7 @@ export default function LoyalCustomersPage() {
                 {canManageZones ? (
                   <div className="fm-zone-row__actions">
                     <button type="button" onClick={() => openEditZone(zone)}><Icon name="Settings2" />Editar</button>
-                    <button type="button" onClick={() => toggleZone(zone)}><Icon name={zone.active === false ? "Play" : "Pause" />{zone.active === false ? "Activar" : "Desactivar"}</button>
+                    <button type="button" onClick={() => toggleZone(zone)}><Icon name={zone.active === false ? "Play" : "Pause"} />{zone.active === false ? "Activar" : "Desactivar"}</button>
                   </div>
                 ) : null}
               </article>
