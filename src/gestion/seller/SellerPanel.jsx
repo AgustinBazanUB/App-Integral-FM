@@ -34,7 +34,7 @@ import {
   formatMoney,
   statusTone,
 } from "../formatters";
-import { useAsyncData, useOnlineStatus } from "../hooks";
+import { useOnlineStatus } from "../hooks";
 import {
   can,
   canAccessAdminPanel,
@@ -42,9 +42,9 @@ import {
 import {
   cancelSellerSale,
   createSellerSale,
-  loadSellerResources,
   updateSellerSale,
 } from "../services/sellerService";
+import CustomerDialog from "./CustomerDialog";
 import DiscountDialog from "./DiscountDialog";
 import {
   deleteSellerPendingSale,
@@ -58,6 +58,7 @@ import {
   useSellerLocations,
   useSellerLocationStock,
   useSellerPendingSales,
+  useSellerResources,
 } from "./hooks";
 import {
   cartItems,
@@ -79,6 +80,8 @@ const friendlyPayment = {
   multiple: "+2 pagos",
 };
 
+const customerZone = (customer = {}) => customer.zoneName || customer.customZone || customer.zone || "";
+
 function SellerHeader({
   profile,
   location,
@@ -87,8 +90,6 @@ function SellerHeader({
   pendingCount,
   view,
   setView,
-  keyboardActive,
-  setKeyboardActive,
   canReturnAdmin,
   onReturnAdmin,
   onLogout,
@@ -112,7 +113,6 @@ function SellerHeader({
           </button>
           <Dropdown label={<span className="fm-profile-trigger"><span className="fm-avatar">{(profile.name || profile.email || "V").slice(0, 1).toUpperCase()}</span><span><strong>{profile.name || "Usuario"}</strong><small>Panel Vendedor</small></span><Icon name="ChevronDown" /></span>}>
             <div className="fm-profile-menu">
-              <button type="button" onClick={() => setKeyboardActive((value) => !value)}><Icon name="Keyboard" />{keyboardActive ? "Desactivar botonera" : "Activar botonera"}</button>
               {canReturnAdmin ? <button type="button" onClick={onReturnAdmin}><Icon name="LayoutDashboard" />Volver al Panel Administrador</button> : null}
               <button type="button" onClick={onLogout}><Icon name="LogOut" />Cerrar sesión</button>
             </div>
@@ -189,7 +189,7 @@ export default function SellerPanel() {
   const navigate = useNavigate();
   const online = useOnlineStatus();
   const locationsResult = useSellerLocations(profile);
-  const resourcesResult = useAsyncData(() => loadSellerResources(profile), [profile.id]);
+  const resourcesResult = useSellerResources(profile);
   const [locationId, setLocationId] = useState("");
   const [view, setView] = useState("sale");
   const [cart, setCart] = useState({});
@@ -200,6 +200,9 @@ export default function SellerPanel() {
   const [payments, setPayments] = useState([]);
   const [ticketRequested, setTicketRequested] = useState(false);
   const [keyboardActive, setKeyboardActive] = useState(true);
+  const [openCategoryId, setOpenCategoryId] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerOpen, setCustomerOpen] = useState(false);
   const [lastProductId, setLastProductId] = useState("");
   const [editSale, setEditSale] = useState(null);
   const [submitState, setSubmitState] = useState({ busy: false, message: "", tone: "info" });
@@ -225,7 +228,7 @@ export default function SellerPanel() {
   const stockResult = useSellerLocationStock(profile, locationId);
   const dailySales = useSellerDailySales(profile, locationId);
   const pendingSales = useSellerPendingSales(profile);
-  const resources = resourcesResult.data || { categories: [], discounts: [], shortcuts: { sellerActions: {} } };
+  const resources = resourcesResult.data || { categories: [], discounts: [], zones: [], shortcuts: { sellerActions: {} } };
 
   useEffect(() => {
     if (!locations.length) {
@@ -263,6 +266,12 @@ export default function SellerPanel() {
     () => groupSellerProducts(products, resources.categories),
     [products, resources.categories],
   );
+
+  useEffect(() => {
+    if (openCategoryId && !productGroups.some((group) => group.id === openCategoryId)) {
+      setOpenCategoryId("");
+    }
+  }, [openCategoryId, productGroups]);
 
   useEffect(() => {
     setCart((current) => Object.fromEntries(Object.entries(current).map(([id, item]) => {
@@ -309,6 +318,8 @@ export default function SellerPanel() {
     setPaymentMethod("");
     setPayments([]);
     setTicketRequested(false);
+    setSelectedCustomer(null);
+    setCustomerOpen(false);
     setLastProductId("");
     setEditSale(null);
   }, []);
@@ -384,12 +395,13 @@ export default function SellerPanel() {
       paymentMethod,
       paymentMethodLabel: PAYMENT_LABELS[paymentMethod],
       payments,
+      customer: selectedCustomer,
       ticketRequested,
     });
     await pendingSales.refresh();
     resetSale();
     setSubmitState({ busy: false, tone: "success", message: "Venta guardada en este dispositivo. Todavía no está confirmada en Firestore." });
-  }, [selectedLocation, profile, currentItems, appliedDiscounts, summary.total, paymentMethod, payments, ticketRequested, pendingSales, resetSale]);
+  }, [selectedLocation, profile, currentItems, appliedDiscounts, summary.total, paymentMethod, payments, selectedCustomer, ticketRequested, pendingSales, resetSale]);
 
   const submitSale = useCallback(async () => {
     if (submitState.busy) return;
@@ -430,9 +442,19 @@ export default function SellerPanel() {
         await savePending();
         return;
       }
+      const common = {
+        profile,
+        items: currentItems,
+        discounts: appliedDiscounts,
+        paymentMethod,
+        paymentMethodLabel: PAYMENT_LABELS[paymentMethod],
+        payments,
+        customer: selectedCustomer,
+        ticketRequested,
+      };
       const result = editSale
-        ? await updateSellerSale({ profile, saleId: editSale.id, items: currentItems, discounts: appliedDiscounts, paymentMethod, paymentMethodLabel: PAYMENT_LABELS[paymentMethod], payments, ticketRequested })
-        : await createSellerSale({ profile, location: selectedLocation, items: currentItems, discounts: appliedDiscounts, paymentMethod, paymentMethodLabel: PAYMENT_LABELS[paymentMethod], payments, ticketRequested });
+        ? await updateSellerSale({ ...common, saleId: editSale.id })
+        : await createSellerSale({ ...common, location: selectedLocation });
       resetSale();
       await dailySales.refresh();
       setReceipt(result);
@@ -440,7 +462,7 @@ export default function SellerPanel() {
     } catch (error) {
       setSubmitState({ busy: false, tone: "error", message: error.message });
     }
-  }, [submitState.busy, selectedLocation, currentItems, hasStockConflict, paymentMethod, payments, summary.total, ticketRequested, ticketAllowed, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales]);
+  }, [submitState.busy, selectedLocation, currentItems, hasStockConflict, paymentMethod, payments, summary.total, selectedCustomer, ticketRequested, ticketAllowed, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales]);
 
   const actionShortcuts = useMemo(() => SELLER_ACTION_SHORTCUTS.map((action) => ({
     ...action,
@@ -492,6 +514,7 @@ export default function SellerPanel() {
           paymentMethod: sale.paymentMethod,
           paymentMethodLabel: sale.paymentMethodLabel,
           payments: sale.payments,
+          customer: sale.customer || null,
           ticketRequested: sale.ticketRequested === true,
           offlineSale: { localId: sale.localId, createdLocallyAt: sale.createdLocallyAt },
         });
@@ -550,6 +573,14 @@ export default function SellerPanel() {
     setPaymentMethod(sale.paymentMethod || "");
     setPayments(salePaymentParts(sale));
     setTicketRequested(sale.ticketRequested === true);
+    setSelectedCustomer(sale.customerId && sale.customerPhoneSnapshot ? {
+      id: sale.customerId,
+      phone: sale.customerPhoneSnapshot,
+      phoneNormalized: sale.customerPhoneSnapshot,
+      name: sale.customerNameSnapshot || "",
+      zoneName: sale.customerZoneSnapshot || "",
+      persisted: true,
+    } : null);
     setEditSale(sale);
     setDetailSale(null);
     setView("sale");
@@ -599,40 +630,63 @@ export default function SellerPanel() {
       <section className="fm-seller-catalog">
         <div className="fm-seller-location-row">
           <label><span>Ubicación</span><select value={locationId} onChange={(event) => requestLocation(event.target.value)}>{locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></label>
-          <Badge tone={keyboardActive ? "success" : "neutral"} icon="Keyboard">Botonera {keyboardActive ? "activa" : "desactivada"}</Badge>
+          <button
+            type="button"
+            className={`fm-seller-keyboard-toggle ${keyboardActive ? "is-active" : "is-inactive"}`}
+            aria-pressed={keyboardActive}
+            aria-label={keyboardActive ? "Botonera activa. Desactivar botonera" : "Botonera desactivada. Activar botonera"}
+            onClick={() => setKeyboardActive((value) => !value)}
+          >
+            <Icon name="Keyboard" />
+            <span><strong>Botonera {keyboardActive ? "activa" : "desactivada"}</strong><small>{keyboardActive ? "Atajos habilitados" : "Atajos pausados"}</small></span>
+          </button>
         </div>
         {!online ? <div className="fm-seller-offline-note"><Icon name="WifiOff" /><span>Sin conexión. La venta quedará pendiente en este dispositivo y no se mostrará como confirmada.</span></div> : null}
         {editSale ? <div className="fm-seller-edit-note"><span>Editando <strong>{editSale.saleCode}</strong></span><button type="button" onClick={resetSale}>Cancelar edición</button></div> : null}
-        {stockResult.status === "loading" || resourcesResult.status === "loading" ? <Skeleton lines={6} /> : null}
-        {stockResult.status === "error" ? <EmptyState icon="AlertTriangle" title="No se pudo leer el stock" description={stockResult.error.message} /> : null}
-        {stockResult.status === "ready" && !productGroups.length ? <EmptyState icon="Boxes" title="No hay productos habilitados" description="La ubicación no tiene productos disponibles para vender." /> : null}
-        {productGroups.map((group) => (
-          <section key={group.id} className="fm-seller-category">
-            <h2>{group.name}</h2>
-            <div className="fm-seller-products">
-              {group.items.map((product) => {
-                const qty = Number(cart[product.id]?.qty || 0);
-                return (
-                  <button key={product.id} type="button" className={qty ? "is-selected" : ""} onClick={() => addProduct(product)} disabled={qty >= Number(product.availableStock || 0)}>
-                    {product.buttonKey || product.buttonLabel ? <span className="fm-seller-key">{product.buttonLabel || product.buttonKey}</span> : null}
-                    <img src={sellerImage(product)} alt="" loading="lazy" />
-                    <strong>{product.abbreviation || product.productName}</strong>
-                    <span>{product.productName}</span>
-                    <small>{formatMoney(product.price)} · Stock {product.availableStock}</small>
-                    {qty ? <b>{qty}</b> : null}
+        {resourcesResult.error ? <Toast tone="error">No se pudieron actualizar algunos recursos: {resourcesResult.error.message}</Toast> : null}
+        <div className="fm-seller-catalog-scroll" aria-label="Catálogo de productos por categoría">
+          {stockResult.status === "loading" || resourcesResult.status === "loading" ? <Skeleton lines={6} /> : null}
+          {stockResult.status === "error" ? <EmptyState icon="AlertTriangle" title="No se pudo leer el stock" description={stockResult.error.message} /> : null}
+          {stockResult.status === "ready" && !productGroups.length ? <EmptyState icon="Boxes" title="No hay productos habilitados" description="La ubicación no tiene productos disponibles para vender." /> : null}
+          {productGroups.map((group) => {
+            const open = openCategoryId === group.id;
+            const controlId = `seller-category-${String(group.id).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+            return (
+              <section key={group.id} className={`fm-seller-category ${open ? "is-open" : ""}`}>
+                <h2>
+                  <button type="button" aria-expanded={open} aria-controls={controlId} onClick={() => setOpenCategoryId((current) => current === group.id ? "" : group.id)}>
+                    <span><strong>{group.name}</strong><small>{group.items.length} producto{group.items.length === 1 ? "" : "s"}</small></span>
+                    <Icon name="ChevronDown" />
                   </button>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+                </h2>
+                {open ? (
+                  <div className="fm-seller-products" id={controlId}>
+                    {group.items.map((product) => {
+                      const qty = Number(cart[product.id]?.qty || 0);
+                      return (
+                        <button key={product.id} type="button" className={qty ? "is-selected" : ""} onClick={() => addProduct(product)} disabled={qty >= Number(product.availableStock || 0)}>
+                          {product.buttonKey || product.buttonLabel ? <span className="fm-seller-key">{product.buttonLabel || product.buttonKey}</span> : null}
+                          <img src={sellerImage(product)} alt="" loading="lazy" decoding="async" />
+                          <strong>{product.abbreviation || product.productName}</strong>
+                          <span>{product.productName}</span>
+                          <small>{formatMoney(product.price)} · Stock {product.availableStock}</small>
+                          {qty ? <b>{qty}</b> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </section>
+            );
+          })}
+        </div>
       </section>
       <aside className="fm-seller-cart">
         <Panel title="Venta actual" description={`${cartQuantity(cart)} producto${cartQuantity(cart) === 1 ? "" : "s"}`} action={<button type="button" className="fm-text-button" disabled={!currentItems.length} onClick={() => setClearRequested(true)}>Vaciar</button>}>
           <div className="fm-seller-cart-lines">
             {currentItems.length ? currentItems.map((item) => (
               <article key={item.id} className={item.qty > item.stock ? "has-error" : ""}>
-                <img src={item.imageUrl} alt="" />
+                <img src={item.imageUrl} alt="" loading="lazy" decoding="async" />
                 <div><strong>{item.abbreviation || item.name}</strong><small>{formatMoney(item.price)} c/u · {formatMoney(item.qty * item.price)}</small></div>
                 <div className="fm-quantity-control"><button type="button" aria-label={`Quitar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, -1)}><Icon name="Minus" /></button><output aria-label={`Cantidad de ${item.name}`}>{item.qty}</output><button type="button" aria-label={`Agregar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, 1)} disabled={item.qty >= item.stock}><Icon name="Plus" /></button></div>
                 <button type="button" className="fm-seller-line-remove" aria-label={`Eliminar ${item.name} del carrito`} onClick={() => setCart((current) => { const next = { ...current }; delete next[item.id]; return next; })}><Icon name="X" /></button>
@@ -650,6 +704,30 @@ export default function SellerPanel() {
 
           <fieldset className="fm-seller-payments"><legend>Forma de pago *</legend>{PAYMENT_OPTIONS.filter((option) => option.value !== "multiple" || multiplePaymentAllowed).map((option) => { const selected = paymentMethod === option.value; return <button key={option.value} type="button" className={selected ? "is-selected" : ""} aria-pressed={selected} onClick={() => option.value === "multiple" ? setMultipleOpen(true) : (setPaymentMethod(option.value), setPayments([]))}>{selected ? <Icon name="Check" /> : null}<span>{friendlyPayment[option.value]}</span></button>; })}</fieldset>
           {paymentMethod === "multiple" ? <p className="fm-seller-payment-summary">{payments.map((payment) => `${friendlyPayment[payment.method]} ${formatMoney(payment.amount)}`).join(" · ")}</p> : null}
+
+          <div className="fm-seller-customer-section">
+            {selectedCustomer ? (
+              <div className="fm-seller-customer-selected">
+                <div className="fm-seller-customer-selected__icon"><Icon name="UserRoundCheck" /></div>
+                <div>
+                  <small>Cliente</small>
+                  <strong>{selectedCustomer.phone || selectedCustomer.phoneNormalized}</strong>
+                  {customerZone(selectedCustomer) ? <span>{customerZone(selectedCustomer)}</span> : null}
+                  {selectedCustomer.name ? <span>{selectedCustomer.name}</span> : null}
+                </div>
+                <div className="fm-seller-customer-selected__actions">
+                  <button type="button" onClick={() => setCustomerOpen(true)}>Cambiar</button>
+                  <button type="button" onClick={() => setSelectedCustomer(null)}>Quitar</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="fm-seller-add-customer" onClick={() => setCustomerOpen(true)}>
+                <Icon name="UserPlus" />
+                <span><strong>Agregar cliente</strong><small>Teléfono · zona · nombre opcional</small></span>
+                <Icon name="ChevronRight" />
+              </button>
+            )}
+          </div>
 
           <label className={`fm-seller-ticket-option ${ticketRequested ? "is-selected" : ""}`}>
             <input type="checkbox" checked={ticketRequested} disabled={!ticketAllowed} onChange={(event) => setTicketRequested(event.target.checked)} />
@@ -670,7 +748,7 @@ export default function SellerPanel() {
       {dailySales.status === "loading" ? <Skeleton lines={5} /> : null}
       {dailySales.status === "error" ? <Toast tone="error">{dailySales.error.message}</Toast> : null}
       <div className="fm-seller-sales-summary"><span>Monto activo</span><strong>{formatMoney((dailySales.data || []).filter((sale) => sale.status === "active").reduce((sum, sale) => sum + Number(sale.total || 0), 0))}</strong><small>{(dailySales.data || []).filter((sale) => sale.status === "active").length} ventas activas</small></div>
-      <div className="fm-seller-sale-list">{(dailySales.data || []).map((sale) => <button key={sale.id} type="button" onClick={() => setDetailSale(sale)}><div><strong>{sale.saleCode}</strong><Badge tone={statusTone(sale.status)}>{sale.status === "active" ? "Activa" : "Anulada"}</Badge></div><div><span>{formatDateTime(sale.createdAt)}</span><strong>{formatMoney(sale.total)}</strong></div><small>{sale.totalItems} productos · {sale.paymentMethodLabel || "Sin forma de pago"}{sale.ticketRequested ? ` · Ticket ${sale.ticketStatus || "pending"}` : ""}</small></button>)}</div>
+      <div className="fm-seller-sale-list">{(dailySales.data || []).map((sale) => <button key={sale.id} type="button" onClick={() => setDetailSale(sale)}><div><strong>{sale.saleCode}</strong><Badge tone={statusTone(sale.status)}>{sale.status === "active" ? "Activa" : "Anulada"}</Badge></div><div><span>{formatDateTime(sale.createdAt)}</span><strong>{formatMoney(sale.total)}</strong></div><small>{sale.totalItems} productos · {sale.paymentMethodLabel || "Sin forma de pago"}{sale.customerPhoneSnapshot ? ` · ${sale.customerPhoneSnapshot}` : ""}{sale.ticketRequested ? ` · Ticket ${sale.ticketStatus || "pending"}` : ""}</small></button>)}</div>
       {dailySales.status === "ready" && !(dailySales.data || []).length ? <EmptyState icon="ReceiptText" title="Todavía no registraste ventas hoy" description="Las ventas confirmadas de esta ubicación aparecerán aquí." /> : null}
     </div>
   );
@@ -679,13 +757,13 @@ export default function SellerPanel() {
     <div className="fm-seller-view">
       <div className="fm-seller-view-head"><div><h1>Ventas pendientes</h1><p>Existen solamente en este dispositivo hasta sincronizarse.</p></div><Button icon="RefreshCw" loading={syncing} disabled={!online || !(pendingSales.data || []).length} onClick={() => syncPending({ manual: true })}>Sincronizar</Button></div>
       {!online ? <div className="fm-seller-offline-note"><Icon name="WifiOff" /><span>La sincronización se habilitará al recuperar internet.</span></div> : null}
-      <div className="fm-seller-pending-list">{(pendingSales.data || []).map((sale) => <article key={sale.localId}><header><strong>{sale.localCode}</strong><Badge tone={sale.status === "sync_error" ? "error" : "warning"}>{sale.status === "sync_error" ? "Error" : "Pendiente"}</Badge></header><div><span>{formatDateTime(sale.createdLocallyAt)}</span><strong>{formatMoney(sale.total)}</strong></div><small>{sale.locationName} · {sale.totalItems} productos{sale.ticketRequested ? " · Ticket pendiente" : ""}</small>{sale.syncError ? <p>{sale.syncError}</p> : null}<button type="button" onClick={() => setDeletePendingTarget(sale)}><Icon name="Trash2" />Eliminar pendiente</button></article>)}</div>
+      <div className="fm-seller-pending-list">{(pendingSales.data || []).map((sale) => <article key={sale.localId}><header><strong>{sale.localCode}</strong><Badge tone={sale.status === "sync_error" ? "error" : "warning"}>{sale.status === "sync_error" ? "Error" : "Pendiente"}</Badge></header><div><span>{formatDateTime(sale.createdLocallyAt)}</span><strong>{formatMoney(sale.total)}</strong></div><small>{sale.locationName} · {sale.totalItems} productos{sale.customer?.phone ? ` · ${sale.customer.phone}` : ""}{sale.ticketRequested ? " · Ticket pendiente" : ""}</small>{sale.syncError ? <p>{sale.syncError}</p> : null}<button type="button" onClick={() => setDeletePendingTarget(sale)}><Icon name="Trash2" />Eliminar pendiente</button></article>)}</div>
       {pendingSales.status === "ready" && !(pendingSales.data || []).length ? <EmptyState icon="RefreshCw" title="No hay ventas pendientes" description="Todas las operaciones de este dispositivo están sincronizadas." /> : null}
     </div>
   );
 
   const stockView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Stock disponible</h1><p>{selectedLocation?.name} · consulta de solo lectura</p></div></div><div className="fm-seller-stock-grid">{products.map((item) => { const status = sellerStockStatus({ ...item, currentStock: item.availableStock }); return <article key={item.id}><img src={sellerImage(item)} alt="" /><div><strong>{item.productName}</strong><span>{item.categoryName || "Sin categoría"}</span><Badge tone={status.tone}>{status.label}</Badge></div><b>{item.availableStock} u.</b></article>; })}</div></div>
+    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Stock disponible</h1><p>{selectedLocation?.name} · consulta de solo lectura</p></div></div><div className="fm-seller-stock-grid">{products.map((item) => { const status = sellerStockStatus({ ...item, currentStock: item.availableStock }); return <article key={item.id}><img src={sellerImage(item)} alt="" loading="lazy" decoding="async" /><div><strong>{item.productName}</strong><span>{item.categoryName || "Sin categoría"}</span><Badge tone={status.tone}>{status.label}</Badge></div><b>{item.availableStock} u.</b></article>; })}</div></div>
   );
 
   const pricesView = (
@@ -693,21 +771,22 @@ export default function SellerPanel() {
   );
 
   const helpView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Ayuda rápida</h1><p>Flujo recomendado para registrar una venta.</p></div></div><ol className="fm-seller-help"><li><Icon name="MapPin" /><div><strong>Elegí la ubicación</strong><span>Verificá el local, feria o evento activo.</span></div></li><li><Icon name="ShoppingCart" /><div><strong>Agregá productos</strong><span>Usá las tarjetas táctiles o la botonera Bluetooth.</span></div></li><li><Icon name="Boxes" /><div><strong>Revisá cantidades</strong><span>El sistema vuelve a validar stock al confirmar.</span></div></li><li><Icon name="Percent" /><div><strong>Aplicá descuentos</strong><span>Los montos fijos se calculan antes de los porcentajes.</span></div></li><li><Icon name="CreditCard" /><div><strong>Elegí el pago</strong><span>Podés usar un medio o distribuir con +2 pagos.</span></div></li><li><Icon name="Check" /><div><strong>Continuá</strong><span>Venta, stock, movimientos y auditoría se guardan juntos.</span></div></li></ol></div>
+    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Ayuda rápida</h1><p>Flujo recomendado para registrar una venta.</p></div></div><ol className="fm-seller-help"><li><Icon name="MapPin" /><div><strong>Elegí la ubicación</strong><span>Verificá el local, feria o evento activo.</span></div></li><li><Icon name="ShoppingCart" /><div><strong>Agregá productos</strong><span>Abrí una categoría, tocá el producto o usá la botonera Bluetooth.</span></div></li><li><Icon name="Boxes" /><div><strong>Revisá cantidades</strong><span>El sistema vuelve a validar stock al confirmar.</span></div></li><li><Icon name="Percent" /><div><strong>Aplicá descuentos</strong><span>Los montos fijos se calculan antes de los porcentajes.</span></div></li><li><Icon name="CreditCard" /><div><strong>Elegí el pago</strong><span>Podés usar un medio o distribuir con +2 pagos.</span></div></li><li><Icon name="UserPlus" /><div><strong>Cliente opcional</strong><span>Identificalo por teléfono y zona sin frenar la venta.</span></div></li><li><Icon name="Check" /><div><strong>Continuá</strong><span>Venta, cliente, stock, movimientos y auditoría se coordinan al guardar.</span></div></li></ol></div>
   );
 
   return (
     <div className="fm-seller-shell">
-      <SellerHeader profile={profile} location={selectedLocation} online={online} syncing={syncing} pendingCount={(pendingSales.data || []).length} view={view} setView={setView} keyboardActive={keyboardActive} setKeyboardActive={setKeyboardActive} canReturnAdmin={canReturnAdmin} onReturnAdmin={returnAdmin} onLogout={logout} />
+      <SellerHeader profile={profile} location={selectedLocation} online={online} syncing={syncing} pendingCount={(pendingSales.data || []).length} view={view} setView={setView} canReturnAdmin={canReturnAdmin} onReturnAdmin={returnAdmin} onLogout={logout} />
       <main className="fm-seller-main" id="main-content">{view === "sale" ? saleView : view === "sales" ? salesView : view === "pending" ? pendingView : view === "stock" ? stockView : view === "prices" ? pricesView : helpView}</main>
+      <CustomerDialog open={customerOpen} zones={resources.zones || []} online={online} initialCustomer={selectedCustomer} onClose={() => setCustomerOpen(false)} onSelect={setSelectedCustomer} />
       <DiscountDialog open={discountOpen} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} manualAllowed={manualDiscountAllowed} onClose={() => setDiscountOpen(false)} onSelectSaved={(discount) => setDiscountIds((current) => current.includes(discount.id) ? current.filter((id) => id !== discount.id) : [...current, discount.id])} onAddManual={(discount) => setManualDiscounts((current) => [...current, discount])} />
       <MultiplePaymentDialog open={multipleOpen} total={summary.total} initialPayments={payments} onClose={() => setMultipleOpen(false)} onConfirm={(entries) => { setPayments(entries.filter((entry) => entry.amount > 0)); setPaymentMethod("multiple"); setMultipleOpen(false); }} />
       <ConfirmationDialog open={Boolean(locationToApply)} title="Cambiar ubicación" description="El carrito actual se vaciará para no mezclar productos ni stock entre ubicaciones." onClose={() => setLocationToApply("")} onConfirm={() => { applyLocation(locationToApply); setLocationToApply(""); }} />
-      <ConfirmationDialog open={clearRequested} title="Vaciar carrito" description="Se eliminarán productos, descuentos, ticket y forma de pago de la venta actual." onClose={() => setClearRequested(false)} onConfirm={() => { resetSale(); setClearRequested(false); }} />
+      <ConfirmationDialog open={clearRequested} title="Vaciar carrito" description="Se eliminarán productos, descuentos, cliente, ticket y forma de pago de la venta actual." onClose={() => setClearRequested(false)} onConfirm={() => { resetSale(); setClearRequested(false); }} />
       <ConfirmationDialog open={Boolean(editRequested)} title="Editar otra venta" description="La venta actual se descartará para cargar la operación seleccionada." onClose={() => setEditRequested(null)} onConfirm={() => { startEdit(editRequested); setEditRequested(null); }} />
       <ConfirmationDialog open={Boolean(deletePendingTarget)} title="Eliminar venta pendiente" description="Esta operación se borrará solamente de este dispositivo y no podrá recuperarse." onClose={() => setDeletePendingTarget(null)} onConfirm={async () => { await deleteSellerPendingSale(deletePendingTarget.localId); setDeletePendingTarget(null); await pendingSales.refresh(); }} />
-      <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Venta registrada"><div className="fm-seller-receipt"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><strong>{receipt?.saleCode}</strong><span>{formatMoney(receipt?.total)}</span><p>{receipt?.paymentMethodLabel}</p>{receipt?.ticketRequested ? <Badge tone="warning">Ticket solicitado · pendiente</Badge> : null}<Button onClick={() => setReceipt(null)}>Nueva venta</Button></div></Modal>
-      <Modal open={Boolean(detailSale)} onClose={() => setDetailSale(null)} title={detailSale?.saleCode || "Detalle de venta"} footer={detailSale?.status === "active" ? <div className="fm-dialog-actions"><Button variant="destructive" onClick={() => { const sale = detailSale; setDetailSale(null); setCancelReason(""); setCancelTarget(sale); }}>Anular</Button><Button variant="secondary" onClick={() => currentItems.length ? setEditRequested(detailSale) : startEdit(detailSale)}>Editar</Button></div> : null}><div className="fm-seller-sale-detail"><p>{formatDateTime(detailSale?.createdAt)} · {detailSale?.paymentMethodLabel}</p>{(detailSale?.items || []).map((item) => <div key={item.productId}><span>{item.qty} × {item.name}</span><strong>{formatMoney(item.subtotal)}</strong></div>)}{(detailSale?.discounts || []).map((discount, index) => <div key={`${discount.discountId}-${index}`}><span>{discount.name}</span><strong>− {formatMoney(discount.amountApplied)}</strong></div>)}<div className="is-total"><span>Total</span><strong>{formatMoney(detailSale?.total)}</strong></div>{detailSale?.ticketRequested ? <div><span>Ticket</span><strong>{detailSale.ticketStatus || "pending"}</strong></div> : null}</div></Modal>
+      <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Venta registrada"><div className="fm-seller-receipt"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><strong>{receipt?.saleCode}</strong><span>{formatMoney(receipt?.total)}</span><p>{receipt?.paymentMethodLabel}</p>{receipt?.customerId ? <Badge tone="success">Cliente asociado</Badge> : null}{receipt?.ticketRequested ? <Badge tone="warning">Ticket solicitado · pendiente</Badge> : null}<Button onClick={() => setReceipt(null)}>Nueva venta</Button></div></Modal>
+      <Modal open={Boolean(detailSale)} onClose={() => setDetailSale(null)} title={detailSale?.saleCode || "Detalle de venta"} footer={detailSale?.status === "active" ? <div className="fm-dialog-actions"><Button variant="destructive" onClick={() => { const sale = detailSale; setDetailSale(null); setCancelReason(""); setCancelTarget(sale); }}>Anular</Button><Button variant="secondary" onClick={() => currentItems.length ? setEditRequested(detailSale) : startEdit(detailSale)}>Editar</Button></div> : null}><div className="fm-seller-sale-detail"><p>{formatDateTime(detailSale?.createdAt)} · {detailSale?.paymentMethodLabel}</p>{detailSale?.customerPhoneSnapshot ? <div><span>Cliente</span><strong>{detailSale.customerPhoneSnapshot}{detailSale.customerNameSnapshot ? ` · ${detailSale.customerNameSnapshot}` : ""}{detailSale.customerZoneSnapshot ? ` · ${detailSale.customerZoneSnapshot}` : ""}</strong></div> : null}{(detailSale?.items || []).map((item) => <div key={item.productId}><span>{item.qty} × {item.name}</span><strong>{formatMoney(item.subtotal)}</strong></div>)}{(detailSale?.discounts || []).map((discount, index) => <div key={`${discount.discountId}-${index}`}><span>{discount.name}</span><strong>− {formatMoney(discount.amountApplied)}</strong></div>)}<div className="is-total"><span>Total</span><strong>{formatMoney(detailSale?.total)}</strong></div>{detailSale?.ticketRequested ? <div><span>Ticket</span><strong>{detailSale.ticketStatus || "pending"}</strong></div> : null}</div></Modal>
       <Modal
         open={Boolean(cancelTarget)}
         onClose={closeCancelDialog}
