@@ -2,6 +2,7 @@
   command = "npm run build"
   publish = "dist"
 
+# Esta configuración también se aplica a los Deploy Previews para probar la app completa.
 [build.environment]
   NODE_VERSION = "20"
   VITE_FIREBASE_API_KEY = "AIzaSyCBVuIt36d_0DbDdEkGwRy85hmpZEjbrVg"
