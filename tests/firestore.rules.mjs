@@ -7,11 +7,15 @@ import {
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
+  query,
   runTransaction,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 
 let environment;
@@ -82,6 +86,29 @@ before(async () => {
       setDoc(doc(database, "financialEntries", "entry-1"), {
         name: "Entrada protegida",
         createdBy: "admin-1",
+      }),
+      setDoc(doc(database, "customerZones", "zone-active"), {
+        name: "Zona Norte",
+        active: true,
+        order: 1,
+      }),
+      setDoc(doc(database, "customerZones", "zone-inactive"), {
+        name: "Zona Histórica",
+        active: false,
+        order: 2,
+      }),
+      setDoc(doc(database, "customers", "customer_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), {
+        customerKey: "customer_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        phone: "11 1234-5678",
+        phoneNormalized: "1112345678",
+        name: "Cliente existente",
+        zoneId: "zone-active",
+        zoneName: "Zona Norte",
+        active: true,
+        deleted: false,
+        source: "seller_sale",
+        createdBy: "seller-1",
+        lastSaleId: "seed-sale",
       }),
     ]);
   });
@@ -245,4 +272,84 @@ test("un encargado puede cargar stock pero no asignar vendedores ni descuentos",
   }));
   await assertFails(updateDoc(doc(database, "locations", "loc-1"), { assignedSellerIds: ["seller-1"], updatedAt: new Date() }));
   await assertFails(updateDoc(doc(database, "locations", "loc-1"), { enabledDiscountIds: ["discount-1"], updatedAt: new Date() }));
+});
+
+test("el vendedor puede resolver un cliente puntual pero no listar la base", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  await assertSucceeds(getDoc(doc(database, "customers", "customer_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")));
+  await assertFails(getDocs(collection(database, "customers")));
+});
+
+test("el vendedor sólo puede listar zonas activas", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  await assertSucceeds(getDocs(query(collection(database, "customerZones"), where("active", "==", true))));
+  await assertFails(getDocs(collection(database, "customerZones")));
+  await assertSucceeds(getDoc(doc(database, "customerZones", "zone-active")));
+  await assertFails(getDoc(doc(database, "customerZones", "zone-inactive")));
+});
+
+test("cliente nuevo y venta quedan vinculados dentro de la misma operación", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  const customerId = "customer_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  const customerRef = doc(database, "customers", customerId);
+  const saleRef = doc(database, "sales", "customer-sale-1");
+
+  await assertSucceeds(runTransaction(database, async (transaction) => {
+    transaction.set(customerRef, {
+      customerKey: customerId,
+      phone: "11 2222-3333",
+      phoneNormalized: "1122223333",
+      name: null,
+      zoneId: "zone-active",
+      zoneName: "Zona Norte",
+      customZone: null,
+      active: true,
+      deleted: false,
+      source: "seller_sale",
+      createdBy: "seller-1",
+      createdByName: "Vendedor",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSaleId: saleRef.id,
+      lastPurchaseAt: new Date(),
+    });
+    transaction.set(saleRef, {
+      saleCode: "FM-LOC-20260806-0002",
+      sellerId: "seller-1",
+      sellerName: "Vendedor",
+      locationId: "loc-1",
+      locationName: "Ubicación autorizada",
+      customerId,
+      customerPhoneSnapshot: "11 2222-3333",
+      customerNameSnapshot: null,
+      customerZoneSnapshot: "Zona Norte",
+      status: "active",
+      total: 1000,
+      totalItems: 1,
+      items: [{ productId: "product-1", name: "Producto", qty: 1, unitPrice: 1000, subtotal: 1000 }],
+      paymentMethod: "cash",
+      paymentMethodLabel: "Pago eft",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }));
+
+  assert.equal((await getDoc(customerRef)).data().phoneNormalized, "1122223333");
+  assert.equal((await getDoc(saleRef)).data().customerId, customerId);
+});
+
+test("el vendedor no puede crear un cliente sin una venta vinculada", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  const customerId = "customer_cccccccccccccccccccccccccccccccccccccccc";
+  await assertFails(setDoc(doc(database, "customers", customerId), {
+    customerKey: customerId,
+    phone: "11 4444-5555",
+    phoneNormalized: "1144445555",
+    zoneName: "Zona Norte",
+    active: true,
+    deleted: false,
+    source: "seller_sale",
+    createdBy: "seller-1",
+    lastSaleId: "sale-no-vinculada",
+  }));
 });
