@@ -95,7 +95,8 @@ test("la aplicación separa bundles, precarga vendedor y conserva offline pendie
   assert.match(management, /loadSellerResourcesShared\(profile\)/);
   assert.doesNotMatch(management, /requestIdleCallback/);
   assert.match(sellerHooks, /getSellerResourcesSharedCached/);
-  assert.match(sellerHooks, /handlers\.current\.enabled/);
+  assert.match(sellerHooks, /const current = handlers\.current;/);
+  assert.match(sellerHooks, /!current\.enabled/);
   assert.match(sellerHooks, /window\.addEventListener\("keydown", onKeyDown, true\)/);
   assert.match(sellerHooks, /keyboardLookupKeys/);
   assert.match(sellerHooks, /new Map\(\)/);
