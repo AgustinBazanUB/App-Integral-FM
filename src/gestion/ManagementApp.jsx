@@ -13,7 +13,10 @@ import {
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import NotAuthorizedPage from "./pages/NotAuthorizedPage";
-import { listLocationsShared } from "./services/sharedResources";
+import {
+  listLocationsShared,
+  loadSellerResourcesShared,
+} from "./services/sharedResources";
 
 const loadSellerPanel = () => import("./seller/SellerPanel");
 const SellerPanel = lazy(loadSellerPanel);
@@ -21,6 +24,7 @@ const AdministrationPage = lazy(() => import("./pages/AdministrationPage"));
 const ActivityPage = lazy(() => import("./pages/ActivityPage"));
 const AuditPage = lazy(() => import("./pages/AuditPage"));
 const GenericModulePage = lazy(() => import("./pages/GenericModulePage"));
+const LoyalCustomersPage = lazy(() => import("./pages/LoyalCustomersPage"));
 const LocationsPage = lazy(() => import("./pages/LocationsPage"));
 const LocationDetailPage = lazy(() => import("./pages/LocationDetailPage"));
 const QuickSalesPage = lazy(() => import("./pages/QuickSalesPage"));
@@ -29,15 +33,6 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 const routeIdFromPath = (pathname) =>
   pathname.split("/").filter(Boolean)[1] || "dashboard";
-
-const scheduleIdle = (callback) => {
-  if (typeof window.requestIdleCallback === "function") {
-    const id = window.requestIdleCallback(callback, { timeout: 1200 });
-    return () => window.cancelIdleCallback?.(id);
-  }
-  const id = window.setTimeout(callback, 250);
-  return () => window.clearTimeout(id);
-};
 
 function ModuleFallback({ seller = false }) {
   return (
@@ -77,14 +72,20 @@ function ManagementRouter() {
     }
   }, [status, sellerPath, routeId, location.pathname, navigate]);
 
+  // El Panel Vendedor se prepara mientras el administrador continúa usando su
+  // pantalla actual. Así la navegación no desmonta el panel antes de tener el
+  // chunk y los recursos compartidos disponibles.
   useEffect(() => {
     if (status !== "ready" || !canAccessSellerPanel(profile) || sellerPath) return undefined;
-    return scheduleIdle(() => {
-      Promise.all([
-        loadSellerPanel(),
-        listLocationsShared(profile),
-      ]).catch(() => {});
+    let cancelled = false;
+    Promise.all([
+      loadSellerPanel(),
+      listLocationsShared(profile),
+      loadSellerResourcesShared(profile),
+    ]).catch(() => {
+      if (cancelled) return;
     });
+    return () => { cancelled = true; };
   }, [status, profile?.id, sellerPath]);
 
   useEffect(() => {
@@ -119,6 +120,8 @@ function ManagementRouter() {
     page = pathParts[2] ? <LocationDetailPage locationId={decodeURIComponent(pathParts[2])} /> : <LocationsPage />;
   } else if (routeId === "quick-sales") {
     page = <QuickSalesPage />;
+  } else if (routeId === "loyal-customers") {
+    page = <LoyalCustomersPage />;
   } else if (routeId === "administration") {
     page = <AdministrationPage />;
   } else if (routeId === "audit") {
