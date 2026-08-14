@@ -59,14 +59,14 @@ class ManagementErrorBoundary extends Component {
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <main id="main-content" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, background: "#f7f3ec" }}>
-        <section style={{ width: "min(560px, 100%)", border: "1px solid #e5dccd", borderRadius: 16, background: "#fff", padding: 24, boxShadow: "0 18px 50px rgb(70 54 29 / 10%)" }}>
+      <main id="main-content" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, background: "#f7f3ec", color: "#171512" }}>
+        <section style={{ width: "min(560px, 100%)", border: "1px solid #e5dccd", borderRadius: 16, background: "#fff", color: "#171512", padding: 24, boxShadow: "0 18px 50px rgb(70 54 29 / 10%)" }}>
           <img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" width="112" height="64" />
-          <h1 style={{ margin: "14px 0 8px" }}>No pudimos abrir este panel</h1>
-          <p style={{ margin: "0 0 18px", color: "#6f675e" }}>La aplicación sigue disponible. Podés volver al panel administrador o recargar esta versión.</p>
+          <h1 style={{ margin: "14px 0 8px", color: "#171512" }}>No pudimos abrir este panel</h1>
+          <p style={{ margin: "0 0 18px", color: "#403a34" }}>La aplicación sigue disponible. Podés volver al panel administrador o recargar esta versión.</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             <button type="button" onClick={() => window.location.assign("/gestion")} style={{ minHeight: 44, border: 0, borderRadius: 10, padding: "0 16px", cursor: "pointer", background: "#b8892d", color: "#fff", fontWeight: 700 }}>Volver al administrador</button>
-            <button type="button" onClick={() => window.location.reload()} style={{ minHeight: 44, border: "1px solid #ded5c6", borderRadius: 10, padding: "0 16px", cursor: "pointer", background: "#fff", color: "#403a34", fontWeight: 700 }}>Recargar</button>
+            <button type="button" onClick={() => window.location.reload()} style={{ minHeight: 44, border: "1px solid #ded5c6", borderRadius: 10, padding: "0 16px", cursor: "pointer", background: "#fff", color: "#171512", fontWeight: 700 }}>Recargar</button>
           </div>
         </section>
       </main>
@@ -102,9 +102,6 @@ function ManagementRouter() {
     }
   }, [status, sellerPath, routeId, location.pathname, navigate]);
 
-  // El código del Panel Vendedor forma parte del bundle de gestión para que el
-  // cambio Administrador → Vendedor no dependa de descargar otro chunk. Mientras
-  // el administrador trabaja, sólo calentamos los datos que el vendedor necesita.
   useEffect(() => {
     if (status !== "ready" || !canAccessSellerPanel(profile) || sellerPath) return undefined;
     let cancelled = false;
