@@ -24,13 +24,19 @@ import {
   ARGENTINA_TIME_ZONE,
 } from "../../modules/locations/domain/time";
 import {
+  buildCustomerDraft,
+  customerDocumentId,
+} from "../customers/customerDomain";
+import {
   can,
   canAccessAdministration,
   effectiveSellerLocations,
 } from "../permissions";
 import { db } from "./firebase";
-import { listDiscounts, listProductCategories } from "./locationManagementService";
-import { listLocations } from "./managementService";
+import {
+  listLocationsShared,
+  loadSellerResourcesShared,
+} from "./sharedResources";
 
 const docsToArray = (snapshot) =>
   snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
@@ -51,8 +57,6 @@ async function runStockMutationWithRuleCompatibility(profile, execute) {
   try {
     return await execute(false);
   } catch (error) {
-    // Compatibilidad temporal durante el despliegue de reglas: los administradores
-    // ya tienen bypass por rol; sólo un vendedor puede necesitar el formato anterior.
     if (!permissionDenied(error) || canAccessAdministration(profile)) throw error;
     return execute(true);
   }
@@ -133,8 +137,85 @@ function normalizeManualDiscount(discount) {
   };
 }
 
+async function prepareSaleCustomer(customer) {
+  if (!customer?.phone && !customer?.phoneNormalized) return null;
+  const draft = buildCustomerDraft({
+    phone: customer.phone || customer.phoneNormalized,
+    name: customer.name || "",
+    zoneId: customer.zoneId || "",
+    zoneName: customer.zoneName || customer.zone || "",
+    customZone: customer.customZone || "",
+  });
+  return {
+    ...draft,
+    id: await customerDocumentId(draft.phoneNormalized),
+  };
+}
+
+function customerSnapshotFields(customer) {
+  if (!customer) {
+    return {
+      customerId: null,
+      customerPhoneSnapshot: null,
+      customerNameSnapshot: null,
+      customerZoneSnapshot: null,
+    };
+  }
+  return {
+    customerId: customer.id,
+    customerPhoneSnapshot: customer.phone || customer.phoneNormalized,
+    customerNameSnapshot: customer.name || null,
+    customerZoneSnapshot: customer.zoneName || customer.customZone || null,
+  };
+}
+
+function resolvedCustomerFromSnapshot(snapshot, prepared) {
+  if (!prepared) return null;
+  if (!snapshot?.exists()) return prepared;
+  const stored = snapshot.data();
+  return {
+    id: snapshot.id,
+    phone: stored.phone || prepared.phone,
+    phoneNormalized: stored.phoneNormalized || prepared.phoneNormalized,
+    name: stored.name || "",
+    zoneId: stored.zoneId || "",
+    zoneName: stored.zoneName || stored.customZone || prepared.zoneName,
+    customZone: stored.customZone || "",
+  };
+}
+
+function writeCustomerForSale(transaction, customerRef, customerSnapshot, customer, profile, saleId) {
+  if (!customerRef || !customer) return;
+  if (customerSnapshot.exists()) {
+    transaction.update(customerRef, {
+      lastSaleId: saleId,
+      lastPurchaseAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return;
+  }
+  transaction.set(customerRef, {
+    customerKey: customer.id,
+    phone: customer.phone,
+    phoneNormalized: customer.phoneNormalized,
+    name: customer.name || null,
+    zoneId: customer.zoneId || null,
+    zoneName: customer.zoneName,
+    customZone: customer.customZone || null,
+    active: true,
+    deleted: false,
+    source: "seller_sale",
+    createdBy: profile.id,
+    createdByName: userName(profile),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    lastSaleId: saleId,
+    lastPurchaseAt: serverTimestamp(),
+  });
+}
+
 export async function listSellerLocations(profile) {
-  const locations = await listLocations(profile);
+  const locations = await listLocationsShared(profile);
   return effectiveSellerLocations(profile, locations);
 }
 
@@ -164,18 +245,7 @@ export async function subscribeSellerLocationStock({ profile, locationId, onData
   );
 }
 
-export async function loadSellerResources(profile) {
-  const [categories, discounts, shortcutsSnapshot] = await Promise.all([
-    listProductCategories(profile),
-    listDiscounts(profile),
-    getDoc(doc(db, "settings", "keyboardShortcuts")),
-  ]);
-  return {
-    categories,
-    discounts,
-    shortcuts: shortcutsSnapshot.exists() ? shortcutsSnapshot.data() : { sellerActions: {} },
-  };
-}
+export const loadSellerResources = (profile) => loadSellerResourcesShared(profile);
 
 export async function listSellerDailySales(profile, locationId) {
   await assertSellerLocation(profile, locationId);
@@ -263,6 +333,7 @@ export async function createSellerSale({
   paymentMethodLabel,
   payments = [],
   ticketRequested = false,
+  customer = null,
   offlineSale = null,
 }) {
   if (!can(profile, "quick-sales", "create")) {
@@ -277,7 +348,9 @@ export async function createSellerSale({
   const subtotal = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
   const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal);
   const payment = normalizePayment(paymentMethod, paymentMethodLabel, payments, discountSummary.total);
+  const preparedCustomer = await prepareSaleCustomer(customer);
   const refs = saleRefs({ location: permittedLocation, saleItems, seller: profile, offlineSale });
+  const customerRef = preparedCustomer ? doc(db, "customers", preparedCustomer.id) : null;
   const createdLocallyAt = refs.localId ? new Date(offlineSale.createdLocallyAt) : null;
   if (createdLocallyAt && Number.isNaN(createdLocallyAt.valueOf())) {
     throw new Error("La fecha local de la venta pendiente no es válida.");
@@ -300,6 +373,7 @@ export async function createSellerSale({
           payments: data.payments || [],
           ticketRequested: data.ticketRequested === true,
           ticketStatus: data.ticketStatus || "not_requested",
+          customerId: data.customerId || null,
           createdAt: data.createdAt,
           alreadySynced: true,
         };
@@ -310,9 +384,12 @@ export async function createSellerSale({
     if (!locationSnapshot.exists() || !isLocationActiveNow({ id: locationSnapshot.id, ...locationSnapshot.data() })) {
       throw new Error("La ubicación dejó de estar activa.");
     }
+    const customerSnapshot = customerRef ? await transaction.get(customerRef) : null;
     const counterSnapshot = await transaction.get(refs.counterRef);
     const stockSnapshots = [];
     for (const stockRef of refs.stockRefs) stockSnapshots.push(await transaction.get(stockRef));
+
+    const resolvedCustomer = resolvedCustomerFromSnapshot(customerSnapshot, preparedCustomer);
     const next = Number(counterSnapshot.data()?.lastNumber || 0) + 1;
     const saleCode = `FM-${refs.prefix}-${refs.dateKey}-${String(next).padStart(4, "0")}`;
     transaction.set(refs.counterRef, { locationId: permittedLocation.id, date: refs.dateKey, lastNumber: next }, { merge: true });
@@ -348,6 +425,8 @@ export async function createSellerSale({
       });
     });
 
+    writeCustomerForSale(transaction, customerRef, customerSnapshot, resolvedCustomer, profile, refs.saleRef.id);
+
     const localFields = saleLocalFields();
     const ticketStatus = ticketRequested ? "pending" : "not_requested";
     transaction.set(refs.saleRef, {
@@ -367,6 +446,7 @@ export async function createSellerSale({
       discountTotal: discountSummary.discountTotal,
       totalBeforeDiscounts: discountSummary.totalBeforeDiscounts,
       ...payment,
+      ...customerSnapshotFields(resolvedCustomer),
       subtotal,
       totalItems: saleItems.reduce((sum, item) => sum + item.qty, 0),
       total: discountSummary.total,
@@ -399,6 +479,7 @@ export async function createSellerSale({
       status: "completed",
       amount: discountSummary.total,
       ticketRequested: Boolean(ticketRequested),
+      ...(resolvedCustomer ? { customerId: resolvedCustomer.id } : {}),
       createdAt: serverTimestamp(),
     });
     return {
@@ -406,6 +487,7 @@ export async function createSellerSale({
       saleCode,
       total: discountSummary.total,
       ...payment,
+      customerId: resolvedCustomer?.id || null,
       ticketRequested: Boolean(ticketRequested),
       ticketStatus,
       createdAt: new Date(),
@@ -422,6 +504,7 @@ export async function updateSellerSale({
   paymentMethodLabel,
   payments = [],
   ticketRequested,
+  customer = undefined,
 }) {
   if (!can(profile, "quick-sales", "edit")) {
     throw new Error("No tenés permiso para editar ventas.");
@@ -443,6 +526,14 @@ export async function updateSellerSale({
   if (nextTicketRequested && !can(profile, "quick-sales", "requestTicket")) {
     throw new Error("No tenés permiso para solicitar ticket.");
   }
+  const preparedCustomer = customer === undefined
+    ? (original.customerId ? await prepareSaleCustomer({
+        phone: original.customerPhoneSnapshot,
+        name: original.customerNameSnapshot || "",
+        zoneName: original.customerZoneSnapshot || "",
+      }) : null)
+    : await prepareSaleCustomer(customer);
+  const customerRef = preparedCustomer ? doc(db, "customers", preparedCustomer.id) : null;
 
   return runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
     const saleSnapshot = await transaction.get(saleReference);
@@ -452,6 +543,8 @@ export async function updateSellerSale({
     if (!canAccessAdministration(profile) && sale.sellerId !== profile.id) {
       throw new Error("No podés editar una venta ajena.");
     }
+    const customerSnapshot = customerRef ? await transaction.get(customerRef) : null;
+    const resolvedCustomer = resolvedCustomerFromSnapshot(customerSnapshot, preparedCustomer);
     const oldQty = new Map((sale.items || []).map((item) => [item.productId, Number(item.qty)]));
     const newQty = new Map(newItems.map((item) => [item.productId, Number(item.qty)]));
     const productIds = [...new Set([...oldQty.keys(), ...newQty.keys()])];
@@ -492,6 +585,8 @@ export async function updateSellerSale({
       });
     });
 
+    writeCustomerForSale(transaction, customerRef, customerSnapshot, resolvedCustomer, profile, saleId);
+
     const ticketStatus = nextTicketRequested
       ? (sale.ticketRequested ? sale.ticketStatus || "pending" : "pending")
       : "not_requested";
@@ -504,6 +599,7 @@ export async function updateSellerSale({
       discountTotal: discountSummary.discountTotal,
       totalBeforeDiscounts: discountSummary.totalBeforeDiscounts,
       ...payment,
+      ...customerSnapshotFields(resolvedCustomer),
       subtotal,
       totalItems: newItems.reduce((sum, item) => sum + item.qty, 0),
       total: discountSummary.total,
@@ -527,6 +623,7 @@ export async function updateSellerSale({
       userName: userName(profile),
       status: "completed",
       amount: discountSummary.total,
+      ...(resolvedCustomer ? { customerId: resolvedCustomer.id } : {}),
       createdAt: serverTimestamp(),
     });
     return {
@@ -534,6 +631,7 @@ export async function updateSellerSale({
       saleCode: sale.saleCode,
       total: discountSummary.total,
       ...payment,
+      customerId: resolvedCustomer?.id || null,
       ticketRequested: nextTicketRequested,
       ticketStatus,
       createdAt: sale.createdAt,
