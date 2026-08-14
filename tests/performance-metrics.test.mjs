@@ -89,7 +89,14 @@ test("la aplicación separa bundles, precarga vendedor y conserva offline pendie
   const seller = read("src/gestion/seller/SellerPanel.jsx");
   assert.match(app, /lazy\(\(\) => import\("\.\/Storefront"\)\)/);
   assert.match(management, /const SellerPanel = lazy\(loadSellerPanel\)/);
-  assert.match(management, /requestIdleCallback/);
+  assert.match(management, /Promise\.all\(\[/);
+  assert.match(management, /loadSellerPanel\(\)/);
+  assert.match(management, /listLocationsShared\(profile\)/);
+  assert.match(management, /loadSellerResourcesShared\(profile\)/);
+  assert.doesNotMatch(management, /requestIdleCallback/);
+  assert.match(sellerHooks, /getSellerResourcesSharedCached/);
+  assert.match(sellerHooks, /handlers\.current\.enabled/);
+  assert.match(sellerHooks, /window\.addEventListener\("keydown", onKeyDown, true\)/);
   assert.match(sellerHooks, /keyboardLookupKeys/);
   assert.match(sellerHooks, /new Map\(\)/);
   assert.match(seller, /saveSellerPendingSale/);
