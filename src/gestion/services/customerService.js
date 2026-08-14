@@ -122,8 +122,6 @@ export async function listActiveCustomerZones({ allowOfflineFallback = true } = 
       const zones = docsToArray(await getDocs(query(
         collection(db, "customerZones"),
         where("active", "==", true),
-        orderBy("order"),
-        orderBy("name"),
         limit(100),
       )));
       return rememberActiveZones(sortZones(zones));
@@ -142,8 +140,6 @@ export async function listCustomerZones(profile) {
   return withRuntimeCache(ALL_ZONES_CACHE_KEY, async () => sortZones(
     docsToArray(await getDocs(query(
       collection(db, "customerZones"),
-      orderBy("order"),
-      orderBy("name"),
       limit(150),
     ))),
   ), 60_000);
