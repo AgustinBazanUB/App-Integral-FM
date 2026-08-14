@@ -29,7 +29,6 @@ export default function CustomerDialog({
   onClose,
   onSelect,
 }) {
-  const phoneRef = useRef(null);
   const lookupSequence = useRef(0);
   const [form, setForm] = useState(EMPTY_FORM);
   const [foundCustomer, setFoundCustomer] = useState(null);
@@ -67,18 +66,18 @@ export default function CustomerDialog({
     const normalized = normalizeCustomerPhone(form.phone);
     if (!isValidCustomerPhone(normalized)) {
       setError("Ingresá un teléfono válido.");
-      return null;
+      return { status: "invalid", customer: null };
     }
     if (!online) {
       setLookupState({ busy: false, checked: true, message: "Sin conexión: el teléfono se resolverá al sincronizar la venta." });
-      return null;
+      return { status: "offline", customer: null };
     }
     const request = ++lookupSequence.current;
     setLookupState({ busy: true, checked: false, message: "Buscando cliente…" });
     setError("");
     try {
       const customer = await findCustomerByPhone(form.phone);
-      if (request !== lookupSequence.current) return null;
+      if (request !== lookupSequence.current) return { status: "stale", customer: null };
       if (customer) {
         setFoundCustomer({ ...customer, persisted: true });
         setForm({
@@ -88,15 +87,15 @@ export default function CustomerDialog({
           name: customer.name || "",
         });
         setLookupState({ busy: false, checked: true, message: "Cliente encontrado" });
-        return customer;
+        return { status: "found", customer };
       }
       setFoundCustomer(null);
       setLookupState({ busy: false, checked: true, message: "Teléfono nuevo" });
-      return null;
+      return { status: "new", customer: null };
     } catch (lookupError) {
       setLookupState({ busy: false, checked: false, message: "" });
       setError(lookupError.message);
-      return null;
+      return { status: "error", customer: null };
     }
   };
 
@@ -104,13 +103,14 @@ export default function CustomerDialog({
     setError("");
     let existing = foundCustomer;
     if (!lookupState.checked && online) {
-      existing = await lookup();
+      const result = await lookup();
+      if (result.status === "error" || result.status === "invalid" || result.status === "stale") return;
+      existing = result.customer;
       if (existing) {
         onSelect({ ...existing, persisted: true });
         onClose();
         return;
       }
-      if (!isValidCustomerPhone(form.phone)) return;
     }
     if (existing) {
       onSelect({ ...existing, persisted: true });
@@ -151,13 +151,16 @@ export default function CustomerDialog({
       }
     >
       <div className="fm-customer-dialog">
-        <FormField label="Teléfono" required hint="Es el identificador principal. Espacios, guiones y paréntesis no generan duplicados.">
+        <div className={`fm-field ${error && !isValidCustomerPhone(form.phone) ? "fm-field--error" : ""}`}>
+          <label htmlFor="seller-customer-phone">Teléfono <span aria-hidden="true">*</span></label>
           <div className="fm-customer-phone-field">
             <input
-              ref={phoneRef}
+              id="seller-customer-phone"
               type="tel"
               inputMode="tel"
               autoComplete="tel"
+              required
+              aria-describedby="seller-customer-phone-hint"
               value={form.phone}
               onChange={(event) => resetLookup(event.target.value)}
               onBlur={() => {
@@ -168,7 +171,8 @@ export default function CustomerDialog({
               <Icon name="Search" />Buscar
             </button>
           </div>
-        </FormField>
+          <p id="seller-customer-phone-hint" className="fm-field__hint">Es el identificador principal. Espacios, guiones y paréntesis no generan duplicados.</p>
+        </div>
 
         {lookupState.message ? (
           <div className={`fm-customer-lookup ${foundCustomer ? "is-found" : ""}`} role="status">
