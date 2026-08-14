@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { Component, lazy, Suspense, useEffect } from "react";
 import { Skeleton } from "../design-system";
 import { useLocation, useNavigate } from "../router";
 import { AuthProvider, useAuth } from "./AuthContext";
@@ -13,13 +13,12 @@ import {
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import NotAuthorizedPage from "./pages/NotAuthorizedPage";
+import SellerPanel from "./seller/SellerPanel";
 import {
   listLocationsShared,
   loadSellerResourcesShared,
 } from "./services/sharedResources";
 
-const loadSellerPanel = () => import("./seller/SellerPanel");
-const SellerPanel = lazy(loadSellerPanel);
 const AdministrationPage = lazy(() => import("./pages/AdministrationPage"));
 const ActivityPage = lazy(() => import("./pages/ActivityPage"));
 const AuditPage = lazy(() => import("./pages/AuditPage"));
@@ -34,14 +33,45 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const routeIdFromPath = (pathname) =>
   pathname.split("/").filter(Boolean)[1] || "dashboard";
 
-function ModuleFallback({ seller = false }) {
+function ModuleFallback() {
   return (
-    <main className={seller ? "fm-seller-transition" : "fm-module-transition"} id={seller ? "main-content" : undefined} aria-live="polite">
-      {seller ? <img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" width="112" height="64" /> : null}
-      <Skeleton lines={seller ? 4 : 5} />
+    <main className="fm-module-transition" aria-live="polite">
+      <Skeleton lines={5} />
       <span className="sr-only">Preparando módulo</span>
     </main>
   );
+}
+
+class ManagementErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Error no controlado en gestión", error, info);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <main id="main-content" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, background: "#f7f3ec" }}>
+        <section style={{ width: "min(560px, 100%)", border: "1px solid #e5dccd", borderRadius: 16, background: "#fff", padding: 24, boxShadow: "0 18px 50px rgb(70 54 29 / 10%)" }}>
+          <img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" width="112" height="64" />
+          <h1 style={{ margin: "14px 0 8px" }}>No pudimos abrir este panel</h1>
+          <p style={{ margin: "0 0 18px", color: "#6f675e" }}>La aplicación sigue disponible. Podés volver al panel administrador o recargar esta versión.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <button type="button" onClick={() => window.location.assign("/gestion")} style={{ minHeight: 44, border: 0, borderRadius: 10, padding: "0 16px", cursor: "pointer", background: "#b8892d", color: "#fff", fontWeight: 700 }}>Volver al administrador</button>
+            <button type="button" onClick={() => window.location.reload()} style={{ minHeight: 44, border: "1px solid #ded5c6", borderRadius: 10, padding: "0 16px", cursor: "pointer", background: "#fff", color: "#403a34", fontWeight: 700 }}>Recargar</button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 }
 
 function ManagementRouter() {
@@ -72,14 +102,13 @@ function ManagementRouter() {
     }
   }, [status, sellerPath, routeId, location.pathname, navigate]);
 
-  // El Panel Vendedor se prepara mientras el administrador continúa usando su
-  // pantalla actual. Así la navegación no desmonta el panel antes de tener el
-  // chunk y los recursos compartidos disponibles.
+  // El código del Panel Vendedor forma parte del bundle de gestión para que el
+  // cambio Administrador → Vendedor no dependa de descargar otro chunk. Mientras
+  // el administrador trabaja, sólo calentamos los datos que el vendedor necesita.
   useEffect(() => {
     if (status !== "ready" || !canAccessSellerPanel(profile) || sellerPath) return undefined;
     let cancelled = false;
     Promise.all([
-      loadSellerPanel(),
       listLocationsShared(profile),
       loadSellerResourcesShared(profile),
     ]).catch(() => {
@@ -107,7 +136,7 @@ function ManagementRouter() {
 
   if (sellerPath || isPureSeller(profile)) {
     return canAccessSellerPanel(profile)
-      ? <Suspense fallback={<ModuleFallback seller />}><SellerPanel /></Suspense>
+      ? <SellerPanel />
       : <NotAuthorizedPage />;
   }
 
@@ -146,5 +175,11 @@ function ManagementRouter() {
 }
 
 export default function ManagementApp() {
-  return <AuthProvider><ManagementRouter /></AuthProvider>;
+  return (
+    <AuthProvider>
+      <ManagementErrorBoundary>
+        <ManagementRouter />
+      </ManagementErrorBoundary>
+    </AuthProvider>
+  );
 }
