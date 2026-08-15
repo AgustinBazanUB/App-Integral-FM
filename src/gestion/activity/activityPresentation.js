@@ -23,6 +23,14 @@ const definitions = {
   "product.updatedFromLocation": { label: "Producto maestro actualizado", icon: "PackageCheck", tone: "olive", group: "Productos" },
   "customer.created": { label: "Cliente creado", icon: "UserPlus", tone: "info", group: "Clientes" },
   "customer.updated": { label: "Cliente actualizado", icon: "UserRoundCheck", tone: "info", group: "Clientes" },
+  "whatsappCampaign.created": { label: "Campaña WhatsApp creada", icon: "Megaphone", tone: "gold", group: "Marketing" },
+  "whatsappCampaign.prepared": { label: "Campaña WhatsApp preparada", icon: "Check", tone: "gold", group: "Marketing" },
+  "whatsappCampaign.delivered": { label: "Campaña entregada a extensión", icon: "MessagesSquare", tone: "gold", group: "Marketing" },
+  "whatsappCampaign.running": { label: "Campaña WhatsApp iniciada", icon: "Play", tone: "gold", group: "Marketing" },
+  "whatsappCampaign.paused": { label: "Campaña WhatsApp pausada", icon: "Pause", tone: "neutral", group: "Marketing" },
+  "whatsappCampaign.completed": { label: "Campaña WhatsApp finalizada", icon: "Check", tone: "olive", group: "Marketing" },
+  "whatsappCampaign.error": { label: "Campaña WhatsApp con error", icon: "AlertTriangle", tone: "error", group: "Marketing" },
+  "whatsappCampaign.cancelled": { label: "Campaña WhatsApp cancelada", icon: "X", tone: "error", group: "Marketing" },
 };
 
 export const ACTIVITY_DEFINITIONS = Object.freeze(definitions);
@@ -35,6 +43,7 @@ const prefixFallbacks = [
   ["product.", { icon: "PackageCheck", tone: "olive", group: "Productos" }],
   ["customer.", { icon: "UserRound", tone: "info", group: "Clientes" }],
   ["discount.", { icon: "Percent", tone: "gold", group: "Descuentos" }],
+  ["whatsappCampaign.", { icon: "Megaphone", tone: "gold", group: "Marketing" }],
 ];
 
 function readableUnknown(action) {

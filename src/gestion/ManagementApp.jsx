@@ -15,6 +15,7 @@ import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import NotAuthorizedPage from "./pages/NotAuthorizedPage";
 import SellerPanel from "./seller/SellerPanel";
+import WhatsAppExtensionSync from "./marketing/whatsapp/WhatsAppExtensionSync";
 import {
   listLocationsShared,
   loadSellerResourcesShared,
@@ -29,6 +30,7 @@ const LocationsPage = lazy(managementPageLoaders.locations);
 const LocationDetailPage = lazy(managementPageLoaders.locationDetail);
 const QuickSalesPage = lazy(managementPageLoaders["quick-sales"]);
 const SalesMetricsPage = lazy(managementPageLoaders.metrics);
+const WhatsAppCampaignsPage = lazy(managementPageLoaders.marketingWhatsapp);
 const SettingsPage = lazy(managementPageLoaders.settings);
 
 const routeIdFromPath = (pathname) =>
@@ -157,6 +159,8 @@ function ManagementRouter() {
     page = <ActivityPage />;
   } else if (routeId === "metrics") {
     page = <SalesMetricsPage />;
+  } else if (routeId === "marketing" && pathParts[2] === "whatsapp") {
+    page = <WhatsAppCampaignsPage />;
   } else if (routeId === "settings") {
     page = <SettingsPage />;
   } else if (moduleById[routeId]) {
@@ -167,6 +171,7 @@ function ManagementRouter() {
 
   return (
     <ManagementShell>
+      <WhatsAppExtensionSync />
       <Suspense fallback={<ModuleFallback />}>{page}</Suspense>
     </ManagementShell>
   );

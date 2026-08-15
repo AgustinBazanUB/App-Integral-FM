@@ -353,3 +353,68 @@ test("el vendedor no puede crear un cliente sin una venta vinculada", async () =
     lastSaleId: "sale-no-vinculada",
   }));
 });
+
+test("campañas WhatsApp quedan restringidas a marketing autorizado y sin binarios", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const sellerDb = environment.authenticatedContext("seller-1").firestore();
+  const campaignRef = doc(adminDb, "whatsappCampaigns", "wa-1");
+  await assertSucceeds(setDoc(campaignRef, {
+    name: "Campaña segura",
+    source: "whatsapp",
+    filters: {},
+    message: "Hola",
+    imageCount: 0,
+    imageNames: [],
+    imageOrder: [],
+    imageMetadata: [],
+    totalRecipients: 1,
+    sentCount: 0,
+    errorCount: 0,
+    progressPercentage: 0,
+    status: "draft",
+    snapshotState: "draft",
+    active: true,
+    deleted: false,
+    createdBy: "admin-1",
+    createdByName: "Administrador",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
+  await assertFails(getDoc(doc(sellerDb, "whatsappCampaigns", "wa-1")));
+  await assertFails(setDoc(doc(adminDb, "whatsappCampaigns", "wa-binary"), {
+    name: "No válida",
+    source: "whatsapp",
+    filters: {},
+    message: "Hola",
+    imageCount: 1,
+    imageData: "base64",
+    totalRecipients: 0,
+    sentCount: 0,
+    errorCount: 0,
+    progressPercentage: 0,
+    status: "draft",
+    createdBy: "admin-1",
+  }));
+});
+
+test("destinatarios WhatsApp viven en subcolección protegida", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const sellerDb = environment.authenticatedContext("seller-1").firestore();
+  const recipientRef = doc(adminDb, "whatsappCampaigns", "wa-1", "recipients", "recipient_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  await assertSucceeds(setDoc(recipientRef, {
+    recipientId: "recipient_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    clientId: null,
+    name: "Cliente",
+    phone: "1157571979",
+    phoneNormalized: "1157571979",
+    whatsappPhone: "5491157571979",
+    zone: "Centro",
+    category: null,
+    source: "excel",
+    status: "pending",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
+  await assertFails(getDoc(doc(sellerDb, "whatsappCampaigns", "wa-1", "recipients", "recipient_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")));
+});
+
