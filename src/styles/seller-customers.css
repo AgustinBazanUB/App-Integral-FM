@@ -678,3 +678,41 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Clientes Fidelizados: detalle, edición y WhatsApp sin perder la tarjeta completa. */
+.fm-customer-card { position: relative; transition: border-color var(--fm-duration-fast), box-shadow var(--fm-duration-fast), transform var(--fm-duration-fast); }
+.fm-customer-card:hover,
+.fm-customer-card:focus-within { border-color: var(--fm-border-accent); box-shadow: var(--fm-shadow-sm); transform: translateY(-1px); }
+.fm-customer-card__open { position: absolute; z-index: 1; inset: 0; width: 100%; border: 0; border-radius: inherit; background: transparent; cursor: pointer; }
+.fm-customer-card__open:focus-visible { outline: 3px solid rgb(184 138 45 / 28%); outline-offset: 2px; }
+.fm-customer-card__identity,
+.fm-customer-card > .fm-badge { position: relative; z-index: 0; pointer-events: none; }
+.fm-customer-phone-link { position: relative; z-index: 2; display: inline-flex; width: fit-content; min-height: 40px; align-items: center; gap: 6px; color: var(--fm-text-accent); text-decoration: none; pointer-events: auto; }
+.fm-customer-phone-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.fm-customer-phone-link:focus-visible { outline: 3px solid rgb(184 138 45 / 28%); outline-offset: 2px; border-radius: 6px; }
+.fm-customer-phone-link svg { width: 15px !important; height: 15px !important; }
+
+.fm-customer-detail { display: grid; gap: 18px; }
+.fm-customer-detail__hero { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--fm-border-subtle); padding-bottom: 14px; }
+.fm-customer-detail__hero > div { display: grid; gap: 2px; }
+.fm-customer-detail__hero small { color: var(--fm-text-muted); font-size: .7rem; }
+.fm-customer-detail__hero strong { font-family: var(--fm-font-display); font-size: 1.35rem; }
+.fm-customer-detail dl { display: grid; gap: 0; margin: 0; }
+.fm-customer-detail dl > div { display: grid; grid-template-columns: minmax(120px, .4fr) 1fr; align-items: center; gap: 12px; min-height: 48px; border-bottom: 1px solid var(--fm-border-subtle); }
+.fm-customer-detail dl > div:last-child { border-bottom: 0; }
+.fm-customer-detail dt { color: var(--fm-text-muted); font-size: .72rem; font-weight: 700; }
+.fm-customer-detail dd { margin: 0; color: var(--fm-text); font-size: .85rem; }
+.fm-customer-detail dd a { display: inline-flex; min-height: 40px; align-items: center; gap: 7px; color: var(--fm-text-accent); font-weight: 700; text-decoration: none; }
+.fm-customer-detail dd a:hover { text-decoration: underline; }
+.fm-customer-detail dd a svg { width: 16px; height: 16px; }
+.fm-customer-detail-form { min-width: min(480px, 76vw); }
+
+@media (max-width: 640px) {
+  .fm-customer-card { align-items: flex-start; }
+  .fm-customer-card__identity { flex: 1; }
+  .fm-customer-phone-link { min-height: 44px; }
+  .fm-customer-detail-form { min-width: 0; }
+  .fm-customer-detail dl > div { grid-template-columns: 1fr; gap: 3px; padding: 9px 0; }
+  .fm-customer-detail dd a { min-height: 44px; }
+}

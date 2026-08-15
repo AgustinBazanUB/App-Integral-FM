@@ -22,6 +22,7 @@ import {
 } from "../../modules/locations/domain/time";
 import { Link, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
+import { getActivityPresentation, getActivityTypeGroups } from "../activity/activityPresentation";
 import DashboardFilters from "../components/DashboardFilters";
 import { Icon } from "../components/icons";
 import { formatDateTime, formatMoney } from "../formatters";
@@ -58,19 +59,22 @@ function SalesBars({ data }) {
 function ActivityList({ activities }) {
   return (
     <ul className="fm-activity-list">
-      {activities.map((activity) => (
-        <li key={activity.id}>
-          <div className="fm-activity-list__icon"><Icon name={activity.source === "sales" ? "ReceiptText" : activity.source === "stockMovements" ? "PackagePlus" : "Activity"} /></div>
-          <div>
-            <strong>{activity.title}</strong>
-            <span>{activity.description || activity.locationName || "Sistema"} · {formatDateTime(activity.createdAt)}</span>
-            <small>{activity.userName || "Sistema"}{activity.locationName ? ` · ${activity.locationName}` : ""}</small>
-          </div>
-          <Badge tone={activity.status === "cancelled" ? "error" : "success"}>
-            {activity.amount != null ? formatMoney(activity.amount) : "Registrada"}
-          </Badge>
-        </li>
-      ))}
+      {activities.map((activity) => {
+        const presentation = getActivityPresentation(activity);
+        return (
+          <li key={activity.id}>
+            <div className={`fm-activity-list__icon is-${presentation.tone}`}><Icon name={presentation.icon} /></div>
+            <div>
+              <strong>{presentation.label}</strong>
+              <span>{activity.description || activity.locationName || "Sistema"} · {formatDateTime(activity.createdAt)}</span>
+              <small>{activity.userName || "Sistema"}{activity.locationName ? ` · ${activity.locationName}` : ""}</small>
+            </div>
+            <Badge tone={activity.status === "cancelled" ? "error" : "success"}>
+              {activity.amount != null ? formatMoney(activity.amount) : "Registrada"}
+            </Badge>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -100,6 +104,7 @@ export default function DashboardPage() {
   const [referenceKey, setReferenceKey] = useState(() => argentinaDateKey());
   const [selectedLocationIds, setSelectedLocationIds] = useState(null);
   const [stockPickerOpen, setStockPickerOpen] = useState(false);
+  const [activityType, setActivityType] = useState("");
 
   useEffect(() => {
     window.sessionStorage.setItem(SESSION_FORMAT_KEY, format);
@@ -149,11 +154,13 @@ export default function DashboardPage() {
       locationIds: effectiveLocationIds,
       from: range.start,
       to: range.end,
+      filters: { action: activityType },
       pageSize: 6,
     });
     return page.items;
-  }, [profile.id, allowedLocationIdsKey, selectedLocationIdsKey, format, referenceKey]);
+  }, [profile.id, allowedLocationIdsKey, selectedLocationIdsKey, format, referenceKey, activityType]);
 
+  const activityTypeGroups = useMemo(() => getActivityTypeGroups(activityResult.data || []), [activityResult.data]);
   const modules = visibleBusinessModules(profile);
   const summary = useMemo(() => summarizeSales(salesResult.data || []), [salesResult.data]);
   const chart = useMemo(() => buildPeriodSalesSeries(salesResult.data || [], range, format), [salesResult.data, range, format]);
@@ -253,7 +260,10 @@ export default function DashboardPage() {
             <Panel
               title="Actividad del período"
               description="Operaciones dentro del período y las ubicaciones seleccionadas."
-              action={<Link className="fm-button fm-button--secondary" to="/gestion/actividad"><Icon name="Activity" /><span>Ver toda la actividad</span></Link>}
+              action={<div className="fm-dashboard-activity-actions">
+                <label><span className="sr-only">Tipo de actividad</span><select value={activityType} onChange={(event) => setActivityType(event.target.value)} aria-label="Filtrar actividad del período por tipo"><option value="">Todas</option>{activityTypeGroups.map((group) => <optgroup key={group.label} label={group.label}>{group.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</optgroup>)}</select></label>
+                <Link className="fm-button fm-button--secondary" to="/gestion/actividad"><Icon name="Activity" /><span>Ver toda la actividad</span></Link>
+              </div>}
             >
               {activityResult.status === "loading" ? <Skeleton lines={5} /> : null}
               {activityResult.data?.length ? <ActivityList activities={activityResult.data} /> : null}

@@ -31,6 +31,30 @@ export function isValidCustomerPhone(value) {
   return normalized.length >= 8 && normalized.length <= 11;
 }
 
+
+export function formatPhoneForDisplay(value) {
+  const normalized = normalizeCustomerPhone(value);
+  if (!normalized) return "";
+  if (normalized.length === 10 && normalized.startsWith("11")) {
+    return `11-${normalized.slice(2, 6)}-${normalized.slice(6)}`;
+  }
+  if (normalized.length <= 4) return normalized;
+  return `${normalized.slice(0, -4)}-${normalized.slice(-4)}`;
+}
+
+export function phoneToWhatsAppInternational(value) {
+  const normalized = normalizeCustomerPhone(value);
+  if (!isValidCustomerPhone(normalized)) return "";
+  // Los clientes de esta base usan numeración argentina nacional. Para móviles,
+  // WhatsApp requiere país 54 + indicador móvil 9 + número nacional sin 0/15.
+  return normalized.length === 10 ? `549${normalized}` : `54${normalized}`;
+}
+
+export function customerWhatsAppUrl(value) {
+  const international = phoneToWhatsAppInternational(value);
+  return international ? `https://wa.me/${international}` : "";
+}
+
 export function cleanCustomerName(value) {
   const name = String(value || "").trim().replace(/\s+/g, " ");
   return name || "";

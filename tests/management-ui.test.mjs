@@ -47,7 +47,8 @@ test("las consultas de ventas usan rango y la actividad usa cursor", async () =>
   assert.match(source, /where\("createdAt", ">=", Timestamp\.fromDate\(start\)\)/);
   assert.match(source, /where\("createdAt", "<", Timestamp\.fromDate\(end\)\)/);
   assert.match(source, /startAfter\(cursor\[key\]\)/);
-  assert.match(source, /limit\(pageSize \+ 1\)/);
+  assert.match(source, /const sourceLimit = hasPostFilter/);
+  assert.match(source, /limit\(sourceLimit\)/);
 });
 
 test("Ubicaciones comienza con ubicaciones y eventos, sin tarjetas de métricas", async () => {

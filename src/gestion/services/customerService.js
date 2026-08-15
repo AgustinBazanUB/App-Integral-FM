@@ -1,3 +1,4 @@
+
 import {
   collection,
   doc,
@@ -6,9 +7,11 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import {
   buildCustomerDraft,
@@ -27,6 +30,28 @@ const LOCAL_ZONES_KEY = "flor-mia-customer-zones-v1";
 
 function userName(profile = {}) {
   return profile.name || profile.email || "Usuario";
+}
+
+function assertCanEditCustomer(profile) {
+  if (!can(profile, "loyal-customers", "edit")) {
+    throw new Error("No tenés permiso para editar clientes.");
+  }
+}
+
+function customerAudit(profile, { action, customerId, changedFields = [] }) {
+  return {
+    action,
+    title: action === "customer.created" ? "Cliente creado" : "Cliente actualizado",
+    description: action === "customer.created" ? "Nuevo cliente fidelizado" : "Datos principales actualizados",
+    moduleId: "loyal-customers",
+    entityType: "customer",
+    entityId: customerId,
+    userId: profile.id,
+    userName: userName(profile),
+    status: "completed",
+    ...(changedFields.length ? { changedFields } : {}),
+    createdAt: serverTimestamp(),
+  };
 }
 
 function sortZones(zones = []) {
@@ -64,7 +89,8 @@ export async function findCustomerByPhone(phone) {
   if (!phoneNormalized) return null;
   const customerId = await customerDocumentId(phoneNormalized);
   const snapshot = await getDoc(doc(db, "customers", customerId));
-  return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+  if (!snapshot.exists() || snapshot.data().deleted === true || snapshot.data().active === false) return null;
+  return { id: snapshot.id, ...snapshot.data() };
 }
 
 export async function listCustomers(profile, pageSize = 200) {
@@ -77,10 +103,11 @@ export async function listCustomers(profile, pageSize = 200) {
       collection(db, "customers"),
       orderBy("updatedAt", "desc"),
       limit(size),
-    )));
+    ))).filter((customer) => customer.deleted !== true);
   } catch (error) {
     if (error?.code === "permission-denied") throw error;
-    return docsToArray(await getDocs(query(collection(db, "customers"), limit(size))));
+    return docsToArray(await getDocs(query(collection(db, "customers"), limit(size))))
+      .filter((customer) => customer.deleted !== true);
   }
 }
 
@@ -92,7 +119,11 @@ export async function saveCustomerFromAdmin(profile, input) {
   const customerId = await customerDocumentId(draft.phoneNormalized);
   const reference = doc(db, "customers", customerId);
   const existing = await getDoc(reference);
-  const payload = {
+  if (existing.exists() && !can(profile, "loyal-customers", "edit")) {
+    throw new Error("Ese cliente ya existe y no tenés permiso para editarlo.");
+  }
+  const batch = writeBatch(db);
+  batch.set(reference, {
     customerKey: customerId,
     phone: draft.phone,
     phoneNormalized: draft.phoneNormalized,
@@ -111,9 +142,93 @@ export async function saveCustomerFromAdmin(profile, input) {
       createdByName: userName(profile),
       createdAt: serverTimestamp(),
     }),
-  };
-  await setDoc(reference, payload, { merge: true });
+  }, { merge: true });
+  batch.set(doc(collection(db, "auditLogs")), customerAudit(profile, {
+    action: existing.exists() ? "customer.updated" : "customer.created",
+    customerId,
+    changedFields: existing.exists() ? ["name", "phone", "zone"] : [],
+  }));
+  await batch.commit();
   return customerId;
+}
+
+export async function updateCustomerFromAdmin(profile, currentCustomer, input) {
+  assertCanEditCustomer(profile);
+  if (!currentCustomer?.id) throw new Error("El cliente no está disponible.");
+  const draft = buildCustomerDraft(input);
+  const targetId = await customerDocumentId(draft.phoneNormalized);
+  const currentRef = doc(db, "customers", currentCustomer.id);
+  const targetRef = doc(db, "customers", targetId);
+  const auditRef = doc(collection(db, "auditLogs"));
+
+  return runTransaction(db, async (transaction) => {
+    const currentSnapshot = await transaction.get(currentRef);
+    if (!currentSnapshot.exists() || currentSnapshot.data().deleted === true) {
+      throw new Error("El cliente dejó de estar disponible. Actualizá el listado.");
+    }
+    const stored = currentSnapshot.data();
+    let targetSnapshot = currentSnapshot;
+    if (targetId !== currentCustomer.id) {
+      targetSnapshot = await transaction.get(targetRef);
+      if (targetSnapshot.exists() && targetSnapshot.data().deleted !== true) {
+        throw new Error("Ya existe otro cliente con ese teléfono.");
+      }
+    }
+
+    const changedFields = [];
+    if (String(stored.name || "") !== draft.name) changedFields.push("name");
+    if (String(stored.phoneNormalized || "") !== draft.phoneNormalized || String(stored.phone || "") !== draft.phone) changedFields.push("phone");
+    if (String(stored.zoneId || "") !== draft.zoneId || String(stored.zoneName || "") !== draft.zoneName || String(stored.customZone || "") !== draft.customZone) changedFields.push("zone");
+
+    const payload = {
+      customerKey: targetId,
+      phone: draft.phone,
+      phoneNormalized: draft.phoneNormalized,
+      name: draft.name || null,
+      zoneId: draft.zoneId || null,
+      zoneName: draft.zoneName,
+      customZone: draft.customZone || null,
+      active: true,
+      deleted: false,
+      source: stored.source || "admin",
+      updatedBy: profile.id,
+      updatedByName: userName(profile),
+      updatedAt: serverTimestamp(),
+    };
+
+    if (targetId === currentCustomer.id) {
+      transaction.set(currentRef, payload, { merge: true });
+    } else {
+      transaction.set(targetRef, {
+        ...payload,
+        createdBy: profile.id,
+        createdByName: userName(profile),
+        createdAt: serverTimestamp(),
+        originalCreatedBy: stored.createdBy || null,
+        originalCreatedByName: stored.createdByName || null,
+        originalCreatedAt: stored.createdAt || null,
+        lastSaleId: stored.lastSaleId || null,
+        lastPurchaseAt: stored.lastPurchaseAt || null,
+        migratedFromCustomerId: currentCustomer.id,
+      }, { merge: true });
+      transaction.set(currentRef, {
+        active: false,
+        deleted: true,
+        movedToCustomerId: targetId,
+        movedAt: serverTimestamp(),
+        updatedBy: profile.id,
+        updatedByName: userName(profile),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    }
+
+    transaction.set(auditRef, customerAudit(profile, {
+      action: "customer.updated",
+      customerId: targetId,
+      changedFields,
+    }));
+    return { id: targetId, changedFields };
+  });
 }
 
 export async function listActiveCustomerZones({ allowOfflineFallback = true } = {}) {

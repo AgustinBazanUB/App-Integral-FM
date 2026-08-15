@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   buildCustomerDraft,
   customerDocumentId,
+  customerWhatsAppUrl,
+  formatPhoneForDisplay,
   matchesCustomerSearch,
   normalizeCustomerPhone,
 } from "../src/gestion/customers/customerDomain.js";
@@ -70,4 +72,21 @@ test("la búsqueda administrativa encuentra teléfono, nombre y zona", () => {
   assert.equal(matchesCustomerSearch(customer, "agustin"), true);
   assert.equal(matchesCustomerSearch(customer, "zona norte"), true);
   assert.equal(matchesCustomerSearch(customer, "sur"), false);
+});
+
+
+test("el teléfono CABA se muestra legible sin alterar la normalización", () => {
+  assert.equal(formatPhoneForDisplay("1157571979"), "11-5757-1979");
+  assert.equal(formatPhoneForDisplay("+54 9 11 5757-1979"), "11-5757-1979");
+  assert.equal(normalizeCustomerPhone("11-5757-1979"), "1157571979");
+});
+
+test("otros teléfonos conservan todos sus dígitos en el formato visible", () => {
+  const normalized = normalizeCustomerPhone("261 555-1234");
+  assert.equal(formatPhoneForDisplay(normalized).replace(/\D/g, ""), normalized);
+});
+
+test("WhatsApp usa numeración internacional sin guiones ni datos adicionales", () => {
+  assert.equal(customerWhatsAppUrl("11-5757-1979"), "https://wa.me/5491157571979");
+  assert.doesNotMatch(customerWhatsAppUrl("11-5757-1979"), /[-?&]/);
 });

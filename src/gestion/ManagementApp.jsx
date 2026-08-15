@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "../router";
 import { AuthProvider, useAuth } from "./AuthContext";
 import ManagementShell from "./ManagementShell";
 import { moduleById, SALES_METRICS_PATH } from "./modules";
+import { managementPageLoaders } from "./routePreload";
 import {
   canAccessAdminPanel,
   canAccessManagementRoute,
@@ -19,26 +20,26 @@ import {
   loadSellerResourcesShared,
 } from "./services/sharedResources";
 
-const AdministrationPage = lazy(() => import("./pages/AdministrationPage"));
-const ActivityPage = lazy(() => import("./pages/ActivityPage"));
-const AuditPage = lazy(() => import("./pages/AuditPage"));
-const GenericModulePage = lazy(() => import("./pages/GenericModulePage"));
-const LoyalCustomersPage = lazy(() => import("./pages/LoyalCustomersPage"));
-const LocationsPage = lazy(() => import("./pages/LocationsPage"));
-const LocationDetailPage = lazy(() => import("./pages/LocationDetailPage"));
-const QuickSalesPage = lazy(() => import("./pages/QuickSalesPage"));
-const SalesMetricsPage = lazy(() => import("./pages/SalesMetricsPage"));
-const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const AdministrationPage = lazy(managementPageLoaders.administration);
+const ActivityPage = lazy(managementPageLoaders.actividad);
+const AuditPage = lazy(managementPageLoaders.audit);
+const GenericModulePage = lazy(managementPageLoaders.generic);
+const LoyalCustomersPage = lazy(managementPageLoaders["loyal-customers"]);
+const LocationsPage = lazy(managementPageLoaders.locations);
+const LocationDetailPage = lazy(managementPageLoaders.locationDetail);
+const QuickSalesPage = lazy(managementPageLoaders["quick-sales"]);
+const SalesMetricsPage = lazy(managementPageLoaders.metrics);
+const SettingsPage = lazy(managementPageLoaders.settings);
 
 const routeIdFromPath = (pathname) =>
   pathname.split("/").filter(Boolean)[1] || "dashboard";
 
 function ModuleFallback() {
   return (
-    <main className="fm-module-transition" aria-live="polite">
+    <section className="fm-module-transition" aria-live="polite">
       <Skeleton lines={5} />
       <span className="sr-only">Preparando módulo</span>
-    </main>
+    </section>
   );
 }
 

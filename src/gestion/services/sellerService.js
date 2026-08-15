@@ -173,6 +173,9 @@ function resolvedCustomerFromSnapshot(snapshot, prepared) {
   if (!prepared) return null;
   if (!snapshot?.exists()) return prepared;
   const stored = snapshot.data();
+  if (stored.deleted === true || stored.active === false) {
+    throw new Error("Este teléfono fue reemplazado en Clientes Fidelizados. Usá el número actualizado.");
+  }
   return {
     id: snapshot.id,
     phone: stored.phone || prepared.phone,

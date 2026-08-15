@@ -434,7 +434,7 @@ service cloud.firestore {
       allow get: if canModule("loyal-customers", "view")
         || (quickSalesPermission("create") && customerKeyShape(customerId));
       allow list: if canModule("loyal-customers", "view");
-      allow create: if (canModule("loyal-customers", "create") && ownsNewRecord())
+      allow create: if ((canModule("loyal-customers", "create") || canModule("loyal-customers", "edit")) && ownsNewRecord())
         || sellerCustomerCreate(customerId);
       allow update: if (canModule("loyal-customers", "edit") && logicalMutation())
         || sellerCustomerUpdate(customerId);
@@ -530,6 +530,9 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && (isAdmin()
+          || (("moduleId" in request.resource.data)
+            && request.resource.data.moduleId == "loyal-customers"
+            && (canModule("loyal-customers", "create") || canModule("loyal-customers", "edit")))
           || (("locationId" in request.resource.data)
             && allowedLocation(request.resource.data.locationId)));
       allow update, delete: if false;

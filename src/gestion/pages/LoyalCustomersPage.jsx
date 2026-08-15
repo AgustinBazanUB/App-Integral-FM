@@ -1,3 +1,4 @@
+
 import { useMemo, useState } from "react";
 import {
   Badge,
@@ -14,12 +15,15 @@ import {
 } from "../../design-system";
 import {
   customerDisplayName,
+  customerWhatsAppUrl,
   customerZoneLabel,
+  formatPhoneForDisplay,
   matchesCustomerSearch,
   normalizeCustomerPhone,
 } from "../customers/customerDomain";
 import { useAuth } from "../AuthContext";
 import { Icon } from "../components/icons";
+import { formatDateTime } from "../formatters";
 import { useAsyncData } from "../hooks";
 import { can } from "../permissions";
 import {
@@ -28,44 +32,71 @@ import {
   saveCustomerFromAdmin,
   saveCustomerZone,
   setCustomerZoneActive,
+  updateCustomerFromAdmin,
 } from "../services/customerService";
 
 const blankCustomer = { phone: "", zoneId: "", customZone: "", name: "" };
 const blankZone = { name: "", order: 0, active: true };
 
-function customerPhone(customer) {
-  return customer.phone || customer.phoneNormalized || customer.title || "Sin teléfono";
+function displayedPhone(customer) {
+  return formatPhoneForDisplay(customer.phoneNormalized || customer.phone || customer.title) || "Sin teléfono";
 }
 
-function CustomersList({ customers }) {
+function customerToForm(customer = {}, zones = []) {
+  const configured = zones.some((zone) => zone.id && zone.id === customer.zoneId);
+  const usesCustom = Boolean(customer.customZone) || (!configured && !customer.zoneId && customer.zoneName);
+  return {
+    phone: customer.phoneNormalized || customer.phone || "",
+    name: customer.name || "",
+    zoneId: usesCustom ? "__custom" : (customer.zoneId || ""),
+    customZone: usesCustom ? (customer.customZone || customer.zoneName || "") : "",
+  };
+}
+
+function CustomersList({ customers, onOpen }) {
   if (!customers.length) {
     return <EmptyState icon="UsersRound" title="No hay clientes para mostrar" description="Los clientes identificados desde una venta aparecerán aquí automáticamente." />;
   }
   return (
     <div className="fm-customers-list">
-      {customers.map((customer) => (
-        <article key={customer.id} className="fm-customer-card">
-          <div className="fm-customer-card__identity">
-            <span className="fm-customer-card__icon"><Icon name="UserRound" /></span>
-            <div>
-              {customer.name ? <strong>{customerDisplayName(customer)}</strong> : null}
-              <b>{customerPhone(customer)}</b>
-              {customerZoneLabel(customer) ? <span><Icon name="MapPin" />{customerZoneLabel(customer)}</span> : null}
+      {customers.map((customer) => {
+        const phone = displayedPhone(customer);
+        const whatsappUrl = customerWhatsAppUrl(customer.phoneNormalized || customer.phone);
+        return (
+          <article key={customer.id} className="fm-customer-card">
+            <button type="button" className="fm-customer-card__open" onClick={() => onOpen(customer)} aria-label={`Abrir detalle de ${customerDisplayName(customer)}`} />
+            <div className="fm-customer-card__identity">
+              <span className="fm-customer-card__icon"><Icon name="UserRound" /></span>
+              <div>
+                {customer.name ? <strong>{customerDisplayName(customer)}</strong> : null}
+                {whatsappUrl ? (
+                  <a
+                    className="fm-customer-phone-link"
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Abrir WhatsApp con ${phone}`}
+                    onClick={(event) => event.stopPropagation()}
+                  ><Icon name="MessagesSquare" /><b>{phone}</b></a>
+                ) : <b>{phone}</b>}
+                {customerZoneLabel(customer) ? <span><Icon name="MapPin" />{customerZoneLabel(customer)}</span> : null}
+              </div>
             </div>
-          </div>
-          <Badge tone={customer.active === false ? "neutral" : "success"}>
-            {customer.active === false ? "Inactivo" : "Activo"}
-          </Badge>
-        </article>
-      ))}
+            <Badge tone={customer.active === false ? "neutral" : "success"}>
+              {customer.active === false ? "Inactivo" : "Activo"}
+            </Badge>
+          </article>
+        );
+      })}
     </div>
   );
 }
 
 export default function LoyalCustomersPage() {
   const { profile } = useAuth();
-  const canCreateCustomers = can(profile, "loyal-customers", "create") || can(profile, "loyal-customers", "edit");
-  const canManageZones = can(profile, "loyal-customers", "edit") || can(profile, "loyal-customers", "admin");
+  const canEditCustomers = can(profile, "loyal-customers", "edit");
+  const canCreateCustomers = can(profile, "loyal-customers", "create") || canEditCustomers;
+  const canManageZones = canEditCustomers || can(profile, "loyal-customers", "admin");
   const customersResult = useAsyncData(() => listCustomers(profile, 250), [profile.id]);
   const zonesResult = useAsyncData(() => listCustomerZones(profile), [profile.id]);
   const [tab, setTab] = useState("customers");
@@ -74,6 +105,11 @@ export default function LoyalCustomersPage() {
   const [customerForm, setCustomerForm] = useState(blankCustomer);
   const [customerBusy, setCustomerBusy] = useState(false);
   const [customerError, setCustomerError] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [editingCustomer, setEditingCustomer] = useState(false);
+  const [detailForm, setDetailForm] = useState(blankCustomer);
+  const [detailBusy, setDetailBusy] = useState(false);
+  const [detailError, setDetailError] = useState("");
   const [zoneOpen, setZoneOpen] = useState(false);
   const [zoneForm, setZoneForm] = useState(blankZone);
   const [editingZoneId, setEditingZoneId] = useState("");
@@ -118,6 +154,51 @@ export default function LoyalCustomersPage() {
     }
   };
 
+  const openCustomer = (customer) => {
+    setSelectedCustomer(customer);
+    setDetailForm(customerToForm(customer, zones));
+    setEditingCustomer(false);
+    setDetailError("");
+  };
+
+  const closeCustomer = () => {
+    if (detailBusy) return;
+    setSelectedCustomer(null);
+    setEditingCustomer(false);
+    setDetailError("");
+  };
+
+  const startCustomerEdit = () => {
+    setDetailForm(customerToForm(selectedCustomer, zones));
+    setDetailError("");
+    setEditingCustomer(true);
+  };
+
+  const saveCustomerEdit = async () => {
+    if (!selectedCustomer) return;
+    setDetailBusy(true);
+    setDetailError("");
+    try {
+      const selectedZone = zones.find((zone) => zone.id === detailForm.zoneId);
+      const result = await updateCustomerFromAdmin(profile, selectedCustomer, {
+        phone: detailForm.phone,
+        name: detailForm.name,
+        zoneId: selectedZone?.id || "",
+        zoneName: selectedZone?.name || "",
+        customZone: detailForm.zoneId === "__custom" ? detailForm.customZone : "",
+      });
+      const refreshed = await customersResult.refresh();
+      const updated = (refreshed || []).find((customer) => customer.id === result.id);
+      setSelectedCustomer(updated || { ...selectedCustomer, id: result.id, phone: detailForm.phone, phoneNormalized: normalizeCustomerPhone(detailForm.phone), name: detailForm.name, zoneId: selectedZone?.id || "", zoneName: selectedZone?.name || detailForm.customZone, customZone: detailForm.zoneId === "__custom" ? detailForm.customZone : "" });
+      setEditingCustomer(false);
+      setMessage("Cliente actualizado.");
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setDetailBusy(false);
+    }
+  };
+
   const openNewZone = () => {
     setEditingZoneId("");
     setZoneForm(blankZone);
@@ -157,6 +238,10 @@ export default function LoyalCustomersPage() {
     }
   };
 
+  const detailPhone = selectedCustomer ? displayedPhone(selectedCustomer) : "";
+  const detailWhatsapp = selectedCustomer ? customerWhatsAppUrl(selectedCustomer.phoneNormalized || selectedCustomer.phone) : "";
+  const historicalZone = selectedCustomer?.zoneId ? zones.find((zone) => zone.id === selectedCustomer.zoneId && zone.active === false) : null;
+
   return (
     <div className="fm-page fm-customers-page">
       <PageHeader
@@ -194,11 +279,11 @@ export default function LoyalCustomersPage() {
               onChange={(event) => setSearch(event.target.value)}
               autoComplete="off"
             />
-            {search && normalizeCustomerPhone(search) ? <small>Teléfono normalizado: {normalizeCustomerPhone(search)}</small> : null}
+            {search && normalizeCustomerPhone(search) ? <small>Teléfono normalizado: {formatPhoneForDisplay(normalizeCustomerPhone(search))}</small> : null}
           </div>
           {customersResult.status === "loading" ? <Skeleton lines={6} /> : null}
           {customersResult.status === "error" ? <Toast tone="error">{customersResult.error.message}</Toast> : null}
-          {customersResult.status === "ready" ? <CustomersList customers={filteredCustomers} /> : null}
+          {customersResult.status === "ready" ? <CustomersList customers={filteredCustomers} onOpen={openCustomer} /> : null}
         </Panel>
       ) : (
         <Panel
@@ -226,6 +311,37 @@ export default function LoyalCustomersPage() {
       )}
 
       <Modal
+        open={Boolean(selectedCustomer)}
+        onClose={closeCustomer}
+        title={editingCustomer ? "Editar cliente" : "Detalle del cliente"}
+        description={editingCustomer ? "Los cambios se guardan únicamente al confirmar." : "Datos principales del cliente fidelizado."}
+        footer={selectedCustomer ? <div className="fm-dialog-actions">
+          {editingCustomer ? <><Button variant="secondary" disabled={detailBusy} onClick={() => { setEditingCustomer(false); setDetailError(""); }}>Cancelar</Button><Button icon="Save" loading={detailBusy} onClick={saveCustomerEdit}>Guardar cambios</Button></> : <><Button variant="secondary" onClick={closeCustomer}>Cerrar</Button>{canEditCustomers ? <Button icon="Settings2" onClick={startCustomerEdit}>Editar</Button> : null}</>}
+        </div> : null}
+      >
+        {selectedCustomer ? editingCustomer ? (
+          <div className="fm-customer-form fm-customer-detail-form">
+            <FormField label="Nombre (opcional)"><input autoComplete="name" value={detailForm.name} onChange={(event) => setDetailForm((current) => ({ ...current, name: event.target.value }))} /></FormField>
+            <FormField label="Teléfono" required hint="Se valida contra la base antes de guardar para evitar duplicados."><input type="tel" inputMode="tel" autoComplete="tel" value={detailForm.phone} onChange={(event) => setDetailForm((current) => ({ ...current, phone: event.target.value }))} /></FormField>
+            <FormField label="Zona" required><select value={detailForm.zoneId} onChange={(event) => setDetailForm((current) => ({ ...current, zoneId: event.target.value }))}><option value="">Elegir zona</option>{activeZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}{historicalZone ? <option value={historicalZone.id}>{historicalZone.name} (inactiva · actual)</option> : null}<option value="__custom">Otra zona</option></select></FormField>
+            {detailForm.zoneId === "__custom" ? <FormField label="Otra zona" required><input value={detailForm.customZone} onChange={(event) => setDetailForm((current) => ({ ...current, customZone: event.target.value }))} /></FormField> : null}
+            {detailError ? <Toast tone="error">{detailError}</Toast> : null}
+          </div>
+        ) : (
+          <div className="fm-customer-detail">
+            <div className="fm-customer-detail__hero"><span className="fm-customer-card__icon"><Icon name="UserRound" /></span><div><small>Cliente</small><strong>{customerDisplayName(selectedCustomer)}</strong></div></div>
+            <dl>
+              <div><dt>Teléfono</dt><dd>{detailWhatsapp ? <a href={detailWhatsapp} target="_blank" rel="noopener noreferrer" aria-label={`Abrir WhatsApp con ${detailPhone}`}><Icon name="MessagesSquare" />{detailPhone}</a> : detailPhone}</dd></div>
+              <div><dt>Zona</dt><dd>{customerZoneLabel(selectedCustomer) || "Sin zona"}</dd></div>
+              {selectedCustomer.createdAt ? <div><dt>Alta</dt><dd>{formatDateTime(selectedCustomer.createdAt)}</dd></div> : null}
+              {selectedCustomer.lastPurchaseAt ? <div><dt>Última compra</dt><dd>{formatDateTime(selectedCustomer.lastPurchaseAt)}</dd></div> : null}
+              {selectedCustomer.updatedAt ? <div><dt>Última actualización</dt><dd>{formatDateTime(selectedCustomer.updatedAt)}</dd></div> : null}
+            </dl>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
         open={customerOpen}
         onClose={() => !customerBusy && setCustomerOpen(false)}
         title="Nuevo cliente"
@@ -233,16 +349,8 @@ export default function LoyalCustomersPage() {
         footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={() => setCustomerOpen(false)}>Cancelar</Button><Button icon="Save" loading={customerBusy} onClick={saveCustomer}>Guardar</Button></div>}
       >
         <div className="fm-customer-form">
-          <FormField label="Teléfono" required hint="Se usa para evitar clientes duplicados aunque cambie el formato escrito.">
-            <input type="tel" inputMode="tel" autoComplete="tel" value={customerForm.phone} onChange={(event) => setCustomerForm((current) => ({ ...current, phone: event.target.value }))} />
-          </FormField>
-          <FormField label="Zona" required>
-            <select value={customerForm.zoneId} onChange={(event) => setCustomerForm((current) => ({ ...current, zoneId: event.target.value }))}>
-              <option value="">Elegir zona</option>
-              {activeZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}
-              <option value="__custom">Otra zona</option>
-            </select>
-          </FormField>
+          <FormField label="Teléfono" required hint="Se usa para evitar clientes duplicados aunque cambie el formato escrito."><input type="tel" inputMode="tel" autoComplete="tel" value={customerForm.phone} onChange={(event) => setCustomerForm((current) => ({ ...current, phone: event.target.value }))} /></FormField>
+          <FormField label="Zona" required><select value={customerForm.zoneId} onChange={(event) => setCustomerForm((current) => ({ ...current, zoneId: event.target.value }))}><option value="">Elegir zona</option>{activeZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}<option value="__custom">Otra zona</option></select></FormField>
           {customerForm.zoneId === "__custom" ? <FormField label="Nueva zona" required><input value={customerForm.customZone} onChange={(event) => setCustomerForm((current) => ({ ...current, customZone: event.target.value }))} /></FormField> : null}
           <FormField label="Nombre (opcional)"><input autoComplete="name" value={customerForm.name} onChange={(event) => setCustomerForm((current) => ({ ...current, name: event.target.value }))} /></FormField>
           {customerError ? <Toast tone="error">{customerError}</Toast> : null}
