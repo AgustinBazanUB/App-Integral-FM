@@ -93,3 +93,7 @@ No enviar ni almacenar en Flor Mía: cookies, tokens, contraseñas, QR, localSto
 ## Frecuencia de progreso
 
 La extensión puede informar progreso tantas veces como sea útil, siempre con `sequence` creciente. La Web-App actualiza los contadores del documento principal, pero sólo crea un evento/auditoría cuando cambia el estado operativo (inicio/reanudación, pausa, finalización, error o cancelación), evitando ruido y escrituras innecesarias.
+
+## Estado de implementación de la Web-App
+
+El lado Flor Mía de este contrato está implementado en la ruta `/gestion/marketing/whatsapp`. La versión web valida el origen, versión y schema de los mensajes, transfiere imágenes únicamente en memoria, persiste sólo metadatos y snapshots de destinatarios en subcolecciones, y rechaza preparar una campaña mientras la extensión no informe estado `operational: true`.
