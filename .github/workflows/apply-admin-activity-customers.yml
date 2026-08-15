@@ -25,7 +25,9 @@ jobs:
           cache: npm
 
       - name: Apply requested changes
-        run: python .github/scripts/apply-admin-activity-customers.py
+        run: |
+          python .github/scripts/apply-admin-activity-customers.py
+          python .github/scripts/patch-admin-stage-tests.py
 
       - name: Install dependencies
         run: npm ci
