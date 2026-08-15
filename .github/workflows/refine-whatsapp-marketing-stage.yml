@@ -1,0 +1,41 @@
+name: Refine WhatsApp Marketing Stage
+
+on:
+  push:
+    branches:
+      - agent/rendimiento-vendedor-clientes
+    paths:
+      - .github/workflows/refine-whatsapp-marketing-stage.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refine-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rendimiento-vendedor-clientes
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Apply refinements
+        run: python scripts/refine_whatsapp_marketing_stage.py
+      - name: Unit and integration tests
+        run: npm test
+      - name: Firestore rules tests
+        run: npx firebase-tools@14.12.0 emulators:exec --only firestore --project demo-flor-mia-integral "npm run test:rules"
+      - name: Production build
+        run: npm run build
+      - name: Commit validated refinements
+        run: |
+          git config user.name "AgustinBazanUB"
+          git config user.email "167490338+AgustinBazanUB@users.noreply.github.com"
+          git rm scripts/refine_whatsapp_marketing_stage.py .github/workflows/refine-whatsapp-marketing-stage.yml
+          git add -A
+          git commit -m "[skip netlify] Endurecer permisos y UX de campañas WhatsApp"
+          git push origin HEAD:agent/rendimiento-vendedor-clientes
