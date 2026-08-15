@@ -267,22 +267,33 @@ service cloud.firestore {
         ])
         && linkedSellerCustomer(customerId);
     }
+    function whatsappDenied(action) {
+      let user = profile();
+      return ("permissionDeny" in user)
+        && ("marketing" in user.permissionDeny)
+        && (user.permissionDeny.marketing is list)
+        && action in user.permissionDeny.marketing;
+    }
     function whatsappCanView() {
-      return canModule("marketing", "whatsappView")
-        || canModule("marketing", "whatsappViewHistory")
-        || canModule("marketing", "view");
+      return activeUser() && (
+        (!whatsappDenied("whatsappView") && canModule("marketing", "whatsappView"))
+        || (!whatsappDenied("whatsappViewHistory") && canModule("marketing", "whatsappViewHistory"))
+      );
     }
     function whatsappCanCreate() {
-      return canModule("marketing", "whatsappCreateCampaign")
-        || canModule("marketing", "create");
+      return activeUser()
+        && !whatsappDenied("whatsappCreateCampaign")
+        && canModule("marketing", "whatsappCreateCampaign");
     }
     function whatsappCanSend() {
-      return canModule("marketing", "whatsappSendToExtension")
-        || canModule("marketing", "edit");
+      return activeUser()
+        && !whatsappDenied("whatsappSendToExtension")
+        && canModule("marketing", "whatsappSendToExtension");
     }
     function whatsappCanCancel() {
-      return canModule("marketing", "whatsappCancelCampaign")
-        || canModule("marketing", "edit");
+      return activeUser()
+        && !whatsappDenied("whatsappCancelCampaign")
+        && canModule("marketing", "whatsappCancelCampaign");
     }
     function whatsappStatus(value) {
       return value in ["draft", "ready", "running", "paused", "completed", "error", "cancelled"];
@@ -318,6 +329,35 @@ service cloud.firestore {
         && data.source in ["flor_mia", "excel"]
         && data.status in ["pending", "running", "completed", "error"]
         && !data.keys().hasAny(["cookies", "token", "password", "imageData", "imageBase64"]);
+    }
+    function whatsappCreateCampaignUpdate() {
+      return whatsappCanCreate()
+        && request.resource.data.status in ["draft", "ready"]
+        && request.resource.data.sentCount == 0
+        && request.resource.data.errorCount == 0
+        && request.resource.data.progressPercentage == 0
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "name", "filters", "message", "imageCount", "imageNames", "imageOrder",
+          "imageMetadata", "totalRecipients", "sentCount", "errorCount",
+          "progressPercentage", "status", "snapshotState", "preparedAt",
+          "updatedBy", "updatedByName", "updatedAt"
+        ]);
+    }
+    function whatsappExtensionCampaignUpdate() {
+      return whatsappCanSend()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "status", "sentCount", "errorCount", "progressPercentage",
+          "lastExtensionSequence", "lastExtensionUpdateAt", "startedAt", "finishedAt",
+          "extensionErrorCode", "extensionErrorMessage", "deliveredToExtensionAt",
+          "cancelledAt", "cancelledBy", "updatedBy", "updatedByName", "updatedAt"
+        ]);
+    }
+    function whatsappCancelCampaignUpdate() {
+      return whatsappCanCancel()
+        && request.resource.data.status == "cancelled"
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "status", "cancelledAt", "cancelledBy", "finishedAt", "updatedAt"
+        ]);
     }
 
     match /users/{uid} {
@@ -562,15 +602,23 @@ service cloud.firestore {
       allow create: if whatsappCanCreate()
         && ownsNewRecord()
         && validWhatsappCampaign(request.resource.data);
-      allow update: if (whatsappCanCreate() || whatsappCanSend() || whatsappCanCancel())
-        && request.resource.data.createdBy == resource.data.createdBy
-        && validWhatsappCampaign(request.resource.data);
+      allow update: if request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.source == resource.data.source
+        && validWhatsappCampaign(request.resource.data)
+        && (whatsappCreateCampaignUpdate() || whatsappExtensionCampaignUpdate() || whatsappCancelCampaignUpdate());
       allow delete: if false;
       match /recipients/{recipientId} {
         allow get, list: if whatsappCanView();
-        allow create, update: if (whatsappCanCreate() || whatsappCanSend())
+        allow create: if whatsappCanCreate()
+          && get(/databases/$(database)/documents/whatsappCampaigns/$(campaignId)).data.status == "draft"
           && validWhatsappRecipient(request.resource.data);
-        allow delete: if whatsappCanCreate();
+        allow update: if whatsappCanSend()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "status", "updatedAt", "errorCode", "errorMessage"
+          ])
+          && validWhatsappRecipient(request.resource.data);
+        allow delete: if whatsappCanCreate()
+          && get(/databases/$(database)/documents/whatsappCampaigns/$(campaignId)).data.status == "draft";
       }
       match /events/{eventId} {
         allow get, list: if whatsappCanView();

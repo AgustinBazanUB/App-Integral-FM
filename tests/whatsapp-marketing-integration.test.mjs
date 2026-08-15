@@ -55,3 +55,26 @@ test("permisos WhatsApp están integrados al módulo marketing", async () => {
     assert.match(permissions, new RegExp(action));
   }
 });
+
+
+test("WhatsApp no hereda permisos genéricos de create/edit y el Excel tiene vista previa", async () => {
+  const [service, page, generic] = await Promise.all([
+    read("src/gestion/marketing/whatsapp/campaignService.js"),
+    read("src/gestion/pages/WhatsAppCampaignsPage.jsx"),
+    read("src/gestion/pages/GenericModulePage.jsx"),
+  ]);
+  assert.doesNotMatch(service, /whatsappCreateCampaign[^\n]+marketing\", \"create/);
+  assert.doesNotMatch(service, /whatsappSendToExtension[^\n]+marketing\", \"edit/);
+  assert.match(page, /fm-wa-excel-preview/);
+  assert.match(generic, /whatsappView/);
+});
+
+test("progreso repetido no crea auditoría en cada tick y existe evento started explícito", async () => {
+  const [service, bridge] = await Promise.all([
+    read("src/gestion/marketing/whatsapp/campaignService.js"),
+    read("src/gestion/marketing/whatsapp/extensionBridge.js"),
+  ]);
+  assert.match(service, /const statusChanged = current\.status !== status/);
+  assert.match(service, /if \(statusChanged\)/);
+  assert.match(bridge, /FLORMIA_CAMPAIGN_STARTED/);
+});

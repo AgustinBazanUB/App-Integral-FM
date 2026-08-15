@@ -8,6 +8,7 @@ export const EXTENSION_MESSAGE_TYPES = Object.freeze({
   status: "FLORMIA_EXTENSION_STATUS",
   prepare: "FLORMIA_CAMPAIGN_PREPARE",
   accepted: "FLORMIA_CAMPAIGN_ACCEPTED",
+  started: "FLORMIA_CAMPAIGN_STARTED",
   progress: "FLORMIA_CAMPAIGN_PROGRESS",
   paused: "FLORMIA_CAMPAIGN_PAUSED",
   completed: "FLORMIA_CAMPAIGN_COMPLETED",
@@ -19,6 +20,7 @@ export const EXTENSION_MESSAGE_TYPES = Object.freeze({
 const inboundTypes = new Set([
   EXTENSION_MESSAGE_TYPES.status,
   EXTENSION_MESSAGE_TYPES.accepted,
+  EXTENSION_MESSAGE_TYPES.started,
   EXTENSION_MESSAGE_TYPES.progress,
   EXTENSION_MESSAGE_TYPES.paused,
   EXTENSION_MESSAGE_TYPES.completed,
@@ -27,6 +29,7 @@ const inboundTypes = new Set([
 ]);
 
 const campaignEventTypes = new Set([
+  EXTENSION_MESSAGE_TYPES.started,
   EXTENSION_MESSAGE_TYPES.progress,
   EXTENSION_MESSAGE_TYPES.paused,
   EXTENSION_MESSAGE_TYPES.completed,

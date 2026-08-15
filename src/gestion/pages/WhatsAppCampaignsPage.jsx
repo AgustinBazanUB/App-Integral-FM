@@ -122,8 +122,8 @@ function CampaignWizard({ profile, extensionStatus, refreshExtension, initialCam
   const [notice, setNotice] = useState("");
   const imageRef = useRef([]);
 
-  const canImport = can(profile, "marketing", "whatsappImportExcel") || can(profile, "marketing", "create");
-  const canSend = can(profile, "marketing", "whatsappSendToExtension") || can(profile, "marketing", "edit");
+  const canImport = can(profile, "marketing", "whatsappImportExcel");
+  const canSend = can(profile, "marketing", "whatsappSendToExtension");
 
   useEffect(() => {
     imageRef.current = images;
@@ -355,7 +355,7 @@ function CampaignWizard({ profile, extensionStatus, refreshExtension, initialCam
         </Panel>
 
         {canImport ? <Panel title="Importar desde Excel" description="El archivo se procesa localmente y no se sube a Firebase.">
-          <div className="fm-wa-excel"><label className="fm-wa-file"><span>Seleccionar .xlsx</span><input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => importExcel(event.target.files?.[0])} /></label>{excelSheet ? <><p><strong>{excelSheet.fileName}</strong> · {excelSheet.rows.length} filas detectadas</p><div className="fm-wa-mapping">{[["phone","Teléfono *"],["name","Nombre"],["zone","Zona"],["category","Categoría"],["notes","Observaciones"]].map(([field,label]) => <label key={field}><span>{label}</span><select value={excelMapping[field]} onChange={(event) => setExcelMapping((current) => ({ ...current, [field]: event.target.value }))}><option value="">Sin mapear</option>{excelSheet.headers.map((header) => <option key={header} value={header}>{header}</option>)}</select></label>)}</div><Button variant="secondary" onClick={confirmExcel}>Confirmar importación</Button></> : null}</div>
+          <div className="fm-wa-excel"><label className="fm-wa-file"><span>Seleccionar .xlsx</span><input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => importExcel(event.target.files?.[0])} /></label>{excelSheet ? <><p><strong>{excelSheet.fileName}</strong> · {excelSheet.rows.length} filas detectadas</p><div className="fm-wa-mapping">{[["phone","Teléfono *"],["name","Nombre"],["zone","Zona"],["category","Categoría"],["notes","Observaciones"]].map(([field,label]) => <label key={field}><span>{label}</span><select value={excelMapping[field]} onChange={(event) => setExcelMapping((current) => ({ ...current, [field]: event.target.value }))}><option value="">Sin mapear</option>{excelSheet.headers.map((header) => <option key={header} value={header}>{header}</option>)}</select></label>)}</div><div className="fm-wa-excel-preview" aria-label="Vista previa del Excel"><table><thead><tr>{excelSheet.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{excelSheet.rows.slice(0, 5).map((row, rowIndex) => <tr key={rowIndex}>{excelSheet.headers.map((header, columnIndex) => <td key={`${rowIndex}-${header}`}>{row[columnIndex] == null ? "" : String(row[columnIndex])}</td>)}</tr>)}</tbody></table><small>Vista previa de hasta 5 filas. El archivo permanece solamente en tu navegador.</small></div><Button variant="secondary" onClick={confirmExcel}>Confirmar importación</Button></> : null}</div>
         </Panel> : null}
 
         <Panel title={`Destinatarios seleccionados: ${recipients.length}`} description="Un mismo teléfono normalizado aparece una sola vez; Flor Mía tiene prioridad sobre Excel.">
@@ -405,7 +405,7 @@ function CampaignDetail({ campaign, profile, onClose, onContinue, onChanged }) {
       onClose();
     } catch (cause) { setError(cause.message); } finally { setBusy(false); }
   };
-  const canCancel = can(profile, "marketing", "whatsappCancelCampaign") || can(profile, "marketing", "edit");
+  const canCancel = can(profile, "marketing", "whatsappCancelCampaign");
   return <Modal open onClose={onClose} title={campaign.name} description="Detalle de campaña de WhatsApp" footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={onClose}>Cerrar</Button>{campaign.status === "draft" ? <Button onClick={onContinue}>Continuar borrador</Button> : null}{canCancel && ["draft","ready","running","paused"].includes(campaign.status) ? <Button variant="secondary" loading={busy} onClick={cancel}>Cancelar campaña</Button> : null}</div>}>
     {error ? <Toast tone="error">{error}</Toast> : null}
     <dl className="fm-wa-review"><div><dt>Estado</dt><dd><Badge tone={CAMPAIGN_STATUS_TONES[campaign.status] || "neutral"}>{CAMPAIGN_STATUS_LABELS[campaign.status] || campaign.status}</Badge></dd></div><div><dt>Creador</dt><dd>{campaign.createdByName || campaign.createdBy}</dd></div><div><dt>Fecha</dt><dd>{formatDateTime(campaign.createdAt)}</dd></div><div><dt>Destinatarios</dt><dd>{campaign.totalRecipients || 0}</dd></div><div><dt>Enviados</dt><dd>{campaign.sentCount || 0} · {campaign.progressPercentage || 0}%</dd></div><div><dt>Errores</dt><dd>{campaign.errorCount || 0}{campaign.extensionErrorMessage ? ` · ${campaign.extensionErrorMessage}` : ""}</dd></div><div><dt>Segmentación</dt><dd>{Object.entries(campaign.filters || {}).filter(([,value]) => value).map(([key,value]) => `${key}: ${value}`).join(" · ") || "Sin filtros guardados"}</dd></div><div><dt>Mensaje</dt><dd className="fm-wa-review-message">{campaign.message || "Sin texto"}</dd></div><div><dt>Imágenes</dt><dd>{(campaign.imageMetadata || []).map((image) => `${image.order}. ${image.name}`).join(" · ") || "Sin imágenes persistidas"}</dd></div><div><dt>Inicio / fin</dt><dd>{campaign.startedAt ? formatDateTime(campaign.startedAt) : "—"} / {campaign.finishedAt ? formatDateTime(campaign.finishedAt) : "—"}</dd></div></dl>
@@ -425,7 +425,7 @@ export default function WhatsAppCampaignsPage() {
   const [wizard, setWizard] = useState(null);
   const [detail, setDetail] = useState(null);
 
-  const canCreate = can(profile, "marketing", "whatsappCreateCampaign") || can(profile, "marketing", "create");
+  const canCreate = can(profile, "marketing", "whatsappCreateCampaign");
 
   const refreshExtension = async () => {
     setExtensionBusy(true);
@@ -461,7 +461,7 @@ export default function WhatsAppCampaignsPage() {
           extensionVersion: message.payload.extensionVersion || "",
         });
       }
-      if ([EXTENSION_MESSAGE_TYPES.progress, EXTENSION_MESSAGE_TYPES.paused, EXTENSION_MESSAGE_TYPES.completed, EXTENSION_MESSAGE_TYPES.error, EXTENSION_MESSAGE_TYPES.cancelled].includes(message.type)) {
+      if ([EXTENSION_MESSAGE_TYPES.started, EXTENSION_MESSAGE_TYPES.progress, EXTENSION_MESSAGE_TYPES.paused, EXTENSION_MESSAGE_TYPES.completed, EXTENSION_MESSAGE_TYPES.error, EXTENSION_MESSAGE_TYPES.cancelled].includes(message.type)) {
         window.setTimeout(() => loadCampaigns(), 350);
       }
     });

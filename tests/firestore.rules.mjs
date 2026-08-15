@@ -47,6 +47,12 @@ before(async () => {
         active: true,
         allowedLocationIds: ["loc-1"],
       }),
+      setDoc(doc(database, "users", "marketing-denied"), {
+        name: "Marketing restringido",
+        role: "marketing_manager",
+        active: true,
+        permissionDeny: { marketing: ["whatsappSendToExtension"] },
+      }),
       setDoc(doc(database, "locations", "loc-1"), {
         name: "Ubicación autorizada",
         active: true,
@@ -418,3 +424,36 @@ test("destinatarios WhatsApp viven en subcolección protegida", async () => {
   await assertFails(getDoc(doc(sellerDb, "whatsappCampaigns", "wa-1", "recipients", "recipient_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")));
 });
 
+
+test("reglas respetan denegación específica de envío WhatsApp", async () => {
+  const database = environment.authenticatedContext("marketing-denied").firestore();
+  const campaignRef = doc(database, "whatsappCampaigns", "wa-denied");
+  await assertSucceeds(setDoc(campaignRef, {
+    name: "Borrador restringido",
+    source: "whatsapp",
+    filters: {},
+    message: "Hola",
+    imageCount: 0,
+    imageNames: [],
+    imageOrder: [],
+    imageMetadata: [],
+    totalRecipients: 0,
+    sentCount: 0,
+    errorCount: 0,
+    progressPercentage: 0,
+    status: "draft",
+    snapshotState: "draft",
+    active: true,
+    deleted: false,
+    createdBy: "marketing-denied",
+    createdByName: "Marketing restringido",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
+  await assertFails(updateDoc(campaignRef, {
+    status: "running",
+    lastExtensionSequence: 1,
+    lastExtensionUpdateAt: new Date(),
+    updatedAt: new Date(),
+  }));
+});

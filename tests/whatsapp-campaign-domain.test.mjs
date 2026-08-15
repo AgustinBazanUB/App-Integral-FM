@@ -71,3 +71,18 @@ test("progreso deriva porcentaje sin superar 100", () => {
   assert.equal(progressPercentage(487, 240), 49);
   assert.equal(progressPercentage(10, 99), 100);
 });
+
+
+import { can } from "../src/gestion/permissions.js";
+
+test("permissionDeny específico bloquea envío aunque el rol pueda editar Marketing", () => {
+  const profile = {
+    id: "marketing-1",
+    active: true,
+    role: "marketing_manager",
+    permissionDeny: { marketing: ["whatsappSendToExtension"] },
+  };
+  assert.equal(can(profile, "marketing", "edit"), true);
+  assert.equal(can(profile, "marketing", "whatsappSendToExtension"), false);
+  assert.equal(can(profile, "marketing", "whatsappCreateCampaign"), true);
+});

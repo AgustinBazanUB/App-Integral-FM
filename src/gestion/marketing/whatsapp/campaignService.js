@@ -38,19 +38,19 @@ function profileName(profile = {}) {
 }
 
 function canView(profile) {
-  return can(profile, "marketing", "whatsappView") || can(profile, "marketing", "whatsappViewHistory") || can(profile, "marketing", "view");
+  return can(profile, "marketing", "whatsappView") || can(profile, "marketing", "whatsappViewHistory");
 }
 
 function canCreate(profile) {
-  return can(profile, "marketing", "whatsappCreateCampaign") || can(profile, "marketing", "create");
+  return can(profile, "marketing", "whatsappCreateCampaign");
 }
 
 function canSend(profile) {
-  return can(profile, "marketing", "whatsappSendToExtension") || can(profile, "marketing", "edit");
+  return can(profile, "marketing", "whatsappSendToExtension");
 }
 
 function canCancel(profile) {
-  return can(profile, "marketing", "whatsappCancelCampaign") || can(profile, "marketing", "edit");
+  return can(profile, "marketing", "whatsappCancelCampaign");
 }
 
 function campaignAudit(profile, action, campaignId, title, description) {
@@ -297,6 +297,7 @@ export async function recordCampaignDeliveredToExtension(profile, campaignId) {
 }
 
 const extensionStatusByType = {
+  [EXTENSION_MESSAGE_TYPES.started]: "running",
   [EXTENSION_MESSAGE_TYPES.progress]: "running",
   [EXTENSION_MESSAGE_TYPES.paused]: "paused",
   [EXTENSION_MESSAGE_TYPES.completed]: "completed",
@@ -305,6 +306,7 @@ const extensionStatusByType = {
 };
 
 const actionByType = {
+  [EXTENSION_MESSAGE_TYPES.started]: "whatsappCampaign.running",
   [EXTENSION_MESSAGE_TYPES.progress]: "whatsappCampaign.running",
   [EXTENSION_MESSAGE_TYPES.paused]: "whatsappCampaign.paused",
   [EXTENSION_MESSAGE_TYPES.completed]: "whatsappCampaign.completed",
@@ -347,18 +349,21 @@ export async function applyExtensionCampaignEvent(profile, message) {
       ...(status === "cancelled" ? { cancelledAt: serverTimestamp(), cancelledBy: profile.id } : {}),
     };
     transaction.set(campaignRef, update, { merge: true });
-    transaction.set(eventRef, {
-      type: message.type,
-      label: CAMPAIGN_STATUS_LABELS[status],
-      sequence: update.lastExtensionSequence,
-      sentCount: counters.sent,
-      errorCount: counters.errors,
-      progressPercentage: counters.progress,
-      message: status === "error" ? update.extensionErrorMessage : null,
-      createdAt: serverTimestamp(),
-    });
-    transaction.set(auditRef, campaignAudit(profile, actionByType[message.type], message.campaignId, `Campaña de WhatsApp ${CAMPAIGN_STATUS_LABELS[status].toLocaleLowerCase("es")}`, `Progreso reportado: ${counters.sent}/${counters.total}.`));
-    return { ignored: false, status, ...counters };
+    const statusChanged = current.status !== status;
+    if (statusChanged) {
+      transaction.set(eventRef, {
+        type: message.type,
+        label: CAMPAIGN_STATUS_LABELS[status],
+        sequence: update.lastExtensionSequence,
+        sentCount: counters.sent,
+        errorCount: counters.errors,
+        progressPercentage: counters.progress,
+        message: status === "error" ? update.extensionErrorMessage : null,
+        createdAt: serverTimestamp(),
+      });
+      transaction.set(auditRef, campaignAudit(profile, actionByType[message.type], message.campaignId, `Campaña de WhatsApp ${CAMPAIGN_STATUS_LABELS[status].toLocaleLowerCase("es")}`, `Progreso reportado: ${counters.sent}/${counters.total}.`));
+    }
+    return { ignored: false, status, statusChanged, ...counters };
   });
 }
 

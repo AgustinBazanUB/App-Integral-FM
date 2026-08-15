@@ -24,6 +24,7 @@ Web → extensión:
 Extensión → Web:
 - `FLORMIA_EXTENSION_STATUS`
 - `FLORMIA_CAMPAIGN_ACCEPTED`
+- `FLORMIA_CAMPAIGN_STARTED`
 - `FLORMIA_CAMPAIGN_PROGRESS`
 - `FLORMIA_CAMPAIGN_PAUSED`
 - `FLORMIA_CAMPAIGN_COMPLETED`
@@ -88,3 +89,7 @@ La extensión debe incrementar `sequence`. La Web-App ignora secuencias antiguas
 ## Datos prohibidos
 
 No enviar ni almacenar en Flor Mía: cookies, tokens, contraseñas, QR, localStorage de WhatsApp, selectores internos, configuraciones de timing/tandas/reintentos ni binarios persistentes de las imágenes.
+
+## Frecuencia de progreso
+
+La extensión puede informar progreso tantas veces como sea útil, siempre con `sequence` creciente. La Web-App actualiza los contadores del documento principal, pero sólo crea un evento/auditoría cuando cambia el estado operativo (inicio/reanudación, pausa, finalización, error o cancelación), evitando ruido y escrituras innecesarias.
