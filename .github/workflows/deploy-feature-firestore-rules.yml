@@ -1,0 +1,38 @@
+name: Deploy Feature Firestore Rules
+
+on:
+  push:
+    branches:
+      - agent/rendimiento-vendedor-clientes
+    paths:
+      - .github/workflows/deploy-feature-firestore-rules.yml
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/rendimiento-vendedor-clientes
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Prepare Firebase credentials
+        shell: bash
+        env:
+          FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM }}
+        run: |
+          test -n "$FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM" > "$RUNNER_TEMP/firebase-service-account.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+
+      - name: Deploy Firestore rules only
+        run: npx firebase-tools@14.12.0 deploy --only firestore:rules --project app-integral-fm --non-interactive
