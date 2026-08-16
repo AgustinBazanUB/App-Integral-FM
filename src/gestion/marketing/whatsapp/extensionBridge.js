@@ -203,7 +203,7 @@ export async function prepareCampaignForExtension(campaign, imageItems = [], { t
   return response;
 }
 
-export async function requestWhatsAppPreflight({ timeoutMs = 12000 } = {}) {
+export async function requestWhatsAppPreflight({ timeoutMs = 20000 } = {}) {
   try {
     const id = postEnvelope(EXTENSION_MESSAGE_TYPES.preflightRequest, { payload: { requestedAt: Date.now() } });
     const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.status]), timeoutMs);
