@@ -5,6 +5,7 @@ import {
   EXTENSION_MESSAGE_TYPES,
   prepareCampaignForExtension,
   requestCampaignStart,
+  requestWhatsAppPreflight,
 } from "../src/gestion/marketing/whatsapp/extensionBridge.js";
 
 async function withExtensionReply(replyType, run) {
@@ -29,7 +30,9 @@ async function withExtensionReply(replyType, run) {
           replyTo: envelope.requestId,
           campaignId: envelope.campaignId,
           sequence: 2,
-          payload: { campaignId: envelope.campaignId, sequence: 2 },
+          payload: replyType === EXTENSION_MESSAGE_TYPES.status
+            ? { operational: true, message: "Diagnóstico operativo", configuredLimit: 1000, sentToday: 0, availableToday: 1000 }
+            : { campaignId: envelope.campaignId, sequence: 2 },
         };
         for (const listener of listeners) listener({ source: fakeWindow, origin, data: response });
       });
@@ -68,5 +71,13 @@ test("START se envía separado de PREPARE con campaignId y expectedSequence", as
     assert.equal(posted[0].envelope.campaignId, "campaign-1");
     assert.equal(posted[0].envelope.sequence, 1);
     assert.equal(response.sequence, 2);
+  });
+});
+
+test("Comprobar solicita un preflight nuevo en vez de leer solamente el estado anterior", async () => {
+  await withExtensionReply(EXTENSION_MESSAGE_TYPES.status, async (posted) => {
+    const status = await requestWhatsAppPreflight();
+    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.preflightRequest);
+    assert.equal(status.operational, true);
   });
 });

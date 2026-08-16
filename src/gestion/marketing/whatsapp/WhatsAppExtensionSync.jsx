@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useAuth } from "../../AuthContext";
 import { can } from "../../permissions";
 import { applyExtensionCampaignEvent } from "./campaignService";
+import { createCampaignEventQueue } from "./campaignEventQueue";
 import { EXTENSION_MESSAGE_TYPES, subscribeExtensionMessages } from "./extensionBridge";
 
 const campaignEvents = new Set([
@@ -16,13 +17,15 @@ const campaignEvents = new Set([
   EXTENSION_MESSAGE_TYPES.cancelled,
 ]);
 
+const enqueueCampaignEvent = createCampaignEventQueue(applyExtensionCampaignEvent);
+
 export default function WhatsAppExtensionSync() {
   const { profile } = useAuth();
   useEffect(() => {
     if (!profile?.id || !can(profile, "marketing", "whatsappSendToExtension")) return undefined;
     return subscribeExtensionMessages((message) => {
       if (!campaignEvents.has(message.type)) return;
-      applyExtensionCampaignEvent(profile, message).catch((error) => {
+      enqueueCampaignEvent(profile, message).catch((error) => {
         console.error("No se pudo aplicar un estado de la extensión", error);
       });
     });

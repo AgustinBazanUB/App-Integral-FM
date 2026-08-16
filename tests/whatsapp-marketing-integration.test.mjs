@@ -81,3 +81,10 @@ test("progreso repetido no crea auditoría en cada tick y existe evento started 
   assert.match(bridge, /FLORMIA_CAMPAIGN_START/);
   assert.match(service, /extensionCampaignCounters\(message\.payload, current\)/);
 });
+
+test("la pantalla no mantiene despierta la extensión con polling continuo", async () => {
+  const page = await read("src/gestion/pages/WhatsAppCampaignsPage.jsx");
+  assert.doesNotMatch(page, /setInterval\(refreshExtension/);
+  assert.match(page, /visibilitychange/);
+  assert.match(page, /requestWhatsAppPreflight/);
+});

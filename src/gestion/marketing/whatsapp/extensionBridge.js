@@ -5,6 +5,7 @@ export const EXTENSION_CHANNEL = "flor_mia_whatsapp_extension";
 
 export const EXTENSION_MESSAGE_TYPES = Object.freeze({
   ping: "FLORMIA_EXTENSION_PING",
+  preflightRequest: "FLORMIA_EXTENSION_PREFLIGHT_REQUEST",
   status: "FLORMIA_EXTENSION_STATUS",
   prepare: "FLORMIA_CAMPAIGN_PREPARE",
   accepted: "FLORMIA_CAMPAIGN_ACCEPTED",
@@ -200,6 +201,33 @@ export async function prepareCampaignForExtension(campaign, imageItems = [], { t
     throw new Error(response.payload?.message || "La extensión rechazó la campaña.");
   }
   return response;
+}
+
+export async function requestWhatsAppPreflight({ timeoutMs = 12000 } = {}) {
+  try {
+    const id = postEnvelope(EXTENSION_MESSAGE_TYPES.preflightRequest, { payload: { requestedAt: Date.now() } });
+    const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.status]), timeoutMs);
+    return {
+      operational: response.payload.operational === true,
+      message: response.payload.message || (response.payload.operational ? "La extensión está lista." : "La extensión requiere revisión."),
+      extensionVersion: response.payload.extensionVersion || "",
+      configuredLimit: Number(response.payload.configuredLimit || 0),
+      sentToday: Number(response.payload.sentToday || 0),
+      availableToday: Number(response.payload.availableToday || 0),
+      errorCode: response.payload.errorCode || "",
+      checkedAt: Date.now(),
+    };
+  } catch (error) {
+    return {
+      operational: false,
+      message: error?.message || "No fue posible ejecutar el diagnóstico de la extensión.",
+      errorCode: "extension_preflight_failed",
+      configuredLimit: 0,
+      sentToday: 0,
+      availableToday: 0,
+      checkedAt: Date.now(),
+    };
+  }
 }
 
 async function requestCampaignControl(type, campaignId, acceptedTypes, { sequence, timeoutMs = 5000 } = {}) {

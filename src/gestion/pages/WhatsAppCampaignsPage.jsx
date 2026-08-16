@@ -51,6 +51,7 @@ import {
   prepareCampaignForExtension,
   requestCampaignCancellation,
   requestCampaignStart,
+  requestWhatsAppPreflight,
   subscribeExtensionMessages,
 } from "../marketing/whatsapp/extensionBridge";
 
@@ -430,8 +431,13 @@ export default function WhatsAppCampaignsPage() {
   const canCreate = can(profile, "marketing", "whatsappCreateCampaign");
 
   const refreshExtension = async () => {
-    setExtensionBusy(true);
     const status = await pingWhatsAppExtension();
+    setExtensionStatus(status);
+  };
+
+  const diagnoseExtension = async () => {
+    setExtensionBusy(true);
+    const status = await requestWhatsAppPreflight();
     setExtensionStatus(status);
     setExtensionBusy(false);
   };
@@ -450,7 +456,11 @@ export default function WhatsAppCampaignsPage() {
   useEffect(() => {
     refreshExtension();
     loadCampaigns();
-    const interval = window.setInterval(refreshExtension, 20000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshExtension();
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("focus", refreshWhenVisible);
     const unsubscribe = subscribeExtensionMessages((message) => {
       if (message.type === EXTENSION_MESSAGE_TYPES.status) {
         setExtensionStatus({
@@ -467,7 +477,11 @@ export default function WhatsAppCampaignsPage() {
         window.setTimeout(() => loadCampaigns(), 350);
       }
     });
-    return () => { window.clearInterval(interval); unsubscribe(); };
+    return () => {
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("focus", refreshWhenVisible);
+      unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id]);
 
@@ -481,11 +495,11 @@ export default function WhatsAppCampaignsPage() {
     setWizard(campaign);
   };
 
-  if (wizard !== null) return <CampaignWizard profile={profile} extensionStatus={extensionStatus} refreshExtension={refreshExtension} initialCampaign={wizard?.id ? wizard : null} onClose={() => setWizard(null)} onSaved={() => loadCampaigns()} />;
+  if (wizard !== null) return <CampaignWizard profile={profile} extensionStatus={extensionStatus} refreshExtension={diagnoseExtension} initialCampaign={wizard?.id ? wizard : null} onClose={() => setWizard(null)} onSaved={() => loadCampaigns()} />;
 
   return <div className="fm-page-enter fm-wa-page">
     <PageHeader eyebrow="Marketing · WhatsApp" title="Campañas y mensajes masivos" description="Flor Mía prepara y administra campañas; la extensión privada ejecuta técnicamente WhatsApp Web." actions={<div className="fm-page-actions"><Link className="fm-button fm-button--secondary" to="/gestion/marketing"><Icon name="ArrowLeft" />Marketing</Link>{canCreate ? <Button icon="Plus" onClick={() => setWizard({})}>Nueva campaña de WhatsApp</Button> : null}</div>} />
-    <ExtensionStatus status={extensionStatus} refreshing={extensionBusy} onRefresh={refreshExtension} />
+    <ExtensionStatus status={extensionStatus} refreshing={extensionBusy} onRefresh={diagnoseExtension} />
     {error ? <Toast tone="error">{error}</Toast> : null}
     {activeCampaigns.length ? <Panel title="Resumen operativo" description="Campañas que todavía dependen de actualizaciones de la extensión."><div className="fm-wa-active-grid">{activeCampaigns.map((campaign) => <button type="button" key={campaign.id} onClick={() => openCampaign(campaign)}><strong>{campaign.name}</strong><span>{campaign.sentCount || 0} / {campaign.totalRecipients || 0}</span><progress max="100" value={campaign.progressPercentage || 0}>{campaign.progressPercentage || 0}%</progress><Badge tone={CAMPAIGN_STATUS_TONES[campaign.status] || "neutral"}>{CAMPAIGN_STATUS_LABELS[campaign.status] || campaign.status}</Badge></button>)}</div></Panel> : null}
     <Panel title="Historial de campañas" description="Más recientes primero. Se cargan 20 campañas por página.">
