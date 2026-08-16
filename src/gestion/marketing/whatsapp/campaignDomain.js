@@ -223,3 +223,11 @@ export function safeCampaignCounters(totalRecipients, sentCount, errorCount = 0)
   const errors = Math.max(0, Math.min(total, Number(errorCount || 0)));
   return { total, sent, errors, progress: progressPercentage(total, sent) };
 }
+
+export function extensionCampaignCounters(payload = {}, current = {}) {
+  return safeCampaignCounters(
+    current.totalRecipients,
+    payload.sent ?? payload.progress?.completed ?? current.sentCount,
+    payload.finalSummary?.failed ?? current.errorCount,
+  );
+}

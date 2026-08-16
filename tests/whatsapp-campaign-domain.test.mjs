@@ -7,6 +7,7 @@ import {
   customerCommunicationAllowed,
   customerMatchesCampaignFilters,
   extensionPrimaryStatus,
+  extensionCampaignCounters,
   progressPercentage,
 } from "../src/gestion/marketing/whatsapp/campaignDomain.js";
 import { detectExcelMapping, mapExcelRows } from "../src/gestion/marketing/whatsapp/excelImport.js";
@@ -70,6 +71,13 @@ test("estado extensión sólo se proyecta como verde o rojo", () => {
 test("progreso deriva porcentaje sin superar 100", () => {
   assert.equal(progressPercentage(487, 240), 49);
   assert.equal(progressPercentage(10, 99), 100);
+});
+
+test("progreso de la extensión usa el contrato público sent/progress.completed", () => {
+  assert.deepEqual(
+    extensionCampaignCounters({ sent: 1, progress: { completed: 1 }, finalSummary: { failed: 0 } }, { totalRecipients: 1, sentCount: 0, errorCount: 0 }),
+    { total: 1, sent: 1, errors: 0, progress: 100 },
+  );
 });
 
 

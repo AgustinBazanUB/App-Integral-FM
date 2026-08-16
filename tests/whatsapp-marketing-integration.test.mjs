@@ -25,12 +25,13 @@ test("contrato es versionado, valida origen y no usa wildcard", async () => {
   assert.doesNotMatch(bridge, /postMessage\([^\n]+["']\*["']/);
 });
 
-test("imágenes se transfieren como ArrayBuffer y no se persisten como Base64", async () => {
+test("imágenes se serializan como dataBase64 para la extensión y no se persisten", async () => {
   const [bridge, service] = await Promise.all([
     read("src/gestion/marketing/whatsapp/extensionBridge.js"),
     read("src/gestion/marketing/whatsapp/campaignService.js"),
   ]);
   assert.match(bridge, /arrayBuffer\(\)/);
+  assert.match(bridge, /dataBase64:\s*arrayBufferToBase64/);
   assert.doesNotMatch(service, /base64|imageData|ArrayBuffer/i);
   assert.match(service, /imageMetadata/);
 });
@@ -77,4 +78,6 @@ test("progreso repetido no crea auditoría en cada tick y existe evento started 
   assert.match(service, /const statusChanged = current\.status !== status/);
   assert.match(service, /if \(statusChanged\)/);
   assert.match(bridge, /FLORMIA_CAMPAIGN_STARTED/);
+  assert.match(bridge, /FLORMIA_CAMPAIGN_START/);
+  assert.match(service, /extensionCampaignCounters\(message\.payload, current\)/);
 });

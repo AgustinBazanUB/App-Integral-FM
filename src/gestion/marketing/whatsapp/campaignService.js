@@ -22,10 +22,10 @@ import {
   customerCategory,
   customerCommunicationAllowed,
   customerMatchesCampaignFilters,
+  extensionCampaignCounters,
   progressPercentage,
   recipientDocumentId,
   recipientFromCustomer,
-  safeCampaignCounters,
 } from "./campaignDomain.js";
 import { EXTENSION_MESSAGE_TYPES } from "./extensionBridge.js";
 
@@ -300,8 +300,10 @@ const extensionStatusByType = {
   [EXTENSION_MESSAGE_TYPES.started]: "running",
   [EXTENSION_MESSAGE_TYPES.progress]: "running",
   [EXTENSION_MESSAGE_TYPES.paused]: "paused",
+  [EXTENSION_MESSAGE_TYPES.resumed]: "running",
   [EXTENSION_MESSAGE_TYPES.completed]: "completed",
   [EXTENSION_MESSAGE_TYPES.error]: "error",
+  [EXTENSION_MESSAGE_TYPES.stopped]: "cancelled",
   [EXTENSION_MESSAGE_TYPES.cancelled]: "cancelled",
 };
 
@@ -309,8 +311,10 @@ const actionByType = {
   [EXTENSION_MESSAGE_TYPES.started]: "whatsappCampaign.running",
   [EXTENSION_MESSAGE_TYPES.progress]: "whatsappCampaign.running",
   [EXTENSION_MESSAGE_TYPES.paused]: "whatsappCampaign.paused",
+  [EXTENSION_MESSAGE_TYPES.resumed]: "whatsappCampaign.running",
   [EXTENSION_MESSAGE_TYPES.completed]: "whatsappCampaign.completed",
   [EXTENSION_MESSAGE_TYPES.error]: "whatsappCampaign.error",
+  [EXTENSION_MESSAGE_TYPES.stopped]: "whatsappCampaign.cancelled",
   [EXTENSION_MESSAGE_TYPES.cancelled]: "whatsappCampaign.cancelled",
 };
 
@@ -326,11 +330,7 @@ export async function applyExtensionCampaignEvent(profile, message) {
     const sequence = Number(message.sequence || 0);
     const lastSequence = Number(current.lastExtensionSequence || 0);
     if (sequence && sequence <= lastSequence) return { ignored: true, stale: true };
-    const counters = safeCampaignCounters(
-      current.totalRecipients,
-      message.payload?.sentCount ?? current.sentCount,
-      message.payload?.errorCount ?? current.errorCount,
-    );
+    const counters = extensionCampaignCounters(message.payload, current);
     const status = extensionStatusByType[message.type];
     const update = {
       status,
@@ -343,8 +343,8 @@ export async function applyExtensionCampaignEvent(profile, message) {
       ...(status === "running" && !current.startedAt ? { startedAt: serverTimestamp() } : {}),
       ...(["completed", "error", "cancelled"].includes(status) ? { finishedAt: serverTimestamp() } : {}),
       ...(status === "error" ? {
-        extensionErrorCode: message.payload?.errorCode || "extension_error",
-        extensionErrorMessage: message.payload?.message || "La extensión informó un error.",
+        extensionErrorCode: message.payload?.errorCode || message.payload?.errorSummary?.code || "extension_error",
+        extensionErrorMessage: message.payload?.message || message.payload?.errorSummary?.message || "La extensión informó un error.",
       } : {}),
       ...(status === "cancelled" ? { cancelledAt: serverTimestamp(), cancelledBy: profile.id } : {}),
     };

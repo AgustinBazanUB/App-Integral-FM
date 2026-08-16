@@ -50,6 +50,7 @@ import {
   pingWhatsAppExtension,
   prepareCampaignForExtension,
   requestCampaignCancellation,
+  requestCampaignStart,
   subscribeExtensionMessages,
 } from "../marketing/whatsapp/extensionBridge";
 
@@ -314,11 +315,12 @@ function CampaignWizard({ profile, extensionStatus, refreshExtension, initialCam
       });
       setCampaignId(id);
       const payload = campaignSummaryForExtension(id, name, profile, recipients, message);
-      await prepareCampaignForExtension(payload, images);
+      const accepted = await prepareCampaignForExtension(payload, images);
       await recordCampaignDeliveredToExtension(profile, id);
+      await requestCampaignStart(id, { sequence: accepted.sequence });
       for (const image of images) URL.revokeObjectURL(image.url);
       setImages([]);
-      setNotice("La extensión aceptó la campaña.");
+      setNotice("La extensión aceptó e inició la campaña.");
       onSaved?.();
       onClose();
     } catch (cause) {
@@ -378,7 +380,7 @@ function CampaignWizard({ profile, extensionStatus, refreshExtension, initialCam
         <Panel title="Revisión final" description="Confirmá el contenido antes de entregarlo a la extensión."><dl className="fm-wa-review"><div><dt>Campaña</dt><dd>{name || "Sin nombre"}</dd></div><div><dt>Destinatarios</dt><dd>{recipients.length} mensajes/contactos seleccionados</dd></div><div><dt>Segmentación</dt><dd>{[filters.zoneId && (filterOptions.zones.find((zone) => zone.id === filters.zoneId)?.name), filters.category].filter(Boolean).join(" + ") || "Selección manual / sin filtro"}</dd></div><div><dt>Multimedia</dt><dd>{images.length} imagen(es) · {images.map((item) => item.file.name).join(" → ") || "Sin imágenes"}</dd></div><div><dt>Mensaje</dt><dd className="fm-wa-review-message">{message || "Sin texto"}</dd></div><div><dt>Extensión</dt><dd>{extensionPrimaryStatus(extensionStatus).label}</dd></div></dl>
           {extensionStatus.availableToday > 0 && recipients.length > extensionStatus.availableToday ? <Toast tone="info">La selección supera los disponibles informados por la extensión hoy. La extensión conserva la autoridad final sobre el límite de ejecución.</Toast> : null}
           {!validation.valid ? <div className="fm-wa-errors" role="alert"><strong>Antes de preparar:</strong><ul>{validation.errors.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
-          <Button icon="Megaphone" loading={busy} disabled={!validation.valid || !canSend} onClick={prepare}>Preparar campaña para extensión</Button>
+          <Button icon="Megaphone" loading={busy} disabled={!validation.valid || !canSend} onClick={prepare}>Preparar e iniciar campaña</Button>
         </Panel>
       </div> : null}
 

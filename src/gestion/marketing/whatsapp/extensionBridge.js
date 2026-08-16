@@ -11,10 +11,17 @@ export const EXTENSION_MESSAGE_TYPES = Object.freeze({
   started: "FLORMIA_CAMPAIGN_STARTED",
   progress: "FLORMIA_CAMPAIGN_PROGRESS",
   paused: "FLORMIA_CAMPAIGN_PAUSED",
+  resumed: "FLORMIA_CAMPAIGN_RESUMED",
   completed: "FLORMIA_CAMPAIGN_COMPLETED",
   error: "FLORMIA_CAMPAIGN_ERROR",
+  stopped: "FLORMIA_CAMPAIGN_STOPPED",
   cancelled: "FLORMIA_CAMPAIGN_CANCELLED",
   cancelRequest: "FLORMIA_CAMPAIGN_CANCEL_REQUEST",
+  startRequest: "FLORMIA_CAMPAIGN_START",
+  pauseRequest: "FLORMIA_CAMPAIGN_PAUSE",
+  resumeRequest: "FLORMIA_CAMPAIGN_RESUME",
+  stopRequest: "FLORMIA_CAMPAIGN_STOP",
+  statusRequest: "FLORMIA_CAMPAIGN_STATUS_REQUEST",
 });
 
 const inboundTypes = new Set([
@@ -23,8 +30,10 @@ const inboundTypes = new Set([
   EXTENSION_MESSAGE_TYPES.started,
   EXTENSION_MESSAGE_TYPES.progress,
   EXTENSION_MESSAGE_TYPES.paused,
+  EXTENSION_MESSAGE_TYPES.resumed,
   EXTENSION_MESSAGE_TYPES.completed,
   EXTENSION_MESSAGE_TYPES.error,
+  EXTENSION_MESSAGE_TYPES.stopped,
   EXTENSION_MESSAGE_TYPES.cancelled,
 ]);
 
@@ -32,8 +41,10 @@ const campaignEventTypes = new Set([
   EXTENSION_MESSAGE_TYPES.started,
   EXTENSION_MESSAGE_TYPES.progress,
   EXTENSION_MESSAGE_TYPES.paused,
+  EXTENSION_MESSAGE_TYPES.resumed,
   EXTENSION_MESSAGE_TYPES.completed,
   EXTENSION_MESSAGE_TYPES.error,
+  EXTENSION_MESSAGE_TYPES.stopped,
   EXTENSION_MESSAGE_TYPES.cancelled,
 ]);
 
@@ -87,7 +98,7 @@ export function subscribeExtensionMessages(callback) {
   };
 }
 
-function postEnvelope(type, { payload = {}, campaignId = null, transfer = [] } = {}) {
+function postEnvelope(type, { payload = {}, campaignId = null, sequence = null, transfer = [] } = {}) {
   if (typeof window === "undefined") throw new Error("La integración con la extensión requiere un navegador.");
   const id = requestId();
   const envelope = {
@@ -96,10 +107,21 @@ function postEnvelope(type, { payload = {}, campaignId = null, transfer = [] } =
     type,
     requestId: id,
     ...(campaignId ? { campaignId } : {}),
+    ...(Number.isInteger(sequence) ? { sequence } : {}),
     payload,
   };
   window.postMessage(envelope, window.location.origin, transfer);
   return id;
+}
+
+export function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 32_768;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function waitForReply(id, acceptedTypes, timeoutMs) {
@@ -148,22 +170,19 @@ export async function pingWhatsAppExtension({ timeoutMs = 1800 } = {}) {
 
 export async function prepareCampaignForExtension(campaign, imageItems = [], { timeoutMs = 6000 } = {}) {
   const transferredImages = [];
-  const transfer = [];
   for (let index = 0; index < imageItems.length; index += 1) {
     const item = imageItems[index];
     const data = await item.file.arrayBuffer();
-    transfer.push(data);
     transferredImages.push({
       order: index + 1,
       name: item.file.name,
       type: item.file.type,
       size: item.file.size,
-      data,
+      dataBase64: arrayBufferToBase64(data),
     });
   }
   const id = postEnvelope(EXTENSION_MESSAGE_TYPES.prepare, {
     campaignId: campaign.campaignId,
-    transfer,
     payload: {
       campaignId: campaign.campaignId,
       campaignName: campaign.campaignName,
@@ -183,7 +202,31 @@ export async function prepareCampaignForExtension(campaign, imageItems = [], { t
   return response;
 }
 
+async function requestCampaignControl(type, campaignId, acceptedTypes, { sequence, timeoutMs = 5000 } = {}) {
+  const id = postEnvelope(type, { campaignId, sequence, payload: { campaignId } });
+  const response = await waitForReply(id, new Set([...acceptedTypes, EXTENSION_MESSAGE_TYPES.error]), timeoutMs);
+  if (response.type === EXTENSION_MESSAGE_TYPES.error) {
+    throw new Error(response.payload?.message || "La extensión rechazó el control de campaña.");
+  }
+  return response;
+}
+
+export function requestCampaignStart(campaignId, options = {}) {
+  return requestCampaignControl(EXTENSION_MESSAGE_TYPES.startRequest, campaignId, [EXTENSION_MESSAGE_TYPES.started], options);
+}
+
+export function requestCampaignPause(campaignId, options = {}) {
+  return requestCampaignControl(EXTENSION_MESSAGE_TYPES.pauseRequest, campaignId, [EXTENSION_MESSAGE_TYPES.paused], options);
+}
+
+export function requestCampaignResume(campaignId, options = {}) {
+  return requestCampaignControl(EXTENSION_MESSAGE_TYPES.resumeRequest, campaignId, [EXTENSION_MESSAGE_TYPES.resumed, EXTENSION_MESSAGE_TYPES.started], options);
+}
+
+export function requestCampaignStop(campaignId, options = {}) {
+  return requestCampaignControl(EXTENSION_MESSAGE_TYPES.stopRequest, campaignId, [EXTENSION_MESSAGE_TYPES.stopped, EXTENSION_MESSAGE_TYPES.cancelled], options);
+}
+
 export async function requestCampaignCancellation(campaignId, { timeoutMs = 5000 } = {}) {
-  const id = postEnvelope(EXTENSION_MESSAGE_TYPES.cancelRequest, { campaignId, payload: { campaignId } });
-  return waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.cancelled, EXTENSION_MESSAGE_TYPES.error]), timeoutMs);
+  return requestCampaignStop(campaignId, { timeoutMs });
 }
