@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   EXTENSION_CHANNEL,
   EXTENSION_MESSAGE_TYPES,
+  EXTENSION_TIMEOUTS,
   prepareCampaignForExtension,
   requestCampaignStart,
   requestWhatsAppPreflight,
@@ -45,6 +46,13 @@ async function withExtensionReply(replyType, run) {
     delete globalThis.window;
   }
 }
+
+test("los timeouts de la integración cubren operaciones reales de WhatsApp", () => {
+  assert.equal(EXTENSION_TIMEOUTS.ping, 5000);
+  assert.equal(EXTENSION_TIMEOUTS.prepare, 30000);
+  assert.equal(EXTENSION_TIMEOUTS.preflight, 35000);
+  assert.equal(EXTENSION_TIMEOUTS.control, 35000);
+});
 
 test("PREPARE serializa imágenes como dataBase64 compatible con la extensión", async () => {
   await withExtensionReply(EXTENSION_MESSAGE_TYPES.accepted, async (posted) => {
