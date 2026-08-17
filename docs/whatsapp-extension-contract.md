@@ -1,4 +1,3 @@
-
 # Contrato Flor Mía Web-App ↔ Extensión WhatsApp
 
 ## Alcance
@@ -14,11 +13,30 @@ La Web-App prepara campañas. La extensión privada ejecuta técnicamente WhatsA
 - Las respuestas deben usar `replyTo` con el `requestId` recibido cuando respondan a una solicitud puntual.
 - Los eventos de campaña deben incluir `campaignId` y un `sequence` entero monótonamente creciente.
 
+### Ventanas de respuesta de la Web-App
+
+La Web-App usa ventanas diferentes según el tipo de operación para evitar falsos timeouts mientras la extensión realiza trabajo real:
+
+- `PING`: 5 segundos.
+- `PREPARE`: 30 segundos.
+- `PREFLIGHT`: 35 segundos.
+- `START / PAUSE / RESUME / STOP`: 35 segundos.
+
+Estos timeouts son límites de espera de la Web-App; no sustituyen los timeouts técnicos internos ni las comprobaciones de seguridad de la extensión.
+
+Si la extensión se recarga o actualiza mientras el Deploy Preview permanece abierto, el content script anterior pierde su contexto de extensión. La pestaña debe recargarse para inyectar el bridge de la versión nueva. La extensión responde este caso como `EXTENSION_CONTEXT_INVALIDATED` y no debe intentar usar nuevamente `chrome.runtime` desde ese contexto viejo.
+
 ## Mensajes
 
 Web → extensión:
 - `FLORMIA_EXTENSION_PING`
+- `FLORMIA_EXTENSION_PREFLIGHT_REQUEST`
 - `FLORMIA_CAMPAIGN_PREPARE`
+- `FLORMIA_CAMPAIGN_START`
+- `FLORMIA_CAMPAIGN_PAUSE`
+- `FLORMIA_CAMPAIGN_RESUME`
+- `FLORMIA_CAMPAIGN_STOP`
+- `FLORMIA_CAMPAIGN_STATUS_REQUEST`
 - `FLORMIA_CAMPAIGN_CANCEL_REQUEST`
 
 Extensión → Web:
@@ -27,8 +45,10 @@ Extensión → Web:
 - `FLORMIA_CAMPAIGN_STARTED`
 - `FLORMIA_CAMPAIGN_PROGRESS`
 - `FLORMIA_CAMPAIGN_PAUSED`
+- `FLORMIA_CAMPAIGN_RESUMED`
 - `FLORMIA_CAMPAIGN_COMPLETED`
 - `FLORMIA_CAMPAIGN_ERROR`
+- `FLORMIA_CAMPAIGN_STOPPED`
 - `FLORMIA_CAMPAIGN_CANCELLED`
 
 ## Estado de extensión
@@ -39,7 +59,7 @@ Extensión → Web:
 {
   operational: true | false,
   message: "texto comprensible",
-  extensionVersion: "opcional",
+  extensionVersion: "0.9.1.2",
   configuredLimit: 1000,
   sentToday: 427,
   availableToday: 573,
@@ -62,12 +82,14 @@ La Web-App sólo interpreta dos estados principales: Operativa o Error / requier
   message,
   imageCount,
   imageOrder,
-  images: [{ order, name, type, size, data: ArrayBuffer }],
+  images: [{ order, name, type, size, dataBase64 }],
   totalRecipients
 }
 ```
 
-El `ArrayBuffer` es temporal y se transfiere únicamente en memoria. Firestore conserva sólo metadatos de imágenes. El orden lógico definido por la Web-App es Imagen 1 → Imagen 2 → Imagen 3 → Texto. La extensión debe garantizar el orden técnico real.
+`dataBase64` es únicamente un formato temporal de transporte dentro del mensaje Web-App → extensión. La Web-App obtiene los bytes desde el `File`/`ArrayBuffer`, los serializa para el bridge y no persiste esa representación en Firestore, Firebase Storage, GitHub ni Netlify. La extensión reconstruye los bytes del archivo original antes de preparar el adjunto. Firestore conserva sólo metadatos de imágenes.
+
+El orden lógico definido por la Web-App es Imagen 1 → Imagen 2 → Imagen 3 → Texto. La extensión debe garantizar el orden técnico real.
 
 ## Progreso
 
