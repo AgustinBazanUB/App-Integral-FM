@@ -3,6 +3,13 @@ import { WHATSAPP_PROTOCOL_VERSION } from "./campaignDomain.js";
 
 export const EXTENSION_CHANNEL = "flor_mia_whatsapp_extension";
 
+export const EXTENSION_TIMEOUTS = Object.freeze({
+  ping: 5000,
+  prepare: 30000,
+  preflight: 35000,
+  control: 35000,
+});
+
 export const EXTENSION_MESSAGE_TYPES = Object.freeze({
   ping: "FLORMIA_EXTENSION_PING",
   preflightRequest: "FLORMIA_EXTENSION_PREFLIGHT_REQUEST",
@@ -137,12 +144,12 @@ function waitForReply(id, acceptedTypes, timeoutMs) {
     });
     timer = window.setTimeout(() => {
       unsubscribe();
-      reject(new Error("La extensión no respondió dentro del tiempo esperado."));
+      reject(new Error(`La extensión no respondió dentro del tiempo esperado (${Math.round(timeoutMs / 1000)} s).`));
     }, timeoutMs);
   });
 }
 
-export async function pingWhatsAppExtension({ timeoutMs = 1800 } = {}) {
+export async function pingWhatsAppExtension({ timeoutMs = EXTENSION_TIMEOUTS.ping } = {}) {
   try {
     const id = postEnvelope(EXTENSION_MESSAGE_TYPES.ping, { payload: { requestedAt: Date.now() } });
     const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.status]), timeoutMs);
@@ -159,7 +166,7 @@ export async function pingWhatsAppExtension({ timeoutMs = 1800 } = {}) {
   } catch (error) {
     return {
       operational: false,
-      message: "Extensión no detectada o sin respuesta.",
+      message: error?.message || "Extensión no detectada o sin respuesta.",
       errorCode: "extension_unavailable",
       configuredLimit: 0,
       sentToday: 0,
@@ -169,7 +176,7 @@ export async function pingWhatsAppExtension({ timeoutMs = 1800 } = {}) {
   }
 }
 
-export async function prepareCampaignForExtension(campaign, imageItems = [], { timeoutMs = 6000 } = {}) {
+export async function prepareCampaignForExtension(campaign, imageItems = [], { timeoutMs = EXTENSION_TIMEOUTS.prepare } = {}) {
   const transferredImages = [];
   for (let index = 0; index < imageItems.length; index += 1) {
     const item = imageItems[index];
@@ -203,7 +210,7 @@ export async function prepareCampaignForExtension(campaign, imageItems = [], { t
   return response;
 }
 
-export async function requestWhatsAppPreflight({ timeoutMs = 20000 } = {}) {
+export async function requestWhatsAppPreflight({ timeoutMs = EXTENSION_TIMEOUTS.preflight } = {}) {
   try {
     const id = postEnvelope(EXTENSION_MESSAGE_TYPES.preflightRequest, { payload: { requestedAt: Date.now() } });
     const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.status]), timeoutMs);
@@ -230,7 +237,7 @@ export async function requestWhatsAppPreflight({ timeoutMs = 20000 } = {}) {
   }
 }
 
-async function requestCampaignControl(type, campaignId, acceptedTypes, { sequence, timeoutMs = 5000 } = {}) {
+async function requestCampaignControl(type, campaignId, acceptedTypes, { sequence, timeoutMs = EXTENSION_TIMEOUTS.control } = {}) {
   const id = postEnvelope(type, { campaignId, sequence, payload: { campaignId } });
   const response = await waitForReply(id, new Set([...acceptedTypes, EXTENSION_MESSAGE_TYPES.error]), timeoutMs);
   if (response.type === EXTENSION_MESSAGE_TYPES.error) {
@@ -255,6 +262,6 @@ export function requestCampaignStop(campaignId, options = {}) {
   return requestCampaignControl(EXTENSION_MESSAGE_TYPES.stopRequest, campaignId, [EXTENSION_MESSAGE_TYPES.stopped, EXTENSION_MESSAGE_TYPES.cancelled], options);
 }
 
-export async function requestCampaignCancellation(campaignId, { timeoutMs = 5000 } = {}) {
+export async function requestCampaignCancellation(campaignId, { timeoutMs = EXTENSION_TIMEOUTS.control } = {}) {
   return requestCampaignStop(campaignId, { timeoutMs });
 }
