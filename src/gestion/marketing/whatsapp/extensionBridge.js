@@ -1,4 +1,3 @@
-
 import { WHATSAPP_PROTOCOL_VERSION } from "./campaignDomain.js";
 
 export const EXTENSION_CHANNEL = "flor_mia_whatsapp_extension";
@@ -58,6 +57,7 @@ const campaignEventTypes = new Set([
 
 const subscribers = new Set();
 let listening = false;
+let pingInFlight = null;
 
 const plainObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const requestId = () => globalThis.crypto?.randomUUID?.() || `fm-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -149,13 +149,13 @@ function waitForReply(id, acceptedTypes, timeoutMs) {
   });
 }
 
-export async function pingWhatsAppExtension({ timeoutMs = EXTENSION_TIMEOUTS.ping } = {}) {
+async function performPing(timeoutMs) {
   try {
     const id = postEnvelope(EXTENSION_MESSAGE_TYPES.ping, { payload: { requestedAt: Date.now() } });
     const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.status]), timeoutMs);
     return {
       operational: response.payload.operational === true,
-      message: response.payload.message || (response.payload.operational ? "La extensión está lista." : "La extensión requiere revisión."),
+      message: response.payload.message || (response.payload.operational ? "Listo para enviar." : "La extensión necesita revisión."),
       extensionVersion: response.payload.extensionVersion || "",
       configuredLimit: Number(response.payload.configuredLimit || 0),
       sentToday: Number(response.payload.sentToday || 0),
@@ -174,6 +174,12 @@ export async function pingWhatsAppExtension({ timeoutMs = EXTENSION_TIMEOUTS.pin
       checkedAt: Date.now(),
     };
   }
+}
+
+export function pingWhatsAppExtension({ timeoutMs = EXTENSION_TIMEOUTS.ping } = {}) {
+  if (pingInFlight) return pingInFlight;
+  pingInFlight = performPing(timeoutMs).finally(() => { pingInFlight = null; });
+  return pingInFlight;
 }
 
 export async function prepareCampaignForExtension(campaign, imageItems = [], { timeoutMs = EXTENSION_TIMEOUTS.prepare } = {}) {
@@ -216,7 +222,7 @@ export async function requestWhatsAppPreflight({ timeoutMs = EXTENSION_TIMEOUTS.
     const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.status]), timeoutMs);
     return {
       operational: response.payload.operational === true,
-      message: response.payload.message || (response.payload.operational ? "La extensión está lista." : "La extensión requiere revisión."),
+      message: response.payload.message || (response.payload.operational ? "Listo para enviar." : "La extensión necesita revisión."),
       extensionVersion: response.payload.extensionVersion || "",
       configuredLimit: Number(response.payload.configuredLimit || 0),
       sentToday: Number(response.payload.sentToday || 0),
@@ -227,7 +233,7 @@ export async function requestWhatsAppPreflight({ timeoutMs = EXTENSION_TIMEOUTS.
   } catch (error) {
     return {
       operational: false,
-      message: error?.message || "No fue posible ejecutar el diagnóstico de la extensión.",
+      message: error?.message || "No fue posible ejecutar la comprobación de la extensión.",
       errorCode: "extension_preflight_failed",
       configuredLimit: 0,
       sentToday: 0,
@@ -238,12 +244,13 @@ export async function requestWhatsAppPreflight({ timeoutMs = EXTENSION_TIMEOUTS.
 }
 
 async function requestCampaignControl(type, campaignId, acceptedTypes, { sequence, timeoutMs = EXTENSION_TIMEOUTS.control } = {}) {
-  const id = postEnvelope(type, { campaignId, sequence, payload: { campaignId } });
+  const requestedAt = Date.now();
+  const id = postEnvelope(type, { campaignId, sequence, payload: { campaignId, requestedAt } });
   const response = await waitForReply(id, new Set([...acceptedTypes, EXTENSION_MESSAGE_TYPES.error]), timeoutMs);
   if (response.type === EXTENSION_MESSAGE_TYPES.error) {
     throw new Error(response.payload?.message || "La extensión rechazó el control de campaña.");
   }
-  return response;
+  return { ...response, requestedAt, completedAt: Date.now() };
 }
 
 export function requestCampaignStart(campaignId, options = {}) {
