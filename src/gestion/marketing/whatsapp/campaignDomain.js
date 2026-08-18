@@ -211,17 +211,17 @@ export function extensionPrimaryStatus(status = {}) {
     return { operational: false, label: "WhatsApp Web no está abierto", tone: "error", message: "Abrí WhatsApp Web para continuar." };
   }
   if (code === "extension_unavailable" || code === "extension_not_ready") {
-    return { operational: false, label: "Extensión desconectada", tone: "error", message: status.message || "Volvé a cargar la extensión o revisá Chrome." };
+    return { operational: false, label: "Extensión desconectada", tone: "error", message: "Volvé a cargar la extensión o revisá Chrome." };
   }
   return {
     operational: false,
     label: "Necesita revisión",
     tone: "error",
-    message: status.message || "Hubo un problema y la campaña quedó protegida para evitar un envío incorrecto.",
+    message: "Hubo un problema y la campaña quedó protegida para evitar un envío incorrecto.",
   };
 }
 
-export function userFacingCampaignProblem(errorCode, fallback = "") {
+export function userFacingCampaignProblem(errorCode) {
   if (errorCode === "CONTACT_CONTEXT_UNVERIFIED") {
     return "No pudimos confirmar que WhatsApp abrió el contacto correcto. La campaña se pausó para evitar enviar el mensaje a otra persona.";
   }
@@ -234,7 +234,7 @@ export function userFacingCampaignProblem(errorCode, fallback = "") {
   if (["CAPABILITY_UNAVAILABLE", "WHATSAPP_UI_CHANGED", "SELECTOR_STRATEGY_EXHAUSTED"].includes(String(errorCode || ""))) {
     return "WhatsApp cambió y necesitamos revisar la conexión antes de continuar.";
   }
-  return fallback || "Hubo un problema y la campaña quedó pausada para revisión.";
+  return "Hubo un problema y la campaña quedó pausada para revisión.";
 }
 
 export function campaignValidation({ name, recipients = [], message = "", images = [], extensionStatus, persistedImageMetadata = [] } = {}) {
