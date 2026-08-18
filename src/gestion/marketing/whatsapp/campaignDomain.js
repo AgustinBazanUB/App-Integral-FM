@@ -1,4 +1,3 @@
-
 import {
   isValidCustomerPhone,
   normalizeCustomerPhone,
@@ -12,11 +11,11 @@ export const MAX_CAMPAIGN_IMAGES = 3;
 export const CAMPAIGN_STATUS_LABELS = Object.freeze({
   draft: "Borrador",
   ready: "Lista para enviar",
-  running: "En proceso",
-  paused: "Pausada",
-  completed: "Finalizada",
-  error: "Con error",
-  cancelled: "Cancelada",
+  running: "Campaña en curso",
+  paused: "Campaña pausada",
+  completed: "Campaña completada",
+  error: "Necesita revisión",
+  cancelled: "Campaña detenida",
 });
 
 export const CAMPAIGN_STATUS_TONES = Object.freeze({
@@ -149,9 +148,11 @@ export function analyzeRecipientCandidates(candidates = []) {
       invalidRows.push({ ...candidate, reason: "Sin teléfono" });
       continue;
     }
+    // El bridge exige un WhatsApp phone canónico. Un teléfono válido para la ficha
+    // de cliente pero ambiguo para WhatsApp no se entrega a la extensión.
     if (!isValidCustomerPhone(candidate.phoneNormalized) || !candidate.whatsappPhone) {
       invalidPhone += 1;
-      invalidRows.push({ ...candidate, reason: "Teléfono inválido" });
+      invalidRows.push({ ...candidate, reason: "Teléfono inválido para WhatsApp" });
       continue;
     }
     const existing = unique.get(candidate.phoneNormalized);
@@ -194,20 +195,57 @@ export async function recipientDocumentId(phone) {
 }
 
 export function extensionPrimaryStatus(status = {}) {
-  return status.operational === true
-    ? { operational: true, label: "Operativa", tone: "success", message: status.message || "La extensión respondió correctamente." }
-    : { operational: false, label: "Error / requiere revisión", tone: "error", message: status.message || "Extensión no detectada o sin respuesta." };
+  if (status.operational === true) {
+    return {
+      operational: true,
+      label: "Conectado",
+      tone: "success",
+      message: status.message || "Listo para enviar.",
+    };
+  }
+  const code = String(status.errorCode || "");
+  if (code === "session_not_ready") {
+    return { operational: false, label: "WhatsApp necesita iniciar sesión", tone: "error", message: "Abrí WhatsApp Web y escaneá el código QR para continuar." };
+  }
+  if (code === "whatsapp_not_open") {
+    return { operational: false, label: "WhatsApp Web no está abierto", tone: "error", message: "Abrí WhatsApp Web para continuar." };
+  }
+  if (code === "extension_unavailable" || code === "extension_not_ready") {
+    return { operational: false, label: "Extensión desconectada", tone: "error", message: status.message || "Volvé a cargar la extensión o revisá Chrome." };
+  }
+  return {
+    operational: false,
+    label: "Necesita revisión",
+    tone: "error",
+    message: status.message || "Hubo un problema y la campaña quedó protegida para evitar un envío incorrecto.",
+  };
+}
+
+export function userFacingCampaignProblem(errorCode, fallback = "") {
+  if (errorCode === "CONTACT_CONTEXT_UNVERIFIED") {
+    return "No pudimos confirmar que WhatsApp abrió el contacto correcto. La campaña se pausó para evitar enviar el mensaje a otra persona.";
+  }
+  if (errorCode === "SESSION_NOT_READY" || errorCode === "session_not_ready") {
+    return "WhatsApp necesita iniciar sesión. Abrí WhatsApp Web y escaneá el código QR.";
+  }
+  if (errorCode === "WHATSAPP_NOT_OPEN" || errorCode === "whatsapp_not_open") {
+    return "WhatsApp Web no está abierto. Abrilo para continuar.";
+  }
+  if (["CAPABILITY_UNAVAILABLE", "WHATSAPP_UI_CHANGED", "SELECTOR_STRATEGY_EXHAUSTED"].includes(String(errorCode || ""))) {
+    return "WhatsApp cambió y necesitamos revisar la conexión antes de continuar.";
+  }
+  return fallback || "Hubo un problema y la campaña quedó pausada para revisión.";
 }
 
 export function campaignValidation({ name, recipients = [], message = "", images = [], extensionStatus, persistedImageMetadata = [] } = {}) {
   const errors = [];
   if (!String(name || "").trim()) errors.push("Ingresá un nombre para la campaña.");
   if (!recipients.length) errors.push("Seleccioná al menos un destinatario válido.");
-  if (recipients.some((recipient) => !isValidCustomerPhone(recipient.phoneNormalized || recipient.phone))) errors.push("Hay destinatarios con teléfonos inválidos.");
+  if (recipients.some((recipient) => !recipient.whatsappPhone)) errors.push("Hay destinatarios sin un número de WhatsApp canónico.");
   if (images.length > MAX_CAMPAIGN_IMAGES) errors.push("La campaña admite como máximo 3 imágenes.");
   if (!String(message || "").trim() && !images.length) errors.push("Ingresá un mensaje o agregá al menos una imagen.");
   if (persistedImageMetadata.length && images.length < persistedImageMetadata.length) errors.push("Volvé a seleccionar las imágenes del borrador antes de preparar la campaña.");
-  if (extensionStatus?.operational !== true) errors.push(extensionStatus?.message || "La extensión no está operativa.");
+  if (extensionStatus?.operational !== true) errors.push(extensionPrimaryStatus(extensionStatus).message);
   return { valid: errors.length === 0, errors };
 }
 
