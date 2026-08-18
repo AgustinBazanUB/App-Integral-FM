@@ -1,4 +1,3 @@
-
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -9,7 +8,12 @@ import {
   extensionPrimaryStatus,
   extensionCampaignCounters,
   progressPercentage,
+  userFacingCampaignProblem,
 } from "../src/gestion/marketing/whatsapp/campaignDomain.js";
+import {
+  normalizeCustomerPhone,
+  phoneToWhatsAppInternational,
+} from "../src/gestion/customers/customerDomain.js";
 import { detectExcelMapping, mapExcelRows } from "../src/gestion/marketing/whatsapp/excelImport.js";
 
 const flor = { source: "flor_mia", clientId: "c1", name: "Ana", phone: "11 5757-1979", zone: "Microcentro", category: "Premium" };
@@ -22,6 +26,27 @@ test("deduplica Flor Mía + Excel y prioriza datos maestros", () => {
   assert.equal(result.recipients[0].source, "flor_mia");
   assert.equal(result.recipients[0].clientId, "c1");
   assert.equal(result.recipients[0].name, "Ana");
+  assert.equal(result.recipients[0].whatsappPhone, "5491157571979");
+});
+
+test("normaliza formatos argentinos equivalentes al mismo WhatsApp canónico", () => {
+  const inputs = [
+    "11 5757-1979",
+    "+54 9 11 5757 1979",
+    "0054 9 11 5757 1979",
+    "+54 11 5757 1979",
+  ];
+  for (const input of inputs) {
+    assert.equal(normalizeCustomerPhone(input), "1157571979");
+    assert.equal(phoneToWhatsAppInternational(input), "5491157571979");
+  }
+});
+
+test("no entrega a la extensión un teléfono nacional ambiguo", () => {
+  assert.equal(phoneToWhatsAppInternational("5757-1979"), "");
+  const result = analyzeRecipientCandidates([{ source: "excel", phone: "5757-1979" }]);
+  assert.equal(result.valid, 0);
+  assert.equal(result.invalid, 1);
 });
 
 test("contabiliza sin teléfono e inválidos sin mezclarlos con válidos", () => {
@@ -63,9 +88,18 @@ test("validación final exige extensión operativa, destinatario y contenido", (
   assert.equal(valid.valid, true);
 });
 
-test("estado extensión sólo se proyecta como verde o rojo", () => {
-  assert.equal(extensionPrimaryStatus({ operational: true }).tone, "success");
-  assert.equal(extensionPrimaryStatus({ operational: false }).tone, "error");
+test("estado de extensión usa vocabulario simple", () => {
+  assert.equal(extensionPrimaryStatus({ operational: true }).label, "Conectado");
+  assert.equal(extensionPrimaryStatus({ operational: false }).label, "Necesita revisión");
+  assert.equal(extensionPrimaryStatus({ operational: false, errorCode: "session_not_ready" }).label, "WhatsApp necesita iniciar sesión");
+  assert.equal(extensionPrimaryStatus({ operational: false, errorCode: "extension_unavailable" }).label, "Extensión desconectada");
+});
+
+test("CONTACT_CONTEXT_UNVERIFIED tiene explicación segura para usuario", () => {
+  const message = userFacingCampaignProblem("CONTACT_CONTEXT_UNVERIFIED");
+  assert.match(message, /confirmar.*contacto correcto/i);
+  assert.match(message, /evitar/i);
+  assert.doesNotMatch(message, /ContactEngine|capability|checkpoint|selector/i);
 });
 
 test("progreso deriva porcentaje sin superar 100", () => {
@@ -79,7 +113,6 @@ test("progreso de la extensión usa el contrato público sent/progress.completed
     { total: 1, sent: 1, errors: 0, progress: 100 },
   );
 });
-
 
 import { can } from "../src/gestion/permissions.js";
 

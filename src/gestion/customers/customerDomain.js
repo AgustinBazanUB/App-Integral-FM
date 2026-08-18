@@ -31,6 +31,9 @@ export function isValidCustomerPhone(value) {
   return normalized.length >= 8 && normalized.length <= 11;
 }
 
+export function isValidArgentineWhatsAppMobile(value) {
+  return /^\d{10}$/.test(normalizeCustomerPhone(value));
+}
 
 export function formatPhoneForDisplay(value) {
   const normalized = normalizeCustomerPhone(value);
@@ -44,10 +47,11 @@ export function formatPhoneForDisplay(value) {
 
 export function phoneToWhatsAppInternational(value) {
   const normalized = normalizeCustomerPhone(value);
-  if (!isValidCustomerPhone(normalized)) return "";
-  // Los clientes de esta base usan numeración argentina nacional. Para móviles,
-  // WhatsApp requiere país 54 + indicador móvil 9 + número nacional sin 0/15.
-  return normalized.length === 10 ? `549${normalized}` : `54${normalized}`;
+  // Contrato actual de Flor Mía: la UI acepta formatos argentinos amigables,
+  // pero el bridge sólo entrega un móvil canónico inequívoco 549 + 10 dígitos.
+  // La extensión recibe esos dígitos completos y nunca adivina el país.
+  if (!isValidArgentineWhatsAppMobile(normalized)) return "";
+  return `549${normalized}`;
 }
 
 export function customerWhatsAppUrl(value) {
