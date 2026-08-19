@@ -4,6 +4,8 @@
 
 La Web-App prepara campañas. La extensión privada ejecuta técnicamente WhatsApp Web. La Web-App no conoce selectores DOM, tiempos, tandas, reintentos, cookies, QR, credenciales ni tokens de WhatsApp.
 
+Versión de extensión objetivo de este corte: **0.9.3**.
+
 ## Transporte
 
 - Canal: `flor_mia_whatsapp_extension`.
@@ -15,8 +17,6 @@ La Web-App prepara campañas. La extensión privada ejecuta técnicamente WhatsA
 
 ### Ventanas de respuesta de la Web-App
 
-La Web-App usa ventanas diferentes según el tipo de operación para evitar falsos timeouts mientras la extensión realiza trabajo real:
-
 - `PING`: 5 segundos.
 - `PREPARE`: 30 segundos.
 - `PREFLIGHT`: 35 segundos.
@@ -24,7 +24,7 @@ La Web-App usa ventanas diferentes según el tipo de operación para evitar fals
 
 Estos timeouts son límites de espera de la Web-App; no sustituyen los timeouts técnicos internos ni las comprobaciones de seguridad de la extensión. La interfaz acusa visualmente Pause/Stop de inmediato (`Pausando…` / `Deteniendo…`) y evita clicks duplicados mientras espera la transición durable de la extensión.
 
-Si la extensión se recarga o actualiza mientras el Deploy Preview permanece abierto, el content script anterior pierde su contexto de extensión. La pestaña debe recargarse para inyectar el bridge de la versión nueva. La extensión responde este caso como `EXTENSION_CONTEXT_INVALIDATED` y no debe intentar usar nuevamente `chrome.runtime` desde ese contexto viejo.
+Si la extensión se recarga o actualiza mientras el Deploy Preview permanece abierto, el content script anterior pierde su contexto de extensión. La pestaña debe recargarse para inyectar el bridge de la versión nueva. La extensión responde este caso de forma segura y no debe intentar usar nuevamente `chrome.runtime` desde ese contexto viejo.
 
 ## Contrato de teléfono
 
@@ -77,7 +77,7 @@ Extensión → Web:
 {
   operational: true | false,
   message: "texto comprensible",
-  extensionVersion: "0.9.2",
+  extensionVersion: "0.9.3",
   configuredLimit: 1000,
   sentToday: 427,
   availableToday: 573,
@@ -105,6 +105,8 @@ La vista primaria usa un modelo mental simple: **Conectado / Listo para enviar**
 }
 ```
 
+`message` se transporta como el string escrito por el usuario. El bridge no lo sustituye por placeholders, texto de prueba ni contenido diagnóstico. La extensión conserva ese string en CampaignStore/checkpoint y sólo normaliza CRLF a LF al escribir en el `contenteditable`, porque ésa es la representación de línea del navegador.
+
 `dataBase64` es únicamente un formato temporal de transporte dentro del mensaje Web-App → extensión. La Web-App obtiene los bytes desde el `File`/`ArrayBuffer`, los serializa para el bridge y no persiste esa representación en Firestore, Firebase Storage, GitHub ni Netlify. La extensión reconstruye los bytes del archivo original antes de preparar el adjunto. Firestore conserva sólo metadatos de imágenes.
 
 El orden lógico definido por la Web-App es Imagen 1 → Imagen 2 → Imagen 3 → Texto. La extensión garantiza el orden técnico real.
@@ -113,14 +115,27 @@ El orden lógico definido por la Web-App es Imagen 1 → Imagen 2 → Imagen 3 �
 
 Antes del primer step de contenido la extensión debe completar:
 
-`openConversation → wait conversation → proveConversation → contenido`
+`openConversation → nueva generación del Content Script → proveConversation → contenido real`
 
 - composer visible no prueba identidad;
 - la URL `/send?phone=...` no prueba identidad por sí sola;
+- después de `/send`, la extensión espera una instancia nueva del Content Script antes de probar el chat;
 - sólo evidencia estructurada fuerte del peer activo permite avanzar;
 - si no puede demostrarse el destinatario, la campaña se pausa sin enviar;
 - si `sendAttempted=true`, Pause/Stop espera la reconciliación necesaria antes de cruzar la frontera segura;
 - un resultado ambiguo nunca se reintenta a ciegas.
+
+### Diagnósticos 0.9.3
+
+Los preflights automáticos y health checks son **no destructivos**. No pueden:
+
+- escribir o borrar texto del composer;
+- reemplazar un borrador existente;
+- adjuntar una imagen técnica;
+- abrir un preview artificial;
+- presionar Send.
+
+Las capacidades que sólo pueden demostrarse modificando la conversación se validan durante el step real con el contenido real, nunca mediante un probe sintético.
 
 ## Progreso
 
@@ -153,4 +168,4 @@ La extensión puede informar progreso tantas veces como sea útil, siempre con `
 
 El lado Flor Mía está implementado en `/gestion/marketing/whatsapp`. La Web-App valida origen, versión y schema, normaliza destinatarios antes del handoff, transfiere imágenes únicamente en memoria, persiste sólo metadatos y snapshots de destinatarios en subcolecciones y rechaza preparar una campaña mientras la extensión no informe `operational: true`.
 
-La extensión 0.9.2 conserva CampaignEngine/ContactEngine, checkpoints durables, prevención de duplicados y prueba de contexto de conversación antes de permitir contenido.
+La extensión 0.9.3 conserva CampaignEngine/ContactEngine, checkpoints durables, prevención de duplicados y prueba de contexto de conversación antes de permitir contenido. Los tests/build validan el contrato; una prueba manual con un único contacto autorizado sigue siendo obligatoria para declarar comportamiento real en WhatsApp Web.
