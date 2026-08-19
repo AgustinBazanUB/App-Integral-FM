@@ -1,9 +1,8 @@
 
 import {
-  isValidCustomerPhone,
+  canonicalWhatsAppPhone,
   normalizeCustomerPhone,
   normalizedSearchText,
-  phoneToWhatsAppInternational,
 } from "../../customers/customerDomain.js";
 
 export const WHATSAPP_PROTOCOL_VERSION = 1;
@@ -11,26 +10,42 @@ export const MAX_CAMPAIGN_IMAGES = 3;
 
 export const CAMPAIGN_STATUS_LABELS = Object.freeze({
   draft: "Borrador",
+  received: "Lista para iniciar",
   ready: "Lista para enviar",
-  running: "En proceso",
-  paused: "Pausada",
-  completed: "Finalizada",
-  error: "Con error",
-  cancelled: "Cancelada",
+  running: "Campaña en curso",
+  pause_requested: "Pausando…",
+  waiting_contact: "Campaña en curso",
+  waiting_batch: "Campaña en curso",
+  paused: "Campaña pausada",
+  daily_limit_reached: "Campaña pausada",
+  images_required: "Necesita revisión",
+  completed: "Campaña completada",
+  stopped: "Campaña detenida",
+  error: "Necesita revisión",
+  cancelled: "Campaña cancelada",
 });
 
 export const CAMPAIGN_STATUS_TONES = Object.freeze({
   draft: "neutral",
+  received: "info",
   ready: "info",
   running: "info",
+  pause_requested: "info",
+  waiting_contact: "info",
+  waiting_batch: "info",
   paused: "neutral",
+  daily_limit_reached: "neutral",
+  images_required: "warning",
   completed: "success",
+  stopped: "neutral",
   error: "error",
   cancelled: "neutral",
 });
 
-export const ACTIVE_CAMPAIGN_STATUSES = new Set(["ready", "running", "paused"]);
-export const FINAL_CAMPAIGN_STATUSES = new Set(["completed", "error", "cancelled"]);
+export const ACTIVE_CAMPAIGN_STATUSES = new Set([
+  "received", "ready", "running", "pause_requested", "waiting_contact", "waiting_batch", "paused", "daily_limit_reached", "images_required",
+]);
+export const FINAL_CAMPAIGN_STATUSES = new Set(["completed", "stopped", "error", "cancelled"]);
 
 const explicitlyBlockedFields = [
   "marketingEnabled",
@@ -100,10 +115,11 @@ export function recipientFromExcel(row = {}) {
 
 function normalizedCandidate(candidate = {}) {
   const phoneNormalized = normalizeCustomerPhone(candidate.phone);
+  const whatsappPhone = canonicalWhatsAppPhone(phoneNormalized);
   return {
     ...candidate,
     phoneNormalized,
-    whatsappPhone: phoneToWhatsAppInternational(phoneNormalized),
+    whatsappPhone,
   };
 }
 
@@ -149,17 +165,19 @@ export function analyzeRecipientCandidates(candidates = []) {
       invalidRows.push({ ...candidate, reason: "Sin teléfono" });
       continue;
     }
-    if (!isValidCustomerPhone(candidate.phoneNormalized) || !candidate.whatsappPhone) {
+    if (!candidate.whatsappPhone) {
       invalidPhone += 1;
-      invalidRows.push({ ...candidate, reason: "Teléfono inválido" });
+      invalidRows.push({ ...candidate, reason: "Celular argentino incompleto o ambiguo" });
       continue;
     }
-    const existing = unique.get(candidate.phoneNormalized);
+    // Dedupe por el mismo identificador canónico que recibe la extensión. Así +54 9,
+    // 0/15 legado y formato local no crean destinatarios duplicados.
+    const existing = unique.get(candidate.whatsappPhone);
     if (existing) {
       duplicates += 1;
-      unique.set(candidate.phoneNormalized, mergeDuplicate(existing, candidate));
+      unique.set(candidate.whatsappPhone, mergeDuplicate(existing, candidate));
     } else {
-      unique.set(candidate.phoneNormalized, candidate);
+      unique.set(candidate.whatsappPhone, candidate);
     }
   }
 
@@ -184,30 +202,54 @@ export function campaignRecipientDisplayPhone(recipient = {}) {
 }
 
 export async function recipientDocumentId(phone) {
-  const normalized = normalizeCustomerPhone(phone);
-  if (!isValidCustomerPhone(normalized)) throw new Error("El destinatario no tiene un teléfono válido.");
+  const canonical = canonicalWhatsAppPhone(phone);
+  if (!canonical) throw new Error("El destinatario no tiene un celular argentino válido para WhatsApp.");
   if (!globalThis.crypto?.subtle) throw new Error("Este navegador no permite generar identificadores seguros.");
-  const bytes = new TextEncoder().encode(`flor-mia:whatsapp-recipient:${normalized}`);
+  const bytes = new TextEncoder().encode(`flor-mia:whatsapp-recipient:${canonical}`);
   const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
   const hex = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   return `recipient_${hex.slice(0, 40)}`;
 }
 
+export function userFacingWhatsAppProblem({ code, message } = {}) {
+  if (code === "CONTACT_CONTEXT_UNVERIFIED") {
+    return "No pudimos confirmar que WhatsApp abrió el contacto correcto. La campaña se pausó para evitar enviar el mensaje a otra persona.";
+  }
+  if (code === "WHATSAPP_NOT_OPEN") return "WhatsApp Web no está abierto. Abrilo para continuar.";
+  if (code === "SESSION_NOT_READY") return "WhatsApp necesita iniciar sesión. Abrí WhatsApp Web y escaneá el código QR.";
+  if (["PREFLIGHT_FAILED", "WHATSAPP_UI_CHANGED"].includes(code)) return "WhatsApp cambió y necesitamos revisar la conexión antes de continuar.";
+  if (code === "INTERFACE_LOADING" || code === "TIMEOUT") return "WhatsApp Web todavía se está cargando. La campaña quedó pausada para continuar de forma segura.";
+  return String(message || "Hubo un problema y la campaña quedó pausada de forma segura.");
+}
+
 export function extensionPrimaryStatus(status = {}) {
-  return status.operational === true
-    ? { operational: true, label: "Operativa", tone: "success", message: status.message || "La extensión respondió correctamente." }
-    : { operational: false, label: "Error / requiere revisión", tone: "error", message: status.message || "Extensión no detectada o sin respuesta." };
+  if (status.operational === true) {
+    return {
+      operational: true,
+      label: "Conectado",
+      tone: "success",
+      message: status.message || "Listo para enviar.",
+    };
+  }
+  return {
+    operational: false,
+    label: status.errorCode === "WHATSAPP_NOT_OPEN" ? "WhatsApp Web no está abierto" : "Necesita revisión",
+    tone: "error",
+    message: userFacingWhatsAppProblem({ code: status.errorCode, message: status.message || "Extensión desconectada. Revisá Chrome para continuar." }),
+  };
 }
 
 export function campaignValidation({ name, recipients = [], message = "", images = [], extensionStatus, persistedImageMetadata = [] } = {}) {
   const errors = [];
   if (!String(name || "").trim()) errors.push("Ingresá un nombre para la campaña.");
   if (!recipients.length) errors.push("Seleccioná al menos un destinatario válido.");
-  if (recipients.some((recipient) => !isValidCustomerPhone(recipient.phoneNormalized || recipient.phone))) errors.push("Hay destinatarios con teléfonos inválidos.");
+  if (recipients.some((recipient) => !canonicalWhatsAppPhone(recipient.whatsappPhone || recipient.phoneNormalized || recipient.phone))) {
+    errors.push("Hay destinatarios cuyo celular no puede normalizarse de forma inequívoca para WhatsApp.");
+  }
   if (images.length > MAX_CAMPAIGN_IMAGES) errors.push("La campaña admite como máximo 3 imágenes.");
   if (!String(message || "").trim() && !images.length) errors.push("Ingresá un mensaje o agregá al menos una imagen.");
   if (persistedImageMetadata.length && images.length < persistedImageMetadata.length) errors.push("Volvé a seleccionar las imágenes del borrador antes de preparar la campaña.");
-  if (extensionStatus?.operational !== true) errors.push(extensionStatus?.message || "La extensión no está operativa.");
+  if (extensionStatus?.operational !== true) errors.push(userFacingWhatsAppProblem({ code: extensionStatus?.errorCode, message: extensionStatus?.message || "La extensión no está conectada." }));
   return { valid: errors.length === 0, errors };
 }
 
