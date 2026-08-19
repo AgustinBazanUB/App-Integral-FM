@@ -1,9 +1,9 @@
-  duration_ms: 1.783004
+  duration_ms: 2.397046
   ...
 # Subtest: 0.9.4.3 persiste y muestra confirmados vs enviados sin confirmación
 ok 163 - 0.9.4.3 persiste y muestra confirmados vs enviados sin confirmación
   ---
-  duration_ms: 3.518419
+  duration_ms: 2.17971
   ...
 1..163
 # tests 163
@@ -13,7 +13,7 @@ ok 163 - 0.9.4.3 persiste y muestra confirmados vs enviados sin confirmación
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 716.45043
+# duration_ms 782.472723
 
 > app-integral-fm@1.0.0 test:rules
 > node --test tests/firestore.rules.mjs
@@ -22,7 +22,7 @@ TAP version 13
 # Subtest: el vendedor sólo puede leer ubicaciones asignadas
 not ok 1 - el vendedor sólo puede leer ubicaciones asignadas
   ---
-  duration_ms: 15.252895
+  duration_ms: 14.035598
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:127:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -36,7 +36,7 @@ not ok 1 - el vendedor sólo puede leer ubicaciones asignadas
 # Subtest: el vendedor no puede crear ubicaciones
 not ok 2 - el vendedor no puede crear ubicaciones
   ---
-  duration_ms: 1.045532
+  duration_ms: 0.958189
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:133:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -50,7 +50,7 @@ not ok 2 - el vendedor no puede crear ubicaciones
 # Subtest: finanzas queda restringido al rol autorizado
 not ok 3 - finanzas queda restringido al rol autorizado
   ---
-  duration_ms: 0.086717
+  duration_ms: 0.084898
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:143:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -64,7 +64,7 @@ not ok 3 - finanzas queda restringido al rol autorizado
 # Subtest: el vendedor no puede ajustar stock fuera de una venta válida
 not ok 4 - el vendedor no puede ajustar stock fuera de una venta válida
   ---
-  duration_ms: 0.069495
+  duration_ms: 0.068658
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:150:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -78,7 +78,7 @@ not ok 4 - el vendedor no puede ajustar stock fuera de una venta válida
 # Subtest: una venta válida actualiza venta, movimiento y stock en la misma transacción
 not ok 5 - una venta válida actualiza venta, movimiento y stock en la misma transacción
   ---
-  duration_ms: 0.090534
+  duration_ms: 0.097673
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:165:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -92,7 +92,7 @@ not ok 5 - una venta válida actualiza venta, movimiento y stock en la misma tra
 # Subtest: la anulación conserva la venta y devuelve el stock de forma atómica
 not ok 6 - la anulación conserva la venta y devuelve el stock de forma atómica
   ---
-  duration_ms: 0.075687
+  duration_ms: 0.05867
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:215:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -106,7 +106,7 @@ not ok 6 - la anulación conserva la venta y devuelve el stock de forma atómica
 # Subtest: el vendedor no puede leer stock ni actividad de otra ubicación
 not ok 7 - el vendedor no puede leer stock ni actividad de otra ubicación
   ---
-  duration_ms: 0.064237
+  duration_ms: 0.076684
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:260:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -120,7 +120,7 @@ not ok 7 - el vendedor no puede leer stock ni actividad de otra ubicación
 # Subtest: un encargado puede cargar stock pero no asignar vendedores ni descuentos
 not ok 8 - un encargado puede cargar stock pero no asignar vendedores ni descuentos
   ---
-  duration_ms: 0.073102
+  duration_ms: 0.072735
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:268:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -134,7 +134,7 @@ not ok 8 - un encargado puede cargar stock pero no asignar vendedores ni descuen
 # Subtest: el vendedor puede resolver un cliente puntual pero no listar la base
 not ok 9 - el vendedor puede resolver un cliente puntual pero no listar la base
   ---
-  duration_ms: 0.227502
+  duration_ms: 0.221574
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:283:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -148,7 +148,7 @@ not ok 9 - el vendedor puede resolver un cliente puntual pero no listar la base
 # Subtest: el vendedor sólo puede listar zonas activas
 not ok 10 - el vendedor sólo puede listar zonas activas
   ---
-  duration_ms: 0.140173
+  duration_ms: 0.13917
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:289:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -162,7 +162,7 @@ not ok 10 - el vendedor sólo puede listar zonas activas
 # Subtest: cliente nuevo y venta quedan vinculados dentro de la misma operación
 not ok 11 - cliente nuevo y venta quedan vinculados dentro de la misma operación
   ---
-  duration_ms: 0.088791
+  duration_ms: 0.084357
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:297:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -176,7 +176,7 @@ not ok 11 - cliente nuevo y venta quedan vinculados dentro de la misma operació
 # Subtest: el vendedor no puede crear un cliente sin una venta vinculada
 not ok 12 - el vendedor no puede crear un cliente sin una venta vinculada
   ---
-  duration_ms: 0.101984
+  duration_ms: 0.067346
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:347:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -190,7 +190,7 @@ not ok 12 - el vendedor no puede crear un cliente sin una venta vinculada
 # Subtest: campañas WhatsApp quedan restringidas a marketing autorizado y sin binarios
 not ok 13 - campañas WhatsApp quedan restringidas a marketing autorizado y sin binarios
   ---
-  duration_ms: 0.066731
+  duration_ms: 0.058459
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:363:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -204,7 +204,7 @@ not ok 13 - campañas WhatsApp quedan restringidas a marketing autorizado y sin 
 # Subtest: destinatarios WhatsApp viven en subcolección protegida
 not ok 14 - destinatarios WhatsApp viven en subcolección protegida
   ---
-  duration_ms: 0.058376
+  duration_ms: 0.066203
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:406:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -218,7 +218,7 @@ not ok 14 - destinatarios WhatsApp viven en subcolección protegida
 # Subtest: reglas respetan denegación específica de envío WhatsApp
 not ok 15 - reglas respetan denegación específica de envío WhatsApp
   ---
-  duration_ms: 0.063484
+  duration_ms: 0.061555
   location: '/home/runner/work/App-Integral-FM/App-Integral-FM/tests/firestore.rules.mjs:428:1'
   failureType: 'hookFailed'
   error: "The host and port of the firestore emulator must be specified. (You may wrap the test script with `firebase emulators:exec './your-test-script'` to enable automatic discovery, or specify manually via initializeTestEnvironment({firestore: {host, port}})."
@@ -237,4 +237,4 @@ not ok 15 - reglas respetan denegación específica de envío WhatsApp
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 252.40627
+# duration_ms 238.055864
