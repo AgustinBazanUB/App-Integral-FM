@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildCustomerDraft,
+  canonicalWhatsAppPhone,
   customerDocumentId,
   customerWhatsAppUrl,
   formatPhoneForDisplay,
@@ -22,6 +23,22 @@ test("formatos equivalentes del mismo teléfono argentino producen la misma norm
 
 test("el formato móvil internacional +54 9 se normaliza al número nacional", () => {
   assert.equal(normalizeCustomerPhone("+54 9 11 6123-4567"), "1161234567");
+});
+
+test("el contrato WhatsApp canoniza formatos argentinos equivalentes a 549 + 10 dígitos", () => {
+  const variants = [
+    "11 5757-1979",
+    "+54 9 11 5757-1979",
+    "0054 9 11 5757-1979",
+    "011 15 5757-1979",
+  ];
+  assert.deepEqual([...new Set(variants.map((value) => canonicalWhatsAppPhone(value)))], ["5491157571979"]);
+});
+
+test("el contrato WhatsApp no adivina país ni acepta números argentinos ambiguos", () => {
+  assert.equal(canonicalWhatsAppPhone("5757-1979"), "");
+  assert.equal(canonicalWhatsAppPhone("261 555-123"), "");
+  assert.equal(canonicalWhatsAppPhone("11 5757-1979", { country: "UY" }), "");
 });
 
 test("el nombre es opcional pero la zona y el teléfono son obligatorios", () => {
@@ -74,7 +91,6 @@ test("la búsqueda administrativa encuentra teléfono, nombre y zona", () => {
   assert.equal(matchesCustomerSearch(customer, "sur"), false);
 });
 
-
 test("el teléfono CABA se muestra legible sin alterar la normalización", () => {
   assert.equal(formatPhoneForDisplay("1157571979"), "11-5757-1979");
   assert.equal(formatPhoneForDisplay("+54 9 11 5757-1979"), "11-5757-1979");
@@ -86,7 +102,7 @@ test("otros teléfonos conservan todos sus dígitos en el formato visible", () =
   assert.equal(formatPhoneForDisplay(normalized).replace(/\D/g, ""), normalized);
 });
 
-test("WhatsApp usa numeración internacional sin guiones ni datos adicionales", () => {
+test("WhatsApp usa numeración internacional canónica sin guiones ni datos adicionales", () => {
   assert.equal(customerWhatsAppUrl("11-5757-1979"), "https://wa.me/5491157571979");
   assert.doesNotMatch(customerWhatsAppUrl("11-5757-1979"), /[-?&]/);
 });
