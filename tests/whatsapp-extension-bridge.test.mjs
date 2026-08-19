@@ -4,7 +4,9 @@ import {
   EXTENSION_CHANNEL,
   EXTENSION_MESSAGE_TYPES,
   EXTENSION_TIMEOUTS,
+  pingWhatsAppExtension,
   prepareCampaignForExtension,
+  requestCampaignPause,
   requestCampaignStart,
   requestWhatsAppPreflight,
 } from "../src/gestion/marketing/whatsapp/extensionBridge.js";
@@ -13,7 +15,7 @@ async function withExtensionReply(replyType, run) {
   const listeners = new Set();
   const posted = [];
   const fakeWindow = {
-    location: { origin: "https://deploy-preview-7--appintegralflormia.netlify.app" },
+    location: { origin: "https://deploy-preview-8--appintegralflormia.netlify.app" },
     addEventListener(type, listener) {
       if (type === "message") listeners.add(listener);
     },
@@ -79,6 +81,27 @@ test("START se envía separado de PREPARE con campaignId y expectedSequence", as
     assert.equal(posted[0].envelope.campaignId, "campaign-1");
     assert.equal(posted[0].envelope.sequence, 1);
     assert.equal(response.sequence, 2);
+  });
+});
+
+test("dos refresh simultáneos reutilizan un único ping liviano", async () => {
+  await withExtensionReply(EXTENSION_MESSAGE_TYPES.status, async (posted) => {
+    const [first, second] = await Promise.all([pingWhatsAppExtension(), pingWhatsAppExtension()]);
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.ping);
+    assert.equal(first.operational, true);
+    assert.equal(second.operational, true);
+  });
+});
+
+test("PAUSE manda el control con requestedAt sin pedir diagnóstico pesado", async () => {
+  await withExtensionReply(EXTENSION_MESSAGE_TYPES.paused, async (posted) => {
+    const response = await requestCampaignPause("campaign-1");
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.pauseRequest);
+    assert.equal(posted[0].envelope.payload.campaignId, "campaign-1");
+    assert.equal(typeof posted[0].envelope.payload.requestedAt, "number");
+    assert.equal(response.completedAt >= response.requestedAt, true);
   });
 });
 
