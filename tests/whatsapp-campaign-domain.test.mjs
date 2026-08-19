@@ -9,19 +9,31 @@ import {
   extensionPrimaryStatus,
   extensionCampaignCounters,
   progressPercentage,
+  userFacingWhatsAppProblem,
 } from "../src/gestion/marketing/whatsapp/campaignDomain.js";
 import { detectExcelMapping, mapExcelRows } from "../src/gestion/marketing/whatsapp/excelImport.js";
 
 const flor = { source: "flor_mia", clientId: "c1", name: "Ana", phone: "11 5757-1979", zone: "Microcentro", category: "Premium" };
 const excel = { source: "excel", clientId: null, name: "Otro nombre", phone: "+54 9 11 5757 1979", zone: "", category: "", notes: "Excel" };
 
-test("deduplica Flor Mía + Excel y prioriza datos maestros", () => {
+test("deduplica Flor Mía + Excel por teléfono WhatsApp canónico y prioriza datos maestros", () => {
   const result = analyzeRecipientCandidates([excel, flor]);
   assert.equal(result.valid, 1);
   assert.equal(result.duplicates, 1);
   assert.equal(result.recipients[0].source, "flor_mia");
   assert.equal(result.recipients[0].clientId, "c1");
   assert.equal(result.recipients[0].name, "Ana");
+  assert.equal(result.recipients[0].whatsappPhone, "5491157571979");
+});
+
+test("formatos 0/15 y +54 9 del mismo móvil no generan destinatarios duplicados", () => {
+  const result = analyzeRecipientCandidates([
+    { source: "excel", phone: "011 15 5757-1979" },
+    { source: "excel", phone: "+54 9 11 5757-1979" },
+  ]);
+  assert.equal(result.valid, 1);
+  assert.equal(result.duplicates, 1);
+  assert.equal(result.recipients[0].whatsappPhone, "5491157571979");
 });
 
 test("contabiliza sin teléfono e inválidos sin mezclarlos con válidos", () => {
@@ -29,6 +41,13 @@ test("contabiliza sin teléfono e inválidos sin mezclarlos con válidos", () =>
   assert.equal(result.missingPhone, 1);
   assert.equal(result.invalid, 1);
   assert.equal(result.valid, 1);
+});
+
+test("un teléfono ambiguo no se completa silenciosamente para la extensión", () => {
+  const result = analyzeRecipientCandidates([{ source: "excel", phone: "5757-1979" }]);
+  assert.equal(result.valid, 0);
+  assert.equal(result.invalid, 1);
+  assert.match(result.invalidRows[0].reason, /ambiguo/i);
 });
 
 test("respeta bloqueos explícitos pero no inventa consentimiento cuando el campo no existe", () => {
@@ -55,7 +74,7 @@ test("mapping Excel detecta teléfono y deja nombre opcional", () => {
   assert.equal(rows[0].name, "");
 });
 
-test("validación final exige extensión operativa, destinatario y contenido", () => {
+test("validación final exige extensión operativa, destinatario canónico y contenido", () => {
   const invalid = campaignValidation({ name: "Campaña", recipients: [], message: "", images: [], extensionStatus: { operational: false, message: "Extensión no detectada" } });
   assert.equal(invalid.valid, false);
   const recipient = analyzeRecipientCandidates([flor]).recipients;
@@ -63,9 +82,21 @@ test("validación final exige extensión operativa, destinatario y contenido", (
   assert.equal(valid.valid, true);
 });
 
-test("estado extensión sólo se proyecta como verde o rojo", () => {
-  assert.equal(extensionPrimaryStatus({ operational: true }).tone, "success");
-  assert.equal(extensionPrimaryStatus({ operational: false }).tone, "error");
+test("estado de conexión usa vocabulario simple", () => {
+  assert.deepEqual(extensionPrimaryStatus({ operational: true, message: "Listo" }), {
+    operational: true,
+    label: "Conectado",
+    tone: "success",
+    message: "Listo",
+  });
+  assert.equal(extensionPrimaryStatus({ operational: false }).label, "Necesita revisión");
+});
+
+test("CONTACT_CONTEXT_UNVERIFIED se presenta como pausa de seguridad y no como capability", () => {
+  assert.equal(
+    userFacingWhatsAppProblem({ code: "CONTACT_CONTEXT_UNVERIFIED" }),
+    "No pudimos confirmar que WhatsApp abrió el contacto correcto. La campaña se pausó para evitar enviar el mensaje a otra persona.",
+  );
 });
 
 test("progreso deriva porcentaje sin superar 100", () => {
@@ -79,7 +110,6 @@ test("progreso de la extensión usa el contrato público sent/progress.completed
     { total: 1, sent: 1, errors: 0, progress: 100 },
   );
 });
-
 
 import { can } from "../src/gestion/permissions.js";
 
