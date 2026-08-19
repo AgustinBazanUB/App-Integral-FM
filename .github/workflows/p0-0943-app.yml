@@ -64,7 +64,6 @@ jobs:
           s=s.replace('''<div><dt>Enviados</dt><dd>{counters.sent}</dd></div><div><dt>Problemas</dt>''','''<div><dt>Enviados</dt><dd>{counters.sent}</dd></div><div><dt>Confirmados</dt><dd>{counters.confirmedSent}</dd></div><div><dt>Sin confirmación</dt><dd>{counters.unverifiedSent}</dd></div><div><dt>Problemas</dt>''')
           write(p,s)
 
-          # Domain tests: update expected shape and cover confirmed/unverified split.
           p='tests/whatsapp-campaign-domain.test.mjs'
           s=read(p)
           s=s.replace('{ total: 100, sent: 97, errors: 3, failed: 3, processed: 100, remaining: 0, progress: 100 }', '{ total: 100, sent: 97, confirmedSent: 97, unverifiedSent: 0, errors: 3, failed: 3, processed: 100, remaining: 0, progress: 100 }')
@@ -81,15 +80,15 @@ jobs:
           PY
             npm ci
             npm test
-            npm run test:rules
+            npx firebase-tools@14.12.0 emulators:exec --only firestore --project demo-flor-mia-integral "npm run test:rules"
             npm run build
           } 2>&1 | tee /tmp/p0-app.log
       - name: Commit Web App integration
         if: steps.work.outcome == 'success'
         shell: bash
         run: |
-          git rm .github/workflows/p0-0943-app.yml .p0-app-trigger 2>/dev/null || true
-          git rm -f .p0-0943-app-debug.txt 2>/dev/null || true
+          git rm .github/workflows/p0-0943-app.yml 2>/dev/null || true
+          git rm -f .p0-app-trigger .p0-app-trigger-2 .p0-0943-app-debug.txt 2>/dev/null || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
@@ -100,7 +99,7 @@ jobs:
         shell: bash
         run: |
           git reset --hard HEAD
-          tail -n 240 /tmp/p0-app.log > .p0-0943-app-debug.txt
+          tail -n 260 /tmp/p0-app.log > .p0-0943-app-debug.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .p0-0943-app-debug.txt
