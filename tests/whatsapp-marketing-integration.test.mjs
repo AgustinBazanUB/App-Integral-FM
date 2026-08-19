@@ -105,7 +105,7 @@ test("snapshot de PING se aplica por la misma cola y la secuencia evita retroces
     read("src/gestion/marketing/whatsapp/campaignService.js"),
   ]);
   assert.match(bridge, /campaign:\s*plainObject\(response\.payload\.campaign\)/);
-  assert.match(sync, /applyExtensionCampaignSnapshot/);
+  assert.match(sync, /applyReconciledExtensionCampaignSnapshot/);
   assert.match(sync, /createCampaignEventQueue/);
   assert.match(service, /sequence && sequence <= lastSequence/);
   assert.match(service, /processedCount/);
