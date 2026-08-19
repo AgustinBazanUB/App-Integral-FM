@@ -4,12 +4,14 @@ import {
   EXTENSION_CHANNEL,
   EXTENSION_MESSAGE_TYPES,
   EXTENSION_TIMEOUTS,
+  extensionConnectionState,
+  pingWhatsAppExtension,
   prepareCampaignForExtension,
   requestCampaignStart,
   requestWhatsAppPreflight,
 } from "../src/gestion/marketing/whatsapp/extensionBridge.js";
 
-async function withExtensionReply(replyType, run) {
+async function withExtensionReply(replyType, run, payloadOverride = null) {
   const listeners = new Set();
   const posted = [];
   const fakeWindow = {
@@ -31,9 +33,20 @@ async function withExtensionReply(replyType, run) {
           replyTo: envelope.requestId,
           campaignId: envelope.campaignId,
           sequence: 2,
-          payload: replyType === EXTENSION_MESSAGE_TYPES.status
-            ? { operational: true, message: "Conexión operativa", configuredLimit: 1000, sentToday: 0, availableToday: 1000 }
-            : { campaignId: envelope.campaignId, sequence: 2 },
+          payload: payloadOverride || (replyType === EXTENSION_MESSAGE_TYPES.status
+            ? {
+                operational: true,
+                message: "Conexión operativa",
+                configuredLimit: 1000,
+                sentToday: 0,
+                availableToday: 1000,
+                extensionVersion: "0.9.4",
+                bridgeInstanceId: "bridge-2",
+                bridgeGeneration: 2,
+                bridgeCreatedAt: "2026-08-19T03:00:00.000Z",
+                runtimeAvailable: true,
+              }
+            : { campaignId: envelope.campaignId, sequence: 2 }),
         };
         for (const listener of listeners) listener({ source: fakeWindow, origin, data: response });
       });
@@ -105,4 +118,21 @@ test("Comprobar solicita un preflight nuevo en vez de leer solamente el estado a
     assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.preflightRequest);
     assert.equal(status.operational, true);
   });
+});
+
+test("PING concurrente se deduplica y conserva una sola comprobación lightweight", async () => {
+  await withExtensionReply(EXTENSION_MESSAGE_TYPES.status, async (posted) => {
+    const [first, second] = await Promise.all([pingWhatsAppExtension(), pingWhatsAppExtension()]);
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.ping);
+    assert.equal(first.connectionState, "connected");
+    assert.deepEqual(first, second);
+    assert.equal(first.bridgeGeneration, 2);
+  });
+});
+
+test("EXTENSION_CONTEXT_INVALIDATED pide reload controlado en vez de reintentos infinitos", () => {
+  assert.equal(extensionConnectionState({ operational: false, errorCode: "EXTENSION_CONTEXT_INVALIDATED" }), "needs_page_reload");
+  assert.equal(extensionConnectionState({ operational: true }), "connected");
+  assert.equal(extensionConnectionState({ operational: false, errorCode: "extension_unavailable" }), "disconnected");
 });
