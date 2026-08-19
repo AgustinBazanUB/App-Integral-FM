@@ -1,4 +1,3 @@
-
 import { WHATSAPP_PROTOCOL_VERSION } from "./campaignDomain.js";
 
 export const EXTENSION_CHANNEL = "flor_mia_whatsapp_extension";
@@ -110,6 +109,11 @@ export function subscribeExtensionMessages(callback) {
   };
 }
 
+function emitLocalEnvelope(message) {
+  for (const subscriber of subscribers) subscriber(message);
+  return message;
+}
+
 function postEnvelope(type, { payload = {}, campaignId = null, sequence = null, transfer = [] } = {}) {
   if (typeof window === "undefined") throw new Error("La integración con la extensión requiere un navegador.");
   const id = requestId();
@@ -168,6 +172,36 @@ function waitForReply(id, acceptedTypes, timeoutMs, { signal } = {}) {
     timer = window.setTimeout(() => {
       finish(() => reject(new Error(`La extensión no respondió dentro del tiempo esperado (${Math.round(timeoutMs / 1000)} s).`)));
     }, timeoutMs);
+  });
+}
+
+function extensionResponseError(response, fallbackMessage) {
+  const error = new Error(response?.payload?.message || fallbackMessage);
+  error.code = response?.payload?.code || response?.payload?.errorCode || "extension_control_failed";
+  error.recoverable = response?.payload?.recoverable !== false;
+  if (plainObject(response?.payload?.details)) error.details = response.payload.details;
+  return error;
+}
+
+function campaignConflict(message) {
+  const error = new Error(message);
+  error.code = "CAMPAIGN_CONFLICT";
+  error.recoverable = true;
+  return error;
+}
+
+function syntheticStoppedEnvelope(campaignId, campaign = null, { emitterReleased = false } = {}) {
+  return emitLocalEnvelope({
+    channel: EXTENSION_CHANNEL,
+    protocolVersion: WHATSAPP_PROTOCOL_VERSION,
+    type: EXTENSION_MESSAGE_TYPES.stopped,
+    campaignId,
+    payload: {
+      ...(plainObject(campaign) ? campaign : {}),
+      campaignId,
+      status: "stopped",
+      emitterReleased,
+    },
   });
 }
 
@@ -237,6 +271,15 @@ export function pingWhatsAppExtension({ timeoutMs = EXTENSION_TIMEOUTS.ping, sig
   return operation;
 }
 
+export async function requestCampaignStatus({ timeoutMs = EXTENSION_TIMEOUTS.ping, signal } = {}) {
+  const id = postEnvelope(EXTENSION_MESSAGE_TYPES.statusRequest, { payload: {} });
+  const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.status, EXTENSION_MESSAGE_TYPES.error]), timeoutMs, { signal });
+  if (response.type === EXTENSION_MESSAGE_TYPES.error) {
+    throw extensionResponseError(response, "No se pudo consultar el estado activo de la campaña.");
+  }
+  return statusFromResponse(response);
+}
+
 export async function prepareCampaignForExtension(campaign, imageItems = [], { timeoutMs = EXTENSION_TIMEOUTS.prepare } = {}) {
   const transferredImages = [];
   for (let index = 0; index < imageItems.length; index += 1) {
@@ -266,7 +309,7 @@ export async function prepareCampaignForExtension(campaign, imageItems = [], { t
   });
   const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.accepted, EXTENSION_MESSAGE_TYPES.error]), timeoutMs);
   if (response.type === EXTENSION_MESSAGE_TYPES.error) {
-    throw new Error(response.payload?.message || "La extensión rechazó la campaña.");
+    throw extensionResponseError(response, "La extensión rechazó la campaña.");
   }
   return response;
 }
@@ -286,7 +329,7 @@ async function requestCampaignControl(type, campaignId, acceptedTypes, { sequenc
   const id = postEnvelope(type, { campaignId, sequence, payload: { campaignId } });
   const response = await waitForReply(id, new Set([...acceptedTypes, EXTENSION_MESSAGE_TYPES.error]), timeoutMs, { signal });
   if (response.type === EXTENSION_MESSAGE_TYPES.error) {
-    throw new Error(response.payload?.message || "La extensión rechazó el control de campaña.");
+    throw extensionResponseError(response, "La extensión rechazó el control de campaña.");
   }
   return response;
 }
@@ -311,12 +354,62 @@ export function requestCampaignRetryFailed(campaignId, options = {}) {
   return requestCampaignControl(EXTENSION_MESSAGE_TYPES.retryFailedRequest, campaignId, [EXTENSION_MESSAGE_TYPES.started, EXTENSION_MESSAGE_TYPES.paused], options);
 }
 
-export function requestCampaignStop(campaignId, options = {}) {
-  return requestCampaignControl(EXTENSION_MESSAGE_TYPES.stopRequest, campaignId, [EXTENSION_MESSAGE_TYPES.stopped, EXTENSION_MESSAGE_TYPES.cancelled], options);
+export async function requestCampaignStop(campaignId, options = {}) {
+  const live = await requestCampaignStatus({
+    timeoutMs: Math.min(options.timeoutMs ?? EXTENSION_TIMEOUTS.control, EXTENSION_TIMEOUTS.ping),
+    signal: options.signal,
+  });
+  const active = live.campaign;
+  if (!active) {
+    return syntheticStoppedEnvelope(campaignId, null, { emitterReleased: true });
+  }
+  if (active.campaignId !== campaignId) {
+    throw campaignConflict(`La extensión está controlando otra campaña (${active.campaignName || active.campaignId}). Actualizá la pantalla antes de detener.`);
+  }
+  if (active.status === "stopped") {
+    return syntheticStoppedEnvelope(campaignId, active, { emitterReleased: false });
+  }
+  return requestCampaignControl(
+    EXTENSION_MESSAGE_TYPES.stopRequest,
+    campaignId,
+    [EXTENSION_MESSAGE_TYPES.stopped, EXTENSION_MESSAGE_TYPES.cancelled],
+    { ...options, sequence: Number.isInteger(active.sequence) ? active.sequence : options.sequence },
+  );
 }
 
-export function requestCampaignDelete(campaignId, options = {}) {
-  return requestCampaignControl(EXTENSION_MESSAGE_TYPES.deleteRequest, campaignId, [EXTENSION_MESSAGE_TYPES.stopped], options);
+export async function requestCampaignDelete(campaignId, options = {}) {
+  const queryOptions = {
+    timeoutMs: Math.min(options.timeoutMs ?? EXTENSION_TIMEOUTS.control, EXTENSION_TIMEOUTS.ping),
+    signal: options.signal,
+  };
+  const live = await requestCampaignStatus(queryOptions);
+  const active = live.campaign;
+  if (!active || active.campaignId !== campaignId) {
+    return syntheticStoppedEnvelope(campaignId, null, { emitterReleased: true });
+  }
+  if (active.status !== "stopped") {
+    throw campaignConflict("La campaña todavía está activa en la extensión. Primero detenela y, cuando figure como detenida, volvé a borrarla.");
+  }
+  try {
+    const response = await requestCampaignControl(
+      EXTENSION_MESSAGE_TYPES.deleteRequest,
+      campaignId,
+      [EXTENSION_MESSAGE_TYPES.stopped],
+      { ...options, sequence: Number.isInteger(active.sequence) ? active.sequence : options.sequence },
+    );
+    if (response?.payload?.emitterReleased === true) return response;
+    return emitLocalEnvelope({
+      ...response,
+      payload: { ...(response.payload || {}), emitterReleased: true },
+    });
+  } catch (error) {
+    if (error?.code !== "CAMPAIGN_CONFLICT") throw error;
+    const after = await requestCampaignStatus(queryOptions);
+    if (!after.campaign || after.campaign.campaignId !== campaignId) {
+      return syntheticStoppedEnvelope(campaignId, null, { emitterReleased: true });
+    }
+    throw error;
+  }
 }
 
 export async function requestCampaignCancellation(campaignId, { timeoutMs = EXTENSION_TIMEOUTS.control } = {}) {
