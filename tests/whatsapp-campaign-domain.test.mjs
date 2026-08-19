@@ -105,6 +105,13 @@ test("CONTACT_CONTEXT_UNVERIFIED se presenta como pausa de seguridad y no como c
   );
 });
 
+test("INTERFACE_LOADING explica que no terminó de abrirse el contacto sin afirmar un falso problema de compatibilidad", () => {
+  assert.equal(
+    userFacingWhatsAppProblem({ code: "INTERFACE_LOADING" }),
+    "WhatsApp necesita unos segundos más. No pudimos terminar de abrir el contacto. La campaña se pausó para evitar un envío incorrecto.",
+  );
+});
+
 test("progreso deriva porcentaje sin superar 100", () => {
   assert.equal(progressPercentage(487, 240), 49);
   assert.equal(progressPercentage(10, 99), 100);
