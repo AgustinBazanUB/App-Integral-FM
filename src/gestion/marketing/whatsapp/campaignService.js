@@ -303,7 +303,7 @@ const extensionStatusByType = {
   [EXTENSION_MESSAGE_TYPES.resumed]: "running",
   [EXTENSION_MESSAGE_TYPES.completed]: "completed",
   [EXTENSION_MESSAGE_TYPES.error]: "error",
-  [EXTENSION_MESSAGE_TYPES.stopped]: "cancelled",
+  [EXTENSION_MESSAGE_TYPES.stopped]: "stopped",
   [EXTENSION_MESSAGE_TYPES.cancelled]: "cancelled",
 };
 
@@ -314,7 +314,7 @@ const actionByType = {
   [EXTENSION_MESSAGE_TYPES.resumed]: "whatsappCampaign.running",
   [EXTENSION_MESSAGE_TYPES.completed]: "whatsappCampaign.completed",
   [EXTENSION_MESSAGE_TYPES.error]: "whatsappCampaign.error",
-  [EXTENSION_MESSAGE_TYPES.stopped]: "whatsappCampaign.cancelled",
+  [EXTENSION_MESSAGE_TYPES.stopped]: "whatsappCampaign.stopped",
   [EXTENSION_MESSAGE_TYPES.cancelled]: "whatsappCampaign.cancelled",
 };
 
@@ -341,12 +341,13 @@ export async function applyExtensionCampaignEvent(profile, message) {
       lastExtensionUpdateAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       ...(status === "running" && !current.startedAt ? { startedAt: serverTimestamp() } : {}),
-      ...(["completed", "error", "cancelled"].includes(status) ? { finishedAt: serverTimestamp() } : {}),
+      ...(["completed", "error", "cancelled", "stopped"].includes(status) ? { finishedAt: serverTimestamp() } : {}),
       ...(status === "error" ? {
         extensionErrorCode: message.payload?.errorCode || message.payload?.errorSummary?.code || "extension_error",
         extensionErrorMessage: message.payload?.message || message.payload?.errorSummary?.message || "La extensión informó un error.",
       } : {}),
       ...(status === "cancelled" ? { cancelledAt: serverTimestamp(), cancelledBy: profile.id } : {}),
+      ...(status === "stopped" ? { stoppedAt: serverTimestamp(), stoppedBy: profile.id } : {}),
     };
     transaction.set(campaignRef, update, { merge: true });
     const statusChanged = current.status !== status;
