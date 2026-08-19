@@ -15,56 +15,20 @@ async function patch(path, replacements) {
 
 const pageChanged = await patch("src/gestion/pages/WhatsAppCampaignsPage.jsx", [
   [
-`function ExtensionStatus({ status, refreshing, onRefresh }) {\n  const primary = extensionPrimaryStatus(status);`,
-`function ExtensionStatus({ status, refreshing, onRefresh, onReconnect }) {\n  const primary = extensionPrimaryStatus(status);\n  const reconnect = status.connectionState && status.connectionState !== "connected";`
+`    let heartbeatController = null;\n    let reconnectAttempt = 0;\n    const retryDelays = [1000, 3000, 10000, 30000];`,
+`    let heartbeatController = null;\n    let heartbeatRunning = false;\n    let reconnectAttempt = 0;\n    const retryDelays = [1000, 3000, 10000, 30000];`
   ],
   [
-`      <Button variant="secondary" icon="RefreshCw" loading={refreshing} onClick={onRefresh}>Revisar conexión</Button>`,
-`      <Button variant="secondary" icon="RefreshCw" loading={refreshing} onClick={reconnect ? (onReconnect || onRefresh) : onRefresh}>{reconnect ? "Reconectar" : "Revisar conexión"}</Button>`
-  ],
-  [
-`  const [error, setError] = useState("");\n  useEffect(() => { listCampaignEvents(profile, campaign.id).then(setEvents).catch((cause) => setError(cause.message)); }, [campaign.id, profile.id]);\n\n  const runControl = async (kind) => {\n    if (pendingControl) return;\n    setPendingControl(kind);`,
-`  const [error, setError] = useState("");\n  const controlInFlightRef = useRef(false);\n  useEffect(() => { listCampaignEvents(profile, campaign.id).then(setEvents).catch((cause) => setError(cause.message)); }, [campaign.id, profile.id]);\n\n  const runControl = async (kind) => {\n    if (controlInFlightRef.current || pendingControl) return;\n    controlInFlightRef.current = true;\n    setPendingControl(kind);`
-  ],
-  [
-`    } catch (cause) {\n      setError(cause.message || "No se pudo aplicar el control. Revisá la conexión e intentá nuevamente.");\n      setPendingControl("");\n    }\n  };`,
-`    } catch (cause) {\n      controlInFlightRef.current = false;\n      setError(cause.message || "No se pudo aplicar el control. Revisá la conexión e intentá nuevamente.");\n      setPendingControl("");\n    }\n  };`
-  ],
-  [
-`  const [extensionStatus, setExtensionStatus] = useState({ operational: false, message: "Comprobando conexión…", configuredLimit: 0, sentToday: 0, availableToday: 0 });`,
-`  const [extensionStatus, setExtensionStatus] = useState({ operational: false, connectionState: "reconnecting", message: "Comprobando conexión…", configuredLimit: 0, sentToday: 0, availableToday: 0 });`
-  ],
-  [
-`  const refreshExtension = async () => {\n    const status = await pingWhatsAppExtension();\n    setExtensionStatus(status);\n  };`,
-`  const refreshExtension = async () => {\n    const status = await pingWhatsAppExtension();\n    setExtensionStatus(status);\n    return status;\n  };\n\n  const reconnectExtension = async () => {\n    if (extensionStatus.connectionState === "needs_page_reload") {\n      window.location.reload();\n      return;\n    }\n    setExtensionStatus((current) => ({ ...current, operational: false, connectionState: "reconnecting", message: "Reconectando la extensión…" }));\n    await refreshExtension();\n  };`
-  ],
-  [
-`  useEffect(() => {\n    refreshExtension();\n    loadCampaigns();\n    const refreshWhenVisible = () => {\n      if (document.visibilityState === "visible") refreshExtension();\n    };\n    document.addEventListener("visibilitychange", refreshWhenVisible);\n    window.addEventListener("focus", refreshWhenVisible);`,
-`  useEffect(() => {\n    let cancelled = false;\n    let heartbeatTimer = null;\n    let heartbeatController = null;\n    let reconnectAttempt = 0;\n    const retryDelays = [1000, 3000, 10000, 30000];\n\n    const scheduleHeartbeat = (delay) => {\n      window.clearTimeout(heartbeatTimer);\n      if (cancelled || document.visibilityState !== "visible") return;\n      heartbeatTimer = window.setTimeout(runHeartbeat, delay);\n    };\n    const runHeartbeat = async () => {\n      if (cancelled || document.visibilityState !== "visible") return;\n      heartbeatController?.abort();\n      heartbeatController = new AbortController();\n      try {\n        const status = await pingWhatsAppExtension({ signal: heartbeatController.signal });\n        if (cancelled) return;\n        if (status.connectionState === "connected") {\n          reconnectAttempt = 0;\n          setExtensionStatus(status);\n          scheduleHeartbeat(30000);\n          return;\n        }\n        if (status.connectionState === "needs_page_reload") {\n          setExtensionStatus(status);\n          return;\n        }\n        const delay = retryDelays[Math.min(reconnectAttempt, retryDelays.length - 1)];\n        reconnectAttempt += 1;\n        setExtensionStatus({ ...status, connectionState: "reconnecting", message: "Reconectando la extensión…" });\n        scheduleHeartbeat(delay);\n      } catch (cause) {\n        if (cause?.name !== "AbortError" && !cancelled) scheduleHeartbeat(retryDelays[Math.min(reconnectAttempt++, retryDelays.length - 1)]);\n      }\n    };\n\n    runHeartbeat();\n    loadCampaigns();\n    const refreshWhenVisible = () => {\n      if (document.visibilityState === "visible") {\n        reconnectAttempt = 0;\n        runHeartbeat();\n      } else {\n        heartbeatController?.abort();\n        window.clearTimeout(heartbeatTimer);\n      }\n    };\n    document.addEventListener("visibilitychange", refreshWhenVisible);\n    window.addEventListener("focus", refreshWhenVisible);`
-  ],
-  [
-`    return () => {\n      document.removeEventListener("visibilitychange", refreshWhenVisible);\n      window.removeEventListener("focus", refreshWhenVisible);\n      unsubscribe();\n    };`,
-`    return () => {\n      cancelled = true;\n      heartbeatController?.abort();\n      window.clearTimeout(heartbeatTimer);\n      document.removeEventListener("visibilitychange", refreshWhenVisible);\n      window.removeEventListener("focus", refreshWhenVisible);\n      unsubscribe();\n    };`
-  ],
-  [
-`          errorCode: message.payload.errorCode || "",\n          extensionVersion: message.payload.extensionVersion || "",`,
-`          errorCode: message.payload.errorCode || "",\n          connectionState: message.payload.operational === true ? "connected" : message.payload.errorCode === "EXTENSION_CONTEXT_INVALIDATED" ? "needs_page_reload" : "disconnected",\n          extensionVersion: message.payload.extensionVersion || "",\n          bridgeInstanceId: message.payload.bridgeInstanceId || "",\n          bridgeGeneration: Number(message.payload.bridgeGeneration || 0),`
-  ],
-  [
-`    <ExtensionStatus status={extensionStatus} refreshing={extensionBusy} onRefresh={diagnoseExtension} />`,
-`    <ExtensionStatus status={extensionStatus} refreshing={extensionBusy} onRefresh={diagnoseExtension} onReconnect={reconnectExtension} />`
+`    const runHeartbeat = async () => {\n      if (cancelled || document.visibilityState !== "visible") return;\n      heartbeatController?.abort();\n      heartbeatController = new AbortController();\n      try {\n        const status = await pingWhatsAppExtension({ signal: heartbeatController.signal });\n        if (cancelled) return;\n        if (status.connectionState === "connected") {\n          reconnectAttempt = 0;\n          setExtensionStatus(status);\n          scheduleHeartbeat(30000);\n          return;\n        }\n        if (status.connectionState === "needs_page_reload") {\n          setExtensionStatus(status);\n          return;\n        }\n        const delay = retryDelays[Math.min(reconnectAttempt, retryDelays.length - 1)];\n        reconnectAttempt += 1;\n        setExtensionStatus({ ...status, connectionState: "reconnecting", message: "Reconectando la extensión…" });\n        scheduleHeartbeat(delay);\n      } catch (cause) {\n        if (cause?.name !== "AbortError" && !cancelled) scheduleHeartbeat(retryDelays[Math.min(reconnectAttempt++, retryDelays.length - 1)]);\n      }\n    };`,
+`    const runHeartbeat = async () => {\n      if (cancelled || document.visibilityState !== "visible" || heartbeatRunning) return;\n      heartbeatRunning = true;\n      const controller = new AbortController();\n      heartbeatController = controller;\n      try {\n        const status = await pingWhatsAppExtension({ signal: controller.signal });\n        if (cancelled || controller.signal.aborted) return;\n        if (status.connectionState === "connected") {\n          reconnectAttempt = 0;\n          setExtensionStatus(status);\n          scheduleHeartbeat(60000);\n          return;\n        }\n        if (status.connectionState === "needs_page_reload") {\n          setExtensionStatus(status);\n          return;\n        }\n        if (reconnectAttempt >= retryDelays.length) {\n          setExtensionStatus({ ...status, connectionState: "disconnected", message: status.message || "No pudimos contactar la extensión." });\n          return;\n        }\n        const delay = retryDelays[reconnectAttempt];\n        reconnectAttempt += 1;\n        setExtensionStatus({ ...status, connectionState: "reconnecting", message: "Reconectando la extensión…" });\n        scheduleHeartbeat(delay);\n      } catch (cause) {\n        if (cause?.name === "AbortError" || cancelled) return;\n        if (reconnectAttempt >= retryDelays.length) {\n          setExtensionStatus((current) => ({ ...current, operational: false, connectionState: "disconnected", message: "No pudimos contactar la extensión." }));\n          return;\n        }\n        scheduleHeartbeat(retryDelays[reconnectAttempt]);\n        reconnectAttempt += 1;\n      } finally {\n        if (heartbeatController === controller) heartbeatController = null;\n        heartbeatRunning = false;\n      }\n    };`
   ]
 ]);
 
-const domainChanged = await patch("src/gestion/marketing/whatsapp/campaignDomain.js", [
+const bridgeChanged = await patch("src/gestion/marketing/whatsapp/extensionBridge.js", [
   [
-`  if (code === "WHATSAPP_NOT_OPEN") return "WhatsApp Web no está abierto. Abrilo para continuar.";`,
-`  if (code === "EXTENSION_CONTEXT_INVALIDATED") return "Necesitamos reconectar la extensión.";\n  if (code === "WHATSAPP_NOT_OPEN") return "WhatsApp Web no está abierto. Abrilo para continuar.";`
-  ],
-  [
-`export function extensionPrimaryStatus(status = {}) {\n  if (status.operational === true) {`,
-`export function extensionPrimaryStatus(status = {}) {\n  if (status.connectionState === "needs_page_reload") {\n    return { operational: false, label: "Necesitamos reconectar la extensión", tone: "warning", message: "Usá Reconectar para actualizar esta pantalla y volver a enlazar la extensión." };\n  }\n  if (status.connectionState === "reconnecting") {\n    return { operational: false, label: "Reconectando…", tone: "info", message: status.message || "Restableciendo la conexión con la extensión." };\n  }\n  if (status.connectionState === "disconnected") {\n    return { operational: false, label: "Extensión desconectada", tone: "error", message: status.message || "No pudimos contactar la extensión." };\n  }\n  if (status.operational === true) {`
+`  pingInFlight = operation;\n  void operation.finally(() => {\n    if (pingInFlight === operation) pingInFlight = null;\n  });\n  return operation;`,
+`  pingInFlight = operation;\n  const clear = () => {\n    if (pingInFlight === operation) pingInFlight = null;\n  };\n  operation.then(clear, clear);\n  return operation;`
   ]
 ]);
 
-console.log(JSON.stringify({ pageChanged, domainChanged }));
+console.log(JSON.stringify({ pageChanged, bridgeChanged }));
