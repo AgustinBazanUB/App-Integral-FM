@@ -64,15 +64,16 @@ function imageMetadata(images) {
   return images.map((item, index) => ({ name: item.file.name, type: item.file.type, size: item.file.size, order: index + 1 }));
 }
 
-function ExtensionStatus({ status, refreshing, onRefresh }) {
+function ExtensionStatus({ status, refreshing, onRefresh, onReconnect }) {
   const primary = extensionPrimaryStatus(status);
+  const reconnect = status.connectionState && status.connectionState !== "connected";
   return (
     <section className={`fm-wa-extension is-${primary.operational ? "operational" : "error"}`} aria-live="polite">
       <div className="fm-wa-extension__state">
         <span className="fm-wa-extension__icon"><Icon name={primary.operational ? "Check" : "AlertTriangle"} /></span>
         <div><small>Conexión con WhatsApp</small><strong>{primary.label}</strong><p>{primary.message}</p></div>
       </div>
-      <Button variant="secondary" icon="RefreshCw" loading={refreshing} onClick={onRefresh}>Revisar conexión</Button>
+      <Button variant="secondary" icon="RefreshCw" loading={refreshing} onClick={reconnect ? (onReconnect || onRefresh) : onRefresh}>{reconnect ? "Reconectar" : "Revisar conexión"}</Button>
       <div className="fm-wa-extension__limits">
         <span><b>{Number(status.configuredLimit || 0).toLocaleString("es-AR")}</b><small>Límite configurado</small></span>
         <span><b>{Number(status.sentToday || 0).toLocaleString("es-AR")}</b><small>Enviados hoy</small></span>
@@ -396,10 +397,12 @@ function CampaignDetail({ campaign, profile, onClose, onContinue, onChanged }) {
   const [events, setEvents] = useState([]);
   const [pendingControl, setPendingControl] = useState("");
   const [error, setError] = useState("");
+  const controlInFlightRef = useRef(false);
   useEffect(() => { listCampaignEvents(profile, campaign.id).then(setEvents).catch((cause) => setError(cause.message)); }, [campaign.id, profile.id]);
 
   const runControl = async (kind) => {
-    if (pendingControl) return;
+    if (controlInFlightRef.current || pendingControl) return;
+    controlInFlightRef.current = true;
     setPendingControl(kind);
     setError("");
     try {
@@ -415,6 +418,7 @@ function CampaignDetail({ campaign, profile, onClose, onContinue, onChanged }) {
       await onChanged();
       onClose();
     } catch (cause) {
+      controlInFlightRef.current = false;
       setError(cause.message || "No se pudo aplicar el control. Revisá la conexión e intentá nuevamente.");
       setPendingControl("");
     }
@@ -451,7 +455,7 @@ function CampaignDetail({ campaign, profile, onClose, onContinue, onChanged }) {
 
 export default function WhatsAppCampaignsPage() {
   const { profile } = useAuth();
-  const [extensionStatus, setExtensionStatus] = useState({ operational: false, message: "Comprobando conexión…", configuredLimit: 0, sentToday: 0, availableToday: 0 });
+  const [extensionStatus, setExtensionStatus] = useState({ operational: false, connectionState: "reconnecting", message: "Comprobando conexión…", configuredLimit: 0, sentToday: 0, availableToday: 0 });
   const [extensionBusy, setExtensionBusy] = useState(false);
   const [campaigns, setCampaigns] = useState([]);
   const [cursor, setCursor] = useState(null);
@@ -466,6 +470,16 @@ export default function WhatsAppCampaignsPage() {
   const refreshExtension = async () => {
     const status = await pingWhatsAppExtension();
     setExtensionStatus(status);
+    return status;
+  };
+
+  const reconnectExtension = async () => {
+    if (extensionStatus.connectionState === "needs_page_reload") {
+      window.location.reload();
+      return;
+    }
+    setExtensionStatus((current) => ({ ...current, operational: false, connectionState: "reconnecting", message: "Reconectando la extensión…" }));
+    await refreshExtension();
   };
 
   const diagnoseExtension = async () => {
@@ -490,10 +504,53 @@ export default function WhatsAppCampaignsPage() {
   };
 
   useEffect(() => {
-    refreshExtension();
+    let cancelled = false;
+    let heartbeatTimer = null;
+    let heartbeatController = null;
+    let reconnectAttempt = 0;
+    const retryDelays = [1000, 3000, 10000, 30000];
+
+    const scheduleHeartbeat = (delay) => {
+      window.clearTimeout(heartbeatTimer);
+      if (cancelled || document.visibilityState !== "visible") return;
+      heartbeatTimer = window.setTimeout(runHeartbeat, delay);
+    };
+    const runHeartbeat = async () => {
+      if (cancelled || document.visibilityState !== "visible") return;
+      heartbeatController?.abort();
+      heartbeatController = new AbortController();
+      try {
+        const status = await pingWhatsAppExtension({ signal: heartbeatController.signal });
+        if (cancelled) return;
+        if (status.connectionState === "connected") {
+          reconnectAttempt = 0;
+          setExtensionStatus(status);
+          scheduleHeartbeat(30000);
+          return;
+        }
+        if (status.connectionState === "needs_page_reload") {
+          setExtensionStatus(status);
+          return;
+        }
+        const delay = retryDelays[Math.min(reconnectAttempt, retryDelays.length - 1)];
+        reconnectAttempt += 1;
+        setExtensionStatus({ ...status, connectionState: "reconnecting", message: "Reconectando la extensión…" });
+        scheduleHeartbeat(delay);
+      } catch (cause) {
+        if (cause?.name !== "AbortError" && !cancelled) scheduleHeartbeat(retryDelays[Math.min(reconnectAttempt++, retryDelays.length - 1)]);
+      }
+    };
+
+    runHeartbeat();
     loadCampaigns();
     const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") refreshExtension();
+      if (document.visibilityState === "visible") {
+        reconnectAttempt = 0;
+        runHeartbeat();
+      } else {
+        heartbeatController?.abort();
+        window.clearTimeout(heartbeatTimer);
+      }
     };
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("focus", refreshWhenVisible);
@@ -506,7 +563,10 @@ export default function WhatsAppCampaignsPage() {
           sentToday: Number(message.payload.sentToday || 0),
           availableToday: Number(message.payload.availableToday || 0),
           errorCode: message.payload.errorCode || "",
+          connectionState: message.payload.operational === true ? "connected" : message.payload.errorCode === "EXTENSION_CONTEXT_INVALIDATED" ? "needs_page_reload" : "disconnected",
           extensionVersion: message.payload.extensionVersion || "",
+          bridgeInstanceId: message.payload.bridgeInstanceId || "",
+          bridgeGeneration: Number(message.payload.bridgeGeneration || 0),
         });
       }
       if ([EXTENSION_MESSAGE_TYPES.started, EXTENSION_MESSAGE_TYPES.progress, EXTENSION_MESSAGE_TYPES.paused, EXTENSION_MESSAGE_TYPES.resumed, EXTENSION_MESSAGE_TYPES.completed, EXTENSION_MESSAGE_TYPES.error, EXTENSION_MESSAGE_TYPES.stopped, EXTENSION_MESSAGE_TYPES.cancelled].includes(message.type)) {
@@ -514,6 +574,9 @@ export default function WhatsAppCampaignsPage() {
       }
     });
     return () => {
+      cancelled = true;
+      heartbeatController?.abort();
+      window.clearTimeout(heartbeatTimer);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.removeEventListener("focus", refreshWhenVisible);
       unsubscribe();
@@ -535,7 +598,7 @@ export default function WhatsAppCampaignsPage() {
 
   return <div className="fm-page-enter fm-wa-page">
     <PageHeader eyebrow="Marketing · WhatsApp" title="Campañas y mensajes masivos" description="Prepará campañas, seguí su progreso y controlalas desde una sola pantalla." actions={<div className="fm-page-actions"><Link className="fm-button fm-button--secondary" to="/gestion/marketing"><Icon name="ArrowLeft" />Marketing</Link>{canCreate ? <Button icon="Plus" onClick={() => setWizard({})}>Nueva campaña de WhatsApp</Button> : null}</div>} />
-    <ExtensionStatus status={extensionStatus} refreshing={extensionBusy} onRefresh={diagnoseExtension} />
+    <ExtensionStatus status={extensionStatus} refreshing={extensionBusy} onRefresh={diagnoseExtension} onReconnect={reconnectExtension} />
     {error ? <Toast tone="error">{error}</Toast> : null}
     {activeCampaigns.length ? <Panel title="Campañas activas" description="Progreso y estado actual."><div className="fm-wa-active-grid">{activeCampaigns.map((campaign) => <button type="button" key={campaign.id} onClick={() => openCampaign(campaign)}><strong>{campaign.name}</strong><span>{campaign.sentCount || 0} / {campaign.totalRecipients || 0}</span><progress max="100" value={campaign.progressPercentage || 0}>{campaign.progressPercentage || 0}%</progress><Badge tone={CAMPAIGN_STATUS_TONES[campaign.status] || "neutral"}>{CAMPAIGN_STATUS_LABELS[campaign.status] || campaign.status}</Badge></button>)}</div></Panel> : null}
     <Panel title="Historial de campañas" description="Más recientes primero. Se cargan 20 campañas por página.">
