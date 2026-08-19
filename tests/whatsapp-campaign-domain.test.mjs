@@ -4,12 +4,14 @@ import assert from "node:assert/strict";
 import {
   CAMPAIGN_STATUS_LABELS,
   analyzeRecipientCandidates,
+  campaignControlAvailability,
   campaignValidation,
   customerCommunicationAllowed,
   customerMatchesCampaignFilters,
   extensionPrimaryStatus,
   extensionCampaignCounters,
   progressPercentage,
+  safeCampaignCounters,
   userFacingWhatsAppProblem,
 } from "../src/gestion/marketing/whatsapp/campaignDomain.js";
 import { detectExcelMapping, mapExcelRows } from "../src/gestion/marketing/whatsapp/excelImport.js";
@@ -98,17 +100,17 @@ test("la detención conserva un estado distinto de la cancelación previa", () =
   assert.equal(CAMPAIGN_STATUS_LABELS.cancelled, "Campaña cancelada");
 });
 
-test("CONTACT_CONTEXT_UNVERIFIED se presenta como pausa de seguridad y no como capability", () => {
+test("CONTACT_CONTEXT_UNVERIFIED se presenta en lenguaje de seguridad para el usuario", () => {
   assert.equal(
     userFacingWhatsAppProblem({ code: "CONTACT_CONTEXT_UNVERIFIED" }),
-    "No pudimos confirmar que WhatsApp abrió el contacto correcto. La campaña se pausó para evitar enviar el mensaje a otra persona.",
+    "No pudimos confirmar que WhatsApp abrió el contacto correcto. La campaña se protegió para evitar enviar el mensaje a otra persona.",
   );
 });
 
-test("INTERFACE_LOADING explica que no terminó de abrirse el contacto sin afirmar un falso problema de compatibilidad", () => {
+test("INTERFACE_LOADING explica una espera general de WhatsApp sin exponer internals", () => {
   assert.equal(
     userFacingWhatsAppProblem({ code: "INTERFACE_LOADING" }),
-    "WhatsApp necesita unos segundos más. No pudimos terminar de abrir el contacto. La campaña se pausó para evitar un envío incorrecto.",
+    "WhatsApp necesita unos segundos más. La campaña quedó pausada para no avanzar mientras la interfaz general no está lista.",
   );
 });
 
@@ -117,11 +119,46 @@ test("progreso deriva porcentaje sin superar 100", () => {
   assert.equal(progressPercentage(10, 99), 100);
 });
 
-test("progreso de la extensión usa el contrato público sent/progress.completed", () => {
+test("97 enviados + 3 fallidos terminales equivale a 100 procesados sin mentir sobre enviados", () => {
   assert.deepEqual(
-    extensionCampaignCounters({ sent: 1, progress: { completed: 1 }, finalSummary: { failed: 0 } }, { totalRecipients: 1, sentCount: 0, errorCount: 0 }),
-    { total: 1, sent: 1, errors: 0, progress: 100 },
+    safeCampaignCounters(100, 97, 3),
+    { total: 100, sent: 97, errors: 3, failed: 3, processed: 100, remaining: 0, progress: 100 },
   );
+});
+
+test("progreso de la extensión usa sent y failed separados", () => {
+  assert.deepEqual(
+    extensionCampaignCounters({ total: 100, sent: 97, failed: 3 }, { totalRecipients: 100, sentCount: 0, errorCount: 0 }),
+    { total: 100, sent: 97, errors: 3, failed: 3, processed: 100, remaining: 0, progress: 100 },
+  );
+});
+
+test("Reintentar aparece sólo para una pausa recuperable y nunca ante envío ambiguo", () => {
+  assert.deepEqual(
+    campaignControlAvailability({ status: "paused", extensionBlockReason: { code: "contact_failed" } }),
+    {
+      ambiguous: false,
+      canPause: false,
+      canResume: false,
+      canRetry: true,
+      canRetryFailed: false,
+      canStop: true,
+      canDelete: false,
+    },
+  );
+  const ambiguous = campaignControlAvailability({ status: "paused", extensionBlockReason: { code: "contact_ambiguous" } });
+  assert.equal(ambiguous.ambiguous, true);
+  assert.equal(ambiguous.canRetry, false);
+  assert.equal(ambiguous.canResume, false);
+});
+
+test("Reintentar fallidos sólo aparece al completar con fallidos seguros y Borrar sólo tras Stop", () => {
+  const completed = campaignControlAvailability({ status: "completed", errorCount: 3, extensionRetryableFailed: 3 });
+  assert.equal(completed.canRetryFailed, true);
+  assert.equal(completed.canStop, false);
+  const stopped = campaignControlAvailability({ status: "stopped" });
+  assert.equal(stopped.canDelete, true);
+  assert.equal(stopped.canRetry, false);
 });
 
 import { can } from "../src/gestion/permissions.js";
