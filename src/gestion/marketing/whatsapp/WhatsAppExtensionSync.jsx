@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { useAuth } from "../../AuthContext";
 import { can } from "../../permissions";
-import { applyExtensionCampaignEvent } from "./campaignService";
+import { applyExtensionCampaignEvent, applyExtensionCampaignSnapshot } from "./campaignService";
 import { createCampaignEventQueue } from "./campaignEventQueue";
 import { EXTENSION_MESSAGE_TYPES, subscribeExtensionMessages } from "./extensionBridge";
 
@@ -17,15 +17,24 @@ const campaignEvents = new Set([
   EXTENSION_MESSAGE_TYPES.cancelled,
 ]);
 
-const enqueueCampaignEvent = createCampaignEventQueue(applyExtensionCampaignEvent);
+const enqueueCampaignState = createCampaignEventQueue((profile, message) => {
+  if (message.type === EXTENSION_MESSAGE_TYPES.status) {
+    return applyExtensionCampaignSnapshot(profile, message.payload?.campaign);
+  }
+  return applyExtensionCampaignEvent(profile, message);
+});
 
 export default function WhatsAppExtensionSync() {
   const { profile } = useAuth();
   useEffect(() => {
     if (!profile?.id || !can(profile, "marketing", "whatsappSendToExtension")) return undefined;
     return subscribeExtensionMessages((message) => {
-      if (!campaignEvents.has(message.type)) return;
-      enqueueCampaignEvent(profile, message).catch((error) => {
+      const snapshot = message.type === EXTENSION_MESSAGE_TYPES.status ? message.payload?.campaign : null;
+      if (!campaignEvents.has(message.type) && !snapshot?.campaignId) return;
+      const normalizedMessage = snapshot?.campaignId
+        ? { ...message, campaignId: snapshot.campaignId }
+        : message;
+      enqueueCampaignState(profile, normalizedMessage).catch((error) => {
         console.error("No se pudo aplicar un estado de la extensión", error);
       });
     });
