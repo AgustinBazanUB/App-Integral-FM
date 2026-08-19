@@ -28,7 +28,10 @@ export const EXTENSION_MESSAGE_TYPES = Object.freeze({
   startRequest: "FLORMIA_CAMPAIGN_START",
   pauseRequest: "FLORMIA_CAMPAIGN_PAUSE",
   resumeRequest: "FLORMIA_CAMPAIGN_RESUME",
+  retryRequest: "FLORMIA_CAMPAIGN_RETRY",
+  retryFailedRequest: "FLORMIA_CAMPAIGN_RETRY_FAILED",
   stopRequest: "FLORMIA_CAMPAIGN_STOP",
+  deleteRequest: "FLORMIA_CAMPAIGN_DELETE",
   statusRequest: "FLORMIA_CAMPAIGN_STATUS_REQUEST",
 });
 
@@ -175,7 +178,7 @@ export function extensionConnectionState({ operational = false, errorCode = "" }
   return "disconnected";
 }
 
-function statusFromResponse(response) {
+export function statusFromResponse(response) {
   const errorCode = response.payload.errorCode || "";
   const operational = response.payload.operational === true;
   return {
@@ -187,10 +190,29 @@ function statusFromResponse(response) {
     sentToday: Number(response.payload.sentToday || 0),
     availableToday: Number(response.payload.availableToday || 0),
     errorCode,
+    campaign: plainObject(response.payload.campaign) ? response.payload.campaign : null,
     bridgeInstanceId: response.payload.bridgeInstanceId || "",
     bridgeGeneration: Number(response.payload.bridgeGeneration || 0),
     bridgeCreatedAt: response.payload.bridgeCreatedAt || "",
     runtimeAvailable: response.payload.runtimeAvailable !== false,
+    checkedAt: Date.now(),
+  };
+}
+
+function unavailableStatus(error, fallbackMessage, errorCode) {
+  return {
+    operational: false,
+    connectionState: "disconnected",
+    message: error?.message || fallbackMessage,
+    errorCode,
+    campaign: null,
+    configuredLimit: 0,
+    sentToday: 0,
+    availableToday: 0,
+    bridgeInstanceId: "",
+    bridgeGeneration: 0,
+    bridgeCreatedAt: "",
+    runtimeAvailable: false,
     checkedAt: Date.now(),
   };
 }
@@ -204,20 +226,7 @@ export function pingWhatsAppExtension({ timeoutMs = EXTENSION_TIMEOUTS.ping, sig
       return statusFromResponse(response);
     } catch (error) {
       if (error?.name === "AbortError") throw error;
-      return {
-        operational: false,
-        connectionState: "disconnected",
-        message: error?.message || "Extensión no detectada o sin respuesta.",
-        errorCode: "extension_unavailable",
-        configuredLimit: 0,
-        sentToday: 0,
-        availableToday: 0,
-        bridgeInstanceId: "",
-        bridgeGeneration: 0,
-        bridgeCreatedAt: "",
-        runtimeAvailable: false,
-        checkedAt: Date.now(),
-      };
+      return unavailableStatus(error, "Extensión no detectada o sin respuesta.", "extension_unavailable");
     }
   })();
   pingInFlight = operation;
@@ -269,20 +278,7 @@ export async function requestWhatsAppPreflight({ timeoutMs = EXTENSION_TIMEOUTS.
     return statusFromResponse(response);
   } catch (error) {
     if (error?.name === "AbortError") throw error;
-    return {
-      operational: false,
-      connectionState: "disconnected",
-      message: error?.message || "No fue posible ejecutar el diagnóstico de la extensión.",
-      errorCode: "extension_preflight_failed",
-      configuredLimit: 0,
-      sentToday: 0,
-      availableToday: 0,
-      bridgeInstanceId: "",
-      bridgeGeneration: 0,
-      bridgeCreatedAt: "",
-      runtimeAvailable: false,
-      checkedAt: Date.now(),
-    };
+    return unavailableStatus(error, "No fue posible ejecutar el diagnóstico de la extensión.", "extension_preflight_failed");
   }
 }
 
@@ -307,8 +303,20 @@ export function requestCampaignResume(campaignId, options = {}) {
   return requestCampaignControl(EXTENSION_MESSAGE_TYPES.resumeRequest, campaignId, [EXTENSION_MESSAGE_TYPES.resumed, EXTENSION_MESSAGE_TYPES.started], options);
 }
 
+export function requestCampaignRetry(campaignId, options = {}) {
+  return requestCampaignControl(EXTENSION_MESSAGE_TYPES.retryRequest, campaignId, [EXTENSION_MESSAGE_TYPES.resumed, EXTENSION_MESSAGE_TYPES.started], options);
+}
+
+export function requestCampaignRetryFailed(campaignId, options = {}) {
+  return requestCampaignControl(EXTENSION_MESSAGE_TYPES.retryFailedRequest, campaignId, [EXTENSION_MESSAGE_TYPES.started, EXTENSION_MESSAGE_TYPES.paused], options);
+}
+
 export function requestCampaignStop(campaignId, options = {}) {
   return requestCampaignControl(EXTENSION_MESSAGE_TYPES.stopRequest, campaignId, [EXTENSION_MESSAGE_TYPES.stopped, EXTENSION_MESSAGE_TYPES.cancelled], options);
+}
+
+export function requestCampaignDelete(campaignId, options = {}) {
+  return requestCampaignControl(EXTENSION_MESSAGE_TYPES.deleteRequest, campaignId, [EXTENSION_MESSAGE_TYPES.stopped], options);
 }
 
 export async function requestCampaignCancellation(campaignId, { timeoutMs = EXTENSION_TIMEOUTS.control } = {}) {
