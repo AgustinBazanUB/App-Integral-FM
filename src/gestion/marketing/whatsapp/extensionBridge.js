@@ -221,9 +221,10 @@ export function pingWhatsAppExtension({ timeoutMs = EXTENSION_TIMEOUTS.ping, sig
     }
   })();
   pingInFlight = operation;
-  void operation.finally(() => {
+  const clear = () => {
     if (pingInFlight === operation) pingInFlight = null;
-  });
+  };
+  operation.then(clear, clear);
   return operation;
 }
 
