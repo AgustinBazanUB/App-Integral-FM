@@ -315,6 +315,6 @@ export function campaignControlAvailability(campaign = {}) {
     canRetry: !ambiguous && retryablePause,
     canRetryFailed: status === "completed" && failed > 0 && retryableFailed > 0,
     canStop: !["completed", "stopped", "cancelled"].includes(status),
-    canDelete: status === "stopped" && !ambiguous,
+    canDelete: status === "stopped" && !ambiguous && campaign.emitterReleased !== true,
   };
 }
