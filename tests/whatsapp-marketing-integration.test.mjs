@@ -121,3 +121,18 @@ test("la pantalla no mantiene despierta la extensión con polling continuo", asy
   assert.match(page, /heartbeatController\?\.abort\(\)/);
   assert.match(page, /requestWhatsAppPreflight/);
 });
+
+test("0.9.4.3 persiste y muestra confirmados vs enviados sin confirmación", async () => {
+  const [service, page, domain] = await Promise.all([
+    read("src/gestion/marketing/whatsapp/campaignService.js"),
+    read("src/gestion/pages/WhatsAppCampaignsPage.jsx"),
+    read("src/gestion/marketing/whatsapp/campaignDomain.js"),
+  ]);
+  assert.match(service, /confirmedSentCount/);
+  assert.match(service, /unverifiedSentCount/);
+  assert.match(service, /extensionFinalSummary/);
+  assert.match(domain, /confirmedSent/);
+  assert.match(domain, /unverifiedSent/);
+  assert.match(page, /Sin confirmación/);
+  assert.match(page, /extensionConnectionState/);
+});

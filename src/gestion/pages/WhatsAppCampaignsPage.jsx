@@ -49,6 +49,7 @@ import {
 } from "../marketing/whatsapp/campaignService";
 import {
   EXTENSION_MESSAGE_TYPES,
+  extensionConnectionState,
   pingWhatsAppExtension,
   prepareCampaignForExtension,
   requestCampaignDelete,
@@ -406,7 +407,7 @@ function CampaignDetail({ campaign, profile, onClose, onContinue, onChanged }) {
   useEffect(() => { listCampaignEvents(profile, campaign.id).then(setEvents).catch((cause) => setError(cause.message)); }, [campaign.id, profile.id]);
 
   const controls = campaignControlAvailability(campaign);
-  const counters = safeCampaignCounters(campaign.totalRecipients, campaign.sentCount, campaign.errorCount);
+  const counters = safeCampaignCounters(campaign.totalRecipients, campaign.sentCount, campaign.errorCount, campaign.confirmedSentCount, campaign.unverifiedSentCount);
 
   const runControl = async (kind) => {
     if (controlInFlightRef.current || pendingControl) return;
@@ -466,8 +467,9 @@ function CampaignDetail({ campaign, profile, onClose, onContinue, onChanged }) {
     {error ? <Toast tone="error">{error}</Toast> : null}
     {pendingControl ? <Toast tone="info">{displayStatus} La orden se aplicará respetando la primera frontera segura.</Toast> : null}
     {controls.ambiguous ? <Toast tone="warning">No pudimos confirmar el último envío. Revisalo antes de continuar; no ofrecemos un reintento directo porque podría duplicar el mensaje.</Toast> : null}
-    {campaign.status === "completed" && counters.errors > 0 ? <Toast tone="info">Campaña completada · {counters.sent} enviados · {counters.errors} con problemas.</Toast> : null}
-    <dl className="fm-wa-review"><div><dt>Estado</dt><dd><Badge tone={CAMPAIGN_STATUS_TONES[campaign.status] || "neutral"}>{displayStatus}</Badge></dd></div><div><dt>Creador</dt><dd>{campaign.createdByName || campaign.createdBy}</dd></div><div><dt>Fecha</dt><dd>{formatDateTime(campaign.createdAt)}</dd></div><div><dt>Progreso</dt><dd>{campaign.processedCount ?? counters.processed} / {counters.total} procesados · {campaign.progressPercentage ?? counters.progress}%</dd></div><div><dt>Enviados</dt><dd>{counters.sent}</dd></div><div><dt>Problemas</dt><dd>{counters.errors}{campaign.extensionErrorMessage ? ` · ${campaign.extensionErrorMessage}` : ""}</dd></div><div><dt>Segmentación</dt><dd>{Object.entries(campaign.filters || {}).filter(([,value]) => value).map(([key,value]) => `${key}: ${value}`).join(" · ") || "Sin filtros guardados"}</dd></div><div><dt>Mensaje</dt><dd className="fm-wa-review-message">{campaign.message || "Sin texto"}</dd></div><div><dt>Imágenes</dt><dd>{(campaign.imageMetadata || []).map((image) => `${image.order}. ${image.name}`).join(" · ") || "Sin imágenes persistidas"}</dd></div><div><dt>Inicio / fin</dt><dd>{campaign.startedAt ? formatDateTime(campaign.startedAt) : "—"} / {campaign.finishedAt ? formatDateTime(campaign.finishedAt) : "—"}</dd></div></dl>
+    {campaign.status === "completed" && counters.unverifiedSent > 0 ? <Toast tone="info">Campaña completada · {counters.unverifiedSent} envío(s) fueron ejecutados pero no pudieron confirmarse en la interfaz.</Toast> : null}
+    {campaign.status === "completed" && counters.unverifiedSent === 0 && counters.errors > 0 ? <Toast tone="info">Campaña completada · {counters.sent} enviados · {counters.errors} con problemas.</Toast> : null}
+    <dl className="fm-wa-review"><div><dt>Estado</dt><dd><Badge tone={CAMPAIGN_STATUS_TONES[campaign.status] || "neutral"}>{displayStatus}</Badge></dd></div><div><dt>Creador</dt><dd>{campaign.createdByName || campaign.createdBy}</dd></div><div><dt>Fecha</dt><dd>{formatDateTime(campaign.createdAt)}</dd></div><div><dt>Progreso</dt><dd>{campaign.processedCount ?? counters.processed} / {counters.total} procesados · {campaign.progressPercentage ?? counters.progress}%</dd></div><div><dt>Enviados</dt><dd>{counters.sent}</dd></div><div><dt>Confirmados</dt><dd>{counters.confirmedSent}</dd></div><div><dt>Sin confirmación</dt><dd>{counters.unverifiedSent}</dd></div><div><dt>Problemas</dt><dd>{counters.errors}{campaign.extensionErrorMessage ? ` · ${campaign.extensionErrorMessage}` : ""}</dd></div><div><dt>Segmentación</dt><dd>{Object.entries(campaign.filters || {}).filter(([,value]) => value).map(([key,value]) => `${key}: ${value}`).join(" · ") || "Sin filtros guardados"}</dd></div><div><dt>Mensaje</dt><dd className="fm-wa-review-message">{campaign.message || "Sin texto"}</dd></div><div><dt>Imágenes</dt><dd>{(campaign.imageMetadata || []).map((image) => `${image.order}. ${image.name}`).join(" · ") || "Sin imágenes persistidas"}</dd></div><div><dt>Inicio / fin</dt><dd>{campaign.startedAt ? formatDateTime(campaign.startedAt) : "—"} / {campaign.finishedAt ? formatDateTime(campaign.finishedAt) : "—"}</dd></div></dl>
     <h3>Actividad</h3><div className="fm-wa-events">{events.length ? events.map((event) => <div key={event.id}><strong>{event.label || event.type}</strong><span>{formatDateTime(event.createdAt)}</span>{event.message ? <small>{event.message}</small> : null}</div>) : <p>Sin eventos adicionales.</p>}</div>
   </Modal>;
 }
@@ -597,7 +599,12 @@ export default function WhatsAppCampaignsPage() {
           sentToday: Number(message.payload.sentToday || 0),
           availableToday: Number(message.payload.availableToday || 0),
           errorCode: message.payload.errorCode || "",
-          connectionState: message.payload.operational === true ? "connected" : message.payload.errorCode === "EXTENSION_CONTEXT_INVALIDATED" ? "needs_page_reload" : "disconnected",
+          connectionState: extensionConnectionState({
+            operational: message.payload.operational === true,
+            errorCode: message.payload.errorCode || "",
+            runtimeAvailable: message.payload.runtimeAvailable !== false,
+            responded: true,
+          }),
           extensionVersion: message.payload.extensionVersion || "",
           bridgeInstanceId: message.payload.bridgeInstanceId || "",
           bridgeGeneration: Number(message.payload.bridgeGeneration || 0),
@@ -636,11 +643,11 @@ export default function WhatsAppCampaignsPage() {
     <PageHeader eyebrow="Marketing · WhatsApp" title="Campañas y mensajes masivos" description="Prepará campañas, seguí su progreso y controlalas desde una sola pantalla." actions={<div className="fm-page-actions"><Link className="fm-button fm-button--secondary" to="/gestion/marketing"><Icon name="ArrowLeft" />Marketing</Link>{canCreate ? <Button icon="Plus" onClick={() => setWizard({})}>Nueva campaña de WhatsApp</Button> : null}</div>} />
     <ExtensionStatus status={extensionStatus} refreshing={extensionBusy} onRefresh={diagnoseExtension} onReconnect={reconnectExtension} />
     {error ? <Toast tone="error">{error}</Toast> : null}
-    {activeCampaigns.length ? <Panel title="Campañas activas" description="Progreso procesado y envíos confirmados."><div className="fm-wa-active-grid">{activeCampaigns.map((campaign) => { const counters = safeCampaignCounters(campaign.totalRecipients, campaign.sentCount, campaign.errorCount); return <button type="button" key={campaign.id} onClick={() => openCampaign(campaign)}><strong>{campaign.name}</strong><span>{campaign.processedCount ?? counters.processed} / {counters.total} procesados · {counters.sent} enviados</span><progress max="100" value={campaign.progressPercentage ?? counters.progress}>{campaign.progressPercentage ?? counters.progress}%</progress><Badge tone={CAMPAIGN_STATUS_TONES[campaign.status] || "neutral"}>{CAMPAIGN_STATUS_LABELS[campaign.status] || campaign.status}</Badge></button>; })}</div></Panel> : null}
+    {activeCampaigns.length ? <Panel title="Campañas activas" description="Progreso procesado y envíos confirmados."><div className="fm-wa-active-grid">{activeCampaigns.map((campaign) => { const counters = safeCampaignCounters(campaign.totalRecipients, campaign.sentCount, campaign.errorCount, campaign.confirmedSentCount, campaign.unverifiedSentCount); return <button type="button" key={campaign.id} onClick={() => openCampaign(campaign)}><strong>{campaign.name}</strong><span>{campaign.processedCount ?? counters.processed} / {counters.total} procesados · {counters.confirmedSent} confirmados{counters.unverifiedSent ? ` · ${counters.unverifiedSent} sin confirmación` : ""}</span><progress max="100" value={campaign.progressPercentage ?? counters.progress}>{campaign.progressPercentage ?? counters.progress}%</progress><Badge tone={CAMPAIGN_STATUS_TONES[campaign.status] || "neutral"}>{CAMPAIGN_STATUS_LABELS[campaign.status] || campaign.status}</Badge></button>; })}</div></Panel> : null}
     <Panel title="Historial de campañas" description="Más recientes primero. Se cargan 20 campañas por página.">
       {loading && !campaigns.length ? <Skeleton lines={6} /> : null}
       {!loading && !campaigns.length ? <EmptyState icon="Megaphone" title="Todavía no hay campañas de WhatsApp" description="Creá la primera campaña cuando necesites preparar un envío." /> : null}
-      <div className="fm-wa-history">{campaigns.map((campaign) => { const counters = safeCampaignCounters(campaign.totalRecipients, campaign.sentCount, campaign.errorCount); return <button type="button" key={campaign.id} onClick={() => openCampaign(campaign)}><span className="fm-wa-history__main"><strong>{campaign.name}</strong><small>{formatDateTime(campaign.createdAt)} · {campaign.totalRecipients || 0} destinatarios</small></span><span>{counters.sent} enviados · {counters.errors} con problemas · {campaign.progressPercentage ?? counters.progress}% procesado</span><Badge tone={CAMPAIGN_STATUS_TONES[campaign.status] || "neutral"}>{CAMPAIGN_STATUS_LABELS[campaign.status] || campaign.status}</Badge>{campaign.extensionErrorMessage ? <small className="fm-wa-history__error">Necesita revisión</small> : null}</button>; })}</div>
+      <div className="fm-wa-history">{campaigns.map((campaign) => { const counters = safeCampaignCounters(campaign.totalRecipients, campaign.sentCount, campaign.errorCount, campaign.confirmedSentCount, campaign.unverifiedSentCount); return <button type="button" key={campaign.id} onClick={() => openCampaign(campaign)}><span className="fm-wa-history__main"><strong>{campaign.name}</strong><small>{formatDateTime(campaign.createdAt)} · {campaign.totalRecipients || 0} destinatarios</small></span><span>{counters.confirmedSent} confirmados{counters.unverifiedSent ? ` · ${counters.unverifiedSent} sin confirmación` : ""} · {counters.errors} con problemas · {campaign.progressPercentage ?? counters.progress}% procesado</span><Badge tone={CAMPAIGN_STATUS_TONES[campaign.status] || "neutral"}>{CAMPAIGN_STATUS_LABELS[campaign.status] || campaign.status}</Badge>{campaign.extensionErrorMessage ? <small className="fm-wa-history__error">Necesita revisión</small> : null}</button>; })}</div>
       {hasMore ? <div className="fm-load-more"><Button variant="secondary" loading={loading} onClick={() => loadCampaigns({ append: true })}>Cargar más campañas</Button></div> : null}
     </Panel>
     {detail ? <CampaignDetail campaign={detail} profile={profile} onClose={() => setDetail(null)} onContinue={continueDraft} onChanged={() => loadCampaigns()} /> : null}

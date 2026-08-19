@@ -268,14 +268,24 @@ export function progressPercentage(totalRecipients, processedCount) {
   return total ? Math.round((processed / total) * 100) : 0;
 }
 
-export function safeCampaignCounters(totalRecipients, sentCount, errorCount = 0) {
+export function safeCampaignCounters(totalRecipients, sentCount, errorCount = 0, confirmedSentCount = null, unverifiedSentCount = null) {
   const total = Math.max(0, Number(totalRecipients || 0));
   const sent = Math.max(0, Math.min(total, Number(sentCount || 0)));
   const errors = Math.max(0, Math.min(Math.max(0, total - sent), Number(errorCount || 0)));
+  const explicitUnverified = unverifiedSentCount == null ? 0 : Math.max(0, Number(unverifiedSentCount || 0));
+  const unverifiedSent = Math.min(sent, explicitUnverified);
+  const fallbackConfirmed = Math.max(0, sent - unverifiedSent);
+  const confirmedSent = confirmedSentCount == null
+    ? fallbackConfirmed
+    : Math.min(fallbackConfirmed, Math.max(0, Number(confirmedSentCount || 0)));
+  const accountedSent = confirmedSent + unverifiedSent;
+  const normalizedConfirmed = accountedSent < sent ? confirmedSent + (sent - accountedSent) : confirmedSent;
   const processed = Math.min(total, sent + errors);
   return {
     total,
     sent,
+    confirmedSent: normalizedConfirmed,
+    unverifiedSent,
     errors,
     failed: errors,
     processed,
@@ -285,11 +295,19 @@ export function safeCampaignCounters(totalRecipients, sentCount, errorCount = 0)
 }
 
 export function extensionCampaignCounters(payload = {}, current = {}) {
-  const total = payload.total ?? payload.progress?.total ?? current.totalRecipients;
+  const summary = payload.finalSummary || {};
+  const total = payload.total ?? payload.progress?.total ?? summary.total ?? current.totalRecipients;
+  const confirmedSent = payload.confirmedSent ?? summary.confirmedSent ?? current.confirmedSentCount;
+  const unverifiedSent = payload.unverifiedSent ?? summary.unverifiedSent ?? current.unverifiedSentCount;
+  const derivedSent = (confirmedSent != null || unverifiedSent != null)
+    ? Number(confirmedSent || 0) + Number(unverifiedSent || 0)
+    : undefined;
   return safeCampaignCounters(
     total,
-    payload.sent ?? current.sentCount,
-    payload.failed ?? payload.finalSummary?.failed ?? current.errorCount,
+    payload.sent ?? summary.sent ?? derivedSent ?? current.sentCount,
+    payload.failed ?? summary.failed ?? current.errorCount,
+    confirmedSent,
+    unverifiedSent,
   );
 }
 

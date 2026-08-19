@@ -122,14 +122,25 @@ test("progreso deriva porcentaje sin superar 100", () => {
 test("97 enviados + 3 fallidos terminales equivale a 100 procesados sin mentir sobre enviados", () => {
   assert.deepEqual(
     safeCampaignCounters(100, 97, 3),
-    { total: 100, sent: 97, errors: 3, failed: 3, processed: 100, remaining: 0, progress: 100 },
+    { total: 100, sent: 97, confirmedSent: 97, unverifiedSent: 0, errors: 3, failed: 3, processed: 100, remaining: 0, progress: 100 },
+  );
+});
+
+test("contadores separan envíos confirmados de enviados sin confirmación", () => {
+  assert.deepEqual(
+    safeCampaignCounters(100, 100, 0, 98, 2),
+    { total: 100, sent: 100, confirmedSent: 98, unverifiedSent: 2, errors: 0, failed: 0, processed: 100, remaining: 0, progress: 100 },
+  );
+  assert.deepEqual(
+    extensionCampaignCounters({ total: 100, sent: 100, confirmedSent: 98, unverifiedSent: 2, failed: 0 }, {}),
+    { total: 100, sent: 100, confirmedSent: 98, unverifiedSent: 2, errors: 0, failed: 0, processed: 100, remaining: 0, progress: 100 },
   );
 });
 
 test("progreso de la extensión usa sent y failed separados", () => {
   assert.deepEqual(
     extensionCampaignCounters({ total: 100, sent: 97, failed: 3 }, { totalRecipients: 100, sentCount: 0, errorCount: 0 }),
-    { total: 100, sent: 97, errors: 3, failed: 3, processed: 100, remaining: 0, progress: 100 },
+    { total: 100, sent: 97, confirmedSent: 97, unverifiedSent: 0, errors: 3, failed: 3, processed: 100, remaining: 0, progress: 100 },
   );
 });
 

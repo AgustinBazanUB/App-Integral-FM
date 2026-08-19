@@ -255,6 +255,8 @@ export async function prepareCampaignSnapshot(profile, input) {
     await setDoc(reference, {
       totalRecipients: input.recipients.length,
       sentCount: 0,
+      confirmedSentCount: 0,
+      unverifiedSentCount: 0,
       errorCount: 0,
       processedCount: 0,
       progressPercentage: 0,
@@ -339,6 +341,8 @@ export async function applyExtensionCampaignEvent(profile, message) {
     const update = {
       status,
       sentCount: counters.sent,
+      confirmedSentCount: counters.confirmedSent,
+      unverifiedSentCount: counters.unverifiedSent,
       errorCount: counters.errors,
       processedCount: counters.processed,
       progressPercentage: counters.progress,
@@ -348,6 +352,7 @@ export async function applyExtensionCampaignEvent(profile, message) {
       extensionRetryableFailed: Math.max(0, Number(message.payload?.retryableFailed || 0)),
       extensionRetryCycle: Math.max(0, Number(message.payload?.retryCycle || 0)),
       extensionVersion: String(message.payload?.extensionVersion || current.extensionVersion || ""),
+      ...(status === "completed" && message.payload?.finalSummary ? { extensionFinalSummary: message.payload.finalSummary } : {}),
       updatedAt: serverTimestamp(),
       ...(status === "running" && !current.startedAt ? { startedAt: serverTimestamp() } : {}),
       ...(["completed", "error", "cancelled", "stopped"].includes(status) ? { finishedAt: serverTimestamp() } : {}),
@@ -366,6 +371,8 @@ export async function applyExtensionCampaignEvent(profile, message) {
         label: CAMPAIGN_STATUS_LABELS[status],
         sequence: update.lastExtensionSequence,
         sentCount: counters.sent,
+        confirmedSentCount: counters.confirmedSent,
+        unverifiedSentCount: counters.unverifiedSent,
         errorCount: counters.errors,
         processedCount: counters.processed,
         progressPercentage: counters.progress,
@@ -377,7 +384,7 @@ export async function applyExtensionCampaignEvent(profile, message) {
         actionByType[message.type],
         message.campaignId,
         `Campaña de WhatsApp ${CAMPAIGN_STATUS_LABELS[status].toLocaleLowerCase("es")}`,
-        `Procesados: ${counters.processed}/${counters.total} · enviados: ${counters.sent} · con problemas: ${counters.errors}.`,
+        `Procesados: ${counters.processed}/${counters.total} · confirmados: ${counters.confirmedSent} · sin confirmación: ${counters.unverifiedSent} · con problemas: ${counters.errors}.`,
       ));
     }
     return { ignored: false, status, statusChanged, ...counters };
