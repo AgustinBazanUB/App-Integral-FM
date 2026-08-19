@@ -172,6 +172,19 @@ test("Reintentar fallidos sólo aparece al completar con fallidos seguros y Borr
   assert.equal(stopped.canRetry, false);
 });
 
+test("un envío SENT_UNVERIFIED no entra en Reintentar fallidos", () => {
+  const completed = campaignControlAvailability({
+    status: "completed",
+    sentCount: 1,
+    confirmedSentCount: 0,
+    unverifiedSentCount: 1,
+    errorCount: 0,
+    extensionRetryableFailed: 0,
+  });
+  assert.equal(completed.canRetryFailed, false);
+  assert.equal(completed.canRetry, false);
+});
+
 import { can } from "../src/gestion/permissions.js";
 
 test("permissionDeny específico bloquea envío aunque el rol pueda editar Marketing", () => {
