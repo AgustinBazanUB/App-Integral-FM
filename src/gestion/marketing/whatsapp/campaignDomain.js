@@ -213,6 +213,7 @@ export function userFacingWhatsAppProblem({ code, message } = {}) {
   if (code === "CONTACT_CONTEXT_UNVERIFIED") {
     return "No pudimos confirmar que WhatsApp abrió el contacto correcto. La campaña se pausó para evitar enviar el mensaje a otra persona.";
   }
+  if (code === "EXTENSION_CONTEXT_INVALIDATED") return "Necesitamos reconectar la extensión.";
   if (code === "WHATSAPP_NOT_OPEN") return "WhatsApp Web no está abierto. Abrilo para continuar.";
   if (code === "SESSION_NOT_READY") return "WhatsApp necesita iniciar sesión. Abrí WhatsApp Web y escaneá el código QR.";
   if (["PREFLIGHT_FAILED", "WHATSAPP_UI_CHANGED"].includes(code)) return "WhatsApp cambió y necesitamos revisar la conexión antes de continuar.";
@@ -221,6 +222,15 @@ export function userFacingWhatsAppProblem({ code, message } = {}) {
 }
 
 export function extensionPrimaryStatus(status = {}) {
+  if (status.connectionState === "needs_page_reload") {
+    return { operational: false, label: "Necesitamos reconectar la extensión", tone: "warning", message: "Usá Reconectar para actualizar esta pantalla y volver a enlazar la extensión." };
+  }
+  if (status.connectionState === "reconnecting") {
+    return { operational: false, label: "Reconectando…", tone: "info", message: status.message || "Restableciendo la conexión con la extensión." };
+  }
+  if (status.connectionState === "disconnected") {
+    return { operational: false, label: "Extensión desconectada", tone: "error", message: status.message || "No pudimos contactar la extensión." };
+  }
   if (status.operational === true) {
     return {
       operational: true,
