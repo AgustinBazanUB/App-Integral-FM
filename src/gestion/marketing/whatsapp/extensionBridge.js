@@ -205,20 +205,22 @@ function syntheticStoppedEnvelope(campaignId, campaign = null, { emitterReleased
   });
 }
 
-export function extensionConnectionState({ operational = false, errorCode = "" } = {}) {
-  if (operational) return "connected";
+export function extensionConnectionState({ operational = false, errorCode = "", runtimeAvailable = false, responded = false } = {}) {
   if (errorCode === "EXTENSION_CONTEXT_INVALIDATED") return "needs_page_reload";
   if (errorCode === "extension_reconnecting") return "reconnecting";
+  if (operational) return "connected";
+  if (responded && runtimeAvailable !== false) return "connected";
   return "disconnected";
 }
 
 export function statusFromResponse(response) {
   const errorCode = response.payload.errorCode || "";
   const operational = response.payload.operational === true;
+  const runtimeAvailable = response.payload.runtimeAvailable !== false;
   return {
     operational,
-    connectionState: extensionConnectionState({ operational, errorCode }),
-    message: response.payload.message || (operational ? "La extensión está lista." : "La extensión requiere revisión."),
+    connectionState: extensionConnectionState({ operational, errorCode, runtimeAvailable, responded: true }),
+    message: response.payload.message || (operational ? "La extensión está lista." : "La extensión está conectada, pero WhatsApp necesita revisión."),
     extensionVersion: response.payload.extensionVersion || "",
     configuredLimit: Number(response.payload.configuredLimit || 0),
     sentToday: Number(response.payload.sentToday || 0),
@@ -228,7 +230,7 @@ export function statusFromResponse(response) {
     bridgeInstanceId: response.payload.bridgeInstanceId || "",
     bridgeGeneration: Number(response.payload.bridgeGeneration || 0),
     bridgeCreatedAt: response.payload.bridgeCreatedAt || "",
-    runtimeAvailable: response.payload.runtimeAvailable !== false,
+    runtimeAvailable,
     checkedAt: Date.now(),
   };
 }
