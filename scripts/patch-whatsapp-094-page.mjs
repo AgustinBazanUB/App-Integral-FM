@@ -13,7 +13,7 @@ async function patch(path, replacements) {
   return changed;
 }
 
-const changed = await patch("src/gestion/pages/WhatsAppCampaignsPage.jsx", [
+const pageChanged = await patch("src/gestion/pages/WhatsAppCampaignsPage.jsx", [
   [
 `function ExtensionStatus({ status, refreshing, onRefresh }) {\n  const primary = extensionPrimaryStatus(status);`,
 `function ExtensionStatus({ status, refreshing, onRefresh, onReconnect }) {\n  const primary = extensionPrimaryStatus(status);\n  const reconnect = status.connectionState && status.connectionState !== "connected";`
@@ -56,4 +56,15 @@ const changed = await patch("src/gestion/pages/WhatsAppCampaignsPage.jsx", [
   ]
 ]);
 
-console.log(JSON.stringify({ changed }));
+const domainChanged = await patch("src/gestion/marketing/whatsapp/campaignDomain.js", [
+  [
+`  if (code === "WHATSAPP_NOT_OPEN") return "WhatsApp Web no está abierto. Abrilo para continuar.";`,
+`  if (code === "EXTENSION_CONTEXT_INVALIDATED") return "Necesitamos reconectar la extensión.";\n  if (code === "WHATSAPP_NOT_OPEN") return "WhatsApp Web no está abierto. Abrilo para continuar.";`
+  ],
+  [
+`export function extensionPrimaryStatus(status = {}) {\n  if (status.operational === true) {`,
+`export function extensionPrimaryStatus(status = {}) {\n  if (status.connectionState === "needs_page_reload") {\n    return { operational: false, label: "Necesitamos reconectar la extensión", tone: "warning", message: "Usá Reconectar para actualizar esta pantalla y volver a enlazar la extensión." };\n  }\n  if (status.connectionState === "reconnecting") {\n    return { operational: false, label: "Reconectando…", tone: "info", message: status.message || "Restableciendo la conexión con la extensión." };\n  }\n  if (status.connectionState === "disconnected") {\n    return { operational: false, label: "Extensión desconectada", tone: "error", message: status.message || "No pudimos contactar la extensión." };\n  }\n  if (status.operational === true) {`
+  ]
+]);
+
+console.log(JSON.stringify({ pageChanged, domainChanged }));
