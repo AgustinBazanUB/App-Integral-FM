@@ -2,6 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  CAMPAIGN_STATUS_LABELS,
   analyzeRecipientCandidates,
   campaignValidation,
   customerCommunicationAllowed,
@@ -90,6 +91,11 @@ test("estado de conexión usa vocabulario simple", () => {
     message: "Listo",
   });
   assert.equal(extensionPrimaryStatus({ operational: false }).label, "Necesita revisión");
+});
+
+test("la detención conserva un estado distinto de la cancelación previa", () => {
+  assert.equal(CAMPAIGN_STATUS_LABELS.stopped, "Campaña detenida");
+  assert.equal(CAMPAIGN_STATUS_LABELS.cancelled, "Campaña cancelada");
 });
 
 test("CONTACT_CONTEXT_UNVERIFIED se presenta como pausa de seguridad y no como capability", () => {
