@@ -211,14 +211,15 @@ export async function recipientDocumentId(phone) {
 
 export function userFacingWhatsAppProblem({ code, message } = {}) {
   if (code === "CONTACT_CONTEXT_UNVERIFIED") {
-    return "No pudimos confirmar que WhatsApp abrió el contacto correcto. La campaña se pausó para evitar enviar el mensaje a otra persona.";
+    return "No pudimos confirmar que WhatsApp abrió el contacto correcto. La campaña se protegió para evitar enviar el mensaje a otra persona.";
   }
   if (code === "EXTENSION_CONTEXT_INVALIDATED") return "Necesitamos reconectar la extensión.";
   if (code === "WHATSAPP_NOT_OPEN") return "WhatsApp Web no está abierto. Abrilo para continuar.";
   if (code === "SESSION_NOT_READY") return "WhatsApp necesita iniciar sesión. Abrí WhatsApp Web y escaneá el código QR.";
   if (["PREFLIGHT_FAILED", "WHATSAPP_UI_CHANGED"].includes(code)) return "WhatsApp cambió y necesitamos revisar la conexión antes de continuar.";
-  if (code === "INTERFACE_LOADING" || code === "TIMEOUT") return "WhatsApp necesita unos segundos más. No pudimos terminar de abrir el contacto. La campaña se pausó para evitar un envío incorrecto.";
-  return String(message || "Hubo un problema y la campaña quedó pausada de forma segura.");
+  if (code === "INTERFACE_LOADING") return "WhatsApp necesita unos segundos más. La campaña quedó pausada para no avanzar mientras la interfaz general no está lista.";
+  if (code === "TIMEOUT") return "No pudimos completar este contacto a tiempo. Si el fallo fue antes del envío, puede reintentarse de forma segura.";
+  return String(message || "Hubo un problema y la campaña quedó protegida de forma segura.");
 }
 
 export function extensionPrimaryStatus(status = {}) {
@@ -261,23 +262,59 @@ export function campaignValidation({ name, recipients = [], message = "", images
   return { valid: errors.length === 0, errors };
 }
 
-export function progressPercentage(totalRecipients, sentCount) {
+export function progressPercentage(totalRecipients, processedCount) {
   const total = Math.max(0, Number(totalRecipients || 0));
-  const sent = Math.max(0, Math.min(total, Number(sentCount || 0)));
-  return total ? Math.round((sent / total) * 100) : 0;
+  const processed = Math.max(0, Math.min(total, Number(processedCount || 0)));
+  return total ? Math.round((processed / total) * 100) : 0;
 }
 
 export function safeCampaignCounters(totalRecipients, sentCount, errorCount = 0) {
   const total = Math.max(0, Number(totalRecipients || 0));
   const sent = Math.max(0, Math.min(total, Number(sentCount || 0)));
-  const errors = Math.max(0, Math.min(total, Number(errorCount || 0)));
-  return { total, sent, errors, progress: progressPercentage(total, sent) };
+  const errors = Math.max(0, Math.min(Math.max(0, total - sent), Number(errorCount || 0)));
+  const processed = Math.min(total, sent + errors);
+  return {
+    total,
+    sent,
+    errors,
+    failed: errors,
+    processed,
+    remaining: Math.max(0, total - processed),
+    progress: progressPercentage(total, processed),
+  };
 }
 
 export function extensionCampaignCounters(payload = {}, current = {}) {
+  const total = payload.total ?? payload.progress?.total ?? current.totalRecipients;
   return safeCampaignCounters(
-    current.totalRecipients,
-    payload.sent ?? payload.progress?.completed ?? current.sentCount,
-    payload.finalSummary?.failed ?? current.errorCount,
+    total,
+    payload.sent ?? current.sentCount,
+    payload.failed ?? payload.finalSummary?.failed ?? current.errorCount,
   );
+}
+
+const RETRYABLE_PAUSE_CODES = new Set([
+  "contact_failed",
+  "contact_paused",
+  "repeated_contact_failures",
+  "service_worker_restarted",
+]);
+
+export function campaignControlAvailability(campaign = {}) {
+  const status = String(campaign.status || "");
+  const blockCode = String(campaign.extensionBlockReason?.code || campaign.blockReason?.code || "");
+  const ambiguous = blockCode === "contact_ambiguous" || campaign.hasAmbiguousSend === true;
+  const retryableFailed = Math.max(0, Number(campaign.retryableFailed ?? campaign.extensionRetryableFailed ?? 0));
+  const failed = Math.max(0, Number(campaign.errorCount ?? campaign.failed ?? 0));
+  const normalPause = status === "paused" && (blockCode === "manual_pause" || !blockCode);
+  const retryablePause = (status === "paused" || status === "error") && RETRYABLE_PAUSE_CODES.has(blockCode);
+  return {
+    ambiguous,
+    canPause: ["running", "waiting_contact", "waiting_batch"].includes(status),
+    canResume: normalPause || status === "daily_limit_reached",
+    canRetry: !ambiguous && retryablePause,
+    canRetryFailed: status === "completed" && failed > 0 && retryableFailed > 0,
+    canStop: !["completed", "stopped", "cancelled"].includes(status),
+    canDelete: status === "stopped" && !ambiguous,
+  };
 }
