@@ -11,10 +11,28 @@ import {
   requestCampaignRetry,
   requestCampaignRetryFailed,
   requestCampaignStart,
+  requestCampaignStatus,
+  requestCampaignStop,
   requestWhatsAppPreflight,
 } from "../src/gestion/marketing/whatsapp/extensionBridge.js";
 
-async function withExtensionReply(replyType, run, payloadOverride = null) {
+function defaultStatusPayload(campaign = null) {
+  return {
+    operational: true,
+    message: "Conexión operativa",
+    configuredLimit: 1000,
+    sentToday: 0,
+    availableToday: 1000,
+    extensionVersion: "0.9.4.2",
+    bridgeInstanceId: "bridge-2",
+    bridgeGeneration: 2,
+    bridgeCreatedAt: "2026-08-19T03:00:00.000Z",
+    runtimeAvailable: true,
+    campaign,
+  };
+}
+
+async function withExtensionResolver(resolveReply, run) {
   const listeners = new Set();
   const posted = [];
   const fakeWindow = {
@@ -28,29 +46,17 @@ async function withExtensionReply(replyType, run, payloadOverride = null) {
     setTimeout,
     postMessage(envelope, origin, transfer = []) {
       posted.push({ envelope, origin, transfer });
+      const resolved = resolveReply(envelope, posted.length - 1);
+      if (!resolved) return;
       queueMicrotask(() => {
         const response = {
           channel: EXTENSION_CHANNEL,
           protocolVersion: 1,
-          type: replyType,
+          type: resolved.type,
           replyTo: envelope.requestId,
           campaignId: envelope.campaignId,
-          sequence: 2,
-          payload: payloadOverride || (replyType === EXTENSION_MESSAGE_TYPES.status
-            ? {
-                operational: true,
-                message: "Conexión operativa",
-                configuredLimit: 1000,
-                sentToday: 0,
-                availableToday: 1000,
-                extensionVersion: "0.9.4.2",
-                bridgeInstanceId: "bridge-2",
-                bridgeGeneration: 2,
-                bridgeCreatedAt: "2026-08-19T03:00:00.000Z",
-                runtimeAvailable: true,
-                campaign: null,
-              }
-            : { campaignId: envelope.campaignId, sequence: 2 }),
+          ...(Number.isInteger(resolved.sequence) ? { sequence: resolved.sequence } : {}),
+          payload: resolved.payload ?? {},
         };
         for (const listener of listeners) listener({ source: fakeWindow, origin, data: response });
       });
@@ -62,6 +68,16 @@ async function withExtensionReply(replyType, run, payloadOverride = null) {
   } finally {
     delete globalThis.window;
   }
+}
+
+async function withExtensionReply(replyType, run, payloadOverride = null) {
+  return withExtensionResolver((envelope) => ({
+    type: replyType,
+    sequence: 2,
+    payload: payloadOverride || (replyType === EXTENSION_MESSAGE_TYPES.status
+      ? defaultStatusPayload(null)
+      : { campaignId: envelope.campaignId, sequence: 2 }),
+  }), run);
 }
 
 test("los timeouts de la integración cubren operaciones reales de WhatsApp sin ping agresivo", () => {
@@ -116,7 +132,7 @@ test("START se envía separado de PREPARE con campaignId y expectedSequence", as
   });
 });
 
-test("Retry, Retry Failed y Delete usan controles explícitos con campaignId", async () => {
+test("Retry y Retry Failed usan controles explícitos con campaignId", async () => {
   await withExtensionReply(EXTENSION_MESSAGE_TYPES.resumed, async (posted) => {
     await requestCampaignRetry("campaign-retry", { sequence: 8 });
     assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.retryRequest);
@@ -127,9 +143,87 @@ test("Retry, Retry Failed y Delete usan controles explícitos con campaignId", a
     await requestCampaignRetryFailed("campaign-failed", { sequence: 10 });
     assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.retryFailedRequest);
   });
-  await withExtensionReply(EXTENSION_MESSAGE_TYPES.stopped, async (posted) => {
-    await requestCampaignDelete("campaign-stopped", { sequence: 12 });
-    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.deleteRequest);
+});
+
+test("STATUS_REQUEST consulta la campaña realmente activa de la extensión", async () => {
+  const campaign = { campaignId: "campaign-live", campaignName: "Live", status: "paused", sequence: 7 };
+  await withExtensionResolver((envelope) => {
+    assert.equal(envelope.type, EXTENSION_MESSAGE_TYPES.statusRequest);
+    return { type: EXTENSION_MESSAGE_TYPES.status, payload: defaultStatusPayload(campaign) };
+  }, async () => {
+    const status = await requestCampaignStatus();
+    assert.deepEqual(status.campaign, campaign);
+  });
+});
+
+test("STOP sobre una campaña pausada consulta estado y luego detiene con la sequence real", async () => {
+  const campaign = { campaignId: "campaign-paused", campaignName: "Pausada", status: "paused", sequence: 11 };
+  await withExtensionResolver((envelope) => {
+    if (envelope.type === EXTENSION_MESSAGE_TYPES.statusRequest) {
+      return { type: EXTENSION_MESSAGE_TYPES.status, payload: defaultStatusPayload(campaign) };
+    }
+    if (envelope.type === EXTENSION_MESSAGE_TYPES.stopRequest) {
+      return {
+        type: EXTENSION_MESSAGE_TYPES.stopped,
+        sequence: 12,
+        payload: { ...campaign, status: "stopped", sequence: 12 },
+      };
+    }
+    return null;
+  }, async (posted) => {
+    const response = await requestCampaignStop("campaign-paused");
+    assert.equal(posted.length, 2);
+    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.statusRequest);
+    assert.equal(posted[1].envelope.type, EXTENSION_MESSAGE_TYPES.stopRequest);
+    assert.equal(posted[1].envelope.sequence, 11);
+    assert.equal(response.type, EXTENSION_MESSAGE_TYPES.stopped);
+  });
+});
+
+test("STOP no libera accidentalmente una campaña que ya está stopped", async () => {
+  const campaign = { campaignId: "campaign-stopped", campaignName: "Detenida", status: "stopped", sequence: 15 };
+  await withExtensionResolver((envelope) => ({
+    type: EXTENSION_MESSAGE_TYPES.status,
+    payload: defaultStatusPayload(campaign),
+  }), async (posted) => {
+    const response = await requestCampaignStop("campaign-stopped");
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.statusRequest);
+    assert.equal(response.type, EXTENSION_MESSAGE_TYPES.stopped);
+    assert.equal(response.payload.emitterReleased, false);
+  });
+});
+
+test("DELETE libera stopped y, si el emisor ya estaba libre, lo reconcilia como released", async () => {
+  const stopped = { campaignId: "campaign-stopped", campaignName: "Detenida", status: "stopped", sequence: 20 };
+  await withExtensionResolver((envelope) => {
+    if (envelope.type === EXTENSION_MESSAGE_TYPES.statusRequest) {
+      return { type: EXTENSION_MESSAGE_TYPES.status, payload: defaultStatusPayload(stopped) };
+    }
+    if (envelope.type === EXTENSION_MESSAGE_TYPES.deleteRequest) {
+      return {
+        type: EXTENSION_MESSAGE_TYPES.stopped,
+        sequence: 20,
+        payload: { ...stopped, emitterReleased: true },
+      };
+    }
+    return null;
+  }, async (posted) => {
+    const response = await requestCampaignDelete("campaign-stopped");
+    assert.equal(posted.length, 2);
+    assert.equal(posted[1].envelope.type, EXTENSION_MESSAGE_TYPES.deleteRequest);
+    assert.equal(posted[1].envelope.sequence, 20);
+    assert.equal(response.payload.emitterReleased, true);
+  });
+
+  await withExtensionResolver(() => ({
+    type: EXTENSION_MESSAGE_TYPES.status,
+    payload: defaultStatusPayload(null),
+  }), async (posted) => {
+    const response = await requestCampaignDelete("campaign-already-free");
+    assert.equal(posted.length, 1);
+    assert.equal(response.type, EXTENSION_MESSAGE_TYPES.stopped);
+    assert.equal(response.payload.emitterReleased, true);
   });
 });
 
@@ -166,17 +260,12 @@ test("PING conserva el snapshot de campaña para resincronizar después de perde
     const status = await pingWhatsAppExtension();
     assert.deepEqual(status.campaign, campaign);
   }, {
-    operational: true,
-    message: "Conexión operativa",
-    configuredLimit: 1000,
+    ...defaultStatusPayload(campaign),
     sentToday: 97,
     availableToday: 903,
-    extensionVersion: "0.9.4.2",
     bridgeInstanceId: "bridge-sync",
     bridgeGeneration: 4,
     bridgeCreatedAt: "2026-08-19T16:00:00.000Z",
-    runtimeAvailable: true,
-    campaign,
   });
 });
 
