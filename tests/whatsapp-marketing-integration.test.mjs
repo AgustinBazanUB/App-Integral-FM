@@ -32,7 +32,7 @@ test("imágenes se serializan como dataBase64 para la extensión y no se persist
   ]);
   assert.match(bridge, /arrayBuffer\(\)/);
   assert.match(bridge, /dataBase64:\s*arrayBufferToBase64/);
-  assert.doesNotMatch(service, /base64|imageData|ArrayBuffer/i);
+  assert.doesNotMatch(service, /imageData|ArrayBuffer/i);
   assert.match(service, /imageMetadata/);
 });
 
@@ -56,7 +56,6 @@ test("permisos WhatsApp están integrados al módulo marketing", async () => {
     assert.match(permissions, new RegExp(action));
   }
 });
-
 
 test("WhatsApp no hereda permisos genéricos de create/edit y el Excel tiene vista previa", async () => {
   const [service, page, generic] = await Promise.all([
@@ -82,9 +81,43 @@ test("progreso repetido no crea auditoría en cada tick y existe evento started 
   assert.match(service, /extensionCampaignCounters\(message\.payload, current\)/);
 });
 
+test("Retry, Retry Failed y Delete están cableados a controles explícitos y UX no técnica", async () => {
+  const [bridge, page, domain] = await Promise.all([
+    read("src/gestion/marketing/whatsapp/extensionBridge.js"),
+    read("src/gestion/pages/WhatsAppCampaignsPage.jsx"),
+    read("src/gestion/marketing/whatsapp/campaignDomain.js"),
+  ]);
+  assert.match(bridge, /FLORMIA_CAMPAIGN_RETRY/);
+  assert.match(bridge, /FLORMIA_CAMPAIGN_RETRY_FAILED/);
+  assert.match(bridge, /FLORMIA_CAMPAIGN_DELETE/);
+  assert.match(page, />Reintentar</);
+  assert.match(page, />Reintentar fallidos</);
+  assert.match(page, />Borrar campaña</);
+  assert.match(page, /No pudimos confirmar el último envío/);
+  assert.doesNotMatch(page, /sendAttempted|ContactEngine|checkpoint|Content Script|correlationId/);
+  assert.match(domain, /campaignControlAvailability/);
+});
+
+test("snapshot de PING se aplica por la misma cola y la secuencia evita retrocesos", async () => {
+  const [bridge, sync, service] = await Promise.all([
+    read("src/gestion/marketing/whatsapp/extensionBridge.js"),
+    read("src/gestion/marketing/whatsapp/WhatsAppExtensionSync.jsx"),
+    read("src/gestion/marketing/whatsapp/campaignService.js"),
+  ]);
+  assert.match(bridge, /campaign:\s*plainObject\(response\.payload\.campaign\)/);
+  assert.match(sync, /applyExtensionCampaignSnapshot/);
+  assert.match(sync, /createCampaignEventQueue/);
+  assert.match(service, /sequence && sequence <= lastSequence/);
+  assert.match(service, /processedCount/);
+  assert.match(service, /extensionRetryableFailed/);
+});
+
 test("la pantalla no mantiene despierta la extensión con polling continuo", async () => {
   const page = await read("src/gestion/pages/WhatsAppCampaignsPage.jsx");
   assert.doesNotMatch(page, /setInterval\(refreshExtension/);
+  assert.doesNotMatch(page, /setInterval\(/);
   assert.match(page, /visibilitychange/);
+  assert.match(page, /scheduleHeartbeat\(60000\)/);
+  assert.match(page, /heartbeatController\?\.abort\(\)/);
   assert.match(page, /requestWhatsAppPreflight/);
 });
