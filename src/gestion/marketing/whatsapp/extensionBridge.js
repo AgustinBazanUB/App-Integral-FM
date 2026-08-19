@@ -58,6 +58,7 @@ const campaignEventTypes = new Set([
 
 const subscribers = new Set();
 let listening = false;
+let pingInFlight = null;
 
 const plainObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const requestId = () => globalThis.crypto?.randomUUID?.() || `fm-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -132,48 +133,98 @@ export function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
-function waitForReply(id, acceptedTypes, timeoutMs) {
+function abortError() {
+  const error = new Error("La comprobación de la extensión fue cancelada.");
+  error.name = "AbortError";
+  return error;
+}
+
+function waitForReply(id, acceptedTypes, timeoutMs, { signal } = {}) {
   return new Promise((resolve, reject) => {
     let timer;
+    let settled = false;
+    const finish = (callback) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      unsubscribe();
+      callback();
+    };
     const unsubscribe = subscribeExtensionMessages((message) => {
       if (message.replyTo !== id && message.requestId !== id) return;
       if (!acceptedTypes.has(message.type)) return;
-      clearTimeout(timer);
-      unsubscribe();
-      resolve(message);
+      finish(() => resolve(message));
     });
+    const onAbort = () => finish(() => reject(abortError()));
+    if (signal?.aborted) {
+      finish(() => reject(abortError()));
+      return;
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
     timer = window.setTimeout(() => {
-      unsubscribe();
-      reject(new Error(`La extensión no respondió dentro del tiempo esperado (${Math.round(timeoutMs / 1000)} s).`));
+      finish(() => reject(new Error(`La extensión no respondió dentro del tiempo esperado (${Math.round(timeoutMs / 1000)} s).`)));
     }, timeoutMs);
   });
 }
 
-export async function pingWhatsAppExtension({ timeoutMs = EXTENSION_TIMEOUTS.ping } = {}) {
-  try {
-    const id = postEnvelope(EXTENSION_MESSAGE_TYPES.ping, { payload: { requestedAt: Date.now() } });
-    const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.status]), timeoutMs);
-    return {
-      operational: response.payload.operational === true,
-      message: response.payload.message || (response.payload.operational ? "La extensión está lista." : "La extensión requiere revisión."),
-      extensionVersion: response.payload.extensionVersion || "",
-      configuredLimit: Number(response.payload.configuredLimit || 0),
-      sentToday: Number(response.payload.sentToday || 0),
-      availableToday: Number(response.payload.availableToday || 0),
-      errorCode: response.payload.errorCode || "",
-      checkedAt: Date.now(),
-    };
-  } catch (error) {
-    return {
-      operational: false,
-      message: error?.message || "Extensión no detectada o sin respuesta.",
-      errorCode: "extension_unavailable",
-      configuredLimit: 0,
-      sentToday: 0,
-      availableToday: 0,
-      checkedAt: Date.now(),
-    };
-  }
+export function extensionConnectionState({ operational = false, errorCode = "" } = {}) {
+  if (operational) return "connected";
+  if (errorCode === "EXTENSION_CONTEXT_INVALIDATED") return "needs_page_reload";
+  if (errorCode === "extension_reconnecting") return "reconnecting";
+  return "disconnected";
+}
+
+function statusFromResponse(response) {
+  const errorCode = response.payload.errorCode || "";
+  const operational = response.payload.operational === true;
+  return {
+    operational,
+    connectionState: extensionConnectionState({ operational, errorCode }),
+    message: response.payload.message || (operational ? "La extensión está lista." : "La extensión requiere revisión."),
+    extensionVersion: response.payload.extensionVersion || "",
+    configuredLimit: Number(response.payload.configuredLimit || 0),
+    sentToday: Number(response.payload.sentToday || 0),
+    availableToday: Number(response.payload.availableToday || 0),
+    errorCode,
+    bridgeInstanceId: response.payload.bridgeInstanceId || "",
+    bridgeGeneration: Number(response.payload.bridgeGeneration || 0),
+    bridgeCreatedAt: response.payload.bridgeCreatedAt || "",
+    runtimeAvailable: response.payload.runtimeAvailable !== false,
+    checkedAt: Date.now(),
+  };
+}
+
+export function pingWhatsAppExtension({ timeoutMs = EXTENSION_TIMEOUTS.ping, signal } = {}) {
+  if (pingInFlight) return pingInFlight;
+  const operation = (async () => {
+    try {
+      const id = postEnvelope(EXTENSION_MESSAGE_TYPES.ping, { payload: { requestedAt: Date.now() } });
+      const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.status]), timeoutMs, { signal });
+      return statusFromResponse(response);
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      return {
+        operational: false,
+        connectionState: "disconnected",
+        message: error?.message || "Extensión no detectada o sin respuesta.",
+        errorCode: "extension_unavailable",
+        configuredLimit: 0,
+        sentToday: 0,
+        availableToday: 0,
+        bridgeInstanceId: "",
+        bridgeGeneration: 0,
+        bridgeCreatedAt: "",
+        runtimeAvailable: false,
+        checkedAt: Date.now(),
+      };
+    }
+  })();
+  pingInFlight = operation;
+  void operation.finally(() => {
+    if (pingInFlight === operation) pingInFlight = null;
+  });
+  return operation;
 }
 
 export async function prepareCampaignForExtension(campaign, imageItems = [], { timeoutMs = EXTENSION_TIMEOUTS.prepare } = {}) {
@@ -210,36 +261,33 @@ export async function prepareCampaignForExtension(campaign, imageItems = [], { t
   return response;
 }
 
-export async function requestWhatsAppPreflight({ timeoutMs = EXTENSION_TIMEOUTS.preflight } = {}) {
+export async function requestWhatsAppPreflight({ timeoutMs = EXTENSION_TIMEOUTS.preflight, signal } = {}) {
   try {
     const id = postEnvelope(EXTENSION_MESSAGE_TYPES.preflightRequest, { payload: { requestedAt: Date.now() } });
-    const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.status]), timeoutMs);
-    return {
-      operational: response.payload.operational === true,
-      message: response.payload.message || (response.payload.operational ? "La extensión está lista." : "La extensión requiere revisión."),
-      extensionVersion: response.payload.extensionVersion || "",
-      configuredLimit: Number(response.payload.configuredLimit || 0),
-      sentToday: Number(response.payload.sentToday || 0),
-      availableToday: Number(response.payload.availableToday || 0),
-      errorCode: response.payload.errorCode || "",
-      checkedAt: Date.now(),
-    };
+    const response = await waitForReply(id, new Set([EXTENSION_MESSAGE_TYPES.status]), timeoutMs, { signal });
+    return statusFromResponse(response);
   } catch (error) {
+    if (error?.name === "AbortError") throw error;
     return {
       operational: false,
+      connectionState: "disconnected",
       message: error?.message || "No fue posible ejecutar el diagnóstico de la extensión.",
       errorCode: "extension_preflight_failed",
       configuredLimit: 0,
       sentToday: 0,
       availableToday: 0,
+      bridgeInstanceId: "",
+      bridgeGeneration: 0,
+      bridgeCreatedAt: "",
+      runtimeAvailable: false,
       checkedAt: Date.now(),
     };
   }
 }
 
-async function requestCampaignControl(type, campaignId, acceptedTypes, { sequence, timeoutMs = EXTENSION_TIMEOUTS.control } = {}) {
+async function requestCampaignControl(type, campaignId, acceptedTypes, { sequence, timeoutMs = EXTENSION_TIMEOUTS.control, signal } = {}) {
   const id = postEnvelope(type, { campaignId, sequence, payload: { campaignId } });
-  const response = await waitForReply(id, new Set([...acceptedTypes, EXTENSION_MESSAGE_TYPES.error]), timeoutMs);
+  const response = await waitForReply(id, new Set([...acceptedTypes, EXTENSION_MESSAGE_TYPES.error]), timeoutMs, { signal });
   if (response.type === EXTENSION_MESSAGE_TYPES.error) {
     throw new Error(response.payload?.message || "La extensión rechazó el control de campaña.");
   }
