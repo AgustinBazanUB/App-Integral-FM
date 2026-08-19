@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   test-build:
@@ -22,3 +23,24 @@ jobs:
       - run: npm test
       - run: npx firebase-tools@14.12.0 emulators:exec --only firestore --project demo-flor-mia-integral "npm run test:rules"
       - run: npm run build
+      - name: Publicar resultado del commit
+        if: always() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+          VERIFY_STATE: ${{ job.status }}
+        run: |
+          if [ "$VERIFY_STATE" = "success" ]; then
+            state=success
+            description="tests + Firestore rules + build passed"
+          else
+            state=failure
+            description="tests/build verification failed"
+          fi
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA" \
+            --data "{\"state\":\"$state\",\"context\":\"verify/web-app\",\"description\":\"$description\"}"
