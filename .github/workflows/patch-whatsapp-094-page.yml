@@ -21,9 +21,9 @@ jobs:
       - name: Commit patch when changed
         shell: bash
         run: |
-          if git diff --quiet -- src/gestion/pages/WhatsAppCampaignsPage.jsx src/gestion/marketing/whatsapp/campaignDomain.js; then exit 0; fi
+          if git diff --quiet -- src/gestion/pages/WhatsAppCampaignsPage.jsx src/gestion/marketing/whatsapp/extensionBridge.js; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/gestion/pages/WhatsAppCampaignsPage.jsx src/gestion/marketing/whatsapp/campaignDomain.js
-          git commit -m "fix: reconnect extension and dedupe campaign controls"
+          git add src/gestion/pages/WhatsAppCampaignsPage.jsx src/gestion/marketing/whatsapp/extensionBridge.js
+          git commit -m "perf: bound extension reconnect heartbeat"
           git push origin HEAD:agent/rendimiento-vendedor-clientes
