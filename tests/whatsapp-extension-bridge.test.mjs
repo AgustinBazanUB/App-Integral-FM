@@ -32,7 +32,7 @@ async function withExtensionReply(replyType, run) {
           campaignId: envelope.campaignId,
           sequence: 2,
           payload: replyType === EXTENSION_MESSAGE_TYPES.status
-            ? { operational: true, message: "Diagnóstico operativo", configuredLimit: 1000, sentToday: 0, availableToday: 1000 }
+            ? { operational: true, message: "Conexión operativa", configuredLimit: 1000, sentToday: 0, availableToday: 1000 }
             : { campaignId: envelope.campaignId, sequence: 2 },
         };
         for (const listener of listeners) listener({ source: fakeWindow, origin, data: response });
@@ -69,6 +69,23 @@ test("PREPARE serializa imágenes como dataBase64 compatible con la extensión",
     assert.equal(envelope.payload.images[0].dataBase64, "AQID");
     assert.equal("data" in envelope.payload.images[0], false);
     assert.deepEqual(transfer, []);
+  });
+});
+
+test("PREPARE entrega exactamente el mensaje escrito por el usuario, incluido Unicode y saltos", async () => {
+  const message = "  Hola, esto es una prueba 👋\nÁrbol y acción  ";
+  await withExtensionReply(EXTENSION_MESSAGE_TYPES.accepted, async (posted) => {
+    await prepareCampaignForExtension({
+      campaignId: "campaign-exact-text",
+      campaignName: "Texto exacto",
+      createdBy: "owner",
+      recipients: [{ recipientId: "recipient-1", phone: "5491112345678", source: "flor_mia" }],
+      message,
+      totalRecipients: 1,
+    });
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.prepare);
+    assert.equal(posted[0].envelope.payload.message, message);
   });
 });
 
