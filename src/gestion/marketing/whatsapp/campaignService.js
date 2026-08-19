@@ -184,6 +184,7 @@ export async function saveWhatsAppCampaignDraft(profile, input, campaignId = nul
     totalRecipients: Math.max(0, Number(input.totalRecipients || 0)),
     sentCount: Math.max(0, Number(existing?.data()?.sentCount || 0)),
     errorCount: Math.max(0, Number(existing?.data()?.errorCount || 0)),
+    processedCount: Math.max(0, Number(existing?.data()?.processedCount || 0)),
     progressPercentage: Math.max(0, Number(existing?.data()?.progressPercentage || 0)),
     status: existing?.exists() && existing.data().status !== "draft" ? existing.data().status : "draft",
     snapshotState: "draft",
@@ -255,6 +256,7 @@ export async function prepareCampaignSnapshot(profile, input) {
       totalRecipients: input.recipients.length,
       sentCount: 0,
       errorCount: 0,
+      processedCount: 0,
       progressPercentage: 0,
       status: "ready",
       snapshotState: "ready",
@@ -297,6 +299,7 @@ export async function recordCampaignDeliveredToExtension(profile, campaignId) {
 }
 
 const extensionStatusByType = {
+  [EXTENSION_MESSAGE_TYPES.accepted]: "ready",
   [EXTENSION_MESSAGE_TYPES.started]: "running",
   [EXTENSION_MESSAGE_TYPES.progress]: "running",
   [EXTENSION_MESSAGE_TYPES.paused]: "paused",
@@ -308,6 +311,7 @@ const extensionStatusByType = {
 };
 
 const actionByType = {
+  [EXTENSION_MESSAGE_TYPES.accepted]: "whatsappCampaign.ready",
   [EXTENSION_MESSAGE_TYPES.started]: "whatsappCampaign.running",
   [EXTENSION_MESSAGE_TYPES.progress]: "whatsappCampaign.running",
   [EXTENSION_MESSAGE_TYPES.paused]: "whatsappCampaign.paused",
@@ -336,9 +340,14 @@ export async function applyExtensionCampaignEvent(profile, message) {
       status,
       sentCount: counters.sent,
       errorCount: counters.errors,
+      processedCount: counters.processed,
       progressPercentage: counters.progress,
       lastExtensionSequence: sequence || lastSequence + 1,
       lastExtensionUpdateAt: serverTimestamp(),
+      extensionBlockReason: message.payload?.blockReason || null,
+      extensionRetryableFailed: Math.max(0, Number(message.payload?.retryableFailed || 0)),
+      extensionRetryCycle: Math.max(0, Number(message.payload?.retryCycle || 0)),
+      extensionVersion: String(message.payload?.extensionVersion || current.extensionVersion || ""),
       updatedAt: serverTimestamp(),
       ...(status === "running" && !current.startedAt ? { startedAt: serverTimestamp() } : {}),
       ...(["completed", "error", "cancelled", "stopped"].includes(status) ? { finishedAt: serverTimestamp() } : {}),
@@ -358,20 +367,49 @@ export async function applyExtensionCampaignEvent(profile, message) {
         sequence: update.lastExtensionSequence,
         sentCount: counters.sent,
         errorCount: counters.errors,
+        processedCount: counters.processed,
         progressPercentage: counters.progress,
         message: status === "error" ? update.extensionErrorMessage : null,
         createdAt: serverTimestamp(),
       });
-      transaction.set(auditRef, campaignAudit(profile, actionByType[message.type], message.campaignId, `Campaña de WhatsApp ${CAMPAIGN_STATUS_LABELS[status].toLocaleLowerCase("es")}`, `Progreso reportado: ${counters.sent}/${counters.total}.`));
+      transaction.set(auditRef, campaignAudit(
+        profile,
+        actionByType[message.type],
+        message.campaignId,
+        `Campaña de WhatsApp ${CAMPAIGN_STATUS_LABELS[status].toLocaleLowerCase("es")}`,
+        `Procesados: ${counters.processed}/${counters.total} · enviados: ${counters.sent} · con problemas: ${counters.errors}.`,
+      ));
     }
     return { ignored: false, status, statusChanged, ...counters };
+  });
+}
+
+export function extensionEventTypeForSnapshot(snapshot = {}) {
+  const status = String(snapshot.status || "");
+  if (["received", "ready"].includes(status)) return EXTENSION_MESSAGE_TYPES.accepted;
+  if (["running", "pause_requested", "waiting_contact", "waiting_batch"].includes(status)) return EXTENSION_MESSAGE_TYPES.progress;
+  if (["paused", "daily_limit_reached", "images_required"].includes(status)) return EXTENSION_MESSAGE_TYPES.paused;
+  if (status === "completed") return EXTENSION_MESSAGE_TYPES.completed;
+  if (status === "stopped") return EXTENSION_MESSAGE_TYPES.stopped;
+  if (status === "error") return EXTENSION_MESSAGE_TYPES.error;
+  return null;
+}
+
+export async function applyExtensionCampaignSnapshot(profile, snapshot) {
+  const type = extensionEventTypeForSnapshot(snapshot);
+  if (!type || !snapshot?.campaignId || !Number.isInteger(Number(snapshot.sequence))) return { ignored: true };
+  return applyExtensionCampaignEvent(profile, {
+    type,
+    campaignId: snapshot.campaignId,
+    sequence: Number(snapshot.sequence),
+    payload: snapshot,
   });
 }
 
 export async function cancelLocalCampaign(profile, campaign) {
   if (!canCancel(profile)) throw new Error("No tenés permiso para cancelar campañas.");
   if (!campaign?.id) throw new Error("La campaña no está disponible.");
-  if (!['draft', 'ready'].includes(campaign.status)) throw new Error("La campaña ya está bajo control de la extensión.");
+  if (!["draft", "ready"].includes(campaign.status)) throw new Error("La campaña ya está bajo control de la extensión.");
   const batch = writeBatch(db);
   batch.set(doc(db, "whatsappCampaigns", campaign.id), {
     status: "cancelled",
