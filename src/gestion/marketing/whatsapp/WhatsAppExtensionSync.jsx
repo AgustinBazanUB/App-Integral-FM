@@ -1,8 +1,10 @@
-
 import { useEffect } from "react";
 import { useAuth } from "../../AuthContext";
 import { can } from "../../permissions";
-import { applyExtensionCampaignEvent, applyExtensionCampaignSnapshot } from "./campaignService";
+import {
+  applyReconciledExtensionCampaignEvent,
+  applyReconciledExtensionCampaignSnapshot,
+} from "./campaignReconciliation";
 import { createCampaignEventQueue } from "./campaignEventQueue";
 import { EXTENSION_MESSAGE_TYPES, subscribeExtensionMessages } from "./extensionBridge";
 
@@ -19,9 +21,9 @@ const campaignEvents = new Set([
 
 const enqueueCampaignState = createCampaignEventQueue((profile, message) => {
   if (message.type === EXTENSION_MESSAGE_TYPES.status) {
-    return applyExtensionCampaignSnapshot(profile, message.payload?.campaign);
+    return applyReconciledExtensionCampaignSnapshot(profile, message.payload?.campaign);
   }
-  return applyExtensionCampaignEvent(profile, message);
+  return applyReconciledExtensionCampaignEvent(profile, message);
 });
 
 export default function WhatsAppExtensionSync() {
