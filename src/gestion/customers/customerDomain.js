@@ -31,7 +31,6 @@ export function isValidCustomerPhone(value) {
   return normalized.length >= 8 && normalized.length <= 11;
 }
 
-
 export function formatPhoneForDisplay(value) {
   const normalized = normalizeCustomerPhone(value);
   if (!normalized) return "";
@@ -42,12 +41,21 @@ export function formatPhoneForDisplay(value) {
   return `${normalized.slice(0, -4)}-${normalized.slice(-4)}`;
 }
 
+/**
+ * Contrato Web App → extensión para WhatsApp.
+ * La UI puede recibir formatos argentinos amigables (+54 9, 0/15 legado o 11XXXXXXXX),
+ * pero la integración sólo entrega un móvil argentino inequívoco: 549 + 10 dígitos nacionales.
+ * No se adivina otro país silenciosamente.
+ */
+export function canonicalWhatsAppPhone(value, { country = "AR" } = {}) {
+  if (country !== "AR") return "";
+  const national = normalizeCustomerPhone(value);
+  if (!/^\d{10}$/.test(national)) return "";
+  return `549${national}`;
+}
+
 export function phoneToWhatsAppInternational(value) {
-  const normalized = normalizeCustomerPhone(value);
-  if (!isValidCustomerPhone(normalized)) return "";
-  // Los clientes de esta base usan numeración argentina nacional. Para móviles,
-  // WhatsApp requiere país 54 + indicador móvil 9 + número nacional sin 0/15.
-  return normalized.length === 10 ? `549${normalized}` : `54${normalized}`;
+  return canonicalWhatsAppPhone(value);
 }
 
 export function customerWhatsAppUrl(value) {
