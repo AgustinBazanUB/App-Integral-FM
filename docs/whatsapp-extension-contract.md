@@ -2,9 +2,9 @@
 
 ## Alcance
 
-La Web-App prepara campañas. La extensión privada ejecuta técnicamente WhatsApp Web. La Web-App no conoce selectores DOM, tiempos, tandas, reintentos, cookies, QR, credenciales ni tokens de WhatsApp.
+La Web-App prepara campañas. La extensión privada ejecuta técnicamente WhatsApp Web. La Web-App no conoce selectores DOM, tiempos internos, checkpoints, QR, credenciales ni tokens de WhatsApp.
 
-Versión de extensión objetivo de este corte: **0.9.3**.
+Versión de extensión objetivo de este corte: **0.9.4**.
 
 ## Transporte
 
@@ -12,8 +12,8 @@ Versión de extensión objetivo de este corte: **0.9.3**.
 - `protocolVersion`: `1`.
 - La Web-App usa `window.postMessage()` con `targetOrigin = window.location.origin`.
 - El content script escucha únicamente páginas autorizadas y valida `event.source`, `event.origin`, `channel`, `protocolVersion`, `type` y schema.
-- Las respuestas usan `replyTo` con el `requestId` recibido cuando responden a una solicitud puntual.
-- Los eventos de campaña incluyen `campaignId` y un `sequence` entero monótonamente creciente.
+- Las respuestas puntuales usan `replyTo` con el `requestId` recibido.
+- Los eventos de campaña incluyen `campaignId` y `sequence` entero monótonamente creciente.
 
 ### Ventanas de respuesta de la Web-App
 
@@ -22,27 +22,54 @@ Versión de extensión objetivo de este corte: **0.9.3**.
 - `PREFLIGHT`: 35 segundos.
 - `START / PAUSE / RESUME / STOP`: 35 segundos.
 
-Estos timeouts son límites de espera de la Web-App; no sustituyen los timeouts técnicos internos ni las comprobaciones de seguridad de la extensión. La interfaz acusa visualmente Pause/Stop de inmediato (`Pausando…` / `Deteniendo…`) y evita clicks duplicados mientras espera la transición durable de la extensión.
+Estos timeouts son límites del bridge, no sustituyen los budgets internos ni las comprobaciones de seguridad. Pause/Stop tienen ACK visual inmediato y el control duplicado se bloquea sin esperar el siguiente render.
 
-Si la extensión se recarga o actualiza mientras el Deploy Preview permanece abierto, el content script anterior pierde su contexto de extensión. La pestaña debe recargarse para inyectar el bridge de la versión nueva. La extensión responde este caso de forma segura y no debe intentar usar nuevamente `chrome.runtime` desde ese contexto viejo.
+## Lifecycle y reconexión del bridge
+
+Cada Content Bridge de la Web-App publica metadata de lifecycle:
+
+```js
+{
+  bridgeInstanceId,
+  bridgeGeneration,
+  bridgeCreatedAt,
+  extensionVersion,
+  runtimeAvailable
+}
+```
+
+La generación más nueva es la única que puede responder. Una instancia anterior que detecta que fue reemplazada deja de escuchar `window.message`, `chrome.storage.onChanged` y sus observers. Nunca deben responder dos bridges al mismo PING.
+
+La Web-App maneja cuatro estados de conexión:
+
+- `connected`;
+- `reconnecting`;
+- `needs_page_reload`;
+- `disconnected`.
+
+El heartbeat es un `PING` lightweight, no un preflight. Los PING concurrentes se deduplican. Mientras la página está visible se comprueba de forma espaciada; ante fallos hay backoff acotado y una sola reconexión activa. Al ocultarse la página, timers y request pendientes se cancelan.
+
+Si un content script conserva un `chrome.runtime` invalidado después de recargar/actualizar la extensión, se marca stale, emite como máximo una señal local segura y deja de usar el runtime. La UI muestra **“Necesitamos reconectar la extensión”** y el botón **Reconectar** recarga únicamente la Web-App. No hace falta desinstalar la extensión.
+
+Una suspensión normal del Service Worker MV3 no equivale a este error. El worker puede rehidratar campaña/checkpoints al despertar; no se mantiene vivo mediante keepalive agresivo.
 
 ## Contrato de teléfono
 
-La UI acepta formatos argentinos habituales para no exigir E.164 al usuario. Antes de construir la campaña, la Web-App normaliza un móvil argentino inequívoco a:
+La UI acepta formatos argentinos habituales. Antes de construir la campaña, un móvil argentino inequívoco se normaliza a:
 
 `549` + `10 dígitos nacionales`
 
-Ejemplo: `11 5757-1979`, `+54 9 11 5757-1979` y el formato local legado equivalente producen `5491157571979`.
+Ejemplo: `11 5757-1979`, `+54 9 11 5757-1979`, `5491157571979`, variantes con espacios/guiones y el formato local legado `011 15-...` admitido producen el mismo canonical.
 
-Reglas de integración:
+Reglas:
 
-- el valor amigable/nacional puede seguir usándose para display y administración;
-- `recipients[].phone` enviado a la extensión debe ser el valor WhatsApp canónico;
-- la deduplicación de destinatarios usa ese mismo canonical;
-- la Web-App no adivina otro país ni completa silenciosamente un número ambiguo;
-- la extensión vuelve a validar el payload y compara el destinatario real antes de permitir contenido.
+- el formato amigable puede seguir usándose para display;
+- `recipients[].phone` enviado a la extensión usa el canonical;
+- deduplicación usa ese mismo canonical;
+- un número regional corto o ambiguo no se completa silenciosamente;
+- la extensión vuelve a validar el payload y el destinatario antes de contenido.
 
-WhatsApp puede exponer internamente un JID argentino equivalente sin el indicador móvil `9`. Esa equivalencia sólo puede aceptarse de forma controlada cuando el payload ya declaró inequívocamente `549 + 10 dígitos`; nunca se usa para adivinar un país o aceptar un teléfono distinto.
+WhatsApp puede exponer un JID argentino equivalente sin el indicador móvil `9`. Sólo se acepta la equivalencia controlada `549 + 10 nacionales` ↔ `54 + esos 10 nacionales`; nunca se usa para adivinar país o aceptar otro número.
 
 ## Mensajes
 
@@ -71,21 +98,25 @@ Extensión → Web:
 
 ## Estado de extensión
 
-`FLORMIA_EXTENSION_STATUS.payload`:
+`FLORMIA_EXTENSION_STATUS.payload` puede incluir:
 
 ```js
 {
-  operational: true | false,
-  message: "texto comprensible",
-  extensionVersion: "0.9.3",
+  operational: true,
+  message: "Listo para enviar",
+  extensionVersion: "0.9.4",
   configuredLimit: 1000,
   sentToday: 427,
   availableToday: 573,
+  bridgeInstanceId: "...",
+  bridgeGeneration: 4,
+  bridgeCreatedAt: "...",
+  runtimeAvailable: true,
   errorCode: "opcional"
 }
 ```
 
-La vista primaria usa un modelo mental simple: **Conectado / Listo para enviar** o **Necesita revisión**. Compatibilidad de UI y verificación de destinatario son conceptos distintos: un preflight GREEN no prueba por sí mismo que el chat activo corresponda al destinatario esperado. El límite diario es autoridad exclusiva de la extensión.
+Conexión/compatibilidad y verificación de destinatario son conceptos distintos: un status operativo o preflight GREEN nunca autoriza por sí solo a enviar contenido a un chat.
 
 ## Preparación de campaña
 
@@ -105,67 +136,83 @@ La vista primaria usa un modelo mental simple: **Conectado / Listo para enviar**
 }
 ```
 
-`message` se transporta como el string escrito por el usuario. El bridge no lo sustituye por placeholders, texto de prueba ni contenido diagnóstico. La extensión conserva ese string en CampaignStore/checkpoint y sólo normaliza CRLF a LF al escribir en el `contenteditable`, porque ésa es la representación de línea del navegador.
+`message` viaja como el string escrito por el usuario. El bridge no lo sustituye por placeholders, probes ni texto diagnóstico. La extensión conserva ese string en CampaignStore/checkpoint y sólo representa CRLF/CR como LF al escribir el `contenteditable`.
 
-`dataBase64` es únicamente un formato temporal de transporte dentro del mensaje Web-App → extensión. La Web-App obtiene los bytes desde el `File`/`ArrayBuffer`, los serializa para el bridge y no persiste esa representación en Firestore, Firebase Storage, GitHub ni Netlify. La extensión reconstruye los bytes del archivo original antes de preparar el adjunto. Firestore conserva sólo metadatos de imágenes.
+Las imágenes son temporales. Firestore conserva metadatos/snapshots, no Base64 persistente ni binarios. La extensión reconstruye el archivo para el step activo y libera las referencias cuando dejan de ser necesarias.
 
-El orden lógico definido por la Web-App es Imagen 1 → Imagen 2 → Imagen 3 → Texto. La extensión garantiza el orden técnico real.
+## Conversation Proof 0.9.4
 
-## Seguridad de conversación y envío
+Flujo previo a contenido:
 
-Antes del primer step de contenido la extensión debe completar:
+`navigation request → fresh Content Script → handshake → conversation proof → contenido real`
 
-`openConversation → nueva generación del Content Script → proveConversation → contenido real`
+### Strong proof
 
-- composer visible no prueba identidad;
-- la URL `/send?phone=...` no prueba identidad por sí sola;
-- después de `/send`, la extensión espera una instancia nueva del Content Script antes de probar el chat;
-- sólo evidencia estructurada fuerte del peer activo permite avanzar;
-- si no puede demostrarse el destinatario, la campaña se pausa sin enviar;
-- si `sendAttempted=true`, Pause/Stop espera la reconciliación necesaria antes de cruzar la frontera segura;
-- un resultado ambiguo nunca se reintenta a ciegas.
+Puede provenir de evidencia semántica directamente vinculada al peer:
 
-### Diagnósticos 0.9.3
+- `phone` retenido por la navegación `/send?phone=...` cuando coincide con el canonical esperado;
+- `data-jid`, `data-chat-id`, `data-peer-id` o `data-contact-id` del header/main;
+- consenso de JID de mensajes pertenecientes al chat.
 
-Los preflights automáticos y health checks son **no destructivos**. No pueden:
+Una evidencia fuerte distinta o conflictiva siempre bloquea.
 
-- escribir o borrar texto del composer;
-- reemplazar un borrador existente;
-- adjuntar una imagen técnica;
-- abrir un preview artificial;
-- presionar Send.
+### Causal proof
 
-Las capacidades que sólo pueden demostrarse modificando la conversación se validan durante el step real con el contenido real, nunca mediante un probe sintético.
+Si WhatsApp muestra un nombre guardado y no expone teléfono/JID utilizable, no se acepta `nombre + composer` por sí solos. Puede establecerse una lease causal únicamente si se conserva una cadena correlacionada:
 
-## Progreso
+1. tab de WhatsApp ya vinculado;
+2. canonical esperado;
+3. `navigationRequestId` único;
+4. transición desde el Content Script anterior;
+5. Content Script nuevo confirmado;
+6. cronología de navegación válida;
+7. ausencia de error de número inválido;
+8. conversación/header/composer presentes;
+9. huella semántica secundaria de esa conversación;
+10. sin selección manual de otro chat;
+11. sin evidencia fuerte contradictoria.
 
-Los eventos de progreso incluyen:
+La lease se vuelve a validar inmediatamente antes del Send. Si cambia el chat, fingerprint, tab, generación o aparece evidencia contradictoria, falla cerrado.
 
-```js
-{
-  channel: "flor_mia_whatsapp_extension",
-  protocolVersion: 1,
-  type: "FLORMIA_CAMPAIGN_PROGRESS",
-  campaignId: "...",
-  sequence: 12,
-  payload: { sent: 240, progress: { completed: 240 }, finalSummary: { failed: 3 } }
-}
-```
+### Fail
 
-La extensión incrementa `sequence`. La Web-App ignora secuencias antiguas y nunca permite que enviados supere `totalRecipients`.
+Se bloquea el envío ante número inválido, JID/teléfono distinto, identificadores conflictivos, navegación stale, selección manual, cambio de conversación o evidencia insuficiente sin cadena causal.
 
-## Datos prohibidos
+## Retry budget
 
-No enviar ni almacenar en Flor Mía: cookies, tokens, contraseñas, QR, localStorage de WhatsApp, selectores internos, configuraciones de timing/tandas/reintentos ni binarios persistentes de las imágenes.
+Un proof sin evidencia nueva no consume bloques repetidos de 15 segundos. El proof está acotado a aproximadamente 4 segundos por generación de navegación y una falla `insufficient_evidence` pausa ese ciclo sin repetirlo inmediatamente.
 
-## Frecuencia de estado
+El checkpoint distingue:
 
-La pantalla no ejecuta diagnósticos pesados para refrescar un badge. Usa PING al cargar/recuperar foco y eventos push de campaña. `PREFLIGHT` completo se reserva para una comprobación solicitada explícitamente o un punto técnico donde realmente sea necesario.
+- `openConversationAttempts`: contador diagnóstico de aperturas;
+- `openConversationFailures`: budget acumulativo de fallos.
 
-La extensión puede informar progreso tantas veces como sea útil, siempre con `sequence` creciente. La Web-App actualiza los contadores del documento principal, pero sólo crea un evento/auditoría cuando cambia el estado operativo, evitando ruido y escrituras innecesarias.
+Las aperturas confirmadas no consumen el budget de fallos, porque una reconciliación posterior puede necesitar volver a probar el chat. Los fallos de apertura/proof sí se acumulan a través de Resume y quedan limitados.
+
+## Resume / Pause / Stop
+
+- La Web-App usa un mutex síncrono además del estado visual para impedir doble Resume/Pause/Stop antes del próximo render.
+- Un Resume duplicado que llega cuando la extensión ya está `running/waiting` es idempotente: devuelve el estado actual en vez de `INVALID_INPUT`.
+- Pause/Stop abortan waits/proof pre-send cuando todavía no hubo `sendAttempted`.
+- Si un Send pudo ocurrir, se completa la reconciliación necesaria antes de detenerse en una frontera segura.
+
+## Diagnósticos
+
+Preflight automático, status y health checks son no destructivos. No pueden escribir/borrar el composer, adjuntar probes, abrir previews sintéticos ni presionar Send.
+
+El reporte técnico puede registrar etapa, duración, proof level/strategy, generación, request ID y counters sanitizados, pero no el texto privado ni snapshots DOM. Los reportes grandes se generan bajo demanda o por incidente, no como parte del heartbeat.
+
+## Frecuencia y performance
+
+- El Service Worker mantiene queue, campaña, delays, checkpoints y controles.
+- El Content Script conoce sólo el contacto/step activo y funciona como adaptador DOM.
+- No hay polling de 100 ms permanente.
+- Los waits usan checks inmediatos + observers/eventos acotados + timeout/AbortSignal.
+- El PING de estado no ejecuta compatibility discovery ni genera reportes.
+- El heartbeat de la Web-App está single-flight y se detiene al ocultarse la página.
 
 ## Estado de implementación
 
-El lado Flor Mía está implementado en `/gestion/marketing/whatsapp`. La Web-App valida origen, versión y schema, normaliza destinatarios antes del handoff, transfiere imágenes únicamente en memoria, persiste sólo metadatos y snapshots de destinatarios en subcolecciones y rechaza preparar una campaña mientras la extensión no informe `operational: true`.
+El lado Flor Mía se mantiene en `/gestion/marketing/whatsapp` dentro del Deploy Preview. La rama normaliza destinatarios, preserva exactamente el mensaje, deduplica PING/control y expone reconexión simple.
 
-La extensión 0.9.3 conserva CampaignEngine/ContactEngine, checkpoints durables, prevención de duplicados y prueba de contexto de conversación antes de permitir contenido. Los tests/build validan el contrato; una prueba manual con un único contacto autorizado sigue siendo obligatoria para declarar comportamiento real en WhatsApp Web.
+La extensión 0.9.4 conserva CampaignEngine/ContactEngine, checkpoints durables y prevención at-most-once. Tests y build validan el contrato; **una prueba manual con un único contacto autorizado sigue siendo obligatoria** antes de declarar funcionamiento real en WhatsApp Web.
