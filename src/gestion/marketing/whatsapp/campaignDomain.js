@@ -170,8 +170,6 @@ export function analyzeRecipientCandidates(candidates = []) {
       invalidRows.push({ ...candidate, reason: "Celular argentino incompleto o ambiguo" });
       continue;
     }
-    // Dedupe por el mismo identificador canónico que recibe la extensión. Así +54 9,
-    // 0/15 legado y formato local no crean destinatarios duplicados.
     const existing = unique.get(candidate.whatsappPhone);
     if (existing) {
       duplicates += 1;
@@ -218,7 +216,7 @@ export function userFacingWhatsAppProblem({ code, message } = {}) {
   if (code === "WHATSAPP_NOT_OPEN") return "WhatsApp Web no está abierto. Abrilo para continuar.";
   if (code === "SESSION_NOT_READY") return "WhatsApp necesita iniciar sesión. Abrí WhatsApp Web y escaneá el código QR.";
   if (["PREFLIGHT_FAILED", "WHATSAPP_UI_CHANGED"].includes(code)) return "WhatsApp cambió y necesitamos revisar la conexión antes de continuar.";
-  if (code === "INTERFACE_LOADING" || code === "TIMEOUT") return "WhatsApp Web todavía se está cargando. La campaña quedó pausada para continuar de forma segura.";
+  if (code === "INTERFACE_LOADING" || code === "TIMEOUT") return "WhatsApp necesita unos segundos más. No pudimos terminar de abrir el contacto. La campaña se pausó para evitar un envío incorrecto.";
   return String(message || "Hubo un problema y la campaña quedó pausada de forma segura.");
 }
 
