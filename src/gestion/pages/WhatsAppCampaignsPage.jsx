@@ -507,6 +507,7 @@ export default function WhatsAppCampaignsPage() {
     let cancelled = false;
     let heartbeatTimer = null;
     let heartbeatController = null;
+    let heartbeatRunning = false;
     let reconnectAttempt = 0;
     const retryDelays = [1000, 3000, 10000, 30000];
 
@@ -516,28 +517,42 @@ export default function WhatsAppCampaignsPage() {
       heartbeatTimer = window.setTimeout(runHeartbeat, delay);
     };
     const runHeartbeat = async () => {
-      if (cancelled || document.visibilityState !== "visible") return;
-      heartbeatController?.abort();
-      heartbeatController = new AbortController();
+      if (cancelled || document.visibilityState !== "visible" || heartbeatRunning) return;
+      heartbeatRunning = true;
+      const controller = new AbortController();
+      heartbeatController = controller;
       try {
-        const status = await pingWhatsAppExtension({ signal: heartbeatController.signal });
-        if (cancelled) return;
+        const status = await pingWhatsAppExtension({ signal: controller.signal });
+        if (cancelled || controller.signal.aborted) return;
         if (status.connectionState === "connected") {
           reconnectAttempt = 0;
           setExtensionStatus(status);
-          scheduleHeartbeat(30000);
+          scheduleHeartbeat(60000);
           return;
         }
         if (status.connectionState === "needs_page_reload") {
           setExtensionStatus(status);
           return;
         }
-        const delay = retryDelays[Math.min(reconnectAttempt, retryDelays.length - 1)];
+        if (reconnectAttempt >= retryDelays.length) {
+          setExtensionStatus({ ...status, connectionState: "disconnected", message: status.message || "No pudimos contactar la extensión." });
+          return;
+        }
+        const delay = retryDelays[reconnectAttempt];
         reconnectAttempt += 1;
         setExtensionStatus({ ...status, connectionState: "reconnecting", message: "Reconectando la extensión…" });
         scheduleHeartbeat(delay);
       } catch (cause) {
-        if (cause?.name !== "AbortError" && !cancelled) scheduleHeartbeat(retryDelays[Math.min(reconnectAttempt++, retryDelays.length - 1)]);
+        if (cause?.name === "AbortError" || cancelled) return;
+        if (reconnectAttempt >= retryDelays.length) {
+          setExtensionStatus((current) => ({ ...current, operational: false, connectionState: "disconnected", message: "No pudimos contactar la extensión." }));
+          return;
+        }
+        scheduleHeartbeat(retryDelays[reconnectAttempt]);
+        reconnectAttempt += 1;
+      } finally {
+        if (heartbeatController === controller) heartbeatController = null;
+        heartbeatRunning = false;
       }
     };
 
