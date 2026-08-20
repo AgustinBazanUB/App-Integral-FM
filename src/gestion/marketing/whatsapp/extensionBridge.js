@@ -445,18 +445,47 @@ export async function requestCampaignCancellation(campaignId, options = {}) {
   };
   const live = await requestCampaignStatus(queryOptions);
   const active = live.campaign;
+
   if (!active) {
     return syntheticCancelledEnvelope(campaignId, null, "extension_has_no_active_campaign");
   }
+
+  // La campaña solicitada es un registro stale de la Web App. No tocamos la
+  // campaña distinta que sí controla la extensión: sólo archivamos la vieja.
   if (active.campaignId !== campaignId) {
-    throw campaignConflict(
-      `La extensión conserva otra campaña activa (${active.campaignName || active.campaignId}). Cancelá o reconciliá esa campaña antes de continuar.`,
-      { blockingCampaign: active },
-    );
+    return syntheticCancelledEnvelope(campaignId, null, "requested_campaign_not_active_in_extension");
   }
+
   if (active.status === "cancelled") {
     return syntheticCancelledEnvelope(campaignId, active, "extension_already_cancelled");
   }
+
+  if (active.status === "stopped") {
+    try {
+      return await requestCampaignControl(
+        EXTENSION_MESSAGE_TYPES.cancelRequest,
+        campaignId,
+        [EXTENSION_MESSAGE_TYPES.cancelled],
+        { ...options, sequence: Number.isInteger(active.sequence) ? active.sequence : options.sequence },
+      );
+    } catch (error) {
+      // Compatibilidad con 0.9.4.4: esa versión podía rechazar stopped ->
+      // cancelled. En ese caso liberamos explícitamente el slot stopped y
+      // reconciliamos el registro histórico como cancelled en la Web App.
+      const invalidLegacyTransition = error?.code === "INTERNAL_ERROR"
+        || error?.code === "internal"
+        || String(error?.message || "").includes("Transición de campaña inválida");
+      if (!invalidLegacyTransition) throw error;
+      await requestCampaignControl(
+        EXTENSION_MESSAGE_TYPES.deleteRequest,
+        campaignId,
+        [EXTENSION_MESSAGE_TYPES.stopped],
+        { ...options, sequence: Number.isInteger(active.sequence) ? active.sequence : options.sequence },
+      );
+      return syntheticCancelledEnvelope(campaignId, active, "legacy_stopped_campaign_released");
+    }
+  }
+
   return requestCampaignControl(
     EXTENSION_MESSAGE_TYPES.cancelRequest,
     campaignId,
