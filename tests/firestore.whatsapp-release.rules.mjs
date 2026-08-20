@@ -73,6 +73,11 @@ before(async () => {
         createdBy: "marketing-control-denied",
         createdByName: "Marketing sin control de campaña",
       }),
+      setDoc(doc(database, "whatsappCampaigns", "wa-prepare"), {
+        ...baseCampaign,
+        status: "draft",
+        snapshotState: "writing",
+      }),
     ]);
   });
 });
@@ -111,6 +116,44 @@ test("un perfil sin permisos de cancelación ni envío no puede archivar la camp
     doc(database, "whatsappCampaigns", "wa-control-denied"),
     cancellationPatch("marketing-control-denied"),
   ));
+});
+
+test("preparar una campaña nueva usa sólo campos permitidos en draft a ready", async () => {
+  const database = environment.authenticatedContext("admin-1").firestore();
+  await assertSucceeds(updateDoc(doc(database, "whatsappCampaigns", "wa-prepare"), {
+    totalRecipients: 1,
+    sentCount: 0,
+    errorCount: 0,
+    progressPercentage: 0,
+    status: "ready",
+    snapshotState: "ready",
+    preparedAt: new Date(),
+    updatedAt: new Date(),
+  }));
+});
+
+test("iniciar la campaña persiste el estado running sin campos nuevos no desplegados", async () => {
+  const database = environment.authenticatedContext("admin-1").firestore();
+  await assertSucceeds(updateDoc(doc(database, "whatsappCampaigns", "wa-prepare"), {
+    status: "running",
+    sentCount: 0,
+    errorCount: 0,
+    progressPercentage: 0,
+    lastExtensionSequence: 1,
+    lastExtensionUpdateAt: new Date(),
+    startedAt: new Date(),
+    updatedAt: new Date(),
+  }));
+});
+
+test("Firestore sigue rechazando métricas nuevas si se escriben directo en el documento principal", async () => {
+  const database = environment.authenticatedContext("admin-1").firestore();
+  await assertFails(updateDoc(doc(database, "whatsappCampaigns", "wa-prepare"), {
+    confirmedSentCount: 1,
+    unverifiedSentCount: 0,
+    processedCount: 1,
+    updatedAt: new Date(),
+  }));
 });
 
 test("el estado stopped sigue bloqueado por las reglas actuales y por eso no se persiste como paso intermedio", async () => {
