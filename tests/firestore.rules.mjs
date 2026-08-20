@@ -7,11 +7,15 @@ import {
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
+  query,
   runTransaction,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 
 let environment;
@@ -42,6 +46,12 @@ before(async () => {
         role: "location_manager",
         active: true,
         allowedLocationIds: ["loc-1"],
+      }),
+      setDoc(doc(database, "users", "marketing-denied"), {
+        name: "Marketing restringido",
+        role: "marketing_manager",
+        active: true,
+        permissionDeny: { marketing: ["whatsappSendToExtension"] },
       }),
       setDoc(doc(database, "locations", "loc-1"), {
         name: "Ubicación autorizada",
@@ -82,6 +92,29 @@ before(async () => {
       setDoc(doc(database, "financialEntries", "entry-1"), {
         name: "Entrada protegida",
         createdBy: "admin-1",
+      }),
+      setDoc(doc(database, "customerZones", "zone-active"), {
+        name: "Zona Norte",
+        active: true,
+        order: 1,
+      }),
+      setDoc(doc(database, "customerZones", "zone-inactive"), {
+        name: "Zona Histórica",
+        active: false,
+        order: 2,
+      }),
+      setDoc(doc(database, "customers", "customer_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), {
+        customerKey: "customer_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        phone: "11 1234-5678",
+        phoneNormalized: "1112345678",
+        name: "Cliente existente",
+        zoneId: "zone-active",
+        zoneName: "Zona Norte",
+        active: true,
+        deleted: false,
+        source: "seller_sale",
+        createdBy: "seller-1",
+        lastSaleId: "seed-sale",
       }),
     ]);
   });
@@ -245,4 +278,182 @@ test("un encargado puede cargar stock pero no asignar vendedores ni descuentos",
   }));
   await assertFails(updateDoc(doc(database, "locations", "loc-1"), { assignedSellerIds: ["seller-1"], updatedAt: new Date() }));
   await assertFails(updateDoc(doc(database, "locations", "loc-1"), { enabledDiscountIds: ["discount-1"], updatedAt: new Date() }));
+});
+
+test("el vendedor puede resolver un cliente puntual pero no listar la base", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  await assertSucceeds(getDoc(doc(database, "customers", "customer_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")));
+  await assertFails(getDocs(collection(database, "customers")));
+});
+
+test("el vendedor sólo puede listar zonas activas", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  await assertSucceeds(getDocs(query(collection(database, "customerZones"), where("active", "==", true))));
+  await assertFails(getDocs(collection(database, "customerZones")));
+  await assertSucceeds(getDoc(doc(database, "customerZones", "zone-active")));
+  await assertFails(getDoc(doc(database, "customerZones", "zone-inactive")));
+});
+
+test("cliente nuevo y venta quedan vinculados dentro de la misma operación", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  const customerId = "customer_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  const customerRef = doc(database, "customers", customerId);
+  const saleRef = doc(database, "sales", "customer-sale-1");
+
+  await assertSucceeds(runTransaction(database, async (transaction) => {
+    transaction.set(customerRef, {
+      customerKey: customerId,
+      phone: "11 2222-3333",
+      phoneNormalized: "1122223333",
+      name: null,
+      zoneId: "zone-active",
+      zoneName: "Zona Norte",
+      customZone: null,
+      active: true,
+      deleted: false,
+      source: "seller_sale",
+      createdBy: "seller-1",
+      createdByName: "Vendedor",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSaleId: saleRef.id,
+      lastPurchaseAt: new Date(),
+    });
+    transaction.set(saleRef, {
+      saleCode: "FM-LOC-20260806-0002",
+      sellerId: "seller-1",
+      sellerName: "Vendedor",
+      locationId: "loc-1",
+      locationName: "Ubicación autorizada",
+      customerId,
+      customerPhoneSnapshot: "11 2222-3333",
+      customerNameSnapshot: null,
+      customerZoneSnapshot: "Zona Norte",
+      status: "active",
+      total: 1000,
+      totalItems: 1,
+      items: [{ productId: "product-1", name: "Producto", qty: 1, unitPrice: 1000, subtotal: 1000 }],
+      paymentMethod: "cash",
+      paymentMethodLabel: "Pago eft",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }));
+
+  assert.equal((await getDoc(customerRef)).data().phoneNormalized, "1122223333");
+  assert.equal((await getDoc(saleRef)).data().customerId, customerId);
+});
+
+test("el vendedor no puede crear un cliente sin una venta vinculada", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  const customerId = "customer_cccccccccccccccccccccccccccccccccccccccc";
+  await assertFails(setDoc(doc(database, "customers", customerId), {
+    customerKey: customerId,
+    phone: "11 4444-5555",
+    phoneNormalized: "1144445555",
+    zoneName: "Zona Norte",
+    active: true,
+    deleted: false,
+    source: "seller_sale",
+    createdBy: "seller-1",
+    lastSaleId: "sale-no-vinculada",
+  }));
+});
+
+test("campañas WhatsApp quedan restringidas a marketing autorizado y sin binarios", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const sellerDb = environment.authenticatedContext("seller-1").firestore();
+  const campaignRef = doc(adminDb, "whatsappCampaigns", "wa-1");
+  await assertSucceeds(setDoc(campaignRef, {
+    name: "Campaña segura",
+    source: "whatsapp",
+    filters: {},
+    message: "Hola",
+    imageCount: 0,
+    imageNames: [],
+    imageOrder: [],
+    imageMetadata: [],
+    totalRecipients: 1,
+    sentCount: 0,
+    errorCount: 0,
+    progressPercentage: 0,
+    status: "draft",
+    snapshotState: "draft",
+    active: true,
+    deleted: false,
+    createdBy: "admin-1",
+    createdByName: "Administrador",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
+  await assertFails(getDoc(doc(sellerDb, "whatsappCampaigns", "wa-1")));
+  await assertFails(setDoc(doc(adminDb, "whatsappCampaigns", "wa-binary"), {
+    name: "No válida",
+    source: "whatsapp",
+    filters: {},
+    message: "Hola",
+    imageCount: 1,
+    imageData: "base64",
+    totalRecipients: 0,
+    sentCount: 0,
+    errorCount: 0,
+    progressPercentage: 0,
+    status: "draft",
+    createdBy: "admin-1",
+  }));
+});
+
+test("destinatarios WhatsApp viven en subcolección protegida", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const sellerDb = environment.authenticatedContext("seller-1").firestore();
+  const recipientRef = doc(adminDb, "whatsappCampaigns", "wa-1", "recipients", "recipient_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  await assertSucceeds(setDoc(recipientRef, {
+    recipientId: "recipient_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    clientId: null,
+    name: "Cliente",
+    phone: "1157571979",
+    phoneNormalized: "1157571979",
+    whatsappPhone: "5491157571979",
+    zone: "Centro",
+    category: null,
+    source: "excel",
+    status: "pending",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
+  await assertFails(getDoc(doc(sellerDb, "whatsappCampaigns", "wa-1", "recipients", "recipient_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")));
+});
+
+
+test("reglas respetan denegación específica de envío WhatsApp", async () => {
+  const database = environment.authenticatedContext("marketing-denied").firestore();
+  const campaignRef = doc(database, "whatsappCampaigns", "wa-denied");
+  await assertSucceeds(setDoc(campaignRef, {
+    name: "Borrador restringido",
+    source: "whatsapp",
+    filters: {},
+    message: "Hola",
+    imageCount: 0,
+    imageNames: [],
+    imageOrder: [],
+    imageMetadata: [],
+    totalRecipients: 0,
+    sentCount: 0,
+    errorCount: 0,
+    progressPercentage: 0,
+    status: "draft",
+    snapshotState: "draft",
+    active: true,
+    deleted: false,
+    createdBy: "marketing-denied",
+    createdByName: "Marketing restringido",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
+  await assertFails(updateDoc(campaignRef, {
+    status: "running",
+    lastExtensionSequence: 1,
+    lastExtensionUpdateAt: new Date(),
+    updatedAt: new Date(),
+  }));
 });

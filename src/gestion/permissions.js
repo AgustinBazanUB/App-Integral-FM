@@ -32,11 +32,25 @@ export const ACTIONS = [
   "useOfflineSales",
   "useKeyboard",
   "requestTicket",
+  "whatsappView",
+  "whatsappCreateCampaign",
+  "whatsappSendToExtension",
+  "whatsappCancelCampaign",
+  "whatsappViewHistory",
+  "whatsappImportExcel",
 ];
 
 const everyAction = [...ACTIONS];
 const operational = ["view", "create", "edit", "export"];
 const viewOnly = ["view"];
+const whatsappMarketingActions = [
+  "whatsappView",
+  "whatsappCreateCampaign",
+  "whatsappSendToExtension",
+  "whatsappCancelCampaign",
+  "whatsappViewHistory",
+  "whatsappImportExcel",
+];
 const sellerSalesActions = [
   "view",
   "create",
@@ -73,7 +87,9 @@ export const ROLE_TEMPLATES = {
           ]
         : id === "quick-sales"
           ? [...operational, ...sellerSalesActions]
-          : [...operational, "approve", "viewAllLocations"],
+          : id === "marketing"
+            ? [...operational, ...whatsappMarketingActions]
+            : [...operational, "approve", "viewAllLocations"],
     ]),
   ),
   seller: {
@@ -104,7 +120,7 @@ export const ROLE_TEMPLATES = {
   marketing_manager: {
     "loyal-customers": ["view", "viewSensitive"],
     social: operational,
-    marketing: operational,
+    marketing: [...operational, ...whatsappMarketingActions],
     metrics: viewOnly,
   },
   ecommerce_manager: {

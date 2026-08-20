@@ -1,0 +1,108 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  buildCustomerDraft,
+  canonicalWhatsAppPhone,
+  customerDocumentId,
+  customerWhatsAppUrl,
+  formatPhoneForDisplay,
+  matchesCustomerSearch,
+  normalizeCustomerPhone,
+} from "../src/gestion/customers/customerDomain.js";
+
+test("formatos equivalentes del mismo teléfono argentino producen la misma normalización", () => {
+  const variants = [
+    "11 1234-5678",
+    "(11) 1234-5678",
+    "1112345678",
+    "+54 11 1234-5678",
+    "0054 11 1234-5678",
+  ];
+  assert.deepEqual([...new Set(variants.map(normalizeCustomerPhone))], ["1112345678"]);
+});
+
+test("el formato móvil internacional +54 9 se normaliza al número nacional", () => {
+  assert.equal(normalizeCustomerPhone("+54 9 11 6123-4567"), "1161234567");
+});
+
+test("el contrato WhatsApp canoniza formatos argentinos equivalentes a 549 + 10 dígitos", () => {
+  const variants = [
+    "11 5757-1979",
+    "+54 9 11 5757-1979",
+    "0054 9 11 5757-1979",
+    "011 15 5757-1979",
+  ];
+  assert.deepEqual([...new Set(variants.map((value) => canonicalWhatsAppPhone(value)))], ["5491157571979"]);
+});
+
+test("el contrato WhatsApp no adivina país ni acepta números argentinos ambiguos", () => {
+  assert.equal(canonicalWhatsAppPhone("5757-1979"), "");
+  assert.equal(canonicalWhatsAppPhone("261 555-123"), "");
+  assert.equal(canonicalWhatsAppPhone("11 5757-1979", { country: "UY" }), "");
+});
+
+test("el nombre es opcional pero la zona y el teléfono son obligatorios", () => {
+  assert.deepEqual(buildCustomerDraft({
+    phone: "11 1234-5678",
+    zoneId: "zona-norte",
+    zoneName: "Zona Norte",
+  }), {
+    phone: "11 1234-5678",
+    phoneNormalized: "1112345678",
+    name: "",
+    zoneId: "zona-norte",
+    zoneName: "Zona Norte",
+    customZone: "",
+  });
+  assert.throws(() => buildCustomerDraft({ phone: "123", zoneName: "CABA" }), /teléfono válido/i);
+  assert.throws(() => buildCustomerDraft({ phone: "11 1234-5678" }), /zona/i);
+});
+
+test("la zona libre no crea una referencia a una zona global", () => {
+  const customer = buildCustomerDraft({
+    phone: "11 2222-3333",
+    zoneId: "no-debe-usarse",
+    zoneName: "Zona previa",
+    customZone: "Barrio nuevo",
+  });
+  assert.equal(customer.zoneId, "");
+  assert.equal(customer.zoneName, "Barrio nuevo");
+  assert.equal(customer.customZone, "Barrio nuevo");
+});
+
+test("el id de cliente es determinístico y no expone el teléfono", async () => {
+  const first = await customerDocumentId("11 1234-5678");
+  const second = await customerDocumentId("+54 11 1234-5678");
+  assert.equal(first, second);
+  assert.match(first, /^customer_[0-9a-f]{40}$/);
+  assert.doesNotMatch(first, /1112345678/);
+});
+
+test("la búsqueda administrativa encuentra teléfono, nombre y zona", () => {
+  const customer = {
+    phone: "11 1234-5678",
+    phoneNormalized: "1112345678",
+    name: "Agustín Pérez",
+    zoneName: "Zona Norte",
+  };
+  assert.equal(matchesCustomerSearch(customer, "12345678"), true);
+  assert.equal(matchesCustomerSearch(customer, "agustin"), true);
+  assert.equal(matchesCustomerSearch(customer, "zona norte"), true);
+  assert.equal(matchesCustomerSearch(customer, "sur"), false);
+});
+
+test("el teléfono CABA se muestra legible sin alterar la normalización", () => {
+  assert.equal(formatPhoneForDisplay("1157571979"), "11-5757-1979");
+  assert.equal(formatPhoneForDisplay("+54 9 11 5757-1979"), "11-5757-1979");
+  assert.equal(normalizeCustomerPhone("11-5757-1979"), "1157571979");
+});
+
+test("otros teléfonos conservan todos sus dígitos en el formato visible", () => {
+  const normalized = normalizeCustomerPhone("261 555-1234");
+  assert.equal(formatPhoneForDisplay(normalized).replace(/\D/g, ""), normalized);
+});
+
+test("WhatsApp usa numeración internacional canónica sin guiones ni datos adicionales", () => {
+  assert.equal(customerWhatsAppUrl("11-5757-1979"), "https://wa.me/5491157571979");
+  assert.doesNotMatch(customerWhatsAppUrl("11-5757-1979"), /[-?&]/);
+});

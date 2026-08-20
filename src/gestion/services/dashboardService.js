@@ -158,6 +158,8 @@ export async function listActivityPage({
   const groups = activityGroups(profile, locationIds);
   if (!groups.length) return { items: [], cursor, hasMore: false };
   const sources = activitySourcesFor(profile);
+  const hasPostFilter = Boolean(filters.userId || filters.moduleId || filters.action);
+  const sourceLimit = hasPostFilter ? Math.min(100, Math.max(pageSize * 5, pageSize + 1)) : pageSize + 1;
   const tasks = sources.flatMap((source) => groups.map(async (group) => {
     const key = `${source}:${group.suffix}`;
     const constraints = [];
@@ -166,7 +168,7 @@ export async function listActivityPage({
     if (to) constraints.push(where("createdAt", "<", Timestamp.fromDate(to)));
     constraints.push(orderBy("createdAt", "desc"));
     if (cursor[key]) constraints.push(startAfter(cursor[key]));
-    constraints.push(limit(pageSize + 1));
+    constraints.push(limit(sourceLimit));
     const snapshot = await getDocs(query(collection(db, source), ...constraints));
     return snapshot.docs.map((item) => ({ key, source, item }));
   }));
@@ -193,7 +195,7 @@ export async function listActivityPage({
   return {
     items,
     cursor: nextCursor,
-    hasMore: processed.length < raw.length || fetchedGroups.some((entries) => entries.length > pageSize),
+    hasMore: processed.length < raw.length || fetchedGroups.some((entries) => entries.length >= sourceLimit),
   };
 }
 

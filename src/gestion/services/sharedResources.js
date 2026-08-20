@@ -1,16 +1,19 @@
 import { doc, getDoc } from "firebase/firestore";
-import {
-  listLocations,
-} from "./managementService";
+import { normalizedRole } from "../permissions";
+import { listActiveCustomerZones } from "./customerService";
+import { db } from "./firebase";
 import {
   listAssignableSellers,
   listDiscounts,
   listMasterProducts,
   listProductCategories,
 } from "./locationManagementService";
-import { db } from "./firebase";
-import { invalidateRuntimeCache, withRuntimeCache } from "./runtimeCache";
-import { normalizedRole } from "../permissions";
+import { listLocations } from "./managementService";
+import {
+  getRuntimeCachedValue,
+  invalidateRuntimeCache,
+  withRuntimeCache,
+} from "./runtimeCache";
 
 const profileScope = (profile) => [
   profile?.id || "anonymous",
@@ -18,8 +21,17 @@ const profileScope = (profile) => [
   [...new Set(profile?.allowedLocationIds || [])].sort().join(","),
 ].join("|");
 
+const locationsKey = (profile) => `locations:${profileScope(profile)}`;
+const sellerResourcesKey = (profile) => `seller-resources:${profileScope(profile)}`;
+
+export const getLocationsSharedCached = (profile) =>
+  getRuntimeCachedValue(locationsKey(profile));
+
+export const getSellerResourcesSharedCached = (profile) =>
+  getRuntimeCachedValue(sellerResourcesKey(profile));
+
 export const listLocationsShared = (profile) => withRuntimeCache(
-  `locations:${profileScope(profile)}`,
+  locationsKey(profile),
   () => listLocations(profile),
   30_000,
 );
@@ -49,16 +61,18 @@ export const listAssignableSellersShared = (profile) => withRuntimeCache(
 );
 
 export const loadSellerResourcesShared = (profile) => withRuntimeCache(
-  `seller-resources:${profileScope(profile)}`,
+  sellerResourcesKey(profile),
   async () => {
-    const [categories, discounts, shortcutsSnapshot] = await Promise.all([
+    const [categories, discounts, shortcutsSnapshot, zones] = await Promise.all([
       listProductCategoriesShared(profile),
       listDiscountsShared(profile),
       getDoc(doc(db, "settings", "keyboardShortcuts")),
+      listActiveCustomerZones(),
     ]);
     return {
       categories,
       discounts,
+      zones,
       shortcuts: shortcutsSnapshot.exists() ? shortcutsSnapshot.data() : { sellerActions: {} },
     };
   },

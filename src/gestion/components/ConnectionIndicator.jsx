@@ -1,8 +1,10 @@
-import { useState } from "react";
-import { Badge, Button, Modal } from "../../design-system";
+
+import { useCallback, useRef, useState } from "react";
+import { Button } from "../../design-system";
 import { reconnectFirestore } from "../connection";
 import { useAuth } from "../AuthContext";
 import { useConnectionStatus } from "../hooks";
+import AnchoredPopover from "./AnchoredPopover";
 import { Icon } from "./icons";
 
 const labels = {
@@ -11,61 +13,64 @@ const labels = {
   reconnecting: "Reconectando",
 };
 
-export default function ConnectionIndicator({ compact = false }) {
+export default function ConnectionIndicator() {
   const { profile } = useAuth();
   const status = useConnectionStatus();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const triggerRef = useRef(null);
   const busy = status === "reconnecting";
   const online = status === "online";
+  const close = useCallback(() => setOpen(false), []);
 
   const reconnect = async () => {
     setMessage("");
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setMessage("No se pudo restablecer la conexión.");
+      return;
+    }
     try {
       const connected = await reconnectFirestore(profile.id);
-      setMessage(connected ? "La conexión con Firestore está disponible." : "El dispositivo continúa sin conexión.");
+      setMessage(connected ? "Conexión restablecida." : "No se pudo restablecer la conexión.");
     } catch {
-      setMessage("No pudimos confirmar conexión con Firestore. Podés volver a intentar cuando mejore la red.");
+      setMessage("No se pudo restablecer la conexión.");
     }
   };
 
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
-        className={`fm-connection-trigger ${compact ? "is-compact" : ""}`}
-        onClick={() => setOpen(true)}
+        className={`fm-connection-trigger is-${status}`}
+        onClick={() => setOpen((value) => !value)}
         aria-haspopup="dialog"
+        aria-expanded={open}
         aria-label={`Estado de conexión: ${labels[status]}`}
       >
-        <Badge tone={online ? "success" : "warning"} icon={busy ? "RefreshCw" : online ? "Wifi" : "WifiOff"}>
-          {labels[status]}
-        </Badge>
+        <Icon name={busy ? "RefreshCw" : online ? "Wifi" : "WifiOff"} />
+        <span>{labels[status]}</span>
       </button>
-      <Modal
+      <AnchoredPopover
         open={open}
-        onClose={() => setOpen(false)}
-        title="Estado de conexión"
-        description="Comprobación compartida por toda la aplicación integral."
+        onClose={close}
+        triggerRef={triggerRef}
+        className="fm-connection-popover"
+        role="dialog"
+        ariaLabel="Estado de conexión"
       >
-        <div className="fm-connection-panel">
-          <div className={`fm-connection-panel__state is-${status}`}>
-            <Icon name={busy ? "RefreshCw" : online ? "Wifi" : "WifiOff"} />
-            <div>
-              <strong>{labels[status]}</strong>
-              <p>{online
-                ? "La aplicación puede consultar y registrar información normalmente."
-                : "Podés seguir usando la información disponible y el Panel Vendedor mantiene su cola de ventas pendientes offline."}</p>
-            </div>
-          </div>
-          {!online ? (
-            <Button icon="RefreshCw" disabled={busy} onClick={reconnect}>
-              {busy ? "Reconectando…" : "Reconectar"}
-            </Button>
-          ) : null}
-          {message ? <p className="fm-connection-panel__message" aria-live="polite">{message}</p> : null}
+        <div className="fm-connection-popover__head">
+          <span className={`fm-connection-popover__icon is-${status}`}><Icon name={busy ? "RefreshCw" : online ? "Wifi" : "WifiOff"} /></span>
+          <div><small>Estado de conexión</small><strong>{labels[status]}</strong></div>
         </div>
-      </Modal>
+        <p>{online ? "Conexión disponible." : busy ? "Comprobando conexión con Firestore…" : "Sin conexión."}</p>
+        {!online ? (
+          <Button icon="RefreshCw" variant="secondary" loading={busy} onClick={reconnect}>
+            Reconectar
+          </Button>
+        ) : null}
+        {message ? <p className="fm-connection-popover__message" aria-live="polite">{message}</p> : null}
+      </AnchoredPopover>
     </>
   );
 }

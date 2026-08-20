@@ -62,7 +62,11 @@ service cloud.firestore {
           && action in ["create", "edit", "export", "approve"])
         || (role == "marketing_manager"
           && moduleId in ["social", "marketing"]
-          && action in ["create", "edit", "export"])
+          && action in [
+            "create", "edit", "export",
+            "whatsappView", "whatsappCreateCampaign", "whatsappSendToExtension",
+            "whatsappCancelCampaign", "whatsappViewHistory", "whatsappImportExcel"
+          ])
         || (role == "ecommerce_manager"
           && moduleId in ["ecommerce", "shipping", "loyal-customers"]
           && action in ["create", "edit", "export"])
@@ -81,7 +85,9 @@ service cloud.firestore {
           && action in [
             "create", "edit", "export", "approve", "viewAllLocations",
             "viewLocationProducts", "configureLocationProducts", "viewStock",
-            "loadStock", "adjustStock", "assignDiscounts"
+            "loadStock", "adjustStock", "assignDiscounts",
+            "whatsappView", "whatsappCreateCampaign", "whatsappSendToExtension",
+            "whatsappCancelCampaign", "whatsappViewHistory", "whatsappImportExcel"
           ])
       );
     }
@@ -219,6 +225,139 @@ service cloud.firestore {
     function logicalMutation() {
       return !("deleted" in request.resource.data)
         || request.resource.data.deleted is bool;
+    }
+    function customerKeyShape(customerId) {
+      return customerId is string
+        && customerId.size() == 49
+        && customerId.matches('customer_[0-9a-f]+');
+    }
+    function linkedSellerCustomer(customerId) {
+      let saleId = request.resource.data.lastSaleId;
+      let salePath = /databases/$(database)/documents/sales/$(saleId);
+      let sale = getAfter(salePath).data;
+      return saleId is string
+        && existsAfter(salePath)
+        && sale.sellerId == request.auth.uid
+        && sale.customerId == customerId
+        && sale.status == "active"
+        && allowedLocation(sale.locationId);
+    }
+    function sellerCustomerCreate(customerId) {
+      return quickSalesPermission("create")
+        && customerKeyShape(customerId)
+        && request.resource.data.customerKey == customerId
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.source == "seller_sale"
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() > 0
+        && request.resource.data.phoneNormalized is string
+        && request.resource.data.phoneNormalized.size() >= 8
+        && request.resource.data.phoneNormalized.size() <= 11
+        && request.resource.data.zoneName is string
+        && request.resource.data.zoneName.size() > 0
+        && request.resource.data.active == true
+        && request.resource.data.deleted == false
+        && linkedSellerCustomer(customerId);
+    }
+    function sellerCustomerUpdate(customerId) {
+      return quickSalesPermission("create")
+        && customerKeyShape(customerId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "lastSaleId", "lastPurchaseAt", "updatedAt"
+        ])
+        && linkedSellerCustomer(customerId);
+    }
+    function whatsappDenied(action) {
+      let user = profile();
+      return ("permissionDeny" in user)
+        && ("marketing" in user.permissionDeny)
+        && (user.permissionDeny.marketing is list)
+        && action in user.permissionDeny.marketing;
+    }
+    function whatsappCanView() {
+      return activeUser() && (
+        (!whatsappDenied("whatsappView") && canModule("marketing", "whatsappView"))
+        || (!whatsappDenied("whatsappViewHistory") && canModule("marketing", "whatsappViewHistory"))
+      );
+    }
+    function whatsappCanCreate() {
+      return activeUser()
+        && !whatsappDenied("whatsappCreateCampaign")
+        && canModule("marketing", "whatsappCreateCampaign");
+    }
+    function whatsappCanSend() {
+      return activeUser()
+        && !whatsappDenied("whatsappSendToExtension")
+        && canModule("marketing", "whatsappSendToExtension");
+    }
+    function whatsappCanCancel() {
+      return activeUser()
+        && !whatsappDenied("whatsappCancelCampaign")
+        && canModule("marketing", "whatsappCancelCampaign");
+    }
+    function whatsappStatus(value) {
+      return value in ["draft", "ready", "running", "paused", "completed", "error", "cancelled"];
+    }
+    function noWhatsappSecrets(data) {
+      return !data.keys().hasAny([
+        "cookies", "cookie", "whatsappToken", "token", "password", "qr",
+        "localStorage", "imageData", "imageBase64", "binaryImages", "filePath",
+        "selectors", "retryDelay", "batchDelay", "messageDelay"
+      ]);
+    }
+    function validWhatsappCampaign(data) {
+      return data.name is string
+        && data.name.size() > 0
+        && whatsappStatus(data.status)
+        && data.totalRecipients is int
+        && data.totalRecipients >= 0
+        && data.sentCount is int
+        && data.sentCount >= 0
+        && data.sentCount <= data.totalRecipients
+        && data.errorCount is int
+        && data.errorCount >= 0
+        && data.imageCount is int
+        && data.imageCount >= 0
+        && data.imageCount <= 3
+        && noWhatsappSecrets(data);
+    }
+    function validWhatsappRecipient(data) {
+      return data.recipientId is string
+        && data.phoneNormalized is string
+        && data.phoneNormalized.size() >= 8
+        && data.phoneNormalized.size() <= 11
+        && data.source in ["flor_mia", "excel"]
+        && data.status in ["pending", "running", "completed", "error"]
+        && !data.keys().hasAny(["cookies", "token", "password", "imageData", "imageBase64"]);
+    }
+    function whatsappCreateCampaignUpdate() {
+      return whatsappCanCreate()
+        && request.resource.data.status in ["draft", "ready"]
+        && request.resource.data.sentCount == 0
+        && request.resource.data.errorCount == 0
+        && request.resource.data.progressPercentage == 0
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "name", "filters", "message", "imageCount", "imageNames", "imageOrder",
+          "imageMetadata", "totalRecipients", "sentCount", "errorCount",
+          "progressPercentage", "status", "snapshotState", "preparedAt",
+          "updatedBy", "updatedByName", "updatedAt"
+        ]);
+    }
+    function whatsappExtensionCampaignUpdate() {
+      return whatsappCanSend()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "status", "sentCount", "errorCount", "progressPercentage",
+          "lastExtensionSequence", "lastExtensionUpdateAt", "startedAt", "finishedAt",
+          "extensionErrorCode", "extensionErrorMessage", "deliveredToExtensionAt",
+          "cancelledAt", "cancelledBy", "updatedBy", "updatedByName", "updatedAt"
+        ]);
+    }
+    function whatsappCancelCampaignUpdate() {
+      return whatsappCanCancel()
+        && request.resource.data.status == "cancelled"
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "status", "cancelledAt", "cancelledBy", "finishedAt", "updatedAt"
+        ]);
     }
 
     match /users/{uid} {
@@ -390,15 +529,27 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /customers/{customerId} {
-      allow read: if canModule("loyal-customers", "view");
-      allow create: if canModule("loyal-customers", "create") && ownsNewRecord();
-      allow update: if canModule("loyal-customers", "edit") && logicalMutation();
+      allow get: if canModule("loyal-customers", "view")
+        || (quickSalesPermission("create") && customerKeyShape(customerId));
+      allow list: if canModule("loyal-customers", "view");
+      allow create: if ((canModule("loyal-customers", "create") || canModule("loyal-customers", "edit")) && ownsNewRecord())
+        || sellerCustomerCreate(customerId);
+      allow update: if (canModule("loyal-customers", "edit") && logicalMutation())
+        || sellerCustomerUpdate(customerId);
       allow delete: if false;
       match /interactions/{interactionId} {
         allow read: if canModule("loyal-customers", "view");
         allow create, update: if canModule("loyal-customers", "edit");
         allow delete: if false;
       }
+    }
+    match /customerZones/{zoneId} {
+      allow get: if canModule("loyal-customers", "view")
+        || (quickSalesPermission("create") && resource.data.active == true);
+      allow list: if canModule("loyal-customers", "view")
+        || (quickSalesPermission("create") && resource.data.active == true);
+      allow create, update: if canModule("loyal-customers", "edit");
+      allow delete: if false;
     }
     match /orders/{orderId} {
       allow read: if canModule("ecommerce", "view");
@@ -446,6 +597,35 @@ service cloud.firestore {
       allow update: if canModule("marketing", "edit") && logicalMutation();
       allow delete: if false;
     }
+    match /whatsappCampaigns/{campaignId} {
+      allow get, list: if whatsappCanView();
+      allow create: if whatsappCanCreate()
+        && ownsNewRecord()
+        && validWhatsappCampaign(request.resource.data);
+      allow update: if request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.source == resource.data.source
+        && validWhatsappCampaign(request.resource.data)
+        && (whatsappCreateCampaignUpdate() || whatsappExtensionCampaignUpdate() || whatsappCancelCampaignUpdate());
+      allow delete: if false;
+      match /recipients/{recipientId} {
+        allow get, list: if whatsappCanView();
+        allow create: if whatsappCanCreate()
+          && get(/databases/$(database)/documents/whatsappCampaigns/$(campaignId)).data.status == "draft"
+          && validWhatsappRecipient(request.resource.data);
+        allow update: if whatsappCanSend()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "status", "updatedAt", "errorCode", "errorMessage"
+          ])
+          && validWhatsappRecipient(request.resource.data);
+        allow delete: if whatsappCanCreate()
+          && get(/databases/$(database)/documents/whatsappCampaigns/$(campaignId)).data.status == "draft";
+      }
+      match /events/{eventId} {
+        allow get, list: if whatsappCanView();
+        allow create: if whatsappCanCreate() || whatsappCanSend() || whatsappCanCancel();
+        allow update, delete: if false;
+      }
+    }
     match /contentItems/{contentId} {
       allow read: if canModule("marketing", "view");
       allow create, update: if canModule("marketing", "edit");
@@ -477,6 +657,12 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && (isAdmin()
+          || (("moduleId" in request.resource.data)
+            && request.resource.data.moduleId == "loyal-customers"
+            && (canModule("loyal-customers", "create") || canModule("loyal-customers", "edit")))
+          || (("moduleId" in request.resource.data)
+            && request.resource.data.moduleId == "marketing"
+            && (whatsappCanCreate() || whatsappCanSend() || whatsappCanCancel() || canModule("marketing", "edit")))
           || (("locationId" in request.resource.data)
             && allowedLocation(request.resource.data.locationId)));
       allow update, delete: if false;

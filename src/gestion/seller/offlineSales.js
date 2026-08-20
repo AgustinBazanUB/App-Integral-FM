@@ -1,5 +1,6 @@
 import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
 import { normalizePayment } from "../../modules/locations/domain/payments";
+import { buildCustomerDraft } from "../customers/customerDomain";
 
 const DB_NAME = "flor_mia_integral_offline";
 const DB_VERSION = 1;
@@ -115,6 +116,7 @@ function normalizePendingSale(sale) {
     throw new Error("La fecha local de la venta no es válida.");
   }
   const ticketRequested = sale.ticketRequested === true;
+  const customer = sale.customer ? buildCustomerDraft(sale.customer) : null;
   return {
     localId: requiredText(sale.localId, "el identificador local"),
     localCode: requiredText(sale.localCode || sale.localId, "el código local"),
@@ -140,6 +142,7 @@ function normalizePendingSale(sale) {
     totalItems: items.reduce((sum, item) => sum + item.qty, 0),
     total,
     ...payment,
+    customer,
     ticketRequested,
     ticketStatus: ticketRequested ? "pending" : "not_requested",
     clientStatus: "offline_pending",

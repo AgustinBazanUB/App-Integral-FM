@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Dropdown,
   IconButton,
   SearchInput,
 } from "../design-system";
 import { Link, useLocation } from "../router";
 import { useAuth } from "./AuthContext";
+import AnchoredPopover from "./components/AnchoredPopover";
 import ConnectionIndicator from "./components/ConnectionIndicator";
 import { Icon } from "./components/icons";
 import { useConnectionStatus } from "./hooks";
@@ -14,6 +14,7 @@ import {
   managementRoutes,
   moduleById,
 } from "./modules";
+import { preloadManagementRoute } from "./routePreload";
 import {
   canAccessManagementRoute,
   canAccessSellerPanel,
@@ -37,7 +38,6 @@ const roleLabels = {
 const routeIdFromPath = (pathname) =>
   pathname.split("/").filter(Boolean)[1] || "dashboard";
 
-const preloadSeller = () => import("./seller/SellerPanel").catch(() => {});
 
 export default function ManagementShell({ children }) {
   const { profile, logout } = useAuth();
@@ -46,7 +46,9 @@ export default function ManagementShell({ children }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
   const searchRef = useRef(null);
+  const profileTriggerRef = useRef(null);
   const mobileCloseRef = useRef(null);
   const activeId = routeIdFromPath(location.pathname);
   const availableRoutes = useMemo(
@@ -64,6 +66,7 @@ export default function ManagementShell({ children }) {
 
   useEffect(() => {
     setDrawerOpen(false);
+    setProfileOpen(false);
     setSearch("");
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [location.pathname]);
@@ -111,6 +114,9 @@ export default function ManagementShell({ children }) {
               to={getManagementPath(route.id)}
               aria-current={activeId === route.id ? "page" : undefined}
               title={collapsed ? route.label : undefined}
+              onPointerEnter={() => preloadManagementRoute(route.id)}
+              onPointerDown={() => preloadManagementRoute(route.id)}
+              onFocus={() => preloadManagementRoute(route.id)}
             >
               <Icon name={route.icon || module?.icon} />
               <span>{route.label}</span>
@@ -159,20 +165,43 @@ export default function ManagementShell({ children }) {
         </div>
         <div className="fm-management-header__actions">
           <ConnectionIndicator />
-          <Dropdown label={<span className="fm-profile-trigger"><span className="fm-avatar">{(profile.name || profile.email || "F").slice(0, 1).toUpperCase()}</span><span><strong>{profile.name || "Usuario"}</strong><small>{roleLabels[normalizedRole(profile)] || normalizedRole(profile)}</small></span><Icon name="ChevronDown" /></span>}>
+          <button
+            ref={profileTriggerRef}
+            type="button"
+            className="fm-profile-button"
+            onClick={() => setProfileOpen((value) => !value)}
+            aria-haspopup="menu"
+            aria-expanded={profileOpen}
+          >
+            <span className="fm-profile-trigger">
+              <span className="fm-avatar">{(profile.name || profile.email || "F").slice(0, 1).toUpperCase()}</span>
+              <span><strong>{profile.name || "Usuario"}</strong><small>{roleLabels[normalizedRole(profile)] || normalizedRole(profile)}</small></span>
+              <Icon name="ChevronDown" />
+            </span>
+          </button>
+          <AnchoredPopover
+            open={profileOpen}
+            onClose={() => setProfileOpen(false)}
+            triggerRef={profileTriggerRef}
+            className="fm-profile-popover"
+            role="menu"
+            ariaLabel="Menú de usuario"
+          >
             <div className="fm-profile-menu">
-              <Link to="/gestion/settings"><Icon name="UserRound" />Mi perfil</Link>
+              <Link role="menuitem" to="/gestion/settings" onClick={() => setProfileOpen(false)}><Icon name="UserRound" />Mi perfil</Link>
               {canAccessSellerPanel(profile) ? (
                 <Link
+                  role="menuitem"
                   to="/vendedor"
-                  onPointerEnter={preloadSeller}
-                  onFocus={preloadSeller}
-                  onClick={() => localStorage.setItem(`flor-mia-preferred-panel-${profile.id}`, "seller")}
+                  onClick={() => {
+                    setProfileOpen(false);
+                    try { localStorage.setItem(`flor-mia-preferred-panel-${profile.id}`, "seller"); } catch { /* preferencia no crítica */ }
+                  }}
                 ><Icon name="ShoppingCart" />Ver Panel Vendedor</Link>
               ) : null}
-              <button type="button" onClick={logout}><Icon name="LogOut" />Cerrar sesión</button>
+              <button role="menuitem" type="button" onClick={() => { setProfileOpen(false); logout(); }}><Icon name="LogOut" />Cerrar sesión</button>
             </div>
-          </Dropdown>
+          </AnchoredPopover>
         </div>
       </header>
 

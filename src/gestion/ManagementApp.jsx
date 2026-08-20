@@ -1,9 +1,10 @@
-import { lazy, Suspense, useEffect } from "react";
+import { Component, lazy, Suspense, useEffect } from "react";
 import { Skeleton } from "../design-system";
 import { useLocation, useNavigate } from "../router";
 import { AuthProvider, useAuth } from "./AuthContext";
 import ManagementShell from "./ManagementShell";
 import { moduleById, SALES_METRICS_PATH } from "./modules";
+import { managementPageLoaders } from "./routePreload";
 import {
   canAccessAdminPanel,
   canAccessManagementRoute,
@@ -13,40 +14,67 @@ import {
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import NotAuthorizedPage from "./pages/NotAuthorizedPage";
-import { listLocationsShared } from "./services/sharedResources";
+import SellerPanel from "./seller/SellerPanel";
+import WhatsAppExtensionSync from "./marketing/whatsapp/WhatsAppExtensionSync";
+import {
+  listLocationsShared,
+  loadSellerResourcesShared,
+} from "./services/sharedResources";
 
-const loadSellerPanel = () => import("./seller/SellerPanel");
-const SellerPanel = lazy(loadSellerPanel);
-const AdministrationPage = lazy(() => import("./pages/AdministrationPage"));
-const ActivityPage = lazy(() => import("./pages/ActivityPage"));
-const AuditPage = lazy(() => import("./pages/AuditPage"));
-const GenericModulePage = lazy(() => import("./pages/GenericModulePage"));
-const LocationsPage = lazy(() => import("./pages/LocationsPage"));
-const LocationDetailPage = lazy(() => import("./pages/LocationDetailPage"));
-const QuickSalesPage = lazy(() => import("./pages/QuickSalesPage"));
-const SalesMetricsPage = lazy(() => import("./pages/SalesMetricsPage"));
-const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const AdministrationPage = lazy(managementPageLoaders.administration);
+const ActivityPage = lazy(managementPageLoaders.actividad);
+const AuditPage = lazy(managementPageLoaders.audit);
+const GenericModulePage = lazy(managementPageLoaders.generic);
+const LoyalCustomersPage = lazy(managementPageLoaders["loyal-customers"]);
+const LocationsPage = lazy(managementPageLoaders.locations);
+const LocationDetailPage = lazy(managementPageLoaders.locationDetail);
+const QuickSalesPage = lazy(managementPageLoaders["quick-sales"]);
+const SalesMetricsPage = lazy(managementPageLoaders.metrics);
+const WhatsAppCampaignsPage = lazy(managementPageLoaders.marketingWhatsapp);
+const SettingsPage = lazy(managementPageLoaders.settings);
 
 const routeIdFromPath = (pathname) =>
   pathname.split("/").filter(Boolean)[1] || "dashboard";
 
-const scheduleIdle = (callback) => {
-  if (typeof window.requestIdleCallback === "function") {
-    const id = window.requestIdleCallback(callback, { timeout: 1200 });
-    return () => window.cancelIdleCallback?.(id);
-  }
-  const id = window.setTimeout(callback, 250);
-  return () => window.clearTimeout(id);
-};
-
-function ModuleFallback({ seller = false }) {
+function ModuleFallback() {
   return (
-    <main className={seller ? "fm-seller-transition" : "fm-module-transition"} id={seller ? "main-content" : undefined} aria-live="polite">
-      {seller ? <img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" width="112" height="64" /> : null}
-      <Skeleton lines={seller ? 4 : 5} />
+    <section className="fm-module-transition" aria-live="polite">
+      <Skeleton lines={5} />
       <span className="sr-only">Preparando módulo</span>
-    </main>
+    </section>
   );
+}
+
+class ManagementErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Error no controlado en gestión", error, info);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <main id="main-content" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, background: "#f7f3ec", color: "#171512" }}>
+        <section style={{ width: "min(560px, 100%)", border: "1px solid #e5dccd", borderRadius: 16, background: "#fff", color: "#171512", padding: 24, boxShadow: "0 18px 50px rgb(70 54 29 / 10%)" }}>
+          <img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" width="112" height="64" />
+          <h1 style={{ margin: "14px 0 8px", color: "#171512" }}>No pudimos abrir este panel</h1>
+          <p style={{ margin: "0 0 18px", color: "#403a34" }}>La aplicación sigue disponible. Podés volver al panel administrador o recargar esta versión.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <button type="button" onClick={() => window.location.assign("/gestion")} style={{ minHeight: 44, border: 0, borderRadius: 10, padding: "0 16px", cursor: "pointer", background: "#b8892d", color: "#fff", fontWeight: 700 }}>Volver al administrador</button>
+            <button type="button" onClick={() => window.location.reload()} style={{ minHeight: 44, border: "1px solid #ded5c6", borderRadius: 10, padding: "0 16px", cursor: "pointer", background: "#fff", color: "#171512", fontWeight: 700 }}>Recargar</button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 }
 
 function ManagementRouter() {
@@ -79,12 +107,14 @@ function ManagementRouter() {
 
   useEffect(() => {
     if (status !== "ready" || !canAccessSellerPanel(profile) || sellerPath) return undefined;
-    return scheduleIdle(() => {
-      Promise.all([
-        loadSellerPanel(),
-        listLocationsShared(profile),
-      ]).catch(() => {});
+    let cancelled = false;
+    Promise.all([
+      listLocationsShared(profile),
+      loadSellerResourcesShared(profile),
+    ]).catch(() => {
+      if (cancelled) return;
     });
+    return () => { cancelled = true; };
   }, [status, profile?.id, sellerPath]);
 
   useEffect(() => {
@@ -106,7 +136,7 @@ function ManagementRouter() {
 
   if (sellerPath || isPureSeller(profile)) {
     return canAccessSellerPanel(profile)
-      ? <Suspense fallback={<ModuleFallback seller />}><SellerPanel /></Suspense>
+      ? <SellerPanel />
       : <NotAuthorizedPage />;
   }
 
@@ -119,6 +149,8 @@ function ManagementRouter() {
     page = pathParts[2] ? <LocationDetailPage locationId={decodeURIComponent(pathParts[2])} /> : <LocationsPage />;
   } else if (routeId === "quick-sales") {
     page = <QuickSalesPage />;
+  } else if (routeId === "loyal-customers") {
+    page = <LoyalCustomersPage />;
   } else if (routeId === "administration") {
     page = <AdministrationPage />;
   } else if (routeId === "audit") {
@@ -127,6 +159,8 @@ function ManagementRouter() {
     page = <ActivityPage />;
   } else if (routeId === "metrics") {
     page = <SalesMetricsPage />;
+  } else if (routeId === "marketing" && pathParts[2] === "whatsapp") {
+    page = <WhatsAppCampaignsPage />;
   } else if (routeId === "settings") {
     page = <SettingsPage />;
   } else if (moduleById[routeId]) {
@@ -137,11 +171,18 @@ function ManagementRouter() {
 
   return (
     <ManagementShell>
+      <WhatsAppExtensionSync />
       <Suspense fallback={<ModuleFallback />}>{page}</Suspense>
     </ManagementShell>
   );
 }
 
 export default function ManagementApp() {
-  return <AuthProvider><ManagementRouter /></AuthProvider>;
+  return (
+    <AuthProvider>
+      <ManagementErrorBoundary>
+        <ManagementRouter />
+      </ManagementErrorBoundary>
+    </AuthProvider>
+  );
 }

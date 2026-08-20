@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAsyncData } from "../hooks";
 import { effectiveSellerLocations } from "../permissions";
-import { listLocationsShared } from "../services/sharedResources";
+import {
+  getLocationsSharedCached,
+  getSellerResourcesSharedCached,
+  listLocationsShared,
+  loadSellerResourcesShared,
+} from "../services/sharedResources";
 import {
   listSellerDailySales,
   subscribeSellerLocationStock,
@@ -13,11 +17,65 @@ import {
   keyboardLookupKeys,
 } from "./sellerDomain";
 
+function useWarmResource({ initialValue, load, dependencies }) {
+  const initial = initialValue();
+  const [state, setState] = useState(() => ({
+    status: initial == null ? "loading" : "ready",
+    data: initial ?? null,
+    error: null,
+  }));
+  const request = useRef(0);
+
+  const refresh = useCallback(async ({ keepCurrent = true } = {}) => {
+    const current = ++request.current;
+    setState((previous) => ({
+      ...previous,
+      status: keepCurrent && previous.data != null ? "ready" : "loading",
+      error: null,
+    }));
+    try {
+      const data = await load();
+      if (current === request.current) setState({ status: "ready", data, error: null });
+      return data;
+    } catch (error) {
+      if (current === request.current) {
+        setState((previous) => ({
+          status: previous.data != null ? "ready" : "error",
+          data: previous.data,
+          error,
+        }));
+      }
+      throw error;
+    }
+  // El llamador declara las dependencias que vuelven estable la carga.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, dependencies);
+
+  useEffect(() => {
+    refresh({ keepCurrent: true }).catch(() => {});
+    return () => { request.current += 1; };
+  }, [refresh]);
+
+  return { ...state, refresh };
+}
+
 export function useSellerLocations(profile) {
-  return useAsyncData(async () => {
-    const locations = await listLocationsShared(profile);
-    return effectiveSellerLocations(profile, locations);
-  }, [profile.id, (profile.allowedLocationIds || []).join(",")]);
+  return useWarmResource({
+    initialValue: () => {
+      const cached = getLocationsSharedCached(profile);
+      return cached ? effectiveSellerLocations(profile, cached) : null;
+    },
+    load: async () => effectiveSellerLocations(profile, await listLocationsShared(profile)),
+    dependencies: [profile.id, (profile.allowedLocationIds || []).join(",")],
+  });
+}
+
+export function useSellerResources(profile) {
+  return useWarmResource({
+    initialValue: () => getSellerResourcesSharedCached(profile),
+    load: () => loadSellerResourcesShared(profile),
+    dependencies: [profile.id, (profile.allowedLocationIds || []).join(",")],
+  });
 }
 
 export function useSellerLocationStock(profile, locationId) {
@@ -29,19 +87,19 @@ export function useSellerLocationStock(profile, locationId) {
     }
     let disposed = false;
     let unsubscribe = null;
-    setState((current) => ({ ...current, status: "loading", error: null }));
+    setState((current) => ({ ...current, status: current.data?.length ? "ready" : "loading", error: null }));
     subscribeSellerLocationStock({
       profile,
       locationId,
       onData: (data) => !disposed && setState({ status: "ready", data, error: null }),
-      onError: (error) => !disposed && setState({ status: "error", data: [], error }),
+      onError: (error) => !disposed && setState((current) => ({ status: current.data?.length ? "ready" : "error", data: current.data || [], error })),
     })
       .then((cleanup) => {
         if (disposed) cleanup?.();
         else unsubscribe = cleanup;
       })
       .catch((error) => {
-        if (!disposed) setState({ status: "error", data: [], error });
+        if (!disposed) setState((current) => ({ status: current.data?.length ? "ready" : "error", data: current.data || [], error }));
       });
     return () => {
       disposed = true;
@@ -60,13 +118,13 @@ export function useSellerDailySales(profile, locationId) {
       return [];
     }
     const current = ++request.current;
-    setState((previous) => ({ ...previous, status: "loading", error: null }));
+    setState((previous) => ({ ...previous, status: previous.data?.length ? "ready" : "loading", error: null }));
     try {
       const data = await listSellerDailySales(profile, locationId);
       if (current === request.current) setState({ status: "ready", data, error: null });
       return data;
     } catch (error) {
-      if (current === request.current) setState({ status: "error", data: [], error });
+      if (current === request.current) setState((previous) => ({ status: previous.data?.length ? "ready" : "error", data: previous.data || [], error }));
       throw error;
     }
   }, [profile, locationId]);
@@ -85,7 +143,7 @@ export function useSellerPendingSales(profile) {
       setState({ status: "ready", data, error: null });
       return data;
     } catch (error) {
-      setState({ status: "error", data: [], error });
+      setState((current) => ({ status: current.data?.length ? "ready" : "error", data: current.data || [], error }));
       throw error;
     }
   }, [profile.id]);
@@ -122,6 +180,7 @@ export function useSellerKeyboard({
   const actionLookup = useMemo(() => shortcutMap(actionShortcuts), [actionShortcuts]);
   const handlers = useRef({});
   handlers.current = {
+    enabled,
     productLookup,
     discountLookup,
     actionLookup,
@@ -134,15 +193,15 @@ export function useSellerKeyboard({
   };
 
   useEffect(() => {
-    if (!enabled) return undefined;
     const onKeyDown = (event) => {
+      const current = handlers.current;
       if (
+        !current.enabled ||
         event.defaultPrevented ||
         event.repeat ||
         isEditableTarget(event.target) ||
         document.querySelector(".fm-overlay")
       ) return;
-      const current = handlers.current;
       if (event.code === "NumpadEnter" || event.key === "Enter") {
         event.preventDefault();
         current.onContinue?.();
@@ -184,5 +243,5 @@ export function useSellerKeyboard({
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [enabled]);
+  }, []);
 }

@@ -115,6 +115,11 @@ export default function GenericModulePage({ moduleId }) {
         description={module.description}
         actions={can(profile, moduleId, "create") && module.primaryAction ? <Button icon="Plus" onClick={() => setModalOpen(true)}>{module.primaryAction}</Button> : null}
       />
+      {moduleId === "marketing" && can(profile, "marketing", "whatsappView") ? (
+        <Panel className="fm-editorial-panel" title="WhatsApp" description="Prepará destinatarios, mensajes e imágenes temporales antes de entregar la campaña a la extensión privada de Flor Mía.">
+          <Link className="fm-button fm-button--secondary" to="/gestion/marketing/whatsapp">Campañas y mensajes masivos</Link>
+        </Panel>
+      ) : null}
       {moduleId === "ecommerce" ? (
         <Panel className="fm-editorial-panel" title="Superficie pública conectada" description="La tienda, el catálogo, el carrito y el checkout aprobado se conservan dentro de este repositorio.">
           <Link className="fm-button fm-button--secondary" to="/productos">Abrir catálogo público</Link>
