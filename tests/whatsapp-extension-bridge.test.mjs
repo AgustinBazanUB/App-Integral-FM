@@ -310,15 +310,16 @@ test("CANCEL stale en Web App no manda control si la extensión ya está idle y 
   });
 });
 
-test("CANCEL detecta blockingCampaign en vez de mandar un comando al ID incorrecto", async () => {
+test("CANCEL archiva una campaña stale sin mandar un comando a otra campaña activa", async () => {
   const blocking = { campaignId: "campaign-A", campaignName: "Anterior", status: "paused", sequence: 5 };
   await withExtensionResolver(() => ({ type: EXTENSION_MESSAGE_TYPES.status, payload: defaultStatusPayload(blocking) }), async (posted) => {
-    await assert.rejects(() => requestCampaignCancellation("campaign-B"), (error) => {
-      assert.equal(error.code, "CAMPAIGN_CONFLICT");
-      assert.equal(error.details.blockingCampaign.campaignId, "campaign-A");
-      return true;
-    });
+    const response = await requestCampaignCancellation("campaign-B");
     assert.equal(posted.length, 1);
+    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.statusRequest);
+    assert.equal(response.type, EXTENSION_MESSAGE_TYPES.cancelled);
+    assert.equal(response.payload.emitterReleased, true);
+    assert.equal(response.payload.staleReconciled, true);
+    assert.equal(response.payload.cancellationReason, "requested_campaign_not_active_in_extension");
   });
 });
 
