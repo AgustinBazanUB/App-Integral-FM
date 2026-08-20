@@ -1,0 +1,184 @@
+name: Fix stale WhatsApp campaigns
+
+on:
+  push:
+    branches: [agent/rendimiento-vendedor-clientes]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply stale-campaign reconciliation repair
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          bridge = Path('src/gestion/marketing/whatsapp/extensionBridge.js')
+          text = bridge.read_text()
+          old = '''export async function requestCampaignCancellation(campaignId, options = {}) {
+  const queryOptions = {
+    timeoutMs: Math.min(options.timeoutMs ?? EXTENSION_TIMEOUTS.control, EXTENSION_TIMEOUTS.ping),
+    signal: options.signal,
+  };
+  const live = await requestCampaignStatus(queryOptions);
+  const active = live.campaign;
+  if (!active) {
+    return syntheticCancelledEnvelope(campaignId, null, "extension_has_no_active_campaign");
+  }
+  if (active.campaignId !== campaignId) {
+    throw campaignConflict(
+      `La extensión conserva otra campaña activa (${active.campaignName || active.campaignId}). Cancelá o reconciliá esa campaña antes de continuar.`,
+      { blockingCampaign: active },
+    );
+  }
+  if (active.status === "cancelled") {
+    return syntheticCancelledEnvelope(campaignId, active, "extension_already_cancelled");
+  }
+  return requestCampaignControl(
+    EXTENSION_MESSAGE_TYPES.cancelRequest,
+    campaignId,
+    [EXTENSION_MESSAGE_TYPES.cancelled],
+    { ...options, sequence: Number.isInteger(active.sequence) ? active.sequence : options.sequence },
+  );
+}'''
+          new = '''export async function requestCampaignCancellation(campaignId, options = {}) {
+  const queryOptions = {
+    timeoutMs: Math.min(options.timeoutMs ?? EXTENSION_TIMEOUTS.control, EXTENSION_TIMEOUTS.ping),
+    signal: options.signal,
+  };
+  const live = await requestCampaignStatus(queryOptions);
+  const active = live.campaign;
+  if (!active) {
+    return syntheticCancelledEnvelope(campaignId, null, "extension_has_no_active_campaign");
+  }
+  if (active.campaignId !== campaignId) {
+    return syntheticCancelledEnvelope(campaignId, null, "requested_campaign_not_active_in_extension");
+  }
+  if (active.status === "cancelled") {
+    return syntheticCancelledEnvelope(campaignId, active, "extension_already_cancelled");
+  }
+  if (active.status === "stopped") {
+    try {
+      return await requestCampaignControl(
+        EXTENSION_MESSAGE_TYPES.cancelRequest,
+        campaignId,
+        [EXTENSION_MESSAGE_TYPES.cancelled],
+        { ...options, sequence: Number.isInteger(active.sequence) ? active.sequence : options.sequence },
+      );
+    } catch (error) {
+      const invalidLegacyTransition = error?.code === "INTERNAL_ERROR"
+        || error?.code === "internal"
+        || String(error?.message || "").includes("Transición de campaña inválida");
+      if (!invalidLegacyTransition) throw error;
+      await requestCampaignControl(
+        EXTENSION_MESSAGE_TYPES.deleteRequest,
+        campaignId,
+        [EXTENSION_MESSAGE_TYPES.stopped],
+        { ...options, sequence: Number.isInteger(active.sequence) ? active.sequence : options.sequence },
+      );
+      return syntheticCancelledEnvelope(campaignId, active, "legacy_stopped_campaign_released");
+    }
+  }
+  return requestCampaignControl(
+    EXTENSION_MESSAGE_TYPES.cancelRequest,
+    campaignId,
+    [EXTENSION_MESSAGE_TYPES.cancelled],
+    { ...options, sequence: Number.isInteger(active.sequence) ? active.sequence : options.sequence },
+  );
+}'''
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('requestCampaignCancellation marker not found')
+              bridge.write_text(text.replace(old, new, 1))
+
+          page = Path('src/gestion/pages/WhatsAppCampaignsPage.jsx')
+          text = page.read_text()
+          old_label = '>Cancelar campaña</Button>'
+          new_label = '>Cancelar y quitar de activas</Button>'
+          if old_label in text:
+              page.write_text(text.replace(old_label, new_label, 1))
+
+          tests = Path('tests/whatsapp-extension-bridge.test.mjs')
+          text = tests.read_text()
+          old_test = '''test("CANCEL detecta blockingCampaign en vez de mandar un comando al ID incorrecto", async () => {
+  const blocking = { campaignId: "campaign-A", campaignName: "Anterior", status: "paused", sequence: 5 };
+  await withExtensionResolver(() => ({ type: EXTENSION_MESSAGE_TYPES.status, payload: defaultStatusPayload(blocking) }), async (posted) => {
+    await assert.rejects(() => requestCampaignCancellation("campaign-B"), (error) => {
+      assert.equal(error.code, "CAMPAIGN_CONFLICT");
+      assert.equal(error.details.blockingCampaign.campaignId, "campaign-A");
+      return true;
+    });
+    assert.equal(posted.length, 1);
+  });
+});'''
+          new_test = '''test("CANCEL permite archivar una campaña stale sin tocar la campaña activa real de la extensión", async () => {
+  const blocking = { campaignId: "campaign-A", campaignName: "Anterior", status: "paused", sequence: 5 };
+  await withExtensionResolver(() => ({ type: EXTENSION_MESSAGE_TYPES.status, payload: defaultStatusPayload(blocking) }), async (posted) => {
+    const response = await requestCampaignCancellation("campaign-B");
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.statusRequest);
+    assert.equal(response.type, EXTENSION_MESSAGE_TYPES.cancelled);
+    assert.equal(response.payload.staleReconciled, true);
+    assert.equal(response.payload.cancellationReason, "requested_campaign_not_active_in_extension");
+  });
+});'''
+          if new_test not in text:
+              if old_test not in text:
+                  raise SystemExit('blockingCampaign test marker not found')
+              text = text.replace(old_test, new_test, 1)
+
+          stopped_marker = 'CANCEL sobre stopped libera el emisor incluso con una extensión 0.9.4.4'
+          if stopped_marker not in text:
+              addition = '''\n\ntest("CANCEL sobre stopped libera el emisor incluso con una extensión 0.9.4.4", async () => {
+  const stopped = { campaignId: "campaign-stopped-cancel", campaignName: "Vieja", status: "stopped", sequence: 44 };
+  await withExtensionResolver((envelope) => {
+    if (envelope.type === EXTENSION_MESSAGE_TYPES.statusRequest) return { type: EXTENSION_MESSAGE_TYPES.status, payload: defaultStatusPayload(stopped) };
+    if (envelope.type === EXTENSION_MESSAGE_TYPES.cancelRequest) return {
+      type: EXTENSION_MESSAGE_TYPES.error,
+      payload: { code: "internal", message: "Transición de campaña inválida: stopped → cancelled.", recoverable: false },
+    };
+    if (envelope.type === EXTENSION_MESSAGE_TYPES.deleteRequest) return {
+      type: EXTENSION_MESSAGE_TYPES.stopped,
+      sequence: 44,
+      payload: { ...stopped, emitterReleased: true },
+    };
+    return null;
+  }, async (posted) => {
+    const response = await requestCampaignCancellation(stopped.campaignId);
+    assert.equal(posted.length, 3);
+    assert.equal(posted[1].envelope.type, EXTENSION_MESSAGE_TYPES.cancelRequest);
+    assert.equal(posted[2].envelope.type, EXTENSION_MESSAGE_TYPES.deleteRequest);
+    assert.equal(response.type, EXTENSION_MESSAGE_TYPES.cancelled);
+    assert.equal(response.payload.emitterReleased, true);
+    assert.equal(response.payload.cancellationReason, "legacy_stopped_campaign_released");
+  });
+});\n'''
+              text += addition
+          tests.write_text(text)
+          PY
+      - run: npm ci
+      - run: npm test
+      - run: npx firebase-tools@14.12.0 emulators:exec --only firestore --project demo-flor-mia-integral "npm run test:rules"
+      - run: npm run build
+      - name: Publish verified repair
+        shell: bash
+        run: |
+          git rm .github/workflows/fix-whatsapp-stale-campaigns.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: remove stale WhatsApp campaigns from active queue"
+          git push origin agent/rendimiento-vendedor-clientes
