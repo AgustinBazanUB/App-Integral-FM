@@ -352,7 +352,11 @@ export async function applyExtensionCampaignEvent(profile, message) {
       extensionRetryableFailed: Math.max(0, Number(message.payload?.retryableFailed || 0)),
       extensionRetryCycle: Math.max(0, Number(message.payload?.retryCycle || 0)),
       extensionVersion: String(message.payload?.extensionVersion || current.extensionVersion || ""),
-      ...(status === "completed" && message.payload?.finalSummary ? { extensionFinalSummary: message.payload.finalSummary } : {}),
+      ...(["completed", "stopped", "cancelled"].includes(status) && message.payload?.finalSummary ? {
+        extensionFinalSummary: message.payload.finalSummary,
+        extensionLastCompletedContactId: message.payload.finalSummary.lastCompletedContactId || null,
+        extensionCancellationEvidence: message.payload.finalSummary.cancellationEvidence || null,
+      } : {}),
       updatedAt: serverTimestamp(),
       ...(status === "running" && !current.startedAt ? { startedAt: serverTimestamp() } : {}),
       ...(["completed", "error", "cancelled", "stopped"].includes(status) ? { finishedAt: serverTimestamp() } : {}),

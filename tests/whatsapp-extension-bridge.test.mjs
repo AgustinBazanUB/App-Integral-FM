@@ -7,7 +7,9 @@ import {
   extensionConnectionState,
   pingWhatsAppExtension,
   prepareCampaignForExtension,
+  requestCampaignCancellation,
   requestCampaignDelete,
+  requestCampaignDiagnosticReport,
   requestCampaignRetry,
   requestCampaignRetryFailed,
   requestCampaignStart,
@@ -23,7 +25,7 @@ function defaultStatusPayload(campaign = null) {
     configuredLimit: 1000,
     sentToday: 0,
     availableToday: 1000,
-    extensionVersion: "0.9.4.2",
+    extensionVersion: "0.9.4.4",
     bridgeInstanceId: "bridge-2",
     bridgeGeneration: 2,
     bridgeCreatedAt: "2026-08-19T03:00:00.000Z",
@@ -273,4 +275,62 @@ test("EXTENSION_CONTEXT_INVALIDATED pide reload controlado en vez de reintentos 
   assert.equal(extensionConnectionState({ operational: false, errorCode: "EXTENSION_CONTEXT_INVALIDATED" }), "needs_page_reload");
   assert.equal(extensionConnectionState({ operational: true }), "connected");
   assert.equal(extensionConnectionState({ operational: false, errorCode: "extension_unavailable" }), "disconnected");
+});
+
+
+test("CANCEL paused consulta source of truth, envía Cancel real y exige la sequence activa", async () => {
+  const campaign = { campaignId: "campaign-paused-cancel", campaignName: "Pausada", status: "paused", sequence: 31 };
+  await withExtensionResolver((envelope) => {
+    if (envelope.type === EXTENSION_MESSAGE_TYPES.statusRequest) return { type: EXTENSION_MESSAGE_TYPES.status, payload: defaultStatusPayload(campaign) };
+    if (envelope.type === EXTENSION_MESSAGE_TYPES.cancelRequest) return {
+      type: EXTENSION_MESSAGE_TYPES.cancelled,
+      sequence: 32,
+      payload: { ...campaign, status: "cancelled", sequence: 32, emitterReleased: true },
+    };
+    return null;
+  }, async (posted) => {
+    const response = await requestCampaignCancellation(campaign.campaignId);
+    assert.equal(posted.length, 2);
+    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.statusRequest);
+    assert.equal(posted[1].envelope.type, EXTENSION_MESSAGE_TYPES.cancelRequest);
+    assert.equal(posted[1].envelope.sequence, 31);
+    assert.equal(response.type, EXTENSION_MESSAGE_TYPES.cancelled);
+    assert.equal(response.payload.emitterReleased, true);
+  });
+});
+
+test("CANCEL stale en Web App no manda control si la extensión ya está idle y reconcilia cancelled localmente", async () => {
+  await withExtensionResolver(() => ({ type: EXTENSION_MESSAGE_TYPES.status, payload: defaultStatusPayload(null) }), async (posted) => {
+    const response = await requestCampaignCancellation("campaign-stale");
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].envelope.type, EXTENSION_MESSAGE_TYPES.statusRequest);
+    assert.equal(response.type, EXTENSION_MESSAGE_TYPES.cancelled);
+    assert.equal(response.payload.emitterReleased, true);
+    assert.equal(response.payload.staleReconciled, true);
+  });
+});
+
+test("CANCEL detecta blockingCampaign en vez de mandar un comando al ID incorrecto", async () => {
+  const blocking = { campaignId: "campaign-A", campaignName: "Anterior", status: "paused", sequence: 5 };
+  await withExtensionResolver(() => ({ type: EXTENSION_MESSAGE_TYPES.status, payload: defaultStatusPayload(blocking) }), async (posted) => {
+    await assert.rejects(() => requestCampaignCancellation("campaign-B"), (error) => {
+      assert.equal(error.code, "CAMPAIGN_CONFLICT");
+      assert.equal(error.details.blockingCampaign.campaignId, "campaign-A");
+      return true;
+    });
+    assert.equal(posted.length, 1);
+  });
+});
+
+test("reporte bajo demanda usa el canal dedicado y devuelve texto + JSON", async () => {
+  await withExtensionResolver((envelope) => {
+    assert.equal(envelope.type, EXTENSION_MESSAGE_TYPES.diagnosticReportRequest);
+    assert.equal(envelope.payload.webAppContext.campaignIdDisplayed, "campaign-report");
+    return { type: EXTENSION_MESSAGE_TYPES.diagnosticReport, payload: { text: "REPORTE", json: "{\"ok\":true}", report: { reportSchemaVersion: 2 } } };
+  }, async (posted) => {
+    const report = await requestCampaignDiagnosticReport("campaign-report", { campaignIdDisplayed: "campaign-report" });
+    assert.equal(posted.length, 1);
+    assert.equal(report.text, "REPORTE");
+    assert.equal(report.json, '{"ok":true}');
+  });
 });

@@ -92,7 +92,7 @@ test("Retry, Retry Failed y Delete están cableados a controles explícitos y UX
   assert.match(bridge, /FLORMIA_CAMPAIGN_DELETE/);
   assert.match(page, />Reintentar</);
   assert.match(page, />Reintentar fallidos</);
-  assert.match(page, />Borrar campaña</);
+  assert.match(page, />Quitar del emisor</);
   assert.match(page, /No pudimos confirmar el último envío/);
   assert.doesNotMatch(page, /sendAttempted|ContactEngine|checkpoint|Content Script|correlationId/);
   assert.match(domain, /campaignControlAvailability/);
@@ -135,4 +135,23 @@ test("0.9.4.3 persiste y muestra confirmados vs enviados sin confirmación", asy
   assert.match(domain, /unverifiedSent/);
   assert.match(page, /Sin confirmación/);
   assert.match(page, /extensionConnectionState/);
+});
+
+
+test("0.9.4.4 usa App Integral FM como control plane para Cancel y reporte bajo demanda", async () => {
+  const [bridge, page, domain, service] = await Promise.all([
+    read("src/gestion/marketing/whatsapp/extensionBridge.js"),
+    read("src/gestion/pages/WhatsAppCampaignsPage.jsx"),
+    read("src/gestion/marketing/whatsapp/campaignDomain.js"),
+    read("src/gestion/marketing/whatsapp/campaignService.js"),
+  ]);
+  assert.match(bridge, /FLORMIA_CAMPAIGN_CANCEL_REQUEST/);
+  assert.match(bridge, /FLORMIA_DIAGNOSTIC_REPORT_REQUEST/);
+  assert.match(bridge, /blockingCampaign/);
+  assert.match(page, />Cancelar campaña</);
+  assert.match(page, />Generar reporte</);
+  assert.match(page, /applyReconciledExtensionCampaignEvent/);
+  assert.match(domain, /canCancel/);
+  assert.match(service, /extensionCancellationEvidence/);
+  assert.doesNotMatch(page, /querySelector\(|MutationObserver/);
 });

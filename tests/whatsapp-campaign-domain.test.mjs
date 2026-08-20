@@ -154,6 +154,7 @@ test("Reintentar aparece sólo para una pausa recuperable y nunca ante envío am
       canRetry: true,
       canRetryFailed: false,
       canStop: true,
+      canCancel: true,
       canDelete: false,
     },
   );
@@ -161,6 +162,7 @@ test("Reintentar aparece sólo para una pausa recuperable y nunca ante envío am
   assert.equal(ambiguous.ambiguous, true);
   assert.equal(ambiguous.canRetry, false);
   assert.equal(ambiguous.canResume, false);
+  assert.equal(ambiguous.canCancel, true);
 });
 
 test("Reintentar fallidos sólo aparece al completar con fallidos seguros y Borrar sólo tras Stop", () => {
@@ -170,6 +172,7 @@ test("Reintentar fallidos sólo aparece al completar con fallidos seguros y Borr
   const stopped = campaignControlAvailability({ status: "stopped" });
   assert.equal(stopped.canDelete, true);
   assert.equal(stopped.canRetry, false);
+  assert.equal(stopped.canCancel, false);
 });
 
 test("un envío SENT_UNVERIFIED no entra en Reintentar fallidos", () => {

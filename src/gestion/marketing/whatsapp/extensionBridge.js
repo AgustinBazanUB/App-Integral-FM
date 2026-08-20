@@ -32,6 +32,8 @@ export const EXTENSION_MESSAGE_TYPES = Object.freeze({
   stopRequest: "FLORMIA_CAMPAIGN_STOP",
   deleteRequest: "FLORMIA_CAMPAIGN_DELETE",
   statusRequest: "FLORMIA_CAMPAIGN_STATUS_REQUEST",
+  diagnosticReportRequest: "FLORMIA_DIAGNOSTIC_REPORT_REQUEST",
+  diagnosticReport: "FLORMIA_DIAGNOSTIC_REPORT",
 });
 
 const inboundTypes = new Set([
@@ -45,6 +47,7 @@ const inboundTypes = new Set([
   EXTENSION_MESSAGE_TYPES.error,
   EXTENSION_MESSAGE_TYPES.stopped,
   EXTENSION_MESSAGE_TYPES.cancelled,
+  EXTENSION_MESSAGE_TYPES.diagnosticReport,
 ]);
 
 const campaignEventTypes = new Set([
@@ -183,10 +186,11 @@ function extensionResponseError(response, fallbackMessage) {
   return error;
 }
 
-function campaignConflict(message) {
+function campaignConflict(message, details = null) {
   const error = new Error(message);
   error.code = "CAMPAIGN_CONFLICT";
   error.recoverable = true;
+  if (plainObject(details)) error.details = details;
   return error;
 }
 
@@ -201,6 +205,23 @@ function syntheticStoppedEnvelope(campaignId, campaign = null, { emitterReleased
       campaignId,
       status: "stopped",
       emitterReleased,
+    },
+  });
+}
+
+function syntheticCancelledEnvelope(campaignId, campaign = null, reason = "extension_already_idle") {
+  return emitLocalEnvelope({
+    channel: EXTENSION_CHANNEL,
+    protocolVersion: WHATSAPP_PROTOCOL_VERSION,
+    type: EXTENSION_MESSAGE_TYPES.cancelled,
+    campaignId,
+    payload: {
+      ...(plainObject(campaign) ? campaign : {}),
+      campaignId,
+      status: "cancelled",
+      emitterReleased: true,
+      cancellationReason: reason,
+      staleReconciled: true,
     },
   });
 }
@@ -366,7 +387,10 @@ export async function requestCampaignStop(campaignId, options = {}) {
     return syntheticStoppedEnvelope(campaignId, null, { emitterReleased: true });
   }
   if (active.campaignId !== campaignId) {
-    throw campaignConflict(`La extensión está controlando otra campaña (${active.campaignName || active.campaignId}). Actualizá la pantalla antes de detener.`);
+    throw campaignConflict(
+      `La extensión está controlando otra campaña (${active.campaignName || active.campaignId}). Actualizá la pantalla antes de detener.`,
+      { blockingCampaign: active },
+    );
   }
   if (active.status === "stopped") {
     return syntheticStoppedEnvelope(campaignId, active, { emitterReleased: false });
@@ -414,6 +438,46 @@ export async function requestCampaignDelete(campaignId, options = {}) {
   }
 }
 
-export async function requestCampaignCancellation(campaignId, { timeoutMs = EXTENSION_TIMEOUTS.control } = {}) {
-  return requestCampaignStop(campaignId, { timeoutMs });
+export async function requestCampaignCancellation(campaignId, options = {}) {
+  const queryOptions = {
+    timeoutMs: Math.min(options.timeoutMs ?? EXTENSION_TIMEOUTS.control, EXTENSION_TIMEOUTS.ping),
+    signal: options.signal,
+  };
+  const live = await requestCampaignStatus(queryOptions);
+  const active = live.campaign;
+  if (!active) {
+    return syntheticCancelledEnvelope(campaignId, null, "extension_has_no_active_campaign");
+  }
+  if (active.campaignId !== campaignId) {
+    throw campaignConflict(
+      `La extensión conserva otra campaña activa (${active.campaignName || active.campaignId}). Cancelá o reconciliá esa campaña antes de continuar.`,
+      { blockingCampaign: active },
+    );
+  }
+  if (active.status === "cancelled") {
+    return syntheticCancelledEnvelope(campaignId, active, "extension_already_cancelled");
+  }
+  return requestCampaignControl(
+    EXTENSION_MESSAGE_TYPES.cancelRequest,
+    campaignId,
+    [EXTENSION_MESSAGE_TYPES.cancelled],
+    { ...options, sequence: Number.isInteger(active.sequence) ? active.sequence : options.sequence },
+  );
+}
+
+export async function requestCampaignDiagnosticReport(campaignId, webAppContext = {}, { timeoutMs = EXTENSION_TIMEOUTS.control, signal } = {}) {
+  const id = postEnvelope(EXTENSION_MESSAGE_TYPES.diagnosticReportRequest, {
+    campaignId,
+    payload: { webAppContext: plainObject(webAppContext) ? webAppContext : {} },
+  });
+  const response = await waitForReply(
+    id,
+    new Set([EXTENSION_MESSAGE_TYPES.diagnosticReport, EXTENSION_MESSAGE_TYPES.error]),
+    timeoutMs,
+    { signal },
+  );
+  if (response.type === EXTENSION_MESSAGE_TYPES.error) {
+    throw extensionResponseError(response, "No se pudo generar el reporte de situación actual.");
+  }
+  return response.payload;
 }

@@ -52,7 +52,9 @@ import {
   extensionConnectionState,
   pingWhatsAppExtension,
   prepareCampaignForExtension,
+  requestCampaignCancellation,
   requestCampaignDelete,
+  requestCampaignDiagnosticReport,
   requestCampaignPause,
   requestCampaignResume,
   requestCampaignRetry,
@@ -62,6 +64,7 @@ import {
   requestWhatsAppPreflight,
   subscribeExtensionMessages,
 } from "../marketing/whatsapp/extensionBridge";
+import { applyReconciledExtensionCampaignEvent } from "../marketing/whatsapp/campaignReconciliation";
 
 const steps = ["Información", "Destinatarios", "Mensaje", "Imágenes", "Revisión"];
 const emptyFilters = { zoneId: "", zoneName: "", category: "", search: "" };
@@ -403,6 +406,9 @@ function CampaignDetail({ campaign, profile, onClose, onContinue, onChanged }) {
   const [events, setEvents] = useState([]);
   const [pendingControl, setPendingControl] = useState("");
   const [error, setError] = useState("");
+  const [diagnosticReport, setDiagnosticReport] = useState(null);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportNotice, setReportNotice] = useState("");
   const controlInFlightRef = useRef(false);
   useEffect(() => { listCampaignEvents(profile, campaign.id).then(setEvents).catch((cause) => setError(cause.message)); }, [campaign.id, profile.id]);
 
@@ -429,6 +435,9 @@ function CampaignDetail({ campaign, profile, onClose, onContinue, onChanged }) {
         await requestCampaignStop(campaign.id);
       } else if (kind === "delete") {
         await requestCampaignDelete(campaign.id);
+      } else if (kind === "cancelExecution") {
+        const response = await requestCampaignCancellation(campaign.id);
+        await applyReconciledExtensionCampaignEvent(profile, response);
       }
       await onChanged();
       onClose();
@@ -436,6 +445,36 @@ function CampaignDetail({ campaign, profile, onClose, onContinue, onChanged }) {
       controlInFlightRef.current = false;
       setError(cause.message || "No se pudo aplicar el control. Revisá la conexión e intentá nuevamente.");
       setPendingControl("");
+    }
+  };
+
+  const generateReport = async () => {
+    if (reportBusy) return;
+    setReportBusy(true);
+    setReportNotice("");
+    setError("");
+    try {
+      const report = await requestCampaignDiagnosticReport(campaign.id, {
+        campaignIdDisplayed: campaign.id,
+        campaignStatusDisplayed: campaign.status,
+        lastExtensionSequence: Number(campaign.lastExtensionSequence || 0),
+        pendingControl: pendingControl || null,
+      });
+      setDiagnosticReport(report);
+      setReportNotice("Reporte generado sin modificar la campaña.");
+    } catch (cause) {
+      setError(cause.message || "No se pudo generar el reporte de situación actual.");
+    } finally {
+      setReportBusy(false);
+    }
+  };
+
+  const copyReport = async (value, label) => {
+    try {
+      await navigator.clipboard.writeText(String(value || ""));
+      setReportNotice(`${label} copiado.`);
+    } catch {
+      setReportNotice("No se pudo copiar automáticamente. Podés seleccionar el contenido manualmente.");
     }
   };
 
@@ -447,6 +486,7 @@ function CampaignDetail({ campaign, profile, onClose, onContinue, onChanged }) {
     retryFailed: "Preparando fallidos…",
     stop: "Deteniendo…",
     delete: "Quitando campaña…",
+    cancelExecution: "Cancelando campaña…",
     cancel: "Cancelando…",
   };
   const displayStatus = pendingLabels[pendingControl] || CAMPAIGN_STATUS_LABELS[campaign.status] || campaign.status;
@@ -460,16 +500,26 @@ function CampaignDetail({ campaign, profile, onClose, onContinue, onChanged }) {
     {canControl && controls.canRetry ? <Button variant="secondary" loading={pendingControl === "retry"} disabled={Boolean(pendingControl)} onClick={() => runControl("retry")}>Reintentar</Button> : null}
     {canControl && controls.canRetryFailed ? <Button loading={pendingControl === "retryFailed"} disabled={Boolean(pendingControl)} onClick={() => runControl("retryFailed")}>Reintentar fallidos</Button> : null}
     {canControl && controls.canStop ? <Button variant="secondary" loading={pendingControl === "stop"} disabled={Boolean(pendingControl)} onClick={() => runControl("stop")}>Detener campaña</Button> : null}
-    {canControl && controls.canDelete ? <Button variant="secondary" loading={pendingControl === "delete"} disabled={Boolean(pendingControl)} onClick={() => runControl("delete")}>Borrar campaña</Button> : null}
+    {canControl && controls.canCancel ? <Button variant="secondary" loading={pendingControl === "cancelExecution"} disabled={Boolean(pendingControl)} onClick={() => runControl("cancelExecution")}>Cancelar campaña</Button> : null}
+    {campaign.status !== "draft" && campaign.status !== "cancelled" ? <Button variant="secondary" loading={reportBusy} disabled={Boolean(pendingControl) || reportBusy} onClick={generateReport}>Generar reporte</Button> : null}
+    {canControl && controls.canDelete ? <Button variant="secondary" loading={pendingControl === "delete"} disabled={Boolean(pendingControl)} onClick={() => runControl("delete")}>Quitar del emisor</Button> : null}
   </div>;
 
   return <Modal open onClose={pendingControl ? undefined : onClose} title={campaign.name} description="Seguimiento de campaña de WhatsApp" footer={footer}>
     {error ? <Toast tone="error">{error}</Toast> : null}
     {pendingControl ? <Toast tone="info">{displayStatus} La orden se aplicará respetando la primera frontera segura.</Toast> : null}
-    {controls.ambiguous ? <Toast tone="warning">No pudimos confirmar el último envío. Revisalo antes de continuar; no ofrecemos un reintento directo porque podría duplicar el mensaje.</Toast> : null}
+    {controls.ambiguous ? <Toast tone="warning">No pudimos confirmar el último envío. No ofrecemos un reintento directo porque podría duplicarlo; si querés abandonar definitivamente la campaña, podés cancelarla sin volver a enviar.</Toast> : null}
+    {reportNotice ? <Toast tone="info">{reportNotice}</Toast> : null}
     {campaign.status === "completed" && counters.unverifiedSent > 0 ? <Toast tone="info">Campaña completada · {counters.unverifiedSent} envío(s) fueron ejecutados pero no pudieron confirmarse en la interfaz.</Toast> : null}
     {campaign.status === "completed" && counters.unverifiedSent === 0 && counters.errors > 0 ? <Toast tone="info">Campaña completada · {counters.sent} enviados · {counters.errors} con problemas.</Toast> : null}
     <dl className="fm-wa-review"><div><dt>Estado</dt><dd><Badge tone={CAMPAIGN_STATUS_TONES[campaign.status] || "neutral"}>{displayStatus}</Badge></dd></div><div><dt>Creador</dt><dd>{campaign.createdByName || campaign.createdBy}</dd></div><div><dt>Fecha</dt><dd>{formatDateTime(campaign.createdAt)}</dd></div><div><dt>Progreso</dt><dd>{campaign.processedCount ?? counters.processed} / {counters.total} procesados · {campaign.progressPercentage ?? counters.progress}%</dd></div><div><dt>Enviados</dt><dd>{counters.sent}</dd></div><div><dt>Confirmados</dt><dd>{counters.confirmedSent}</dd></div><div><dt>Sin confirmación</dt><dd>{counters.unverifiedSent}</dd></div><div><dt>Problemas</dt><dd>{counters.errors}{campaign.extensionErrorMessage ? ` · ${campaign.extensionErrorMessage}` : ""}</dd></div><div><dt>Segmentación</dt><dd>{Object.entries(campaign.filters || {}).filter(([,value]) => value).map(([key,value]) => `${key}: ${value}`).join(" · ") || "Sin filtros guardados"}</dd></div><div><dt>Mensaje</dt><dd className="fm-wa-review-message">{campaign.message || "Sin texto"}</dd></div><div><dt>Imágenes</dt><dd>{(campaign.imageMetadata || []).map((image) => `${image.order}. ${image.name}`).join(" · ") || "Sin imágenes persistidas"}</dd></div><div><dt>Inicio / fin</dt><dd>{campaign.startedAt ? formatDateTime(campaign.startedAt) : "—"} / {campaign.finishedAt ? formatDateTime(campaign.finishedAt) : "—"}</dd></div></dl>
+    {diagnosticReport ? <section className="fm-wa-stack" aria-label="Reporte de situación actual">
+      <h3>Reporte de situación actual</h3>
+      <p>Se generó bajo demanda y no pausa, reanuda ni modifica la campaña.</p>
+      <div className="fm-dialog-actions"><Button variant="secondary" onClick={() => copyReport(diagnosticReport.text, "Reporte para ChatGPT / Codex")}>Copiar texto</Button><Button variant="secondary" onClick={() => copyReport(diagnosticReport.json, "JSON técnico")}>Copiar JSON</Button></div>
+      <FormField label="Reporte para ChatGPT / Codex"><textarea readOnly rows={10} value={diagnosticReport.text || ""} /></FormField>
+      <FormField label="JSON técnico"><textarea readOnly rows={8} value={diagnosticReport.json || ""} /></FormField>
+    </section> : null}
     <h3>Actividad</h3><div className="fm-wa-events">{events.length ? events.map((event) => <div key={event.id}><strong>{event.label || event.type}</strong><span>{formatDateTime(event.createdAt)}</span>{event.message ? <small>{event.message}</small> : null}</div>) : <p>Sin eventos adicionales.</p>}</div>
   </Modal>;
 }
