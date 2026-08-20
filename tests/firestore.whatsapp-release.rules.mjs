@@ -54,11 +54,13 @@ before(async () => {
         active: true,
         permissionDeny: { marketing: ["whatsappSendToExtension"] },
       }),
-      setDoc(doc(database, "users", "marketing-cancel-denied"), {
-        name: "Marketing sin cancelación",
+      setDoc(doc(database, "users", "marketing-control-denied"), {
+        name: "Marketing sin control de campaña",
         role: "marketing_manager",
         active: true,
-        permissionDeny: { marketing: ["whatsappCancelCampaign"] },
+        permissionDeny: {
+          marketing: ["whatsappCancelCampaign", "whatsappSendToExtension"],
+        },
       }),
       setDoc(doc(database, "whatsappCampaigns", "wa-release"), baseCampaign),
       setDoc(doc(database, "whatsappCampaigns", "wa-send-denied"), {
@@ -66,10 +68,10 @@ before(async () => {
         createdBy: "marketing-send-denied",
         createdByName: "Marketing sin envío",
       }),
-      setDoc(doc(database, "whatsappCampaigns", "wa-cancel-denied"), {
+      setDoc(doc(database, "whatsappCampaigns", "wa-control-denied"), {
         ...baseCampaign,
-        createdBy: "marketing-cancel-denied",
-        createdByName: "Marketing sin cancelación",
+        createdBy: "marketing-control-denied",
+        createdByName: "Marketing sin control de campaña",
       }),
     ]);
   });
@@ -103,11 +105,11 @@ test("quitar una campaña vieja depende de permiso de cancelación, no de permis
   ));
 });
 
-test("un perfil con cancelación WhatsApp denegada no puede archivar la campaña", async () => {
-  const database = environment.authenticatedContext("marketing-cancel-denied").firestore();
+test("un perfil sin permisos de cancelación ni envío no puede archivar la campaña", async () => {
+  const database = environment.authenticatedContext("marketing-control-denied").firestore();
   await assertFails(updateDoc(
-    doc(database, "whatsappCampaigns", "wa-cancel-denied"),
-    cancellationPatch("marketing-cancel-denied"),
+    doc(database, "whatsappCampaigns", "wa-control-denied"),
+    cancellationPatch("marketing-control-denied"),
   ));
 });
 
