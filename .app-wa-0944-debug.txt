@@ -1,4 +1,2 @@
-  File ".github/scripts/app-wa-0944.py", line 8
-    '''    assert.match(page, />Borrar campaña</);''',
-           ^^^^^^
-SyntaxError: invalid syntax
+Web App 0.9.4.4 control plane patch applied
+missing marker tests/whatsapp-marketing-integration.test.mjs: '    assert.match(page, />Borrar campaña</);'
