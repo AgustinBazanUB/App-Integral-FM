@@ -184,7 +184,6 @@ export async function saveWhatsAppCampaignDraft(profile, input, campaignId = nul
     totalRecipients: Math.max(0, Number(input.totalRecipients || 0)),
     sentCount: Math.max(0, Number(existing?.data()?.sentCount || 0)),
     errorCount: Math.max(0, Number(existing?.data()?.errorCount || 0)),
-    processedCount: Math.max(0, Number(existing?.data()?.processedCount || 0)),
     progressPercentage: Math.max(0, Number(existing?.data()?.progressPercentage || 0)),
     status: existing?.exists() && existing.data().status !== "draft" ? existing.data().status : "draft",
     snapshotState: "draft",
@@ -255,10 +254,7 @@ export async function prepareCampaignSnapshot(profile, input) {
     await setDoc(reference, {
       totalRecipients: input.recipients.length,
       sentCount: 0,
-      confirmedSentCount: 0,
-      unverifiedSentCount: 0,
       errorCount: 0,
-      processedCount: 0,
       progressPercentage: 0,
       status: "ready",
       snapshotState: "ready",
@@ -324,6 +320,31 @@ const actionByType = {
   [EXTENSION_MESSAGE_TYPES.cancelled]: "whatsappCampaign.cancelled",
 };
 
+const FIRESTORE_EXTENSION_CAMPAIGN_FIELDS = Object.freeze([
+  "status",
+  "sentCount",
+  "errorCount",
+  "progressPercentage",
+  "lastExtensionSequence",
+  "lastExtensionUpdateAt",
+  "startedAt",
+  "finishedAt",
+  "extensionErrorCode",
+  "extensionErrorMessage",
+  "deliveredToExtensionAt",
+  "cancelledAt",
+  "cancelledBy",
+  "updatedBy",
+  "updatedByName",
+  "updatedAt",
+]);
+
+function firestoreCompatibleExtensionUpdate(update = {}) {
+  return Object.fromEntries(FIRESTORE_EXTENSION_CAMPAIGN_FIELDS
+    .filter((field) => Object.prototype.hasOwnProperty.call(update, field))
+    .map((field) => [field, update[field]]));
+}
+
 export async function applyExtensionCampaignEvent(profile, message) {
   if (!canSend(profile) || !message?.campaignId || !extensionStatusByType[message.type]) return { ignored: true };
   const campaignRef = doc(db, "whatsappCampaigns", message.campaignId);
@@ -367,7 +388,7 @@ export async function applyExtensionCampaignEvent(profile, message) {
       ...(status === "cancelled" ? { cancelledAt: serverTimestamp(), cancelledBy: profile.id } : {}),
       ...(status === "stopped" ? { stoppedAt: serverTimestamp(), stoppedBy: profile.id } : {}),
     };
-    transaction.set(campaignRef, update, { merge: true });
+    transaction.set(campaignRef, firestoreCompatibleExtensionUpdate(update), { merge: true });
     const statusChanged = current.status !== status;
     if (statusChanged) {
       transaction.set(eventRef, {
@@ -381,6 +402,11 @@ export async function applyExtensionCampaignEvent(profile, message) {
         processedCount: counters.processed,
         progressPercentage: counters.progress,
         message: status === "error" ? update.extensionErrorMessage : null,
+        blockReason: message.payload?.blockReason || null,
+        retryableFailed: Math.max(0, Number(message.payload?.retryableFailed || 0)),
+        retryCycle: Math.max(0, Number(message.payload?.retryCycle || 0)),
+        extensionVersion: String(message.payload?.extensionVersion || current.extensionVersion || ""),
+        ...(["completed", "cancelled"].includes(status) && message.payload?.finalSummary ? { finalSummary: message.payload.finalSummary } : {}),
         createdAt: serverTimestamp(),
       });
       transaction.set(auditRef, campaignAudit(
