@@ -165,7 +165,7 @@ test("Reintentar aparece sólo para una pausa recuperable y nunca ante envío am
   assert.equal(ambiguous.canCancel, true);
 });
 
-test("Reintentar fallidos sólo aparece al completar con fallidos seguros y Borrar sólo tras Stop", () => {
+test("Reintentar fallidos sólo aparece al completar con fallidos seguros y Quitar del emisor sólo tras Stop", () => {
   const completed = campaignControlAvailability({ status: "completed", errorCount: 3, extensionRetryableFailed: 3 });
   assert.equal(completed.canRetryFailed, true);
   assert.equal(completed.canStop, false);
