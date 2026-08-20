@@ -20,10 +20,7 @@ const baseCampaign = {
   imageMetadata: [],
   totalRecipients: 1,
   sentCount: 0,
-  confirmedSentCount: 0,
-  unverifiedSentCount: 0,
   errorCount: 0,
-  processedCount: 0,
   progressPercentage: 0,
   status: "paused",
   snapshotState: "ready",
@@ -51,17 +48,28 @@ before(async () => {
         role: "admin",
         active: true,
       }),
-      setDoc(doc(database, "users", "marketing-denied"), {
-        name: "Marketing restringido",
+      setDoc(doc(database, "users", "marketing-send-denied"), {
+        name: "Marketing sin envío",
         role: "marketing_manager",
         active: true,
         permissionDeny: { marketing: ["whatsappSendToExtension"] },
       }),
+      setDoc(doc(database, "users", "marketing-cancel-denied"), {
+        name: "Marketing sin cancelación",
+        role: "marketing_manager",
+        active: true,
+        permissionDeny: { marketing: ["whatsappCancelCampaign"] },
+      }),
       setDoc(doc(database, "whatsappCampaigns", "wa-release"), baseCampaign),
-      setDoc(doc(database, "whatsappCampaigns", "wa-denied-release"), {
+      setDoc(doc(database, "whatsappCampaigns", "wa-send-denied"), {
         ...baseCampaign,
-        createdBy: "marketing-denied",
-        createdByName: "Marketing restringido",
+        createdBy: "marketing-send-denied",
+        createdByName: "Marketing sin envío",
+      }),
+      setDoc(doc(database, "whatsappCampaigns", "wa-cancel-denied"), {
+        ...baseCampaign,
+        createdBy: "marketing-cancel-denied",
+        createdByName: "Marketing sin cancelación",
       }),
     ]);
   });
@@ -71,71 +79,53 @@ after(async () => {
   await environment?.cleanup();
 });
 
-test("una campaña puede persistir el estado stopped informado por la extensión", async () => {
+const cancellationPatch = (userId) => ({
+  status: "cancelled",
+  cancelledAt: new Date(),
+  cancelledBy: userId,
+  finishedAt: new Date(),
+  updatedAt: new Date(),
+});
+
+test("una campaña vieja puede salir de activas usando sólo el contrato Firestore ya permitido", async () => {
   const database = environment.authenticatedContext("admin-1").firestore();
-  await assertSucceeds(updateDoc(doc(database, "whatsappCampaigns", "wa-release"), {
+  await assertSucceeds(updateDoc(
+    doc(database, "whatsappCampaigns", "wa-release"),
+    cancellationPatch("admin-1"),
+  ));
+});
+
+test("quitar una campaña vieja depende de permiso de cancelación, no de permiso de envío", async () => {
+  const database = environment.authenticatedContext("marketing-send-denied").firestore();
+  await assertSucceeds(updateDoc(
+    doc(database, "whatsappCampaigns", "wa-send-denied"),
+    cancellationPatch("marketing-send-denied"),
+  ));
+});
+
+test("un perfil con cancelación WhatsApp denegada no puede archivar la campaña", async () => {
+  const database = environment.authenticatedContext("marketing-cancel-denied").firestore();
+  await assertFails(updateDoc(
+    doc(database, "whatsappCampaigns", "wa-cancel-denied"),
+    cancellationPatch("marketing-cancel-denied"),
+  ));
+});
+
+test("el estado stopped sigue bloqueado por las reglas actuales y por eso no se persiste como paso intermedio", async () => {
+  const database = environment.authenticatedContext("admin-1").firestore();
+  await assertFails(updateDoc(doc(database, "whatsappCampaigns", "wa-release"), {
     status: "stopped",
     stoppedAt: new Date(),
     stoppedBy: "admin-1",
-    finishedAt: new Date(),
-    lastExtensionSequence: 10,
-    lastExtensionUpdateAt: new Date(),
-    extensionBlockReason: null,
-    extensionRetryableFailed: 0,
-    extensionRetryCycle: 0,
-    extensionVersion: "0.9.4.4",
     updatedAt: new Date(),
   }));
 });
 
-test("la reconciliación puede liberar el emisor de una campaña vieja", async () => {
-  const database = environment.authenticatedContext("admin-1").firestore();
-  await assertSucceeds(updateDoc(doc(database, "whatsappCampaigns", "wa-release"), {
-    emitterReleased: true,
-    emitterReleasedAt: new Date(),
-    extensionBlockReason: null,
-    updatedAt: new Date(),
-  }));
-});
-
-test("la cancelación reconciliada puede persistir contadores y cierre sin ampliar permisos generales", async () => {
-  const database = environment.authenticatedContext("admin-1").firestore();
-  await assertSucceeds(updateDoc(doc(database, "whatsappCampaigns", "wa-release"), {
-    status: "cancelled",
-    sentCount: 0,
-    confirmedSentCount: 0,
-    unverifiedSentCount: 0,
-    errorCount: 0,
-    processedCount: 0,
-    progressPercentage: 0,
-    lastExtensionSequence: 11,
-    lastExtensionUpdateAt: new Date(),
-    extensionBlockReason: null,
-    extensionRetryableFailed: 0,
-    extensionRetryCycle: 0,
-    extensionVersion: "0.9.4.4",
-    finishedAt: new Date(),
-    cancelledAt: new Date(),
-    cancelledBy: "admin-1",
-    updatedAt: new Date(),
-  }));
-});
-
-test("un perfil con envío WhatsApp denegado sigue sin poder liberar el emisor", async () => {
-  const database = environment.authenticatedContext("marketing-denied").firestore();
-  await assertFails(updateDoc(doc(database, "whatsappCampaigns", "wa-denied-release"), {
-    emitterReleased: true,
-    emitterReleasedAt: new Date(),
-    extensionBlockReason: null,
-    updatedAt: new Date(),
-  }));
-});
-
-test("la liberación no permite modificar contenido ni destinatarios de la campaña", async () => {
+test("el cierre no puede colar campos de runtime que las reglas desplegadas no autorizan", async () => {
   const database = environment.authenticatedContext("admin-1").firestore();
   await assertFails(updateDoc(doc(database, "whatsappCampaigns", "wa-release"), {
     emitterReleased: true,
-    message: "Contenido alterado",
+    emitterReleasedAt: new Date(),
     updatedAt: new Date(),
   }));
 });
