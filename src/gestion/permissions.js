@@ -38,6 +38,10 @@ export const ACTIONS = [
   "whatsappCancelCampaign",
   "whatsappViewHistory",
   "whatsappImportExcel",
+  "metaAdsView",
+  "metaAdsCreateProject",
+  "metaAdsEditProject",
+  "metaAdsArchiveProject",
 ];
 
 const everyAction = [...ACTIONS];
@@ -50,6 +54,12 @@ const whatsappMarketingActions = [
   "whatsappCancelCampaign",
   "whatsappViewHistory",
   "whatsappImportExcel",
+];
+const metaAdsMarketingActions = [
+  "metaAdsView",
+  "metaAdsCreateProject",
+  "metaAdsEditProject",
+  "metaAdsArchiveProject",
 ];
 const sellerSalesActions = [
   "view",
@@ -120,7 +130,7 @@ export const ROLE_TEMPLATES = {
   marketing_manager: {
     "loyal-customers": ["view", "viewSensitive"],
     social: operational,
-    marketing: [...operational, ...whatsappMarketingActions],
+    marketing: [...operational, ...whatsappMarketingActions, ...metaAdsMarketingActions],
     metrics: viewOnly,
   },
   ecommerce_manager: {

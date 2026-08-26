@@ -120,6 +120,11 @@ export default function GenericModulePage({ moduleId }) {
           <Link className="fm-button fm-button--secondary" to="/gestion/marketing/whatsapp">Campañas y mensajes masivos</Link>
         </Panel>
       ) : null}
+      {moduleId === "marketing" && can(profile, "marketing", "metaAdsView") ? (
+        <Panel className="fm-editorial-panel" title="Meta Ads" description="Organizá proyectos publicitarios, producto y estado antes de incorporar IA, creatividades y publicación real en etapas posteriores.">
+          <Link className="fm-button fm-button--secondary" to="/gestion/marketing/meta-ads">Planificación, creatividades y campañas</Link>
+        </Panel>
+      ) : null}
       {moduleId === "ecommerce" ? (
         <Panel className="fm-editorial-panel" title="Superficie pública conectada" description="La tienda, el catálogo, el carrito y el checkout aprobado se conservan dentro de este repositorio.">
           <Link className="fm-button fm-button--secondary" to="/productos">Abrir catálogo público</Link>
@@ -164,4 +169,3 @@ export default function GenericModulePage({ moduleId }) {
     </div>
   );
 }
-

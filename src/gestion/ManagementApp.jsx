@@ -6,6 +6,7 @@ import ManagementShell from "./ManagementShell";
 import { moduleById, SALES_METRICS_PATH } from "./modules";
 import { managementPageLoaders } from "./routePreload";
 import {
+  can,
   canAccessAdminPanel,
   canAccessManagementRoute,
   canAccessSellerPanel,
@@ -31,6 +32,7 @@ const LocationDetailPage = lazy(managementPageLoaders.locationDetail);
 const QuickSalesPage = lazy(managementPageLoaders["quick-sales"]);
 const SalesMetricsPage = lazy(managementPageLoaders.metrics);
 const WhatsAppCampaignsPage = lazy(managementPageLoaders.marketingWhatsapp);
+const MetaAdsPage = lazy(managementPageLoaders.marketingMetaAds);
 const SettingsPage = lazy(managementPageLoaders.settings);
 
 const routeIdFromPath = (pathname) =>
@@ -86,6 +88,7 @@ function ManagementRouter() {
   const sellerPath =
     location.pathname === "/vendedor" ||
     location.pathname.startsWith("/vendedor/");
+  const metaAdsPath = routeId === "marketing" && pathParts[2] === "meta-ads";
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -122,10 +125,14 @@ function ManagementRouter() {
       document.title = "Panel Vendedor | Flor Mía";
       return;
     }
+    if (metaAdsPath) {
+      document.title = "Meta Ads | Flor Mía";
+      return;
+    }
     document.title = routeId === "dashboard"
       ? "Gestión integral | Flor Mía"
       : `${routeId === "actividad" ? "Actividad" : moduleById[routeId]?.label || "Gestión"} | Flor Mía`;
-  }, [routeId, sellerPath]);
+  }, [routeId, sellerPath, metaAdsPath]);
 
   if (status === "loading") {
     return <main className="fm-auth-loading" id="main-content"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><Skeleton lines={3} /></main>;
@@ -140,8 +147,12 @@ function ManagementRouter() {
       : <NotAuthorizedPage />;
   }
 
+  const routeAllowed = metaAdsPath
+    ? can(profile, "marketing", "metaAdsView")
+    : canAccessManagementRoute(profile, routeId);
+
   let page;
-  if (!canAccessManagementRoute(profile, routeId)) {
+  if (!routeAllowed) {
     page = <NotAuthorizedPage />;
   } else if (routeId === "dashboard") {
     page = <DashboardPage />;
@@ -161,6 +172,8 @@ function ManagementRouter() {
     page = <SalesMetricsPage />;
   } else if (routeId === "marketing" && pathParts[2] === "whatsapp") {
     page = <WhatsAppCampaignsPage />;
+  } else if (metaAdsPath) {
+    page = <MetaAdsPage campaignId={pathParts[3] ? decodeURIComponent(pathParts[3]) : null} />;
   } else if (routeId === "settings") {
     page = <SettingsPage />;
   } else if (moduleById[routeId]) {
