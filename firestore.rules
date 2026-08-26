@@ -65,7 +65,8 @@ service cloud.firestore {
           && action in [
             "create", "edit", "export",
             "whatsappView", "whatsappCreateCampaign", "whatsappSendToExtension",
-            "whatsappCancelCampaign", "whatsappViewHistory", "whatsappImportExcel"
+            "whatsappCancelCampaign", "whatsappViewHistory", "whatsappImportExcel",
+            "metaAdsView", "metaAdsCreateProject", "metaAdsEditProject", "metaAdsArchiveProject"
           ])
         || (role == "ecommerce_manager"
           && moduleId in ["ecommerce", "shipping", "loyal-customers"]
@@ -359,6 +360,112 @@ service cloud.firestore {
           "status", "cancelledAt", "cancelledBy", "finishedAt", "updatedAt"
         ]);
     }
+    function metaAdsDenied(action) {
+      let user = profile();
+      return ("permissionDeny" in user)
+        && ("marketing" in user.permissionDeny)
+        && (user.permissionDeny.marketing is list)
+        && action in user.permissionDeny.marketing;
+    }
+    function metaAdsCan(action) {
+      return activeUser()
+        && !metaAdsDenied(action)
+        && canModule("marketing", action);
+    }
+    function validMetaAdsStatus(value) {
+      return value in [
+        "draft", "planning", "creative", "validation", "rendering", "ready",
+        "publishing", "active", "paused", "completed", "error", "archived"
+      ];
+    }
+    function validMetaAdsProduct(data) {
+      return (data.productId == null && data.productNameSnapshot == null)
+        || (data.productId is string
+          && data.productId.size() > 0
+          && data.productId.size() <= 128
+          && data.productNameSnapshot is string
+          && data.productNameSnapshot.size() > 0
+          && data.productNameSnapshot.size() <= 180);
+    }
+    function validMetaAdsCampaignProject(data) {
+      return data.keys().hasOnly([
+          "name", "channel", "status", "schemaVersion", "productId", "productNameSnapshot",
+          "archived", "createdBy", "createdByName", "createdAt", "updatedBy", "updatedByName",
+          "updatedAt", "archivedAt", "archivedBy", "archivedByName"
+        ])
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 120
+        && data.channel == "meta_ads"
+        && data.schemaVersion == 1
+        && validMetaAdsStatus(data.status)
+        && data.archived is bool
+        && data.archived == (data.status == "archived")
+        && validMetaAdsProduct(data)
+        && data.createdBy is string
+        && data.createdBy.size() > 0
+        && data.createdByName is string
+        && data.createdByName.size() > 0
+        && data.createdAt is timestamp
+        && data.updatedBy is string
+        && data.updatedBy.size() > 0
+        && data.updatedByName is string
+        && data.updatedByName.size() > 0
+        && data.updatedAt is timestamp
+        && ((data.status == "archived"
+            && ("archivedAt" in data)
+            && data.archivedAt is timestamp
+            && ("archivedBy" in data)
+            && data.archivedBy is string
+            && data.archivedBy.size() > 0
+            && ("archivedByName" in data)
+            && data.archivedByName is string
+            && data.archivedByName.size() > 0)
+          || (data.status != "archived"
+            && !data.keys().hasAny(["archivedAt", "archivedBy", "archivedByName"])));
+    }
+    function metaAdsCreateProjectAllowed() {
+      return metaAdsCan("metaAdsCreateProject")
+        && request.resource.data.status == "draft"
+        && request.resource.data.archived == false
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.updatedBy == request.auth.uid
+        && validMetaAdsCampaignProject(request.resource.data);
+    }
+    function metaAdsEditProjectAllowed() {
+      return metaAdsCan("metaAdsEditProject")
+        && resource.data.status == "draft"
+        && resource.data.archived == false
+        && request.resource.data.status == "draft"
+        && request.resource.data.archived == false
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.channel == resource.data.channel
+        && request.resource.data.schemaVersion == resource.data.schemaVersion
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "name", "productId", "productNameSnapshot", "updatedBy", "updatedByName", "updatedAt"
+        ])
+        && validMetaAdsCampaignProject(request.resource.data);
+    }
+    function metaAdsArchiveProjectAllowed() {
+      return metaAdsCan("metaAdsArchiveProject")
+        && resource.data.status == "draft"
+        && resource.data.archived == false
+        && request.resource.data.status == "archived"
+        && request.resource.data.archived == true
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.channel == resource.data.channel
+        && request.resource.data.schemaVersion == resource.data.schemaVersion
+        && request.resource.data.archivedBy == request.auth.uid
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "status", "archived", "archivedAt", "archivedBy", "archivedByName",
+          "updatedBy", "updatedByName", "updatedAt"
+        ])
+        && validMetaAdsCampaignProject(request.resource.data);
+    }
 
     match /users/{uid} {
       allow get: if isAdmin() || (activeUser() && request.auth.uid == uid);
@@ -597,6 +704,12 @@ service cloud.firestore {
       allow update: if canModule("marketing", "edit") && logicalMutation();
       allow delete: if false;
     }
+    match /metaCampaignProjects/{campaignId} {
+      allow get, list: if metaAdsCan("metaAdsView");
+      allow create: if metaAdsCreateProjectAllowed();
+      allow update: if metaAdsEditProjectAllowed() || metaAdsArchiveProjectAllowed();
+      allow delete: if false;
+    }
     match /whatsappCampaigns/{campaignId} {
       allow get, list: if whatsappCanView();
       allow create: if whatsappCanCreate()
@@ -662,7 +775,13 @@ service cloud.firestore {
             && (canModule("loyal-customers", "create") || canModule("loyal-customers", "edit")))
           || (("moduleId" in request.resource.data)
             && request.resource.data.moduleId == "marketing"
-            && (whatsappCanCreate() || whatsappCanSend() || whatsappCanCancel() || canModule("marketing", "edit")))
+            && (whatsappCanCreate()
+              || whatsappCanSend()
+              || whatsappCanCancel()
+              || metaAdsCan("metaAdsCreateProject")
+              || metaAdsCan("metaAdsEditProject")
+              || metaAdsCan("metaAdsArchiveProject")
+              || canModule("marketing", "edit")))
           || (("locationId" in request.resource.data)
             && allowedLocation(request.resource.data.locationId)));
       allow update, delete: if false;
