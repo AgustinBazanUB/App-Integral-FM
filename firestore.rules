@@ -66,7 +66,8 @@ service cloud.firestore {
             "create", "edit", "export",
             "whatsappView", "whatsappCreateCampaign", "whatsappSendToExtension",
             "whatsappCancelCampaign", "whatsappViewHistory", "whatsappImportExcel",
-            "metaAdsView", "metaAdsCreateProject", "metaAdsEditProject", "metaAdsArchiveProject"
+            "metaAdsView", "metaAdsCreateProject", "metaAdsEditProject", "metaAdsArchiveProject",
+            "metaAdsManageKnowledge", "metaAdsManageTheory"
           ])
         || (role == "ecommerce_manager"
           && moduleId in ["ecommerce", "shipping", "loyal-customers"]
@@ -367,11 +368,50 @@ service cloud.firestore {
         && (user.permissionDeny.marketing is list)
         && action in user.permissionDeny.marketing;
     }
-    function metaAdsCan(action) {
-      return activeUser()
-        && !metaAdsDenied(action)
-        && canModule("marketing", action);
+    function metaAdsExplicit(action) {
+      let user = profile();
+      return ("permissions" in user) && ("marketing" in user.permissions) && (
+        ((user.permissions.marketing is list) && (action in user.permissions.marketing || "admin" in user.permissions.marketing))
+        || ((user.permissions.marketing is map) && (((action in user.permissions.marketing) && user.permissions.marketing[action] == true) || (("admin" in user.permissions.marketing) && user.permissions.marketing.admin == true)))
+      );
     }
+    function metaAdsAllowed(action) {
+      let user = profile();
+      return ("permissionAllow" in user) && ("marketing" in user.permissionAllow) && (user.permissionAllow.marketing is list) && action in user.permissionAllow.marketing;
+    }
+    function metaAdsCan(action) {
+      return activeUser() && !metaAdsDenied(action) && (adminRole() || metaAdsExplicit(action) || metaAdsAllowed(action) || rolePermission("marketing", action));
+    }
+
+    function validKnowledgeList(v) { return v is list && v.size() <= 50; }
+    function validBusinessContext(d) {
+      return d.keys().hasOnly(["schemaVersion","brandDescription","positioning","history","differentiators","channels","characteristics","policies","promotions","brandArguments","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt"])
+        && d.schemaVersion == 1 && d.brandDescription is string && d.brandDescription.size() <= 5000 && d.positioning is string && d.positioning.size() <= 5000 && d.history is string && d.history.size() <= 5000
+        && validKnowledgeList(d.differentiators) && validKnowledgeList(d.channels) && validKnowledgeList(d.characteristics) && validKnowledgeList(d.policies) && validKnowledgeList(d.promotions) && validKnowledgeList(d.brandArguments)
+        && d.createdBy is string && d.createdAt is timestamp && d.updatedBy is string && d.updatedAt is timestamp;
+    }
+    function validProductMarketing(d, productId) {
+      return d.keys().hasOnly(["schemaVersion","productId","benefits","objections","differentiators","origin","uses","arguments","marketingNotes","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt"])
+        && d.schemaVersion == 1 && d.productId == productId && productId.size() > 0 && productId.size() <= 128 && exists(/databases/$(database)/documents/products/$(productId))
+        && validKnowledgeList(d.benefits) && validKnowledgeList(d.objections) && validKnowledgeList(d.differentiators) && d.origin is string && d.origin.size() <= 500 && validKnowledgeList(d.uses) && validKnowledgeList(d.arguments) && d.marketingNotes is string && d.marketingNotes.size() <= 4000
+        && d.createdBy is string && d.createdAt is timestamp && d.updatedBy is string && d.updatedAt is timestamp;
+    }
+    function validTheoryStatus(v) { return v in ["draft","compiling","review","approved","active","archived","error"]; }
+    function validTheoryConfig(c) {
+      return c is map && c.keys().hasOnly(["schemaVersion","platform","name","description","campaignRules","creativeRequirements","validationRules","questionPolicy","testingRules","recommendationRules","metadata"]) && c.schemaVersion == 1 && c.platform is string && c.name is string && c.name.size() > 0 && c.name.size() <= 120 && c.description is string
+        && c.campaignRules is list && c.campaignRules.size() <= 80 && c.creativeRequirements is list && c.creativeRequirements.size() <= 80 && c.validationRules is list && c.validationRules.size() <= 80 && c.questionPolicy is map && c.testingRules is list && c.testingRules.size() <= 80 && c.recommendationRules is list && c.recommendationRules.size() <= 80 && c.metadata is map;
+    }
+    function validTheoryParent(d) {
+      return d.keys().hasOnly(["schemaVersion","name","description","status","latestVersion","latestVersionId","activeVersion","activeVersionId","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt"]) && d.schemaVersion == 1 && d.name is string && d.name.size() > 0 && d.name.size() <= 120 && d.description is string && validTheoryStatus(d.status) && d.latestVersion is int && d.latestVersion >= 1 && d.latestVersionId is string && (d.activeVersion == null || (d.activeVersion is int && d.activeVersion >= 1)) && (d.activeVersionId == null || d.activeVersionId is string) && d.createdBy is string && d.createdAt is timestamp && d.updatedBy is string && d.updatedAt is timestamp;
+    }
+    function validSourceMeta(m) { return m is map && m.keys().hasOnly(["sourceType","sourceName","sourceHash","sourceSize","sourceCharacterCount"]) && m.sourceType in ["text","markdown","pdf","editor"] && m.sourceName is string && (m.sourceHash == null || m.sourceHash is string) && (m.sourceSize == null || (m.sourceSize is int && m.sourceSize >= 0 && m.sourceSize <= 3000000)) && m.sourceCharacterCount is int && m.sourceCharacterCount > 0 && m.sourceCharacterCount <= 60000; }
+    function validCompilerMeta(m) { return m == null || (m is map && m.keys().hasOnly(["provider","operation","model","responseId","inputTokens","outputTokens","totalTokens","actualCostUsd","compilerVersion"]) && m.provider == "openai" && m.operation == "theory_compile" && m.model is string && m.inputTokens is int && m.inputTokens >= 0 && m.outputTokens is int && m.outputTokens >= 0 && m.totalTokens is int && m.totalTokens >= 0 && (m.actualCostUsd == null || (m.actualCostUsd is number && m.actualCostUsd >= 0))); }
+    function validTheoryVersion(d,theoryId) {
+      return d.keys().hasOnly(["schemaVersion","theoryId","version","status","config","sourceText","sourceMetadata","compilerMetadata","compileError","derivedFromVersionId","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt","approvedBy","approvedByName","approvedAt","activatedBy","activatedByName","activatedAt"]) && d.schemaVersion == 1 && d.theoryId == theoryId && d.version is int && d.version >= 1 && validTheoryStatus(d.status) && (d.config == null || validTheoryConfig(d.config)) && d.sourceText is string && d.sourceText.size() > 0 && d.sourceText.size() <= 60000 && validSourceMeta(d.sourceMetadata) && validCompilerMeta(d.compilerMetadata) && d.createdBy is string && d.createdAt is timestamp && d.updatedBy is string && d.updatedAt is timestamp;
+    }
+    function theoryTransition(a,b) { return (a == "draft" && b in ["draft","compiling"]) || (a == "compiling" && b in ["review","error"]) || (a == "review" && b in ["review","compiling","approved"]) || (a == "error" && b in ["draft","compiling"]) || (a == "approved" && b == "active") || (a == "active" && b == "archived") || (a == "archived" && b == "active"); }
+    function validAiUsage(d) { return d.keys().hasOnly(["schemaVersion","operation","theoryId","theoryVersionId","userId","userName","model","inputTokens","outputTokens","totalTokens","actualCostUsd","success","errorCode","responseId","createdAt"]) && d.schemaVersion == 1 && d.operation == "theory_compile" && d.userId == request.auth.uid && d.model is string && d.inputTokens is int && d.inputTokens >= 0 && d.outputTokens is int && d.outputTokens >= 0 && d.totalTokens is int && d.totalTokens >= 0 && (d.actualCostUsd == null || (d.actualCostUsd is number && d.actualCostUsd >= 0)) && d.success is bool && d.createdAt is timestamp; }
+
     function validMetaAdsStatus(value) {
       return value in [
         "draft", "planning", "creative", "validation", "rendering", "ready",
@@ -704,6 +744,28 @@ service cloud.firestore {
       allow update: if canModule("marketing", "edit") && logicalMutation();
       allow delete: if false;
     }
+    match /marketingKnowledge/{documentId} {
+      allow get: if documentId == "businessContext" && metaAdsCan("metaAdsView"); allow list: if false;
+      allow create: if documentId == "businessContext" && metaAdsCan("metaAdsManageKnowledge") && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedBy == request.auth.uid && validBusinessContext(request.resource.data);
+      allow update: if documentId == "businessContext" && metaAdsCan("metaAdsManageKnowledge") && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedBy == request.auth.uid && validBusinessContext(request.resource.data); allow delete: if false;
+    }
+    match /marketingProductProfiles/{productId} {
+      allow get: if metaAdsCan("metaAdsView"); allow list: if false;
+      allow create: if metaAdsCan("metaAdsManageKnowledge") && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedBy == request.auth.uid && validProductMarketing(request.resource.data,productId);
+      allow update: if metaAdsCan("metaAdsManageKnowledge") && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.productId == resource.data.productId && request.resource.data.updatedBy == request.auth.uid && validProductMarketing(request.resource.data,productId); allow delete: if false;
+    }
+    match /metaAdTheories/{theoryId} {
+      allow get,list: if metaAdsCan("metaAdsView");
+      allow create: if metaAdsCan("metaAdsManageTheory") && request.resource.data.status == "draft" && request.resource.data.latestVersion == 1 && request.resource.data.activeVersion == null && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedBy == request.auth.uid && validTheoryParent(request.resource.data);
+      allow update: if metaAdsCan("metaAdsManageTheory") && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.schemaVersion == resource.data.schemaVersion && request.resource.data.name == resource.data.name && request.resource.data.description == resource.data.description && request.resource.data.latestVersion >= resource.data.latestVersion && request.resource.data.latestVersion <= resource.data.latestVersion + 1 && request.resource.data.updatedBy == request.auth.uid && validTheoryParent(request.resource.data); allow delete: if false;
+      match /versions/{versionId} {
+        allow get,list: if metaAdsCan("metaAdsView");
+        allow create: if metaAdsCan("metaAdsManageTheory") && request.resource.data.status == "draft" && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedBy == request.auth.uid && validTheoryVersion(request.resource.data,theoryId);
+        allow update: if metaAdsCan("metaAdsManageTheory") && request.resource.data.schemaVersion == resource.data.schemaVersion && request.resource.data.theoryId == resource.data.theoryId && request.resource.data.version == resource.data.version && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedBy == request.auth.uid && theoryTransition(resource.data.status,request.resource.data.status) && validTheoryVersion(request.resource.data,theoryId); allow delete: if false;
+      }
+    }
+    match /aiUsage/{usageId} { allow get,list: if metaAdsCan("metaAdsManageTheory"); allow create: if metaAdsCan("metaAdsManageTheory") && validAiUsage(request.resource.data); allow update,delete: if false; }
+
     match /metaCampaignProjects/{campaignId} {
       allow get, list: if metaAdsCan("metaAdsView");
       allow create: if metaAdsCreateProjectAllowed();
@@ -781,6 +843,8 @@ service cloud.firestore {
               || metaAdsCan("metaAdsCreateProject")
               || metaAdsCan("metaAdsEditProject")
               || metaAdsCan("metaAdsArchiveProject")
+              || metaAdsCan("metaAdsManageKnowledge")
+              || metaAdsCan("metaAdsManageTheory")
               || canModule("marketing", "edit")))
           || (("locationId" in request.resource.data)
             && allowedLocation(request.resource.data.locationId)));

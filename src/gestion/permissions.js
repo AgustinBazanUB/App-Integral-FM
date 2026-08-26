@@ -42,6 +42,8 @@ export const ACTIONS = [
   "metaAdsCreateProject",
   "metaAdsEditProject",
   "metaAdsArchiveProject",
+  "metaAdsManageKnowledge",
+  "metaAdsManageTheory",
 ];
 
 const everyAction = [...ACTIONS];
@@ -60,6 +62,8 @@ const metaAdsMarketingActions = [
   "metaAdsCreateProject",
   "metaAdsEditProject",
   "metaAdsArchiveProject",
+  "metaAdsManageKnowledge",
+  "metaAdsManageTheory",
 ];
 const sellerSalesActions = [
   "view",

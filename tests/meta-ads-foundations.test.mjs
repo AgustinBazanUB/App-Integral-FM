@@ -12,14 +12,16 @@ test("Marketing conserva WhatsApp y agrega acceso separado a Meta Ads", async ()
 });
 
 test("routing lazy incluye Meta Ads sin reemplazar WhatsApp", async () => {
-  const [app, preload] = await Promise.all([
+  const [app, preload, hub] = await Promise.all([
     read("src/gestion/ManagementApp.jsx"),
     read("src/gestion/routePreload.js"),
+    read("src/gestion/pages/MetaAdsHubPage.jsx"),
   ]);
   assert.match(app, /marketingMetaAds/);
   assert.match(app, /pathParts\[2\] === "meta-ads"/);
   assert.match(app, /WhatsAppCampaignsPage/);
-  assert.match(preload, /MetaAdsPage/);
+  assert.match(preload, /MetaAdsHubPage/);
+  assert.match(hub, /MetaAdsPage/);
   assert.match(preload, /WhatsAppCampaignsPage/);
 });
 
