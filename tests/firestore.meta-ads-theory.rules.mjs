@@ -1,0 +1,79 @@
+import test,{after,before}from"node:test";import{assertFails,assertSucceeds,initializeTestEnvironment}from"@firebase/rules-unit-testing";import{readFile}from"node:fs/promises";import{collection,doc,getDoc,getDocs,setDoc,updateDoc}from"firebase/firestore";let environment;const now=()=>new Date();
+const business=uid=>({schemaVersion:1,brandDescription:"Productores",positioning:"Venta directa",history:"",differentiators:["Origen"],channels:["Local"],characteristics:[],policies:[],promotions:[],brandArguments:[],createdBy:uid,createdByName:uid,createdAt:now(),updatedBy:uid,updatedByName:uid,updatedAt:now()});
+const config=(recommended=3,key="hook")=>({schemaVersion:1,platform:"meta_ads",name:"Metodología",description:"Prueba",campaignRules:[],creativeRequirements:[{key,label:key==="hook"?"Hooks":"Testimoniales",required:true,minCount:1,recommendedCount:recommended,maxCount:10,duration:{minSeconds:3,idealSeconds:4,maxSeconds:6},instructions:"Grabar piezas breves."}],validationRules:[],questionPolicy:{mode:"minimal",instructions:"",requiredFields:[]},testingRules:[],recommendationRules:[],metadata:{compilerNotes:""}});
+const parent=uid=>({schemaVersion:1,name:"Metodología de prueba",description:"",status:"draft",latestVersion:1,latestVersionId:"v1",activeVersion:null,activeVersionId:null,createdBy:uid,createdByName:uid,createdAt:now(),updatedBy:uid,updatedByName:uid,updatedAt:now()});
+const version=(uid,status="draft",number=1)=>({schemaVersion:1,theoryId:"theory-1",version:number,status,config:status==="draft"?null:config(),sourceText:"La campaña requiere hooks breves.",sourceMetadata:{sourceType:"text",sourceName:"Prueba",sourceHash:"abc123",sourceSize:100,sourceCharacterCount:100},compilerMetadata:status==="review"?{provider:"openai",operation:"theory_compile",model:"test",responseId:null,inputTokens:10,outputTokens:10,totalTokens:20,actualCostUsd:null,compilerVersion:"1"}:null,compileError:null,derivedFromVersionId:null,createdBy:uid,createdByName:uid,createdAt:now(),updatedBy:uid,updatedByName:uid,updatedAt:now(),approvedBy:null,approvedByName:null,approvedAt:null,activatedBy:null,activatedByName:null,activatedAt:null});
+before(async()=>{environment=await initializeTestEnvironment({projectId:"demo-flor-mia-theory",firestore:{rules:await readFile(new URL("../firestore.rules",import.meta.url),"utf8")}});await environment.withSecurityRulesDisabled(async context=>{const db=context.firestore();await Promise.all([setDoc(doc(db,"users","admin-theory"),{role:"admin",active:true,name:"Admin"}),setDoc(doc(db,"users","marketing-theory"),{role:"marketing_manager",active:true,name:"Marketing"}),setDoc(doc(db,"users","seller-theory"),{role:"seller",active:true,name:"Seller"}),setDoc(doc(db,"users","inactive-theory"),{role:"marketing_manager",active:false,name:"Inactive"}),setDoc(doc(db,"users","denied-theory"),{role:"marketing_manager",active:true,name:"Denied",permissionDeny:{marketing:["metaAdsManageTheory"]}}),setDoc(doc(db,"users","explicit-theory"),{role:"ecommerce_manager",active:true,name:"Explicit",permissions:{marketing:{metaAdsView:true,metaAdsManageKnowledge:true,metaAdsManageTheory:true}}}),setDoc(doc(db,"products","product-real"),{name:"Producto real",active:true})]);});});after(async()=>environment?.cleanup());
+test("Knowledge: marketing y permiso explícito escriben; seller e inactivo no",async()=>{const db=environment.authenticatedContext("marketing-theory").firestore(),ref=doc(db,"marketingKnowledge","businessContext");await assertSucceeds(setDoc(ref,business("marketing-theory")));await assertSucceeds(getDoc(ref));const explicit=environment.authenticatedContext("explicit-theory").firestore();await assertSucceeds(getDoc(doc(explicit,"marketingKnowledge","businessContext")));for(const uid of ["seller-theory","inactive-theory"]){const d=environment.authenticatedContext(uid).firestore();await assertFails(getDoc(doc(d,"marketingKnowledge","businessContext")));await assertFails(setDoc(doc(d,"marketingKnowledge","businessContext"),business(uid)));}});
+test("Knowledge: metadata referencia producto real y rechaza inexistente o campo extra",async()=>{const db=environment.authenticatedContext("marketing-theory").firestore();const valid={schemaVersion:1,productId:"product-real",benefits:["Sabor"],objections:[],differentiators:[],origin:"Mendoza",uses:[],arguments:[],marketingNotes:"",createdBy:"marketing-theory",createdByName:"Marketing",createdAt:now(),updatedBy:"marketing-theory",updatedByName:"Marketing",updatedAt:now()};await assertSucceeds(setDoc(doc(db,"marketingProductProfiles","product-real"),valid));await assertFails(setDoc(doc(db,"marketingProductProfiles","missing"),{...valid,productId:"missing"}));await assertFails(setDoc(doc(db,"marketingProductProfiles","other"),{...valid,token:"secret"}));});
+test("Theory: crea padre y draft v1; listado e historial legibles",async()=>{const db=environment.authenticatedContext("marketing-theory").firestore();await assertSucceeds(setDoc(doc(db,"metaAdTheories","theory-1"),parent("marketing-theory")));await assertSucceeds(setDoc(doc(db,"metaAdTheories","theory-1","versions","v1"),version("marketing-theory")));await assertSucceeds(getDocs(collection(db,"metaAdTheories")));await assertSucceeds(getDocs(collection(db,"metaAdTheories","theory-1","versions")));});
+test("Theory: seller, inactivo y permissionDeny no gestionan",async()=>{for(const uid of ["seller-theory","inactive-theory","denied-theory"]){const db=environment.authenticatedContext(uid).firestore();await assertFails(setDoc(doc(db,"metaAdTheories",`${uid}-theory`),parent(uid)));}});
+test("Theory: versión, ownership y config poison se rechazan",async()=>{const db=environment.authenticatedContext("marketing-theory").firestore(),ref=doc(db,"metaAdTheories","theory-1","versions","v1");await assertFails(updateDoc(ref,{version:2,updatedBy:"marketing-theory",updatedAt:now()}));await assertFails(updateDoc(ref,{createdBy:"otro",updatedBy:"marketing-theory",updatedAt:now()}));await assertSucceeds(updateDoc(ref,{status:"compiling",updatedBy:"marketing-theory",updatedByName:"Marketing",updatedAt:now()}));await assertFails(updateDoc(ref,{status:"review",config:{...config(),schemaVersion:99},updatedBy:"marketing-theory",updatedByName:"Marketing",updatedAt:now()}));});
+test("Theory: review → approved → active y activa queda inmutable",async()=>{const db=environment.authenticatedContext("marketing-theory").firestore(),ref=doc(db,"metaAdTheories","theory-1","versions","v1");await assertSucceeds(updateDoc(ref,{status:"review",config:config(),compilerMetadata:{provider:"openai",operation:"theory_compile",model:"test",responseId:null,inputTokens:10,outputTokens:10,totalTokens:20,actualCostUsd:null,compilerVersion:"1"},compileError:null,updatedBy:"marketing-theory",updatedByName:"Marketing",updatedAt:now()}));await assertSucceeds(updateDoc(ref,{status:"approved",approvedBy:"marketing-theory",approvedByName:"Marketing",approvedAt:now(),updatedBy:"marketing-theory",updatedByName:"Marketing",updatedAt:now()}));await assertSucceeds(updateDoc(ref,{status:"active",activatedBy:"marketing-theory",activatedByName:"Marketing",activatedAt:now(),updatedBy:"marketing-theory",updatedByName:"Marketing",updatedAt:now()}));await assertFails(updateDoc(ref,{sourceText:"alterado",updatedBy:"marketing-theory",updatedByName:"Marketing",updatedAt:now()}));});
+test("Theory: nueva versión draft puede cambiar 3→6 y categoría dinámica sin tocar v1",async()=>{const db=environment.authenticatedContext("marketing-theory").firestore(),v2={...version("marketing-theory","draft",2),config:config(6,"testimonial"),derivedFromVersionId:"v1"};await assertSucceeds(setDoc(doc(db,"metaAdTheories","theory-1","versions","v2"),v2));const v1=await getDoc(doc(db,"metaAdTheories","theory-1","versions","v1"));assert.equal(v1.data().version,1);});
+test("AIUsage registra tokens propios y es inmutable",async()=>{const db=environment.authenticatedContext("marketing-theory").firestore(),ref=doc(db,"aiUsage","usage-1");await assertSucceeds(setDoc(ref,{schemaVersion:1,operation:"theory_compile",theoryId:"theory-1",theoryVersionId:"v1",userId:"marketing-theory",userName:"Marketing",model:"gpt-test",inputTokens:10,outputTokens:20,totalTokens:30,actualCostUsd:null,success:true,errorCode:null,responseId:"resp-test",createdAt:now()}));await assertFails(updateDoc(ref,{totalTokens:999}));});
+
+
+test("Theory Rules rechazan cantidades, duraciones y claves anidadas inválidas", async () => {
+  const db = environment.authenticatedContext("marketing-theory").firestore();
+  const theoryId = "theory-invalid-nested";
+  await assertSucceeds(setDoc(doc(db, "metaAdTheories", theoryId), {
+    ...parent("marketing-theory"),
+    name: "Nested invalid",
+  }));
+  const ref = doc(db, "metaAdTheories", theoryId, "versions", "v1");
+  await assertSucceeds(setDoc(ref, {
+    ...version("marketing-theory"),
+    theoryId,
+  }));
+  await assertSucceeds(updateDoc(ref, {
+    status: "compiling",
+    updatedBy: "marketing-theory",
+    updatedByName: "Marketing",
+    updatedAt: now(),
+  }));
+  const compilerMetadata = {
+    provider: "openai",
+    operation: "theory_compile",
+    model: "test",
+    responseId: null,
+    inputTokens: 1,
+    outputTokens: 1,
+    totalTokens: 2,
+    actualCostUsd: null,
+    compilerVersion: "1",
+  };
+  const negative = config();
+  negative.creativeRequirements[0].minCount = -1;
+  await assertFails(updateDoc(ref, {
+    status: "review",
+    config: negative,
+    compilerMetadata,
+    compileError: null,
+    updatedBy: "marketing-theory",
+    updatedByName: "Marketing",
+    updatedAt: now(),
+  }));
+  const badDuration = config();
+  badDuration.creativeRequirements[0].duration = { minSeconds: 7, idealSeconds: 5, maxSeconds: 4 };
+  await assertFails(updateDoc(ref, {
+    status: "review",
+    config: badDuration,
+    compilerMetadata,
+    compileError: null,
+    updatedBy: "marketing-theory",
+    updatedByName: "Marketing",
+    updatedAt: now(),
+  }));
+  const poisoned = config();
+  poisoned.creativeRequirements[0].html = "<script>";
+  await assertFails(updateDoc(ref, {
+    status: "review",
+    config: poisoned,
+    compilerMetadata,
+    compileError: null,
+    updatedBy: "marketing-theory",
+    updatedByName: "Marketing",
+    updatedAt: now(),
+  }));
+});
