@@ -100,6 +100,8 @@ Los permisos explícitos continúan funcionando mediante el mecanismo actual de 
 
 Estas Rules fueron validadas con Emulator y desplegadas de forma controlada el 26 de agosto de 2026 exclusivamente al proyecto `app-integral-fm`, después de confirmar que `npm test`, Rules Emulator y build estaban en verde. El CLI confirmó `Deploy complete!` y luego se repitieron Rules Emulator y `npm test` con resultado exitoso. No se desplegaron Rules a `fm-stock-y-venta`.
 
+La ejecución posterior confirmó 30/30 tests de Rules y 180/180 tests de aplicación. El deploy utilizó el service account ya configurado en GitHub Secrets para `app-integral-fm`.
+
 ## Auditoría
 
 Crear, editar y archivar CampaignProjects escribe eventos en `auditLogs` con `moduleId = "marketing"` y `entityType = "metaCampaignProject"`.
