@@ -1,0 +1,29 @@
+name: Stage 3 bootstrap
+on:
+  push:
+    branches: [feature/meta-ads-theory-engine]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: contains(github.event.head_commit.message, '[stage3-bootstrap]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/meta-ads-theory-engine
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Expand Stage 3 payload
+        run: base64 --decode stage3-payload.b64 | tar -xz
+      - run: node scripts/apply-stage3-existing-files.mjs
+      - name: Remove bootstrap files
+        run: rm stage3-payload.b64 scripts/apply-stage3-existing-files.mjs .github/workflows/stage3-bootstrap.yml
+      - name: Commit patched Stage 3
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(meta-ads): implement knowledge base and theory engine"
+          git push origin HEAD:feature/meta-ads-theory-engine
