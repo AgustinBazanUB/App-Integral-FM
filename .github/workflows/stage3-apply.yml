@@ -1,0 +1,53 @@
+name: Stage 3 apply and verify
+on:
+  push:
+    branches: [feature/meta-ads-theory-engine]
+permissions:
+  contents: write
+jobs:
+  apply-verify:
+    if: contains(github.event.head_commit.message, '[stage3-apply]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/meta-ads-theory-engine
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply additive Stage 3 patches
+        run: node scripts/apply-stage3-patches.mjs
+      - name: Fix Theory review flow
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/gestion/pages/MetaAdsTheoriesView.jsx')
+          s=p.read_text()
+          old='const approve=async()=>{setBusy(true);try{const config=parseJson();if(!config)throw new Error("TheoryConfig inválido.");if(JSON.stringify(config)!==JSON.stringify(version.config)){await saveTheoryVersion(profile,theory,version,{sourceText,config,sourceType:version.sourceMetadata?.sourceType||"editor",sourceName:version.sourceMetadata?.sourceName||"Editor interno"});version=await getTheoryVersion(profile,theory.id,version.id);}await approveTheoryVersion(profile,theory,version);setMessage("Versión aprobada. La activación sigue siendo una acción separada.");await reload(version.id);}catch(error){setMessage(theoryFriendlyError(error));}finally{setBusy(false);}};'
+          new='const approve=async()=>{setBusy(true);try{const config=parseJson();if(!config)throw new Error("TheoryConfig inválido.");let current=version;if(JSON.stringify(config)!==JSON.stringify(version.config)){await saveTheoryVersion(profile,theory,version,{sourceText,config,sourceType:version.sourceMetadata?.sourceType||"editor",sourceName:version.sourceMetadata?.sourceName||"Editor interno"});current=await getTheoryVersion(profile,theory.id,version.id);}await approveTheoryVersion(profile,theory,current);setMessage("Versión aprobada. La activación sigue siendo una acción separada.");await reload(current.id);}catch(error){setMessage(theoryFriendlyError(error));}finally{setBusy(false);}};'
+          if old not in s: raise SystemExit('approve flow pattern not found')
+          p.write_text(s.replace(old,new))
+          PY
+      - name: Install dependencies
+        run: npm ci
+      - name: Application and domain tests
+        run: npm test
+      - name: Firestore Rules Emulator tests
+        run: npx firebase-tools@14.12.0 emulators:exec --only firestore --project demo-flor-mia-stage3 "npm run test:rules"
+      - name: Production build
+        run: npm run build
+      - name: Remove temporary implementation artifacts
+        run: |
+          rm -f stage3-payload.b64 stage3-payload-00.b64
+          rm -f scripts/apply-stage3-patches.mjs
+          rm -f .github/workflows/stage3-bootstrap.yml
+          rm -f .github/workflows/stage3-apply.yml
+      - name: Commit verified Stage 3 implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(meta-ads): integrate knowledge base and theory engine"
+          git push origin HEAD:feature/meta-ads-theory-engine
+          git push origin --delete tmp-noop tmp-stage3-safe || true
