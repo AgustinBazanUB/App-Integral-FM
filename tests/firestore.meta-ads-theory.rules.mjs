@@ -12,3 +12,68 @@ test("Theory: versión, ownership y config poison se rechazan",async()=>{const d
 test("Theory: review → approved → active y activa queda inmutable",async()=>{const db=environment.authenticatedContext("marketing-theory").firestore(),ref=doc(db,"metaAdTheories","theory-1","versions","v1");await assertSucceeds(updateDoc(ref,{status:"review",config:config(),compilerMetadata:{provider:"openai",operation:"theory_compile",model:"test",responseId:null,inputTokens:10,outputTokens:10,totalTokens:20,actualCostUsd:null,compilerVersion:"1"},compileError:null,updatedBy:"marketing-theory",updatedByName:"Marketing",updatedAt:now()}));await assertSucceeds(updateDoc(ref,{status:"approved",approvedBy:"marketing-theory",approvedByName:"Marketing",approvedAt:now(),updatedBy:"marketing-theory",updatedByName:"Marketing",updatedAt:now()}));await assertSucceeds(updateDoc(ref,{status:"active",activatedBy:"marketing-theory",activatedByName:"Marketing",activatedAt:now(),updatedBy:"marketing-theory",updatedByName:"Marketing",updatedAt:now()}));await assertFails(updateDoc(ref,{sourceText:"alterado",updatedBy:"marketing-theory",updatedByName:"Marketing",updatedAt:now()}));});
 test("Theory: nueva versión draft puede cambiar 3→6 y categoría dinámica sin tocar v1",async()=>{const db=environment.authenticatedContext("marketing-theory").firestore(),v2={...version("marketing-theory","draft",2),config:config(6,"testimonial"),derivedFromVersionId:"v1"};await assertSucceeds(setDoc(doc(db,"metaAdTheories","theory-1","versions","v2"),v2));const v1=await getDoc(doc(db,"metaAdTheories","theory-1","versions","v1"));assert.equal(v1.data().version,1);});
 test("AIUsage registra tokens propios y es inmutable",async()=>{const db=environment.authenticatedContext("marketing-theory").firestore(),ref=doc(db,"aiUsage","usage-1");await assertSucceeds(setDoc(ref,{schemaVersion:1,operation:"theory_compile",theoryId:"theory-1",theoryVersionId:"v1",userId:"marketing-theory",userName:"Marketing",model:"gpt-test",inputTokens:10,outputTokens:20,totalTokens:30,actualCostUsd:null,success:true,errorCode:null,responseId:"resp-test",createdAt:now()}));await assertFails(updateDoc(ref,{totalTokens:999}));});
+
+
+test("Theory Rules rechazan cantidades, duraciones y claves anidadas inválidas", async () => {
+  const db = environment.authenticatedContext("marketing-theory").firestore();
+  const theoryId = "theory-invalid-nested";
+  await assertSucceeds(setDoc(doc(db, "metaAdTheories", theoryId), {
+    ...parent("marketing-theory"),
+    name: "Nested invalid",
+  }));
+  const ref = doc(db, "metaAdTheories", theoryId, "versions", "v1");
+  await assertSucceeds(setDoc(ref, {
+    ...version("marketing-theory"),
+    theoryId,
+  }));
+  await assertSucceeds(updateDoc(ref, {
+    status: "compiling",
+    updatedBy: "marketing-theory",
+    updatedByName: "Marketing",
+    updatedAt: now(),
+  }));
+  const compilerMetadata = {
+    provider: "openai",
+    operation: "theory_compile",
+    model: "test",
+    responseId: null,
+    inputTokens: 1,
+    outputTokens: 1,
+    totalTokens: 2,
+    actualCostUsd: null,
+    compilerVersion: "1",
+  };
+  const negative = config();
+  negative.creativeRequirements[0].minCount = -1;
+  await assertFails(updateDoc(ref, {
+    status: "review",
+    config: negative,
+    compilerMetadata,
+    compileError: null,
+    updatedBy: "marketing-theory",
+    updatedByName: "Marketing",
+    updatedAt: now(),
+  }));
+  const badDuration = config();
+  badDuration.creativeRequirements[0].duration = { minSeconds: 7, idealSeconds: 5, maxSeconds: 4 };
+  await assertFails(updateDoc(ref, {
+    status: "review",
+    config: badDuration,
+    compilerMetadata,
+    compileError: null,
+    updatedBy: "marketing-theory",
+    updatedByName: "Marketing",
+    updatedAt: now(),
+  }));
+  const poisoned = config();
+  poisoned.creativeRequirements[0].html = "<script>";
+  await assertFails(updateDoc(ref, {
+    status: "review",
+    config: poisoned,
+    compilerMetadata,
+    compileError: null,
+    updatedBy: "marketing-theory",
+    updatedByName: "Marketing",
+    updatedAt: now(),
+  }));
+});
