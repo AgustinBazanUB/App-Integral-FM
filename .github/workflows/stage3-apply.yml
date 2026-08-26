@@ -16,14 +16,26 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Prepare deterministic patches
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/gestion/permissions.js'); s=p.read_text()
+          old='  "metaAdsArchiveProject",\n];'
+          new='  "metaAdsArchiveProject",\n  "metaAdsManageKnowledge",\n  "metaAdsManageTheory",\n];'
+          if s.count(old)!=2: raise SystemExit(f'permissions patterns: {s.count(old)}')
+          s=s.replace(old,new,1).replace(old,new,1); p.write_text(s)
+          h=Path('scripts/apply-stage3-patches.mjs'); lines=h.read_text().splitlines()
+          lines=[line for line in lines if not line.startswith('await patch("src/gestion/permissions.js"')]
+          h.write_text('\n'.join(lines)+'\n')
+          PY
       - name: Apply additive Stage 3 patches
         run: node scripts/apply-stage3-patches.mjs
       - name: Fix Theory review flow
         run: |
           python - <<'PY'
           from pathlib import Path
-          p=Path('src/gestion/pages/MetaAdsTheoriesView.jsx')
-          s=p.read_text()
+          p=Path('src/gestion/pages/MetaAdsTheoriesView.jsx'); s=p.read_text()
           old='const approve=async()=>{setBusy(true);try{const config=parseJson();if(!config)throw new Error("TheoryConfig inválido.");if(JSON.stringify(config)!==JSON.stringify(version.config)){await saveTheoryVersion(profile,theory,version,{sourceText,config,sourceType:version.sourceMetadata?.sourceType||"editor",sourceName:version.sourceMetadata?.sourceName||"Editor interno"});version=await getTheoryVersion(profile,theory.id,version.id);}await approveTheoryVersion(profile,theory,version);setMessage("Versión aprobada. La activación sigue siendo una acción separada.");await reload(version.id);}catch(error){setMessage(theoryFriendlyError(error));}finally{setBusy(false);}};'
           new='const approve=async()=>{setBusy(true);try{const config=parseJson();if(!config)throw new Error("TheoryConfig inválido.");let current=version;if(JSON.stringify(config)!==JSON.stringify(version.config)){await saveTheoryVersion(profile,theory,version,{sourceText,config,sourceType:version.sourceMetadata?.sourceType||"editor",sourceName:version.sourceMetadata?.sourceName||"Editor interno"});current=await getTheoryVersion(profile,theory.id,version.id);}await approveTheoryVersion(profile,theory,current);setMessage("Versión aprobada. La activación sigue siendo una acción separada.");await reload(current.id);}catch(error){setMessage(theoryFriendlyError(error));}finally{setBusy(false);}};'
           if old not in s: raise SystemExit('approve flow pattern not found')
