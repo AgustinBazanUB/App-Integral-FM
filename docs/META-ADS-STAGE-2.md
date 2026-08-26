@@ -16,7 +16,7 @@ Se usa una colección específica:
 
 `metaCampaignProjects/{campaignId}`
 
-Se descartó reutilizar `campaigns` en esta etapa porque esa colección es consumida por `GenericModulePage` con un contrato genérico. Mezclar CampaignProjects de Meta con registros genéricos de Marketing obligaría a discriminar dos esquemas y reglas diferentes dentro de la misma colección y haría que los proyectos Meta aparezcan en consumidores existentes que no fueron diseññados para ellos.
+Se descartó reutilizar `campaigns` en esta etapa porque esa colección es consumida por `GenericModulePage` con un contrato genérico. Mezclar CampaignProjects de Meta con registros genéricos de Marketing obligaría a discriminar dos esquemas y reglas diferentes dentro de la misma colección y haría que los proyectos Meta aparezcan en consumidores existentes que no fueron diseñados para ellos.
 
 La colección separada mantiene el contrato estricto, evita contaminación de Marketing actual y no agrega costo relevante en Spark.
 
@@ -98,7 +98,7 @@ Los permisos explícitos continúan funcionando mediante el mecanismo actual de 
 - prohíben delete físico;
 - rechazan campos desconocidos, incluyendo cualquier secreto/token.
 
-Estas Rules están versionadas en la rama y testeadas con Emulator. **No deben desplegarse a producción automáticamente desde este PR.**
+Estas Rules fueron validadas con Emulator y desplegadas de forma controlada el 26 de agosto de 2026 exclusivamente al proyecto `app-integral-fm`, después de confirmar que `npm test`, Rules Emulator y build estaban en verde. El CLI confirmó `Deploy complete!` y luego se repitieron Rules Emulator y `npm test` con resultado exitoso. No se desplegaron Rules a `fm-stock-y-venta`.
 
 ## Auditoría
 
