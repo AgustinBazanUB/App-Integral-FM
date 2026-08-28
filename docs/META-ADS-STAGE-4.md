@@ -67,7 +67,7 @@ Tipos soportados:
 
 La salida de OpenAI usa Structured Outputs y después vuelve a validarse en `validateQuestions`. Las keys generadas deben pertenecer a las dimensiones faltantes permitidas.
 
-Las respuestas pasan por `validateAnswers` antes de persistirse o generar el plan.
+Las respuestas pasan por `validateAnswers` antes de persistirse o generar el plan. Las preguntas booleanas y numéricas empiezan sin respuesta (`null`), para no transformar un dato desconocido en `No` o `0` sin intervención del usuario.
 
 ## CampaignPlan
 
@@ -222,17 +222,53 @@ Etapa 4 no requiere un índice compuesto nuevo.
 
 Las lecturas agregadas usan documentos directos, subcolecciones por campaña y el orden simple por `revision`. `firestore.indexes.json` no se modifica por esta etapa.
 
-## Pruebas
+## Pruebas y publicación de Rules
 
-La barrera de integración previa al cierre alcanzó:
+Barrera final limpia antes de publicar:
 
-- `npm test`: 212/212 PASS;
-- Firestore Rules Emulator: 45/45 PASS;
-- `npm run build`: PASS.
+- `npm test`: **213/213 PASS**;
+- Firestore Rules Emulator: **45/45 PASS**;
+- `npm run build`: **PASS**;
+- `.firebaserc`: default **`app-integral-fm`**;
+- `firestore.indexes.json`: sin cambios respecto de Etapa 3.
 
-Además se verifican regresiones de Etapas 2/3 y módulos existentes, incluido WhatsApp.
+Las Rules se publicaron de forma controlada exclusivamente con `--only firestore:rules --project app-integral-fm`. No se desplegaron Hosting ni índices y no se tocó el proyecto legado `fm-stock-y-venta`.
 
-Antes del checkpoint final se vuelve a ejecutar una suite limpia después de los ajustes/documentación finales y, si las Rules permanecen verdes, se publican exclusivamente en `app-integral-fm` y se repiten los tests.
+Después de publicar se repitieron:
+
+- Firestore Rules Emulator: **45/45 PASS**;
+- `npm test`: **213/213 PASS**.
+
+El CI permanente del repositorio también pasó instalación, tests, Rules Emulator y build sobre el stack completo Etapas 2–4 mediante el PR auxiliar de Preview.
+
+## Deploy Preview y smoke HTTP
+
+PR real de Etapa 4: `#13`, base `feature/meta-ads-theory-engine`.
+
+PR auxiliar en draft, sólo para CI/Preview: `#14`, base `main`, marcado explícitamente **NO MERGE**.
+
+Deploy Preview exacto:
+
+`https://deploy-preview-14--appintegralflormia.netlify.app`
+
+Smoke HTTP ejecutado desde GitHub Actions:
+
+- `/`: HTTP 200;
+- `/gestion/marketing/meta-ads`: HTTP 200;
+- `/.netlify/functions/campaign-planner?health=1`: HTTP 200;
+- POST con operación real `generateQuestions` pero sin Firebase ID Token: HTTP 401, `code=unauthenticated`.
+
+Health observado en el Preview:
+
+- `configured: true`;
+- `questionModel: gpt-5.6-luna`;
+- `planModel: gpt-5.6-luna`;
+- `pricingConfigured: false`;
+- precios por token: `null`.
+
+Esto confirma que `OPENAI_API_KEY` está presente en el contexto de Deploy Preview y que la función está desplegada. No demuestra que la cuenta de API tenga saldo/crédito disponible, porque el health no consume OpenAI y una generación real requiere una sesión Firebase autorizada y una campaña real en estado de planificación. Esa validación autenticada queda explícitamente pendiente en lugar de inventarse.
+
+El workflow temporal de smoke fue eliminado después de la verificación.
 
 ## Fuera de alcance
 
