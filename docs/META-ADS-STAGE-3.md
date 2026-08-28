@@ -148,3 +148,7 @@ Cuando esta etapa haya sido validada de extremo a extremo, Campaign Planner + Qu
 - una referencia inmutable `theoryId / theoryVersionId / theoryVersion` y su `TheoryConfig`.
 
 Las campañas históricas no reciben automáticamente una teoría nueva ni cambian retroactivamente de metodología.
+
+### Nota de continuidad desde Etapa 4
+
+La rama de Etapa 4 implementa el consumidor previsto en esta sección y está documentada en `docs/META-ADS-STAGE-4.md`. Campaign Planner fija `theoryId / theoryVersionId / theoryVersion` al comenzar y consume exactamente esa versión; no cambia una campaña existente cuando se activa una metodología posterior.
