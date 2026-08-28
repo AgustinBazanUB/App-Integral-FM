@@ -382,7 +382,8 @@ service cloud.firestore {
     function metaAdsRoleCan(action) {
       return profile().role == "marketing_manager" && action in [
         "metaAdsView", "metaAdsCreateProject", "metaAdsEditProject", "metaAdsArchiveProject",
-        "metaAdsManageKnowledge", "metaAdsManageTheory"
+        "metaAdsManageKnowledge", "metaAdsManageTheory",
+        "metaAdsPlanCampaign", "metaAdsApprovePlan"
       ];
     }
     function metaAdsCan(action) {
@@ -446,7 +447,21 @@ service cloud.firestore {
       return d.keys().hasOnly(["schemaVersion","theoryId","version","status","config","sourceText","sourceMetadata","compilerMetadata","compileError","derivedFromVersionId","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt","approvedBy","approvedByName","approvedAt","activatedBy","activatedByName","activatedAt"]) && d.schemaVersion == 1 && d.theoryId == theoryId && d.version is int && d.version >= 1 && validTheoryStatus(d.status) && (d.config == null || validTheoryConfig(d.config)) && d.sourceText is string && d.sourceText.size() > 0 && d.sourceText.size() <= 60000 && validSourceMeta(d.sourceMetadata) && validCompilerMeta(d.compilerMetadata) && d.createdBy is string && d.createdAt is timestamp && d.updatedBy is string && d.updatedAt is timestamp;
     }
     function theoryTransition(a,b) { return (a == "draft" && b in ["draft","compiling"]) || (a == "compiling" && b in ["review","error"]) || (a == "review" && b in ["review","compiling","approved"]) || (a == "error" && b in ["draft","compiling"]) || (a == "approved" && b == "active") || (a == "active" && b == "archived") || (a == "archived" && b == "active"); }
-    function validAiUsage(d) { return d.keys().hasOnly(["schemaVersion","operation","theoryId","theoryVersionId","userId","userName","model","inputTokens","outputTokens","totalTokens","actualCostUsd","success","errorCode","responseId","createdAt"]) && d.schemaVersion == 1 && d.operation == "theory_compile" && d.userId == request.auth.uid && d.model is string && d.inputTokens is int && d.inputTokens >= 0 && d.outputTokens is int && d.outputTokens >= 0 && d.totalTokens is int && d.totalTokens >= 0 && (d.actualCostUsd == null || (d.actualCostUsd is number && d.actualCostUsd >= 0)) && d.success is bool && d.createdAt is timestamp; }
+    function validAiUsage(d) {
+      let theoryOperation = d.operation == "theory_compile";
+      let campaignOperation = d.operation in ["campaign_questions", "campaign_plan"];
+      return d.keys().hasOnly(["schemaVersion","operation","theoryId","theoryVersionId","campaignId","userId","userName","model","inputTokens","outputTokens","totalTokens","actualCostUsd","success","errorCode","responseId","createdAt"])
+        && d.schemaVersion == 1 && (theoryOperation || campaignOperation) && d.userId == request.auth.uid
+        && d.model is string && d.inputTokens is int && d.inputTokens >= 0 && d.outputTokens is int && d.outputTokens >= 0
+        && d.totalTokens is int && d.totalTokens >= 0 && (d.actualCostUsd == null || (d.actualCostUsd is number && d.actualCostUsd >= 0))
+        && d.success is bool && d.createdAt is timestamp
+        && ((theoryOperation && d.theoryId is string && d.theoryVersionId is string)
+          || (campaignOperation && d.campaignId is string && d.campaignId.size() > 0 && d.campaignId.size() <= 128));
+    }
+    function aiUsageCanCreate() {
+      return (request.resource.data.operation == "theory_compile" && metaAdsCan("metaAdsManageTheory"))
+        || (request.resource.data.operation in ["campaign_questions", "campaign_plan"] && metaAdsCan("metaAdsPlanCampaign"));
+    }
 
     function validMetaAdsStatus(value) {
       return value in [
@@ -463,42 +478,171 @@ service cloud.firestore {
           && data.productNameSnapshot.size() > 0
           && data.productNameSnapshot.size() <= 180);
     }
+    function validMetaAdsPlanningFields(data) {
+      let fields = ["planningStatus","theoryId","theoryVersionId","theoryVersion","theoryNameSnapshot","latestPlanRevision","approvedPlanRevision","lastPlanningAt","lastPlanningBy"];
+      return !data.keys().hasAny(fields)
+        || (data.keys().hasAll(fields)
+          && data.planningStatus in ["context_ready","questions_ready","answers_ready","plan_ready","approved"]
+          && data.theoryId is string && data.theoryId.size() > 0 && data.theoryId.size() <= 128
+          && data.theoryVersionId is string && data.theoryVersionId.size() > 0 && data.theoryVersionId.size() <= 128
+          && data.theoryVersion is int && data.theoryVersion >= 1
+          && data.theoryNameSnapshot is string && data.theoryNameSnapshot.size() > 0 && data.theoryNameSnapshot.size() <= 120
+          && data.latestPlanRevision is int && data.latestPlanRevision >= 0
+          && (data.approvedPlanRevision == null || (data.approvedPlanRevision is int && data.approvedPlanRevision >= 1 && data.approvedPlanRevision <= data.latestPlanRevision))
+          && data.lastPlanningAt is timestamp && data.lastPlanningBy is string && data.lastPlanningBy.size() > 0);
+    }
     function validMetaAdsCampaignProject(data) {
-      return data.keys().hasOnly([
-          "name", "channel", "status", "schemaVersion", "productId", "productNameSnapshot",
-          "archived", "createdBy", "createdByName", "createdAt", "updatedBy", "updatedByName",
-          "updatedAt", "archivedAt", "archivedBy", "archivedByName"
+      return data.keys().hasOnly(["name","channel","status","schemaVersion","productId","productNameSnapshot","archived","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt","archivedAt","archivedBy","archivedByName","planningStatus","theoryId","theoryVersionId","theoryVersion","theoryNameSnapshot","latestPlanRevision","approvedPlanRevision","lastPlanningAt","lastPlanningBy"])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 120 && data.channel == "meta_ads" && data.schemaVersion == 1
+        && validMetaAdsStatus(data.status) && data.archived is bool && data.archived == (data.status == "archived")
+        && validMetaAdsProduct(data) && validMetaAdsPlanningFields(data)
+        && data.createdBy is string && data.createdBy.size() > 0 && data.createdByName is string && data.createdByName.size() > 0 && data.createdAt is timestamp
+        && data.updatedBy is string && data.updatedBy.size() > 0 && data.updatedByName is string && data.updatedByName.size() > 0 && data.updatedAt is timestamp
+        && ((data.status == "archived" && ("archivedAt" in data) && data.archivedAt is timestamp && ("archivedBy" in data) && data.archivedBy is string && data.archivedBy.size() > 0 && ("archivedByName" in data) && data.archivedByName is string && data.archivedByName.size() > 0)
+          || (data.status != "archived" && !data.keys().hasAny(["archivedAt","archivedBy","archivedByName"])));
+    }
+    function metaAdsPlanningTheoryActive(data) {
+      let theoryPath = /databases/$(database)/documents/metaAdTheories/$(data.theoryId)/versions/$(data.theoryVersionId);
+      return exists(theoryPath) && get(theoryPath).data.status == "active" && get(theoryPath).data.version == data.theoryVersion;
+    }
+    function metaAdsPlanningIdentityStable() {
+      return request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.channel == resource.data.channel
+        && request.resource.data.schemaVersion == resource.data.schemaVersion;
+    }
+    function metaAdsPlanProjectAllowedCompact(changed) {
+      return metaAdsCan("metaAdsPlanCampaign")
+        && metaAdsPlanningIdentityStable()
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.archived == false
+        && validMetaAdsCampaignProject(request.resource.data)
+        && (resource.data.status == "draft"
+          ? (request.resource.data.status == "planning"
+            && request.resource.data.planningStatus == "context_ready"
+            && request.resource.data.latestPlanRevision == 0
+            && request.resource.data.approvedPlanRevision == null
+            && request.resource.data.lastPlanningBy == request.auth.uid
+            && metaAdsPlanningTheoryActive(request.resource.data)
+            && changed.hasOnly([
+              "status","planningStatus","theoryId","theoryVersionId","theoryVersion","theoryNameSnapshot",
+              "latestPlanRevision","approvedPlanRevision","lastPlanningAt","lastPlanningBy",
+              "updatedBy","updatedByName","updatedAt"
+            ]))
+          : (resource.data.status in ["planning","creative"]
+            && request.resource.data.status == resource.data.status
+            && request.resource.data.theoryId == resource.data.theoryId
+            && request.resource.data.theoryVersionId == resource.data.theoryVersionId
+            && request.resource.data.theoryVersion == resource.data.theoryVersion
+            && request.resource.data.theoryNameSnapshot == resource.data.theoryNameSnapshot
+            && request.resource.data.planningStatus in ["context_ready","questions_ready","answers_ready","plan_ready"]
+            && request.resource.data.latestPlanRevision >= resource.data.latestPlanRevision
+            && request.resource.data.latestPlanRevision <= resource.data.latestPlanRevision + 1
+            && request.resource.data.approvedPlanRevision == resource.data.approvedPlanRevision
+            && request.resource.data.lastPlanningBy == request.auth.uid
+            && changed.hasOnly([
+              "planningStatus","latestPlanRevision","lastPlanningAt","lastPlanningBy",
+              "updatedBy","updatedByName","updatedAt"
+            ])));
+    }
+    function metaAdsApproveProjectAllowedCompact(changed) {
+      return metaAdsCan("metaAdsApprovePlan")
+        && metaAdsPlanningIdentityStable()
+        && request.resource.data.updatedBy == request.auth.uid
+        && resource.data.status in ["planning","creative"]
+        && resource.data.planningStatus == "plan_ready"
+        && resource.data.latestPlanRevision >= 1
+        && request.resource.data.status == "creative"
+        && request.resource.data.archived == false
+        && request.resource.data.planningStatus == "approved"
+        && request.resource.data.theoryId == resource.data.theoryId
+        && request.resource.data.theoryVersionId == resource.data.theoryVersionId
+        && request.resource.data.theoryVersion == resource.data.theoryVersion
+        && request.resource.data.theoryNameSnapshot == resource.data.theoryNameSnapshot
+        && request.resource.data.latestPlanRevision == resource.data.latestPlanRevision
+        && request.resource.data.approvedPlanRevision is int
+        && request.resource.data.approvedPlanRevision >= 1
+        && request.resource.data.approvedPlanRevision <= request.resource.data.latestPlanRevision
+        && request.resource.data.lastPlanningBy == request.auth.uid
+        && changed.hasOnly([
+          "status","planningStatus","approvedPlanRevision","lastPlanningAt","lastPlanningBy",
+          "updatedBy","updatedByName","updatedAt"
         ])
-        && data.name is string
-        && data.name.size() > 0
-        && data.name.size() <= 120
-        && data.channel == "meta_ads"
-        && data.schemaVersion == 1
-        && validMetaAdsStatus(data.status)
-        && data.archived is bool
-        && data.archived == (data.status == "archived")
-        && validMetaAdsProduct(data)
-        && data.createdBy is string
-        && data.createdBy.size() > 0
-        && data.createdByName is string
-        && data.createdByName.size() > 0
-        && data.createdAt is timestamp
-        && data.updatedBy is string
-        && data.updatedBy.size() > 0
-        && data.updatedByName is string
-        && data.updatedByName.size() > 0
-        && data.updatedAt is timestamp
-        && ((data.status == "archived"
-            && ("archivedAt" in data)
-            && data.archivedAt is timestamp
-            && ("archivedBy" in data)
-            && data.archivedBy is string
-            && data.archivedBy.size() > 0
-            && ("archivedByName" in data)
-            && data.archivedByName is string
-            && data.archivedByName.size() > 0)
-          || (data.status != "archived"
-            && !data.keys().hasAny(["archivedAt", "archivedBy", "archivedByName"])));
+        && validMetaAdsCampaignProject(request.resource.data);
+    }
+    function metaAdsCampaignProjectUpdateAllowed() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let planningChange = changed.hasAny([
+        "planningStatus","theoryId","theoryVersionId","theoryVersion","theoryNameSnapshot",
+        "latestPlanRevision","approvedPlanRevision","lastPlanningAt","lastPlanningBy"
+      ]);
+      return planningChange
+        ? (request.resource.data.planningStatus == "approved"
+          ? metaAdsApproveProjectAllowedCompact(changed)
+          : metaAdsPlanProjectAllowedCompact(changed))
+        : (request.resource.data.status == "archived"
+          ? metaAdsArchiveProjectAllowed()
+          : metaAdsEditProjectAllowed());
+    }
+    function validPlanningStateStatus(value) { return value in ["context_ready","questions_ready","answers_ready","plan_ready","approved"]; }
+    function validPlanningState(data,campaignId) {
+      return data.keys().hasOnly(["schemaVersion","campaignId","status","theoryId","theoryVersionId","theoryVersion","questions","answers","latestPlanRevision","approvedPlanRevision","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt"])
+        && data.schemaVersion == 1 && data.campaignId == campaignId && validPlanningStateStatus(data.status)
+        && data.theoryId is string && data.theoryVersionId is string && data.theoryVersion is int && data.theoryVersion >= 1
+        && data.questions is list && data.questions.size() <= 6 && data.answers is map && data.latestPlanRevision is int && data.latestPlanRevision >= 0
+        && (data.approvedPlanRevision == null || (data.approvedPlanRevision is int && data.approvedPlanRevision >= 1 && data.approvedPlanRevision <= data.latestPlanRevision))
+        && data.createdBy is string && data.createdAt is timestamp && data.updatedBy is string && data.updatedAt is timestamp;
+    }
+    function planningStateUpdateAllowed(campaignId) {
+      let immutable = request.resource.data.campaignId == resource.data.campaignId
+        && request.resource.data.theoryId == resource.data.theoryId
+        && request.resource.data.theoryVersionId == resource.data.theoryVersionId
+        && request.resource.data.theoryVersion == resource.data.theoryVersion
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt;
+      return immutable
+        && request.resource.data.updatedBy == request.auth.uid
+        && validPlanningState(request.resource.data,campaignId)
+        && (request.resource.data.status == "approved"
+          ? (metaAdsCan("metaAdsApprovePlan")
+            && resource.data.status == "plan_ready"
+            && request.resource.data.approvedPlanRevision is int)
+          : (metaAdsCan("metaAdsPlanCampaign")
+            && request.resource.data.status in ["context_ready","questions_ready","answers_ready","plan_ready"]
+            && request.resource.data.approvedPlanRevision == resource.data.approvedPlanRevision));
+    }
+    function validCampaignPlanEnvelope(plan) {
+      return plan is map && plan.keys().hasAll(["schemaVersion","summary","strategy","concept","angle","commercialObjective","targetAudience","coreMessage","offer","cta","creativeDirection","creativePieces","testingPlan","assumptions","warnings"])
+        && plan.keys().hasOnly(["schemaVersion","summary","strategy","concept","angle","commercialObjective","targetAudience","coreMessage","offer","cta","creativeDirection","creativePieces","testingPlan","assumptions","warnings"])
+        && plan.schemaVersion == 1 && plan.summary is string && plan.strategy is string && plan.concept is string && plan.angle is string && plan.commercialObjective is string && plan.targetAudience is string && plan.coreMessage is string && plan.offer is string && plan.cta is string && plan.creativeDirection is string && plan.testingPlan is string
+        && plan.creativePieces is list && plan.creativePieces.size() <= 100 && plan.assumptions is list && plan.assumptions.size() <= 30 && plan.warnings is list && plan.warnings.size() <= 30;
+    }
+    function campaignPlanTheoryMatches(data,campaignId) {
+      let project = get(/databases/$(database)/documents/metaCampaignProjects/$(campaignId)).data;
+      return data.theoryId == project.theoryId && data.theoryVersionId == project.theoryVersionId && data.theoryVersion == project.theoryVersion;
+    }
+    function validCampaignPlanRecord(data,campaignId) {
+      return data.keys().hasOnly(["schemaVersion","campaignId","revision","status","theoryId","theoryVersionId","theoryVersion","plan","model","responseId","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt","approvedBy","approvedByName","approvedAt"])
+        && data.schemaVersion == 1 && data.campaignId == campaignId && data.revision is int && data.revision >= 1 && data.status in ["draft","approved"]
+        && data.theoryId is string && data.theoryVersionId is string && data.theoryVersion is int && data.theoryVersion >= 1 && validCampaignPlanEnvelope(data.plan)
+        && data.model is string && (data.responseId == null || data.responseId is string) && data.createdBy is string && data.createdAt is timestamp && data.updatedBy is string && data.updatedAt is timestamp
+        && ((data.status == "draft" && data.approvedBy == null && data.approvedByName == null && data.approvedAt == null) || (data.status == "approved" && data.approvedBy is string && data.approvedByName is string && data.approvedAt is timestamp));
+    }
+    function campaignPlanDraftUpdateAllowed(campaignId) {
+      return metaAdsCan("metaAdsPlanCampaign") && resource.data.status == "draft" && request.resource.data.status == "draft"
+        && request.resource.data.campaignId == resource.data.campaignId && request.resource.data.revision == resource.data.revision
+        && request.resource.data.theoryId == resource.data.theoryId && request.resource.data.theoryVersionId == resource.data.theoryVersionId && request.resource.data.theoryVersion == resource.data.theoryVersion
+        && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["plan","updatedBy","updatedByName","updatedAt"]) && validCampaignPlanRecord(request.resource.data,campaignId);
+    }
+    function campaignPlanApproveAllowed(campaignId) {
+      return metaAdsCan("metaAdsApprovePlan") && resource.data.status == "draft" && request.resource.data.status == "approved"
+        && request.resource.data.campaignId == resource.data.campaignId && request.resource.data.revision == resource.data.revision
+        && request.resource.data.theoryId == resource.data.theoryId && request.resource.data.theoryVersionId == resource.data.theoryVersionId && request.resource.data.theoryVersion == resource.data.theoryVersion
+        && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.approvedBy == request.auth.uid && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","plan","approvedBy","approvedByName","approvedAt","updatedBy","updatedByName","updatedAt"])
+        && validCampaignPlanRecord(request.resource.data,campaignId);
     }
     function metaAdsCreateProjectAllowed() {
       return metaAdsCan("metaAdsCreateProject")
@@ -800,13 +944,23 @@ service cloud.firestore {
         allow update: if metaAdsCan("metaAdsManageTheory") && request.resource.data.schemaVersion == resource.data.schemaVersion && request.resource.data.theoryId == resource.data.theoryId && request.resource.data.version == resource.data.version && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedBy == request.auth.uid && theoryTransition(resource.data.status,request.resource.data.status) && validTheoryVersion(request.resource.data,theoryId); allow delete: if false;
       }
     }
-    match /aiUsage/{usageId} { allow get,list: if metaAdsCan("metaAdsManageTheory"); allow create: if metaAdsCan("metaAdsManageTheory") && validAiUsage(request.resource.data); allow update,delete: if false; }
+    match /aiUsage/{usageId} { allow get,list: if metaAdsCan("metaAdsManageTheory") || metaAdsCan("metaAdsPlanCampaign"); allow create: if aiUsageCanCreate() && validAiUsage(request.resource.data); allow update,delete: if false; }
 
     match /metaCampaignProjects/{campaignId} {
       allow get, list: if metaAdsCan("metaAdsView");
       allow create: if metaAdsCreateProjectAllowed();
-      allow update: if metaAdsEditProjectAllowed() || metaAdsArchiveProjectAllowed();
+      allow update: if metaAdsCampaignProjectUpdateAllowed();
       allow delete: if false;
+      match /planning/{planningId} {
+        allow get: if planningId == "state" && metaAdsCan("metaAdsView"); allow list: if false;
+        allow create: if planningId == "state" && metaAdsCan("metaAdsPlanCampaign") && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedBy == request.auth.uid && campaignPlanTheoryMatches(request.resource.data,campaignId) && validPlanningState(request.resource.data,campaignId);
+        allow update: if planningId == "state" && planningStateUpdateAllowed(campaignId); allow delete: if false;
+      }
+      match /plans/{planId} {
+        allow get,list: if metaAdsCan("metaAdsView");
+        allow create: if metaAdsCan("metaAdsPlanCampaign") && request.resource.data.status == "draft" && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedBy == request.auth.uid && campaignPlanTheoryMatches(request.resource.data,campaignId) && validCampaignPlanRecord(request.resource.data,campaignId);
+        allow update: if request.resource.data.status == "approved" ? campaignPlanApproveAllowed(campaignId) : campaignPlanDraftUpdateAllowed(campaignId); allow delete: if false;
+      }
     }
     match /whatsappCampaigns/{campaignId} {
       allow get, list: if whatsappCanView();
@@ -881,6 +1035,8 @@ service cloud.firestore {
               || metaAdsCan("metaAdsArchiveProject")
               || metaAdsCan("metaAdsManageKnowledge")
               || metaAdsCan("metaAdsManageTheory")
+              || metaAdsCan("metaAdsPlanCampaign")
+              || metaAdsCan("metaAdsApprovePlan")
               || canModule("marketing", "edit")))
           || (("locationId" in request.resource.data)
             && allowedLocation(request.resource.data.locationId)));

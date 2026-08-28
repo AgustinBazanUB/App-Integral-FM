@@ -18,6 +18,7 @@ import "../../styles/meta-ads.css";
 import { useAuth } from "../AuthContext";
 import { formatDateTime } from "../formatters";
 import { useAsyncData } from "../hooks";
+import MetaAdsCampaignPlanningWorkspace from "./MetaAdsCampaignPlanningWorkspace";
 import {
   metaAdsStatusLabel,
   metaAdsStatusTone,
@@ -290,7 +291,7 @@ function MetaAdsCampaignDetail({ profile, campaignId }) {
       <PageHeader
         eyebrow="Marketing → Meta Ads"
         title={project.name}
-        description="CampaignProject interno de Flor Mía. Las fases de IA, Drive, render y publicación todavía no están conectadas."
+        description="CampaignProject interno de Flor Mía. La planificación guiada ya puede convertir contexto + metodología + tus respuestas en un plan de campaña."
         actions={<Link className="fm-button fm-button--secondary" to="/gestion/marketing/meta-ads">Volver a campañas</Link>}
       />
 
@@ -307,7 +308,7 @@ function MetaAdsCampaignDetail({ profile, campaignId }) {
         </dl>
       </Panel>
 
-      <Panel title="Edición" description={editable ? "En Etapa 2 sólo se editan nombre y producto mientras la campaña está en borrador." : "Este estado queda en modo lectura en Etapa 2."}>
+      <Panel title="Edición" description={editable ? "Podés editar nombre y producto mientras la campaña está en borrador." : "Una vez iniciada la planificación, los datos base quedan en modo lectura."}>
         <form onSubmit={handleSave}>
           <CampaignForm
             value={form}
@@ -324,7 +325,9 @@ function MetaAdsCampaignDetail({ profile, campaignId }) {
         </form>
       </Panel>
 
-      <Panel title="Proceso de campaña" description="La estructura queda preparada; ninguna fase futura se simula en esta etapa.">
+      <MetaAdsCampaignPlanningWorkspace profile={profile} campaign={project} onCampaignRefresh={projectResult.refresh} />
+
+      <Panel title="Siguientes etapas" description="Drive, validación, render y publicación continúan fuera de esta etapa.">
         <div className="fm-meta-ads-phases">
           {phases.map((phase, index) => (
             <article key={phase} className="fm-meta-ads-phase">

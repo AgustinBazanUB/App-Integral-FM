@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test tests/*.test.mjs",
-    "test:rules": "node --test tests/firestore.rules.mjs tests/firestore.whatsapp-release.rules.mjs tests/firestore.meta-ads.rules.mjs tests/firestore.meta-ads-theory.rules.mjs"
+    "test:rules": "node --test tests/firestore.rules.mjs tests/firestore.whatsapp-release.rules.mjs tests/firestore.meta-ads.rules.mjs tests/firestore.meta-ads-theory.rules.mjs tests/firestore.meta-ads-planner.rules.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.1.1",
