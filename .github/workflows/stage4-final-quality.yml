@@ -1,0 +1,48 @@
+name: Stage 4 final quality
+
+on:
+  push:
+    branches: ["feature/meta-ads-campaign-planner"]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: ${{ !contains(github.event.head_commit.message, '[stage4-final-quality]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/meta-ads-campaign-planner
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply final quality adjustments
+        run: python scripts/stage4-final-quality.py
+      - name: Verify Firebase target and no index changes
+        run: |
+          node -e "const c=require('./.firebaserc'); if(c.projects?.default!=='app-integral-fm') throw new Error('Unexpected Firebase default project: '+c.projects?.default)"
+          git diff origin/feature/meta-ads-theory-engine -- firestore.indexes.json --exit-code
+          if grep -R --line-number --exclude-dir=.git --exclude='stage4-final-quality.yml' 'fm-stock-y-venta' .firebaserc firebase.json firestore.rules package.json src netlify docs tests 2>/dev/null; then
+            echo 'Legacy Firebase project reference detected in Stage 4 runtime/config surface.' >&2
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm test
+      - run: npx firebase-tools@14.12.0 emulators:exec --only firestore --project demo-flor-mia-stage4-final "npm run test:rules"
+      - run: npm run build
+      - name: Remove temporary quality helpers
+        run: |
+          rm -f scripts/stage4-final-quality.py
+          rm -f .github/workflows/stage4-final-quality.yml
+      - name: Commit verified final quality
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(meta-ads): keep unanswered planner fields unknown [stage4-final-quality]"
+            git push origin HEAD:feature/meta-ads-campaign-planner
+          fi
