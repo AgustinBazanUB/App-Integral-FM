@@ -1,0 +1,96 @@
+name: Stage 4 preview smoke
+
+on:
+  push:
+    branches: ["feature/meta-ads-campaign-planner"]
+
+permissions:
+  contents: write
+
+jobs:
+  smoke:
+    if: ${{ !contains(github.event.head_commit.message, '[stage4-preview-smoke-done]') }}
+    runs-on: ubuntu-latest
+    env:
+      PREVIEW_BASE: https://deploy-preview-14--appintegralflormia.netlify.app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/meta-ads-campaign-planner
+      - name: Wait for Netlify preview and verify app shell
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            code=$(curl -L -sS -o /tmp/root.html -w '%{http_code}' "$PREVIEW_BASE/" || true)
+            if [ "$code" = "200" ] && grep -qi '<html' /tmp/root.html; then
+              echo "PREVIEW_ROOT_STATUS=200"
+              break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "Preview root never became ready; last HTTP status: $code" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          bytes=$(wc -c < /tmp/root.html)
+          echo "PREVIEW_ROOT_BYTES=$bytes"
+          test "$bytes" -gt 500
+
+      - name: Verify Meta Ads SPA route resolves
+        run: |
+          set -euo pipefail
+          code=$(curl -L -sS -o /tmp/meta.html -w '%{http_code}' "$PREVIEW_BASE/gestion/marketing/meta-ads")
+          echo "META_ADS_ROUTE_STATUS=$code"
+          test "$code" = "200"
+          grep -qi '<html' /tmp/meta.html
+
+      - name: Verify Campaign Planner health
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/health.json -w '%{http_code}' "$PREVIEW_BASE/.netlify/functions/campaign-planner?health=1")
+          echo "PLANNER_HEALTH_STATUS=$code"
+          cat /tmp/health.json
+          echo
+          test "$code" = "200"
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const h = JSON.parse(fs.readFileSync('/tmp/health.json','utf8'));
+          console.log('PLANNER_AVAILABLE=true');
+          console.log('OPENAI_CONFIGURED=' + String(h.configured === true));
+          console.log('QUESTION_MODEL=' + String(h.questionModel || ''));
+          console.log('PLAN_MODEL=' + String(h.planModel || ''));
+          console.log('PRICING_CONFIGURED=' + String(h.pricingConfigured === true));
+          if (typeof h.configured !== 'boolean') throw new Error('Health payload missing configured boolean');
+          NODE
+
+      - name: Verify unauthenticated POST is rejected before AI
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/unauth.json -w '%{http_code}' \
+            -X POST \
+            -H 'Content-Type: application/json' \
+            --data '{"operation":"questions","campaignId":"smoke-test","requestId":"stage4-smoke"}' \
+            "$PREVIEW_BASE/.netlify/functions/campaign-planner")
+          echo "UNAUTH_POST_STATUS=$code"
+          cat /tmp/unauth.json
+          echo
+          test "$code" = "401"
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const b = JSON.parse(fs.readFileSync('/tmp/unauth.json','utf8'));
+          if (b.code !== 'unauthenticated') throw new Error('Expected unauthenticated code');
+          console.log('AUTH_GUARD_CONFIRMED=true');
+          NODE
+
+      - name: Remove temporary smoke workflow
+        run: rm -f .github/workflows/stage4-preview-smoke.yml
+
+      - name: Commit smoke cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(meta-ads): confirm Stage 4 preview smoke [stage4-preview-smoke-done]"
+            git push origin HEAD:feature/meta-ads-campaign-planner
+          fi
