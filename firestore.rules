@@ -379,8 +379,15 @@ service cloud.firestore {
       let user = profile();
       return ("permissionAllow" in user) && ("marketing" in user.permissionAllow) && (user.permissionAllow.marketing is list) && action in user.permissionAllow.marketing;
     }
+    function metaAdsRoleCan(action) {
+      return profile().role == "marketing_manager" && action in [
+        "metaAdsView", "metaAdsCreateProject", "metaAdsEditProject", "metaAdsArchiveProject",
+        "metaAdsManageKnowledge", "metaAdsManageTheory"
+      ];
+    }
     function metaAdsCan(action) {
-      return activeUser() && !metaAdsDenied(action) && (adminRole() || metaAdsExplicit(action) || metaAdsAllowed(action) || rolePermission("marketing", action));
+      return activeUser() && !metaAdsDenied(action)
+        && (adminRole() || metaAdsExplicit(action) || metaAdsAllowed(action) || metaAdsRoleCan(action));
     }
 
     function validKnowledgeList(v) { return v is list && v.size() <= 50; }
@@ -397,122 +404,9 @@ service cloud.firestore {
         && d.createdBy is string && d.createdAt is timestamp && d.updatedBy is string && d.updatedAt is timestamp;
     }
     function validTheoryStatus(v) { return v in ["draft","compiling","review","approved","active","archived","error"]; }
-    function validDurationValue(v) {
-      return v == null || (v is number && v >= 0 && v <= 900);
-    }
-    function validTheoryDuration(d) {
-      return d is map
-        && d.keys().hasAll(["minSeconds", "idealSeconds", "maxSeconds"])
-        && d.keys().hasOnly(["minSeconds", "idealSeconds", "maxSeconds"])
-        && validDurationValue(d.minSeconds)
-        && validDurationValue(d.idealSeconds)
-        && validDurationValue(d.maxSeconds)
-        && (d.minSeconds == null || d.idealSeconds == null || d.minSeconds <= d.idealSeconds)
-        && (d.idealSeconds == null || d.maxSeconds == null || d.idealSeconds <= d.maxSeconds)
-        && (d.minSeconds == null || d.maxSeconds == null || d.minSeconds <= d.maxSeconds);
-    }
-    function validCreativeRequirement(r) {
-      return r is map
-        && r.keys().hasAll(["key", "label", "required", "minCount", "recommendedCount", "maxCount", "duration", "instructions"])
-        && r.keys().hasOnly(["key", "label", "required", "minCount", "recommendedCount", "maxCount", "duration", "instructions"])
-        && r.key is string && r.key.size() > 0 && r.key.size() <= 64
-        && r.label is string && r.label.size() > 0 && r.label.size() <= 160
-        && r.required is bool
-        && r.minCount is int && r.minCount >= 0 && r.minCount <= 100
-        && r.recommendedCount is int && r.recommendedCount >= 0 && r.recommendedCount <= 100
-        && r.maxCount is int && r.maxCount >= 0 && r.maxCount <= 100
-        && r.minCount <= r.recommendedCount && r.recommendedCount <= r.maxCount
-        && validTheoryDuration(r.duration)
-        && r.instructions is string && r.instructions.size() <= 4000;
-    }
-    function validCreativeRequirements(v) {
-      return v is list && v.size() <= 20
-        && (v.size() < 1 || validCreativeRequirement(v[0]))
-        && (v.size() < 2 || validCreativeRequirement(v[1]))
-        && (v.size() < 3 || validCreativeRequirement(v[2]))
-        && (v.size() < 4 || validCreativeRequirement(v[3]))
-        && (v.size() < 5 || validCreativeRequirement(v[4]))
-        && (v.size() < 6 || validCreativeRequirement(v[5]))
-        && (v.size() < 7 || validCreativeRequirement(v[6]))
-        && (v.size() < 8 || validCreativeRequirement(v[7]))
-        && (v.size() < 9 || validCreativeRequirement(v[8]))
-        && (v.size() < 10 || validCreativeRequirement(v[9]))
-        && (v.size() < 11 || validCreativeRequirement(v[10]))
-        && (v.size() < 12 || validCreativeRequirement(v[11]))
-        && (v.size() < 13 || validCreativeRequirement(v[12]))
-        && (v.size() < 14 || validCreativeRequirement(v[13]))
-        && (v.size() < 15 || validCreativeRequirement(v[14]))
-        && (v.size() < 16 || validCreativeRequirement(v[15]))
-        && (v.size() < 17 || validCreativeRequirement(v[16]))
-        && (v.size() < 18 || validCreativeRequirement(v[17]))
-        && (v.size() < 19 || validCreativeRequirement(v[18]))
-        && (v.size() < 20 || validCreativeRequirement(v[19]));
-    }
-    function validTheoryRule(r) {
-      return r is map
-        && r.keys().hasAll(["key", "label", "instructions", "appliesToObjectives", "appliesToPlatforms"])
-        && r.keys().hasOnly(["key", "label", "instructions", "appliesToObjectives", "appliesToPlatforms"])
-        && r.key is string && r.key.size() > 0 && r.key.size() <= 64
-        && r.label is string && r.label.size() > 0 && r.label.size() <= 160
-        && r.instructions is string && r.instructions.size() <= 4000
-        && r.appliesToObjectives is list && r.appliesToObjectives.size() <= 30
-        && r.appliesToPlatforms is list && r.appliesToPlatforms.size() <= 20;
-    }
-    function validTheoryRuleList(v) {
-      return v is list && v.size() <= 20
-        && (v.size() < 1 || validTheoryRule(v[0]))
-        && (v.size() < 2 || validTheoryRule(v[1]))
-        && (v.size() < 3 || validTheoryRule(v[2]))
-        && (v.size() < 4 || validTheoryRule(v[3]))
-        && (v.size() < 5 || validTheoryRule(v[4]))
-        && (v.size() < 6 || validTheoryRule(v[5]))
-        && (v.size() < 7 || validTheoryRule(v[6]))
-        && (v.size() < 8 || validTheoryRule(v[7]))
-        && (v.size() < 9 || validTheoryRule(v[8]))
-        && (v.size() < 10 || validTheoryRule(v[9]))
-        && (v.size() < 11 || validTheoryRule(v[10]))
-        && (v.size() < 12 || validTheoryRule(v[11]))
-        && (v.size() < 13 || validTheoryRule(v[12]))
-        && (v.size() < 14 || validTheoryRule(v[13]))
-        && (v.size() < 15 || validTheoryRule(v[14]))
-        && (v.size() < 16 || validTheoryRule(v[15]))
-        && (v.size() < 17 || validTheoryRule(v[16]))
-        && (v.size() < 18 || validTheoryRule(v[17]))
-        && (v.size() < 19 || validTheoryRule(v[18]))
-        && (v.size() < 20 || validTheoryRule(v[19]));
-    }
-    function validValidationRule(r) {
-      return r is map
-        && r.keys().hasAll(["key", "label", "severity", "instructions"])
-        && r.keys().hasOnly(["key", "label", "severity", "instructions"])
-        && r.key is string && r.key.size() > 0 && r.key.size() <= 64
-        && r.label is string && r.label.size() > 0 && r.label.size() <= 160
-        && r.severity in ["info", "warning", "error"]
-        && r.instructions is string && r.instructions.size() <= 4000;
-    }
-    function validValidationRules(v) {
-      return v is list && v.size() <= 20
-        && (v.size() < 1 || validValidationRule(v[0]))
-        && (v.size() < 2 || validValidationRule(v[1]))
-        && (v.size() < 3 || validValidationRule(v[2]))
-        && (v.size() < 4 || validValidationRule(v[3]))
-        && (v.size() < 5 || validValidationRule(v[4]))
-        && (v.size() < 6 || validValidationRule(v[5]))
-        && (v.size() < 7 || validValidationRule(v[6]))
-        && (v.size() < 8 || validValidationRule(v[7]))
-        && (v.size() < 9 || validValidationRule(v[8]))
-        && (v.size() < 10 || validValidationRule(v[9]))
-        && (v.size() < 11 || validValidationRule(v[10]))
-        && (v.size() < 12 || validValidationRule(v[11]))
-        && (v.size() < 13 || validValidationRule(v[12]))
-        && (v.size() < 14 || validValidationRule(v[13]))
-        && (v.size() < 15 || validValidationRule(v[14]))
-        && (v.size() < 16 || validValidationRule(v[15]))
-        && (v.size() < 17 || validValidationRule(v[16]))
-        && (v.size() < 18 || validValidationRule(v[17]))
-        && (v.size() < 19 || validValidationRule(v[18]))
-        && (v.size() < 20 || validValidationRule(v[19]));
-    }
+    // TheoryConfig deep validation lives in theorySchema.js and the backend.
+    // Firestore keeps a bounded structural envelope so valid writes stay below
+    // the platform's 1000-expression evaluation budget.
     function validQuestionPolicy(q) {
       return q is map
         && q.keys().hasAll(["mode", "instructions", "requiredFields"])
@@ -535,12 +429,12 @@ service cloud.firestore {
         && c.platform is string && c.platform.size() > 0 && c.platform.size() <= 64
         && c.name is string && c.name.size() > 0 && c.name.size() <= 120
         && c.description is string && c.description.size() <= 4000
-        && validTheoryRuleList(c.campaignRules)
-        && validCreativeRequirements(c.creativeRequirements)
-        && validValidationRules(c.validationRules)
+        && c.campaignRules is list && c.campaignRules.size() <= 20
+        && c.creativeRequirements is list && c.creativeRequirements.size() <= 20
+        && c.validationRules is list && c.validationRules.size() <= 20
         && validQuestionPolicy(c.questionPolicy)
-        && validTheoryRuleList(c.testingRules)
-        && validTheoryRuleList(c.recommendationRules)
+        && c.testingRules is list && c.testingRules.size() <= 20
+        && c.recommendationRules is list && c.recommendationRules.size() <= 20
         && validTheoryMetadata(c.metadata);
     }
     function validTheoryParent(d) {
