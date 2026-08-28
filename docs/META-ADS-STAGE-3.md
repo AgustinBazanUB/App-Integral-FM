@@ -175,6 +175,25 @@ La preview autenticada como Admin abrió `Metodología de prueba` y verificó qu
 
 El procesamiento real quedó **pendiente de confirmación explícita** porque transmite esa metodología a OpenAI, consume créditos de la API y persiste el `TheoryConfig` en Firestore. Por eso la versión continúa en `error` por el intento anterior de credencial inválida; no se fabricó un JSON, no se aprobó ni activó una teoría. Una vez confirmado, el resultado esperado es una versión `review` cuyo `creativeRequirements` exprese semánticamente esos requisitos genéricos y que supere el schema en servidor y cliente.
 
+### Bloqueo operativo — Campaign Planner en Deploy Preview #14
+
+El 28/08/2026 se probó la preview `https://deploy-preview-14--appintegralflormia.netlify.app` con la sesión Admin. La campaña borrador `Prueba 2` (producto real: `Aceite de Oliva Arbequina 500cc`) carga correctamente el producto y permite abrir el área **Planificar campaña**. Sin embargo, el área muestra exactamente:
+
+> No hay una metodología activa
+
+El mensaje agrega: “Activá una metodología en Meta Ads → Metodologías antes de planificar una campaña.” La inspección de Metodologías confirma que la única metodología, `Metodología de prueba`, tiene `v1 · Error`, no posee `TheoryConfig` y no tiene una versión activa. La Function está disponible —la UI muestra `gpt-5.6-luna` y el botón `Procesar con IA` habilitado—, por lo que no es un error de routing, permisos, producto ni de la preview.
+
+**Clasificación:** bloqueo operativo de datos/configuración de la metodología. El guard del Campaign Planner funciona como corresponde al impedir preguntas y generación de plan sin una referencia inmutable a una teoría activa. No corresponde simular preguntas, crear un `CampaignPlan` manual ni modificar código para saltear el guard.
+
+**Cómo destrabarlo en un próximo chat:**
+
+1. Con confirmación explícita para el consumo de API, abrir `Metodología de prueba` y pulsar `Procesar con IA`.
+2. Si OpenAI devuelve un error de crédito o billing, registrar literalmente el mensaje y clasificarlo como `API sin saldo`; no corregir código.
+3. Si responde correctamente, revisar que el `TheoryConfig` represente la fuente, aprobarlo y activarlo.
+4. Volver a `Prueba 2` y recién entonces continuar la cadena `CampaignProject → preguntas → respuestas → CampaignPlan → aprobación`.
+
+Esta secuencia guarda datos en Firestore y el primer paso consume créditos de OpenAI; no debe ejecutarse sin autorización vigente del usuario.
+
 ### Corrección: PDF textual
 
 - **Comportamiento esperado:** elegir PDF mantiene el modal abierto, permite seleccionar un archivo y carga únicamente texto extraíble; un escaneado o PDF sin operadores de texto informa `Este PDF no contiene texto extraíble`, sin OCR ni contenido inventado.
