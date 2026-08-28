@@ -23,6 +23,7 @@ jobs:
         run: |
           python scripts/apply-stage4-planner.py
           python scripts/patch-stage4-rule-dispatch.py
+          python scripts/patch-stage4-final-approval.py
       - run: npm ci
       - run: npm test
       - run: npx firebase-tools@14.12.0 emulators:exec --only firestore --project demo-flor-mia-stage4 "npm run test:rules"
@@ -31,6 +32,7 @@ jobs:
         run: |
           rm -f scripts/apply-stage4-planner.py
           rm -f scripts/patch-stage4-rule-dispatch.py
+          rm -f scripts/patch-stage4-final-approval.py
           rm -f .github/workflows/stage4-integrate-planner.yml
       - name: Commit verified integration
         run: |
