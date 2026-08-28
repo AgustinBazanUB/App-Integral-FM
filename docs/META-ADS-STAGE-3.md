@@ -165,30 +165,40 @@ El 28/08/2026 se validó manualmente el preview `feature/meta-ads-theory-engine`
 
 La suite de aplicación pasó completa (`198/198`). La suite de Rules pasó `37/39` con el emulador Firestore compatible disponible; dos transiciones de TheoryConfig alcanzaron el límite de 1.000 expresiones del emulador antiguo. El archivo compiló en dry-run y las Rules fueron publicadas correctamente.
 
-## Validación Terra — Theory Compiler, PDF, roles y responsive
+## Validación funcional — Deploy Preview #12
 
-El 28/08/2026 se intentó procesar `Metodología de prueba` en el Deploy Preview #11 con el texto de regresión de este documento. La Function respondió que el proveedor OpenAI rechazó la credencial configurada. La versión quedó en `error`, sin `TheoryConfig` fabricado, aprobación ni activación. Es un bloqueo externo: para reintentar se debe corregir la configuración server-side de la integración en Netlify, sin exponer ni pedir secretos.
+El 28/08/2026 se reintentó el Deploy Preview #12 de `codex/stage3-validation` (`b604c90`) después de configurar `OPENAI_API_KEY` como secreto server-side para Deploy Previews en Netlify. El deploy finalizó correctamente: compilación, redirects, headers y la Function `theory-compiler` quedaron publicados. La clave no se leyó ni se incluyó en el repositorio, logs ni documentación.
 
-### Corrección: selector de PDF textual
+### Theory Compiler
 
-- **Comportamiento esperado:** elegir PDF mantiene el modal abierto, permite seleccionar un archivo y muestra el resultado de extracción.
-- **Bug encontrado:** al seleccionar “PDF” el modal mostraba el error límite de la aplicación y no era posible llegar al selector de archivo.
-- **Causa raíz:** `FormField` exige exactamente un hijo para asociar `label`, `id` y descripción. El caso PDF renderizaba el `input` y un párrafo hermano.
-- **Solución:** el texto informativo se integró en `hint` y el único hijo directo quedó siendo el `input` de tipo archivo.
-- **Archivos afectados:** `src/gestion/pages/MetaAdsTheoriesView.jsx`, `tests/meta-ads-theory-ui.test.mjs` y este documento.
-- **Prueba automática:** `el selector PDF usa un único control FormField y no rompe el modal`.
-- **Prueba manual:** se generaron un PDF textual pequeño y otro sólo de imagen; el extractor verificó texto en el primero y cadena vacía en el segundo. La repetición autenticada del selector en el Deploy Preview #12 requiere iniciar sesión en ese origen de preview; no se usaron credenciales ajenas ni se subieron archivos reales.
-- **Resultado:** build y regresión pasan; la prueba de interfaz autenticada queda pendiente por esa sesión externa.
+La preview autenticada como Admin abrió `Metodología de prueba` y verificó que la Function quedó configurada: muestra el modelo por defecto `gpt-5.6-luna`, la estimación de tokens y habilita el botón `Procesar con IA`. La fuente conserva exactamente la metodología de regresión: tres hooks de 3 a 6 segundos, un cuerpo principal, un cierre recomendado y voice-over opcional.
+
+El procesamiento real quedó **pendiente de confirmación explícita** porque transmite esa metodología a OpenAI, consume créditos de la API y persiste el `TheoryConfig` en Firestore. Por eso la versión continúa en `error` por el intento anterior de credencial inválida; no se fabricó un JSON, no se aprobó ni activó una teoría. Una vez confirmado, el resultado esperado es una versión `review` cuyo `creativeRequirements` exprese semánticamente esos requisitos genéricos y que supere el schema en servidor y cliente.
+
+### Corrección: PDF textual
+
+- **Comportamiento esperado:** elegir PDF mantiene el modal abierto, permite seleccionar un archivo y carga únicamente texto extraíble; un escaneado o PDF sin operadores de texto informa `Este PDF no contiene texto extraíble`, sin OCR ni contenido inventado.
+- **Primer bug corregido:** `FormField` exigía un único hijo para asociar etiqueta y descripción, pero el caso PDF renderizaba input y párrafo hermanos. El texto se integró en `hint` y el selector quedó accesible.
+- **Segundo bug encontrado en esta validación:** un PDF textual generado por ReportLab era seleccionable, pero el extractor devolvía falsamente “sin texto”.
+- **Causa raíz:** el extractor sólo descomprimía Flate directo y su regex exigía un salto antes de `endstream`. El PDF usaba los filtros válidos `ASCII85Decode` + `FlateDecode` y terminaba con `~>endstream`.
+- **Solución:** `pdfTextExtractor` decodifica ASCII85 antes de Flate y acepta el final de stream sin ese salto opcional. No se agregó OCR ni se alteró el contrato de privacidad: el binario sigue sin persistirse.
+- **Archivos afectados:** `src/gestion/marketing/metaAds/pdfTextExtractor.js`, `tests/pdf-text-extractor.test.mjs` y este documento.
+- **Pruebas automáticas:** extracción `ASCII85 + Flate`, extracción sin salto antes de `endstream`, rechazo de PDF sin texto, y regresiones de UI del selector.
+- **Evidencia local:** la muestra textual recuperó las cinco reglas de la metodología, incluidas cantidades y duraciones. La subida de esa muestra a la preview queda pendiente de confirmación, porque es una transferencia de archivo al navegador.
 
 ### Roles
 
-La sesión Admin real abrió Conocimiento y Metodologías. La prueba de dominio cubre el guard de ruta y las tres acciones Meta Ads para `admin`, `marketing_manager` y `seller`; el test de Rules confirma lectura/escritura permitida para Marketing y denegada para Seller, inactivo y `permissionDeny`. No hubo sesión autenticada disponible para repetir en la UI como Marketing Manager o Seller, por lo que esas comprobaciones manuales quedan bloqueadas sin solicitar contraseñas.
+La sesión Admin real abrió Conocimiento, selector de producto y Metodologías. La cobertura de dominio verifica guard de ruta y acciones Meta Ads para `admin`, `marketing_manager` y `seller`; las Rules cubren permiso para Marketing y denegación para Seller, perfil inactivo y `permissionDeny`.
+
+No hay sesiones de prueba de Marketing Manager ni Seller disponibles para repetir la UI real, y el emulador Firestore no estaba iniciado en este entorno. En consecuencia, la matriz de permisos implementada se mantiene como contrato cubierto por código y tests, pero la comprobación manual de esas dos sesiones queda bloqueada hasta disponer de cuentas o emulador, sin ampliar permisos ni solicitar contraseñas.
 
 ### Responsive
 
-Se hizo smoke desktop autenticado de la lista/historial de metodologías y las reglas responsive están documentadas arriba. La comprobación manual a 390 px y el preview estructurado quedan bloqueados: el control de navegador disponible no permite cambiar viewport y no existe TheoryConfig por el bloqueo externo de IA. No se declaró una corrección responsive sin haberla reproducido.
+Se recorrió en la preview autenticada la navegación móvil disponible: Conocimiento, selector de producto, lista/detalle de metodología, fuente, historial y editor JSON. No se detectó overflow horizontal del documento; las acciones principales se adaptan a ancho completo y permanecen alcanzables mediante scroll normal. El viewport controlado por el navegador de prueba informó 462 px de ancho efectivo; la repetición exacta a 390 px sigue recomendada antes de cerrar la validación móvil.
 
-La suite de aplicación posterior pasó completa (`200/200`) y el build de producción pasó. La ejecución dedicada de Rules de Theory obtuvo `7/9`: las dos transiciones restantes alcanzaron el límite de 1.000 expresiones del emulador Firestore, el mismo límite externo ya observado; no se modificaron ni relajaron Rules seguras para ajustarse a ese emulador.
+### Verificación automática y límites del entorno
+
+Después de la corrección, el build de producción pasó y la suite de aplicación pasó completa (`203/203`). La suite de Rules no pudo ejecutarse en esta sesión porque falta un emulador Firestore con host y puerto configurados; es una dependencia de entorno, no un fallo de las Rules ni una razón para relajarlas.
 
 ## Índices
 
