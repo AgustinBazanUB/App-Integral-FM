@@ -40,6 +40,14 @@ Los listados cargan metadata acotada. El historial usa `orderBy(version desc)` y
 
 `creativeRequirements[].key` es dinámico. Hooks, bodies, endings, testimonials o product demos son datos de la teoría, no componentes codificados. Se validan cantidades, relaciones `min <= recommended <= max`, duraciones, claves desconocidas y contenido potencialmente peligroso. Para mantener Rules simples y acotadas en Spark, cada grupo de reglas/requisitos queda limitado a 20 elementos.
 
+### Contrato del Theory Compiler
+
+La entrada del compilador es una fuente normalizada de metodología (`sourceText`, tipo y nombre de fuente) más el contexto de una versión `draft`, `review` o `error`. El texto siempre se trata como dato no confiable, aun si proviene de PDF o Markdown.
+
+Una compilación procesada correctamente devuelve un `TheoryConfig` que supera el Structured Output estricto del servidor y `validateTheoryConfig` en cliente/dominio. Por lo tanto tiene `schemaVersion`, plataforma Meta Ads y colecciones estructuradas válidas; cada requisito creativo conserva cantidades coherentes y sus duraciones son numéricas y consistentes. Los conceptos de la fuente se expresan como datos: por ejemplo, hooks, cuerpo, cierre y voice-over pueden ser requisitos o instrucciones, pero no existen campos especiales codificados para un caso de prueba.
+
+La función persiste el resultado sólo después de validarlo y deja la versión en `review`; nunca aprueba ni activa. Si la respuesta del proveedor, el parseo o la validación fallan, no se inventa una configuración: la versión queda en `error` con el error seguro para reintento controlado y conserva su fuente. En ese estado la persona autorizada puede corregir el texto o reintentar cuando se resuelva la dependencia externa.
+
 ## Versionado y activación
 
 Estados implementados:
@@ -61,7 +69,9 @@ Se aceptan:
 - editor interno;
 - PDF textual.
 
-El PDF se procesa lazy en el navegador. No se guarda el binario en Firestore. Límites: 3 MB, 80 páginas y 60.000 caracteres. Si no se obtiene texto suficiente se informa `Este PDF no contiene texto extraíble` y no se simula OCR.
+El PDF se procesa lazy en el navegador al seleccionar el archivo. No se guarda el binario en Firestore: sólo se conserva el texto extraído, el nombre de fuente y su tamaño para crear o procesar una metodología. Límites: 3 MB, 80 páginas y 60.000 caracteres. Un PDF textual pequeño debe mostrar el feedback `PDF listo: … caracteres extraídos` y cargar el contenido en el editor antes de crear la versión. Un PDF escaneado o sin texto debe informar `Este PDF no contiene texto extraíble` y no se simula OCR ni se inventa contenido. Los errores de tipo, tamaño, páginas o extracción se muestran sin cerrar el modal.
+
+El selector de PDF es un único control dentro de `FormField`; la explicación sobre el procesamiento local se entrega mediante su `hint`. Esto conserva la asociación accesible de etiqueta y control, y evita que el modal falle por tener más de un hijo directo.
 
 ## OpenAI backend
 
@@ -107,7 +117,16 @@ Nuevas acciones:
 - `metaAdsManageKnowledge`;
 - `metaAdsManageTheory`.
 
-Admin/general admin conservan acceso total. `marketing_manager` recibe ambas acciones por plantilla. Seller no recibe acceso. `permissionDeny` prevalece. Rules y frontend aplican el mismo criterio.
+Admin/general admin conservan acceso total. `marketing_manager` recibe ambas acciones por plantilla. Seller no recibe acceso. `permissionDeny` prevalece.
+
+| Rol | Conocimiento | Metodologías | Dónde se aplica |
+| --- | --- | --- | --- |
+| `admin` / administrador general | Permitido | Permitido | Guard de ruta, servicios cliente, Netlify Function y Firestore Rules. |
+| `marketing_manager` activo | Permitido | Permitido | Guard de ruta, servicios cliente, Netlify Function y Firestore Rules. |
+| `seller` | Denegado | Denegado | No recibe `metaAdsView`; incluso al forzar la ruta, los servicios y Rules rechazan lectura/escritura. |
+| Perfil inactivo o con `permissionDeny` | Denegado según la acción | Denegado según la acción | `permissionDeny` prevalece en frontend, función y Rules. |
+
+La visibilidad de botones no es la única protección: `ManagementApp` bloquea la ruta de Meta Ads con `metaAdsView`; `knowledgeService` y `theoryService` vuelven a exigir permisos antes de leer o escribir; Firestore Rules verifican el perfil activo y el permiso. La Function exige el mismo permiso de gestión para compilar.
 
 ## Firestore Rules
 
@@ -122,6 +141,22 @@ Las Rules nuevas son aditivas sobre los contratos existentes de ventas, stock, c
 - AIUsage inmutable y propiedad del usuario.
 
 No se habilita delete físico.
+
+## Responsive
+
+Las vistas de Conocimiento y Theory Engine conservan una cuadrícula de detalle en desktop y pasan a una columna en móvil. En pantallas angostas, las pestañas de Meta Ads permiten desplazamiento horizontal; formularios, acciones de diálogo, requisitos del preview e historial deben permanecer alcanzables con scroll normal, sin zoom obligatorio ni overflow horizontal del documento. La verificación manual mínima usa un viewport de 390 px: Conocimiento, selector de producto, lista/detalle de metodología, editor JSON, preview estructurado e historial.
+
+## Validación funcional — Deploy Preview #11
+
+El 28/08/2026 se validó manualmente el preview `feature/meta-ads-theory-engine` (`5fcef10`) en la aplicación Gestión integral | Flor Mía. Se publicaron las Rules de este documento en `app-integral-fm` antes de probar Knowledge y Theory Engine.
+
+- Marketing mostró WhatsApp y Meta Ads; WhatsApp abrió sin envío real y Meta Ads mostró Campañas, Conocimiento y Metodologías. Se abrió una campaña preexistente.
+- BusinessContext persistió un cambio mínimo tras recarga y se restauró el valor original.
+- El producto real `Aceite de Oliva Arbequina 500cc` conservó su identidad de catálogo; su metadata de Marketing persistió sin duplicar el producto y se restauró el valor original.
+- `Metodología de prueba` se creó como `v1 · Borrador`, no activa, y conservó el texto tras recarga. El procesamiento IA quedó disponible pero no se ejecutó.
+- Los puntos posteriores al punto 6 quedan pendientes de un `TheoryConfig` procesado y validado por Terra; no se inventó ni se modificó uno manualmente.
+
+La suite de aplicación pasó completa (`198/198`). La suite de Rules pasó `37/39` con el emulador Firestore compatible disponible; dos transiciones de TheoryConfig alcanzaron el límite de 1.000 expresiones del emulador antiguo. El archivo compiló en dry-run y las Rules fueron publicadas correctamente.
 
 ## Índices
 
