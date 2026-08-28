@@ -28,7 +28,9 @@ export function normalizeCustomerPhone(value) {
 
 export function isValidCustomerPhone(value) {
   const normalized = normalizeCustomerPhone(value);
-  return normalized.length >= 8 && normalized.length <= 11;
+  // Clientes argentinos continúan normalizándose a su número nacional. Para
+  // importaciones explícitamente internacionales se admite el máximo E.164 (15 dígitos).
+  return normalized.length >= 8 && normalized.length <= 15;
 }
 
 export function formatPhoneForDisplay(value) {
