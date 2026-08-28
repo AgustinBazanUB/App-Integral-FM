@@ -63,13 +63,13 @@ jobs:
           if (typeof h.configured !== 'boolean') throw new Error('Health payload missing configured boolean');
           NODE
 
-      - name: Verify unauthenticated POST is rejected before AI
+      - name: Verify unauthenticated valid POST is rejected before AI
         run: |
           set -euo pipefail
           code=$(curl -sS -o /tmp/unauth.json -w '%{http_code}' \
             -X POST \
             -H 'Content-Type: application/json' \
-            --data '{"operation":"questions","campaignId":"smoke-test","requestId":"stage4-smoke"}' \
+            --data '{"operation":"generateQuestions","campaignId":"smoke-test","requestId":"stage4-smoke"}' \
             "$PREVIEW_BASE/.netlify/functions/campaign-planner")
           echo "UNAUTH_POST_STATUS=$code"
           cat /tmp/unauth.json
