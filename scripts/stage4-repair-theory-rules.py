@@ -2,6 +2,27 @@ from pathlib import Path
 
 rules_path = Path("firestore.rules")
 rules = rules_path.read_text()
+
+# Meta Ads uses a compact role check instead of the very broad generic rolePermission
+# tree. This keeps Meta Ads writes predictable and well below Firestore's expression budget.
+old_meta = '''    function metaAdsCan(action) {
+      return activeUser() && !metaAdsDenied(action) && (adminRole() || metaAdsExplicit(action) || metaAdsAllowed(action) || rolePermission("marketing", action));
+    }
+'''
+new_meta = '''    function metaAdsRoleCan(action) {
+      return profile().role == "marketing_manager" && action in [
+        "metaAdsView", "metaAdsCreateProject", "metaAdsEditProject", "metaAdsArchiveProject",
+        "metaAdsManageKnowledge", "metaAdsManageTheory"
+      ];
+    }
+    function metaAdsCan(action) {
+      return activeUser() && !metaAdsDenied(action)
+        && (adminRole() || metaAdsExplicit(action) || metaAdsAllowed(action) || metaAdsRoleCan(action));
+    }
+'''
+if old_meta in rules:
+    rules = rules.replace(old_meta, new_meta)
+
 start = rules.index("    function validDurationValue(v) {")
 end = rules.index("    function validTheoryParent(d) {", start)
 replacement = '''    // TheoryConfig deep validation lives in theorySchema.js and the backend.
@@ -40,40 +61,25 @@ replacement = '''    // TheoryConfig deep validation lives in theorySchema.js an
 '''
 rules_path.write_text(rules[:start] + replacement + rules[end:])
 
-# Keep Rules tests focused on the boundary Rules can safely enforce. Deep nested
-# config validation is already covered by domain/backend tests.
+# Keep Rules tests focused on the structural boundary; deep nested validation is
+# covered by theorySchema.js tests and the backend compiler validation.
 test_path = Path("tests/firestore.meta-ads-theory.rules.mjs")
 test_text = test_path.read_text()
+if 'from"node:assert/strict"' not in test_text:
+    test_text = 'import assert from"node:assert/strict";' + test_text
 marker = '\ntest("Theory Rules rechazan cantidades, duraciones y claves anidadas inválidas"'
 if marker in test_text:
     test_text = test_text[:test_text.index(marker)] + '''\n\ntest("Theory Rules mantienen envelope acotado sin agotar presupuesto", async () => {
   const db = environment.authenticatedContext("marketing-theory").firestore();
   const theoryId = "theory-envelope";
   await assertSucceeds(setDoc(doc(db, "metaAdTheories", theoryId), {
-    ...parent("marketing-theory"),
-    name: "Envelope",
+    ...parent("marketing-theory"), name: "Envelope",
   }));
   const ref = doc(db, "metaAdTheories", theoryId, "versions", "v1");
   await assertSucceeds(setDoc(ref, { ...version("marketing-theory"), theoryId }));
-  await assertSucceeds(updateDoc(ref, {
-    status: "compiling",
-    updatedBy: "marketing-theory",
-    updatedByName: "Marketing",
-    updatedAt: now(),
-  }));
-  const compilerMetadata = {
-    provider: "openai", operation: "theory_compile", model: "test", responseId: null,
-    inputTokens: 1, outputTokens: 1, totalTokens: 2, actualCostUsd: null, compilerVersion: "1",
-  };
-  await assertFails(updateDoc(ref, {
-    status: "review",
-    config: { ...config(), unexpectedTopLevel: true },
-    compilerMetadata,
-    compileError: null,
-    updatedBy: "marketing-theory",
-    updatedByName: "Marketing",
-    updatedAt: now(),
-  }));
+  await assertSucceeds(updateDoc(ref, { status: "compiling", updatedBy: "marketing-theory", updatedByName: "Marketing", updatedAt: now() }));
+  const compilerMetadata = { provider: "openai", operation: "theory_compile", model: "test", responseId: null, inputTokens: 1, outputTokens: 1, totalTokens: 2, actualCostUsd: null, compilerVersion: "1" };
+  await assertFails(updateDoc(ref, { status: "review", config: { ...config(), unexpectedTopLevel: true }, compilerMetadata, compileError: null, updatedBy: "marketing-theory", updatedByName: "Marketing", updatedAt: now() }));
 });\n'''
 test_path.write_text(test_text)
 
