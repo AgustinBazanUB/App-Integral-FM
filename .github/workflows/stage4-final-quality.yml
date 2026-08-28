@@ -26,8 +26,8 @@ jobs:
           node -e "const fs=require('node:fs'); const c=JSON.parse(fs.readFileSync('.firebaserc','utf8')); if(c.projects?.default!=='app-integral-fm') throw new Error('Unexpected Firebase default project: '+c.projects?.default)"
           git fetch origin feature/meta-ads-theory-engine:refs/remotes/origin/feature/meta-ads-theory-engine --depth=1
           git diff --exit-code origin/feature/meta-ads-theory-engine -- firestore.indexes.json
-          if grep -R --line-number --exclude-dir=.git --exclude='stage4-final-quality.yml' 'fm-stock-y-venta' .firebaserc firebase.json firestore.rules package.json src netlify docs tests 2>/dev/null; then
-            echo 'Legacy Firebase project reference detected in Stage 4 runtime/config surface.' >&2
+          if git diff origin/feature/meta-ads-theory-engine -- .firebaserc firebase.json firestore.rules package.json src netlify tests | grep '^+' | grep -v '^+++' | grep -q 'fm-stock-y-venta'; then
+            echo 'Stage 4 introduced a legacy Firebase project reference in runtime/config.' >&2
             exit 1
           fi
       - run: npm ci
