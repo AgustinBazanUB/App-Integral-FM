@@ -146,6 +146,13 @@ No se habilita delete físico.
 
 Las vistas de Conocimiento y Theory Engine conservan una cuadrícula de detalle en desktop y pasan a una columna en móvil. En pantallas angostas, las pestañas de Meta Ads permiten desplazamiento horizontal; formularios, acciones de diálogo, requisitos del preview e historial deben permanecer alcanzables con scroll normal, sin zoom obligatorio ni overflow horizontal del documento. La verificación manual mínima usa un viewport de 390 px: Conocimiento, selector de producto, lista/detalle de metodología, editor JSON, preview estructurado e historial.
 
+## Regresión manual de Etapa 3
+
+1. Como Admin o `marketing_manager`, crear o abrir una metodología en borrador y procesar este texto: `La campaña requiere 3 hooks. Cada hook debe durar entre 3 y 6 segundos. Debe existir 1 cuerpo principal. Se recomienda 1 cierre. El voice-over es opcional.` El resultado correcto es un `TheoryConfig` en `review` que represente esos requisitos semánticamente, sin activarse. Si el proveedor rechaza la credencial o no está configurado, marcar el flujo como bloqueo externo; no escribir un JSON manual para simular una respuesta IA.
+2. En “Nueva metodología”, elegir PDF. El modal debe permanecer abierto y mostrar el control de archivo. Con un PDF textual pequeño, debe informar caracteres extraídos y cargar el texto antes de crear. Con un PDF de imagen/escaneado, debe informar que no contiene texto extraíble, sin crear ni guardar contenido inventado.
+3. Repetir Conocimiento y Metodologías con sesiones reales de `admin`, `marketing_manager` y `seller`. Seller debe recibir “No autorizado” al forzar una URL de Meta Ads y Firestore debe rechazar la lectura/escritura.
+4. A 390 px de ancho, recorrer Conocimiento, un producto, lista/detalle de metodología, preview, editor e historial. Confirmar que cada acción está alcanzable por scroll, que los diálogos se pueden cerrar y que no aparece scroll horizontal del documento. Terminar con smoke desktop de las mismas rutas.
+
 ## Validación funcional — Deploy Preview #11
 
 El 28/08/2026 se validó manualmente el preview `feature/meta-ads-theory-engine` (`5fcef10`) en la aplicación Gestión integral | Flor Mía. Se publicaron las Rules de este documento en `app-integral-fm` antes de probar Knowledge y Theory Engine.
@@ -157,6 +164,31 @@ El 28/08/2026 se validó manualmente el preview `feature/meta-ads-theory-engine`
 - Los puntos posteriores al punto 6 quedan pendientes de un `TheoryConfig` procesado y validado por Terra; no se inventó ni se modificó uno manualmente.
 
 La suite de aplicación pasó completa (`198/198`). La suite de Rules pasó `37/39` con el emulador Firestore compatible disponible; dos transiciones de TheoryConfig alcanzaron el límite de 1.000 expresiones del emulador antiguo. El archivo compiló en dry-run y las Rules fueron publicadas correctamente.
+
+## Validación Terra — Theory Compiler, PDF, roles y responsive
+
+El 28/08/2026 se intentó procesar `Metodología de prueba` en el Deploy Preview #11 con el texto de regresión de este documento. La Function respondió que el proveedor OpenAI rechazó la credencial configurada. La versión quedó en `error`, sin `TheoryConfig` fabricado, aprobación ni activación. Es un bloqueo externo: para reintentar se debe corregir la configuración server-side de la integración en Netlify, sin exponer ni pedir secretos.
+
+### Corrección: selector de PDF textual
+
+- **Comportamiento esperado:** elegir PDF mantiene el modal abierto, permite seleccionar un archivo y muestra el resultado de extracción.
+- **Bug encontrado:** al seleccionar “PDF” el modal mostraba el error límite de la aplicación y no era posible llegar al selector de archivo.
+- **Causa raíz:** `FormField` exige exactamente un hijo para asociar `label`, `id` y descripción. El caso PDF renderizaba el `input` y un párrafo hermano.
+- **Solución:** el texto informativo se integró en `hint` y el único hijo directo quedó siendo el `input` de tipo archivo.
+- **Archivos afectados:** `src/gestion/pages/MetaAdsTheoriesView.jsx`, `tests/meta-ads-theory-ui.test.mjs` y este documento.
+- **Prueba automática:** `el selector PDF usa un único control FormField y no rompe el modal`.
+- **Prueba manual:** se generaron un PDF textual pequeño y otro sólo de imagen; el extractor verificó texto en el primero y cadena vacía en el segundo. La repetición autenticada del selector en el Deploy Preview #12 requiere iniciar sesión en ese origen de preview; no se usaron credenciales ajenas ni se subieron archivos reales.
+- **Resultado:** build y regresión pasan; la prueba de interfaz autenticada queda pendiente por esa sesión externa.
+
+### Roles
+
+La sesión Admin real abrió Conocimiento y Metodologías. La prueba de dominio cubre el guard de ruta y las tres acciones Meta Ads para `admin`, `marketing_manager` y `seller`; el test de Rules confirma lectura/escritura permitida para Marketing y denegada para Seller, inactivo y `permissionDeny`. No hubo sesión autenticada disponible para repetir en la UI como Marketing Manager o Seller, por lo que esas comprobaciones manuales quedan bloqueadas sin solicitar contraseñas.
+
+### Responsive
+
+Se hizo smoke desktop autenticado de la lista/historial de metodologías y las reglas responsive están documentadas arriba. La comprobación manual a 390 px y el preview estructurado quedan bloqueados: el control de navegador disponible no permite cambiar viewport y no existe TheoryConfig por el bloqueo externo de IA. No se declaró una corrección responsive sin haberla reproducido.
+
+La suite de aplicación posterior pasó completa (`200/200`) y el build de producción pasó. La ejecución dedicada de Rules de Theory obtuvo `7/9`: las dos transiciones restantes alcanzaron el límite de 1.000 expresiones del emulador Firestore, el mismo límite externo ya observado; no se modificaron ni relajaron Rules seguras para ajustarse a ese emulador.
 
 ## Índices
 
