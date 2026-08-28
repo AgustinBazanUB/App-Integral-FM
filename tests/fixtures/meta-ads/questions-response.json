@@ -1,0 +1,15 @@
+{
+  "questions": [
+    {
+      "id": "commercial-objective",
+      "key": "commercial_objective",
+      "text": "¿Qué querés lograr principalmente con esta campaña?",
+      "helperText": "Elegí la opción que mejor represente el objetivo del negocio.",
+      "type": "single_choice",
+      "options": ["Recibir consultas", "Vender", "Generar visitas"],
+      "required": true,
+      "reason": "El objetivo comercial todavía no está definido.",
+      "order": 0
+    }
+  ]
+}
