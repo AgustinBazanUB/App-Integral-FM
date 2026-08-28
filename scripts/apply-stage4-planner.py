@@ -1,10 +1,12 @@
 from pathlib import Path
 import json
 
+# Permissions
 p=Path('src/gestion/permissions.js'); s=p.read_text()
 s=s.replace('  "metaAdsManageTheory",\n];','  "metaAdsManageTheory",\n  "metaAdsPlanCampaign",\n  "metaAdsApprovePlan",\n];',2)
 p.write_text(s)
 
+# Campaign detail UI
 p=Path('src/gestion/pages/MetaAdsPage.jsx'); s=p.read_text(); anchor='import { useAsyncData } from "../hooks";\n'
 if 'MetaAdsCampaignPlanningWorkspace' not in s:s=s.replace(anchor,anchor+'import MetaAdsCampaignPlanningWorkspace from "./MetaAdsCampaignPlanningWorkspace";\n')
 s=s.replace('description="CampaignProject interno de Flor Mía. Las fases de IA, Drive, render y publicación todavía no están conectadas."','description="CampaignProject interno de Flor Mía. La planificación guiada ya puede convertir contexto + metodología + tus respuestas en un plan de campaña."')
@@ -14,6 +16,7 @@ if '<MetaAdsCampaignPlanningWorkspace' not in s:s=s.replace(marker,'      <MetaA
 s=s.replace('title="Proceso de campaña" description="La estructura queda preparada; ninguna fase futura se simula en esta etapa."','title="Siguientes etapas" description="Drive, validación, render y publicación continúan fuera de esta etapa."')
 p.write_text(s)
 
+# Responsive planner styles
 p=Path('src/styles/meta-ads.css'); s=p.read_text()
 css='''\n\n/* Stage 4 — Campaign Planner */
 .fm-planner-workspace{display:grid;gap:1rem}.fm-planner-context{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.fm-planner-context>div{display:grid;gap:.2rem;padding:.8rem;border:1px solid var(--fm-border,#e5e7eb);border-radius:12px}.fm-planner-context span{font-size:.78rem;color:var(--fm-muted,#667085)}.fm-planner-questions{display:grid;gap:1rem}.fm-planner-options{display:grid;gap:.5rem}.fm-planner-options label{display:flex;align-items:center;gap:.55rem}.fm-planner-plan-head,.fm-planner-piece__head,.fm-planner-piece-summary{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}.fm-planner-editorial{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem;margin:1rem 0}.fm-planner-editorial section{padding:.8rem;border:1px solid var(--fm-border,#e5e7eb);border-radius:12px}.fm-planner-editorial h4,.fm-planner-piece h4{margin:0 0 .35rem}.fm-planner-editorial p{white-space:pre-wrap;margin:0}.fm-planner-editorial textarea,.fm-planner-piece textarea{width:100%}.fm-planner-pieces{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}.fm-planner-piece{padding:1rem;border:1px solid var(--fm-border,#e5e7eb);border-radius:14px;background:var(--fm-surface,#fff)}.fm-planner-piece p{white-space:pre-wrap}.fm-planner-piece-summary{justify-content:flex-start}.fm-planner-workspace button[disabled]{cursor:not-allowed}@media(max-width:760px){.fm-planner-context,.fm-planner-editorial,.fm-planner-pieces{grid-template-columns:1fr}.fm-planner-plan-head{align-items:stretch}.fm-planner-plan-head .fm-button{width:100%}.fm-planner-piece{padding:.8rem}}
@@ -21,12 +24,16 @@ css='''\n\n/* Stage 4 — Campaign Planner */
 if 'Stage 4 — Campaign Planner' not in s:s+=css
 p.write_text(s)
 
+# Rules test command
 p=Path('package.json'); data=json.loads(p.read_text()); cmd=data['scripts']['test:rules']
 if 'tests/firestore.meta-ads-planner.rules.mjs' not in cmd:data['scripts']['test:rules']=cmd+' tests/firestore.meta-ads-planner.rules.mjs'
 p.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
 
+# Firestore Rules
 p=Path('firestore.rules'); r=p.read_text()
 r=r.replace('        "metaAdsManageKnowledge", "metaAdsManageTheory"\n      ];','        "metaAdsManageKnowledge", "metaAdsManageTheory",\n        "metaAdsPlanCampaign", "metaAdsApprovePlan"\n      ];')
+
+# AIUsage supports theory + planner operations without storing prompts.
 start=r.index('    function validAiUsage(d) {'); end=r.index('\n\n    function validMetaAdsStatus',start)
 ai='''    function validAiUsage(d) {
       let theoryOperation = d.operation == "theory_compile";
@@ -44,6 +51,9 @@ ai='''    function validAiUsage(d) {
         || (request.resource.data.operation in ["campaign_questions", "campaign_plan"] && metaAdsCan("metaAdsPlanCampaign"));
     }'''
 r=r[:start]+ai+r[end:]
+
+# Replace CampaignProject contract block with bounded planning envelope and one
+# combined update validator so Firestore evaluates the large project contract once.
 start=r.index('    function validMetaAdsCampaignProject(data) {'); end=r.index('\n    function metaAdsCreateProjectAllowed()',start)
 project='''    function validMetaAdsPlanningFields(data) {
       let fields = ["planningStatus","theoryId","theoryVersionId","theoryVersion","theoryNameSnapshot","latestPlanRevision","approvedPlanRevision","lastPlanningAt","lastPlanningBy"];
@@ -72,24 +82,42 @@ project='''    function validMetaAdsPlanningFields(data) {
       let theoryPath = /databases/$(database)/documents/metaAdTheories/$(data.theoryId)/versions/$(data.theoryVersionId);
       return exists(theoryPath) && get(theoryPath).data.status == "active" && get(theoryPath).data.version == data.theoryVersion;
     }
-    function metaAdsPlanProjectAllowed() {
-      let sameIdentity = request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.channel == resource.data.channel && request.resource.data.schemaVersion == resource.data.schemaVersion;
-      let start = resource.data.status == "draft" && request.resource.data.status == "planning" && request.resource.data.planningStatus == "context_ready" && request.resource.data.latestPlanRevision == 0 && request.resource.data.approvedPlanRevision == null && request.resource.data.lastPlanningBy == request.auth.uid && metaAdsPlanningTheoryActive(request.resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","planningStatus","theoryId","theoryVersionId","theoryVersion","theoryNameSnapshot","latestPlanRevision","approvedPlanRevision","lastPlanningAt","lastPlanningBy","updatedBy","updatedByName","updatedAt"]);
-      let progress = resource.data.status in ["planning","creative"] && request.resource.data.status == resource.data.status && request.resource.data.theoryId == resource.data.theoryId && request.resource.data.theoryVersionId == resource.data.theoryVersionId && request.resource.data.theoryVersion == resource.data.theoryVersion && request.resource.data.theoryNameSnapshot == resource.data.theoryNameSnapshot
+    function metaAdsCampaignProjectUpdateAllowed() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let sameIdentity = request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.channel == resource.data.channel
+        && request.resource.data.schemaVersion == resource.data.schemaVersion;
+      let edit = metaAdsCan("metaAdsEditProject")
+        && resource.data.status == "draft" && request.resource.data.status == "draft" && request.resource.data.archived == false
+        && changed.hasOnly(["name","productId","productNameSnapshot","updatedBy","updatedByName","updatedAt"]);
+      let archive = metaAdsCan("metaAdsArchiveProject")
+        && resource.data.status == "draft" && request.resource.data.status == "archived" && request.resource.data.archived == true
+        && request.resource.data.archivedBy == request.auth.uid
+        && changed.hasOnly(["status","archived","archivedAt","archivedBy","archivedByName","updatedBy","updatedByName","updatedAt"]);
+      let startPlanning = metaAdsCan("metaAdsPlanCampaign")
+        && resource.data.status == "draft" && request.resource.data.status == "planning" && request.resource.data.archived == false
+        && request.resource.data.planningStatus == "context_ready" && request.resource.data.latestPlanRevision == 0 && request.resource.data.approvedPlanRevision == null
+        && request.resource.data.lastPlanningBy == request.auth.uid && metaAdsPlanningTheoryActive(request.resource.data)
+        && changed.hasOnly(["status","planningStatus","theoryId","theoryVersionId","theoryVersion","theoryNameSnapshot","latestPlanRevision","approvedPlanRevision","lastPlanningAt","lastPlanningBy","updatedBy","updatedByName","updatedAt"]);
+      let planningProgress = metaAdsCan("metaAdsPlanCampaign")
+        && resource.data.status in ["planning","creative"] && request.resource.data.status == resource.data.status
+        && request.resource.data.theoryId == resource.data.theoryId && request.resource.data.theoryVersionId == resource.data.theoryVersionId
+        && request.resource.data.theoryVersion == resource.data.theoryVersion && request.resource.data.theoryNameSnapshot == resource.data.theoryNameSnapshot
         && request.resource.data.planningStatus in ["context_ready","questions_ready","answers_ready","plan_ready"]
         && request.resource.data.latestPlanRevision >= resource.data.latestPlanRevision && request.resource.data.latestPlanRevision <= resource.data.latestPlanRevision + 1
         && request.resource.data.approvedPlanRevision == resource.data.approvedPlanRevision && request.resource.data.lastPlanningBy == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["planningStatus","latestPlanRevision","lastPlanningAt","lastPlanningBy","updatedBy","updatedByName","updatedAt"]);
-      return metaAdsCan("metaAdsPlanCampaign") && sameIdentity && request.resource.data.updatedBy == request.auth.uid && validMetaAdsCampaignProject(request.resource.data) && (start || progress);
-    }
-    function metaAdsApproveProjectAllowed() {
-      return metaAdsCan("metaAdsApprovePlan") && resource.data.status in ["planning","creative"] && request.resource.data.status == "creative" && request.resource.data.planningStatus == "approved"
-        && request.resource.data.theoryId == resource.data.theoryId && request.resource.data.theoryVersionId == resource.data.theoryVersionId && request.resource.data.theoryVersion == resource.data.theoryVersion && request.resource.data.theoryNameSnapshot == resource.data.theoryNameSnapshot
+        && changed.hasOnly(["planningStatus","latestPlanRevision","lastPlanningAt","lastPlanningBy","updatedBy","updatedByName","updatedAt"]);
+      let approve = metaAdsCan("metaAdsApprovePlan")
+        && resource.data.status in ["planning","creative"] && request.resource.data.status == "creative" && request.resource.data.planningStatus == "approved"
+        && request.resource.data.theoryId == resource.data.theoryId && request.resource.data.theoryVersionId == resource.data.theoryVersionId
+        && request.resource.data.theoryVersion == resource.data.theoryVersion && request.resource.data.theoryNameSnapshot == resource.data.theoryNameSnapshot
         && request.resource.data.approvedPlanRevision is int && request.resource.data.approvedPlanRevision >= 1 && request.resource.data.approvedPlanRevision <= request.resource.data.latestPlanRevision
-        && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedBy == request.auth.uid && request.resource.data.lastPlanningBy == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","planningStatus","approvedPlanRevision","lastPlanningAt","lastPlanningBy","updatedBy","updatedByName","updatedAt"])
-        && validMetaAdsCampaignProject(request.resource.data);
+        && request.resource.data.lastPlanningBy == request.auth.uid
+        && changed.hasOnly(["status","planningStatus","approvedPlanRevision","lastPlanningAt","lastPlanningBy","updatedBy","updatedByName","updatedAt"]);
+      return sameIdentity && request.resource.data.updatedBy == request.auth.uid
+        && validMetaAdsCampaignProject(request.resource.data)
+        && (edit || archive || startPlanning || planningProgress || approve);
     }
     function validPlanningStateStatus(value) { return value in ["context_ready","questions_ready","answers_ready","plan_ready","approved"]; }
     function validPlanningState(data,campaignId) {
@@ -140,7 +168,11 @@ project='''    function validMetaAdsPlanningFields(data) {
         && validCampaignPlanRecord(request.resource.data,campaignId);
     }'''
 r=r[:start]+project+r[end:]
+
+# AIUsage rule
 r=r.replace('    match /aiUsage/{usageId} { allow get,list: if metaAdsCan("metaAdsManageTheory"); allow create: if metaAdsCan("metaAdsManageTheory") && validAiUsage(request.resource.data); allow update,delete: if false; }','    match /aiUsage/{usageId} { allow get,list: if metaAdsCan("metaAdsManageTheory") || metaAdsCan("metaAdsPlanCampaign"); allow create: if aiUsageCanCreate() && validAiUsage(request.resource.data); allow update,delete: if false; }')
+
+# CampaignProject match + bounded subcollections
 old='''    match /metaCampaignProjects/{campaignId} {
       allow get, list: if metaAdsCan("metaAdsView");
       allow create: if metaAdsCreateProjectAllowed();
@@ -150,7 +182,7 @@ old='''    match /metaCampaignProjects/{campaignId} {
 new='''    match /metaCampaignProjects/{campaignId} {
       allow get, list: if metaAdsCan("metaAdsView");
       allow create: if metaAdsCreateProjectAllowed();
-      allow update: if metaAdsEditProjectAllowed() || metaAdsArchiveProjectAllowed() || metaAdsPlanProjectAllowed() || metaAdsApproveProjectAllowed();
+      allow update: if metaAdsCampaignProjectUpdateAllowed();
       allow delete: if false;
       match /planning/{planningId} {
         allow get: if planningId == "state" && metaAdsCan("metaAdsView"); allow list: if false;
@@ -165,6 +197,8 @@ new='''    match /metaCampaignProjects/{campaignId} {
     }'''
 if old not in r: raise SystemExit('metaCampaignProjects marker not found')
 r=r.replace(old,new)
+
+# Audit permissions
 r=r.replace('              || metaAdsCan("metaAdsManageTheory")\n              || canModule("marketing", "edit")))','              || metaAdsCan("metaAdsManageTheory")\n              || metaAdsCan("metaAdsPlanCampaign")\n              || metaAdsCan("metaAdsApprovePlan")\n              || canModule("marketing", "edit")))')
 p.write_text(r)
-print('Stage 4 patches applied')
+print('Stage 4 patches applied with compact CampaignProject update validation')
