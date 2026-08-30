@@ -22,8 +22,8 @@ import { useAsyncData } from "../hooks";
 import {
   createQuickSale,
   listLocations,
-  listLocationStock,
 } from "../services/managementService";
+import { listLocationInventory } from "../services/inventoryService";
 import { listDiscounts } from "../services/locationManagementService";
 
 const friendlyPayments = {
@@ -57,8 +57,11 @@ export default function QuickSalesPage() {
     if (!locationId) return;
     let active = true;
     setStock({ status: "loading", data: [] });
-    listLocationStock(locationId)
-      .then((data) => active && setStock({ status: "ready", data }))
+    listLocationInventory(locationId)
+      .then((data) => active && setStock({
+        status: "ready",
+        data: data.filter((item) => item.active !== false && item.masterActive !== false),
+      }))
       .catch((error) => active && setStock({ status: "error", data: [], error }));
     return () => {
       active = false;
@@ -114,8 +117,11 @@ export default function QuickSalesPage() {
       setInvoiceRequested(false);
       setDiscountIds([]);
       setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.` });
-      const refreshedStock = await listLocationStock(locationId);
-      setStock({ status: "ready", data: refreshedStock });
+      const refreshedStock = await listLocationInventory(locationId);
+      setStock({
+        status: "ready",
+        data: refreshedStock.filter((item) => item.active !== false && item.masterActive !== false),
+      });
     } catch (error) {
       setSubmitState({ busy: false, error: error.message, success: "" });
     }
@@ -123,9 +129,9 @@ export default function QuickSalesPage() {
 
   return (
     <div className="fm-page-enter">
-      <PageHeader eyebrow="Módulo 02" title="Ventas rápidas" description="Carga ágil para WhatsApp, Instagram, teléfono y operaciones manuales. La confirmación descuenta stock en una transacción." />
+      <PageHeader eyebrow="Módulo 03" title="Ventas rápidas" description="Carga ágil para WhatsApp, Instagram, teléfono y operaciones manuales. La confirmación descuenta stock en una transacción." />
       <div className="fm-sale-layout">
-        <Panel title="1. Elegí los productos" description="Sólo se muestran productos activos de la ubicación seleccionada.">
+        <Panel title="1. Elegí los productos" description="Sólo se muestran productos activos que ya forman parte de la ubicación seleccionada.">
           <FormField label="Ubicación de salida" required>
               <Select value={locationId} onChange={(event) => { setLocationId(event.target.value); setQuantities({}); setDiscountIds([]); }}>
               <option value="">Elegir ubicación</option>
@@ -134,7 +140,7 @@ export default function QuickSalesPage() {
           </FormField>
           {locationsResult.status === "loading" || stock.status === "loading" ? <Skeleton lines={5} /> : null}
           {stock.status === "error" ? <EmptyState icon="AlertTriangle" title="No se pudo leer el stock" description={stock.error.message} /> : null}
-          {stock.status === "ready" && !stock.data.length ? <EmptyState icon="Box" title="No hay productos disponibles" description="Configurá stock activo antes de registrar una venta." /> : null}
+          {stock.status === "ready" && !stock.data.length ? <EmptyState icon="Box" title="No hay productos disponibles" description="Agregá productos al stock de esta ubicación antes de registrar una venta." /> : null}
           {stock.status === "ready" && stock.data.length ? (
             <div className="fm-product-picker">
               {stock.data.map((item) => {
