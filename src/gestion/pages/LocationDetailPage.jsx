@@ -2,9 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Button,
-  ConfirmationDialog,
   EmptyState,
-  FilterBar,
   FormField,
   Modal,
   PageHeader,
@@ -15,19 +13,25 @@ import {
   Tabs,
   Toast,
 } from "../../design-system";
-import {
-  isDiscountAvailable,
-  joinMasterProducts,
-} from "../../modules/locations/domain/dashboard";
+import { INVENTORY_TYPES, movementLabel } from "../../modules/inventory/domain/inventory";
+import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
 import { locationActivity, locationSchedule } from "../../modules/locations/domain/locations";
 import { Link, useLocation, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
-import LocationProductForm from "../components/LocationProductForm";
+import HelpTooltip from "../components/HelpTooltip";
 import LocationSalesPanel from "../components/LocationSalesPanel";
-import { Icon } from "../components/icons";
 import { formatDate, formatMoney } from "../formatters";
 import { useAsyncData } from "../hooks";
 import { can, normalizedRole } from "../permissions";
+import {
+  addProductToLocation,
+  addStockToInventory,
+  listInventoryMovements,
+  listLocationInventory,
+  listMasterProductsForInventory,
+  listProductCategoriesForInventory,
+  saveLocationProductSettings,
+} from "../services/inventoryService";
 import {
   loadActiveLocationStock,
   saveValidatedLocationDiscounts,
@@ -36,32 +40,23 @@ import {
   getLocation,
   listAssignableSellers,
   listDiscounts,
-  listLocationStockConfiguration,
-  listMasterProducts,
-  listProductCategories,
-  saveLocationProductConfiguration,
   saveLocationSellers,
-  setLocationLifecycle,
 } from "../services/locationManagementService";
 import { locationTypeLabels } from "./LocationsPage";
 
 const tabs = [
-  { id: "products", label: "Productos" },
   { id: "stock", label: "Cargar stock" },
   { id: "sellers", label: "Vendedores" },
   { id: "discounts", label: "Descuentos" },
   { id: "sales", label: "Ventas" },
 ];
 const tabIds = new Set(tabs.map((tab) => tab.id));
-const emptyConfig = { price: 0, yellowAlertQty: 0, redAlertQty: 0, active: true };
 
 function ProductImage({ product }) {
   const source = product.thumbUrl || product.imageUrl;
-  return source ? (
-    <img className="fm-product-thumb" src={source} alt={product.imageAlt || product.productName || product.name || "Producto"} loading="lazy" />
-  ) : (
-    <span className="fm-product-thumb fm-product-thumb--empty" aria-label="Imagen pendiente">FM</span>
-  );
+  return source
+    ? <img className="fm-product-thumb" src={source} alt={product.productName || product.name || "Producto"} loading="lazy" />
+    : <span className="fm-product-thumb fm-product-thumb--empty" aria-label="Imagen pendiente">FM</span>;
 }
 
 function SellerAvatar({ seller }) {
@@ -72,57 +67,307 @@ function SellerAvatar({ seller }) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
-  return source ? (
-    <img className="fm-seller-avatar" src={source} alt="" loading="lazy" />
-  ) : (
-    <span className="fm-seller-avatar fm-seller-avatar--initials" aria-hidden="true">{initials}</span>
+  return source
+    ? <img className="fm-seller-avatar" src={source} alt="" loading="lazy" />
+    : <span className="fm-seller-avatar fm-seller-avatar--initials" aria-hidden="true">{initials}</span>;
+}
+
+function movementDate(value) {
+  const date = value?.toDate?.() || (value ? new Date(value) : null);
+  return date && !Number.isNaN(date.valueOf())
+    ? new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(date)
+    : "Fecha pendiente";
+}
+
+function AddLocationProductModal({ open, location, inventory, categories, profile, onClose, onSaved }) {
+  const [state, setState] = useState({ busy: false, loading: false, error: "" });
+  const [products, setProducts] = useState([]);
+  const [search, setSearch] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [initialStock, setInitialStock] = useState(0);
+  const [useDefaultPrice, setUseDefaultPrice] = useState(true);
+  const [priceOverride, setPriceOverride] = useState(0);
+  const [requestId, setRequestId] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setSearch("");
+    setCategoryId("");
+    setSelectedId("");
+    setInitialStock(0);
+    setUseDefaultPrice(true);
+    setPriceOverride(0);
+    setRequestId(crypto.randomUUID());
+    setState({ busy: false, loading: true, error: "" });
+    listMasterProductsForInventory(profile, { includeInactive: false })
+      .then((data) => {
+        setProducts(data);
+        setState({ busy: false, loading: false, error: "" });
+      })
+      .catch((error) => setState({ busy: false, loading: false, error: error.message }));
+  }, [open, profile.id]);
+
+  const assignedIds = useMemo(() => new Set(inventory.map((item) => item.productId || item.id)), [inventory]);
+  const filtered = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase("es");
+    return products.filter((product) => {
+      if (term && !`${product.name} ${product.abbreviation || ""}`.toLocaleLowerCase("es").includes(term)) return false;
+      if (categoryId && product.categoryId !== categoryId) return false;
+      return true;
+    });
+  }, [categoryId, products, search]);
+  const selected = products.find((product) => product.id === selectedId);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!selected) {
+      setState((current) => ({ ...current, error: "Elegí un producto del catálogo." }));
+      return;
+    }
+    setState((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      await addProductToLocation({
+        location,
+        product: selected,
+        initialStock,
+        useDefaultPrice,
+        priceOverride,
+        profile,
+        requestId,
+      });
+      await onSaved?.();
+      onClose?.();
+    } catch (error) {
+      setState((current) => ({ ...current, busy: false, error: error.message }));
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => !state.busy && onClose?.()}
+      title="Agregar producto"
+      description={`Agrega a ${location?.name || "esta ubicación"} un producto que ya existe en el catálogo de Flor Mía.`}
+    >
+      <form className="fm-inventory-modal" onSubmit={submit}>
+        <div className="fm-inventory-picker-filters">
+          <SearchInput label="Buscar producto" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <Select aria-label="Filtrar por categoría" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+            <option value="">Todas las categorías</option>
+            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </Select>
+        </div>
+        {state.loading ? <Skeleton lines={4} /> : null}
+        {!state.loading ? (
+          <div className="fm-product-select-list" role="radiogroup" aria-label="Productos del catálogo">
+            {filtered.map((product) => {
+              const assigned = assignedIds.has(product.id);
+              return (
+                <label key={product.id} className={`${selectedId === product.id ? "is-selected" : ""} ${assigned ? "is-disabled" : ""}`.trim()}>
+                  <input type="radio" name="location-product" value={product.id} checked={selectedId === product.id} disabled={assigned} onChange={() => {
+                    setSelectedId(product.id);
+                    setPriceOverride(Number(product.defaultPrice || 0));
+                  }} />
+                  <ProductImage product={product} />
+                  <span><strong>{product.name}</strong><small>{product.categoryName || "Sin categoría"} · {formatMoney(product.defaultPrice || 0)}</small></span>
+                  {assigned ? <Badge tone="neutral">Ya agregado</Badge> : null}
+                </label>
+              );
+            })}
+          </div>
+        ) : null}
+        {!state.loading && !filtered.length ? <EmptyState icon="Boxes" title="No hay productos con estos filtros" /> : null}
+
+        {selected ? (
+          <section className="fm-inventory-selection-config">
+            <FormField label="Stock inicial" hint="Cuántas unidades hay físicamente ahora en esta ubicación." required>
+              <input type="number" min="0" step="1" inputMode="numeric" value={initialStock} onChange={(event) => setInitialStock(event.target.value)} />
+            </FormField>
+            <div className="fm-price-choice">
+              <p><strong>Precio predeterminado del producto:</strong> {formatMoney(selected.defaultPrice || 0)}</p>
+              <label className="fm-check-row">
+                <input type="checkbox" checked={useDefaultPrice} onChange={(event) => setUseDefaultPrice(event.target.checked)} />
+                <span>Usar precio predeterminado</span>
+              </label>
+              <p className="fm-field__hint">Usa automáticamente el precio definido en Productos. Si ese precio cambia, esta ubicación también se actualiza.</p>
+              {!useDefaultPrice ? (
+                <FormField label={`Precio especial en ${location.name}`} required>
+                  <input type="number" min="0" step="1" inputMode="numeric" value={priceOverride} onChange={(event) => setPriceOverride(event.target.value)} />
+                </FormField>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {state.error ? <Toast tone="error">{state.error}</Toast> : null}
+        <div className="fm-dialog-actions">
+          <HelpTooltip label="Cierra esta ventana sin agregar ningún producto."><Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button></HelpTooltip>
+          <HelpTooltip label="Agrega el producto a esta ubicación con el stock inicial y el precio elegidos."><Button type="submit" loading={state.busy} disabled={!selected}>Agregar producto</Button></HelpTooltip>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
-function discountRestrictions(discount) {
-  const restrictions = [];
-  if (discount.allowedRoles?.length) restrictions.push(`Roles: ${discount.allowedRoles.join(", ")}`);
-  if (discount.categoryIds?.length) restrictions.push(`${discount.categoryIds.length} categorías`);
-  if (discount.productIds?.length) restrictions.push(`${discount.productIds.length} productos`);
-  if (discount.locationIds?.length) restrictions.push(`${discount.locationIds.length} ubicaciones específicas`);
-  return restrictions.length ? restrictions.join(" · ") : "Sin restricciones adicionales";
+function AddStockModal({ open, location, product, profile, onClose, onSaved }) {
+  const [quantity, setQuantity] = useState(0);
+  const [reason, setReason] = useState("");
+  const [requestId, setRequestId] = useState("");
+  const [state, setState] = useState({ busy: false, error: "" });
+  useEffect(() => {
+    if (!open) return;
+    setQuantity(0);
+    setReason("");
+    setRequestId(crypto.randomUUID());
+    setState({ busy: false, error: "" });
+  }, [open, product?.productId]);
+  const current = Number(product?.currentStock || 0);
+  const next = current + Math.max(0, Number(quantity || 0));
+  const submit = async (event) => {
+    event.preventDefault();
+    setState({ busy: true, error: "" });
+    try {
+      await addStockToInventory({
+        type: INVENTORY_TYPES.LOCATION,
+        inventory: location,
+        product,
+        quantity,
+        reason,
+        profile,
+        requestId,
+      });
+      await onSaved?.();
+      onClose?.();
+    } catch (error) {
+      setState({ busy: false, error: error.message });
+    }
+  };
+  return (
+    <Modal open={open} onClose={() => !state.busy && onClose?.()} title={`Agregar stock · ${product?.productName || "Producto"}`} description="Suma nuevas unidades y deja registrado el ingreso. El stock actual nunca se reemplaza silenciosamente.">
+      <form className="fm-inventory-modal" onSubmit={submit}>
+        <dl className="fm-stock-calculation">
+          <div><dt>Stock actual</dt><dd>{current}</dd></div>
+          <div><dt>Nuevo stock</dt><dd>{next}</dd></div>
+        </dl>
+        <FormField label="Cantidad a agregar" required><input type="number" min="1" step="1" inputMode="numeric" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></FormField>
+        <FormField label="Observación" hint="Opcional. Ejemplo: Ingreso mercadería Mendoza."><input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ingreso de mercadería" /></FormField>
+        {state.error ? <Toast tone="error">{state.error}</Toast> : null}
+        <div className="fm-dialog-actions">
+          <HelpTooltip label="Cierra esta ventana sin modificar el stock."><Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button></HelpTooltip>
+          <HelpTooltip label="Suma esta cantidad al stock actual y registra el movimiento."><Button type="submit" loading={state.busy} disabled={Number(quantity || 0) <= 0}>Confirmar ingreso</Button></HelpTooltip>
+        </div>
+      </form>
+    </Modal>
+  );
 }
 
-function stockFinal(product, value, mode) {
-  if (String(value ?? "").trim() === "") return Number(product.currentStock || 0);
-  const requested = Number(value || 0);
-  if (mode === "add") return Number(product.currentStock || 0) + requested;
-  if (mode === "adjust") return requested;
-  return Number(product.currentStock || 0) + requested - Number(product.initialStock || 0);
+function ProductSettingsModal({ open, location, product, profile, onClose, onSaved }) {
+  const [useDefaultPrice, setUseDefaultPrice] = useState(true);
+  const [priceOverride, setPriceOverride] = useState(0);
+  const [yellowAlertQty, setYellowAlertQty] = useState(0);
+  const [redAlertQty, setRedAlertQty] = useState(0);
+  const [active, setActive] = useState(true);
+  const [state, setState] = useState({ busy: false, error: "" });
+  useEffect(() => {
+    if (!open || !product) return;
+    setUseDefaultPrice(product.usesDefaultPrice !== false);
+    setPriceOverride(Number(product.priceOverride ?? product.effectivePrice ?? 0));
+    setYellowAlertQty(Number(product.yellowAlertQty || 0));
+    setRedAlertQty(Number(product.redAlertQty || 0));
+    setActive(product.active !== false);
+    setState({ busy: false, error: "" });
+  }, [open, product?.productId]);
+  const submit = async (event) => {
+    event.preventDefault();
+    setState({ busy: true, error: "" });
+    try {
+      await saveLocationProductSettings({
+        location,
+        productId: product.productId,
+        values: { useDefaultPrice, priceOverride, yellowAlertQty, redAlertQty, active },
+        profile,
+      });
+      await onSaved?.();
+      onClose?.();
+    } catch (error) {
+      setState({ busy: false, error: error.message });
+    }
+  };
+  return (
+    <Modal open={open} onClose={() => !state.busy && onClose?.()} title={`Configuración · ${product?.productName || "Producto"}`} description={`Define cómo funciona este producto solamente en ${location?.name || "esta ubicación"}.`}>
+      <form className="fm-inventory-modal" onSubmit={submit}>
+        <div className="fm-price-choice">
+          <p><strong>Precio predeterminado:</strong> {formatMoney(product?.defaultPrice || 0)}</p>
+          <label className="fm-check-row"><input type="checkbox" checked={useDefaultPrice} onChange={(event) => setUseDefaultPrice(event.target.checked)} /><span>Usar precio predeterminado</span></label>
+          <p className="fm-field__hint">Si el precio cambia en Productos, esta ubicación toma el nuevo valor automáticamente.</p>
+          {!useDefaultPrice ? <FormField label={`Precio especial en ${location.name}`} required><input type="number" min="0" step="1" inputMode="numeric" value={priceOverride} onChange={(event) => setPriceOverride(event.target.value)} /></FormField> : null}
+        </div>
+        <div className="fm-form-grid">
+          <FormField label="Alerta amarilla" required><input type="number" min="0" step="1" inputMode="numeric" value={yellowAlertQty} onChange={(event) => setYellowAlertQty(event.target.value)} /></FormField>
+          <FormField label="Alerta roja" required><input type="number" min="0" step="1" inputMode="numeric" value={redAlertQty} onChange={(event) => setRedAlertQty(event.target.value)} /></FormField>
+        </div>
+        <label className="fm-check-row"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /><span>Producto habilitado en esta ubicación</span></label>
+        {state.error ? <Toast tone="error">{state.error}</Toast> : null}
+        <div className="fm-dialog-actions">
+          <HelpTooltip label="Cierra esta ventana sin guardar cambios."><Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button></HelpTooltip>
+          <HelpTooltip label="Guarda el precio y las alertas que usa este producto en esta ubicación."><Button type="submit" loading={state.busy}>Guardar configuración</Button></HelpTooltip>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function MovementsModal({ open, location, product, onClose }) {
+  const [pageSize, setPageSize] = useState(30);
+  const result = useAsyncData(
+    () => open && product ? listInventoryMovements({ type: INVENTORY_TYPES.LOCATION, inventoryId: location.id, productId: product.productId, pageSize }) : Promise.resolve([]),
+    [open, product?.productId, location?.id, pageSize],
+  );
+  useEffect(() => { if (open) setPageSize(30); }, [open, product?.productId]);
+  const movements = result.data || [];
+  return (
+    <Modal open={open} onClose={onClose} title={`Movimientos · ${product?.productName || "Producto"}`} description="Muestra los ingresos, transferencias y cambios de stock de este producto.">
+      {result.status === "loading" ? <Skeleton lines={5} /> : null}
+      {result.status === "error" ? <Toast tone="error">{result.error.message}</Toast> : null}
+      {result.status === "ready" && !movements.length ? <EmptyState icon="ClipboardList" title="Todavía no hay movimientos registrados" /> : null}
+      {movements.length ? <div className="fm-movement-list">{movements.map((movement) => (
+        <article key={movement.id}>
+          <div><strong>{Number(movement.qty || 0) > 0 ? "+" : ""}{Number(movement.qty || 0)} · {movementLabel(movement)}</strong><small>{movementDate(movement.createdAt)}</small></div>
+          <span>{movement.reason || "Sin observación"}</span>
+        </article>
+      ))}</div> : null}
+      {movements.length >= pageSize && pageSize < 120 ? (
+        <div className="fm-load-more"><HelpTooltip label="Carga más movimientos anteriores de este producto."><Button variant="secondary" onClick={() => setPageSize((value) => Math.min(120, value + 30))}>Cargar más</Button></HelpTooltip></div>
+      ) : null}
+    </Modal>
+  );
 }
 
 export default function LocationDetailPage({ locationId }) {
   const { profile } = useAuth();
   const routeLocation = useLocation();
   const navigate = useNavigate();
-  const requestedTab = routeLocation.pathname.split("/").filter(Boolean)[3] || "products";
+  const requestedTab = routeLocation.pathname.split("/").filter(Boolean)[3] || "stock";
   const canAssignSellers = ["admin", "general_admin"].includes(normalizedRole(profile));
   const result = useAsyncData(async () => {
     const location = await getLocation(locationId);
     if (!location) throw new Error("La ubicación no existe o ya no está disponible.");
-    const [products, stock, categories, discounts, sellers] = await Promise.all([
-      listMasterProducts(profile),
-      listLocationStockConfiguration(locationId),
-      listProductCategories(profile),
+    const [inventory, categories, discounts, sellers] = await Promise.all([
+      listLocationInventory(locationId),
+      listProductCategoriesForInventory(profile),
       listDiscounts(profile),
       canAssignSellers ? listAssignableSellers() : Promise.resolve([]),
     ]);
-    return { location, products, stock, categories, discounts, sellers };
+    return { location, inventory, categories, discounts, sellers };
   }, [locationId, profile.id, canAssignSellers]);
-  const [activeTab, setActiveTab] = useState(tabIds.has(requestedTab) ? requestedTab : "products");
+  const [activeTab, setActiveTab] = useState(tabIds.has(requestedTab) ? requestedTab : "stock");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [productStatus, setProductStatus] = useState("all");
-  const [stockMode, setStockMode] = useState("initial");
-  const [stockReason, setStockReason] = useState("");
-  const [stockValues, setStockValues] = useState({});
-  const [stockState, setStockState] = useState({ busy: false, error: "", success: "", operationId: "" });
-  const [pendingStock, setPendingStock] = useState(null);
+  const [addProductOpen, setAddProductOpen] = useState(false);
+  const [stockProduct, setStockProduct] = useState(null);
+  const [settingsProduct, setSettingsProduct] = useState(null);
+  const [movementProduct, setMovementProduct] = useState(null);
   const [sellerIds, setSellerIds] = useState([]);
   const [sellerSearch, setSellerSearch] = useState("");
   const [sellerModalOpen, setSellerModalOpen] = useState(false);
@@ -130,18 +375,11 @@ export default function LocationDetailPage({ locationId }) {
   const [sellerState, setSellerState] = useState({ busy: false, error: "", success: "" });
   const [discountIds, setDiscountIds] = useState([]);
   const [discountState, setDiscountState] = useState({ busy: false, error: "", success: "" });
-  const [configProduct, setConfigProduct] = useState(null);
-  const [configValues, setConfigValues] = useState(emptyConfig);
-  const [configState, setConfigState] = useState({ busy: false, error: "" });
-  const [productFormOpen, setProductFormOpen] = useState(false);
-  const [editingMasterProduct, setEditingMasterProduct] = useState(null);
-  const [lifecycleState, setLifecycleState] = useState({ busy: false, error: "" });
 
   const location = result.data?.location;
-  const products = useMemo(() => joinMasterProducts(result.data?.products || [], result.data?.stock || []), [result.data]);
-
+  const inventory = result.data?.inventory || [];
   useEffect(() => {
-    const next = tabIds.has(requestedTab) ? requestedTab : "products";
+    const next = tabIds.has(requestedTab) ? requestedTab : "stock";
     setActiveTab(next);
   }, [requestedTab]);
   useEffect(() => {
@@ -150,74 +388,20 @@ export default function LocationDetailPage({ locationId }) {
     setDiscountIds(location.enabledDiscountIds || []);
   }, [location]);
 
-  const changeTab = (tabId) => {
-    setActiveTab(tabId);
-    setSearch("");
-    navigate(`/gestion/locations/${encodeURIComponent(locationId)}/${tabId}`);
-  };
-
-  const visibleProducts = useMemo(() => {
+  const visibleInventory = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("es");
-    return products.filter((product) => {
+    return inventory.filter((product) => {
       if (term && !`${product.productName} ${product.abbreviation || ""}`.toLocaleLowerCase("es").includes(term)) return false;
       if (categoryFilter && product.categoryId !== categoryFilter) return false;
-      if (productStatus === "configured" && !product.configured) return false;
-      if (productStatus === "unconfigured" && product.configured) return false;
-      if (productStatus === "active" && !product.active) return false;
-      if (productStatus === "inactive" && product.active) return false;
       return true;
     });
-  }, [categoryFilter, productStatus, products, search]);
+  }, [categoryFilter, inventory, search]);
 
-  const productGroups = useMemo(() => {
-    const categoryMap = new Map((result.data?.categories || []).map((category) => [category.id, { ...category, items: [] }]));
-    const uncategorized = { id: "uncategorized", name: "Sin categoría", items: [] };
-    visibleProducts.forEach((product) => {
-      const group = categoryMap.get(product.categoryId) || uncategorized;
-      group.items.push(product);
-    });
-    return [...categoryMap.values(), uncategorized].filter((group) => group.items.length);
-  }, [result.data?.categories, visibleProducts]);
-
-  const updateStockValue = (product, key, value) => setStockValues((current) => ({
-    ...current,
-    [product.id]: {
-      price: product.price,
-      yellowAlertQty: product.yellowAlertQty || 0,
-      redAlertQty: product.redAlertQty || 0,
-      active: product.active,
-      ...current[product.id],
-      [key]: value,
-    },
-  }));
-  const preparedStockEntries = () => products
-    .filter((product) => String(stockValues[product.id]?.quantity ?? "").trim() !== "")
-    .map((product) => ({ product, ...stockValues[product.id] }));
-  const wouldReduceStock = (entries) => entries.some((entry) => stockFinal(entry.product, entry.quantity, stockMode) < Number(entry.product.currentStock || 0));
-  const executeStock = async (entries) => {
-    const operationId = stockState.operationId || crypto.randomUUID();
-    setStockState({ busy: true, error: "", success: "", operationId });
-    try {
-      const operation = await loadActiveLocationStock({ location, entries, mode: stockMode, reason: stockReason, profile, operationId });
-      setStockValues({});
-      setStockReason("");
-      setPendingStock(null);
-      setStockState({ busy: false, error: "", success: `Operación ${operation.operationId} confirmada para ${operation.itemCount} productos.`, operationId: "" });
-      await result.refresh();
-    } catch (error) {
-      setPendingStock(null);
-      setStockState({ busy: false, error: `${error.message} Podés reintentar sin duplicar la operación.`, success: "", operationId });
-    }
-  };
-  const handleStockSubmit = (event) => {
-    event.preventDefault();
-    const entries = preparedStockEntries();
-    if (!entries.length) {
-      setStockState((current) => ({ ...current, error: "Ingresá al menos una cantidad.", success: "" }));
-      return;
-    }
-    if (wouldReduceStock(entries)) setPendingStock(entries);
-    else executeStock(entries);
+  const changeTab = (tabId) => {
+    setSearch("");
+    setCategoryFilter("");
+    setActiveTab(tabId);
+    navigate(`/gestion/locations/${encodeURIComponent(locationId)}/${tabId}`);
   };
 
   const saveSellerSelection = async (nextIds, successMessage) => {
@@ -233,8 +417,6 @@ export default function LocationDetailPage({ locationId }) {
       setSellerState({ busy: false, error: error.message, success: "" });
     }
   };
-  const removeSeller = (sellerId) => saveSellerSelection(sellerIds.filter((id) => id !== sellerId), "El vendedor fue removido de esta ubicación.");
-  const assignSelectedSellers = () => saveSellerSelection([...new Set([...sellerIds, ...pendingSellerIds])], "Los vendedores seleccionados fueron asignados.");
 
   const toggleDiscount = (discountId) => setDiscountIds((current) => current.includes(discountId) ? current.filter((id) => id !== discountId) : [...current, discountId]);
   const handleDiscountSave = async () => {
@@ -248,50 +430,13 @@ export default function LocationDetailPage({ locationId }) {
     }
   };
 
-  const openProductConfig = (product) => {
-    setConfigProduct(product);
-    setConfigValues({ price: product.price || 0, yellowAlertQty: product.yellowAlertQty || 0, redAlertQty: product.redAlertQty || 0, active: product.active !== false });
-    setConfigState({ busy: false, error: "" });
-  };
-  const handleProductConfig = async (event) => {
-    event.preventDefault();
-    setConfigState({ busy: true, error: "" });
-    try {
-      await saveLocationProductConfiguration({ location, product: configProduct, values: configValues, profile });
-      setConfigProduct(null);
-      await result.refresh();
-    } catch (error) {
-      setConfigState({ busy: false, error: error.message });
-    }
-  };
-  const openNewProduct = () => {
-    setEditingMasterProduct(null);
-    setProductFormOpen(true);
-  };
-  const openEditProduct = (product) => {
-    setEditingMasterProduct(product);
-    setProductFormOpen(true);
-  };
-  const activateLocation = async () => {
-    setLifecycleState({ busy: true, error: "" });
-    try {
-      await setLocationLifecycle(location, "activate", profile);
-      await result.refresh();
-      setLifecycleState({ busy: false, error: "" });
-    } catch (error) {
-      setLifecycleState({ busy: false, error: error.message });
-    }
-  };
-
   if (result.status === "loading") return <div className="fm-page-enter"><Skeleton lines={8} /></div>;
   if (result.status === "error") return <div className="fm-page-enter"><Panel><EmptyState icon="AlertTriangle" title="No se pudo abrir la ubicación" description={result.error.message} action={<Link className="fm-button fm-button--secondary" to="/gestion/locations">Volver a ubicaciones</Link>} /></Panel></div>;
 
   const state = locationActivity(location);
   const schedule = locationSchedule(location);
   const canConfigure = can(profile, "locations", "configureLocationProducts");
-  const canCreateProducts = can(profile, "locations", "createLocationProducts");
-  const canEditMasterProducts = can(profile, "locations", "editMasterProducts");
-  const canLoad = can(profile, "locations", stockMode === "adjust" ? "adjustStock" : "loadStock");
+  const canLoad = can(profile, "locations", "loadStock");
   const canAssignDiscounts = can(profile, "locations", "assignDiscounts");
   const allSellers = result.data?.sellers || [];
   const assignedSellers = allSellers.filter((seller) => sellerIds.includes(seller.id));
@@ -313,113 +458,82 @@ export default function LocationDetailPage({ locationId }) {
       <div className="fm-location-tabs-desktop"><Tabs tabs={tabs} active={activeTab} onChange={changeTab} /></div>
       <label className="fm-location-tabs-mobile"><span>Sección</span><Select value={activeTab} onChange={(event) => changeTab(event.target.value)}>{tabs.map((tab) => <option key={tab.id} value={tab.id}>{tab.label}</option>)}</Select></label>
 
-      {activeTab === "products" ? (
-        <Panel title="Productos" description="Catálogo maestro único, organizado por categoría y unido a la configuración local." action={canCreateProducts ? <Button icon="Plus" onClick={openNewProduct}>Agregar nuevo producto</Button> : null}>
-          <FilterBar search={<SearchInput label="Buscar producto" value={search} onChange={(event) => setSearch(event.target.value)} />}>
-            <Select aria-label="Filtrar por categoría" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="">Todas las categorías</option>{result.data.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select>
-            <Select aria-label="Filtrar por estado" value={productStatus} onChange={(event) => setProductStatus(event.target.value)}><option value="all">Todos</option><option value="configured">Con stock configurado</option><option value="unconfigured">Sin configurar</option><option value="active">Activos</option><option value="inactive">Inactivos</option></Select>
-          </FilterBar>
-          {productGroups.length ? <div className="fm-product-category-groups">{productGroups.map((group) => (
-            <details className="fm-product-category" key={group.id} open={Boolean(search || categoryFilter) || undefined}>
-              <summary><span><Icon name="Boxes" /><strong>{group.name}</strong></span><Badge tone="neutral">{group.items.length} productos</Badge></summary>
-              <div className="fm-location-product-grid">{group.items.map((product) => (
-                <article className="fm-location-product-card" key={product.id}>
-                  <ProductImage product={product} />
-                  <div className="fm-location-product-card__main"><h3>{product.productName}</h3><p>{product.abbreviation || "Sin abreviación"}</p><div><Badge tone={!product.configured ? "warning" : product.active ? "success" : "neutral"}>{!product.configured ? "Sin configurar" : product.active ? "Activo" : "Inactivo"}</Badge>{product.imageStatus === "pending" ? <Badge tone="warning">Imagen pendiente</Badge> : null}</div></div>
-                  <dl><div><dt>Precio local</dt><dd>{formatMoney(product.price)}</dd></div><div><dt>Stock actual</dt><dd>{product.currentStock}</dd></div><div><dt>Alertas</dt><dd>{product.yellowAlertQty || 0} / {product.redAlertQty || 0}</dd></div></dl>
-                  <footer>{canConfigure ? <Button variant="secondary" onClick={() => openProductConfig(product)}>Configurar ubicación</Button> : null}{canEditMasterProducts ? <Button variant="ghost" onClick={() => openEditProduct(product)}>Editar producto</Button> : null}</footer>
-                </article>
-              ))}</div>
-            </details>
-          ))}</div> : <EmptyState icon="Boxes" title="No hay productos con estos filtros" />}
-        </Panel>
-      ) : null}
-
       {activeTab === "stock" ? (
-        <Panel title="Cargar stock" description="La operación es atómica, valida el estado actual de la ubicación y registra un movimiento por producto.">
-          {!state.active ? <Toast tone="error"><span>Esta ubicación debe estar activa para cargar stock.</span>{can(profile, "locations", "edit") ? <Button variant="secondary" loading={lifecycleState.busy} onClick={activateLocation}>Activar ubicación</Button> : null}</Toast> : null}
-          {lifecycleState.error ? <Toast tone="error">{lifecycleState.error}</Toast> : null}
-          <form onSubmit={handleStockSubmit}>
-            <div className="fm-stock-mode-row">
-              <FormField label="Modo de carga" required><Select value={stockMode} onChange={(event) => { setStockMode(event.target.value); setStockState({ busy: false, error: "", success: "", operationId: "" }); }}><option value="initial">Configurar stock inicial</option><option value="add">Agregar mercadería</option><option value="adjust">Ajustar inventario</option></Select></FormField>
-              <FormField label="Motivo" hint={stockMode === "adjust" ? "Obligatorio para justificar el ajuste." : "Quedará registrado en el movimiento."}><input className="fm-stock-reason-input" value={stockReason} onChange={(event) => setStockReason(event.target.value)} required={stockMode === "adjust"} placeholder={stockMode === "add" ? "Reposición depósito" : "Motivo de la operación"} /></FormField>
-            </div>
-            <div className="fm-stock-filter-row">
-              <SearchInput label="Buscar producto para cargar" value={search} onChange={(event) => setSearch(event.target.value)} />
-              <Select aria-label="Filtrar stock por categoría" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="">Todas las categorías</option>{result.data.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select>
-            </div>
-            <div className="fm-stock-load-list">
-              {visibleProducts.filter((product) => product.masterActive).map((product) => {
-                const value = stockValues[product.id]?.quantity ?? "";
-                const finalValue = stockFinal(product, value, stockMode);
-                return <label key={product.id} className="fm-stock-load-row">
-                  <ProductImage product={product} />
-                  <span className="fm-stock-load-row__identity"><strong>{product.productName}</strong><small>Stock actual: <b>{product.currentStock}</b> · Inicial: <b>{product.initialStock || 0}</b></small></span>
-                  <span className="fm-stock-load-row__field"><small>{stockMode === "add" ? "Cantidad a agregar" : stockMode === "adjust" ? "Nuevo stock real" : "Stock inicial"}</small><input type="number" min="0" step="1" inputMode="numeric" disabled={!state.active} value={value} onChange={(event) => updateStockValue(product, "quantity", event.target.value)} placeholder="0" /></span>
-                  <span className="fm-stock-final"><small>Stock final</small><strong>{finalValue}</strong><span>{finalValue < Number(product.currentStock || 0) ? "Disminuye" : finalValue > Number(product.currentStock || 0) ? "Aumenta" : "Sin cambios"}</span></span>
-                </label>;
-              })}
-            </div>
-            {stockState.error ? <Toast tone="error">{stockState.error}</Toast> : null}
-            {stockState.success ? <Toast tone="success">{stockState.success}</Toast> : null}
-            {canLoad ? <Button type="submit" icon="PackagePlus" loading={stockState.busy} disabled={!state.active}>Confirmar carga</Button> : <p className="fm-permission-note">Tu perfil puede consultar stock, pero no modificarlo.</p>}
-          </form>
+        <Panel
+          title={`Stock de ${location.name}`}
+          description="Acá ves solamente los productos disponibles en esta ubicación. Para sumar uno nuevo, elegilo desde el catálogo general."
+          action={canConfigure ? <HelpTooltip label="Agrega a esta ubicación un producto que ya existe en el catálogo."><Button icon="Plus" onClick={() => setAddProductOpen(true)}>Agregar producto</Button></HelpTooltip> : null}
+        >
+          {!state.active ? <Toast tone="error">Esta ubicación no está activa. Podés consultar el stock, pero no ingresar mercadería hasta reactivarla.</Toast> : null}
+          {inventory.length ? (
+            <>
+              <div className="fm-inventory-picker-filters">
+                <SearchInput label="Buscar en esta ubicación" value={search} onChange={(event) => setSearch(event.target.value)} />
+                <Select aria-label="Filtrar stock por categoría" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="">Todas las categorías</option>{result.data.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select>
+              </div>
+              {visibleInventory.length ? <div className="fm-inventory-card-grid">{visibleInventory.map((product) => (
+                <article className="fm-inventory-card" key={product.productId}>
+                  <header className="fm-inventory-card__identity"><ProductImage product={product} /><div><h3>{product.productName}</h3><p>{product.categoryName || "Sin categoría"}</p></div><Badge tone={product.active ? "success" : "neutral"}>{product.active ? "Activo" : "Inactivo"}</Badge></header>
+                  <dl className="fm-inventory-card__stats">
+                    <div><dt>Stock actual</dt><dd>{product.currentStock}</dd></div>
+                    <div><dt>Precio efectivo</dt><dd>{formatMoney(product.effectivePrice || 0)}</dd></div>
+                  </dl>
+                  <p className="fm-price-source">{product.usesDefaultPrice ? "Usa el precio de Productos" : product.legacyPrice ? "Precio local anterior (se conserva sin cambios)" : "Usa un precio especial en esta ubicación"}</p>
+                  <footer className="fm-inventory-card__actions">
+                    {canLoad ? <HelpTooltip label="Suma nuevas unidades al stock actual de este producto."><Button onClick={() => setStockProduct(product)} disabled={!state.active}>Agregar stock</Button></HelpTooltip> : null}
+                    <HelpTooltip label="Muestra los ingresos, transferencias y cambios de stock de este producto."><Button variant="secondary" onClick={() => setMovementProduct(product)}>Movimientos</Button></HelpTooltip>
+                    {canConfigure ? <HelpTooltip label="Cambia el precio que usa esta ubicación, las alertas o si el producto está habilitado."><Button variant="ghost" onClick={() => setSettingsProduct(product)}>Configuración</Button></HelpTooltip> : null}
+                  </footer>
+                </article>
+              ))}</div> : <EmptyState icon="Search" title="No hay productos con estos filtros" />}
+            </>
+          ) : (
+            <EmptyState
+              icon="Boxes"
+              title="Esta ubicación todavía no tiene productos cargados"
+              description="Elegí un producto del catálogo y cargá cuántas unidades hay actualmente."
+              action={canConfigure ? <HelpTooltip label="Agrega el primer producto a esta ubicación desde el catálogo general."><Button onClick={() => setAddProductOpen(true)}>Agregar producto</Button></HelpTooltip> : null}
+            />
+          )}
         </Panel>
       ) : null}
 
       {activeTab === "sellers" ? (
-        <Panel title="Vendedores" description="La lista principal muestra únicamente vendedores asignados a esta ubicación." action={canAssignSellers ? <Button icon="UserRoundCheck" onClick={() => { setPendingSellerIds([]); setSellerModalOpen(true); }}>Asignar vendedor</Button> : null}>
+        <Panel title="Vendedores" description="La lista principal muestra únicamente vendedores asignados a esta ubicación." action={canAssignSellers ? <HelpTooltip label="Asigna a esta ubicación uno o más vendedores que ya tienen usuario."><Button icon="UserRoundCheck" onClick={() => { setPendingSellerIds([]); setSellerModalOpen(true); }}>Asignar vendedor</Button></HelpTooltip> : null}>
           {assignedSellers.length ? <div className="fm-assigned-sellers">{assignedSellers.map((seller) => (
-            <article className="fm-seller-card" key={seller.id}><SellerAvatar seller={seller} /><div><h3>{seller.name || "Vendedor"}</h3><p>{seller.email || seller.id}</p><Badge tone={seller.active === true ? "success" : "warning"}>{seller.active === true ? "Activo" : "Inactivo"}</Badge></div>{canAssignSellers ? <Button variant="ghost" loading={sellerState.busy} onClick={() => removeSeller(seller.id)}>Quitar</Button> : null}</article>
-          ))}</div> : <EmptyState icon="UsersRound" title="Todavía no hay vendedores asignados" description="Asigná usuarios existentes sin crear cuentas duplicadas." action={canAssignSellers ? <Button onClick={() => setSellerModalOpen(true)}>Asignar vendedor</Button> : null} />}
+            <article className="fm-seller-card" key={seller.id}><SellerAvatar seller={seller} /><div><h3>{seller.name || "Vendedor"}</h3><p>{seller.email || seller.id}</p><Badge tone={seller.active === true ? "success" : "warning"}>{seller.active === true ? "Activo" : "Inactivo"}</Badge></div>{canAssignSellers ? <HelpTooltip label="Quita a este vendedor de la ubicación sin borrar su usuario."><Button variant="ghost" loading={sellerState.busy} onClick={() => saveSellerSelection(sellerIds.filter((id) => id !== seller.id), "El vendedor fue removido de esta ubicación.")}>Quitar</Button></HelpTooltip> : null}</article>
+          ))}</div> : <EmptyState icon="UsersRound" title="Todavía no hay vendedores asignados" description="Asigná usuarios existentes sin crear cuentas duplicadas." action={canAssignSellers ? <HelpTooltip label="Elige vendedores existentes para esta ubicación."><Button onClick={() => setSellerModalOpen(true)}>Asignar vendedor</Button></HelpTooltip> : null} />}
           {sellerState.error ? <Toast tone="error">{sellerState.error}</Toast> : null}{sellerState.success ? <Toast tone="success">{sellerState.success}</Toast> : null}
         </Panel>
       ) : null}
 
       {activeTab === "discounts" ? (
-        <Panel title="Descuentos" description="Las definiciones siguen siendo globales; aquí sólo se guardan sus IDs habilitados para esta ubicación.">
+        <Panel title="Descuentos" description="Los descuentos se definen una sola vez; acá elegís cuáles se pueden usar en esta ubicación.">
           <div className="fm-location-discounts">{result.data.discounts.map((discount) => {
             const available = isDiscountAvailable(discount, location, new Date(), { ignoreAssignment: true });
             const enabled = discountIds.includes(discount.id);
-            return <label className={!available ? "is-disabled" : ""} key={discount.id}>
-              <input type="checkbox" role="switch" checked={enabled} onChange={() => toggleDiscount(discount.id)} disabled={!canAssignDiscounts || !available} />
-              <span><strong>{discount.name}</strong><small>{discount.type === "percent" ? `${discount.value}%` : formatMoney(discount.value)}{discount.validUntil ? ` · hasta ${formatDate(discount.validUntil)}` : " · sin vencimiento"}</small><small>{discountRestrictions(discount)}</small></span>
-              <Badge tone={!available ? "error" : enabled ? "success" : "neutral"}>{!available ? "No vigente" : enabled ? "Habilitado" : "Disponible"}</Badge>
-            </label>;
+            return <label className={!available ? "is-disabled" : ""} key={discount.id}><input type="checkbox" role="switch" checked={enabled} onChange={() => toggleDiscount(discount.id)} disabled={!canAssignDiscounts || !available} /><span><strong>{discount.name}</strong><small>{discount.type === "percent" ? `${discount.value}%` : formatMoney(discount.value)}</small></span><Badge tone={!available ? "error" : enabled ? "success" : "neutral"}>{!available ? "No vigente" : enabled ? "Habilitado" : "Disponible"}</Badge></label>;
           })}</div>
           {!result.data.discounts.length ? <EmptyState icon="Tags" title="No hay descuentos configurados en el sistema" /> : null}
           {discountState.error ? <Toast tone="error">{discountState.error}</Toast> : null}{discountState.success ? <Toast tone="success">{discountState.success}</Toast> : null}
-          {canAssignDiscounts ? <Button icon="Save" loading={discountState.busy} onClick={handleDiscountSave}>Guardar descuentos</Button> : <p className="fm-permission-note">Podés consultar los descuentos habilitados, pero no modificarlos.</p>}
+          {canAssignDiscounts ? <HelpTooltip label="Guarda qué descuentos pueden usarse en esta ubicación."><Button icon="Save" loading={discountState.busy} onClick={handleDiscountSave}>Guardar descuentos</Button></HelpTooltip> : <p className="fm-permission-note">Podés consultar los descuentos habilitados, pero no modificarlos.</p>}
         </Panel>
       ) : null}
 
-      {activeTab === "sales" ? (
-        <Panel title="Ventas" description="Registro operativo de las ventas asociadas a esta ubicación. No se crean copias de los documentos.">
-          <LocationSalesPanel profile={profile} location={location} products={products} />
-        </Panel>
-      ) : null}
+      {activeTab === "sales" ? <Panel title="Ventas" description="Registro operativo de las ventas asociadas a esta ubicación."><LocationSalesPanel profile={profile} location={location} products={inventory} /></Panel> : null}
 
-      <ConfirmationDialog open={Boolean(pendingStock)} onClose={() => !stockState.busy && setPendingStock(null)} onConfirm={() => executeStock(pendingStock)} busy={stockState.busy} title="Confirmar reducción de stock" description="Uno o más productos quedarán con menos unidades. El ajuste se registrará con su cantidad anterior y posterior." />
+      <AddLocationProductModal open={addProductOpen} location={location} inventory={inventory} categories={result.data.categories} profile={profile} onClose={() => setAddProductOpen(false)} onSaved={result.refresh} />
+      <AddStockModal open={Boolean(stockProduct)} location={location} product={stockProduct} profile={profile} onClose={() => setStockProduct(null)} onSaved={result.refresh} />
+      <ProductSettingsModal open={Boolean(settingsProduct)} location={location} product={settingsProduct} profile={profile} onClose={() => setSettingsProduct(null)} onSaved={result.refresh} />
+      <MovementsModal open={Boolean(movementProduct)} location={location} product={movementProduct} onClose={() => setMovementProduct(null)} />
 
-      <Modal open={Boolean(configProduct)} onClose={() => !configState.busy && setConfigProduct(null)} title={`Configurar ${configProduct?.productName || "producto"}`} description={`Los datos maestros no se modifican; estos valores corresponden únicamente a ${location.name}.`}>
-        <form className="fm-form-grid" onSubmit={handleProductConfig}>
-          <FormField label="Precio local" required><input type="number" min="0" step="1" value={configValues.price} onChange={(event) => setConfigValues({ ...configValues, price: event.target.value })} /></FormField>
-          <FormField label="Alerta amarilla" required><input type="number" min="0" step="1" value={configValues.yellowAlertQty} onChange={(event) => setConfigValues({ ...configValues, yellowAlertQty: event.target.value })} /></FormField>
-          <FormField label="Alerta roja" required><input type="number" min="0" step="1" value={configValues.redAlertQty} onChange={(event) => setConfigValues({ ...configValues, redAlertQty: event.target.value })} /></FormField>
-          <label className="fm-check-row fm-form-grid__full"><input type="checkbox" checked={configValues.active} onChange={(event) => setConfigValues({ ...configValues, active: event.target.checked })} /><span>Producto activo en esta ubicación</span></label>
-          {configState.error ? <p className="fm-form-error fm-form-grid__full" role="alert">{configState.error}</p> : null}
-          <div className="fm-dialog-actions fm-form-grid__full"><Button variant="secondary" onClick={() => setConfigProduct(null)}>Cancelar</Button><Button type="submit" loading={configState.busy}>Guardar configuración</Button></div>
-        </form>
+      <Modal open={sellerModalOpen} onClose={() => !sellerState.busy && setSellerModalOpen(false)} title="Asignar vendedores" description="Elegí usuarios existentes. No se crean cuentas nuevas desde acá.">
+        <SearchInput label="Buscar vendedor" value={sellerSearch} onChange={(event) => setSellerSearch(event.target.value)} />
+        <div className="fm-seller-picker">{availableSellers.map((seller) => <label key={seller.id}><input type="checkbox" checked={pendingSellerIds.includes(seller.id)} onChange={(event) => setPendingSellerIds((current) => event.target.checked ? [...current, seller.id] : current.filter((id) => id !== seller.id))} /><SellerAvatar seller={seller} /><span><strong>{seller.name || "Vendedor"}</strong><small>{seller.email}</small></span></label>)}</div>
+        {!availableSellers.length ? <EmptyState icon="UserRound" title="No hay otros vendedores activos disponibles" /> : null}
+        {sellerState.error ? <Toast tone="error">{sellerState.error}</Toast> : null}
+        <div className="fm-dialog-actions"><HelpTooltip label="Cierra esta ventana sin cambiar vendedores."><Button variant="secondary" onClick={() => setSellerModalOpen(false)}>Cancelar</Button></HelpTooltip><HelpTooltip label="Asigna a esta ubicación los vendedores seleccionados."><Button loading={sellerState.busy} disabled={!pendingSellerIds.length} onClick={() => saveSellerSelection([...new Set([...sellerIds, ...pendingSellerIds])], "Los vendedores seleccionados fueron asignados.")}>Asignar seleccionados</Button></HelpTooltip></div>
       </Modal>
-
-      <Modal open={sellerModalOpen} onClose={() => !sellerState.busy && setSellerModalOpen(false)} title="Asignar vendedor" description="Seleccioná uno o varios usuarios existentes que todavía no están asignados.">
-        <SearchInput label="Buscar vendedor disponible" value={sellerSearch} onChange={(event) => setSellerSearch(event.target.value)} />
-        <div className="fm-seller-picker">{availableSellers.map((seller) => <label key={seller.id}><input type="checkbox" checked={pendingSellerIds.includes(seller.id)} onChange={() => setPendingSellerIds((current) => current.includes(seller.id) ? current.filter((id) => id !== seller.id) : [...current, seller.id])} /><SellerAvatar seller={seller} /><span><strong>{seller.name || "Vendedor"}</strong><small>{seller.email || seller.id}</small></span></label>)}</div>
-        {!availableSellers.length ? <EmptyState icon="UserRoundCheck" title="No hay vendedores disponibles" description="Todos los vendedores activos ya están asignados o no coinciden con la búsqueda." /> : null}
-        <div className="fm-dialog-actions"><Link className="fm-button fm-button--secondary" to="/gestion/administration">Crear nuevo vendedor</Link><Button loading={sellerState.busy} disabled={!pendingSellerIds.length} onClick={assignSelectedSellers}>Confirmar asignación</Button></div>
-      </Modal>
-
-      <LocationProductForm open={productFormOpen} product={editingMasterProduct} categories={result.data.categories} location={location} profile={profile} onClose={() => setProductFormOpen(false)} onSaved={result.refresh} />
     </div>
   );
 }
