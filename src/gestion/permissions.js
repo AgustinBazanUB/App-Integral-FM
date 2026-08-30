@@ -22,6 +22,7 @@ export const ACTIONS = [
   "viewStock",
   "loadStock",
   "adjustStock",
+  "transferStock",
   "assignSellers",
   "assignDiscounts",
   "viewOwn",
@@ -103,11 +104,13 @@ export const ROLE_TEMPLATES = {
             "adjustStock",
             "assignDiscounts",
           ]
-        : id === "quick-sales"
-          ? [...operational, ...sellerSalesActions]
-          : id === "marketing"
-            ? [...operational, ...whatsappMarketingActions]
-            : [...operational, "approve", "viewAllLocations"],
+        : id === "warehouse"
+          ? [...operational, "approve", "transferStock"]
+          : id === "quick-sales"
+            ? [...operational, ...sellerSalesActions]
+            : id === "marketing"
+              ? [...operational, ...whatsappMarketingActions]
+              : [...operational, "approve", "viewAllLocations"],
     ]),
   ),
   seller: {
@@ -130,8 +133,8 @@ export const ROLE_TEMPLATES = {
     alerts: ["view", "edit"],
   },
   warehouse_manager: {
-    locations: ["view"],
-    warehouse: [...operational, "approve"],
+    locations: ["view", "viewAllLocations"],
+    warehouse: [...operational, "approve", "transferStock"],
     suppliers: operational,
     alerts: ["view", "edit"],
   },
@@ -153,7 +156,7 @@ export const ROLE_TEMPLATES = {
   },
   supplier_manager: {
     suppliers: [...operational, "approve"],
-    warehouse: operational,
+    warehouse: [...operational, "transferStock"],
     finance: ["view"],
   },
   financial_manager: {
