@@ -57,6 +57,7 @@ export function effectiveLocationPrice(product = {}, stockItem = {}) {
 
 export function mergeLocationInventoryItem(product = {}, stockItem = {}) {
   const pricing = normalizeLegacyLocationPrice(stockItem, product);
+  const effectivePrice = effectiveLocationPrice(product, stockItem);
   return {
     ...stockItem,
     productId: stockItem.productId || product.id,
@@ -74,15 +75,25 @@ export function mergeLocationInventoryItem(product = {}, stockItem = {}) {
     priceOverride: pricing.priceOverride,
     usesDefaultPrice: pricing.usesDefaultPrice,
     legacyPrice: pricing.legacyPrice === true,
-    price: effectiveLocationPrice(product, stockItem),
-    effectivePrice: effectiveLocationPrice(product, stockItem),
+    price: effectivePrice,
+    effectivePrice,
     active: stockItem.active !== false && stockItem.deleted !== true,
   };
 }
 
 export function mergeWarehouseInventoryItem(product = {}, stockItem = {}) {
+  // Aunque llegue un registro legacy contaminado con campos de precio, la capa
+  // de dominio del depósito nunca los expone ni los propaga.
+  const {
+    price: _legacyPrice,
+    effectivePrice: _legacyEffectivePrice,
+    priceOverride: _legacyPriceOverride,
+    priceMode: _legacyPriceMode,
+    masterDefaultPrice: _legacyMasterDefaultPrice,
+    ...priceFreeStock
+  } = stockItem;
   return {
-    ...stockItem,
+    ...priceFreeStock,
     productId: stockItem.productId || product.id,
     productName: product.name || stockItem.productName || "Producto",
     abbreviation: product.abbreviation || stockItem.abbreviation || "",
@@ -91,6 +102,7 @@ export function mergeWarehouseInventoryItem(product = {}, stockItem = {}) {
     imageUrl: product.imageUrl || stockItem.imageUrl || "",
     thumbUrl: product.thumbUrl || stockItem.thumbUrl || "",
     masterActive: product.active !== false && product.deleted !== true,
+    defaultPrice: Number(product.defaultPrice || 0),
     currentStock: Number(stockItem.currentStock || 0),
     initialStock: Number(stockItem.initialStock || 0),
     active: stockItem.active !== false && stockItem.deleted !== true,
