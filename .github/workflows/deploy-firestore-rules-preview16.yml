@@ -18,42 +18,84 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Prepare Firebase credentials
-        id: firebase-auth
+      - name: Select Firebase service account
+        id: firebase-credentials
         env:
           FIREBASE_SERVICE_ACCOUNT_STANDARD: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM }}
           FIREBASE_SERVICE_ACCOUNT_LEGACY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INTEGRAL_FLOR_MIA }}
-          FIREBASE_TOKEN_VALUE: ${{ secrets.FIREBASE_TOKEN }}
         shell: bash
         run: |
           if [ -n "$FIREBASE_SERVICE_ACCOUNT_STANDARD" ]; then
             printf '%s' "$FIREBASE_SERVICE_ACCOUNT_STANDARD" > "$RUNNER_TEMP/firebase-sa.json"
-            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa.json" >> "$GITHUB_ENV"
-            echo "auth_mode=service-account" >> "$GITHUB_OUTPUT"
           elif [ -n "$FIREBASE_SERVICE_ACCOUNT_LEGACY" ]; then
             printf '%s' "$FIREBASE_SERVICE_ACCOUNT_LEGACY" > "$RUNNER_TEMP/firebase-sa.json"
-            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa.json" >> "$GITHUB_ENV"
-            echo "auth_mode=service-account" >> "$GITHUB_OUTPUT"
-          elif [ -n "$FIREBASE_TOKEN_VALUE" ]; then
-            echo "FIREBASE_TOKEN=$FIREBASE_TOKEN_VALUE" >> "$GITHUB_ENV"
-            echo "auth_mode=token" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::No Firebase deployment credential is configured. Expected FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM, FIREBASE_SERVICE_ACCOUNT_INTEGRAL_FLOR_MIA, or FIREBASE_TOKEN."
+            echo "::error::No Firebase service-account credential is configured."
             exit 1
           fi
 
-      - name: Deploy Firestore Rules only
+      - name: Create Google access token
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM || secrets.FIREBASE_SERVICE_ACCOUNT_INTEGRAL_FLOR_MIA }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/cloud-platform
+
+      - name: Create Firestore ruleset through Firebase Rules API
+        id: ruleset
         env:
-          AUTH_MODE: ${{ steps.firebase-auth.outputs.auth_mode }}
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         shell: bash
         run: |
-          if [ "$AUTH_MODE" = "token" ]; then
-            npx -y firebase-tools@15.10.0 deploy --only firestore:rules --project app-integral-fm --non-interactive --token "$FIREBASE_TOKEN"
-          else
-            npx -y firebase-tools@15.10.0 deploy --only firestore:rules --project app-integral-fm --non-interactive
+          set -euo pipefail
+          BODY="$(jq -n --rawfile rules firestore.rules '{source:{files:[{name:"firestore.rules",content:$rules}]}}')"
+          HTTP_CODE="$(curl -sS -o "$RUNNER_TEMP/ruleset-response.json" -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$BODY" \
+            "https://firebaserules.googleapis.com/v1/projects/app-integral-fm/rulesets")"
+          cat "$RUNNER_TEMP/ruleset-response.json"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::Ruleset creation failed with HTTP $HTTP_CODE"
+            exit 1
           fi
+          RULESET_NAME="$(jq -r '.name // empty' "$RUNNER_TEMP/ruleset-response.json")"
+          if [ -z "$RULESET_NAME" ]; then
+            echo "::error::Firebase Rules API did not return a ruleset name."
+            exit 1
+          fi
+          echo "ruleset_name=$RULESET_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Release Firestore rules to production
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          RULESET_NAME: ${{ steps.ruleset.outputs.ruleset_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_NAME="projects/app-integral-fm/releases/cloud.firestore"
+          PATCH_BODY="$(jq -n --arg name "$RELEASE_NAME" --arg ruleset "$RULESET_NAME" '{release:{name:$name,rulesetName:$ruleset},updateMask:"rulesetName"}')"
+          HTTP_CODE="$(curl -sS -o "$RUNNER_TEMP/release-response.json" -w '%{http_code}' \
+            -X PATCH \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$PATCH_BODY" \
+            "https://firebaserules.googleapis.com/v1/$RELEASE_NAME")"
+          cat "$RUNNER_TEMP/release-response.json"
+          if [ "$HTTP_CODE" = "404" ]; then
+            CREATE_BODY="$(jq -n --arg name "$RELEASE_NAME" --arg ruleset "$RULESET_NAME" '{name:$name,rulesetName:$ruleset}')"
+            HTTP_CODE="$(curl -sS -o "$RUNNER_TEMP/release-response.json" -w '%{http_code}' \
+              -X POST \
+              -H "Authorization: Bearer $ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data "$CREATE_BODY" \
+              "https://firebaserules.googleapis.com/v1/projects/app-integral-fm/releases")"
+            cat "$RUNNER_TEMP/release-response.json"
+          fi
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::Rules release failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "Firestore Rules released successfully to app-integral-fm."
