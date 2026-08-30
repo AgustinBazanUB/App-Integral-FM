@@ -33,13 +33,16 @@ test("las tarjetas de módulos renderizan iconos semánticos y no números", asy
   assert.doesNotMatch(source, /fm-module-card__number/);
 });
 
-test("la ubicación conserva el orden operativo de sus cuatro secciones", async () => {
+test("la ubicación separa el catálogo global y conserva el orden operativo", async () => {
   const source = await read("../src/gestion/pages/LocationDetailPage.jsx");
-  const products = source.indexOf('{ id: "products"');
   const stock = source.indexOf('{ id: "stock"');
   const sellers = source.indexOf('{ id: "sellers"');
   const discounts = source.indexOf('{ id: "discounts"');
-  assert.ok(products >= 0 && products < stock && stock < sellers && sellers < discounts);
+  const sales = source.indexOf('{ id: "sales"');
+  assert.ok(stock >= 0 && stock < sellers && sellers < discounts && discounts < sales);
+  assert.equal(source.indexOf('{ id: "products"'), -1);
+  assert.match(source, /title="Agregar producto"/);
+  assert.match(source, /Agrega a .* un producto que ya existe en el catálogo de Flor Mía/);
 });
 
 test("las consultas de ventas usan rango y la actividad usa cursor", async () => {
