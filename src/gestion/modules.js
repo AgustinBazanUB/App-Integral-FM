@@ -24,7 +24,7 @@ export const businessModules = [
   {
     id: "loyal-customers",
     number: "03",
-    label: "Clientes fidelizados",
+    label: "Clientes",
     shortLabel: "Clientes",
     description: "Historial, segmentos, consentimientos y próximos contactos.",
     collection: "customers",
