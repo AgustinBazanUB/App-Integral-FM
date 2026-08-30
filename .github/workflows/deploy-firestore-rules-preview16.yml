@@ -1,0 +1,67 @@
+name: Deploy Firestore Rules — Preview 16
+
+on:
+  push:
+    branches:
+      - feature/productos-stock-depositos
+    paths:
+      - ".github/workflows/deploy-firestore-rules-preview16.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: App tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Firestore Rules emulator
+        run: npx -y firebase-tools@15.10.0 emulators:exec --only firestore --project demo-flor-mia "npm run test:rules"
+
+      - name: Prepare Firebase credentials
+        id: firebase-auth
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INTEGRAL_FLOR_MIA }}
+          FIREBASE_TOKEN_VALUE: ${{ secrets.FIREBASE_TOKEN }}
+        shell: bash
+        run: |
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-sa.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa.json" >> "$GITHUB_ENV"
+            echo "auth_mode=service-account" >> "$GITHUB_OUTPUT"
+          elif [ -n "$FIREBASE_TOKEN_VALUE" ]; then
+            echo "FIREBASE_TOKEN=$FIREBASE_TOKEN_VALUE" >> "$GITHUB_ENV"
+            echo "auth_mode=token" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::No Firebase deployment credential is configured. Expected FIREBASE_SERVICE_ACCOUNT_INTEGRAL_FLOR_MIA or FIREBASE_TOKEN."
+            exit 1
+          fi
+
+      - name: Deploy Firestore Rules only
+        env:
+          AUTH_MODE: ${{ steps.firebase-auth.outputs.auth_mode }}
+        shell: bash
+        run: |
+          if [ "$AUTH_MODE" = "token" ]; then
+            npx -y firebase-tools@15.10.0 deploy --only firestore:rules --project integral-flor-mia --non-interactive --token "$FIREBASE_TOKEN"
+          else
+            npx -y firebase-tools@15.10.0 deploy --only firestore:rules --project integral-flor-mia --non-interactive
+          fi
