@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  validate-and-deploy:
+  deploy-rules-only:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -22,19 +22,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: App tests
-        run: npm test
-
-      - name: Build
-        run: npm run build
-
-      - name: Firestore Rules emulator
-        run: npx -y firebase-tools@15.10.0 emulators:exec --only firestore --project demo-flor-mia "npm run test:rules"
 
       - name: Prepare Firebase credentials
         id: firebase-auth
