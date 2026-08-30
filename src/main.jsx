@@ -30,6 +30,7 @@ import "./styles/metrics-fixes.css";
 import "./styles/seller-customers.css";
 import "./styles/customer-import.css";
 import "./styles/whatsapp-marketing.css";
+import "./styles/inventory.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
