@@ -4,7 +4,7 @@ import {
   isValidCustomerPhone,
   normalizeCustomerPhone,
   normalizedSearchText,
-} from "./customerDomain";
+} from "./customerDomain.js";
 
 export const FLORMIA_CONTACT_IMPORT_HEADERS = ["Telefono", "Nombre y Apellido", "Zona"];
 
