@@ -6,6 +6,7 @@ import {
   listLocationsShared,
   loadSellerResourcesShared,
 } from "../services/sharedResources";
+import { listLocationInventory } from "../services/inventoryService";
 import {
   listSellerDailySales,
   subscribeSellerLocationStock,
@@ -87,11 +88,35 @@ export function useSellerLocationStock(profile, locationId) {
     }
     let disposed = false;
     let unsubscribe = null;
+    let hydration = 0;
     setState((current) => ({ ...current, status: current.data?.length ? "ready" : "loading", error: null }));
+
+    const refreshHydratedStock = async () => {
+      const currentHydration = ++hydration;
+      try {
+        const data = (await listLocationInventory(locationId))
+          .filter((item) => item.active !== false && item.masterActive !== false);
+        if (!disposed && currentHydration === hydration) {
+          setState({ status: "ready", data, error: null });
+        }
+      } catch (error) {
+        if (!disposed && currentHydration === hydration) {
+          setState((current) => ({
+            status: current.data?.length ? "ready" : "error",
+            data: current.data || [],
+            error,
+          }));
+        }
+      }
+    };
+
+    // El listener conserva la actualización inmediata del stock. Cuando cambia una
+    // unidad, hidratamos sólo los productos asignados a esta ubicación con el maestro
+    // para resolver el precio predeterminado vigente sin leer todo el catálogo.
     subscribeSellerLocationStock({
       profile,
       locationId,
-      onData: (data) => !disposed && setState({ status: "ready", data, error: null }),
+      onData: () => refreshHydratedStock(),
       onError: (error) => !disposed && setState((current) => ({ status: current.data?.length ? "ready" : "error", data: current.data || [], error })),
     })
       .then((cleanup) => {
@@ -103,6 +128,7 @@ export function useSellerLocationStock(profile, locationId) {
       });
     return () => {
       disposed = true;
+      hydration += 1;
       unsubscribe?.();
     };
   }, [profile.id, locationId]);
