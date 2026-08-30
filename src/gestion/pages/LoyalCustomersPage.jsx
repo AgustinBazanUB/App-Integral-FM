@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from "react";
 import {
   Badge,
@@ -13,6 +12,7 @@ import {
   Tabs,
   Toast,
 } from "../../design-system";
+import CustomerImportModal from "../customers/CustomerImportModal";
 import {
   customerDisplayName,
   customerWhatsAppUrl,
@@ -102,6 +102,7 @@ export default function LoyalCustomersPage() {
   const [tab, setTab] = useState("customers");
   const [search, setSearch] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [customerForm, setCustomerForm] = useState(blankCustomer);
   const [customerBusy, setCustomerBusy] = useState(false);
   const [customerError, setCustomerError] = useState("");
@@ -129,6 +130,11 @@ export default function LoyalCustomersPage() {
     setCustomerForm(blankCustomer);
     setCustomerError("");
     setCustomerOpen(true);
+  };
+
+  const handleImportedCustomers = async ({ created, skipped, invalid }) => {
+    await customersResult.refresh();
+    setMessage(`Importación finalizada: ${created} creado(s), ${skipped} omitido(s) y ${invalid} inválido(s).`);
   };
 
   const saveCustomer = async () => {
@@ -246,10 +252,27 @@ export default function LoyalCustomersPage() {
     <div className="fm-page fm-customers-page">
       <PageHeader
         eyebrow="CRM operativo"
-        title="Clientes Fidelizados"
+        title="Clientes"
         description="Una única base de clientes, identificada principalmente por teléfono y alimentada también desde las ventas."
         actions={tab === "customers" && canCreateCustomers
-          ? <Button icon="UserPlus" onClick={openNewCustomer}>Nuevo cliente</Button>
+          ? (
+            <div className="fm-customer-page-actions">
+              <Button icon="UserPlus" onClick={openNewCustomer}>Nuevo cliente</Button>
+              <div className="fm-customer-import-help">
+                <Button
+                  variant="secondary"
+                  icon="FileText"
+                  onClick={() => setImportOpen(true)}
+                  aria-describedby="customer-import-help"
+                >
+                  Agregar Clientes
+                </Button>
+                <div id="customer-import-help" className="fm-customer-import-tooltip" role="tooltip">
+                  Importá un Excel generado por Flor Mía WhatsApp Sender. En la extensión: Contactos → elegí la etiqueta → Analizar → Exportar Excel. El archivo debe tener Telefono, Nombre y Apellido y Zona.
+                </div>
+              </div>
+            </div>
+          )
           : tab === "zones" && canManageZones
             ? <Button icon="Plus" onClick={openNewZone}>Nueva zona</Button>
             : null}
@@ -310,11 +333,19 @@ export default function LoyalCustomersPage() {
         </Panel>
       )}
 
+      <CustomerImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        profile={profile}
+        zones={zones}
+        onImported={handleImportedCustomers}
+      />
+
       <Modal
         open={Boolean(selectedCustomer)}
         onClose={closeCustomer}
         title={editingCustomer ? "Editar cliente" : "Detalle del cliente"}
-        description={editingCustomer ? "Los cambios se guardan únicamente al confirmar." : "Datos principales del cliente fidelizado."}
+        description={editingCustomer ? "Los cambios se guardan únicamente al confirmar." : "Datos principales del cliente."}
         footer={selectedCustomer ? <div className="fm-dialog-actions">
           {editingCustomer ? <><Button variant="secondary" disabled={detailBusy} onClick={() => { setEditingCustomer(false); setDetailError(""); }}>Cancelar</Button><Button icon="Save" loading={detailBusy} onClick={saveCustomerEdit}>Guardar cambios</Button></> : <><Button variant="secondary" onClick={closeCustomer}>Cerrar</Button>{canEditCustomers ? <Button icon="Settings2" onClick={startCustomerEdit}>Editar</Button> : null}</>}
         </div> : null}
