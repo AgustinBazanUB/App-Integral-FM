@@ -1,5 +1,5 @@
 import { useState } from "react";
-import readXlsxFile from "read-excel-file";
+import { readSheet } from "read-excel-file/browser";
 import { Button, Modal, Toast } from "../../design-system";
 import { formatPhoneForDisplay } from "./customerDomain";
 import {
@@ -42,7 +42,7 @@ export default function CustomerImportModal({ open, onClose, profile, zones, onI
     setError("");
     setProgress(null);
     try {
-      const rows = await readXlsxFile(file);
+      const rows = await readSheet(file);
       const initial = parseFlorMiaContactImport(rows, zones);
       const withExisting = await markExistingImportedCustomers(initial, findCustomerByPhone, 8);
       setParsed({ ...withExisting, fileName: file.name });
