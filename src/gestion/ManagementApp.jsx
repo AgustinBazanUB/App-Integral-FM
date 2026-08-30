@@ -29,6 +29,8 @@ const GenericModulePage = lazy(managementPageLoaders.generic);
 const LoyalCustomersPage = lazy(managementPageLoaders["loyal-customers"]);
 const LocationsPage = lazy(managementPageLoaders.locations);
 const LocationDetailPage = lazy(managementPageLoaders.locationDetail);
+const ProductsPage = lazy(managementPageLoaders.products);
+const WarehousePage = lazy(managementPageLoaders.warehouse);
 const QuickSalesPage = lazy(managementPageLoaders["quick-sales"]);
 const SalesMetricsPage = lazy(managementPageLoaders.metrics);
 const WhatsAppCampaignsPage = lazy(managementPageLoaders.marketingWhatsapp);
@@ -158,6 +160,10 @@ function ManagementRouter() {
     page = <DashboardPage />;
   } else if (routeId === "locations") {
     page = pathParts[2] ? <LocationDetailPage locationId={decodeURIComponent(pathParts[2])} /> : <LocationsPage />;
+  } else if (routeId === "products") {
+    page = <ProductsPage />;
+  } else if (routeId === "warehouse") {
+    page = <WarehousePage warehouseId={pathParts[2] ? decodeURIComponent(pathParts[2]) : null} />;
   } else if (routeId === "quick-sales") {
     page = <QuickSalesPage />;
   } else if (routeId === "loyal-customers") {
