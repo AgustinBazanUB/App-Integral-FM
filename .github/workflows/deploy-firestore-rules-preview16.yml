@@ -26,19 +26,24 @@ jobs:
       - name: Prepare Firebase credentials
         id: firebase-auth
         env:
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INTEGRAL_FLOR_MIA }}
+          FIREBASE_SERVICE_ACCOUNT_STANDARD: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM }}
+          FIREBASE_SERVICE_ACCOUNT_LEGACY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INTEGRAL_FLOR_MIA }}
           FIREBASE_TOKEN_VALUE: ${{ secrets.FIREBASE_TOKEN }}
         shell: bash
         run: |
-          if [ -n "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
-            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-sa.json"
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT_STANDARD" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_STANDARD" > "$RUNNER_TEMP/firebase-sa.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa.json" >> "$GITHUB_ENV"
+            echo "auth_mode=service-account" >> "$GITHUB_OUTPUT"
+          elif [ -n "$FIREBASE_SERVICE_ACCOUNT_LEGACY" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_LEGACY" > "$RUNNER_TEMP/firebase-sa.json"
             echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa.json" >> "$GITHUB_ENV"
             echo "auth_mode=service-account" >> "$GITHUB_OUTPUT"
           elif [ -n "$FIREBASE_TOKEN_VALUE" ]; then
             echo "FIREBASE_TOKEN=$FIREBASE_TOKEN_VALUE" >> "$GITHUB_ENV"
             echo "auth_mode=token" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::No Firebase deployment credential is configured. Expected FIREBASE_SERVICE_ACCOUNT_INTEGRAL_FLOR_MIA or FIREBASE_TOKEN."
+            echo "::error::No Firebase deployment credential is configured. Expected FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM, FIREBASE_SERVICE_ACCOUNT_INTEGRAL_FLOR_MIA, or FIREBASE_TOKEN."
             exit 1
           fi
 
@@ -48,7 +53,7 @@ jobs:
         shell: bash
         run: |
           if [ "$AUTH_MODE" = "token" ]; then
-            npx -y firebase-tools@15.10.0 deploy --only firestore:rules --project integral-flor-mia --non-interactive --token "$FIREBASE_TOKEN"
+            npx -y firebase-tools@15.10.0 deploy --only firestore:rules --project app-integral-fm --non-interactive --token "$FIREBASE_TOKEN"
           else
-            npx -y firebase-tools@15.10.0 deploy --only firestore:rules --project integral-flor-mia --non-interactive
+            npx -y firebase-tools@15.10.0 deploy --only firestore:rules --project app-integral-fm --non-interactive
           fi
