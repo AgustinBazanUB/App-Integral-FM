@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "summary": "Campaña de prueba",
+  "strategy": "Mostrar el origen del producto y llevar consultas a WhatsApp.",
+  "concept": "Del productor a tu mesa",
+  "angle": "Origen y calidad",
+  "commercialObjective": "Recibir consultas",
+  "targetAudience": "Personas interesadas en alimentos de calidad",
+  "coreMessage": "Aceite de oliva producido en Mendoza",
+  "offer": "",
+  "cta": "Escribir por WhatsApp",
+  "creativeDirection": "Tomas claras del producto y del origen.",
+  "creativePieces": [
+    {"id":"hook-1","requirementKey":"hook","type":"hook","title":"Origen","script":"¿Sabés quién produce tu aceite?","objective":"Captar atención","instructions":"Mostrar botella y finca","durationSeconds":4,"requirements":[],"status":"proposed"}
+  ],
+  "testingPlan": "Comparar variantes manteniendo el resto estable.",
+  "assumptions": [],
+  "warnings": []
+}
