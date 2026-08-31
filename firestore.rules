@@ -619,7 +619,7 @@ service cloud.firestore {
         && plan.creativePieces is list && plan.creativePieces.size() <= 100 && plan.assumptions is list && plan.assumptions.size() <= 30 && plan.warnings is list && plan.warnings.size() <= 30;
     }
     function campaignPlanTheoryMatches(data,campaignId) {
-      let project = get(/databases/$(database)/documents/metaCampaignProjects/$(campaignId)).data;
+      let project = getAfter(/databases/$(database)/documents/metaCampaignProjects/$(campaignId)).data;
       return data.theoryId == project.theoryId && data.theoryVersionId == project.theoryVersionId && data.theoryVersion == project.theoryVersion;
     }
     function validCampaignPlanRecord(data,campaignId) {
