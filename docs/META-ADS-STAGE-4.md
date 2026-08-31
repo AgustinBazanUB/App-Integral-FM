@@ -330,3 +330,19 @@ La edición manual del resumen se guardó sin llamar nuevamente a OpenAI y persi
 ### Contrato para repetir esta QA
 
 Usar una cuenta admin o `marketing_manager`, una campaña marcada como QA con producto canónico y una metodología activa cuya `questionPolicy.requiredFields` incluya al menos un dato faltante. `Preparar preguntas` debe devolver preguntas reales y persistirlas; después de responder, `Preparar estrategia` debe producir un draft con cantidades exactamente iguales a `creativeRequirements[].recommendedCount`. Editar el draft debe persistir sin consumo de IA; aprobar debe retirar la edición; regenerar debe crear `rN+1` y el selector de historial debe seguir permitiendo abrir `rN`.
+
+### Verificación del artefacto corregido
+
+El commit funcional `4dfd08b` se publicó en `feature/meta-ads-campaign-planner` y se validó mediante el PR auxiliar draft `#17`, marcado **NO MERGE**. Netlify generó `https://deploy-preview-17--appintegralflormia.netlify.app` correctamente. El smoke del artefacto devolvió HTTP 200 en `/`, `/gestion/marketing/meta-ads` y el health del Planner; este último informó `configured=true` y modelos `gpt-5.6-luna`.
+
+La verificación autenticada del Preview `#17` confirmó después de una recarga completa:
+
+- CampaignPlan `r1` y `r2` visibles y seleccionables;
+- `r1` conserva `[QA edición manual]` y no ofrece edición por estar aprobada;
+- la campaña conserva estado `Creatividades` y vuelve a seleccionar la última revisión;
+- la metodología conserva `v1 · Histórica` y `v2 · Activa`;
+- la v1 histórica mantiene fuente y editor JSON deshabilitados y exige crear una versión nueva;
+- la v2 conserva el TheoryConfig de 6 hooks, 1 cuerpo, 1 cierre y voice-over opcional;
+- a 390×844, Conocimiento, producto canónico, metodología, historial y CampaignPlan no generan overflow horizontal; el ancho de documento se mantiene en 375 px.
+
+El CI del PR auxiliar `#17` ejecuta el merge sintético contra el `main` actual, que incorporó posteriormente trabajo de Productos/Stock/Ubicaciones. Allí fallan cinco pruebas de esos módulos porque la rama apilada de Etapa 4 no contiene esas implementaciones más nuevas. No son fallos de Meta Ads ni del commit funcional: sobre la rama exacta de Etapa 4 la barrera permanece en 219/219 tests, 46/46 Rules Emulator y build PASS. No se mezclaron cambios ajenos a Etapa 4 para forzar ese PR auxiliar a verde.
