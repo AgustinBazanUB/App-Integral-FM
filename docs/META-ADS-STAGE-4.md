@@ -245,7 +245,7 @@ El CI permanente del repositorio también pasó instalación, tests, Rules Emula
 
 PR real de Etapa 4: `#13`, base `feature/meta-ads-theory-engine`.
 
-PR auxiliar en draft, sólo para CI/Preview: `#14`, base `main`, marcado explícitamente **NO MERGE**.
+PR auxiliar `#14`, base `main`: posteriormente quedó fusionado el 30/08/2026 y conserva el Deploy Preview histórico utilizado para la validación funcional. El PR real de desarrollo continúa siendo `#13`.
 
 Deploy Preview exacto:
 
@@ -266,7 +266,7 @@ Health observado en el Preview:
 - `pricingConfigured: false`;
 - precios por token: `null`.
 
-Esto confirma que `OPENAI_API_KEY` está presente en el contexto de Deploy Preview y que la función está desplegada. No demuestra que la cuenta de API tenga saldo/crédito disponible, porque el health no consume OpenAI y una generación real requiere una sesión Firebase autorizada y una campaña real en estado de planificación. Esa validación autenticada queda explícitamente pendiente en lugar de inventarse.
+El health confirma que `OPENAI_API_KEY` está presente en el contexto de Deploy Preview y que la función está desplegada, pero por sí solo no prueba una generación. La validación autenticada real se completó posteriormente mediante Theory Compiler, Question Generator y Campaign Planner; la evidencia y el resultado se detallan en el cierre de etapa incluido más abajo.
 
 El workflow temporal de smoke fue eliminado después de la verificación.
 
@@ -286,3 +286,47 @@ Etapa 4 no:
 ## Preparación para la etapa siguiente
 
 La salida estable para una etapa creativa posterior es el `CampaignPlan` aprobado y su conjunto de `CreativePieces`, siempre enlazados a una CampaignProject y a una TheoryVersion fija. Una etapa posterior debe consumir ese contrato aprobado en lugar de volver a inferir estrategia desde cero.
+
+## VALIDACIÓN FINAL / CIERRE DE ETAPA 4 — 31/08/2026
+
+### Comportamiento esperado verificado
+
+El flujo de usuario validado es:
+
+`CampaignProject de QA → TheoryVersion activa fijada → preguntas mínimas → respuestas → CampaignPlan draft → edición manual → aprobación → regeneración en una revisión nueva`.
+
+La prueba autenticada se ejecutó como administrador en el Deploy Preview de Etapa 4 y utilizó OpenAI real con `gpt-5.6-luna`. No se usaron fixtures, mocks ni endpoints sin autenticación. El Question Generator produjo dos preguntas estructuradas (`commercial_objective` y `cta`) y el Campaign Planner produjo planes que superaron Structured Outputs, validación de dominio y persistencia Firestore. La v2 activa exigía 6 hooks y el resultado persistido incluyó exactamente 6 `hooks`, 1 `main_body` y 1 `closing`; `voice_over` era opcional con `recommendedCount = 0`.
+
+La edición manual del resumen se guardó sin llamar nuevamente a OpenAI y persistió después de una recarga completa. La aprobación dejó la revisión sin acción de edición. La regeneración creó una revisión draft nueva y conservó la revisión aprobada anterior. La UI ahora expone un selector `rN · Aprobada/Borrador` para abrir el historial sin sobrescribir revisiones.
+
+### Bugs encontrados y corregidos
+
+1. **Inicio de planificación rechazado por Firestore.** El servicio iniciaba la planificación con un batch que actualiza el CampaignProject y crea `planning/state`. La Rule comparaba la TheoryVersion contra `get(...)`, que veía el documento anterior al batch y por eso rechazaba la creación. Se cambió a `getAfter(...)` y se agregó una prueba que reproduce el batch real completo. Las Rules corregidas se publicaron únicamente en `app-integral-fm` con `--only firestore:rules`.
+2. **Detalle de metodología desactualizado después de procesar, guardar, aprobar o activar.** `reload(version.id)` mantenía el mismo `selectedId`; el efecto dependiente del id no volvía a leer la versión. `reload` ahora recupera explícitamente la versión seleccionada y sincroniza estado, fuente y editor JSON.
+3. **Plan desactualizado después de edición manual.** Firestore persistía el cambio pero el componente seguía mostrando el objeto anterior hasta recargar. El callback de guardado ahora vuelve a cargar el workspace.
+4. **Historial de CampaignPlan no navegable.** Las revisiones ya se preservaban en Firestore, pero la interfaz sólo mostraba la última. Se agregó navegación por revisión para comprobar la anterior y la inmutabilidad de una aprobada.
+5. **Cobertura incompleta de categoría dinámica.** La documentación mencionaba `product_demo`, pero faltaba una prueba explícita. Se agregó junto con pruebas de roles e idempotencia temporal.
+
+### Evidencia automática final
+
+- `npm test`: **219/219 PASS**.
+- Firestore Rules Emulator: **46/46 PASS**.
+- `npm run build`: **PASS** (1776 módulos; sólo advertencia no bloqueante por tamaño de chunk).
+- HTTP `/`: **200**.
+- HTTP `/gestion/marketing/meta-ads`: **200**.
+- health del Planner: **200**, `configured=true`, modelos de preguntas y plan `gpt-5.6-luna`.
+- POST anónimo a `generateQuestions`: **401 unauthenticated**.
+- Rules desplegadas: **`app-integral-fm`**, exclusivamente `firestore:rules`.
+
+### Evidencia funcional real
+
+- Metodología `Metodología de prueba`: v1 histórica y v2 activa, con TheoryConfig persistido después de recarga.
+- CampaignProject `QA ETAPA 4 — OPENAI — NO USAR` (`nS9HcQ96MYQbvtdzNwiB`): preguntas reales, respuestas, dos CampaignPlan generados, edición manual, aprobación y regeneración verificadas.
+- CampaignProject auxiliar `QA ETAPA 4 — NO USAR` (`vGQAE38UPGtI9LJF4XDN`): conservado en planificación con v1 fijada para demostrar que activar v2 no cambia una campaña ya iniciada.
+- Los CampaignProject de QA no se eliminaron. El archivado lógico existente sólo admite campañas en `draft`; después de iniciar planificación la UI no ofrece archivo, por lo que quedan claramente identificados para no mezclarlos con campañas reales.
+- El write de `AIUsage` forma parte del mismo batch que persiste preguntas/plan; si esa escritura hubiera sido rechazada, la operación completa no habría llegado al estado observado.
+- Mobile 390×844: ancho de documento y contenido iguales, sin overflow horizontal; tabs y tarjetas creativas quedaron dentro del viewport. Desktop se volvió a comprobar después de resetear el viewport.
+
+### Contrato para repetir esta QA
+
+Usar una cuenta admin o `marketing_manager`, una campaña marcada como QA con producto canónico y una metodología activa cuya `questionPolicy.requiredFields` incluya al menos un dato faltante. `Preparar preguntas` debe devolver preguntas reales y persistirlas; después de responder, `Preparar estrategia` debe producir un draft con cantidades exactamente iguales a `creativeRequirements[].recommendedCount`. Editar el draft debe persistir sin consumo de IA; aprobar debe retirar la edición; regenerar debe crear `rN+1` y el selector de historial debe seguir permitiendo abrir `rN`.
