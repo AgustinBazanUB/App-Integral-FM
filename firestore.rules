@@ -383,7 +383,8 @@ service cloud.firestore {
       return profile().role == "marketing_manager" && action in [
         "metaAdsView", "metaAdsCreateProject", "metaAdsEditProject", "metaAdsArchiveProject",
         "metaAdsManageKnowledge", "metaAdsManageTheory",
-        "metaAdsPlanCampaign", "metaAdsApprovePlan"
+        "metaAdsPlanCampaign", "metaAdsApprovePlan",
+        "metaAdsViewCreativeWorkspace", "metaAdsUploadCreative"
       ];
     }
     function metaAdsCan(action) {
@@ -491,11 +492,27 @@ service cloud.firestore {
           && (data.approvedPlanRevision == null || (data.approvedPlanRevision is int && data.approvedPlanRevision >= 1 && data.approvedPlanRevision <= data.latestPlanRevision))
           && data.lastPlanningAt is timestamp && data.lastPlanningBy is string && data.lastPlanningBy.size() > 0);
     }
+    function validMetaAdsDriveFields(data) {
+      let fields = ["driveFolderId","driveConnectionId","driveId","driveProvisionedAt","driveStructure"];
+      return !data.keys().hasAny(fields)
+        || (data.keys().hasAll(fields)
+          && data.driveFolderId is string && data.driveFolderId.size() > 0 && data.driveFolderId.size() <= 220
+          && data.driveConnectionId == "googleDrive"
+          && (data.driveId == null || (data.driveId is string && data.driveId.size() <= 220))
+          && data.driveProvisionedAt is timestamp
+          && data.driveStructure is map
+          && data.driveStructure.keys().hasAll(["sourceFolderId","rendersFolderId","finalFolderId","categories"])
+          && data.driveStructure.keys().hasOnly(["sourceFolderId","rendersFolderId","finalFolderId","categories"])
+          && data.driveStructure.sourceFolderId is string && data.driveStructure.sourceFolderId.size() <= 220
+          && data.driveStructure.rendersFolderId is string && data.driveStructure.rendersFolderId.size() <= 220
+          && data.driveStructure.finalFolderId is string && data.driveStructure.finalFolderId.size() <= 220
+          && data.driveStructure.categories is map && data.driveStructure.categories.size() <= 40);
+    }
     function validMetaAdsCampaignProject(data) {
-      return data.keys().hasOnly(["name","channel","status","schemaVersion","productId","productNameSnapshot","archived","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt","archivedAt","archivedBy","archivedByName","planningStatus","theoryId","theoryVersionId","theoryVersion","theoryNameSnapshot","latestPlanRevision","approvedPlanRevision","lastPlanningAt","lastPlanningBy"])
+      return data.keys().hasOnly(["name","channel","status","schemaVersion","productId","productNameSnapshot","archived","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt","archivedAt","archivedBy","archivedByName","planningStatus","theoryId","theoryVersionId","theoryVersion","theoryNameSnapshot","latestPlanRevision","approvedPlanRevision","lastPlanningAt","lastPlanningBy","driveFolderId","driveConnectionId","driveId","driveProvisionedAt","driveStructure"])
         && data.name is string && data.name.size() > 0 && data.name.size() <= 120 && data.channel == "meta_ads" && data.schemaVersion == 1
         && validMetaAdsStatus(data.status) && data.archived is bool && data.archived == (data.status == "archived")
-        && validMetaAdsProduct(data) && validMetaAdsPlanningFields(data)
+        && validMetaAdsProduct(data) && validMetaAdsPlanningFields(data) && validMetaAdsDriveFields(data)
         && data.createdBy is string && data.createdBy.size() > 0 && data.createdByName is string && data.createdByName.size() > 0 && data.createdAt is timestamp
         && data.updatedBy is string && data.updatedBy.size() > 0 && data.updatedByName is string && data.updatedByName.size() > 0 && data.updatedAt is timestamp
         && ((data.status == "archived" && ("archivedAt" in data) && data.archivedAt is timestamp && ("archivedBy" in data) && data.archivedBy is string && data.archivedBy.size() > 0 && ("archivedByName" in data) && data.archivedByName is string && data.archivedByName.size() > 0)
@@ -961,7 +978,22 @@ service cloud.firestore {
         allow create: if metaAdsCan("metaAdsPlanCampaign") && request.resource.data.status == "draft" && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedBy == request.auth.uid && campaignPlanTheoryMatches(request.resource.data,campaignId) && validCampaignPlanRecord(request.resource.data,campaignId);
         allow update: if request.resource.data.status == "approved" ? campaignPlanApproveAllowed(campaignId) : campaignPlanDraftUpdateAllowed(campaignId); allow delete: if false;
       }
+      match /recordingTasks/{taskId} {
+        allow get,list: if metaAdsCan("metaAdsViewCreativeWorkspace");
+        allow create,update,delete: if false;
+      }
+      match /creativeAssets/{assetId} {
+        allow get,list: if metaAdsCan("metaAdsViewCreativeWorkspace");
+        allow create,update,delete: if false;
+      }
     }
+    match /integrationConnections/{integrationId} {
+      allow get: if integrationId == "googleDrive" && (metaAdsCan("metaAdsViewCreativeWorkspace") || metaAdsCan("metaAdsManageDrive"));
+      allow list,create,update,delete: if false;
+    }
+    match /integrationSecrets/{secretId} { allow read,write: if false; }
+    match /integrationOauthStates/{stateId} { allow read,write: if false; }
+    match /creativeUploadSessions/{sessionId} { allow read,write: if false; }
     match /whatsappCampaigns/{campaignId} {
       allow get, list: if whatsappCanView();
       allow create: if whatsappCanCreate()
@@ -1037,6 +1069,9 @@ service cloud.firestore {
               || metaAdsCan("metaAdsManageTheory")
               || metaAdsCan("metaAdsPlanCampaign")
               || metaAdsCan("metaAdsApprovePlan")
+              || metaAdsCan("metaAdsViewCreativeWorkspace")
+              || metaAdsCan("metaAdsUploadCreative")
+              || metaAdsCan("metaAdsManageDrive")
               || canModule("marketing", "edit")))
           || (("locationId" in request.resource.data)
             && allowedLocation(request.resource.data.locationId)));

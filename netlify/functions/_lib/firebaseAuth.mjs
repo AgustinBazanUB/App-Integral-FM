@@ -87,13 +87,19 @@ function explicitAction(profile, action) {
   return false;
 }
 
+const MARKETING_MANAGER_META_ADS_ACTIONS = new Set([
+  "metaAdsView", "metaAdsCreateProject", "metaAdsEditProject", "metaAdsArchiveProject",
+  "metaAdsManageKnowledge", "metaAdsManageTheory", "metaAdsPlanCampaign", "metaAdsApprovePlan",
+  "metaAdsViewCreativeWorkspace", "metaAdsUploadCreative",
+]);
+
 function allowedAction(profile, action) {
   if (profile?.active !== true) return false;
   const denied = new Set(profile.permissionDeny?.marketing || []);
   if (denied.has(action)) return false;
   const role = normalizedRole(profile);
   if (role === "admin" || role === "general_admin") return true;
-  if (role === "marketing_manager") return true;
+  if (role === "marketing_manager") return MARKETING_MANAGER_META_ADS_ACTIONS.has(action);
   if (explicitAction(profile, action)) return true;
   return (profile.permissionAllow?.marketing || []).includes(action);
 }

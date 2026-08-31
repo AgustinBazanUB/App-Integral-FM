@@ -319,7 +319,7 @@ async function provisionCampaign(session, campaignId) {
 }
 
 async function createUpload(session, body) {
-  const campaign = await loadCampaign(body.campaignId);
+  let campaign = await loadCampaign(body.campaignId);
   if (campaign.status !== "creative") {
     const error = new Error("La campaña no está lista para cargar material.");
     error.code = "campaign-state-invalid";
@@ -347,6 +347,7 @@ async function createUpload(session, body) {
   }
   if (!campaign.driveFolderId || !task.driveFolderId) {
     await provisionCampaign(session, campaign.id);
+    campaign = await loadCampaign(campaign.id);
     task = await adminGet(taskPath(campaign.id, taskId));
   }
   if (!task.driveFolderId) {
