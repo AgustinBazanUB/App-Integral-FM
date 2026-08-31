@@ -32,7 +32,7 @@ test("backend inicia Google Drive resumable upload y no recibe binario", () => {
   const helper = fs.readFileSync("netlify/functions/_lib/googleDrive.mjs", "utf8");
   assert.match(helper, /uploadType:\s*"resumable"/);
   assert.match(helper, /X-Upload-Content-Length/);
-  assert.match(backend, /originalFileName:\s*validation\.value\.originalFileName/);
+  assert.match(backend, /originalFileName:\s*local\.value\.originalFileName/);
   assert.doesNotMatch(backend, /arrayBuffer\(\)|formData\(\)|request\.body\.getReader/);
 });
 
@@ -40,8 +40,14 @@ test("browser sube chunks a sessionUrl y Netlify sólo recibe metadata", () => {
   const client = fs.readFileSync("src/gestion/marketing/metaAds/googleDriveService.js", "utf8");
   assert.match(client, /xhrPut\(sessionUrl, chunk/);
   assert.match(client, /Content-Range/);
-  assert.match(client, /authorizedRequest\("createUpload",\s*\{/);
-  assert.doesNotMatch(client, /authorizedRequest\("createUpload"[\s\S]{0,500}\bfile\s*,/);
+  const start = client.indexOf('authorizedRequest("createUpload", {');
+  const end = client.indexOf("  });", start) + 5;
+  const createPayload = client.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(createPayload, /originalFileName:/);
+  assert.match(createPayload, /mimeType:/);
+  assert.match(createPayload, /sizeBytes:/);
+  assert.doesNotMatch(createPayload, /\bfile\s*[:,]/);
 });
 
 test("sesiones resumibles no se persisten con URL y secrets quedan backend-only", () => {
