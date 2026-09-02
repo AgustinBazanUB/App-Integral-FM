@@ -1,24 +1,25 @@
-name: WhatsApp Inbox Light
+name: WhatsApp Inbox Hardening
 
 on:
   push:
     branches:
       - feature/whatsapp-inbox-crm
+      - fix/whatsapp-inbox-hardening
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  inbox-light:
+  inbox-hardening:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -28,6 +29,9 @@ jobs:
 
       - name: Focused Inbox tests
         run: node --test tests/whatsapp-inbox-light.test.mjs
+
+      - name: Full Web App tests
+        run: npm test
 
       - name: Build Web App
         run: npm run build
