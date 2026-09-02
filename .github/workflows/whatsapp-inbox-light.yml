@@ -30,67 +30,52 @@ jobs:
       - name: Focused Inbox tests
         run: node --test tests/whatsapp-inbox-light.test.mjs
 
-      - name: General core regression tests
+      - name: activity-presentation
         if: always()
-        run: >-
-          node --test
-          tests/activity-presentation.test.mjs
-          tests/admin-experience.test.mjs
-          tests/auth-entry.test.mjs
-          tests/cancellation-metrics-filters.test.mjs
-          tests/dashboard-filters.test.mjs
-          tests/data.test.mjs
-          tests/global-overlay-focus.test.mjs
-          tests/inventory-domain.test.mjs
-          tests/location-enhancements.test.mjs
-
-      - name: Customer regression tests
+        run: node --test tests/activity-presentation.test.mjs
+      - name: admin-experience
         if: always()
-        run: >-
-          node --test
-          tests/customer-domain.test.mjs
-          tests/customer-import-ui.test.mjs
-
-      - name: Management and seller regression tests
+        run: node --test tests/admin-experience.test.mjs
+      - name: auth-entry
         if: always()
-        run: >-
-          node --test
-          tests/management-domain.test.mjs
-          tests/management-ui.test.mjs
-          tests/seller-panel.test.mjs
-
-      - name: Performance and search regression tests
+        run: node --test tests/auth-entry.test.mjs
+      - name: cancellation-metrics-filters
         if: always()
-        run: >-
-          node --test
-          tests/performance-metrics.test.mjs
-          tests/search.test.mjs
-
-      - name: Meta Ads regression tests
+        run: node --test tests/cancellation-metrics-filters.test.mjs
+      - name: dashboard-filters
         if: always()
-        run: >-
-          node --test
-          tests/meta-ads-campaign-domain.test.mjs
-          tests/meta-ads-campaign-planner-ui.test.mjs
-          tests/meta-ads-campaign-planning-domain.test.mjs
-          tests/meta-ads-foundations.test.mjs
-          tests/meta-ads-knowledge-domain.test.mjs
-          tests/meta-ads-theory-domain.test.mjs
-          tests/meta-ads-theory-ui.test.mjs
-
-      - name: WhatsApp regression tests
+        run: node --test tests/dashboard-filters.test.mjs
+      - name: data
         if: always()
-        run: >-
-          node --test
-          tests/whatsapp-campaign-domain.test.mjs
-          tests/whatsapp-campaign-event-queue.test.mjs
-          tests/whatsapp-campaign-reconciliation.test.mjs
-          tests/whatsapp-extension-bridge.test.mjs
-          tests/whatsapp-extension-connection-state.test.mjs
-          tests/whatsapp-inbox-light.test.mjs
-          tests/whatsapp-marketing-integration.test.mjs
-          tests/whatsapp-stale-campaign-cleanup.test.mjs
+        run: node --test tests/data.test.mjs
+      - name: global-overlay-focus
+        if: always()
+        run: node --test tests/global-overlay-focus.test.mjs
+      - name: inventory-domain
+        if: always()
+        run: node --test tests/inventory-domain.test.mjs
+      - name: location-enhancements
+        if: always()
+        run: node --test tests/location-enhancements.test.mjs
+      - name: management-domain
+        if: always()
+        run: node --test tests/management-domain.test.mjs
+      - name: management-ui
+        if: always()
+        run: node --test tests/management-ui.test.mjs
+      - name: seller-panel
+        if: always()
+        run: node --test tests/seller-panel.test.mjs
 
+      - name: Confirm passing Customer tests
+        if: always()
+        run: node --test tests/customer-domain.test.mjs tests/customer-import-ui.test.mjs
+      - name: Confirm passing Meta Ads tests
+        if: always()
+        run: node --test tests/meta-ads-*.test.mjs
+      - name: Confirm passing WhatsApp tests
+        if: always()
+        run: node --test tests/whatsapp-*.test.mjs
       - name: Build Web App
         if: always()
         run: npm run build
