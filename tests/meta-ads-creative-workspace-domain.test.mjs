@@ -30,6 +30,39 @@ test("RecordingTaskGenerator crea una tarea por CreativePiece", () => {
   assert.ok(tasks.every((task) => task.sourcePlanRevision === 2 && task.requirementKey === "hook"));
 });
 
+test("generación repetida es determinista y una revisión nueva conserva IDs históricos", () => {
+  const first = generateRecordingTasks({ campaignId: "campaign123", planRecord: approvedPlan(), theoryConfig: theory });
+  const repeated = generateRecordingTasks({ campaignId: "campaign123", planRecord: approvedPlan(), theoryConfig: theory });
+  const revised = generateRecordingTasks({
+    campaignId: "campaign123",
+    planRecord: { ...approvedPlan(), revision: 3 },
+    theoryConfig: theory,
+  });
+
+  assert.deepEqual(repeated, first);
+  assert.deepEqual(first.map((item) => item.id), ["r2-hook_1", "r2-hook_2", "r2-hook_3", "r2-testimonial_1"]);
+  assert.deepEqual(revised.map((item) => item.id), ["r3-hook_1", "r3-hook_2", "r3-hook_3", "r3-testimonial_1"]);
+  assert.ok(revised.every((item) => item.sourcePlanRevision === 3));
+});
+
+test("la cantidad y el orden por categoría salen de CreativePieces", () => {
+  const tasks = generateRecordingTasks({ campaignId: "campaign123", planRecord: approvedPlan(), theoryConfig: theory });
+  assert.equal(tasks.length, pieces.length);
+  assert.deepEqual(tasks.filter((item) => item.requirementKey === "hook").map((item) => item.orderWithinCategory), [1, 2, 3]);
+  assert.deepEqual(tasks.filter((item) => item.requirementKey === "testimonial").map((item) => item.orderWithinCategory), [1]);
+});
+
+test("una CreativePiece no puede apuntar a una categoría ajena a TheoryConfig", () => {
+  assert.throws(
+    () => generateRecordingTasks({
+      campaignId: "campaign123",
+      planRecord: approvedPlan([{ ...pieces[0], requirementKey: "inventada" }]),
+      theoryConfig: theory,
+    }),
+    /categoría no existe/,
+  );
+});
+
 test("una categoría dinámica genera tarea sin cambiar componentes", () => {
   const task = generateRecordingTasks({ campaignId: "campaign123", planRecord: approvedPlan([pieces[3]]), theoryConfig: { creativeRequirements: [theory.creativeRequirements[1]] } })[0];
   assert.equal(task.requirementKey, "testimonial");
@@ -46,6 +79,7 @@ test("folder mapping mantiene nombres amigables y fallback dinámico", () => {
 test("file naming es estable, ordenado y no usa el nombre original como path", () => {
   const task = generateRecordingTasks({ campaignId: "campaign123", planRecord: approvedPlan([pieces[3]]), theoryConfig: { creativeRequirements: [theory.creativeRequirements[1]] } })[0];
   assert.equal(buildDriveFileName(task, 2, { name: "Video final raro.mov" }), "testimonial-01-take-02.mov");
+  assert.equal(buildDriveFileName(task, 3, { name: "otra toma.mov" }), "testimonial-01-take-03.mov");
 });
 
 test("metadata local rechaza tipo y tamaño inválidos", () => {

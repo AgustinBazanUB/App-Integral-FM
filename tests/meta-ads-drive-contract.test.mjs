@@ -8,6 +8,7 @@ process.env.GOOGLE_OAUTH_REDIRECT_URI = "https://example.com/.netlify/functions/
 process.env.GOOGLE_TOKEN_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef";
 
 const drive = await import("../netlify/functions/_lib/googleDrive.mjs");
+const callback = await import("../netlify/functions/google-drive-callback.mjs");
 
 test("OAuth usa scope drive.file, offline access y state", () => {
   const url = new URL(drive.buildGoogleAuthorizationUrl({ state: "state-test" }));
@@ -51,9 +52,13 @@ test("browser sube chunks a sessionUrl y Netlify sólo recibe metadata", () => {
 });
 
 test("sesiones resumibles no se persisten con URL y secrets quedan backend-only", () => {
-  const backend = fs.readFileSync("netlify/functions/google-drive.mjs", "utf8");
+  const backend = fs.readFileSync("netlify/functions/google-drive.mjs", "utf8").replace(/\r\n/g, "\n");
   const rules = fs.readFileSync("firestore.rules", "utf8");
-  const sessionWrite = backend.slice(backend.indexOf("creativeUploadSessions/${uploadId}"), backend.indexOf("return {\n    uploadId", backend.indexOf("creativeUploadSessions/${uploadId}")));
+  const sessionStart = backend.indexOf("await adminSet(`creativeUploadSessions/${uploadId}`, {");
+  const sessionEnd = backend.indexOf("\n  });", sessionStart);
+  assert.notEqual(sessionStart, -1, "debe existir la escritura de la sesión");
+  assert.notEqual(sessionEnd, -1, "debe poder delimitarse la escritura de la sesión");
+  const sessionWrite = backend.slice(sessionStart, sessionEnd);
   assert.equal(sessionWrite.includes("sessionUrl"), false);
   assert.match(rules, /match \/integrationSecrets\/\{secretId\} \{ allow read,write: if false; \}/);
   assert.match(rules, /match \/integrationOauthStates\/\{stateId\} \{ allow read,write: if false; \}/);
@@ -96,6 +101,40 @@ test("health reconoce ambos nombres server-side de la cuenta Firebase", () => {
 
 test("OAuth callback valida que el state pertenezca a Google Drive", () => {
   const callback = fs.readFileSync("netlify/functions/google-drive-callback.mjs", "utf8");
-  assert.match(callback, /stateRecord\.provider !== "google_drive"/);
+  assert.match(callback, /record\.provider !== "google_drive"/);
+  assert.match(callback, /validateOAuthStateRecord\(stateRecord\)/);
   assert.ok(callback.indexOf("ensureDriveRootFolder") < callback.indexOf("storeGoogleDriveSecret"));
+});
+
+test("OAuth state rechaza registros ausentes, inválidos y vencidos", () => {
+  const now = Date.now();
+  assert.equal(callback.validateOAuthStateRecord(null, now), "invalid");
+  assert.equal(callback.validateOAuthStateRecord({ provider: "otro", uid: "admin" }, now), "invalid");
+  assert.equal(callback.validateOAuthStateRecord({
+    provider: "google_drive",
+    uid: "admin",
+    createdAt: new Date(now - 11 * 60 * 1000),
+    expiresAt: new Date(now + 60 * 1000),
+  }, now), "expired");
+  assert.equal(callback.validateOAuthStateRecord({
+    provider: "google_drive",
+    uid: "admin",
+    createdAt: new Date(now - 60 * 1000),
+    expiresAt: new Date(now - 1),
+  }, now), "expired");
+  assert.equal(callback.validateOAuthStateRecord({
+    provider: "google_drive",
+    uid: "admin",
+    createdAt: new Date(now - 60 * 1000),
+    expiresAt: new Date(now + 60 * 1000),
+  }, now), "valid");
+});
+
+test("OAuth state es one-time y callback sin code falla de forma segura", () => {
+  const source = fs.readFileSync("netlify/functions/google-drive-callback.mjs", "utf8");
+  const deleteState = source.indexOf("await adminDelete(`integrationOauthStates/${state}`);");
+  const exchangeCode = source.indexOf("await exchangeAuthorizationCode(code)");
+  assert.ok(deleteState >= 0 && deleteState < exchangeCode);
+  assert.match(source, /if \(providerError \|\| !code\)/);
+  assert.match(source, /providerError === "access_denied" \? "oauth_cancelled" : "oauth_error"/);
 });

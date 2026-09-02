@@ -12,6 +12,14 @@ import { adminDelete, adminGet, adminSet } from "./_lib/serverFirestore.mjs";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 
+export function validateOAuthStateRecord(record, now = Date.now()) {
+  if (!record || record.provider !== "google_drive" || !record.uid) return "invalid";
+  const createdAt = record.createdAt instanceof Date ? record.createdAt.getTime() : new Date(record.createdAt || 0).getTime();
+  const expiresAt = record.expiresAt instanceof Date ? record.expiresAt.getTime() : new Date(record.expiresAt || 0).getTime();
+  if (!createdAt || now - createdAt > STATE_TTL_MS || !expiresAt || expiresAt < now) return "expired";
+  return "valid";
+}
+
 function redirect(location) {
   return new Response(null, {
     status: 302,
@@ -67,13 +75,12 @@ export default async function handler(request) {
   try {
     stateRecord = await adminGet(`integrationOauthStates/${state}`, { optional: true });
     if (!stateRecord) return redirect(`${fallbackOrigin}/gestion/settings?drive=oauth_state_invalid`);
-    if (stateRecord.provider !== "google_drive" || !stateRecord.uid) {
+    const stateStatus = validateOAuthStateRecord(stateRecord);
+    if (stateStatus === "invalid") {
       await adminDelete(`integrationOauthStates/${state}`);
       return redirect(`${fallbackOrigin}/gestion/settings?drive=oauth_state_invalid`);
     }
-    const createdAt = stateRecord.createdAt instanceof Date ? stateRecord.createdAt.getTime() : new Date(stateRecord.createdAt || 0).getTime();
-    const expiresAt = stateRecord.expiresAt instanceof Date ? stateRecord.expiresAt.getTime() : new Date(stateRecord.expiresAt || 0).getTime();
-    if (!createdAt || Date.now() - createdAt > STATE_TTL_MS || !expiresAt || expiresAt < Date.now()) {
+    if (stateStatus === "expired") {
       await adminDelete(`integrationOauthStates/${state}`);
       return redirect(`${fallbackOrigin}/gestion/settings?drive=oauth_state_expired`);
     }
