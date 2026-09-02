@@ -30,8 +30,52 @@ jobs:
       - name: Focused Inbox tests
         run: node --test tests/whatsapp-inbox-light.test.mjs
 
-      - name: Full Web App tests
-        run: npm test
+      - name: Core and CRM regression tests
+        if: always()
+        run: >-
+          node --test
+          tests/activity-presentation.test.mjs
+          tests/admin-experience.test.mjs
+          tests/auth-entry.test.mjs
+          tests/cancellation-metrics-filters.test.mjs
+          tests/customer-domain.test.mjs
+          tests/customer-import-ui.test.mjs
+          tests/dashboard-filters.test.mjs
+          tests/data.test.mjs
+          tests/global-overlay-focus.test.mjs
+          tests/inventory-domain.test.mjs
+          tests/location-enhancements.test.mjs
+          tests/management-domain.test.mjs
+          tests/management-ui.test.mjs
+          tests/performance-metrics.test.mjs
+          tests/search.test.mjs
+          tests/seller-panel.test.mjs
+
+      - name: Meta Ads regression tests
+        if: always()
+        run: >-
+          node --test
+          tests/meta-ads-campaign-domain.test.mjs
+          tests/meta-ads-campaign-planner-ui.test.mjs
+          tests/meta-ads-campaign-planning-domain.test.mjs
+          tests/meta-ads-foundations.test.mjs
+          tests/meta-ads-knowledge-domain.test.mjs
+          tests/meta-ads-theory-domain.test.mjs
+          tests/meta-ads-theory-ui.test.mjs
+
+      - name: WhatsApp regression tests
+        if: always()
+        run: >-
+          node --test
+          tests/whatsapp-campaign-domain.test.mjs
+          tests/whatsapp-campaign-event-queue.test.mjs
+          tests/whatsapp-campaign-reconciliation.test.mjs
+          tests/whatsapp-extension-bridge.test.mjs
+          tests/whatsapp-extension-connection-state.test.mjs
+          tests/whatsapp-inbox-light.test.mjs
+          tests/whatsapp-marketing-integration.test.mjs
+          tests/whatsapp-stale-campaign-cleanup.test.mjs
 
       - name: Build Web App
+        if: always()
         run: npm run build
