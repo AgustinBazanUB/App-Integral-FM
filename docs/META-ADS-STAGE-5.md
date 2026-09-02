@@ -1,0 +1,592 @@
+# Meta Ads — Etapa 5: Workspace Creativo + Google Drive
+
+## Estado
+
+**ETAPA 5 IMPLEMENTADA — PENDIENTE QA DE CIERRE EN CODEX.**
+
+Este documento describe la implementación técnica. Las Firestore Rules nuevas y cualquier índice eventual quedan deliberadamente sin publicar hasta el QA pesado solicitado para el siguiente prompt.
+
+## Objetivo
+
+Etapa 5 convierte el `CampaignPlan` aprobado de Etapa 4 en un Workspace Creativo operativo. El sistema organiza cada `CreativePiece` como una `RecordingTask`, guía al usuario sobre qué grabar, permite cargar varias tomas y guarda el archivo real en Google Drive mientras Firestore conserva únicamente metadata y referencias.
+
+Flujo:
+
+```text
+CampaignProject
+  ↓
+CampaignPlan aprobado + TheoryVersion fija
+  ↓
+CreativePieces[]
+  ↓
+RecordingTaskGenerator determinista
+  ↓
+RecordingTasks[]
+  ↓
+Workspace Creativo
+  ↓
+Browser solicita autorización de upload
+  ↓
+Netlify valida sesión/permisos/campaña/tarea y crea sesión resumible
+  ↓
+Browser ─────────────── archivo ───────────────> Google Drive
+  ↓                                               ↓
+confirmación metadata <──── Netlify/Drive API <── fileId
+  ↓
+CreativeAsset metadata en Firestore
+  ↓
+RecordingTask.selectedAssetId + ready_for_validation
+```
+
+Netlify es **control plane**. No recibe el binario del video como data plane.
+
+## Base utilizada
+
+- Base validada: `feature/meta-ads-campaign-planner`.
+- HEAD validado de Etapa 4: `e8734ce748249b3830926e0ef8338fb9cb5ef644`.
+- PR de Etapa 4: `#13`.
+- Evidencia heredada de cierre de Etapa 4: 219/219 tests de aplicación, 46/46 Rules Emulator y build PASS.
+- Rama de Etapa 5: `feature/meta-ads-creative-workspace`.
+
+No se reconstruyen CampaignProject, Knowledge Base, Theory Engine, Question Generator, Campaign Planner ni AIUsage. Etapa 5 consume sus contratos existentes.
+
+## Principio arquitectónico
+
+Se mantiene **motor estable + teoría variable**. La UI y la estructura Drive consumen `requirementKey`, label e información de `TheoryConfig.creativeRequirements`; no dependen de una lista cerrada de hooks/bodies/endings.
+
+Hay alias de presentación centralizados para categorías frecuentes, pero una nueva categoría como `testimonial`, `product_demo`, `ugc_creator` u otra key válida funciona sin crear un componente React nuevo.
+
+## RecordingTaskGenerator
+
+`src/gestion/marketing/metaAds/creativeWorkspaceDomain.js` implementa generación determinista a partir de:
+
+- CampaignProject/campaignId;
+- CampaignPlan **approved**;
+- `plan.creativePieces[]`;
+- TheoryConfig fijada a la campaña.
+
+Cada tarea conserva solamente el snapshot necesario para producción e historia:
+
+```text
+RecordingTask
+├── schemaVersion
+├── id                       # r{revision}-{creativePieceId}
+├── campaignId
+├── sourcePlanRevision
+├── creativePieceId
+├── requirementKey
+├── category
+├── order
+├── orderWithinCategory
+├── title
+├── script
+├── objective
+├── instructions
+├── targetDurationSeconds
+├── requirements[]
+├── required
+├── mediaKind                # video | audio | image
+├── allowedMimePrefixes[]
+├── acceptedExtensions[]
+├── status                   # pending | ready_for_validation | error
+├── selectedAssetId?
+└── driveFolderId?
+```
+
+El id incluye la revisión del CampaignPlan, por lo que una revisión nueva no sobrescribe silenciosamente tareas históricas.
+
+## Idempotencia de tareas
+
+`prepareWorkspace` vuelve a calcular el conjunto esperado para la revisión aprobada y sólo crea los IDs ausentes. Abrir o recargar la pantalla no duplica tareas.
+
+Si se aprueba una revisión posterior, sus tareas reciben IDs `rN-*`; las tareas/assets anteriores quedan históricas. `currentWorkspace` filtra la revisión aprobada actual y expone contadores de historia previa.
+
+## Workspace Creativo
+
+`src/gestion/pages/MetaAdsCreativeWorkspace.jsx` se integra al detalle de CampaignProject cuando la campaña está en estado `creative`.
+
+La pantalla:
+
+- agrupa dinámicamente por categoría/`requirementKey`;
+- muestra título comprensible;
+- muestra **Qué decir**, **Cómo hacerlo**, **Para qué sirve** y duración ideal;
+- muestra requisitos;
+- muestra estado Pendiente / Subiendo / Listo para validar / Error;
+- permite seleccionar archivo o captura estándar desde móvil cuando el navegador lo ofrece;
+- muestra progreso local sin escribir porcentajes a Firestore;
+- permite varias tomas;
+- permite seleccionar otra toma preferida sin mover ni borrar archivos;
+- ofrece `Abrir en Drive` mediante `driveFileId`.
+
+No se implementó un proxy multimedia pesado. Para esta etapa el fallback seguro de preview es metadata + abrir el archivo en Drive.
+
+## CreativeAsset
+
+Los archivos no viven en Firestore. Firestore guarda metadata equivalente a:
+
+```text
+CreativeAsset
+├── schemaVersion
+├── id
+├── campaignId
+├── recordingTaskId
+├── creativePieceId
+├── requirementKey
+├── sourcePlanRevision
+├── driveFileId
+├── driveFolderId
+├── driveId?
+├── driveFileName
+├── originalFileName
+├── mimeType
+├── sizeBytes
+├── takeNumber
+├── status                   # ready_for_validation | error
+├── uploadedBy
+├── uploadedByName
+├── uploadedAt
+├── driveCreatedAt?
+├── createdAt
+└── updatedAt
+```
+
+El validador rechaza campos con nombres de token, secret, resumable/session URL u otras credenciales.
+
+## Multiple Takes
+
+Cada `RecordingTask` admite múltiples `CreativeAsset`.
+
+Ejemplo:
+
+```text
+Hook 1
+├── Toma 1  ← preferida
+├── Toma 2
+└── Toma 3
+```
+
+`takeNumber` aumenta sin sobrescribir archivos anteriores. `selectedAssetId` vive en la RecordingTask y cambiar la toma preferida es una actualización liviana de metadata.
+
+Una falla al subir una toma adicional no invalida una tarea que ya tenía una toma válida seleccionada.
+
+## Tipos de archivo y validación local liviana
+
+La política de medios se deriva de la requirement:
+
+- video: mp4, mov, m4v, webm;
+- audio: mp3, wav, m4a, aac, ogg;
+- imagen: jpg/jpeg, png, webp, heic.
+
+VoiceOver/audio se reconoce como audio; requirements de imagen se reconocen como imagen; el resto usa video por defecto. La validación de Etapa 5 sólo comprueba archivo, tamaño, MIME y extensión compatibles.
+
+No analiza codec, FPS, audio interno, silencios, transcripción ni contenido. Eso corresponde a Etapa 6.
+
+## Tamaño de archivo
+
+El límite de aplicación por defecto es **1 GiB** (`META_ADS_MAX_UPLOAD_BYTES=1073741824`) y está centralizado/configurable server-side. El backend sólo acepta una configuración dentro de un rango defensivo y el frontend muestra el límite devuelto por health/workspace.
+
+La decisión prioriza clips creativos reales, UX móvil y evitar cargas accidentales gigantes. No pretende reflejar el límite máximo teórico de Google Drive.
+
+Chunks por defecto: 8 MiB (`META_ADS_UPLOAD_CHUNK_BYTES=8388608`), normalizados a múltiplos de 256 KiB.
+
+## Google Drive: decisión My Drive / Shared Drive
+
+La primera versión usa **una conexión organizacional única** y funciona por defecto con **My Drive**. Esto reduce configuración para Flor Mía si se utilizará una única cuenta de Google.
+
+El núcleo no queda bloqueado a My Drive:
+
+- conserva `driveId?`;
+- usa `supportsAllDrives=true` en operaciones compatibles;
+- permite configurar `GOOGLE_DRIVE_SHARED_DRIVE_ID`;
+- cambia el modo reportado a `shared_drive` cuando esa variable existe.
+
+Por lo tanto Shared Drive puede adoptarse sin reconstruir RecordingTask/CreativeAsset.
+
+## Scope Google
+
+Scope seleccionado:
+
+`https://www.googleapis.com/auth/drive.file`
+
+Se usa por menor privilegio: la app trabaja con archivos/carpetas que crea o que el usuario abre/autoriza para esta integración, en lugar de solicitar acceso general a todo Drive por comodidad.
+
+Si un caso futuro exige operaciones fuera de ese alcance deberá revisarse explícitamente; Etapa 5 no amplía el scope a `drive`.
+
+## OAuth 2.0
+
+Flujo implementado:
+
+```text
+Admin autorizado
+  ↓
+Conectar Google Drive
+  ↓
+POST autenticado a Netlify
+  ↓
+state aleatorio backend-only + TTL
+  ↓
+Google Authorization Endpoint
+  ↓
+Authorization Code
+  ↓
+/.netlify/functions/google-drive-callback
+  ↓
+validación state/provider/expiración
+  ↓
+intercambio server-side con client secret
+  ↓
+prueba de Drive + carpeta raíz
+  ↓
+refresh token cifrado backend-only
+  ↓
+connection metadata no secreta
+```
+
+Se usa Authorization Code Flow para web server/confidential client, `state`, `access_type=offline`, redirect URI exacto, client secret sólo server-side y refresh token renovable.
+
+No se expone `GOOGLE_CLIENT_SECRET` al navegador ni existe una variable `VITE_*` para secretos de Google. PKCE no se agregó como pseudo-seguridad en el frontend: el código de autorización se procesa únicamente en el backend confidencial que posee client secret; `state` y redirect controlado cubren la protección del flujo implementado. Si la política oficial o el tipo de cliente cambia en el futuro, este punto debe reevaluarse.
+
+## Redirect URI y Deploy Preview
+
+Google exige redirect URI autorizada exacta; no se diseñaron wildcards inseguros para previews.
+
+`GOOGLE_OAUTH_REDIRECT_URI` debe apuntar a un callback HTTPS estable autorizado en Google Cloud. El `state` guarda también el `returnUrl` de la sesión que inició la conexión, limitado a `/gestion/settings`, de modo que el callback pueda retornar al entorno iniciador sin convertir el redirect registrado en un wildcard.
+
+## Seguridad de tokens
+
+Refresh tokens:
+
+- nunca se guardan en frontend, localStorage o sessionStorage;
+- nunca se guardan en CampaignProject;
+- nunca se guardan plaintext en documentos legibles por clientes;
+- nunca se imprimen en logs.
+
+Persistencia backend-only:
+
+`integrationSecrets/googleDrive`
+
+Campo sensible:
+
+`encryptedRefreshToken`
+
+Cifrado: AES-256-GCM con IV aleatorio y authentication tag. La clave proviene únicamente de `GOOGLE_TOKEN_ENCRYPTION_KEY` server-side; la clave no se almacena en Firestore.
+
+Las Rules preparadas niegan toda lectura/escritura cliente sobre `integrationSecrets`, `integrationOauthStates` y `creativeUploadSessions`.
+
+## DriveService / control plane
+
+Responsabilidades implementadas entre `netlify/functions/_lib/googleDrive.mjs` y `netlify/functions/google-drive.mjs`:
+
+- status/health;
+- OAuth start/callback;
+- refresh access token;
+- cifrado/descifrado refresh token;
+- revocación/desconexión;
+- crear/reusar root folder;
+- crear/reusar folder de campaña;
+- crear/reusar folders de categorías;
+- iniciar resumable upload;
+- verificar metadata real del fileId después del upload;
+- confirmar CreativeAsset;
+- seleccionar toma;
+- auditoría segura.
+
+Se usan APIs HTTP y Web APIs; no se añadió un SDK grande de Google.
+
+## Estructura Drive
+
+Estructura real conceptual:
+
+```text
+Meta Ads/
+└── Campaign-{campaignId}/
+    ├── Source/
+    ├── {Dynamic Category 1}/
+    ├── {Dynamic Category 2}/
+    ├── ...
+    ├── Renders/
+    └── Final/
+```
+
+Aliases amigables centralizados:
+
+- hook → `Hooks`;
+- main_body/body → `Bodies`;
+- ending/closing → `Endings`;
+- b_roll → `B-Roll`;
+- voice_over → `VoiceOver`;
+- testimonial → `Testimonials`;
+- product_demo → `Product-Demo`.
+
+Para categorías nuevas se usa label/key saneado. El identificador de seguridad siempre es `folderId`, no el nombre visible.
+
+`Renders` y `Final` se crean como estructura preparatoria de archivos; **Etapa 5 no renderiza ni edita video**.
+
+## Idempotencia Drive
+
+La carpeta raíz se registra en `integrationConnections/googleDrive.rootFolderId`.
+
+Cada CampaignProject guarda referencias como:
+
+- `driveFolderId`;
+- `driveConnectionId`;
+- `driveId?`;
+- `driveProvisionedAt`;
+- `driveStructure` con IDs de subcarpetas.
+
+Si los IDs existen se verifican y reutilizan. No se hace una búsqueda global de toda la unidad en cada visita.
+
+## Upload resumible directo
+
+Contrato:
+
+1. browser valida metadata básica;
+2. browser solicita `createUpload` con campaignId/taskId/nombre/MIME/tamaño;
+3. backend valida Firebase ID token, usuario activo, permiso, campaña, revisión, tarea, tipo/tamaño y folder confiable;
+4. backend refresca acceso a Drive e inicia sesión resumible;
+5. browser recibe la `sessionUrl` temporal;
+6. browser sube chunks **directamente a Google Drive** usando `PUT` + `Content-Range`;
+7. 308 reanuda desde el offset confirmado; fallas recuperables consultan posición; 404 obliga a iniciar nueva sesión;
+8. browser envía `uploadId` + `driveFileId` al backend;
+9. backend lee metadata real de Drive y verifica appProperties, nombre, MIME, tamaño y parent folder;
+10. sólo entonces persiste CreativeAsset y actualiza la RecordingTask.
+
+La URL de sesión resumible se considera credencial temporal: se devuelve al usuario autorizado, no se persiste en Firestore y no se registra en logs.
+
+## Aislamiento de campañas
+
+El frontend no decide libremente el folder destino. El backend resuelve/valida `driveFolderId` desde CampaignProject y RecordingTask confiables.
+
+Antes de emitir una sesión verifica:
+
+- Firebase ID token;
+- usuario activo;
+- permiso de upload;
+- CampaignProject existente/no archivado;
+- `status=creative`;
+- CampaignPlan actual aprobado;
+- RecordingTask de esa campaña y revisión;
+- folder Drive asociado a esa campaña/tarea;
+- MIME/extensión/tamaño.
+
+En confirmación vuelve a validar identidad mediante `appProperties` de Drive. Cambiar IDs en el navegador no debe permitir escribir en otra campaña.
+
+## Firestore
+
+Modelo preparado:
+
+```text
+metaCampaignProjects/{campaignId}
+├── planning/state                     # Etapa 4
+├── plans/{revision}                   # Etapa 4
+├── recordingTasks/{taskId}            # Etapa 5
+└── creativeAssets/{assetId}            # Etapa 5
+
+integrationConnections/googleDrive      # metadata no secreta
+integrationSecrets/googleDrive          # backend-only
+integrationOauthStates/{state}          # backend-only, temporal
+creativeUploadSessions/{uploadId}       # backend-only, temporal, SIN sessionUrl
+```
+
+No se guardan binarios ni arrays gigantes en CampaignProject. El workspace lee sólo tareas/assets de la campaña abierta, con límite acotado. No hay listener global.
+
+## Firestore Rules
+
+Etapa 5 prepara cambios en `firestore.rules` para:
+
+- permitir lectura de `recordingTasks` y `creativeAssets` sólo con `metaAdsViewCreativeWorkspace`;
+- negar escrituras cliente de ambos: las mutaciones sensibles pasan por backend autenticado;
+- permitir lectura de connection metadata según permiso;
+- negar completamente secretos, OAuth state y upload sessions al cliente;
+- incorporar permisos de workspace respetando `permissionDeny`.
+
+**ESTADO: PENDIENTES DE QA/DEPLOY POR CODEX. NO PUBLICADAS EN ESTA ETAPA.**
+
+No se ejecutó Rules Emulator exhaustivo porque el Prompt 5 lo reserva deliberadamente para el siguiente QA.
+
+## Índices
+
+Etapa 5 no agrega índices compuestos. `firestore.indexes.json` no cambia respecto de la base de Etapa 4.
+
+Las lecturas nuevas son subcolecciones acotadas por campaña y no necesitan un composite index en el contrato actual.
+
+## Permisos
+
+Acciones nuevas:
+
+- `metaAdsViewCreativeWorkspace`;
+- `metaAdsUploadCreative`;
+- `metaAdsManageDrive`.
+
+Comportamiento:
+
+- admin/general admin: acceso completo por plantilla;
+- marketing_manager: ver Workspace + subir/seleccionar material;
+- marketing_manager: **no** administrar OAuth Drive por defecto;
+- seller: sin acceso Meta Ads por defecto;
+- permisos explícitos y `permissionDeny` siguen aplicando.
+
+Frontend, backend y Rules preparadas reflejan la misma separación.
+
+## Configuración / secretos
+
+Variables server-only documentadas en `.env.example`:
+
+```text
+FIREBASE_SERVICE_ACCOUNT_JSON=
+# también se reconoce FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM si ya existe en el entorno
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_OAUTH_REDIRECT_URI=
+GOOGLE_TOKEN_ENCRYPTION_KEY=
+GOOGLE_DRIVE_ROOT_FOLDER_NAME=Meta Ads
+GOOGLE_DRIVE_SHARED_DRIVE_ID=
+META_ADS_MAX_UPLOAD_BYTES=1073741824
+META_ADS_UPLOAD_CHUNK_BYTES=8388608
+```
+
+No se guardan valores reales en GitHub.
+
+## Configuración externa de Google Cloud
+
+Si todavía no existe:
+
+1. abrir Google Cloud Console con el proyecto organizacional elegido;
+2. habilitar **Google Drive API**;
+3. configurar OAuth consent screen / Google Auth Platform según la cuenta/organización;
+4. crear un OAuth Client de tipo **Web application**;
+5. registrar como Authorized redirect URI exactamente el valor HTTPS de `GOOGLE_OAUTH_REDIRECT_URI`;
+6. colocar Client ID y Client Secret únicamente en variables server-side de Netlify;
+7. generar una clave aleatoria fuerte para `GOOGLE_TOKEN_ENCRYPTION_KEY` y guardarla sólo server-side;
+8. verificar que la cuenta de servicio Firebase configurada corresponda exactamente a `app-integral-fm`;
+9. si se decide Shared Drive, configurar `GOOGLE_DRIVE_SHARED_DRIVE_ID` y confirmar que la cuenta autorizada tenga acceso suficiente.
+
+No usar `fm-stock-y-venta`.
+
+## Desconexión / reconexión
+
+Desconectar:
+
+- intenta revocar la credencial Google;
+- elimina el refresh token cifrado local;
+- marca la integración desconectada;
+- conserva `driveFileId`, folders y archivos históricos;
+- nunca borra masivamente Drive.
+
+Si Google invalida el refresh token, el sistema muestra que debe reconectarse y conserva referencias históricas.
+
+## Auditoría
+
+Eventos útiles registrados sin secretos:
+
+- workspace preparado;
+- campaign Drive provisioned;
+- upload completed;
+- upload failed;
+- asset selected;
+- Drive connected;
+- Drive disconnected.
+
+No se registran access tokens, refresh tokens ni URLs resumibles.
+
+## Performance / Spark
+
+- binario: browser → Google Drive;
+- Netlify: autorización, OAuth, metadata y coordinación;
+- porcentaje: sólo estado local React/browser;
+- Firestore: hitos y metadata, no 1%, 2%, 3%...;
+- tareas/assets: sólo por campaña abierta;
+- no listener global;
+- no nueva dependencia grande de Google;
+- Workspace/CSS permanecen dentro del chunk de Meta Ads ya cargado bajo la ruta del módulo.
+
+## Mobile y accesibilidad
+
+La UI tiene breakpoint móvil, tarjetas de una columna, acciones grandes, progress nativo, labels/estado legibles, botones reales, `role=status/alert` donde corresponde y file input estándar.
+
+Para video se usa `capture="environment"` como sugerencia estándar cuando el navegador móvil la soporte; no se depende de APIs experimentales.
+
+El QA visual real desktop/móvil queda para Codex, según el alcance del prompt.
+
+## Tests livianos ejecutados
+
+Workflow final liviano: `Stage 5 final light verification`, run `33647855405`.
+
+Resultados finales sobre código de Etapa 5:
+
+- tests focalizados: **16/16 PASS**;
+- RecordingTaskGenerator: 3 piezas → 3 tareas;
+- categoría dinámica `testimonial`;
+- folder mapping dinámico;
+- file naming seguro;
+- validación de MIME/tamaño;
+- CreativeAsset sin secretos;
+- OAuth `drive.file` + offline + state;
+- AES-GCM refresh token;
+- resumable backend sin binario;
+- browser directo a session URL;
+- session URL no persistida;
+- cliente sin escrituras sensibles;
+- marketing_manager sin administración OAuth por defecto;
+- toma adicional fallida conserva una toma válida previa;
+- health acepta la credencial Firebase server-side ya usada por el proyecto;
+- callback valida proveedor del OAuth state;
+- `node --check`: PASS;
+- `git diff --check`: PASS;
+- `npm run build`: **PASS**, 1780 módulos.
+
+No se ejecutó la suite completa ni Rules Emulator exhaustivo en cumplimiento del alcance de implementación del Prompt 5.
+
+`npm ci` reportó una vulnerabilidad high severity existente en el árbol de dependencias. Etapa 5 no agregó un SDK Google ni una dependencia nueva para ocultarla; el QA de cierre puede evaluar su origen/actualización sin mezclarlo con el objetivo funcional de Drive.
+
+## Limitaciones deliberadas / fuera de alcance
+
+Etapa 5 no implementa:
+
+- Validation Engine;
+- codec/FPS/resolución/transcripción/silencios;
+- Renderer/FFmpeg/Remotion local;
+- Video Director IA;
+- selección IA de tomas;
+- Meta Marketing API;
+- Insights reales;
+- recomendaciones IA automáticas.
+
+El estado final de un asset es `ready_for_validation`, no `validated`.
+
+La campaña permanece en `creative`; Etapa 5 no avanza automáticamente a validación.
+
+## Reglas de producción
+
+Durante la implementación de Etapa 5:
+
+- no se hizo merge a `main`;
+- no se publicaron las nuevas Firestore Rules;
+- no se desplegaron índices;
+- no se tocó `fm-stock-y-venta`;
+- no se simularon carpetas, archivos ni conexión Google real.
+
+## Preparación para Etapa 6
+
+El Validation Engine puede recibir, sin reconstruir almacenamiento:
+
+```text
+CampaignProject
+  + TheoryVersion / TheoryConfig
+  + CampaignPlan aprobado
+  + RecordingTask
+  + RecordingTask.requirements/script/targetDurationSeconds
+  + selectedAssetId
+  + CreativeAsset
+  + driveFileId / mimeType / sizeBytes
+  ↓
+Validation Engine (Etapa 6)
+```
+
+El contrato estable para Etapa 6 es `RecordingTask + selected CreativeAsset + driveFileId`, con trazabilidad a campaign, CreativePiece, requirement y CampaignPlan revision.
+
+## Próxima etapa
+
+**Etapa 6 — Validation Engine.**
+
+No se implementó en este branch.
