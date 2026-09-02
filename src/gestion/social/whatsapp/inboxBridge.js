@@ -1,6 +1,5 @@
-import { WHATSAPP_PROTOCOL_VERSION } from "../../marketing/whatsapp/campaignDomain";
-
-export const WHATSAPP_INBOX_CHANNEL = "flor_mia_whatsapp_extension";
+export const WHATSAPP_INBOX_CHANNEL = "flor_mia_whatsapp_inbox_extension";
+export const WHATSAPP_INBOX_PROTOCOL_VERSION = 1;
 
 export const WHATSAPP_INBOX_TYPES = Object.freeze({
   getChatsRequest: "FLORMIA_INBOX_GET_CHATS_REQUEST",
@@ -26,7 +25,7 @@ function validateEnvelope(event) {
   if (typeof window === "undefined" || event.source !== window || event.origin !== window.location.origin) return null;
   const data = event.data;
   if (!plainObject(data)) return null;
-  if (data.channel !== WHATSAPP_INBOX_CHANNEL || data.protocolVersion !== WHATSAPP_PROTOCOL_VERSION) return null;
+  if (data.channel !== WHATSAPP_INBOX_CHANNEL || data.protocolVersion !== WHATSAPP_INBOX_PROTOCOL_VERSION) return null;
   if (!responseTypes.has(data.type) || typeof data.replyTo !== "string" || !plainObject(data.payload)) return null;
   return data;
 }
@@ -36,7 +35,7 @@ function request(type, payload, acceptedType, timeoutMs = 10_000) {
   const requestId = createRequestId();
   const envelope = {
     channel: WHATSAPP_INBOX_CHANNEL,
-    protocolVersion: WHATSAPP_PROTOCOL_VERSION,
+    protocolVersion: WHATSAPP_INBOX_PROTOCOL_VERSION,
     type,
     requestId,
     payload,
