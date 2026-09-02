@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, "agent/**"]
   pull_request:
-    branches: [main, feature/meta-ads-campaign-planner]
+    branches: [main]
 
 permissions:
   contents: read
