@@ -2,6 +2,7 @@
 import {
   collection,
   doc,
+  documentId,
   getDoc,
   getDocs,
   limit,
@@ -27,6 +28,7 @@ const docsToArray = (snapshot) => snapshot.docs.map((item) => ({ id: item.id, ..
 const ACTIVE_ZONES_CACHE_KEY = "customer-zones:active";
 const ALL_ZONES_CACHE_KEY = "customer-zones:all";
 const LOCAL_ZONES_KEY = "flor-mia-customer-zones-v1";
+const CUSTOMER_BATCH_LOOKUP_SIZE = 30;
 
 function userName(profile = {}) {
   return profile.name || profile.email || "Usuario";
@@ -93,6 +95,27 @@ export async function findCustomerByPhone(phone) {
   return { id: snapshot.id, ...snapshot.data() };
 }
 
+export async function findCustomersByPhones(phones = []) {
+  const normalizedPhones = [...new Set(phones.map(normalizeCustomerPhone).filter(Boolean))];
+  if (!normalizedPhones.length) return new Map();
+  const identities = await Promise.all(normalizedPhones.map(async (phoneNormalized) => ({
+    phoneNormalized,
+    customerId: await customerDocumentId(phoneNormalized),
+  })));
+  const byId = new Map(identities.map((item) => [item.customerId, item.phoneNormalized]));
+  const result = new Map(normalizedPhones.map((phone) => [phone, null]));
+  for (let index = 0; index < identities.length; index += CUSTOMER_BATCH_LOOKUP_SIZE) {
+    const customerIds = identities.slice(index, index + CUSTOMER_BATCH_LOOKUP_SIZE).map((item) => item.customerId);
+    const snapshot = await getDocs(query(collection(db, "customers"), where(documentId(), "in", customerIds)));
+    for (const customer of docsToArray(snapshot)) {
+      if (customer.deleted === true || customer.active === false) continue;
+      const phoneNormalized = byId.get(customer.id) || normalizeCustomerPhone(customer.phoneNormalized || customer.phone);
+      if (phoneNormalized) result.set(phoneNormalized, customer);
+    }
+  }
+  return result;
+}
+
 export async function listCustomers(profile, pageSize = 200) {
   if (!can(profile, "loyal-customers", "view")) {
     throw new Error("No tenés permiso para ver Clientes Fidelizados.");
@@ -109,6 +132,42 @@ export async function listCustomers(profile, pageSize = 200) {
     return docsToArray(await getDocs(query(collection(db, "customers"), limit(size))))
       .filter((customer) => customer.deleted !== true);
   }
+}
+
+export async function createCustomerFromAdminIfMissing(profile, input) {
+  if (!can(profile, "loyal-customers", "create") && !can(profile, "loyal-customers", "edit")) {
+    throw new Error("No tenés permiso para guardar clientes.");
+  }
+  const draft = buildCustomerDraft(input);
+  const customerId = await customerDocumentId(draft.phoneNormalized);
+  const reference = doc(db, "customers", customerId);
+  const auditRef = doc(collection(db, "auditLogs"));
+  return runTransaction(db, async (transaction) => {
+    const existing = await transaction.get(reference);
+    if (existing.exists() && existing.data().deleted !== true) {
+      return { id: customerId, created: false, customer: { id: existing.id, ...existing.data() } };
+    }
+    transaction.set(reference, {
+      customerKey: customerId,
+      phone: draft.phone,
+      phoneNormalized: draft.phoneNormalized,
+      name: draft.name || null,
+      zoneId: draft.zoneId || null,
+      zoneName: draft.zoneName,
+      customZone: draft.customZone || null,
+      active: true,
+      deleted: false,
+      source: "admin",
+      updatedBy: profile.id,
+      updatedByName: userName(profile),
+      updatedAt: serverTimestamp(),
+      createdBy: profile.id,
+      createdByName: userName(profile),
+      createdAt: serverTimestamp(),
+    });
+    transaction.set(auditRef, customerAudit(profile, { action: "customer.created", customerId }));
+    return { id: customerId, created: true, customer: null };
+  });
 }
 
 export async function saveCustomerFromAdmin(profile, input) {
