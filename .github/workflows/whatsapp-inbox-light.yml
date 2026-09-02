@@ -1,0 +1,33 @@
+name: WhatsApp Inbox Light
+
+on:
+  push:
+    branches:
+      - feature/whatsapp-inbox-crm
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inbox-light:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Focused Inbox tests
+        run: node --test tests/whatsapp-inbox-light.test.mjs
+
+      - name: Build Web App
+        run: npm run build
