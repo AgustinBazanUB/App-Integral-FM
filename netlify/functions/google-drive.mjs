@@ -17,7 +17,7 @@ import {
   revokeGoogleRefreshToken,
   saveDriveConnection,
 } from "./_lib/googleDrive.mjs";
-import { adminDelete, adminGet, adminList, adminPatch, adminSet } from "./_lib/serverFirestore.mjs";
+import { adminDelete, adminGet, adminList, adminPatch, adminSet, backendFirebaseConfigured } from "./_lib/serverFirestore.mjs";
 import {
   DEFAULT_MAX_UPLOAD_BYTES,
   DEFAULT_UPLOAD_CHUNK_BYTES,
@@ -527,7 +527,7 @@ async function reportUploadError(session, body) {
   const task = await adminGet(taskPath(upload.campaignId, upload.recordingTaskId), { optional: true });
   if (task) {
     await adminPatch(taskPath(upload.campaignId, upload.recordingTaskId), {
-      status: "error",
+      status: task.selectedAssetId ? "ready_for_validation" : "error",
       updatedBy: session.uid,
       updatedByName: profileName(session),
       updatedAt: new Date(),
@@ -641,7 +641,7 @@ export default async function handler(request) {
       const config = googleDriveConfiguration();
       return json({
         configured: config.configured,
-        firebaseBackendConfigured: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON),
+        firebaseBackendConfigured: backendFirebaseConfigured(),
         scope: config.scope,
         mode: config.mode,
         redirectConfigured: Boolean(config.redirectUri),

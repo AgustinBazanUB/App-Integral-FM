@@ -77,3 +77,25 @@ test("marketing_manager puede usar workspace pero no administrar OAuth por defec
   assert.match(whitelist, /metaAdsUploadCreative/);
   assert.doesNotMatch(whitelist, /metaAdsManageDrive/);
 });
+
+
+test("una toma adicional fallida conserva una tarea que ya tenía toma preferida", () => {
+  const backend = fs.readFileSync("netlify/functions/google-drive.mjs", "utf8");
+  const start = backend.indexOf("async function reportUploadError");
+  const end = backend.indexOf("async function selectAsset", start);
+  const block = backend.slice(start, end);
+  assert.match(block, /status:\s*task\.selectedAssetId\s*\?\s*"ready_for_validation"\s*:\s*"error"/);
+});
+
+test("health reconoce ambos nombres server-side de la cuenta Firebase", () => {
+  const helper = fs.readFileSync("netlify/functions/_lib/serverFirestore.mjs", "utf8");
+  assert.match(helper, /FIREBASE_SERVICE_ACCOUNT_JSON/);
+  assert.match(helper, /FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM/);
+  assert.match(helper, /backendFirebaseConfigured/);
+});
+
+test("OAuth callback valida que el state pertenezca a Google Drive", () => {
+  const callback = fs.readFileSync("netlify/functions/google-drive-callback.mjs", "utf8");
+  assert.match(callback, /stateRecord\.provider !== "google_drive"/);
+  assert.ok(callback.indexOf("ensureDriveRootFolder") < callback.indexOf("storeGoogleDriveSecret"));
+});

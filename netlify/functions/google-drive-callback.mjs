@@ -1,5 +1,6 @@
 import {
   exchangeAuthorizationCode,
+  clearGoogleDriveSecret,
   getDriveAbout,
   ensureDriveRootFolder,
   saveDriveConnection,
@@ -66,6 +67,10 @@ export default async function handler(request) {
   try {
     stateRecord = await adminGet(`integrationOauthStates/${state}`, { optional: true });
     if (!stateRecord) return redirect(`${fallbackOrigin}/gestion/settings?drive=oauth_state_invalid`);
+    if (stateRecord.provider !== "google_drive" || !stateRecord.uid) {
+      await adminDelete(`integrationOauthStates/${state}`);
+      return redirect(`${fallbackOrigin}/gestion/settings?drive=oauth_state_invalid`);
+    }
     const createdAt = stateRecord.createdAt instanceof Date ? stateRecord.createdAt.getTime() : new Date(stateRecord.createdAt || 0).getTime();
     const expiresAt = stateRecord.expiresAt instanceof Date ? stateRecord.expiresAt.getTime() : new Date(stateRecord.expiresAt || 0).getTime();
     if (!createdAt || Date.now() - createdAt > STATE_TTL_MS || !expiresAt || expiresAt < Date.now()) {
@@ -88,18 +93,23 @@ export default async function handler(request) {
     if (!tokens.refresh_token) {
       return redirect(returnUrl.replace("drive=connected", "drive=refresh_token_missing"));
     }
-    await storeGoogleDriveSecret(tokens.refresh_token, { connectedBy: stateRecord.uid });
     const [about, previous] = await Promise.all([
       getDriveAbout(tokens.access_token),
       adminGet("integrationConnections/googleDrive", { optional: true }),
     ]);
     const rootFolder = await ensureDriveRootFolder({ accessToken: tokens.access_token });
-    await saveDriveConnection({
-      account: about.user || {},
-      rootFolder,
-      connectedBy: stateRecord.uid,
-      previous,
-    });
+    await storeGoogleDriveSecret(tokens.refresh_token, { connectedBy: stateRecord.uid });
+    try {
+      await saveDriveConnection({
+        account: about.user || {},
+        rootFolder,
+        connectedBy: stateRecord.uid,
+        previous,
+      });
+    } catch (error) {
+      await clearGoogleDriveSecret().catch(() => {});
+      throw error;
+    }
     await audit({
       uid: stateRecord.uid,
       userName: stateRecord.userName,

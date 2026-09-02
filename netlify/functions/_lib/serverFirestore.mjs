@@ -8,16 +8,16 @@ let cachedToken = null;
 const base64url = (value) => Buffer.from(value).toString("base64url");
 
 function serviceAccount() {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM || "";
   if (!raw) {
-    const error = new Error("Falta FIREBASE_SERVICE_ACCOUNT_JSON en Netlify.");
+    const error = new Error("Falta una cuenta de servicio Firebase server-side en Netlify.");
     error.code = "firebase-admin-not-configured";
     error.status = 503;
     throw error;
   }
   let parsed;
   try { parsed = JSON.parse(raw); } catch {
-    const error = new Error("FIREBASE_SERVICE_ACCOUNT_JSON no tiene un formato válido.");
+    const error = new Error("La cuenta de servicio Firebase server-side no tiene un formato válido.");
     error.code = "firebase-admin-invalid";
     error.status = 500;
     throw error;
@@ -175,6 +175,15 @@ export async function adminList(collectionPath, { pageSize = 200 } = {}) {
     id: document.name.split("/").at(-1),
     ...fromFsFields(document.fields || {}),
   }));
+}
+
+export function backendFirebaseConfigured() {
+  try {
+    serviceAccount();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function backendFirebaseProjectId() {
