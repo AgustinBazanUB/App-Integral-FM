@@ -30,7 +30,7 @@ jobs:
       - name: Focused Inbox tests
         run: node --test tests/whatsapp-inbox-light.test.mjs
 
-      - name: Core and CRM regression tests
+      - name: General core regression tests
         if: always()
         run: >-
           node --test
@@ -38,18 +38,33 @@ jobs:
           tests/admin-experience.test.mjs
           tests/auth-entry.test.mjs
           tests/cancellation-metrics-filters.test.mjs
-          tests/customer-domain.test.mjs
-          tests/customer-import-ui.test.mjs
           tests/dashboard-filters.test.mjs
           tests/data.test.mjs
           tests/global-overlay-focus.test.mjs
           tests/inventory-domain.test.mjs
           tests/location-enhancements.test.mjs
+
+      - name: Customer regression tests
+        if: always()
+        run: >-
+          node --test
+          tests/customer-domain.test.mjs
+          tests/customer-import-ui.test.mjs
+
+      - name: Management and seller regression tests
+        if: always()
+        run: >-
+          node --test
           tests/management-domain.test.mjs
           tests/management-ui.test.mjs
+          tests/seller-panel.test.mjs
+
+      - name: Performance and search regression tests
+        if: always()
+        run: >-
+          node --test
           tests/performance-metrics.test.mjs
           tests/search.test.mjs
-          tests/seller-panel.test.mjs
 
       - name: Meta Ads regression tests
         if: always()
