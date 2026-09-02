@@ -1,0 +1,49 @@
+name: Stage 5 preview smoke
+
+on:
+  push:
+    branches:
+      - feature/meta-ads-creative-workspace
+
+permissions:
+  contents: write
+
+jobs:
+  preview-smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/meta-ads-creative-workspace
+      - name: Smoke Deploy Preview 19
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://deploy-preview-19--appintegralflormia.netlify.app'
+          for i in {1..20}; do
+            ROOT_CODE="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/" || true)"
+            if [ "$ROOT_CODE" = '200' ]; then break; fi
+            sleep 3
+          done
+          echo "root_http=$ROOT_CODE"
+          test "$ROOT_CODE" = '200'
+          META_CODE="$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/gestion/marketing/meta-ads" || true)"
+          echo "meta_ads_http=$META_CODE"
+          test "$META_CODE" = '200'
+          HEALTH_FILE="$(mktemp)"
+          HEALTH_CODE="$(curl -sS -o "$HEALTH_FILE" -w '%{http_code}' "$BASE/.netlify/functions/google-drive?health=1" || true)"
+          echo "drive_health_http=$HEALTH_CODE"
+          cat "$HEALTH_FILE"
+          echo
+          test "$HEALTH_CODE" = '200'
+      - name: Remove temporary smoke workflow
+        run: rm -f .github/workflows/stage5-preview-smoke.yml
+      - name: Commit cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(meta-ads): remove Stage 5 preview smoke helper"
+            git push origin HEAD:feature/meta-ads-creative-workspace
+          fi
