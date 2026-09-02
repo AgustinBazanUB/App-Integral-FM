@@ -598,7 +598,7 @@ No se implementó en este branch.
 - Fecha: 2026-09-02 (America/Buenos_Aires).
 - Rama: `feature/meta-ads-creative-workspace`.
 - HEAD inicial auditado: `93b769d992d5487e0880a4f374962d763114cdc2`.
-- Commit técnico de correcciones: `bce3bbe`.
+- Commits de QA ya publicados: `bce3bbe` (tests/seguridad), `aa78935` (documentación) y `b35a0e9` (reversión sin cambio funcional de un ajuste de workflow que la credencial GitHub no podía publicar).
 - PR funcional: #18, abierto, base `feature/meta-ads-campaign-planner`, sin merge.
 - PR auxiliar de preview: #19, draft, base `main`, sin merge.
 - Preview: `https://deploy-preview-19--appintegralflormia.netlify.app`.
@@ -615,7 +615,7 @@ Resultados obtenidos después de corregir el falso positivo inicial y agregar co
 - `npm run build`: PASS, 1780 módulos.
 - `git diff --check`: PASS.
 - `npm audit`: 0 vulnerabilidades después de actualizar `nanoid` a 3.3.18.
-- CI del HEAD inicial: `action_required`; debe revisarse nuevamente sobre el HEAD final.
+- CI sobre el PR auxiliar #19: FAIL con 5 tests estáticos de inventario al crear el merge de prueba con el `main` posterior. La rama funcional aislada pasa 240/240. Se intentó habilitar CI sobre la base real del PR #18, pero GitHub rechazó modificar el workflow porque la credencial OAuth no tiene scope `workflow`; el cambio se revirtió y no alteró el workflow remoto.
 
 ## RecordingTasks, revisiones y categorías dinámicas
 
@@ -707,7 +707,19 @@ No se pudieron verificar contra Drive real la carpeta raíz, carpeta de campaña
 
 ## Desktop, mobile y regresiones
 
-El Preview 19 carga correctamente y presenta el login. Sin credenciales de administrador disponibles en esta sesión no se afirmó QA autenticado del Workspace. La revisión de código/CSS confirma layout de una columna bajo 720 px, botones de ancho completo, input nativo con `capture=environment`, progreso accesible y errores inline; esto no reemplaza la validación visual real.
+El Preview 19 actualizado recuperó una sesión administrativa real. Se abrió la campaña `nS9HcQ96MYQbvtdzNwiB` (`QA ETAPA 4 — OPENAI — NO USAR`) y se verificó:
+
+- producto real `Aceite de Oliva Arbequina 500cc`;
+- información del negocio disponible;
+- metodología fijada `Metodología de prueba · v2`;
+- dos preguntas con respuestas persistidas (`Vender` y `Escribir por WhatsApp`);
+- dos revisiones aprobadas, r1 y r2;
+- estrategia editorial legible, sin JSON crudo;
+- 8 CreativePieces dinámicas: 6 `hooks`, 1 `main_body` y 1 `closing`.
+
+Al cargar el Workspace Creativo, el backend mostró el bloqueo real y seguro: `Falta una cuenta de servicio Firebase server-side en Netlify.` Esto coincide con el health y evita simular datos.
+
+Se probó la misma campaña con viewport móvil 390×844. Contexto, preguntas, tarjetas del plan, CTA `Regenerar plan`, error del Workspace y siguientes etapas se mostraron en una columna, legibles, sin texto superpuesto ni botones cortados en las secciones recorridas. No se pudo certificar la UI de progreso, selector de archivos ni Multiple Takes porque el bloqueo backend impide generar/cargar tareas.
 
 La suite de aplicación cubre login, Dashboard, ubicaciones, productos, stock, ventas, vendedores, clientes, métricas, WhatsApp, CampaignProject, Knowledge, Theory Engine, Campaign Planner, Settings y Ecommerce: PASS. El Rules Emulator incluye las regresiones previas: PASS.
 
@@ -726,7 +738,7 @@ Pendientes obligatorios antes de Etapa 6:
 1. Configurar en Netlify las cuatro variables Google y una credencial Firebase Admin de `app-integral-fm` para el contexto usado por Deploy Preview.
 2. Confirmar que Drive API esté habilitada y registrar el redirect URI HTTPS exacto en un OAuth Client web.
 3. Completar OAuth con la cuenta organizacional elegida y probar conexión.
-4. Ejecutar carpeta raíz/campaña, upload real, tres tomas, selección/persistencia y QA desktop/mobile autenticado.
+4. Ejecutar carpeta raíz/campaña, upload real, tres tomas, selección/persistencia y completar el QA de los controles de upload en desktop/mobile.
 5. Reintentar el deploy de Rules cuando Firebase Rules API deje de devolver `503`, confirmar `Deploy complete` y repetir tests post-deploy.
 6. Obtener CI verde sobre el HEAD final y confirmar el Preview actualizado.
 
