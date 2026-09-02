@@ -19,6 +19,7 @@ import { useAuth } from "../AuthContext";
 import { formatDateTime } from "../formatters";
 import { useAsyncData } from "../hooks";
 import MetaAdsCampaignPlanningWorkspace from "./MetaAdsCampaignPlanningWorkspace";
+import MetaAdsCreativeWorkspace from "./MetaAdsCreativeWorkspace";
 import {
   metaAdsStatusLabel,
   metaAdsStatusTone,
@@ -35,9 +36,6 @@ import { can } from "../permissions";
 import { listMasterProductsShared } from "../services/sharedResources";
 
 const phases = [
-  "Estrategia",
-  "Guiones",
-  "Grabaciones",
   "Validación",
   "Producción",
   "Meta Ads",
@@ -326,8 +324,9 @@ function MetaAdsCampaignDetail({ profile, campaignId }) {
       </Panel>
 
       <MetaAdsCampaignPlanningWorkspace profile={profile} campaign={project} onCampaignRefresh={projectResult.refresh} />
+      <MetaAdsCreativeWorkspace profile={profile} campaign={project} onCampaignRefresh={projectResult.refresh} />
 
-      <Panel title="Siguientes etapas" description="Drive, validación, render y publicación continúan fuera de esta etapa.">
+      <Panel title="Siguientes etapas" description="Después de grabar y cargar el material, validación, render y publicación continúan en etapas posteriores.">
         <div className="fm-meta-ads-phases">
           {phases.map((phase, index) => (
             <article key={phase} className="fm-meta-ads-phase">
