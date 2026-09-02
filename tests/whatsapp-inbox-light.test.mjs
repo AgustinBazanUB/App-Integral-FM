@@ -87,7 +87,10 @@ test("unsupported WhatsApp chat types cannot contaminate CRM or send controls", 
   assert.match(page, /chatType !== "channel"/);
   assert.match(page, /chatType !== "community"/);
   assert.match(page, /Grupos, canales y comunidades no se convierten en clientes/);
-  assert.match(page, /disabled=\{!canRespond \|\| !crmEligibleChat\(selectedChat\)/);
+  assert.ok(
+    page.includes('disabled={!canRespond || !crmEligibleChat(selectedChat)}'),
+    "send control must be disabled when the user cannot respond or the selected chat is not CRM-eligible",
+  );
 });
 
 test("messages render as React text and the Inbox does not introduce unsafe HTML", async () => {
