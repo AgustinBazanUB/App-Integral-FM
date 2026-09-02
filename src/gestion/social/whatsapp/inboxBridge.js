@@ -66,8 +66,8 @@ function request(type, payload, acceptedType, timeoutMs = 10_000) {
       finish(() => resolve(response.payload));
     };
     const timer = window.setTimeout(() => {
-      const error = new Error("La extensión no respondió al Inbox dentro del tiempo esperado.");
-      error.code = "EXTENSION_NOT_AVAILABLE";
+      const error = new Error("La extensión está instalada, pero el puente de WhatsApp Inbox no respondió. Actualizá Flor Mía WhatsApp Sender y recargá la Web App.");
+      error.code = "INBOX_BRIDGE_NOT_AVAILABLE";
       finish(() => reject(error));
     }, timeoutMs);
     window.addEventListener("message", onMessage);
