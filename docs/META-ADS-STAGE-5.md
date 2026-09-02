@@ -2,9 +2,9 @@
 
 ## Estado
 
-**ETAPA 5 IMPLEMENTADA Y VALIDADA TÉCNICAMENTE — CIERRE BLOQUEADO POR CONFIGURACIÓN EXTERNA Y PUBLICACIÓN DE RULES.**
+**ETAPA 5 IMPLEMENTADA Y VALIDADA TÉCNICAMENTE — CIERRE BLOQUEADO POR CONFIGURACIÓN EXTERNA DE DRIVE Y CI AUXILIAR.**
 
-El QA final del 2 de septiembre de 2026 confirmó la implementación y dejó verdes las suites locales. La Etapa 5 todavía no se declara cerrada porque Google Drive no está configurado en Netlify, no se pudo ejecutar el flujo real OAuth/upload y Firebase devolvió `503` al intentar publicar las Rules en `app-integral-fm`.
+El QA final del 2 de septiembre de 2026 confirmó la implementación, dejó verdes las suites locales y publicó las Rules en `app-integral-fm`. La Etapa 5 todavía no se declara cerrada porque Google Drive no está configurado en Netlify, no se pudo ejecutar el flujo real OAuth/upload y el CI del PR auxiliar contra un `main` posterior permanece rojo.
 
 ## Objetivo
 
@@ -402,7 +402,7 @@ Etapa 5 prepara cambios en `firestore.rules` para:
 
 **ESTADO DE QA: 50/50 tests del Rules Emulator PASS.**
 
-La publicación se intentó dos veces exclusivamente contra `app-integral-fm`. En ambas oportunidades las Rules compilaron, pero `firebaserules.googleapis.com` respondió HTTP `503` antes de crear el ruleset. Por lo tanto, este cierre no afirma que las Rules de Etapa 5 estén publicadas.
+La publicación se ejecutó exclusivamente contra `app-integral-fm`. Los primeros dos intentos recibieron HTTP `503` de `firebaserules.googleapis.com`; el tercer intento compiló y publicó correctamente con `Deploy complete`. La barrera post-deploy volvió a pasar 240/240 tests de aplicación, 50/50 Rules Emulator, build y auditoría de dependencias.
 
 ## Índices
 
@@ -561,7 +561,7 @@ La campaña permanece en `creative`; Etapa 5 no avanza automáticamente a valida
 Durante la implementación y el QA de Etapa 5:
 
 - no se hizo merge a `main`;
-- se intentó publicar únicamente las Firestore Rules a `app-integral-fm`, pero Firebase respondió `503` y no confirmó publicación;
+- se publicaron únicamente las Firestore Rules a `app-integral-fm` después de QA completo;
 - no se desplegaron índices;
 - no se tocó `fm-stock-y-venta`;
 - no se simularon carpetas, archivos ni conexión Google real.
@@ -650,8 +650,8 @@ No se necesitan índices nuevos para las consultas de Etapa 5 y `firestore.index
 - Proyecto confirmado por `.firebaserc` y Firebase CLI: `app-integral-fm` (`App Integral FM`).
 - `fm-stock-y-venta` no fue tocado.
 - Comando limitado ejecutado: `firebase deploy --only firestore:rules --project app-integral-fm`.
-- Ambos intentos compilaron `firestore.rules`, pero finalizaron con HTTP `503` de `firebaserules.googleapis.com` al crear el ruleset.
-- No hubo `Deploy complete`; por ello no hay post-deploy certificable.
+- Los dos primeros intentos compilaron pero finalizaron con HTTP `503`; el tercer intento publicó `firestore.rules` y confirmó `Deploy complete`.
+- Post-deploy: 240/240 app tests, 50/50 Rules Emulator, build y `npm audit` PASS. El Preview 19 recargó la campaña real y siguió leyendo contexto, respuestas y revisiones desde Firebase.
 
 ## Configuración Google real en Netlify
 
@@ -739,7 +739,6 @@ Pendientes obligatorios antes de Etapa 6:
 2. Confirmar que Drive API esté habilitada y registrar el redirect URI HTTPS exacto en un OAuth Client web.
 3. Completar OAuth con la cuenta organizacional elegida y probar conexión.
 4. Ejecutar carpeta raíz/campaña, upload real, tres tomas, selección/persistencia y completar el QA de los controles de upload en desktop/mobile.
-5. Reintentar el deploy de Rules cuando Firebase Rules API deje de devolver `503`, confirmar `Deploy complete` y repetir tests post-deploy.
-6. Obtener CI verde sobre el HEAD final y confirmar el Preview actualizado.
+5. Obtener CI verde sobre el HEAD final y confirmar el Preview actualizado.
 
-**Veredicto: ETAPA 5 NO CERRADA.** La implementación técnica local está sana, pero faltan publicación de Rules, configuración/validación real de Drive y CI/preview final. No pasar al Prompt 6 hasta completar estos puntos.
+**Veredicto: ETAPA 5 NO CERRADA.** La implementación técnica y Firebase Rules están sanas, pero faltan configuración/validación real de Drive, upload/Multiple Takes real y CI final. No pasar al Prompt 6 hasta completar estos puntos.
