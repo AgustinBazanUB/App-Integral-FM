@@ -2,9 +2,9 @@
 
 ## Estado
 
-**ETAPA 5 IMPLEMENTADA — PENDIENTE QA DE CIERRE EN CODEX.**
+**ETAPA 5 IMPLEMENTADA Y VALIDADA TÉCNICAMENTE — CIERRE BLOQUEADO POR CONFIGURACIÓN EXTERNA Y PUBLICACIÓN DE RULES.**
 
-Este documento describe la implementación técnica. Las Firestore Rules nuevas y cualquier índice eventual quedan deliberadamente sin publicar hasta el QA pesado solicitado para el siguiente prompt.
+El QA final del 2 de septiembre de 2026 confirmó la implementación y dejó verdes las suites locales. La Etapa 5 todavía no se declara cerrada porque Google Drive no está configurado en Netlify, no se pudo ejecutar el flujo real OAuth/upload y Firebase devolvió `503` al intentar publicar las Rules en `app-integral-fm`.
 
 ## Objetivo
 
@@ -400,9 +400,9 @@ Etapa 5 prepara cambios en `firestore.rules` para:
 - negar completamente secretos, OAuth state y upload sessions al cliente;
 - incorporar permisos de workspace respetando `permissionDeny`.
 
-**ESTADO: PENDIENTES DE QA/DEPLOY POR CODEX. NO PUBLICADAS EN ESTA ETAPA.**
+**ESTADO DE QA: 50/50 tests del Rules Emulator PASS.**
 
-No se ejecutó Rules Emulator exhaustivo porque el Prompt 5 lo reserva deliberadamente para el siguiente QA.
+La publicación se intentó dos veces exclusivamente contra `app-integral-fm`. En ambas oportunidades las Rules compilaron, pero `firebaserules.googleapis.com` respondió HTTP `503` antes de crear el ruleset. Por lo tanto, este cierre no afirma que las Rules de Etapa 5 estén publicadas.
 
 ## Índices
 
@@ -506,9 +506,9 @@ La UI tiene breakpoint móvil, tarjetas de una columna, acciones grandes, progre
 
 Para video se usa `capture="environment"` como sugerencia estándar cuando el navegador móvil la soporte; no se depende de APIs experimentales.
 
-El QA visual real desktop/móvil queda para Codex, según el alcance del prompt.
+El CSS responsive y los contratos de UI están cubiertos por revisión y tests. El QA visual autenticado real en desktop/móvil queda pendiente porque el Preview 19 requiere una sesión de administrador y la integración Drive aún no está configurada.
 
-## Tests livianos ejecutados
+## Evidencia de implementación previa
 
 Workflow final liviano: `Stage 5 final light verification`, run `33647855405`.
 
@@ -535,9 +535,9 @@ Resultados finales sobre código de Etapa 5:
 - `git diff --check`: PASS;
 - `npm run build`: **PASS**, 1780 módulos.
 
-No se ejecutó la suite completa ni Rules Emulator exhaustivo en cumplimiento del alcance de implementación del Prompt 5.
+Esta evidencia fue reemplazada por el QA final exhaustivo documentado al final de este archivo.
 
-`npm ci` reportó una vulnerabilidad high severity existente en el árbol de dependencias. Etapa 5 no agregó un SDK Google ni una dependencia nueva para ocultarla; el QA de cierre puede evaluar su origen/actualización sin mezclarlo con el objetivo funcional de Drive.
+La vulnerabilidad high heredada de `nanoid 3.3.16` fue corregida durante el QA final actualizando el lockfile a `nanoid 3.3.18`, sin ampliar rangos directos ni agregar dependencias.
 
 ## Limitaciones deliberadas / fuera de alcance
 
@@ -558,10 +558,10 @@ La campaña permanece en `creative`; Etapa 5 no avanza automáticamente a valida
 
 ## Reglas de producción
 
-Durante la implementación de Etapa 5:
+Durante la implementación y el QA de Etapa 5:
 
 - no se hizo merge a `main`;
-- no se publicaron las nuevas Firestore Rules;
+- se intentó publicar únicamente las Firestore Rules a `app-integral-fm`, pero Firebase respondió `503` y no confirmó publicación;
 - no se desplegaron índices;
 - no se tocó `fm-stock-y-venta`;
 - no se simularon carpetas, archivos ni conexión Google real.
@@ -587,6 +587,147 @@ El contrato estable para Etapa 6 es `RecordingTask + selected CreativeAsset + dr
 
 ## Próxima etapa
 
-**Etapa 6 — Validation Engine.**
+**Etapa 6 — Validation Engine, todavía no habilitada.**
 
 No se implementó en este branch.
+
+# QA FINAL / CIERRE ETAPA 5
+
+## Identificación
+
+- Fecha: 2026-09-02 (America/Buenos_Aires).
+- Rama: `feature/meta-ads-creative-workspace`.
+- HEAD inicial auditado: `93b769d992d5487e0880a4f374962d763114cdc2`.
+- Commit técnico de correcciones: `bce3bbe`.
+- PR funcional: #18, abierto, base `feature/meta-ads-campaign-planner`, sin merge.
+- PR auxiliar de preview: #19, draft, base `main`, sin merge.
+- Preview: `https://deploy-preview-19--appintegralflormia.netlify.app`.
+- `main` no fue modificado.
+
+## Barrera automática
+
+Resultados obtenidos después de corregir el falso positivo inicial y agregar cobertura de Etapa 5:
+
+- `npm ci`: PASS.
+- `npm test`: 240/240 PASS en la barrera final.
+- tests focalizados Workspace/Drive/OAuth: 21/21 PASS.
+- Firestore Rules Emulator: 50/50 PASS, incluida la nueva suite `firestore.meta-ads-creative.rules.mjs`.
+- `npm run build`: PASS, 1780 módulos.
+- `git diff --check`: PASS.
+- `npm audit`: 0 vulnerabilidades después de actualizar `nanoid` a 3.3.18.
+- CI del HEAD inicial: `action_required`; debe revisarse nuevamente sobre el HEAD final.
+
+## RecordingTasks, revisiones y categorías dinámicas
+
+Se verificó que el generador:
+
+- consume exclusivamente un CampaignPlan aprobado y la TheoryVersion fijada;
+- crea exactamente una RecordingTask por CreativePiece;
+- produce IDs deterministas `r{revision}-{creativePieceId}`;
+- no cambia el resultado al ejecutarse nuevamente;
+- separa una revisión nueva sin sobrescribir el histórico;
+- acepta `hook`, `testimonial`, `product_demo` y categorías nuevas sin componentes específicos;
+- rechaza una CreativePiece cuyo `requirementKey` no exista en TheoryConfig;
+- conserva script, objetivo, instrucciones, duración, requisitos y trazabilidad de revisión.
+
+El modelo mantiene RecordingTasks y CreativeAssets en subcolecciones de la campaña. No guarda binarios, tokens ni URL resumible. Las lecturas están acotadas a la campaña abierta y no utilizan listeners globales.
+
+## Rules, permisos y aislamiento
+
+La suite nueva confirma:
+
+- admin y marketing_manager pueden leer el Workspace Creativo;
+- seller, usuario inactivo y `permissionDeny` no pueden leerlo;
+- ninguna identidad cliente, ni siquiera admin, puede crear o modificar RecordingTasks/CreativeAssets directamente;
+- las mutaciones reales son backend-only y verifican campaña, tarea, revisión y asset;
+- metadata de conexión puede leerse con permiso, pero secrets, OAuth states y upload sessions son inaccesibles;
+- escrituras cruzadas entre campañas y escrituras directas de integración quedan denegadas.
+
+No se necesitan índices nuevos para las consultas de Etapa 5 y `firestore.indexes.json` no fue modificado.
+
+## Firebase real
+
+- Proyecto confirmado por `.firebaserc` y Firebase CLI: `app-integral-fm` (`App Integral FM`).
+- `fm-stock-y-venta` no fue tocado.
+- Comando limitado ejecutado: `firebase deploy --only firestore:rules --project app-integral-fm`.
+- Ambos intentos compilaron `firestore.rules`, pero finalizaron con HTTP `503` de `firebaserules.googleapis.com` al crear el ruleset.
+- No hubo `Deploy complete`; por ello no hay post-deploy certificable.
+
+## Configuración Google real en Netlify
+
+La pantalla de Environment variables del proyecto `appintegralflormia` mostró únicamente `OPENAI_API_KEY`. El health real del Preview 19 devolvió:
+
+```text
+configured: false
+firebaseBackendConfigured: false
+redirectConfigured: false
+scope: https://www.googleapis.com/auth/drive.file
+mode: my_drive
+```
+
+Estado sin revelar valores:
+
+```text
+GOOGLE_CLIENT_ID: missing
+GOOGLE_CLIENT_SECRET: missing
+GOOGLE_OAUTH_REDIRECT_URI: missing
+GOOGLE_TOKEN_ENCRYPTION_KEY: missing
+Firebase Admin server-side: missing en el contexto del Preview 19
+Google Drive API: no verificada
+```
+
+La ausencia de configuración impide conectar una cuenta real, crear carpetas reales y certificar un upload real o Multiple Takes end-to-end.
+
+## OAuth y tokens
+
+La implementación usa Authorization Code Flow server-side, `state` aleatorio de 256 bits, TTL de diez minutos, uso único antes del intercambio, redirect HTTPS, `access_type=offline`, `include_granted_scopes=true` y callback backend-only. Los tests verifican states ausentes, de otro provider, vencidos, callback sin code y errores seguros.
+
+El scope real es `https://www.googleapis.com/auth/drive.file`, clasificado por Google como no sensible y recomendado para acceso limitado por archivo. Google también recomienda `offline` para obtener refresh tokens en aplicaciones web server y documenta el protocolo `308`/`Range` usado por las cargas resumibles:
+
+- https://developers.google.com/workspace/drive/api/guides/api-specific-auth
+- https://developers.google.com/identity/protocols/oauth2/web-server
+- https://developers.google.com/workspace/drive/api/guides/manage-uploads
+
+El refresh token se cifra con AES-256-GCM en `integrationSecrets/googleDrive`; la clave queda separada en Netlify. Access tokens se refrescan y usan sólo en backend. Los logs registran códigos/estados, no credenciales. La session URL temporal se entrega al navegador autorizado para el upload directo, pero no se persiste ni se registra.
+
+## Upload, carpetas y Multiple Takes
+
+Por código y tests se verificó:
+
+- Browser → Google Drive directo mediante chunks;
+- Netlify sólo autoriza, inicia y confirma; no transporta el binario pesado;
+- `Content-Range`, respuesta `308`, consulta de offset, reintentos y sesión vencida;
+- validación backend de identidad, campaña, tarea, revisión, folder, MIME y tamaño;
+- confirmación posterior contra metadata real de Drive y `appProperties`;
+- naming saneado e identidad por folderId;
+- nombres distintos para toma 1, 2 y 3;
+- preservación de la toma previa y cambio de `selectedAssetId` sin borrar archivos.
+
+No se pudieron verificar contra Drive real la carpeta raíz, carpeta de campaña, folders dinámicos, archivo final, tres tomas ni selección persistida porque falta la configuración externa indicada arriba.
+
+## Desktop, mobile y regresiones
+
+El Preview 19 carga correctamente y presenta el login. Sin credenciales de administrador disponibles en esta sesión no se afirmó QA autenticado del Workspace. La revisión de código/CSS confirma layout de una columna bajo 720 px, botones de ancho completo, input nativo con `capture=environment`, progreso accesible y errores inline; esto no reemplaza la validación visual real.
+
+La suite de aplicación cubre login, Dashboard, ubicaciones, productos, stock, ventas, vendedores, clientes, métricas, WhatsApp, CampaignProject, Knowledge, Theory Engine, Campaign Planner, Settings y Ecommerce: PASS. El Rules Emulator incluye las regresiones previas: PASS.
+
+## Bugs encontrados y corregidos
+
+1. El test que aseguraba que `sessionUrl` no se persistiera incluía accidentalmente el bloque de respuesta al navegador por una delimitación frágil y finales de línea Windows. Se delimitó exactamente la escritura `adminSet`; la implementación nunca persistió esa URL.
+2. No existía una suite del Emulator dedicada a Etapa 5. Se agregó cobertura de roles, denegaciones, secrets y mutaciones backend-only.
+3. La validación de OAuth state estaba embebida y sólo cubierta estáticamente. Se extrajo una función pura usada por el callback y se probaron estados inválidos/vencidos y uso único.
+4. La cobertura del generador no demostraba determinismo, revisiones históricas, cantidades por categoría ni toma 3. Se agregaron estos casos.
+5. `nanoid 3.3.16` tenía una vulnerabilidad high corregible. El lockfile quedó en 3.3.18 y `npm audit` pasó a cero vulnerabilidades.
+
+## Pendientes externos y veredicto
+
+Pendientes obligatorios antes de Etapa 6:
+
+1. Configurar en Netlify las cuatro variables Google y una credencial Firebase Admin de `app-integral-fm` para el contexto usado por Deploy Preview.
+2. Confirmar que Drive API esté habilitada y registrar el redirect URI HTTPS exacto en un OAuth Client web.
+3. Completar OAuth con la cuenta organizacional elegida y probar conexión.
+4. Ejecutar carpeta raíz/campaña, upload real, tres tomas, selección/persistencia y QA desktop/mobile autenticado.
+5. Reintentar el deploy de Rules cuando Firebase Rules API deje de devolver `503`, confirmar `Deploy complete` y repetir tests post-deploy.
+6. Obtener CI verde sobre el HEAD final y confirmar el Preview actualizado.
+
+**Veredicto: ETAPA 5 NO CERRADA.** La implementación técnica local está sana, pero faltan publicación de Rules, configuración/validación real de Drive y CI/preview final. No pasar al Prompt 6 hasta completar estos puntos.
