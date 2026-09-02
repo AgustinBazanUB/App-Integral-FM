@@ -1,0 +1,571 @@
+.fm-wa-inbox-page {
+  min-width: 0;
+}
+
+.fm-wa-inbox__header-actions,
+.fm-wa-inbox__mobile-nav,
+.fm-wa-chat__heading,
+.fm-wa-chat__meta,
+.fm-wa-conversation__header,
+.fm-wa-composer > div,
+.fm-wa-crm-card__heading,
+.fm-wa-crm-card__labels > div {
+  display: flex;
+  align-items: center;
+}
+
+.fm-wa-inbox__header-actions {
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.fm-wa-inbox {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.92fr) minmax(420px, 1.55fr) minmax(280px, 0.9fr);
+  min-height: min(720px, calc(100vh - 220px));
+  border: 1px solid var(--fm-border, #ded5c6);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--fm-surface, #fff);
+  box-shadow: 0 18px 50px rgb(70 54 29 / 8%);
+}
+
+.fm-wa-inbox__list-column,
+.fm-wa-inbox__conversation-column,
+.fm-wa-inbox__crm-column {
+  min-width: 0;
+  min-height: 0;
+  background: #fff;
+}
+
+.fm-wa-inbox__list-column,
+.fm-wa-inbox__crm-column {
+  overflow: auto;
+}
+
+.fm-wa-inbox__list-column {
+  border-right: 1px solid var(--fm-border, #e6ded2);
+}
+
+.fm-wa-inbox__crm-column {
+  border-left: 1px solid var(--fm-border, #e6ded2);
+  background: #fbfaf7;
+}
+
+.fm-wa-inbox__conversation-column {
+  display: flex;
+  flex-direction: column;
+  background: #f4f0e8;
+}
+
+.fm-wa-inbox__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 14px;
+  background: rgb(255 255 255 / 96%);
+  border-bottom: 1px solid var(--fm-border, #e6ded2);
+  backdrop-filter: blur(10px);
+}
+
+.fm-wa-inbox__filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.fm-wa-inbox__filters button,
+.fm-wa-inbox__mobile-nav button {
+  border: 1px solid var(--fm-border, #ded5c6);
+  border-radius: 10px;
+  background: #fff;
+  color: #403a34;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fm-wa-inbox__filters button {
+  min-height: 38px;
+  padding: 7px 9px;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  font-size: 12px;
+}
+
+.fm-wa-inbox__filters button b {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #f1ece3;
+  text-align: center;
+}
+
+.fm-wa-inbox__filters button.is-active,
+.fm-wa-inbox__mobile-nav button.is-active {
+  border-color: #a47c2c;
+  background: #f8f0dc;
+  color: #5f4518;
+}
+
+.fm-wa-inbox__chat-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.fm-wa-chat {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid #eee8df;
+  padding: 12px 13px;
+  background: #fff;
+  color: #25211d;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fm-wa-chat:hover,
+.fm-wa-chat:focus-visible {
+  background: #faf7f1;
+}
+
+.fm-wa-chat.is-selected {
+  background: #f4eddf;
+  box-shadow: inset 3px 0 #a47c2c;
+}
+
+.fm-wa-chat__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #ece6dc;
+  color: #665d52;
+  font-weight: 700;
+}
+
+.fm-wa-chat__body,
+.fm-wa-chat__heading strong,
+.fm-wa-chat__preview {
+  min-width: 0;
+}
+
+.fm-wa-chat__heading {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fm-wa-chat__heading strong,
+.fm-wa-chat__preview {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fm-wa-chat__heading small {
+  flex: 0 0 auto;
+  color: #81786e;
+  font-size: 11px;
+}
+
+.fm-wa-chat__preview {
+  margin-top: 3px;
+  color: #655f57;
+  font-size: 12px;
+}
+
+.fm-wa-chat__meta {
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+  color: #777066;
+  font-size: 10px;
+}
+
+.fm-wa-chat__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.fm-wa-chat__meta svg {
+  width: 11px;
+  height: 11px;
+}
+
+.fm-wa-chat__unread {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #657342;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fm-wa-conversation__header {
+  min-height: 68px;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #ddd5c8;
+  background: #fff;
+}
+
+.fm-wa-conversation__header > div {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.fm-wa-conversation__header strong,
+.fm-wa-conversation__header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fm-wa-conversation__header span {
+  margin-top: 2px;
+  color: #756e66;
+  font-size: 12px;
+}
+
+.fm-wa-inbox__open-crm,
+.fm-wa-inbox__back {
+  border: 1px solid #ddd5c8;
+  border-radius: 9px;
+  background: #fff;
+  color: #403a34;
+  cursor: pointer;
+}
+
+.fm-wa-inbox__open-crm {
+  display: none;
+  min-height: 38px;
+  padding: 0 10px;
+  align-items: center;
+  gap: 6px;
+}
+
+.fm-wa-inbox__back {
+  display: none;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.fm-wa-conversation__messages {
+  flex: 1;
+  min-height: 260px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+}
+
+.fm-wa-conversation__history-note {
+  align-self: center;
+  max-width: 80%;
+  border: 1px solid #ded6c9;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgb(255 255 255 / 80%);
+  color: #726a61;
+  font-size: 11px;
+  text-align: center;
+}
+
+.fm-wa-message {
+  width: fit-content;
+  max-width: min(76%, 620px);
+  border-radius: 13px;
+  padding: 9px 11px 6px;
+  box-shadow: 0 2px 5px rgb(48 39 28 / 6%);
+}
+
+.fm-wa-message p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #29251f;
+  line-height: 1.45;
+}
+
+.fm-wa-message small {
+  display: block;
+  margin-top: 4px;
+  color: #756f67;
+  font-size: 9px;
+  text-align: right;
+}
+
+.fm-wa-message--incoming {
+  align-self: flex-start;
+  background: #fff;
+  border-top-left-radius: 4px;
+}
+
+.fm-wa-message--outgoing {
+  align-self: flex-end;
+  background: #e5ead8;
+  border-top-right-radius: 4px;
+}
+
+.fm-wa-composer {
+  padding: 12px 14px;
+  border-top: 1px solid #ddd5c8;
+  background: #fff;
+}
+
+.fm-wa-composer > label {
+  display: block;
+  margin-bottom: 6px;
+  color: #655e55;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fm-wa-composer > div {
+  gap: 9px;
+}
+
+.fm-wa-composer textarea {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+  border: 1px solid #d9d0c3;
+  border-radius: 11px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #25211d;
+  font: inherit;
+}
+
+.fm-wa-composer__status {
+  display: block;
+  margin-top: 5px;
+  color: #6d665e;
+}
+
+.fm-wa-composer__status--error {
+  color: #a33f32;
+}
+
+.fm-wa-crm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+}
+
+.fm-wa-crm-card__heading {
+  gap: 9px;
+}
+
+.fm-wa-crm-card__heading small {
+  display: block;
+  color: #756e64;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.fm-wa-crm-card__heading h2 {
+  margin: 2px 0 0;
+  font-size: 20px;
+}
+
+.fm-wa-crm-card__facts {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.fm-wa-crm-card__facts > div {
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #e4dcd0;
+}
+
+.fm-wa-crm-card__facts dt {
+  color: #756e64;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.fm-wa-crm-card__facts dd {
+  margin: 3px 0 0;
+  color: #2b2722;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.fm-wa-crm-card__form {
+  display: grid;
+  gap: 10px;
+}
+
+.fm-wa-crm-card__form select,
+.fm-wa-crm-card__form input {
+  width: 100%;
+}
+
+.fm-wa-crm-card__labels {
+  padding-top: 12px;
+  border-top: 1px solid #e3dbce;
+}
+
+.fm-wa-crm-card__labels h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.fm-wa-crm-card__labels > div {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fm-wa-crm-card__labels p {
+  margin: 0;
+  color: #746c62;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.fm-wa-inbox__loading,
+.fm-wa-inbox__connection-state {
+  padding: 18px;
+}
+
+.fm-wa-inbox__connection-state {
+  border: 1px solid #e3dbce;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.fm-wa-inbox__mobile-nav {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .fm-wa-inbox {
+    grid-template-columns: minmax(280px, .9fr) minmax(420px, 1.5fr);
+  }
+
+  .fm-wa-inbox__crm-column {
+    grid-column: 1 / -1;
+    border-left: 0;
+    border-top: 1px solid var(--fm-border, #e6ded2);
+  }
+
+  .fm-wa-crm-card {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .fm-wa-crm-card__heading,
+  .fm-wa-crm-card > .fm-badge,
+  .fm-wa-crm-card__labels,
+  .fm-wa-crm-card > .fm-button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .fm-wa-inbox__header-actions {
+    justify-content: flex-start;
+  }
+
+  .fm-wa-inbox__mobile-nav {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+
+  .fm-wa-inbox__mobile-nav button {
+    min-height: 42px;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  .fm-wa-inbox__mobile-nav button:disabled {
+    opacity: .45;
+    cursor: default;
+  }
+
+  .fm-wa-inbox {
+    display: block;
+    min-height: calc(100vh - 250px);
+    border-radius: 14px;
+  }
+
+  .fm-wa-inbox__list-column,
+  .fm-wa-inbox__conversation-column,
+  .fm-wa-inbox__crm-column {
+    display: none;
+    min-height: calc(100vh - 260px);
+    border: 0;
+  }
+
+  .fm-wa-inbox[data-mobile-view="list"] .fm-wa-inbox__list-column {
+    display: block;
+  }
+
+  .fm-wa-inbox[data-mobile-view="conversation"] .fm-wa-inbox__conversation-column {
+    display: flex;
+  }
+
+  .fm-wa-inbox[data-mobile-view="crm"] .fm-wa-inbox__crm-column {
+    display: block;
+  }
+
+  .fm-wa-inbox__back {
+    display: grid;
+  }
+
+  .fm-wa-inbox__open-crm {
+    display: inline-flex;
+  }
+
+  .fm-wa-conversation__header > .fm-badge {
+    display: none;
+  }
+
+  .fm-wa-conversation__messages {
+    padding: 14px 10px;
+  }
+
+  .fm-wa-message {
+    max-width: 88%;
+  }
+
+  .fm-wa-crm-card {
+    display: flex;
+  }
+}
