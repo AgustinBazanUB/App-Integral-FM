@@ -27,18 +27,20 @@ jobs:
 
           path = Path("firestore.rules")
           text = path.read_text(encoding="utf-8")
-          old = '''        && request.resource.data.sentCount == 0
-        && request.resource.data.confirmedSentCount == 0
-        && request.resource.data.unverifiedSentCount == 0
-        && request.resource.data.processedCount == 0
-        && request.resource.data.errorCount == 0
-'''
-          new = '''        && request.resource.data.sentCount == 0
-        && (!("confirmedSentCount" in request.resource.data) || request.resource.data.confirmedSentCount == 0)
-        && (!("unverifiedSentCount" in request.resource.data) || request.resource.data.unverifiedSentCount == 0)
-        && (!("processedCount" in request.resource.data) || request.resource.data.processedCount == 0)
-        && request.resource.data.errorCount == 0
-'''
+          old = "\n".join([
+              "        && request.resource.data.sentCount == 0",
+              "        && request.resource.data.confirmedSentCount == 0",
+              "        && request.resource.data.unverifiedSentCount == 0",
+              "        && request.resource.data.processedCount == 0",
+              "        && request.resource.data.errorCount == 0",
+          ]) + "\n"
+          new = "\n".join([
+              "        && request.resource.data.sentCount == 0",
+              "        && (!(\"confirmedSentCount\" in request.resource.data) || request.resource.data.confirmedSentCount == 0)",
+              "        && (!(\"unverifiedSentCount\" in request.resource.data) || request.resource.data.unverifiedSentCount == 0)",
+              "        && (!(\"processedCount\" in request.resource.data) || request.resource.data.processedCount == 0)",
+              "        && request.resource.data.errorCount == 0",
+          ]) + "\n"
           if text.count(old) != 1:
               raise SystemExit("Expected exactly one WhatsApp draft counter block; refusing to patch.")
           path.write_text(text.replace(old, new), encoding="utf-8")
