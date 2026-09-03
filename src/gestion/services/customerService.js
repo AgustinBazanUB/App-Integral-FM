@@ -12,7 +12,6 @@ import {
   serverTimestamp,
   setDoc,
   where,
-  writeBatch,
 } from "firebase/firestore";
 import {
   buildCustomerDraft,
@@ -171,44 +170,17 @@ export async function createCustomerFromAdminIfMissing(profile, input) {
 }
 
 export async function saveCustomerFromAdmin(profile, input) {
-  if (!can(profile, "loyal-customers", "create") && !can(profile, "loyal-customers", "edit")) {
-    throw new Error("No tenés permiso para guardar clientes.");
+  const result = await createCustomerFromAdminIfMissing(profile, input);
+  if (!result.created) {
+    const existingName = String(result.customer?.name || "").trim();
+    const error = new Error(existingName
+      ? `Este número ya pertenece al cliente ${existingName}. No se realizaron cambios.`
+      : "Este número ya pertenece a un cliente registrado. No se realizaron cambios.");
+    error.code = "customer/already-exists";
+    error.customer = result.customer;
+    throw error;
   }
-  const draft = buildCustomerDraft(input);
-  const customerId = await customerDocumentId(draft.phoneNormalized);
-  const reference = doc(db, "customers", customerId);
-  const existing = await getDoc(reference);
-  if (existing.exists() && !can(profile, "loyal-customers", "edit")) {
-    throw new Error("Ese cliente ya existe y no tenés permiso para editarlo.");
-  }
-  const batch = writeBatch(db);
-  batch.set(reference, {
-    customerKey: customerId,
-    phone: draft.phone,
-    phoneNormalized: draft.phoneNormalized,
-    name: draft.name || null,
-    zoneId: draft.zoneId || null,
-    zoneName: draft.zoneName,
-    customZone: draft.customZone || null,
-    active: true,
-    deleted: false,
-    source: existing.exists() ? (existing.data().source || "admin") : "admin",
-    updatedBy: profile.id,
-    updatedByName: userName(profile),
-    updatedAt: serverTimestamp(),
-    ...(existing.exists() ? {} : {
-      createdBy: profile.id,
-      createdByName: userName(profile),
-      createdAt: serverTimestamp(),
-    }),
-  }, { merge: true });
-  batch.set(doc(collection(db, "auditLogs")), customerAudit(profile, {
-    action: existing.exists() ? "customer.updated" : "customer.created",
-    customerId,
-    changedFields: existing.exists() ? ["name", "phone", "zone"] : [],
-  }));
-  await batch.commit();
-  return customerId;
+  return result.id;
 }
 
 export async function updateCustomerFromAdmin(profile, currentCustomer, input) {
