@@ -299,7 +299,7 @@ service cloud.firestore {
         && canModule("marketing", "whatsappCancelCampaign");
     }
     function whatsappStatus(value) {
-      return value in ["draft", "ready", "running", "paused", "completed", "error", "cancelled"];
+      return value in ["draft", "ready", "running", "paused", "completed", "error", "cancelled", "stopped"];
     }
     function noWhatsappSecrets(data) {
       return !data.keys().hasAny([
@@ -333,26 +333,54 @@ service cloud.firestore {
         && data.status in ["pending", "running", "completed", "error"]
         && !data.keys().hasAny(["cookies", "token", "password", "imageData", "imageBase64"]);
     }
+    function whatsappCustomerCooldownUpdate(customerId) {
+      let campaignId = request.resource.data.lastBulkWhatsAppCampaignId;
+      let recipientId = request.resource.data.lastBulkWhatsAppRecipientId;
+      let recipientPath = /databases/$(database)/documents/whatsappCampaigns/$(campaignId)/recipients/$(recipientId);
+      return whatsappCanSend()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "lastBulkWhatsAppConfirmedAt", "lastBulkWhatsAppCampaignId", "lastBulkWhatsAppRecipientId"
+        ])
+        && request.resource.data.lastBulkWhatsAppConfirmedAt is timestamp
+        && campaignId is string
+        && campaignId.size() > 0
+        && recipientId is string
+        && recipientId.matches('recipient_[0-9a-f]+')
+        && (!("lastBulkWhatsAppConfirmedAt" in resource.data)
+          || resource.data.lastBulkWhatsAppConfirmedAt == null
+          || request.resource.data.lastBulkWhatsAppConfirmedAt >= resource.data.lastBulkWhatsAppConfirmedAt)
+        && existsAfter(recipientPath)
+        && getAfter(recipientPath).data.clientId == customerId
+        && getAfter(recipientPath).data.extensionResultOutcome == "confirmed"
+        && getAfter(recipientPath).data.deliveryConfidence == "confirmed"
+        && getAfter(recipientPath).data.confirmedAt == request.resource.data.lastBulkWhatsAppConfirmedAt;
+    }
     function whatsappCreateCampaignUpdate() {
       return whatsappCanCreate()
         && request.resource.data.status in ["draft", "ready"]
         && request.resource.data.sentCount == 0
+        && (!("confirmedSentCount" in request.resource.data) || request.resource.data.confirmedSentCount == 0)
+        && (!("unverifiedSentCount" in request.resource.data) || request.resource.data.unverifiedSentCount == 0)
+        && (!("processedCount" in request.resource.data) || request.resource.data.processedCount == 0)
         && request.resource.data.errorCount == 0
         && request.resource.data.progressPercentage == 0
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           "name", "filters", "message", "imageCount", "imageNames", "imageOrder",
-          "imageMetadata", "totalRecipients", "sentCount", "errorCount",
-          "progressPercentage", "status", "snapshotState", "preparedAt",
-          "updatedBy", "updatedByName", "updatedAt"
+          "imageMetadata", "totalRecipients", "sentCount", "confirmedSentCount",
+          "unverifiedSentCount", "processedCount", "errorCount", "progressPercentage",
+          "status", "snapshotState", "preparedAt", "updatedBy", "updatedByName", "updatedAt"
         ]);
     }
     function whatsappExtensionCampaignUpdate() {
       return whatsappCanSend()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          "status", "sentCount", "errorCount", "progressPercentage",
-          "lastExtensionSequence", "lastExtensionUpdateAt", "startedAt", "finishedAt",
-          "extensionErrorCode", "extensionErrorMessage", "deliveredToExtensionAt",
-          "cancelledAt", "cancelledBy", "updatedBy", "updatedByName", "updatedAt"
+          "status", "sentCount", "confirmedSentCount", "unverifiedSentCount", "processedCount",
+          "errorCount", "progressPercentage", "lastExtensionSequence", "lastExtensionUpdateAt",
+          "startedAt", "finishedAt", "extensionErrorCode", "extensionErrorMessage",
+          "extensionBlockReason", "extensionRetryableFailed", "extensionRetryCycle", "extensionVersion",
+          "extensionFinalSummary", "extensionLastCompletedContactId", "extensionCancellationEvidence",
+          "deliveredToExtensionAt", "cancelledAt", "cancelledBy", "stoppedAt", "stoppedBy",
+          "updatedBy", "updatedByName", "updatedAt"
         ]);
     }
     function whatsappCancelCampaignUpdate() {
@@ -943,7 +971,8 @@ service cloud.firestore {
       allow create: if ((canModule("loyal-customers", "create") || canModule("loyal-customers", "edit")) && ownsNewRecord())
         || sellerCustomerCreate(customerId);
       allow update: if (canModule("loyal-customers", "edit") && logicalMutation())
-        || sellerCustomerUpdate(customerId);
+        || sellerCustomerUpdate(customerId)
+        || whatsappCustomerCooldownUpdate(customerId);
       allow delete: if false;
       match /interactions/{interactionId} {
         allow read: if canModule("loyal-customers", "view");
@@ -1060,8 +1089,20 @@ service cloud.firestore {
           && validWhatsappRecipient(request.resource.data);
         allow update: if whatsappCanSend()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "status", "updatedAt", "errorCode", "errorMessage"
+            "status", "updatedAt", "errorCode", "errorMessage", "deliveryConfidence",
+            "extensionResultOutcome", "extensionResultAt", "extensionResultSequence",
+            "customerCooldownSynced", "confirmedAt"
           ])
+          && (!("deliveryConfidence" in request.resource.data) || request.resource.data.deliveryConfidence in ["confirmed", "unverified"])
+          && (!("extensionResultOutcome" in request.resource.data) || request.resource.data.extensionResultOutcome in ["confirmed", "unverified", "failed"])
+          && (!("extensionResultAt" in request.resource.data) || request.resource.data.extensionResultAt is timestamp)
+          && (!("extensionResultSequence" in request.resource.data) || request.resource.data.extensionResultSequence is int)
+          && (!("customerCooldownSynced" in request.resource.data) || request.resource.data.customerCooldownSynced is bool)
+          && (!("confirmedAt" in request.resource.data) || request.resource.data.confirmedAt is timestamp)
+          && (!("extensionResultOutcome" in request.resource.data)
+            || request.resource.data.extensionResultOutcome != "confirmed"
+            || (request.resource.data.deliveryConfidence == "confirmed"
+              && request.resource.data.confirmedAt == request.resource.data.extensionResultAt))
           && validWhatsappRecipient(request.resource.data);
         allow delete: if whatsappCanCreate()
           && get(/databases/$(database)/documents/whatsappCampaigns/$(campaignId)).data.status == "draft";

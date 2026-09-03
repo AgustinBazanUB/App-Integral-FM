@@ -115,6 +115,11 @@ export default function GenericModulePage({ moduleId }) {
         description={module.description}
         actions={can(profile, moduleId, "create") && module.primaryAction ? <Button icon="Plus" onClick={() => setModalOpen(true)}>{module.primaryAction}</Button> : null}
       />
+      {moduleId === "social" && can(profile, "social", "view") ? (
+        <Panel className="fm-editorial-panel" title="WhatsApp" description="Bandeja comercial conectada a WhatsApp Web para responder texto, identificar clientes por teléfono y completar zona sin replicar el historial en Firebase.">
+          <Link className="fm-button fm-button--secondary" to="/gestion/social/whatsapp">Abrir bandeja de WhatsApp</Link>
+        </Panel>
+      ) : null}
       {moduleId === "marketing" && can(profile, "marketing", "whatsappView") ? (
         <Panel className="fm-editorial-panel" title="WhatsApp" description="Prepará destinatarios, mensajes e imágenes temporales antes de entregar la campaña a la extensión privada de Flor Mía.">
           <Link className="fm-button fm-button--secondary" to="/gestion/marketing/whatsapp">Campañas y mensajes masivos</Link>

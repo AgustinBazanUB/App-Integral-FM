@@ -142,6 +142,16 @@ export const icons = {
   Pause,
   Play,
   Trash2,
+  // Alias semánticos del Inbox; reutilizan el set visual existente del proyecto.
+  PlugZap: Zap,
+  QrCode: WifiOff,
+  TriangleAlert: AlertTriangle,
+  ShieldQuestion: CircleHelp,
+  MessageCircle: MessagesSquare,
+  List: ClipboardList,
+  ContactRound: UserRound,
+  MessageSquareText: MessagesSquare,
+  Send: MessagesSquare,
 };
 
 export function Icon({ name, ...props }) {

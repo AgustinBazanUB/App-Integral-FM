@@ -2,6 +2,7 @@
 import {
   collection,
   doc,
+  documentId,
   getDoc,
   getDocs,
   limit,
@@ -11,14 +12,17 @@ import {
   serverTimestamp,
   setDoc,
   startAfter,
+  where,
   writeBatch,
 } from "firebase/firestore";
 import { can } from "../../permissions.js";
 import { db } from "../../services/firebase.js";
 import { listCustomerZones } from "../../services/customerService.js";
 import {
+  BULK_WHATSAPP_CONTACT_FILTERS,
   CAMPAIGN_STATUS_LABELS,
   campaignRecipientDisplayPhone,
+  customerBulkWhatsAppContactState,
   customerCategory,
   customerCommunicationAllowed,
   customerMatchesCampaignFilters,
@@ -31,7 +35,9 @@ import { EXTENSION_MESSAGE_TYPES } from "./extensionBridge.js";
 
 const docsToArray = (snapshot) => snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
 const CHUNK_SIZE = 350;
+const CUSTOMER_LOOKUP_CHUNK_SIZE = 30;
 const MAX_SELECT_ALL = 5000;
+const EXTENSION_RECIPIENT_OUTCOMES = new Set(["confirmed", "unverified", "failed"]);
 
 function profileName(profile = {}) {
   return profile.name || profile.email || "Usuario";
@@ -101,18 +107,36 @@ export async function listCampaignCustomerFilterOptions(profile) {
   };
 }
 
-export async function listAllCampaignCustomers(profile, filters = {}) {
-  const all = [];
+export async function listAllCampaignCustomersWithStats(profile, filters = {}) {
+  const items = [];
   let cursor = null;
   let hasMore = true;
+  let recentlyExcluded = 0;
+  let totalMatchingWithoutCooldown = 0;
+  const withoutCooldown = { ...filters, bulkWhatsAppContact: BULK_WHATSAPP_CONTACT_FILTERS.all };
   while (hasMore) {
     const page = await listCampaignCustomerPage(profile, { pageSize: 150, cursor });
-    all.push(...page.items.filter((customer) => customerMatchesCampaignFilters(customer, filters)));
-    if (all.length > MAX_SELECT_ALL) throw new Error("La selección supera 5.000 clientes. Aplicá un filtro más específico.");
+    for (const customer of page.items) {
+      if (!customerMatchesCampaignFilters(customer, withoutCooldown)) continue;
+      totalMatchingWithoutCooldown += 1;
+      if (customerMatchesCampaignFilters(customer, filters)) {
+        items.push(customer);
+      } else if (
+        filters.bulkWhatsAppContact === BULK_WHATSAPP_CONTACT_FILTERS.available
+        && customerBulkWhatsAppContactState(customer).recentlyContacted
+      ) {
+        recentlyExcluded += 1;
+      }
+    }
+    if (items.length > MAX_SELECT_ALL) throw new Error("La selección supera 5.000 clientes. Aplicá un filtro más específico.");
     cursor = page.cursor;
     hasMore = page.hasMore && Boolean(cursor);
   }
-  return all;
+  return { items, recentlyExcluded, totalMatchingWithoutCooldown };
+}
+
+export async function listAllCampaignCustomers(profile, filters = {}) {
+  return (await listAllCampaignCustomersWithStats(profile, filters)).items;
 }
 
 export async function listWhatsAppCampaignsPage(profile, { pageSize = 20, cursor = null } = {}) {
@@ -222,9 +246,10 @@ export async function replaceCampaignRecipients(profile, campaignId, recipients 
   for (const recipient of recipients) {
     const id = await recipientDocumentId(recipient.phoneNormalized || recipient.phone);
     const reference = doc(collectionRef, id);
+    const isCrmRecipient = recipient.source === "flor_mia";
     operations.push((batch) => batch.set(reference, {
       recipientId: id,
-      clientId: recipient.clientId || null,
+      clientId: isCrmRecipient ? (recipient.clientId || null) : null,
       name: recipient.name || null,
       phone: recipient.phoneNormalized || recipient.phone,
       phoneNormalized: recipient.phoneNormalized || recipient.phone,
@@ -233,12 +258,63 @@ export async function replaceCampaignRecipients(profile, campaignId, recipients 
       category: recipient.category || null,
       source: recipient.source,
       status: "pending",
+      customerLastBulkWhatsAppConfirmedAtSnapshot: isCrmRecipient ? (recipient.lastBulkWhatsAppConfirmedAt || null) : null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }));
   }
   await commitOperations(operations);
   return recipients.length;
+}
+
+async function loadCustomersById(ids = []) {
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  const customers = new Map();
+  for (let index = 0; index < uniqueIds.length; index += CUSTOMER_LOOKUP_CHUNK_SIZE) {
+    const chunk = uniqueIds.slice(index, index + CUSTOMER_LOOKUP_CHUNK_SIZE);
+    if (!chunk.length) continue;
+    const snapshot = await getDocs(query(collection(db, "customers"), where(documentId(), "in", chunk)));
+    for (const customerSnapshot of snapshot.docs) {
+      customers.set(customerSnapshot.id, { id: customerSnapshot.id, ...customerSnapshot.data() });
+    }
+  }
+  return customers;
+}
+
+async function guardRecipientsWithCurrentCustomerState(recipients = [], filters = {}) {
+  const identities = recipients.map((recipient) => (
+    recipient.source === "flor_mia" && recipient.clientId ? recipient.clientId : null
+  ));
+  const customers = await loadCustomersById(identities);
+  const guarded = [];
+  let recentlyExcluded = 0;
+  let communicationBlockedExcluded = 0;
+  for (let index = 0; index < recipients.length; index += 1) {
+    const recipient = recipients[index];
+    const customerId = identities[index];
+    const customer = customerId ? customers.get(customerId) : null;
+    if (customer && !customerCommunicationAllowed(customer)) {
+      communicationBlockedExcluded += 1;
+      continue;
+    }
+    if (customer && filters.bulkWhatsAppContact === BULK_WHATSAPP_CONTACT_FILTERS.available) {
+      if (customerBulkWhatsAppContactState(customer).recentlyContacted) {
+        recentlyExcluded += 1;
+        continue;
+      }
+    }
+    if (customer && filters.bulkWhatsAppContact === BULK_WHATSAPP_CONTACT_FILTERS.recent) {
+      if (!customerBulkWhatsAppContactState(customer).recentlyContacted) continue;
+    }
+    guarded.push({
+      ...recipient,
+      ...(customer ? {
+        clientId: customer.id,
+        lastBulkWhatsAppConfirmedAt: customer.lastBulkWhatsAppConfirmedAt || null,
+      } : recipient.source === "excel" ? { clientId: null } : {}),
+    });
+  }
+  return { recipients: guarded, recentlyExcluded, communicationBlockedExcluded };
 }
 
 export async function prepareCampaignSnapshot(profile, input) {
@@ -254,6 +330,9 @@ export async function prepareCampaignSnapshot(profile, input) {
     await setDoc(reference, {
       totalRecipients: input.recipients.length,
       sentCount: 0,
+      confirmedSentCount: 0,
+      unverifiedSentCount: 0,
+      processedCount: 0,
       errorCount: 0,
       progressPercentage: 0,
       status: "ready",
@@ -274,6 +353,21 @@ export async function prepareCampaignSnapshot(profile, input) {
     await setDoc(reference, { snapshotState: "error", status: "draft", updatedAt: serverTimestamp() }, { merge: true });
     throw error;
   }
+}
+
+export async function prepareCampaignSnapshotWithCooldown(profile, input) {
+  const guarded = await guardRecipientsWithCurrentCustomerState(input.recipients || [], input.filters || {});
+  if (!guarded.recipients.length) {
+    if (guarded.recentlyExcluded > 0) {
+      throw new Error("Todos los clientes seleccionados recibieron una campaña confirmada dentro de los últimos 14 días. Cambiá el filtro o esperá a que vuelvan a estar disponibles.");
+    }
+    throw new Error("No quedaron destinatarios habilitados para preparar la campaña.");
+  }
+  const campaignId = await prepareCampaignSnapshot(profile, {
+    ...input,
+    recipients: guarded.recipients,
+  });
+  return { campaignId, ...guarded };
 }
 
 export async function recordCampaignDeliveredToExtension(profile, campaignId) {
@@ -323,6 +417,9 @@ const actionByType = {
 const FIRESTORE_EXTENSION_CAMPAIGN_FIELDS = Object.freeze([
   "status",
   "sentCount",
+  "confirmedSentCount",
+  "unverifiedSentCount",
+  "processedCount",
   "errorCount",
   "progressPercentage",
   "lastExtensionSequence",
@@ -331,9 +428,18 @@ const FIRESTORE_EXTENSION_CAMPAIGN_FIELDS = Object.freeze([
   "finishedAt",
   "extensionErrorCode",
   "extensionErrorMessage",
+  "extensionBlockReason",
+  "extensionRetryableFailed",
+  "extensionRetryCycle",
+  "extensionVersion",
+  "extensionFinalSummary",
+  "extensionLastCompletedContactId",
+  "extensionCancellationEvidence",
   "deliveredToExtensionAt",
   "cancelledAt",
   "cancelledBy",
+  "stoppedAt",
+  "stoppedBy",
   "updatedBy",
   "updatedByName",
   "updatedAt",
@@ -345,11 +451,30 @@ function firestoreCompatibleExtensionUpdate(update = {}) {
     .map((field) => [field, update[field]]));
 }
 
+async function normalizedExtensionRecipientResult(campaignId, payload = {}) {
+  const result = payload.lastRecipientResult;
+  if (!result || typeof result !== "object") return null;
+  const rawRecipientId = String(result.recipientId || "").trim();
+  const outcome = String(result.outcome || "").trim();
+  const completedAtDate = new Date(String(result.completedAt || ""));
+  if (!rawRecipientId || !EXTENSION_RECIPIENT_OUTCOMES.has(outcome) || !Number.isFinite(completedAtDate.getTime())) return null;
+  const recipientId = rawRecipientId.startsWith("recipient_")
+    ? rawRecipientId
+    : await recipientDocumentId(rawRecipientId).catch(() => "");
+  if (!recipientId) return null;
+  return {
+    recipientId,
+    recipientRef: doc(db, "whatsappCampaigns", campaignId, "recipients", recipientId),
+    outcome,
+  };
+}
+
 export async function applyExtensionCampaignEvent(profile, message) {
   if (!canSend(profile) || !message?.campaignId || !extensionStatusByType[message.type]) return { ignored: true };
   const campaignRef = doc(db, "whatsappCampaigns", message.campaignId);
   const eventRef = doc(collection(db, "whatsappCampaigns", message.campaignId, "events"));
   const auditRef = doc(collection(db, "auditLogs"));
+  const recipientResult = await normalizedExtensionRecipientResult(message.campaignId, message.payload || {});
   return runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(campaignRef);
     if (!snapshot.exists()) return { ignored: true };
@@ -357,6 +482,19 @@ export async function applyExtensionCampaignEvent(profile, message) {
     const sequence = Number(message.sequence || 0);
     const lastSequence = Number(current.lastExtensionSequence || 0);
     if (sequence && sequence <= lastSequence) return { ignored: true, stale: true };
+
+    let recipientSnapshot = null;
+    let customerSnapshot = null;
+    let customerRef = null;
+    if (recipientResult) {
+      recipientSnapshot = await transaction.get(recipientResult.recipientRef);
+      const recipientData = recipientSnapshot.exists() ? recipientSnapshot.data() : null;
+      if (recipientData?.source === "flor_mia" && recipientData?.clientId && recipientResult.outcome === "confirmed") {
+        customerRef = doc(db, "customers", recipientData.clientId);
+        customerSnapshot = await transaction.get(customerRef);
+      }
+    }
+
     const counters = extensionCampaignCounters(message.payload, current);
     const status = extensionStatusByType[message.type];
     const update = {
@@ -389,6 +527,48 @@ export async function applyExtensionCampaignEvent(profile, message) {
       ...(status === "stopped" ? { stoppedAt: serverTimestamp(), stoppedBy: profile.id } : {}),
     };
     transaction.set(campaignRef, firestoreCompatibleExtensionUpdate(update), { merge: true });
+
+    let recipientResultApplied = false;
+    let customerCooldownUpdated = false;
+    if (recipientResult && recipientSnapshot?.exists()) {
+      const recipientData = recipientSnapshot.data();
+      const sameTerminalResult = recipientData.extensionResultOutcome === recipientResult.outcome
+        && ["completed", "error"].includes(recipientData.status);
+      const canSyncCustomer = recipientResult.outcome === "confirmed"
+        && recipientData.source === "flor_mia"
+        && Boolean(customerRef && customerSnapshot?.exists());
+      const shouldSyncCustomer = canSyncCustomer
+        && (!sameTerminalResult || recipientData.customerCooldownSynced !== true);
+      const shouldWriteRecipient = !sameTerminalResult || shouldSyncCustomer;
+
+      if (shouldWriteRecipient) {
+        transaction.set(recipientResult.recipientRef, {
+          status: recipientResult.outcome === "failed" ? "error" : "completed",
+          extensionResultOutcome: recipientResult.outcome,
+          extensionResultAt: serverTimestamp(),
+          extensionResultSequence: update.lastExtensionSequence,
+          customerCooldownSynced: shouldSyncCustomer || (sameTerminalResult && recipientData.customerCooldownSynced === true),
+          ...(recipientResult.outcome === "confirmed" ? {
+            deliveryConfidence: "confirmed",
+            confirmedAt: serverTimestamp(),
+          } : recipientResult.outcome === "unverified" ? {
+            deliveryConfidence: "unverified",
+          } : {}),
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+        recipientResultApplied = !sameTerminalResult;
+      }
+
+      if (shouldSyncCustomer) {
+        transaction.set(customerRef, {
+          lastBulkWhatsAppConfirmedAt: serverTimestamp(),
+          lastBulkWhatsAppCampaignId: message.campaignId,
+          lastBulkWhatsAppRecipientId: recipientResult.recipientId,
+        }, { merge: true });
+        customerCooldownUpdated = true;
+      }
+    }
+
     const statusChanged = current.status !== status;
     if (statusChanged) {
       transaction.set(eventRef, {
@@ -417,7 +597,7 @@ export async function applyExtensionCampaignEvent(profile, message) {
         `Procesados: ${counters.processed}/${counters.total} · confirmados: ${counters.confirmedSent} · sin confirmación: ${counters.unverifiedSent} · con problemas: ${counters.errors}.`,
       ));
     }
-    return { ignored: false, status, statusChanged, ...counters };
+    return { ignored: false, status, statusChanged, recipientResultApplied, customerCooldownUpdated, ...counters };
   });
 }
 
@@ -466,20 +646,21 @@ export async function cancelLocalCampaign(profile, campaign) {
   await batch.commit();
 }
 
-export function campaignSummaryForExtension(campaignId, name, profile, recipients, message) {
+export async function campaignSummaryForExtension(campaignId, name, profile, recipients, message) {
+  const extensionRecipients = await Promise.all(recipients.map(async (recipient) => ({
+    recipientId: await recipientDocumentId(recipient.phoneNormalized || recipient.phone),
+    clientId: recipient.source === "flor_mia" ? (recipient.clientId || null) : null,
+    name: recipient.name || "",
+    phone: recipient.whatsappPhone,
+    source: recipient.source,
+  })));
   return {
     campaignId,
     campaignName: name,
     createdBy: profile.id,
-    recipients: recipients.map((recipient) => ({
-      recipientId: recipient.phoneNormalized,
-      clientId: recipient.clientId || null,
-      name: recipient.name || "",
-      phone: recipient.whatsappPhone,
-      source: recipient.source,
-    })),
+    recipients: extensionRecipients,
     message,
-    totalRecipients: recipients.length,
+    totalRecipients: extensionRecipients.length,
   };
 }
 

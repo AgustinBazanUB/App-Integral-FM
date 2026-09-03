@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 const designSystem = read("src/design-system/index.jsx");
+const focusTrap = read("src/hooks/useFocusTrap.js");
 const locations = read("src/gestion/pages/LocationsPage.jsx");
 const administration = read("src/gestion/pages/AdministrationPage.jsx");
 const genericModule = read("src/gestion/pages/GenericModulePage.jsx");
@@ -19,11 +20,13 @@ test("useOverlay conserva el foco aunque onClose cambie en cada render", () => {
   assert.doesNotMatch(designSystem, /\[initialFocusRef, onClose, open\]/);
 });
 
-test("el focus trap tolera re-renders sin perder el elemento activo", () => {
-  assert.match(designSystem, /returnFocusRef\.current = document\.activeElement;/);
-  assert.match(designSystem, /containerRef\.current\?\.querySelectorAll/);
-  assert.match(designSystem, /event\.key !== "Tab"/);
-  assert.match(designSystem, /window\.requestAnimationFrame\(\(\) => returnFocusRef\.current\?\.focus\?\.\(\)\)/);
+test("el focus trap extraído tolera re-renders y restaura el foco", () => {
+  assert.match(focusTrap, /const previousFocus = document\.activeElement;/);
+  assert.match(focusTrap, /container\.querySelectorAll\(FOCUSABLE_SELECTOR\)/);
+  assert.match(focusTrap, /event\.key !== "Tab"/);
+  assert.match(focusTrap, /returnFocusRef\?\.current \?\? previousFocus/);
+  assert.match(focusTrap, /document\.addEventListener\("keydown", onKeyDown\)/);
+  assert.match(focusTrap, /document\.removeEventListener\("keydown", onKeyDown\)/);
 });
 
 test("los formularios con cierres inline quedan cubiertos por el fix global", () => {

@@ -33,6 +33,7 @@ const ProductsPage = lazy(managementPageLoaders.products);
 const WarehousePage = lazy(managementPageLoaders.warehouse);
 const QuickSalesPage = lazy(managementPageLoaders["quick-sales"]);
 const SalesMetricsPage = lazy(managementPageLoaders.metrics);
+const WhatsAppInboxPage = lazy(managementPageLoaders.socialWhatsapp);
 const WhatsAppCampaignsPage = lazy(managementPageLoaders.marketingWhatsapp);
 const MetaAdsPage = lazy(managementPageLoaders.marketingMetaAds);
 const SettingsPage = lazy(managementPageLoaders.settings);
@@ -90,6 +91,7 @@ function ManagementRouter() {
   const sellerPath =
     location.pathname === "/vendedor" ||
     location.pathname.startsWith("/vendedor/");
+  const socialWhatsappPath = routeId === "social" && pathParts[2] === "whatsapp";
   const metaAdsPath = routeId === "marketing" && pathParts[2] === "meta-ads";
 
   useEffect(() => {
@@ -127,6 +129,10 @@ function ManagementRouter() {
       document.title = "Panel Vendedor | Flor Mía";
       return;
     }
+    if (socialWhatsappPath) {
+      document.title = "WhatsApp | Redes Sociales | Flor Mía";
+      return;
+    }
     if (metaAdsPath) {
       document.title = "Meta Ads | Flor Mía";
       return;
@@ -134,7 +140,7 @@ function ManagementRouter() {
     document.title = routeId === "dashboard"
       ? "Gestión integral | Flor Mía"
       : `${routeId === "actividad" ? "Actividad" : moduleById[routeId]?.label || "Gestión"} | Flor Mía`;
-  }, [routeId, sellerPath, metaAdsPath]);
+  }, [routeId, sellerPath, socialWhatsappPath, metaAdsPath]);
 
   if (status === "loading") {
     return <main className="fm-auth-loading" id="main-content"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><Skeleton lines={3} /></main>;
@@ -176,6 +182,8 @@ function ManagementRouter() {
     page = <ActivityPage />;
   } else if (routeId === "metrics") {
     page = <SalesMetricsPage />;
+  } else if (socialWhatsappPath) {
+    page = <WhatsAppInboxPage />;
   } else if (routeId === "marketing" && pathParts[2] === "whatsapp") {
     page = <WhatsAppCampaignsPage />;
   } else if (metaAdsPath) {

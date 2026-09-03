@@ -35,3 +35,26 @@ test("Clientes page exposes bulk import next to manual creation with contextual 
   assert.match(modules, /label: "Clientes"/);
   assert.match(modal, /Telefono, Nombre y Apellido y Zona/);
 });
+
+test("el alta manual de Clientes es create-only y nunca pisa un cliente existente", async () => {
+  const service = await readFile(new URL("../src/gestion/services/customerService.js", import.meta.url), "utf8");
+
+  assert.match(service, /export async function saveCustomerFromAdmin[\s\S]*createCustomerFromAdminIfMissing\(profile, input\)/);
+  assert.match(service, /if \(!result\.created\)/);
+  assert.match(service, /customer\/already-exists/);
+  assert.match(service, /No se realizaron cambios/);
+});
+
+test("un alta manual duplicada ofrece editar exactamente el cliente existente", async () => {
+  const page = await readFile(new URL("../src/gestion/pages/LoyalCustomersPage.jsx", import.meta.url), "utf8");
+  const service = await readFile(new URL("../src/gestion/services/customerService.js", import.meta.url), "utf8");
+
+  assert.match(service, /error\.customer = result\.customer/);
+  assert.match(page, /error\?\.code === "customer\/already-exists" && error\.customer/);
+  assert.match(page, /setDuplicateCustomer\(error\.customer\)/);
+  assert.match(page, /const editDuplicateCustomer = \(\) =>/);
+  assert.match(page, /setSelectedCustomer\(customer\)/);
+  assert.match(page, /setDetailForm\(customerToForm\(customer, zones\)\)/);
+  assert.match(page, /setEditingCustomer\(true\)/);
+  assert.match(page, />Editar cliente<\/Button>/);
+});

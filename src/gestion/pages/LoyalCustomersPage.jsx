@@ -25,6 +25,10 @@ import { useAuth } from "../AuthContext";
 import { Icon } from "../components/icons";
 import { formatDateTime } from "../formatters";
 import { useAsyncData } from "../hooks";
+import {
+  BULK_WHATSAPP_COOLDOWN_DAYS,
+  customerBulkWhatsAppContactState,
+} from "../marketing/whatsapp/campaignDomain";
 import { can } from "../permissions";
 import {
   listCustomers,
@@ -106,6 +110,7 @@ export default function LoyalCustomersPage() {
   const [customerForm, setCustomerForm] = useState(blankCustomer);
   const [customerBusy, setCustomerBusy] = useState(false);
   const [customerError, setCustomerError] = useState("");
+  const [duplicateCustomer, setDuplicateCustomer] = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [editingCustomer, setEditingCustomer] = useState(false);
   const [detailForm, setDetailForm] = useState(blankCustomer);
@@ -129,7 +134,15 @@ export default function LoyalCustomersPage() {
   const openNewCustomer = () => {
     setCustomerForm(blankCustomer);
     setCustomerError("");
+    setDuplicateCustomer(null);
     setCustomerOpen(true);
+  };
+
+  const closeNewCustomer = () => {
+    if (customerBusy) return;
+    setCustomerOpen(false);
+    setCustomerError("");
+    setDuplicateCustomer(null);
   };
 
   const handleImportedCustomers = async ({ created, skipped, invalid }) => {
@@ -140,6 +153,7 @@ export default function LoyalCustomersPage() {
   const saveCustomer = async () => {
     setCustomerBusy(true);
     setCustomerError("");
+    setDuplicateCustomer(null);
     try {
       const selectedZone = activeZones.find((zone) => zone.id === customerForm.zoneId);
       await saveCustomerFromAdmin(profile, {
@@ -151,10 +165,14 @@ export default function LoyalCustomersPage() {
       });
       setCustomerOpen(false);
       setCustomerForm(blankCustomer);
+      setDuplicateCustomer(null);
       await customersResult.refresh();
       setMessage("Cliente guardado correctamente.");
     } catch (error) {
       setCustomerError(error.message);
+      if (error?.code === "customer/already-exists" && error.customer) {
+        setDuplicateCustomer(error.customer);
+      }
     } finally {
       setCustomerBusy(false);
     }
@@ -165,6 +183,18 @@ export default function LoyalCustomersPage() {
     setDetailForm(customerToForm(customer, zones));
     setEditingCustomer(false);
     setDetailError("");
+  };
+
+  const editDuplicateCustomer = () => {
+    if (!duplicateCustomer || !canEditCustomers) return;
+    const customer = duplicateCustomer;
+    setCustomerOpen(false);
+    setCustomerError("");
+    setDuplicateCustomer(null);
+    setSelectedCustomer(customer);
+    setDetailForm(customerToForm(customer, zones));
+    setDetailError("");
+    setEditingCustomer(true);
   };
 
   const closeCustomer = () => {
@@ -247,6 +277,7 @@ export default function LoyalCustomersPage() {
   const detailPhone = selectedCustomer ? displayedPhone(selectedCustomer) : "";
   const detailWhatsapp = selectedCustomer ? customerWhatsAppUrl(selectedCustomer.phoneNormalized || selectedCustomer.phone) : "";
   const historicalZone = selectedCustomer?.zoneId ? zones.find((zone) => zone.id === selectedCustomer.zoneId && zone.active === false) : null;
+  const campaignContactState = selectedCustomer ? customerBulkWhatsAppContactState(selectedCustomer) : null;
 
   return (
     <div className="fm-page fm-customers-page">
@@ -364,6 +395,9 @@ export default function LoyalCustomersPage() {
             <dl>
               <div><dt>Teléfono</dt><dd>{detailWhatsapp ? <a href={detailWhatsapp} target="_blank" rel="noopener noreferrer" aria-label={`Abrir WhatsApp con ${detailPhone}`}><Icon name="MessagesSquare" />{detailPhone}</a> : detailPhone}</dd></div>
               <div><dt>Zona</dt><dd>{customerZoneLabel(selectedCustomer) || "Sin zona"}</dd></div>
+              <div><dt>Estado para campañas</dt><dd><Badge tone={campaignContactState?.recentlyContacted ? "neutral" : "success"}>{campaignContactState?.recentlyContacted ? "Contactado recientemente" : "Disponible para campaña"}</Badge></dd></div>
+              <div><dt>Último mensaje masivo confirmado</dt><dd>{campaignContactState?.lastConfirmedAt ? formatDateTime(campaignContactState.lastConfirmedAt) : "Nunca"}</dd></div>
+              {campaignContactState?.recentlyContacted && campaignContactState.availableAt ? <div><dt>Disponible nuevamente</dt><dd>{formatDateTime(campaignContactState.availableAt)} · descanso de {BULK_WHATSAPP_COOLDOWN_DAYS} días</dd></div> : null}
               {selectedCustomer.createdAt ? <div><dt>Alta</dt><dd>{formatDateTime(selectedCustomer.createdAt)}</dd></div> : null}
               {selectedCustomer.lastPurchaseAt ? <div><dt>Última compra</dt><dd>{formatDateTime(selectedCustomer.lastPurchaseAt)}</dd></div> : null}
               {selectedCustomer.updatedAt ? <div><dt>Última actualización</dt><dd>{formatDateTime(selectedCustomer.updatedAt)}</dd></div> : null}
@@ -374,17 +408,22 @@ export default function LoyalCustomersPage() {
 
       <Modal
         open={customerOpen}
-        onClose={() => !customerBusy && setCustomerOpen(false)}
+        onClose={closeNewCustomer}
         title="Nuevo cliente"
         description="Teléfono y zona son suficientes; el nombre es opcional."
-        footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={() => setCustomerOpen(false)}>Cancelar</Button><Button icon="Save" loading={customerBusy} onClick={saveCustomer}>Guardar</Button></div>}
+        footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={closeNewCustomer}>Cancelar</Button><Button icon="Save" loading={customerBusy} onClick={saveCustomer}>Guardar</Button></div>}
       >
         <div className="fm-customer-form">
-          <FormField label="Teléfono" required hint="Se usa para evitar clientes duplicados aunque cambie el formato escrito."><input type="tel" inputMode="tel" autoComplete="tel" value={customerForm.phone} onChange={(event) => setCustomerForm((current) => ({ ...current, phone: event.target.value }))} /></FormField>
+          <FormField label="Teléfono" required hint="Se usa para evitar clientes duplicados aunque cambie el formato escrito."><input type="tel" inputMode="tel" autoComplete="tel" value={customerForm.phone} onChange={(event) => { setCustomerForm((current) => ({ ...current, phone: event.target.value })); setCustomerError(""); setDuplicateCustomer(null); }} /></FormField>
           <FormField label="Zona" required><select value={customerForm.zoneId} onChange={(event) => setCustomerForm((current) => ({ ...current, zoneId: event.target.value }))}><option value="">Elegir zona</option>{activeZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}<option value="__custom">Otra zona</option></select></FormField>
           {customerForm.zoneId === "__custom" ? <FormField label="Nueva zona" required><input value={customerForm.customZone} onChange={(event) => setCustomerForm((current) => ({ ...current, customZone: event.target.value }))} /></FormField> : null}
           <FormField label="Nombre (opcional)"><input autoComplete="name" value={customerForm.name} onChange={(event) => setCustomerForm((current) => ({ ...current, name: event.target.value }))} /></FormField>
           {customerError ? <Toast tone="error">{customerError}</Toast> : null}
+          {duplicateCustomer && canEditCustomers ? (
+            <div className="fm-dialog-actions">
+              <Button icon="Settings2" onClick={editDuplicateCustomer}>Editar cliente</Button>
+            </div>
+          ) : null}
         </div>
       </Modal>
 

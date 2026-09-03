@@ -7,6 +7,12 @@ import {
 
 export const WHATSAPP_PROTOCOL_VERSION = 1;
 export const MAX_CAMPAIGN_IMAGES = 3;
+export const BULK_WHATSAPP_COOLDOWN_DAYS = 14;
+export const BULK_WHATSAPP_CONTACT_FILTERS = Object.freeze({
+  available: "available",
+  recent: "recent",
+  all: "all",
+});
 
 export const CAMPAIGN_STATUS_LABELS = Object.freeze({
   draft: "Borrador",
@@ -69,6 +75,58 @@ export function customerZone(customer = {}) {
   return String(customer.zoneName || customer.customZone || customer.zone || "").trim();
 }
 
+function timestampMilliseconds(value) {
+  if (!value) return null;
+  if (typeof value.toMillis === "function") {
+    const millis = Number(value.toMillis());
+    return Number.isFinite(millis) ? millis : null;
+  }
+  if (typeof value.toDate === "function") {
+    const millis = value.toDate()?.getTime?.();
+    return Number.isFinite(millis) ? millis : null;
+  }
+  if (value instanceof Date) {
+    const millis = value.getTime();
+    return Number.isFinite(millis) ? millis : null;
+  }
+  if (typeof value === "object" && Number.isFinite(Number(value.seconds))) {
+    const nanos = Number(value.nanoseconds || 0);
+    return Number(value.seconds) * 1000 + Math.floor(nanos / 1_000_000);
+  }
+  const millis = typeof value === "number" ? value : Date.parse(String(value));
+  return Number.isFinite(millis) ? millis : null;
+}
+
+export function customerBulkWhatsAppContactState(
+  customer = {},
+  { now = new Date(), cooldownDays = BULK_WHATSAPP_COOLDOWN_DAYS } = {},
+) {
+  const lastMillis = timestampMilliseconds(customer.lastBulkWhatsAppConfirmedAt);
+  if (lastMillis == null) {
+    return {
+      state: "never",
+      available: true,
+      recentlyContacted: false,
+      lastConfirmedAt: null,
+      availableAt: null,
+      cooldownDays,
+    };
+  }
+  const safeDays = Math.max(0, Number(cooldownDays || 0));
+  const cooldownMillis = safeDays * 24 * 60 * 60 * 1000;
+  const nowMillis = timestampMilliseconds(now) ?? Date.now();
+  const availableAtMillis = lastMillis + cooldownMillis;
+  const recentlyContacted = nowMillis < availableAtMillis;
+  return {
+    state: recentlyContacted ? "recent" : "available",
+    available: !recentlyContacted,
+    recentlyContacted,
+    lastConfirmedAt: new Date(lastMillis),
+    availableAt: new Date(availableAtMillis),
+    cooldownDays: safeDays,
+  };
+}
+
 export function customerMatchesCampaignFilters(customer, filters = {}) {
   if (!customerCommunicationAllowed(customer)) return false;
   if (filters.zoneId || filters.zoneName) {
@@ -78,6 +136,14 @@ export function customerMatchesCampaignFilters(customer, filters = {}) {
     if (!zoneMatches) return false;
   }
   if (filters.category && normalizedSearchText(customerCategory(customer)) !== normalizedSearchText(filters.category)) return false;
+  const contactFilter = String(filters.bulkWhatsAppContact || BULK_WHATSAPP_CONTACT_FILTERS.all);
+  if (contactFilter !== BULK_WHATSAPP_CONTACT_FILTERS.all) {
+    const contactState = customerBulkWhatsAppContactState(customer, {
+      cooldownDays: filters.bulkWhatsAppCooldownDays || BULK_WHATSAPP_COOLDOWN_DAYS,
+    });
+    if (contactFilter === BULK_WHATSAPP_CONTACT_FILTERS.available && !contactState.available) return false;
+    if (contactFilter === BULK_WHATSAPP_CONTACT_FILTERS.recent && !contactState.recentlyContacted) return false;
+  }
   const search = normalizedSearchText(filters.search || "");
   if (search) {
     const phoneSearch = normalizeCustomerPhone(filters.search);
@@ -98,6 +164,7 @@ export function recipientFromCustomer(customer = {}) {
     zone: customerZone(customer),
     category: customerCategory(customer),
     notes: "",
+    lastBulkWhatsAppConfirmedAt: customer.lastBulkWhatsAppConfirmedAt || null,
   };
 }
 
@@ -257,7 +324,7 @@ export function campaignValidation({ name, recipients = [], message = "", images
   }
   if (images.length > MAX_CAMPAIGN_IMAGES) errors.push("La campaña admite como máximo 3 imágenes.");
   if (!String(message || "").trim() && !images.length) errors.push("Ingresá un mensaje o agregá al menos una imagen.");
-  if (persistedImageMetadata.length && images.length < persistedImageMetadata.length) errors.push("Volvé a seleccionar las imágenes del borrador antes de preparar la campaña.");
+  if (persistedImageMetadata.length && images.length < persistedImageMetadata.length) errors.push("Volvé a seleccionar las imágenes del borrador antes de preparar la campaña; sólo se conservaron nombre y orden.");
   if (extensionStatus?.operational !== true) errors.push(userFacingWhatsAppProblem({ code: extensionStatus?.errorCode, message: extensionStatus?.message || "La extensión no está conectada." }));
   return { valid: errors.length === 0, errors };
 }
