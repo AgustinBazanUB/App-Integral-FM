@@ -359,9 +359,9 @@ service cloud.firestore {
       return whatsappCanCreate()
         && request.resource.data.status in ["draft", "ready"]
         && request.resource.data.sentCount == 0
-        && request.resource.data.confirmedSentCount == 0
-        && request.resource.data.unverifiedSentCount == 0
-        && request.resource.data.processedCount == 0
+        && (!("confirmedSentCount" in request.resource.data) || request.resource.data.confirmedSentCount == 0)
+        && (!("unverifiedSentCount" in request.resource.data) || request.resource.data.unverifiedSentCount == 0)
+        && (!("processedCount" in request.resource.data) || request.resource.data.processedCount == 0)
         && request.resource.data.errorCount == 0
         && request.resource.data.progressPercentage == 0
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
