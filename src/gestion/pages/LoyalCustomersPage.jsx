@@ -25,6 +25,10 @@ import { useAuth } from "../AuthContext";
 import { Icon } from "../components/icons";
 import { formatDateTime } from "../formatters";
 import { useAsyncData } from "../hooks";
+import {
+  BULK_WHATSAPP_COOLDOWN_DAYS,
+  customerBulkWhatsAppContactState,
+} from "../marketing/whatsapp/campaignDomain";
 import { can } from "../permissions";
 import {
   listCustomers,
@@ -273,6 +277,7 @@ export default function LoyalCustomersPage() {
   const detailPhone = selectedCustomer ? displayedPhone(selectedCustomer) : "";
   const detailWhatsapp = selectedCustomer ? customerWhatsAppUrl(selectedCustomer.phoneNormalized || selectedCustomer.phone) : "";
   const historicalZone = selectedCustomer?.zoneId ? zones.find((zone) => zone.id === selectedCustomer.zoneId && zone.active === false) : null;
+  const campaignContactState = selectedCustomer ? customerBulkWhatsAppContactState(selectedCustomer) : null;
 
   return (
     <div className="fm-page fm-customers-page">
@@ -390,6 +395,9 @@ export default function LoyalCustomersPage() {
             <dl>
               <div><dt>Teléfono</dt><dd>{detailWhatsapp ? <a href={detailWhatsapp} target="_blank" rel="noopener noreferrer" aria-label={`Abrir WhatsApp con ${detailPhone}`}><Icon name="MessagesSquare" />{detailPhone}</a> : detailPhone}</dd></div>
               <div><dt>Zona</dt><dd>{customerZoneLabel(selectedCustomer) || "Sin zona"}</dd></div>
+              <div><dt>Estado para campañas</dt><dd><Badge tone={campaignContactState?.recentlyContacted ? "neutral" : "success"}>{campaignContactState?.recentlyContacted ? "Contactado recientemente" : "Disponible para campaña"}</Badge></dd></div>
+              <div><dt>Último mensaje masivo confirmado</dt><dd>{campaignContactState?.lastConfirmedAt ? formatDateTime(campaignContactState.lastConfirmedAt) : "Nunca"}</dd></div>
+              {campaignContactState?.recentlyContacted && campaignContactState.availableAt ? <div><dt>Disponible nuevamente</dt><dd>{formatDateTime(campaignContactState.availableAt)} · descanso de {BULK_WHATSAPP_COOLDOWN_DAYS} días</dd></div> : null}
               {selectedCustomer.createdAt ? <div><dt>Alta</dt><dd>{formatDateTime(selectedCustomer.createdAt)}</dd></div> : null}
               {selectedCustomer.lastPurchaseAt ? <div><dt>Última compra</dt><dd>{formatDateTime(selectedCustomer.lastPurchaseAt)}</dd></div> : null}
               {selectedCustomer.updatedAt ? <div><dt>Última actualización</dt><dd>{formatDateTime(selectedCustomer.updatedAt)}</dd></div> : null}
