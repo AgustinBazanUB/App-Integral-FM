@@ -19,6 +19,8 @@ import { formatDateTime } from "../formatters";
 import { can } from "../permissions";
 import {
   ACTIVE_CAMPAIGN_STATUSES,
+  BULK_WHATSAPP_CONTACT_FILTERS,
+  BULK_WHATSAPP_COOLDOWN_DAYS,
   CAMPAIGN_STATUS_LABELS,
   CAMPAIGN_STATUS_TONES,
   MAX_CAMPAIGN_IMAGES,
@@ -26,6 +28,7 @@ import {
   campaignControlAvailability,
   campaignRecipientDisplayPhone,
   campaignValidation,
+  customerBulkWhatsAppContactState,
   customerMatchesCampaignFilters,
   extensionPrimaryStatus,
   recipientFromCustomer,
@@ -36,13 +39,13 @@ import {
   campaignSummaryForExtension,
   cancelLocalCampaign,
   getWhatsAppCampaign,
-  listAllCampaignCustomers,
+  listAllCampaignCustomersWithStats,
   listCampaignCustomerFilterOptions,
   listCampaignCustomerPage,
   listCampaignEvents,
   listCampaignRecipients,
   listWhatsAppCampaignsPage,
-  prepareCampaignSnapshot,
+  prepareCampaignSnapshotWithCooldown,
   recordCampaignDeliveredToExtension,
   replaceCampaignRecipients,
   saveWhatsAppCampaignDraft,
@@ -67,10 +70,23 @@ import {
 import { applyReconciledExtensionCampaignEvent } from "../marketing/whatsapp/campaignReconciliation";
 
 const steps = ["Información", "Destinatarios", "Mensaje", "Imágenes", "Revisión"];
-const emptyFilters = { zoneId: "", zoneName: "", category: "", search: "" };
+const emptyFilters = {
+  zoneId: "",
+  zoneName: "",
+  category: "",
+  search: "",
+  bulkWhatsAppContact: BULK_WHATSAPP_CONTACT_FILTERS.available,
+  bulkWhatsAppCooldownDays: BULK_WHATSAPP_COOLDOWN_DAYS,
+};
 
 function imageMetadata(images) {
   return images.map((item, index) => ({ name: item.file.name, type: item.file.type, size: item.file.size, order: index + 1 }));
+}
+
+function contactFilterLabel(value) {
+  if (value === BULK_WHATSAPP_CONTACT_FILTERS.recent) return `Contactados en los últimos ${BULK_WHATSAPP_COOLDOWN_DAYS} días`;
+  if (value === BULK_WHATSAPP_CONTACT_FILTERS.all) return "Todos · ignorar descanso";
+  return `Disponibles · sin mensaje confirmado en ${BULK_WHATSAPP_COOLDOWN_DAYS} días`;
 }
 
 function ExtensionStatus({ status, refreshing, onRefresh, onReconnect }) {
@@ -177,6 +193,12 @@ function CampaignWizard({ profile, extensionStatus, refreshExtension, initialCam
     () => customers.filter((customer) => customerMatchesCampaignFilters(customer, filters)),
     [customers, filters],
   );
+  const visibleCooldownExcluded = useMemo(() => {
+    if (filters.bulkWhatsAppContact !== BULK_WHATSAPP_CONTACT_FILTERS.available) return 0;
+    const withoutCooldown = { ...filters, bulkWhatsAppContact: BULK_WHATSAPP_CONTACT_FILTERS.all };
+    const baseline = customers.filter((customer) => customerMatchesCampaignFilters(customer, withoutCooldown));
+    return Math.max(0, baseline.length - filteredCustomers.length);
+  }, [customers, filteredCustomers.length, filters]);
   const analysis = useMemo(
     () => analyzeRecipientCandidates([...selectedFlor.values(), ...excelCandidates]),
     [selectedFlor, excelCandidates],
@@ -224,17 +246,20 @@ function CampaignWizard({ profile, extensionStatus, refreshExtension, initialCam
     setError("");
     try {
       const zone = filterOptions.zones.find((item) => item.id === filters.zoneId);
-      const all = await listAllCampaignCustomers(profile, { ...filters, zoneName: zone?.name || filters.zoneName });
+      const result = await listAllCampaignCustomersWithStats(profile, { ...filters, zoneName: zone?.name || filters.zoneName });
       setSelectedFlor((current) => {
         const next = new Map(current);
-        for (const customer of all) {
+        for (const customer of result.items) {
           const recipient = recipientFromCustomer(customer);
           const normalized = analyzeRecipientCandidates([recipient]).recipients[0];
           if (normalized) next.set(normalized.phoneNormalized, recipient);
         }
         return next;
       });
-      setNotice(`${all.length} clientes habilitados incorporados a la selección.`);
+      const excludedText = result.recentlyExcluded
+        ? ` ${result.recentlyExcluded} cliente(s) fueron excluidos por haber recibido una campaña confirmada en los últimos ${BULK_WHATSAPP_COOLDOWN_DAYS} días.`
+        : "";
+      setNotice(`${result.items.length} clientes habilitados incorporados a la selección.${excludedText}`);
     } catch (cause) {
       setError(cause.message);
     } finally {
@@ -318,7 +343,7 @@ function CampaignWizard({ profile, extensionStatus, refreshExtension, initialCam
     setBusy(true);
     setError("");
     try {
-      const id = await prepareCampaignSnapshot(profile, {
+      const prepared = await prepareCampaignSnapshotWithCooldown(profile, {
         campaignId: campaignId || null,
         name,
         filters,
@@ -326,14 +351,14 @@ function CampaignWizard({ profile, extensionStatus, refreshExtension, initialCam
         imageMetadata: imageMetadata(images),
         recipients,
       });
+      const id = prepared.campaignId;
       setCampaignId(id);
-      const payload = campaignSummaryForExtension(id, name, profile, recipients, message);
+      const payload = await campaignSummaryForExtension(id, name, profile, prepared.recipients, message);
       const accepted = await prepareCampaignForExtension(payload, images);
       await recordCampaignDeliveredToExtension(profile, id);
       await requestCampaignStart(id, { sequence: accepted.sequence });
       for (const image of images) URL.revokeObjectURL(image.url);
       setImages([]);
-      setNotice("La campaña quedó iniciada.");
       onSaved?.();
       onClose();
     } catch (cause) {
@@ -358,22 +383,25 @@ function CampaignWizard({ profile, extensionStatus, refreshExtension, initialCam
       {step === 0 ? <Panel title="Información" description="Nombre administrativo de la campaña."><div className="fm-wa-form"><FormField label="Nombre interno" required><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Promoción aceite Microcentro — Agosto 2026" /></FormField><div className="fm-wa-readonly"><span>Estado</span><Badge tone="neutral">Borrador</Badge></div></div></Panel> : null}
 
       {step === 1 ? <div className="fm-wa-stack">
-        <Panel title="Clientes de Flor Mía" description="Sólo se ofrecen clientes activos y no bloqueados explícitamente para comunicaciones.">
+        <Panel title="Clientes de Flor Mía" description={`Por defecto se excluyen clientes con un envío masivo confirmado en los últimos ${BULK_WHATSAPP_COOLDOWN_DAYS} días.`}>
           <div className="fm-wa-filter-grid">
             <SearchInput label="Buscar por nombre o teléfono" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} />
             <label><span>Zona</span><select value={filters.zoneId} onChange={(event) => setFilters((current) => ({ ...current, zoneId: event.target.value }))}><option value="">Todas las zonas</option>{filterOptions.zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}</select></label>
             <label><span>Categoría</span><select value={filters.category} onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value }))}><option value="">Todas las categorías</option>{filterOptions.categories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+            <label><span>Contacto por campañas</span><select value={filters.bulkWhatsAppContact} onChange={(event) => setFilters((current) => ({ ...current, bulkWhatsAppContact: event.target.value, bulkWhatsAppCooldownDays: BULK_WHATSAPP_COOLDOWN_DAYS }))}><option value={BULK_WHATSAPP_CONTACT_FILTERS.available}>Disponibles para contactar</option><option value={BULK_WHATSAPP_CONTACT_FILTERS.recent}>Contactados recientemente</option><option value={BULK_WHATSAPP_CONTACT_FILTERS.all}>Todos · ignorar descanso</option></select></label>
           </div>
-          <div className="fm-wa-list-actions"><Button variant="secondary" loading={customerBusy} onClick={selectAllResults}>Seleccionar todos los resultados</Button><span>{filteredCustomers.length} visibles en este bloque</span></div>
-          <div className="fm-wa-customer-list">{filteredCustomers.map((customer) => { const candidate = analyzeRecipientCandidates([recipientFromCustomer(customer)]).recipients[0]; const selected = candidate && selectedFlor.has(candidate.phoneNormalized); return <label key={customer.id} className="fm-wa-customer-row"><input type="checkbox" checked={Boolean(selected)} onChange={() => toggleFlorCustomer(customer)} /><span><strong>{customer.name || "Sin nombre"}</strong><small>{candidate ? campaignRecipientDisplayPhone(candidate) : "Celular inválido"} · {customer.zoneName || customer.customZone || "Sin zona"}{(customer.category || customer.segment) ? ` · ${customer.category || customer.segment}` : ""}</small></span></label>; })}</div>
+          {filters.bulkWhatsAppContact === BULK_WHATSAPP_CONTACT_FILTERS.available ? <Toast tone="info">Se excluyen automáticamente los clientes que recibieron una campaña masiva confirmada durante los últimos {BULK_WHATSAPP_COOLDOWN_DAYS} días. Los envíos fallidos o sin confirmación no activan este descanso.</Toast> : null}
+          {filters.bulkWhatsAppContact === BULK_WHATSAPP_CONTACT_FILTERS.all ? <Toast tone="warning">Estás ignorando el descanso de {BULK_WHATSAPP_COOLDOWN_DAYS} días. La verificación final seguirá respetando bloqueos de comunicación, pero permitirá volver a contactar clientes recientes.</Toast> : null}
+          <div className="fm-wa-list-actions"><Button variant="secondary" loading={customerBusy} onClick={selectAllResults}>Seleccionar todos los resultados</Button><span>{filteredCustomers.length} visibles en este bloque{visibleCooldownExcluded ? ` · ${visibleCooldownExcluded} excluido(s) por descanso` : ""}</span></div>
+          <div className="fm-wa-customer-list">{filteredCustomers.map((customer) => { const candidate = analyzeRecipientCandidates([recipientFromCustomer(customer)]).recipients[0]; const selected = candidate && selectedFlor.has(candidate.phoneNormalized); const contactState = customerBulkWhatsAppContactState(customer); const contactText = contactState.recentlyContacted ? `Contactado recientemente · disponible ${formatDateTime(contactState.availableAt)}` : contactState.lastConfirmedAt ? "Disponible para campaña" : "Nunca contactado por campaña"; return <label key={customer.id} className="fm-wa-customer-row"><input type="checkbox" checked={Boolean(selected)} onChange={() => toggleFlorCustomer(customer)} /><span><strong>{customer.name || "Sin nombre"}</strong><small>{candidate ? campaignRecipientDisplayPhone(candidate) : "Celular inválido"} · {customer.zoneName || customer.customZone || "Sin zona"}{(customer.category || customer.segment) ? ` · ${customer.category || customer.segment}` : ""}</small><small>{contactText}</small></span></label>; })}</div>
           {hasMoreCustomers ? <div className="fm-load-more"><Button variant="secondary" loading={customerBusy} onClick={loadMoreCustomers}>Cargar más clientes</Button></div> : null}
         </Panel>
 
-        {canImport ? <Panel title="Importar desde Excel" description="El archivo se procesa localmente y no se sube a Firebase.">
+        {canImport ? <Panel title="Importar desde Excel" description="El archivo se procesa localmente y no se sube a Firebase. Si un teléfono ya pertenece a un cliente de Flor Mía, la verificación final también aplica su descanso de campañas.">
           <div className="fm-wa-excel"><label className="fm-wa-file"><span>Seleccionar .xlsx</span><input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => importExcel(event.target.files?.[0])} /></label>{excelSheet ? <><p><strong>{excelSheet.fileName}</strong> · {excelSheet.rows.length} filas detectadas</p><div className="fm-wa-mapping">{[["phone","Teléfono *"],["name","Nombre"],["zone","Zona"],["category","Categoría"],["notes","Observaciones"]].map(([field,label]) => <label key={field}><span>{label}</span><select value={excelMapping[field]} onChange={(event) => setExcelMapping((current) => ({ ...current, [field]: event.target.value }))}><option value="">Sin mapear</option>{excelSheet.headers.map((header) => <option key={header} value={header}>{header}</option>)}</select></label>)}</div><div className="fm-wa-excel-preview" aria-label="Vista previa del Excel"><table><thead><tr>{excelSheet.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{excelSheet.rows.slice(0, 5).map((row, rowIndex) => <tr key={rowIndex}>{excelSheet.headers.map((header, columnIndex) => <td key={`${rowIndex}-${header}`}>{row[columnIndex] == null ? "" : String(row[columnIndex])}</td>)}</tr>)}</tbody></table><small>Vista previa de hasta 5 filas. El archivo permanece solamente en tu navegador.</small></div><Button variant="secondary" onClick={confirmExcel}>Confirmar importación</Button></> : null}</div>
         </Panel> : null}
 
-        <Panel title={`Destinatarios seleccionados: ${recipients.length}`} description="Distintos formatos del mismo celular se unifican antes de preparar la campaña; Flor Mía tiene prioridad sobre Excel.">
+        <Panel title={`Destinatarios seleccionados: ${recipients.length}`} description="Distintos formatos del mismo celular se unifican antes de preparar la campaña; Flor Mía tiene prioridad sobre Excel. Antes de iniciar se vuelve a comprobar el estado actual de cada cliente.">
           <div className="fm-wa-validation" aria-live="polite"><span><b>{analysis.totalFound}</b>Total encontrado</span><span><b>{analysis.valid}</b>Válidos únicos</span><span><b>{analysis.invalid}</b>Inválidos</span><span><b>{analysis.duplicates}</b>Duplicados</span><span><b>{analysis.missingPhone}</b>Sin teléfono</span></div>
           <RecipientRows recipients={analysis.recipients} excluded={excluded} onToggleExclude={(phone) => setExcluded((current) => { const next = new Set(current); next.has(phone) ? next.delete(phone) : next.add(phone); return next; })} />
         </Panel>
@@ -390,8 +418,9 @@ function CampaignWizard({ profile, extensionStatus, refreshExtension, initialCam
 
       {step === 4 ? <div className="fm-wa-stack">
         <ExtensionStatus status={extensionStatus} refreshing={false} onRefresh={refreshExtension} />
-        <Panel title="Revisión final" description="Confirmá el contenido antes de preparar la campaña."><dl className="fm-wa-review"><div><dt>Campaña</dt><dd>{name || "Sin nombre"}</dd></div><div><dt>Destinatarios</dt><dd>{recipients.length} contactos seleccionados</dd></div><div><dt>Segmentación</dt><dd>{[filters.zoneId && (filterOptions.zones.find((zone) => zone.id === filters.zoneId)?.name), filters.category].filter(Boolean).join(" + ") || "Selección manual / sin filtro"}</dd></div><div><dt>Multimedia</dt><dd>{images.length} imagen(es) · {images.map((item) => item.file.name).join(" → ") || "Sin imágenes"}</dd></div><div><dt>Mensaje</dt><dd className="fm-wa-review-message">{message || "Sin texto"}</dd></div><div><dt>Conexión</dt><dd>{extensionPrimaryStatus(extensionStatus).label}</dd></div></dl>
+        <Panel title="Revisión final" description="Confirmá el contenido antes de preparar la campaña. El sistema vuelve a comprobar el descanso justo antes de transferir destinatarios a la extensión."><dl className="fm-wa-review"><div><dt>Campaña</dt><dd>{name || "Sin nombre"}</dd></div><div><dt>Destinatarios</dt><dd>{recipients.length} contactos seleccionados</dd></div><div><dt>Segmentación</dt><dd>{[filters.zoneId && (filterOptions.zones.find((zone) => zone.id === filters.zoneId)?.name), filters.category].filter(Boolean).join(" + ") || "Selección manual / sin filtro"}</dd></div><div><dt>Descanso de campañas</dt><dd>{contactFilterLabel(filters.bulkWhatsAppContact)}</dd></div><div><dt>Multimedia</dt><dd>{images.length} imagen(es) · {images.map((item) => item.file.name).join(" → ") || "Sin imágenes"}</dd></div><div><dt>Mensaje</dt><dd className="fm-wa-review-message">{message || "Sin texto"}</dd></div><div><dt>Conexión</dt><dd>{extensionPrimaryStatus(extensionStatus).label}</dd></div></dl>
           {extensionStatus.availableToday > 0 && recipients.length > extensionStatus.availableToday ? <Toast tone="info">La selección supera los disponibles informados hoy. No se iniciarán contactos por encima del límite configurado.</Toast> : null}
+          {filters.bulkWhatsAppContact === BULK_WHATSAPP_CONTACT_FILTERS.all ? <Toast tone="warning">La campaña está configurada para ignorar el descanso de {BULK_WHATSAPP_COOLDOWN_DAYS} días.</Toast> : null}
           {!validation.valid ? <div className="fm-wa-errors" role="alert"><strong>Antes de preparar:</strong><ul>{validation.errors.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
           <Button icon="Megaphone" loading={busy} disabled={!validation.valid || !canSend} onClick={prepare}>Preparar e iniciar campaña</Button>
         </Panel>
@@ -690,7 +719,7 @@ export default function WhatsAppCampaignsPage() {
   if (wizard !== null) return <CampaignWizard profile={profile} extensionStatus={extensionStatus} refreshExtension={diagnoseExtension} initialCampaign={wizard?.id ? wizard : null} onClose={() => setWizard(null)} onSaved={() => loadCampaigns()} />;
 
   return <div className="fm-page-enter fm-wa-page">
-    <PageHeader eyebrow="Marketing · WhatsApp" title="Campañas y mensajes masivos" description="Prepará campañas, seguí su progreso y controlalas desde una sola pantalla." actions={<div className="fm-page-actions"><Link className="fm-button fm-button--secondary" to="/gestion/marketing"><Icon name="ArrowLeft" />Marketing</Link>{canCreate ? <Button icon="Plus" onClick={() => setWizard({})}>Nueva campaña de WhatsApp</Button> : null}</div>} />
+    <PageHeader eyebrow="Marketing · WhatsApp" title="Campañas y mensajes masivos" description={`Prepará campañas, seguí su progreso y evitá volver a contactar por defecto a clientes con un envío confirmado en los últimos ${BULK_WHATSAPP_COOLDOWN_DAYS} días.`} actions={<div className="fm-page-actions"><Link className="fm-button fm-button--secondary" to="/gestion/marketing"><Icon name="ArrowLeft" />Marketing</Link>{canCreate ? <Button icon="Plus" onClick={() => setWizard({})}>Nueva campaña de WhatsApp</Button> : null}</div>} />
     <ExtensionStatus status={extensionStatus} refreshing={extensionBusy} onRefresh={diagnoseExtension} onReconnect={reconnectExtension} />
     {error ? <Toast tone="error">{error}</Toast> : null}
     {activeCampaigns.length ? <Panel title="Campañas activas" description="Progreso procesado y envíos confirmados."><div className="fm-wa-active-grid">{activeCampaigns.map((campaign) => { const counters = safeCampaignCounters(campaign.totalRecipients, campaign.sentCount, campaign.errorCount, campaign.confirmedSentCount, campaign.unverifiedSentCount); return <button type="button" key={campaign.id} onClick={() => openCampaign(campaign)}><strong>{campaign.name}</strong><span>{campaign.processedCount ?? counters.processed} / {counters.total} procesados · {counters.confirmedSent} confirmados{counters.unverifiedSent ? ` · ${counters.unverifiedSent} sin confirmación` : ""}</span><progress max="100" value={campaign.progressPercentage ?? counters.progress}>{campaign.progressPercentage ?? counters.progress}%</progress><Badge tone={CAMPAIGN_STATUS_TONES[campaign.status] || "neutral"}>{CAMPAIGN_STATUS_LABELS[campaign.status] || campaign.status}</Badge></button>; })}</div></Panel> : null}
