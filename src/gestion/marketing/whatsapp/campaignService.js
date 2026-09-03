@@ -1,6 +1,5 @@
 
 import {
-  Timestamp,
   collection,
   doc,
   documentId,
@@ -18,7 +17,6 @@ import {
 } from "firebase/firestore";
 import { can } from "../../permissions.js";
 import { db } from "../../services/firebase.js";
-import { customerDocumentId } from "../../customers/customerDomain.js";
 import { listCustomerZones } from "../../services/customerService.js";
 import {
   BULK_WHATSAPP_CONTACT_FILTERS,
@@ -248,9 +246,10 @@ export async function replaceCampaignRecipients(profile, campaignId, recipients 
   for (const recipient of recipients) {
     const id = await recipientDocumentId(recipient.phoneNormalized || recipient.phone);
     const reference = doc(collectionRef, id);
+    const isCrmRecipient = recipient.source === "flor_mia";
     operations.push((batch) => batch.set(reference, {
       recipientId: id,
-      clientId: recipient.clientId || null,
+      clientId: isCrmRecipient ? (recipient.clientId || null) : null,
       name: recipient.name || null,
       phone: recipient.phoneNormalized || recipient.phone,
       phoneNormalized: recipient.phoneNormalized || recipient.phone,
@@ -259,7 +258,7 @@ export async function replaceCampaignRecipients(profile, campaignId, recipients 
       category: recipient.category || null,
       source: recipient.source,
       status: "pending",
-      customerLastBulkWhatsAppConfirmedAtSnapshot: recipient.lastBulkWhatsAppConfirmedAt || null,
+      customerLastBulkWhatsAppConfirmedAtSnapshot: isCrmRecipient ? (recipient.lastBulkWhatsAppConfirmedAt || null) : null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }));
@@ -283,14 +282,9 @@ async function loadCustomersById(ids = []) {
 }
 
 async function guardRecipientsWithCurrentCustomerState(recipients = [], filters = {}) {
-  const identities = await Promise.all(recipients.map(async (recipient) => {
-    if (recipient.clientId) return recipient.clientId;
-    try {
-      return await customerDocumentId(recipient.phoneNormalized || recipient.phone);
-    } catch {
-      return null;
-    }
-  }));
+  const identities = recipients.map((recipient) => (
+    recipient.source === "flor_mia" && recipient.clientId ? recipient.clientId : null
+  ));
   const customers = await loadCustomersById(identities);
   const guarded = [];
   let recentlyExcluded = 0;
@@ -317,7 +311,7 @@ async function guardRecipientsWithCurrentCustomerState(recipients = [], filters 
       ...(customer ? {
         clientId: customer.id,
         lastBulkWhatsAppConfirmedAt: customer.lastBulkWhatsAppConfirmedAt || null,
-      } : {}),
+      } : recipient.source === "excel" ? { clientId: null } : {}),
     });
   }
   return { recipients: guarded, recentlyExcluded, communicationBlockedExcluded };
@@ -472,17 +466,7 @@ async function normalizedExtensionRecipientResult(campaignId, payload = {}) {
     recipientId,
     recipientRef: doc(db, "whatsappCampaigns", campaignId, "recipients", recipientId),
     outcome,
-    completedAt: Timestamp.fromDate(completedAtDate),
-    completedAtMillis: completedAtDate.getTime(),
   };
-}
-
-function timestampMillis(value) {
-  if (!value) return null;
-  if (typeof value.toMillis === "function") return Number(value.toMillis());
-  if (typeof value.toDate === "function") return Number(value.toDate()?.getTime?.());
-  if (typeof value === "object" && Number.isFinite(Number(value.seconds))) return Number(value.seconds) * 1000 + Math.floor(Number(value.nanoseconds || 0) / 1_000_000);
-  return null;
 }
 
 export async function applyExtensionCampaignEvent(profile, message) {
@@ -505,7 +489,7 @@ export async function applyExtensionCampaignEvent(profile, message) {
     if (recipientResult) {
       recipientSnapshot = await transaction.get(recipientResult.recipientRef);
       const recipientData = recipientSnapshot.exists() ? recipientSnapshot.data() : null;
-      if (recipientData?.clientId && recipientResult.outcome === "confirmed") {
+      if (recipientData?.source === "flor_mia" && recipientData?.clientId && recipientResult.outcome === "confirmed") {
         customerRef = doc(db, "customers", recipientData.clientId);
         customerSnapshot = await transaction.get(customerRef);
       }
@@ -548,36 +532,40 @@ export async function applyExtensionCampaignEvent(profile, message) {
     let customerCooldownUpdated = false;
     if (recipientResult && recipientSnapshot?.exists()) {
       const recipientData = recipientSnapshot.data();
-      const previousResultMillis = timestampMillis(recipientData.extensionResultAt);
-      const sameTerminalResult = previousResultMillis === recipientResult.completedAtMillis
-        && recipientData.extensionResultOutcome === recipientResult.outcome;
-      if (!sameTerminalResult) {
+      const sameTerminalResult = recipientData.extensionResultOutcome === recipientResult.outcome
+        && ["completed", "error"].includes(recipientData.status);
+      const canSyncCustomer = recipientResult.outcome === "confirmed"
+        && recipientData.source === "flor_mia"
+        && Boolean(customerRef && customerSnapshot?.exists());
+      const shouldSyncCustomer = canSyncCustomer
+        && (!sameTerminalResult || recipientData.customerCooldownSynced !== true);
+      const shouldWriteRecipient = !sameTerminalResult || shouldSyncCustomer;
+
+      if (shouldWriteRecipient) {
         transaction.set(recipientResult.recipientRef, {
           status: recipientResult.outcome === "failed" ? "error" : "completed",
           extensionResultOutcome: recipientResult.outcome,
-          extensionResultAt: recipientResult.completedAt,
+          extensionResultAt: serverTimestamp(),
           extensionResultSequence: update.lastExtensionSequence,
-          customerCooldownSynced: recipientResult.outcome === "confirmed" && Boolean(customerSnapshot?.exists()),
+          customerCooldownSynced: shouldSyncCustomer || (sameTerminalResult && recipientData.customerCooldownSynced === true),
           ...(recipientResult.outcome === "confirmed" ? {
             deliveryConfidence: "confirmed",
-            confirmedAt: recipientResult.completedAt,
+            confirmedAt: serverTimestamp(),
           } : recipientResult.outcome === "unverified" ? {
             deliveryConfidence: "unverified",
           } : {}),
           updatedAt: serverTimestamp(),
         }, { merge: true });
-        recipientResultApplied = true;
+        recipientResultApplied = !sameTerminalResult;
       }
-      if (recipientResult.outcome === "confirmed" && customerRef && customerSnapshot?.exists()) {
-        const existingCustomerMillis = timestampMillis(customerSnapshot.data().lastBulkWhatsAppConfirmedAt);
-        if (existingCustomerMillis == null || recipientResult.completedAtMillis > existingCustomerMillis) {
-          transaction.set(customerRef, {
-            lastBulkWhatsAppConfirmedAt: recipientResult.completedAt,
-            lastBulkWhatsAppCampaignId: message.campaignId,
-            lastBulkWhatsAppRecipientId: recipientResult.recipientId,
-          }, { merge: true });
-          customerCooldownUpdated = true;
-        }
+
+      if (shouldSyncCustomer) {
+        transaction.set(customerRef, {
+          lastBulkWhatsAppConfirmedAt: serverTimestamp(),
+          lastBulkWhatsAppCampaignId: message.campaignId,
+          lastBulkWhatsAppRecipientId: recipientResult.recipientId,
+        }, { merge: true });
+        customerCooldownUpdated = true;
       }
     }
 
@@ -661,7 +649,7 @@ export async function cancelLocalCampaign(profile, campaign) {
 export async function campaignSummaryForExtension(campaignId, name, profile, recipients, message) {
   const extensionRecipients = await Promise.all(recipients.map(async (recipient) => ({
     recipientId: await recipientDocumentId(recipient.phoneNormalized || recipient.phone),
-    clientId: recipient.clientId || null,
+    clientId: recipient.source === "flor_mia" ? (recipient.clientId || null) : null,
     name: recipient.name || "",
     phone: recipient.whatsappPhone,
     source: recipient.source,
