@@ -3,7 +3,7 @@ name: Deploy Firestore Rules — Preview 16
 on:
   push:
     branches:
-      - feature/productos-stock-depositos
+      - fix/clientes-create-only-preview
     paths:
       - ".github/workflows/deploy-firestore-rules-preview16.yml"
   workflow_dispatch:
