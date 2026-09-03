@@ -10,40 +10,27 @@ permissions:
   contents: read
 
 jobs:
-  remaining-diagnostic:
+  sequential-diagnostic:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
+
       - name: Install
         run: npm ci
-      - name: Activity presentation
-        if: always()
-        run: node --test tests/activity-presentation.test.mjs
-      - name: Admin experience
-        if: always()
-        run: node --test tests/admin-experience.test.mjs
-      - name: Auth entry
-        if: always()
-        run: node --test tests/auth-entry.test.mjs
-      - name: Cancellation metrics filters
-        if: always()
-        run: node --test tests/cancellation-metrics-filters.test.mjs
-      - name: Dashboard filters
-        if: always()
-        run: node --test tests/dashboard-filters.test.mjs
-      - name: Data
-        if: always()
-        run: node --test tests/data.test.mjs
-      - name: Inventory domain
-        if: always()
-        run: node --test tests/inventory-domain.test.mjs
-      - name: Seller panel after responsive cleanup
-        if: always()
-        run: node --test tests/seller-panel.test.mjs
+
+      - name: Focused Inbox tests
+        run: node --test tests/whatsapp-inbox-light.test.mjs
+
+      - name: Full Web App suite sequentially
+        run: node --test --test-concurrency=1 "tests/*.test.mjs"
+
+      - name: Build Web App
+        run: npm run build
