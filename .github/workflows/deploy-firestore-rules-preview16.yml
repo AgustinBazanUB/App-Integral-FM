@@ -71,7 +71,7 @@ jobs:
             const signature = crypto.sign('RSA-SHA256', Buffer.from(unsigned), sa.private_key);
             const assertion = `${unsigned}.${b64url(signature)}`;
             const form = new URLSearchParams({
-              grant_type: 'urn:ietf:params:oauth-grant-type:jwt-bearer',
+              grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
               assertion,
             });
             const response = await fetch('https://oauth2.googleapis.com/token', {
