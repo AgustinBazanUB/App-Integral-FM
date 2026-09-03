@@ -3,13 +3,13 @@ name: Deploy Firestore Rules — Preview 16
 on:
   push:
     branches:
-      - fix/clientes-create-only-preview
+      - feature/productos-stock-depositos
     paths:
       - ".github/workflows/deploy-firestore-rules-preview16.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   deploy-rules-only:
@@ -17,45 +17,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Make WhatsApp draft counters backward compatible
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 <<'PY'
-          from pathlib import Path
-
-          path = Path("firestore.rules")
-          text = path.read_text(encoding="utf-8")
-          old = "\n".join([
-              "        && request.resource.data.sentCount == 0",
-              "        && request.resource.data.confirmedSentCount == 0",
-              "        && request.resource.data.unverifiedSentCount == 0",
-              "        && request.resource.data.processedCount == 0",
-              "        && request.resource.data.errorCount == 0",
-          ]) + "\n"
-          new = "\n".join([
-              "        && request.resource.data.sentCount == 0",
-              "        && (!(\"confirmedSentCount\" in request.resource.data) || request.resource.data.confirmedSentCount == 0)",
-              "        && (!(\"unverifiedSentCount\" in request.resource.data) || request.resource.data.unverifiedSentCount == 0)",
-              "        && (!(\"processedCount\" in request.resource.data) || request.resource.data.processedCount == 0)",
-              "        && request.resource.data.errorCount == 0",
-          ]) + "\n"
-          if text.count(old) != 1:
-              raise SystemExit("Expected exactly one WhatsApp draft counter block; refusing to patch.")
-          path.write_text(text.replace(old, new), encoding="utf-8")
-          PY
-
-      - name: Version corrected Firestore Rules
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add firestore.rules
-          git diff --cached --check
-          git commit -m "fix: allow WhatsApp draft preparation before counters exist"
-          git push origin HEAD:fix/clientes-create-only-preview
 
       - name: Select Firebase service account
         env:
@@ -143,6 +104,7 @@ jobs:
 
           (async () => {
             const token = await getAccessToken();
+
             const rulesetResult = await rulesApi(
               token,
               `/v1/projects/${projectId}/rulesets`,
