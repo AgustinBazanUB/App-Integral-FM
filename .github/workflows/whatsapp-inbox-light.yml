@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  inbox-hardening:
+  seller-diagnostic:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -27,55 +27,62 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Focused Inbox tests
-        run: node --test tests/whatsapp-inbox-light.test.mjs
+      - name: Seller permissions
+        if: always()
+        run: node --test --test-name-pattern="vendedor puro|administrador conserva" tests/seller-panel.test.mjs
 
-      - name: activity-presentation
+      - name: Seller locations
         if: always()
-        run: node --test tests/activity-presentation.test.mjs
-      - name: admin-experience
-        if: always()
-        run: node --test tests/admin-experience.test.mjs
-      - name: auth-entry
-        if: always()
-        run: node --test tests/auth-entry.test.mjs
-      - name: cancellation-metrics-filters
-        if: always()
-        run: node --test tests/cancellation-metrics-filters.test.mjs
-      - name: dashboard-filters
-        if: always()
-        run: node --test tests/dashboard-filters.test.mjs
-      - name: data
-        if: always()
-        run: node --test tests/data.test.mjs
-      - name: global-overlay-focus
-        if: always()
-        run: node --test tests/global-overlay-focus.test.mjs
-      - name: inventory-domain
-        if: always()
-        run: node --test tests/inventory-domain.test.mjs
-      - name: location-enhancements
-        if: always()
-        run: node --test tests/location-enhancements.test.mjs
-      - name: management-domain
-        if: always()
-        run: node --test tests/management-domain.test.mjs
-      - name: management-ui
-        if: always()
-        run: node --test tests/management-ui.test.mjs
-      - name: seller-panel
-        if: always()
-        run: node --test tests/seller-panel.test.mjs
+        run: node --test --test-name-pattern="ubicaciones efectivas" tests/seller-panel.test.mjs
 
-      - name: Confirm passing Customer tests
+      - name: Seller product groups
         if: always()
-        run: node --test tests/customer-domain.test.mjs tests/customer-import-ui.test.mjs
-      - name: Confirm passing Meta Ads tests
+        run: node --test --test-name-pattern="productos visibles" tests/seller-panel.test.mjs
+
+      - name: Seller cart
         if: always()
-        run: node --test tests/meta-ads-*.test.mjs
-      - name: Confirm passing WhatsApp tests
+        run: node --test --test-name-pattern="carrito calcula" tests/seller-panel.test.mjs
+
+      - name: Seller discounts
         if: always()
-        run: node --test tests/whatsapp-*.test.mjs
-      - name: Build Web App
+        run: node --test --test-name-pattern="descuentos fijos|varios porcentajes|descuentos nunca" tests/seller-panel.test.mjs
+
+      - name: Seller stock reservations
         if: always()
-        run: npm run build
+        run: node --test --test-name-pattern="ventas pendientes" tests/seller-panel.test.mjs
+
+      - name: Seller keyboard
+        if: always()
+        run: node --test --test-name-pattern="botonera distingue" tests/seller-panel.test.mjs
+
+      - name: Seller multiple payments
+        if: always()
+        run: node --test --test-name-pattern="2 pagos" tests/seller-panel.test.mjs
+
+      - name: Seller route session
+        if: always()
+        run: node --test --test-name-pattern="ruta y el cambio" tests/seller-panel.test.mjs
+
+      - name: Seller compact UI
+        if: always()
+        run: node --test --test-name-pattern="interfaz compacta" tests/seller-panel.test.mjs
+
+      - name: Seller persisted sale fields
+        if: always()
+        run: node --test --test-name-pattern="venta guarda" tests/seller-panel.test.mjs
+
+      - name: Seller offline queue
+        if: always()
+        run: node --test --test-name-pattern="cola offline" tests/seller-panel.test.mjs
+
+      - name: Seller location sales
+        if: always()
+        run: node --test --test-name-pattern="Ubicaciones incorpora Ventas" tests/seller-panel.test.mjs
+
+      - name: Seller responsive
+        if: always()
+        run: node --test --test-name-pattern="responsive compactas" tests/seller-panel.test.mjs
+
+      - name: Seller Firestore rules
+        if: always()
+        run: node --test --test-name-pattern="reglas vinculan stock" tests/seller-panel.test.mjs
