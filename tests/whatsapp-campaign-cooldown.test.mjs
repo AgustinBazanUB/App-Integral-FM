@@ -70,14 +70,24 @@ test("el circuito confirmado usa recipientId persistido y sólo confirmed actual
 
   assert.match(service, /lastRecipientResult/);
   assert.match(service, /EXTENSION_RECIPIENT_OUTCOMES = new Set\(\["confirmed", "unverified", "failed"\]\)/);
-  assert.match(service, /recipientData\?\.clientId && recipientResult\.outcome === "confirmed"/);
-  assert.match(service, /lastBulkWhatsAppConfirmedAt: recipientResult\.completedAt/);
+  assert.match(service, /recipientData\?\.source === "flor_mia" && recipientData\?\.clientId && recipientResult\.outcome === "confirmed"/);
+  assert.match(service, /lastBulkWhatsAppConfirmedAt: serverTimestamp\(\)/);
   assert.match(service, /lastBulkWhatsAppCampaignId: message\.campaignId/);
   assert.match(service, /lastBulkWhatsAppRecipientId: recipientResult\.recipientId/);
-  assert.match(service, /recipientResult\.completedAtMillis > existingCustomerMillis/);
+  assert.match(service, /extensionResultAt: serverTimestamp\(\)/);
+  assert.match(service, /confirmedAt: serverTimestamp\(\)/);
   assert.match(service, /recipientId: await recipientDocumentId\(recipient\.phoneNormalized \|\| recipient\.phone\)/);
   assert.match(service, /prepareCampaignSnapshotWithCooldown/);
   assert.match(service, /guardRecipientsWithCurrentCustomerState/);
+});
+
+test("Excel queda aislado del CRM aunque el teléfono coincida con un cliente", async () => {
+  const service = await readFile(new URL("../src/gestion/marketing/whatsapp/campaignService.js", import.meta.url), "utf8");
+
+  assert.match(service, /recipient\.source === "flor_mia" && recipient\.clientId \? recipient\.clientId : null/);
+  assert.match(service, /clientId: isCrmRecipient \? \(recipient\.clientId \|\| null\) : null/);
+  assert.match(service, /clientId: recipient\.source === "flor_mia" \? \(recipient\.clientId \|\| null\) : null/);
+  assert.match(service, /recipientData\.source === "flor_mia"/);
 });
 
 test("la UI usa descanso de 14 días por defecto y vuelve a validar al preparar", async () => {
