@@ -30,7 +30,7 @@ jobs:
         run: node --test tests/whatsapp-inbox-light.test.mjs
 
       - name: Full Web App suite sequentially
-        run: node --test --test-concurrency=1 "tests/*.test.mjs"
+        run: node --test --test-concurrency=1 tests/*.test.mjs
 
       - name: Build Web App
         run: npm run build
