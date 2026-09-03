@@ -6,9 +6,8 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 
 const locationsPage = read("src/gestion/pages/LocationsPage.jsx");
 const detailPage = read("src/gestion/pages/LocationDetailPage.jsx");
-const productForm = read("src/gestion/components/LocationProductForm.jsx");
 const service = read("src/gestion/services/locationEnhancementsService.js");
-const images = read("src/data/productImages.js");
+const inventoryService = read("src/gestion/services/inventoryService.js");
 const styles = read("src/styles/location-enhancements.css");
 
 test("las ubicaciones fijadas son personales y tienen límite de cuatro", () => {
@@ -25,29 +24,21 @@ test("cargar stock abre directamente la sección correcta y valida actividad", (
   assert.match(detailPage, /Esta ubicación debe estar activa para cargar stock/);
 });
 
-test("los productos se crean desde la ubicación con alcance local predeterminado", () => {
-  assert.match(detailPage, /Agregar nuevo producto/);
-  assert.match(productForm, /scope: "current"/);
-  assert.match(productForm, /Solo esta ubicación/);
-  assert.match(productForm, /Todas las ubicaciones activas/);
-  assert.match(productForm, /El stock inicial será 0/);
-  assert.match(service, /currentStock: 0/);
-  assert.match(service, /productsSnapshot\.docs\.find/);
+test("agregar producto a una ubicación reutiliza el catálogo global", () => {
+  assert.match(detailPage, /AddLocationProductModal/);
+  assert.match(detailPage, /listMasterProductsForInventory/);
+  assert.match(detailPage, /addProductToLocation/);
+  assert.match(detailPage, /producto que ya existe en el catálogo de Flor Mía/);
+  assert.match(detailPage, /Stock inicial/);
+  assert.match(detailPage, /Usar precio predeterminado/);
+  assert.match(inventoryService, /addProductToLocation/);
+  assert.doesNotMatch(detailPage, /scope: "current"/);
 });
 
 test("la vista de productos está agrupada por categoría", () => {
   assert.match(detailPage, /fm-product-category-groups/);
   assert.match(detailPage, /<details className="fm-product-category"/);
   assert.match(detailPage, /group\.items\.length/);
-});
-
-test("el catálogo de imágenes es local y Firestore guarda rutas", () => {
-  assert.match(images, /\/images\/flor-mia\/logo-flor-mia\.svg/);
-  assert.match(images, /product\.image/);
-  assert.match(service, /path\.startsWith\("data:"\)/);
-  assert.match(service, /path\.startsWith\("blob:"\)/);
-  assert.match(service, /path\.startsWith\("\/images\/"\)/);
-  assert.match(productForm, /Imagen del catálogo local/);
 });
 
 test("vendedores asignados y disponibles se muestran por separado", () => {
