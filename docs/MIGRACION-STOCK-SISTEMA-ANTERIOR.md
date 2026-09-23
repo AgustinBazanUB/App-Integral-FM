@@ -33,3 +33,7 @@ Para leer `fm-stock-y-venta` el workflow intenta, en este orden:
 2. email/contraseña de un administrador legado guardados en GitHub Secrets.
 
 Si ninguna credencial de origen existe, el workflow no inventa stock: sincroniza imágenes, ejecuta tests/build y deja el estado `MIGRATION_SKIPPED_NO_SOURCE_AUTH` en el resumen de Actions.
+
+## Deploy Preview
+
+El PR de esta rama se usa únicamente para generar y validar el Deploy Preview antes de cualquier merge.
