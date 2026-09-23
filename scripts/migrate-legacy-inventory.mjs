@@ -161,6 +161,15 @@ async function run() {
       sourceStockByLocation.set(location.id, await legacy.list(["locationStock", location.id, "items"]));
     }
 
+    console.log("LEGACY_INVENTORY_POINTS", JSON.stringify(sourceLocations.map((location) => ({
+      id: location.id,
+      name: location.name || "",
+      type: location.type || "",
+      kind: location.kind || "",
+      classifiedAs: classifyInventoryPoint(location),
+      stockItems: (sourceStockByLocation.get(location.id) || []).filter((item) => item.deleted !== true).length,
+    }))));
+
     const stats = {
       sourceProducts: sourceProducts.length,
       productsCreated: 0,
