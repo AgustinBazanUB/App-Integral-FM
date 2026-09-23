@@ -1,3 +1,4 @@
+import { legacyProductImages } from "./legacyProductImages";
 import { products } from "./products";
 
 const placeholder = {
@@ -27,7 +28,13 @@ for (const product of products) {
   });
 }
 
-export const productImages = [placeholder, ...catalogByPath.values()];
+const mergedProductImages = [placeholder, ...catalogByPath.values(), ...legacyProductImages];
+const seenImagePaths = new Set();
+export const productImages = mergedProductImages.filter((image) => {
+  if (!image?.imageUrl || seenImagePaths.has(image.imageUrl)) return false;
+  seenImagePaths.add(image.imageUrl);
+  return true;
+});
 
 export const productImageById = Object.fromEntries(
   productImages.map((image) => [image.id, image]),
