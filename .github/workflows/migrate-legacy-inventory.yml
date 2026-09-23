@@ -1,0 +1,67 @@
+name: Migrar stock e imágenes del sistema anterior
+
+on:
+  push:
+    branches:
+      - migration/legacy-stock-products-20260923
+    paths:
+      - ".github/workflows/migrate-legacy-inventory.yml"
+      - "scripts/migrate-legacy-inventory.mjs"
+      - "src/data/legacyProductImages.js"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      TARGET_SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM || secrets.FIREBASE_SERVICE_ACCOUNT_INTEGRAL_FLOR_MIA }}
+      LEGACY_SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FM_STOCK_Y_VENTA || secrets.FIREBASE_SERVICE_ACCOUNT_FM_STOCK_Y_VENTAS || secrets.FIREBASE_SERVICE_ACCOUNT_OLD_FM || secrets.FIREBASE_SERVICE_ACCOUNT_LEGACY_FM }}
+      LEGACY_ADMIN_EMAIL: ${{ secrets.FM_STOCK_ADMIN_EMAIL || secrets.LEGACY_FIREBASE_ADMIN_EMAIL }}
+      LEGACY_ADMIN_PASSWORD: ${{ secrets.FM_STOCK_ADMIN_PASSWORD || secrets.LEGACY_FIREBASE_ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout rama de migración
+        uses: actions/checkout@v4
+        with:
+          ref: migration/legacy-stock-products-20260923
+          fetch-depth: 0
+
+      - name: Copiar imágenes del repositorio anterior
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/fm-stock-y-ventas"
+          git clone --depth 1 https://github.com/AgustinBazanUB/FM-stock-y-ventas.git "$RUNNER_TEMP/fm-stock-y-ventas"
+          mkdir -p public/images/legacy-products
+          rsync -a --delete "$RUNNER_TEMP/fm-stock-y-ventas/assets/products/" public/images/legacy-products/
+
+      - name: Publicar imágenes copiadas en la rama
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- public/images/legacy-products)" ]; then
+            echo "Las imágenes ya estaban sincronizadas."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add public/images/legacy-products
+            git commit -m "chore(migration): copy legacy product images"
+            git push origin HEAD:migration/legacy-stock-products-20260923
+          fi
+
+      - name: Instalar dependencias
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false firebase-admin@13.5.0
+
+      - name: Copiar productos y stock de Firestore
+        run: node scripts/migrate-legacy-inventory.mjs --allow-missing-source
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        if: always()
+        run: npm run build

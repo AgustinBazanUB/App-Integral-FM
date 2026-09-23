@@ -1,0 +1,200 @@
+[
+  {
+    "id": "botella-500cc-blend",
+    "name": "Botella 500 cc Blend",
+    "imageUrl": "/assets/products/botella-500cc-blend.webp",
+    "thumbUrl": "/assets/products/botella-500cc-blend-thumb.webp"
+  },
+  {
+    "id": "producto-img-7380",
+    "name": "Aceite Arbequina · IMG 7380",
+    "imageUrl": "/assets/products/producto-img-7380.jpg",
+    "thumbUrl": "/assets/products/producto-img-7380-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7381",
+    "name": "Aceite Arbequina · IMG 7381",
+    "imageUrl": "/assets/products/producto-img-7381.jpg",
+    "thumbUrl": "/assets/products/producto-img-7381-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7382",
+    "name": "Pistachos en frasco · IMG 7382",
+    "imageUrl": "/assets/products/producto-img-7382.jpg",
+    "thumbUrl": "/assets/products/producto-img-7382-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7383",
+    "name": "Pistachos · IMG 7383",
+    "imageUrl": "/assets/products/producto-img-7383.jpg",
+    "thumbUrl": "/assets/products/producto-img-7383-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7384",
+    "name": "Pistachos · IMG 7384",
+    "imageUrl": "/assets/products/producto-img-7384.jpg",
+    "thumbUrl": "/assets/products/producto-img-7384-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7385",
+    "name": "Fruta seca oscura · IMG 7385",
+    "imageUrl": "/assets/products/producto-img-7385.jpg",
+    "thumbUrl": "/assets/products/producto-img-7385-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7386",
+    "name": "Fruta seca oscura · IMG 7386",
+    "imageUrl": "/assets/products/producto-img-7386.jpg",
+    "thumbUrl": "/assets/products/producto-img-7386-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7387",
+    "name": "Almendras · IMG 7387",
+    "imageUrl": "/assets/products/producto-img-7387.jpg",
+    "thumbUrl": "/assets/products/producto-img-7387-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7388",
+    "name": "Almendras · IMG 7388",
+    "imageUrl": "/assets/products/producto-img-7388.jpg",
+    "thumbUrl": "/assets/products/producto-img-7388-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7389",
+    "name": "Almendras · IMG 7389",
+    "imageUrl": "/assets/products/producto-img-7389.jpg",
+    "thumbUrl": "/assets/products/producto-img-7389-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7390",
+    "name": "Almendras · IMG 7390",
+    "imageUrl": "/assets/products/producto-img-7390.jpg",
+    "thumbUrl": "/assets/products/producto-img-7390-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7391",
+    "name": "Almendras · IMG 7391",
+    "imageUrl": "/assets/products/producto-img-7391.jpg",
+    "thumbUrl": "/assets/products/producto-img-7391-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7392",
+    "name": "Aceite Arbequina · IMG 7392",
+    "imageUrl": "/assets/products/producto-img-7392.jpg",
+    "thumbUrl": "/assets/products/producto-img-7392-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7393",
+    "name": "Aceite Coratina · IMG 7393",
+    "imageUrl": "/assets/products/producto-img-7393.jpg",
+    "thumbUrl": "/assets/products/producto-img-7393-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7394",
+    "name": "Aceite Blend 2 litros · IMG 7394",
+    "imageUrl": "/assets/products/producto-img-7394.jpg",
+    "thumbUrl": "/assets/products/producto-img-7394-thumb.jpg"
+  },
+  {
+    "id": "producto-img-7395",
+    "name": "Aceite Blend 5 litros · IMG 7395",
+    "imageUrl": "/assets/products/producto-img-7395.jpg",
+    "thumbUrl": "/assets/products/producto-img-7395-thumb.jpg"
+  },
+  {
+    "id": "producto-aceitunas-negras-gema-oliv-1kg",
+    "name": "Aceitunas negras Gema Oliv 1 kg",
+    "imageUrl": "/assets/products/producto-aceitunas-negras-gema-oliv-1kg.jpg",
+    "thumbUrl": "/assets/products/producto-aceitunas-negras-gema-oliv-1kg-thumb.jpg"
+  },
+  {
+    "id": "producto-pasta-aceitunas-verdes-tia-clara-220g",
+    "name": "Pasta de aceitunas verdes Tía Clara 220 g",
+    "imageUrl": "/assets/products/producto-pasta-aceitunas-verdes-tia-clara-220g.jpg",
+    "thumbUrl": "/assets/products/producto-pasta-aceitunas-verdes-tia-clara-220g-thumb.jpg"
+  },
+  {
+    "id": "producto-pasta-aceitunas-negras-tia-clara-220g",
+    "name": "Pasta de aceitunas negras Tía Clara 220 g",
+    "imageUrl": "/assets/products/producto-pasta-aceitunas-negras-tia-clara-220g.jpg",
+    "thumbUrl": "/assets/products/producto-pasta-aceitunas-negras-tia-clara-220g-thumb.jpg"
+  },
+  {
+    "id": "producto-vino-bazan-malbec-2024",
+    "name": "Vino Bazan Malbec 2024",
+    "imageUrl": "/assets/products/producto-vino-bazan-malbec-2024.jpg",
+    "thumbUrl": "/assets/products/producto-vino-bazan-malbec-2024-thumb.jpg"
+  },
+  {
+    "id": "producto-sal-malbec-ruru-y-yuyu",
+    "name": "Sal Malbec Ruru y Yuyu",
+    "imageUrl": "/assets/products/producto-sal-malbec-ruru-y-yuyu.jpg",
+    "thumbUrl": "/assets/products/producto-sal-malbec-ruru-y-yuyu-thumb.jpg"
+  },
+  {
+    "id": "producto-emulsion-corporal-olibec",
+    "name": "Emulsión corporal Olibec",
+    "imageUrl": "/assets/products/producto-emulsion-corporal-olibec.jpg",
+    "thumbUrl": "/assets/products/producto-emulsion-corporal-olibec-thumb.jpg"
+  },
+  {
+    "id": "producto-mermelada-peras-tia-clara-400g",
+    "name": "Mermelada de peras Tía Clara 400 g",
+    "imageUrl": "/assets/products/producto-mermelada-peras-tia-clara-400g.jpg",
+    "thumbUrl": "/assets/products/producto-mermelada-peras-tia-clara-400g-thumb.jpg"
+  },
+  {
+    "id": "producto-mermelada-pimiento-tia-clara-220g",
+    "name": "Mermelada de pimiento Tía Clara 220 g",
+    "imageUrl": "/assets/products/producto-mermelada-pimiento-tia-clara-220g.jpg",
+    "thumbUrl": "/assets/products/producto-mermelada-pimiento-tia-clara-220g-thumb.jpg"
+  },
+  {
+    "id": "producto-aceitunas-verdes-gema-oliv-1700g",
+    "name": "Aceitunas verdes Gema Oliv 1.700 g",
+    "imageUrl": "/assets/products/producto-aceitunas-verdes-gema-oliv-1700g.jpg",
+    "thumbUrl": "/assets/products/producto-aceitunas-verdes-gema-oliv-1700g-thumb.jpg"
+  },
+  {
+    "id": "producto-aceitunas-verdes-gema-oliv-500g",
+    "name": "Aceitunas verdes Gema Oliv 500 g",
+    "imageUrl": "/assets/products/producto-aceitunas-verdes-gema-oliv-500g.jpg",
+    "thumbUrl": "/assets/products/producto-aceitunas-verdes-gema-oliv-500g-thumb.jpg"
+  },
+  {
+    "id": "producto-vino-extramuros-cabernet-sauvignon",
+    "name": "Vino Extramuros Cabernet Sauvignon",
+    "imageUrl": "/assets/products/producto-vino-extramuros-cabernet-sauvignon.jpg",
+    "thumbUrl": "/assets/products/producto-vino-extramuros-cabernet-sauvignon-thumb.jpg"
+  },
+  {
+    "id": "producto-vino-suipacha-reserva-otero-ramos",
+    "name": "Vino Suipacha Reserva Otero Ramos",
+    "imageUrl": "/assets/products/producto-vino-suipacha-reserva-otero-ramos.jpg",
+    "thumbUrl": "/assets/products/producto-vino-suipacha-reserva-otero-ramos-thumb.jpg"
+  },
+  {
+    "id": "producto-vino-caritos-estate-malbec",
+    "name": "Vino Caritos Estate Malbec",
+    "imageUrl": "/assets/products/producto-vino-caritos-estate-malbec.jpg",
+    "thumbUrl": "/assets/products/producto-vino-caritos-estate-malbec-thumb.jpg"
+  },
+  {
+    "id": "producto-vino-santa-brasa-malbec",
+    "name": "Vino Santa Brasa Malbec",
+    "imageUrl": "/assets/products/producto-vino-santa-brasa-malbec.jpg",
+    "thumbUrl": "/assets/products/producto-vino-santa-brasa-malbec-thumb.jpg"
+  },
+  {
+    "id": "producto-aceite-alauco-flor-mia-500ml",
+    "name": "Aceite Alauco Flor Mia 500 ml",
+    "imageUrl": "/assets/products/producto-aceite-alauco-flor-mia-500ml.jpg",
+    "thumbUrl": "/assets/products/producto-aceite-alauco-flor-mia-500ml-thumb.jpg"
+  },
+  {
+    "id": "producto-aceitunas-negras-gema-oliv-1kg-b",
+    "name": "Aceitunas negras Gema Oliv 1 kg · foto 2",
+    "imageUrl": "/assets/products/producto-aceitunas-negras-gema-oliv-1kg-b.jpg",
+    "thumbUrl": "/assets/products/producto-aceitunas-negras-gema-oliv-1kg-b-thumb.jpg"
+  }
+]

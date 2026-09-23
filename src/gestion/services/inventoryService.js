@@ -87,19 +87,22 @@ export async function listProductCategoriesForInventory(profile) {
 
 function productPayload(values, categoryName, profile, editing) {
   const name = String(values.name || "").trim();
-  const abbreviation = String(values.abbreviation || "").trim().toUpperCase();
+  const productCode = String(values.productCode ?? values.abbreviation ?? "").trim().toUpperCase();
   const defaultPrice = wholeInventoryQuantity(values.defaultPrice || 0, "El precio predeterminado");
   const yellowAlertQty = wholeInventoryQuantity(values.yellowAlertQty || 0, "La alerta amarilla");
   const redAlertQty = wholeInventoryQuantity(values.redAlertQty || 0, "La alerta roja");
   if (!name) throw new Error("Ingresá el nombre del producto.");
-  if (!abbreviation) throw new Error("Ingresá una abreviación.");
-  if (abbreviation.length > 8) throw new Error("La abreviación admite hasta 8 caracteres.");
+  if (!productCode) throw new Error("Ingresá un ID del producto.");
+  if (productCode.length > 8) throw new Error("El ID del producto admite hasta 8 caracteres.");
   if (yellowAlertQty < redAlertQty) throw new Error("La alerta amarilla debe ser mayor o igual a la roja.");
   return {
     name,
     nameKey: normalizedText(name),
-    abbreviation,
-    abbreviationKey: normalizedText(abbreviation),
+    productCode,
+    productCodeKey: normalizedText(productCode),
+    // Alias legacy para compatibilidad con ventas e inventarios históricos.
+    abbreviation: productCode,
+    abbreviationKey: normalizedText(productCode),
     description: String(values.description || "").trim(),
     defaultPrice,
     yellowAlertQty,
@@ -149,12 +152,12 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
   // no generar duplicados incluso con productos legacy que todavía no tienen nameKey.
   const existingProducts = docsToArray(await getDocs(query(collection(db, "products"), limit(500))));
   const candidateName = normalizedText(values.name);
-  const candidateAbbreviation = normalizedText(values.abbreviation);
+  const candidateProductCode = normalizedText(values.productCode ?? values.abbreviation);
   const duplicate = existingProducts.find((product) => product.id !== productId
     && product.deleted !== true
     && (normalizedText(product.name) === candidateName
-      || normalizedText(product.abbreviation) === candidateAbbreviation));
-  if (duplicate) throw new Error("Ya existe un producto con ese nombre o abreviación.");
+      || normalizedText(product.productCode || product.abbreviation) === candidateProductCode));
+  if (duplicate) throw new Error("Ya existe un producto con ese nombre o ID del producto.");
 
   const productRef = productId ? doc(db, "products", productId) : doc(collection(db, "products"));
   const payload = productPayload(values, categoryName, profile, Boolean(productId));
@@ -228,7 +231,8 @@ export async function addProductToLocation({
     transaction.set(stockRef, {
       productId: product.id,
       productName: master.name,
-      abbreviation: master.abbreviation || "",
+      productCode: master.productCode || master.abbreviation || "",
+      abbreviation: master.productCode || master.abbreviation || "",
       categoryId: master.categoryId || "",
       categoryName: master.categoryName || "Sin categoría",
       imageUrl: master.imageUrl || "",
@@ -420,7 +424,8 @@ export async function addProductToWarehouse({ warehouse, product, initialStock, 
     transaction.set(stockRef, {
       productId: product.id,
       productName: master.name,
-      abbreviation: master.abbreviation || "",
+      productCode: master.productCode || master.abbreviation || "",
+      abbreviation: master.productCode || master.abbreviation || "",
       categoryId: master.categoryId || "",
       categoryName: master.categoryName || "Sin categoría",
       imageUrl: master.imageUrl || "",

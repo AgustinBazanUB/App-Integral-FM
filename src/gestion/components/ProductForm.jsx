@@ -13,7 +13,7 @@ import { saveMasterProduct } from "../services/inventoryService";
 
 const emptyForm = {
   name: "",
-  abbreviation: "",
+  productCode: "",
   categoryId: "",
   description: "",
   defaultPrice: 0,
@@ -33,7 +33,7 @@ function initialForm(product) {
   return {
     ...emptyForm,
     name: product.name || product.productName || "",
-    abbreviation: product.abbreviation || "",
+    productCode: product.productCode || product.abbreviation || "",
     categoryId: product.categoryId || "",
     description: product.description || "",
     defaultPrice: Number(product.defaultPrice || 0),
@@ -131,8 +131,14 @@ export default function ProductForm({ open, product, categories, profile, onClos
         <FormField label="Nombre" required>
           <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         </FormField>
-        <FormField label="Abreviación" hint="Hasta 8 caracteres." required>
-          <input maxLength="8" value={form.abbreviation} onChange={(event) => setForm({ ...form, abbreviation: event.target.value.toUpperCase() })} />
+        <FormField label="ID del producto" hint="Conserva el código actual del producto. Hasta 8 caracteres." required>
+          <input
+            maxLength="8"
+            value={form.productCode}
+            onChange={(event) => setForm({ ...form, productCode: event.target.value.toUpperCase() })}
+            autoCapitalize="characters"
+            aria-label="ID del producto"
+          />
         </FormField>
         <FormField label="Categoría">
           <Select value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
