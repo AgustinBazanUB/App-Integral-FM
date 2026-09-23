@@ -110,8 +110,28 @@ function chooseExisting(source, targets, fields, legacyField) {
 }
 
 function classifyInventoryPoint(location) {
-  const label = norm((location.name || "") + " " + (location.type || "") + " " + (location.kind || ""));
-  return label.includes("deposito") || label.includes("warehouse") ? "warehouse" : "location";
+  const raw = ((location.name || "") + " " + (location.type || "") + " " + (location.kind || ""))
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es");
+  const warehouseToken = /(^|[^a-z0-9])(deposito|deposit|depo|warehouse|almacen|storage)([^a-z0-9]|$)/.test(raw);
+  return warehouseToken ? "warehouse" : "location";
+}
+
+function canonicalWarehouseName(value) {
+  const raw = strip(value)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return raw
+    .replace(/^depo\b/, "deposito")
+    .replace(/^deposit\b/, "deposito")
+    .replace(/^warehouse\b/, "deposito")
+    .replace(/^almacen\b/, "deposito")
+    .replace(/^storage\b/, "deposito")
+    .replace(/[^a-z0-9]+/g, "");
 }
 
 function locationType(source) {
@@ -272,6 +292,10 @@ async function run() {
       const kind = classifyInventoryPoint(source);
       if (kind === "warehouse") {
         let target = chooseExisting(source, targetWarehouses, ["name"], "legacySourceLocationId");
+        if (!target) {
+          const canonicalSourceName = canonicalWarehouseName(source.name);
+          target = targetWarehouses.find((item) => canonicalWarehouseName(item.name) === canonicalSourceName) || null;
+        }
         const targetId = target ? target.id : (targetWarehouses.some((item) => item.id === source.id) ? "legacy_" + source.id : source.id);
         const payload = {
           name: strip(source.name) || "Depósito",
@@ -292,6 +316,37 @@ async function run() {
           targetWarehouses.push(target);
           stats.warehousesCreated += 1;
         }
+
+        // Si una corrida anterior importó este depósito por error como ubicación,
+        // se archiva esa ubicación migrada y se neutraliza su stock para evitar duplicación.
+        const misclassifiedLocation = targetLocations.find((item) => item.legacySourceLocationId === source.id);
+        if (misclassifiedLocation) {
+          await targetDb.collection("locations").doc(misclassifiedLocation.id).set({
+            active: false,
+            deleted: true,
+            deletedAt: now(),
+            deletedBy: ACTOR_ID,
+            deletedByName: ACTOR_NAME,
+            reclassifiedAsWarehouseId: targetId,
+            reclassifiedAt: now(),
+            updatedAt: now(),
+            updatedBy: ACTOR_ID,
+            updatedByName: ACTOR_NAME,
+          }, { merge: true });
+          const wrongStockSnapshot = await targetDb.collection("locationStock").doc(misclassifiedLocation.id).collection("items").get();
+          for (const wrongStockDoc of wrongStockSnapshot.docs) {
+            await wrongStockDoc.ref.set({
+              active: false,
+              deleted: true,
+              currentStock: 0,
+              reclassifiedAsWarehouseId: targetId,
+              reclassifiedAt: now(),
+              updatedAt: now(),
+              updatedBy: ACTOR_ID,
+            }, { merge: true });
+          }
+        }
+
         pointMap.set(source.id, { kind, id: targetId, name: payload.name });
       } else {
         let target = chooseExisting(source, targetLocations, ["name", "codePrefix"], "legacySourceLocationId");
