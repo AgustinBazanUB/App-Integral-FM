@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- public/images/legacy-products; then
+          if [ -z "$(git status --porcelain -- public/images/legacy-products)" ]; then
             echo "Las imágenes ya estaban sincronizadas."
           else
             git config user.name "github-actions[bot]"
@@ -63,4 +63,5 @@ jobs:
         run: npm test
 
       - name: Build
+        if: always()
         run: npm run build
