@@ -126,15 +126,33 @@ service cloud.firestore {
           && (action in user.permissions["quick-sales"] || "admin" in user.permissions["quick-sales"]))
       );
     }
-    function locationInventoryPermission(action) {
+    function locationInventoryRoleManager() {
       let user = profile();
       return signedIn() && user.active == true && (
         user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
-        || explicitPermission("locations", action)
       );
+    }
+    function locationInventoryPermission(action) {
+      return locationInventoryRoleManager() || explicitPermission("locations", action);
+    }
+    function validRoleManagedLocationStockMutation(locationId, productId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return locationInventoryRoleManager()
+        && allowedLocation(locationId)
+        && request.resource.data.productId == productId
+        && request.resource.data.currentStock is int
+        && request.resource.data.currentStock >= 0
+        && changed.hasOnly([
+          "productId", "productName", "abbreviation", "presentation",
+          "categoryId", "categoryName", "imageUrl", "thumbUrl",
+          "price", "priceMode", "priceOverride", "masterDefaultPrice",
+          "initialStock", "currentStock", "lastMovementId",
+          "yellowAlertQty", "redAlertQty", "active", "deleted", "deletedAt",
+          "productDeleted", "updatedAt", "updatedBy"
+        ]);
     }
     function warehouseTransferPermission() {
       let user = profile();
@@ -837,7 +855,12 @@ service cloud.firestore {
       allow read, write: if isAdmin();
       match /items/{productId} {
         allow read: if activeUser() && allowedLocation(locationId);
-        allow create: if ((locationInventoryPermission("configureLocationProducts")
+        allow create: if (locationInventoryRoleManager()
+            && allowedLocation(locationId)
+            && request.resource.data.productId == productId
+            && request.resource.data.currentStock is int
+            && request.resource.data.currentStock >= 0)
+          || ((locationInventoryPermission("configureLocationProducts")
               || locationInventoryPermission("loadStock")
               || locationInventoryPermission("adjustStock")
               || warehouseTransferPermission())
@@ -845,7 +868,8 @@ service cloud.firestore {
             && request.resource.data.productId == productId
             && request.resource.data.currentStock is int
             && request.resource.data.currentStock >= 0);
-        allow update: if validSellerStockMutation(locationId, productId)
+        allow update: if validRoleManagedLocationStockMutation(locationId, productId)
+          || validSellerStockMutation(locationId, productId)
           || (warehouseTransferPermission()
             && allowedLocation(locationId)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
