@@ -903,8 +903,8 @@ service cloud.firestore {
       match /items/{productId} {
         allow read: if activeUser() && allowedLocation(locationId);
         allow create: if validOperationalLocationStockCreate(locationId, productId);
-        allow update: if validSellerStockMutation(locationId, productId)
-          || validOperationalLocationStockMutation(locationId, productId);
+        allow update: if validOperationalLocationStockMutation(locationId, productId)
+          || validSellerStockMutation(locationId, productId);
         allow delete: if false;
       }
     }
