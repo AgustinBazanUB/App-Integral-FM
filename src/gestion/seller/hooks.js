@@ -10,6 +10,7 @@ import {
 import {
   listSellerDailySales,
   subscribeSellerLocationStock,
+  subscribeSellerMasterProducts,
 } from "../services/sellerService";
 import { listSellerPendingSales } from "./offlineSales";
 import {
@@ -77,6 +78,33 @@ export function useSellerResources(profile) {
     load: () => loadSellerResourcesShared(profile),
     dependencies: [profile.id, (profile.allowedLocationIds || []).join(",")],
   });
+}
+
+export function useSellerMasterProducts(initialProducts = []) {
+  const [state, setState] = useState(() => ({
+    status: initialProducts.length ? "ready" : "loading",
+    data: initialProducts,
+    error: null,
+  }));
+
+  useEffect(() => {
+    setState((current) => ({
+      ...current,
+      status: current.data?.length ? "ready" : "loading",
+      error: null,
+    }));
+    const unsubscribe = subscribeSellerMasterProducts({
+      onData: (data) => setState({ status: "ready", data, error: null }),
+      onError: (error) => setState((current) => ({
+        status: current.data?.length ? "ready" : "error",
+        data: current.data || [],
+        error,
+      })),
+    });
+    return () => unsubscribe?.();
+  }, []);
+
+  return state;
 }
 
 export function useSellerLocationStock(profile, locationId, masterProducts = []) {
