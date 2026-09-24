@@ -23,6 +23,10 @@ import {
 } from "../../modules/inventory/domain/inventory";
 import { can, normalizedRole } from "../permissions";
 import { db } from "./firebase";
+import {
+  invalidateRuntimeCache,
+  withRuntimeCache,
+} from "./runtimeCache";
 
 const docsToArray = (snapshot) => snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
 const userName = (profile) => profile.name || profile.email || "Usuario";
@@ -34,13 +38,15 @@ function assertPermission(profile, moduleId, action, message) {
 }
 
 async function safeProduct(productId) {
-  try {
-    const snapshot = await getDoc(doc(db, "products", productId));
-    return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
-  } catch (error) {
-    if (error?.code === "permission-denied" || error?.code === "firestore/permission-denied") return null;
-    throw error;
-  }
+  return withRuntimeCache(`inventory-product:${productId}`, async () => {
+    try {
+      const snapshot = await getDoc(doc(db, "products", productId));
+      return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+    } catch (error) {
+      if (error?.code === "permission-denied" || error?.code === "firestore/permission-denied") return null;
+      throw error;
+    }
+  }, 60_000);
 }
 
 async function hydrateInventory(items, type) {
@@ -66,6 +72,9 @@ async function hydrateInventory(items, type) {
     .sort((a, b) => String(a.productName || "").localeCompare(String(b.productName || ""), "es"));
 }
 
+export const hydrateLocationInventoryItems = (items = []) =>
+  hydrateInventory(items, INVENTORY_TYPES.LOCATION);
+
 export async function listMasterProductsForInventory(profile, { includeInactive } = {}) {
   const showInactive = includeInactive ?? ["admin", "general_admin"].includes(normalizedRole(profile));
   const target = showInactive
@@ -89,12 +98,9 @@ function productPayload(values, categoryName, profile, editing) {
   const name = String(values.name || "").trim();
   const productCode = String(values.productCode ?? values.abbreviation ?? "").trim().toUpperCase();
   const defaultPrice = wholeInventoryQuantity(values.defaultPrice || 0, "El precio predeterminado");
-  const yellowAlertQty = wholeInventoryQuantity(values.yellowAlertQty || 0, "La alerta amarilla");
-  const redAlertQty = wholeInventoryQuantity(values.redAlertQty || 0, "La alerta roja");
   if (!name) throw new Error("Ingresá el nombre del producto.");
   if (!productCode) throw new Error("Ingresá un ID del producto.");
   if (productCode.length > 8) throw new Error("El ID del producto admite hasta 8 caracteres.");
-  if (yellowAlertQty < redAlertQty) throw new Error("La alerta amarilla debe ser mayor o igual a la roja.");
   return {
     name,
     nameKey: normalizedText(name),
@@ -105,8 +111,6 @@ function productPayload(values, categoryName, profile, editing) {
     abbreviationKey: normalizedText(productCode),
     description: String(values.description || "").trim(),
     defaultPrice,
-    yellowAlertQty,
-    redAlertQty,
     categoryId: String(values.categoryId || "").trim(),
     categoryName,
     imageUrl: String(values.imageUrl || "").trim(),
@@ -178,6 +182,7 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
     createdAt: serverTimestamp(),
   });
   await batch.commit();
+  invalidateRuntimeCache(`inventory-product:${productRef.id}`);
   return productRef.id;
 }
 
@@ -243,8 +248,9 @@ export async function addProductToLocation({
       masterDefaultPrice: Number(master.defaultPrice || 0),
       initialStock: initial,
       currentStock: initial,
-      yellowAlertQty: Number(master.yellowAlertQty || 0),
-      redAlertQty: Number(master.redAlertQty || 0),
+      // Los umbrales son propios de esta ubicación y nacen sin una regla global.
+      yellowAlertQty: 0,
+      redAlertQty: 0,
       active: true,
       deleted: false,
       deletedAt: null,
@@ -719,8 +725,9 @@ export async function transferStock({ originWarehouse, destination, lines, profi
           masterDefaultPrice: Number(item.product.defaultPrice || 0),
           initialStock: item.quantity,
           currentStock: item.quantity,
-          yellowAlertQty: Number(item.product.yellowAlertQty || 0),
-          redAlertQty: Number(item.product.redAlertQty || 0),
+          // Una ubicación nueva no hereda umbrales del catálogo maestro.
+          yellowAlertQty: 0,
+          redAlertQty: 0,
           active: true,
           deleted: false,
           productDeleted: false,

@@ -6,7 +6,7 @@ import {
   listLocationsShared,
   loadSellerResourcesShared,
 } from "../services/sharedResources";
-import { listLocationInventory } from "../services/inventoryService";
+import { hydrateLocationInventoryItems } from "../services/inventoryService";
 import {
   listSellerDailySales,
   subscribeSellerLocationStock,
@@ -91,10 +91,12 @@ export function useSellerLocationStock(profile, locationId) {
     let hydration = 0;
     setState((current) => ({ ...current, status: current.data?.length ? "ready" : "loading", error: null }));
 
-    const refreshHydratedStock = async () => {
+    const refreshHydratedStock = async (stockItems) => {
       const currentHydration = ++hydration;
       try {
-        const data = (await listLocationInventory(locationId))
+        // El listener ya entregó los documentos de stock. No se vuelven a leer:
+        // sólo se hidratan con el producto maestro (cacheado por ID).
+        const data = (await hydrateLocationInventoryItems(stockItems))
           .filter((item) => item.active !== false && item.masterActive !== false);
         if (!disposed && currentHydration === hydration) {
           setState({ status: "ready", data, error: null });
@@ -116,7 +118,7 @@ export function useSellerLocationStock(profile, locationId) {
     subscribeSellerLocationStock({
       profile,
       locationId,
-      onData: () => refreshHydratedStock(),
+      onData: (items) => refreshHydratedStock(items),
       onError: (error) => !disposed && setState((current) => ({ status: current.data?.length ? "ready" : "error", data: current.data || [], error })),
     })
       .then((cleanup) => {

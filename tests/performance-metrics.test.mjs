@@ -97,6 +97,8 @@ test("la aplicación separa bundles, mantiene vendedor disponible y conserva off
   assert.match(management, /class ManagementErrorBoundary extends Component/);
   assert.doesNotMatch(management, /requestIdleCallback/);
   assert.match(sellerHooks, /getSellerResourcesSharedCached/);
+  assert.match(sellerHooks, /hydrateLocationInventoryItems\(stockItems\)/);
+  assert.doesNotMatch(sellerHooks, /listLocationInventory\(locationId\)/);
   assert.match(sellerHooks, /const current = handlers\.current;/);
   assert.match(sellerHooks, /!current\.enabled/);
   assert.match(sellerHooks, /window\.addEventListener\("keydown", onKeyDown, true\)/);

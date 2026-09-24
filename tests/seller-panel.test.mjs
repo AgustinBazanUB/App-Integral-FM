@@ -19,6 +19,7 @@ import {
   groupSellerProducts,
   keyMatchesEvent,
   pendingReservedQuantities,
+  sellerDailySummary,
   visibleSellerProducts,
 } from "../src/gestion/seller/sellerDomain.js";
 
@@ -136,6 +137,19 @@ test("las ventas pendientes reservan stock local sin afirmarse confirmadas", () 
   assert.deepEqual(reserved, { p1: 3 });
 });
 
+test("el resumen diario incluye ventas, total y efectivo incluso en pagos combinados", () => {
+  const summary = sellerDailySummary([
+    { status: "active", total: 10000, paymentMethod: "cash" },
+    { status: "active", total: 20000, paymentMethod: "debit" },
+    { status: "active", total: 30000, paymentMethod: "multiple", payments: [
+      { method: "cash", amount: 12000 },
+      { method: "credit", amount: 18000 },
+    ] },
+    { status: "cancelled", total: 99999, paymentMethod: "cash" },
+  ]);
+  assert.deepEqual(summary, { count: 3, total: 60000, cash: 22000 });
+});
+
 test("la botonera distingue tecla, código y ubicación física", () => {
   const product = { buttonKey: "1", buttonCode: "Numpad1", buttonLocation: 3 };
   assert.equal(keyMatchesEvent(product, { key: "1", code: "Numpad1", location: 3 }), true);
@@ -184,6 +198,8 @@ test("la interfaz compacta descuentos y prepara ticket sin simular ARCA", async 
   assert.match(panel, />Agregar descuento</);
   assert.match(panel, />Agregar ticket</);
   assert.match(panel, /"Continuar"/);
+  assert.match(panel, /stock digital no alcanza/i);
+  assert.doesNotMatch(panel, /disabled=\{qty >= Number\(product\.availableStock/);
   assert.match(panel, /ticketRequested/);
   assert.match(dialog, />Descuentos disponibles</);
   assert.match(dialog, />Descuento manual</);
@@ -208,7 +224,8 @@ test("la venta guarda creador, fecha local, descuentos desglosados y ticket", as
     "ticketStatus",
   ]) assert.match(service, new RegExp(field));
   assert.match(service, /runTransaction\(db/);
-  assert.match(service, /previousStock < item\.qty/);
+  assert.doesNotMatch(service, /previousStock < item\.qty/);
+  assert.doesNotMatch(service, /newStock < 0.*insufficient/s);
   assert.match(service, /lastMovementId/);
   assert.match(service, /sale\.cancelled/);
   assert.match(service, /sale\.updated/);
