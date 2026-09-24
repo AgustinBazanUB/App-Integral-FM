@@ -123,6 +123,20 @@ before(async () => {
         createdBy: "seller-1",
         lastSaleId: "seed-sale",
       }),
+      setDoc(doc(database, "customers", "customer_dddddddddddddddddddddddddddddddddddddddd"), {
+        customerKey: "customer_dddddddddddddddddddddddddddddddddddddddd",
+        phone: "11 7777-8888",
+        phoneNormalized: "1177778888",
+        name: null,
+        zoneId: "",
+        zoneName: "",
+        customZone: null,
+        active: true,
+        deleted: false,
+        source: "seller_sale",
+        createdBy: "seller-1",
+        lastSaleId: "seed-sale-incomplete",
+      }),
     ]);
   });
 });
@@ -135,6 +149,22 @@ test("el vendedor sólo puede leer ubicaciones asignadas", async () => {
   const database = environment.authenticatedContext("seller-1").firestore();
   await assertSucceeds(getDoc(doc(database, "locations", "loc-1")));
   await assertFails(getDoc(doc(database, "locations", "loc-2")));
+});
+
+test("un administrador no puede crear un depósito como ubicación de venta", async () => {
+  const database = environment.authenticatedContext("admin-1").firestore();
+  await assertFails(setDoc(doc(database, "locations", "invalid-warehouse-location"), {
+    name: "Depósito inválido",
+    type: "warehouse_store",
+    active: true,
+    deleted: false,
+  }));
+  await assertSucceeds(setDoc(doc(database, "locations", "valid-fair-location"), {
+    name: "Feria válida",
+    type: "fair",
+    active: true,
+    deleted: false,
+  }));
 });
 
 test("el vendedor no puede crear ubicaciones", async () => {
@@ -399,6 +429,123 @@ test("cliente nuevo y venta quedan vinculados dentro de la misma operación", as
 
   assert.equal((await getDoc(customerRef)).data().phoneNormalized, "1122223333");
   assert.equal((await getDoc(saleRef)).data().customerId, customerId);
+});
+
+test("un cliente nuevo puede guardarse sólo con teléfono y completarse más adelante", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  const customerId = "customer_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+  const customerRef = doc(database, "customers", customerId);
+  const saleRef = doc(database, "sales", "customer-sale-phone-only");
+
+  await assertSucceeds(runTransaction(database, async (transaction) => {
+    transaction.set(customerRef, {
+      customerKey: customerId,
+      phone: "11 3333-4444",
+      phoneNormalized: "1133334444",
+      name: null,
+      zoneId: "",
+      zoneName: "",
+      customZone: null,
+      active: true,
+      deleted: false,
+      source: "seller_sale",
+      createdBy: "seller-1",
+      createdByName: "Vendedor",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSaleId: saleRef.id,
+      lastPurchaseAt: new Date(),
+    });
+    transaction.set(saleRef, {
+      saleCode: "FM-LOC-20260806-0003",
+      sellerId: "seller-1",
+      sellerName: "Vendedor",
+      locationId: "loc-1",
+      locationName: "Ubicación autorizada",
+      customerId,
+      customerPhoneSnapshot: "11 3333-4444",
+      customerNameSnapshot: null,
+      customerZoneSnapshot: null,
+      status: "active",
+      total: 1000,
+      totalItems: 1,
+      items: [{ productId: "product-1", name: "Producto", qty: 1, unitPrice: 1000, subtotal: 1000 }],
+      paymentMethod: "cash",
+      paymentMethodLabel: "Pago eft",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }));
+
+  assert.equal((await getDoc(customerRef)).data().zoneName, "");
+});
+
+test("el vendedor puede completar nombre y zona faltantes sin sobrescribir datos existentes", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  const customerId = "customer_dddddddddddddddddddddddddddddddddddddddd";
+  const customerRef = doc(database, "customers", customerId);
+  const saleRef = doc(database, "sales", "customer-sale-complete");
+
+  await assertSucceeds(runTransaction(database, async (transaction) => {
+    transaction.update(customerRef, {
+      name: "Cliente completado",
+      zoneId: "zone-active",
+      zoneName: "Zona Norte",
+      customZone: "",
+      lastSaleId: saleRef.id,
+      lastPurchaseAt: new Date(),
+      updatedAt: new Date(),
+    });
+    transaction.set(saleRef, {
+      saleCode: "FM-LOC-20260806-0004",
+      sellerId: "seller-1",
+      sellerName: "Vendedor",
+      locationId: "loc-1",
+      locationName: "Ubicación autorizada",
+      customerId,
+      customerPhoneSnapshot: "11 7777-8888",
+      customerNameSnapshot: "Cliente completado",
+      customerZoneSnapshot: "Zona Norte",
+      status: "active",
+      total: 1000,
+      totalItems: 1,
+      items: [{ productId: "product-1", name: "Producto", qty: 1, unitPrice: 1000, subtotal: 1000 }],
+      paymentMethod: "cash",
+      paymentMethodLabel: "Pago eft",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }));
+  const customer = await getDoc(customerRef);
+  assert.equal(customer.data().name, "Cliente completado");
+  assert.equal(customer.data().zoneName, "Zona Norte");
+
+  const protectedCustomer = doc(database, "customers", "customer_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  const protectedSale = doc(database, "sales", "customer-sale-overwrite");
+  await assertFails(runTransaction(database, async (transaction) => {
+    transaction.update(protectedCustomer, {
+      name: "Nombre sobrescrito",
+      lastSaleId: protectedSale.id,
+      lastPurchaseAt: new Date(),
+      updatedAt: new Date(),
+    });
+    transaction.set(protectedSale, {
+      saleCode: "FM-LOC-20260806-0005",
+      sellerId: "seller-1",
+      sellerName: "Vendedor",
+      locationId: "loc-1",
+      locationName: "Ubicación autorizada",
+      customerId: "customer_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      status: "active",
+      total: 1000,
+      totalItems: 1,
+      items: [{ productId: "product-1", name: "Producto", qty: 1, unitPrice: 1000, subtotal: 1000 }],
+      paymentMethod: "cash",
+      paymentMethodLabel: "Pago eft",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }));
 });
 
 test("el vendedor no puede crear un cliente sin una venta vinculada", async () => {
