@@ -249,8 +249,6 @@ async function run() {
         abbreviationKey: norm(code),
         description: strip(source.description),
         defaultPrice: nonNegative(source.defaultPrice ?? source.price, target?.defaultPrice ?? 0),
-        yellowAlertQty: nonNegative(source.yellowAlertQty, target?.yellowAlertQty ?? 0),
-        redAlertQty: nonNegative(source.redAlertQty, target?.redAlertQty ?? 0),
         categoryId: targetCategoryId,
         categoryName: targetCategory?.name || strip(source.categoryName) || "Sin categoría",
         imageUrl: rewriteAsset(source.imageUrl) || target?.imageUrl || "",
@@ -431,8 +429,9 @@ async function run() {
             priceOverride: useDefault ? null : sourcePrice,
             price: sourcePrice,
             masterDefaultPrice: defaultPrice,
-            yellowAlertQty: nonNegative(item.yellowAlertQty, product.yellowAlertQty ?? 0),
-            redAlertQty: nonNegative(item.redAlertQty, product.redAlertQty ?? 0),
+            // Los umbrales se conservan sólo si existían en esta ubicación de origen.
+            yellowAlertQty: nonNegative(item.yellowAlertQty, 0),
+            redAlertQty: nonNegative(item.redAlertQty, 0),
           }, { merge: true });
           stats.locationStockItems += 1;
         }
