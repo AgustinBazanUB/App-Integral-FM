@@ -70,6 +70,13 @@ before(async () => {
         active: true,
         deleted: false,
       }),
+      setDoc(doc(database, "locationStock", "loc-1", "items", "product-negative"), {
+        productId: "product-negative",
+        productName: "Producto con diferencia física",
+        currentStock: 0,
+        active: true,
+        deleted: false,
+      }),
       setDoc(doc(database, "locationStock", "loc-2", "items", "product-1"), {
         productId: "product-1",
         productName: "Producto ajeno",
@@ -210,6 +217,56 @@ test("una venta válida actualiza venta, movimiento y stock en la misma transacc
 
   assert.equal((await getDoc(stockRef)).data().currentStock, 4);
   assert.equal((await getDoc(saleRef)).data().sellerId, "seller-1");
+});
+
+test("una venta física válida puede dejar stock digital negativo sin habilitar ajustes libres", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  const saleRef = doc(database, "sales", "seller-sale-negative-1");
+  const movementRef = doc(database, "stockMovements", "seller-movement-negative-1");
+  const stockRef = doc(database, "locationStock", "loc-1", "items", "product-negative");
+
+  await assertSucceeds(runTransaction(database, async (transaction) => {
+    const stock = await transaction.get(stockRef);
+    const previousStock = stock.data().currentStock;
+    const newStock = previousStock - 1;
+    transaction.set(saleRef, {
+      saleCode: "FM-LOC-20260923-NEG1",
+      sellerId: "seller-1",
+      sellerName: "Vendedor",
+      locationId: "loc-1",
+      locationName: "Ubicación autorizada",
+      status: "active",
+      total: 1000,
+      totalItems: 1,
+      items: [{ productId: "product-negative", name: "Producto con diferencia física", qty: 1, unitPrice: 1000, subtotal: 1000 }],
+      paymentMethod: "cash",
+      paymentMethodLabel: "Pago eft",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    transaction.set(movementRef, {
+      locationId: "loc-1",
+      productId: "product-negative",
+      type: "sale",
+      qty: -1,
+      previousStock,
+      newStock,
+      reason: "Venta física con stock digital agotado",
+      userId: "seller-1",
+      userName: "Vendedor",
+      saleId: saleRef.id,
+      createdAt: new Date(),
+    });
+    transaction.update(stockRef, {
+      currentStock: newStock,
+      lastSaleId: saleRef.id,
+      lastMovementId: movementRef.id,
+      updatedAt: new Date(),
+    });
+  }));
+
+  assert.equal((await getDoc(stockRef)).data().currentStock, -1);
+  await assertFails(updateDoc(stockRef, { currentStock: -2, updatedAt: new Date() }));
 });
 
 test("la anulación conserva la venta y devuelve el stock de forma atómica", async () => {
