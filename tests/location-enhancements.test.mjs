@@ -65,3 +65,21 @@ test("los valores de stock usan texto oscuro y controles táctiles", () => {
   assert.match(styles, /min-height: 44px/);
   assert.match(styles, /@media \(max-width: 768px\)/);
 });
+
+
+test("las ubicaciones nuevas se limitan a Local, Feria o Evento y los depósitos legacy no entran al vendedor", () => {
+  const permissions = read("src/gestion/permissions.js");
+  const management = read("src/gestion/services/locationManagementService.js");
+  const rules = read("firestore.rules");
+  assert.match(locationsPage, /sellableLocationTypeOptions = \["store", "fair", "event"\]/);
+  assert.match(management, /supportedTypes = new Set\(\["store", "fair", "event"\]\)/);
+  assert.match(permissions, /location\?\.type !== "warehouse_store"/);
+  assert.match(rules, /sellableLocationType/);
+});
+
+test("la asignación de una ubicación contempla vendedores y administradores activos", () => {
+  const management = read("src/gestion/services/locationManagementService.js");
+  assert.match(management, /new Set\(\["seller", "admin", "general_admin"\]\)/);
+  assert.match(management, /user\.active === true/);
+  assert.match(detailPage, /Asignar vendedor/);
+});
