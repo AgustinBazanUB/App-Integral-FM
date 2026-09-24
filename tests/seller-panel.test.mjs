@@ -50,6 +50,7 @@ const locations = [
   { id: "loc-2", name: "Feria", active: true, deleted: false },
   { id: "loc-3", name: "Pausada", active: false, deleted: false },
   { id: "loc-4", name: "Eliminada", active: true, deleted: true },
+  { id: "warehouse-legacy", name: "Depósito legacy", type: "warehouse_store", active: true, deleted: false },
 ];
 
 test("un vendedor puro accede al Panel Vendedor y no al administrativo", () => {
@@ -258,6 +259,38 @@ test("stock, navegación y venta actual tienen reglas responsive compactas", asy
   assert.match(css, /@media \(max-width: 360px\)/);
   assert.match(css, /min-height: 44px/);
   assert.doesNotMatch(css, /width:\s*100vw/);
+});
+
+
+
+test("el Panel Vendedor precarga catálogo maestro y evita lecturas N+1 por producto", async () => {
+  const shared = await read("../src/gestion/services/sharedResources.js");
+  const hooks = await read("../src/gestion/seller/hooks.js");
+  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
+  assert.match(shared, /listMasterProductsShared\(profile\)/);
+  assert.match(shared, /products,/);
+  assert.match(hooks, /mergeLocationInventoryItem/);
+  assert.doesNotMatch(hooks, /listLocationInventory/);
+  assert.match(panel, /useSellerLocationStock\(profile, locationId, masterProducts\)/);
+});
+
+test("la creación online usa un identificador idempotente para evitar ventas duplicadas", async () => {
+  const service = await read("../src/gestion/services/sellerService.js");
+  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
+  assert.match(service, /requestId = ""/);
+  assert.match(service, /online_\$\{seller\.id\}_\$\{safeRequestId\}/);
+  assert.match(service, /clientRequestId: refs\.requestId/);
+  assert.match(service, /alreadySynced: true/);
+  assert.match(panel, /saleAttemptId = useRef\("")/);
+  assert.match(panel, /requestId: saleAttemptId\.current/);
+});
+
+test("el flujo del vendedor respeta descuentos, métricas diarias y precios por categorías", async () => {
+  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
+  assert.match(panel, /disabled=\{!currentItems\.length\}.*Agregar descuento/s);
+  assert.match(panel, /Efectivo \{formatMoney\(cashTotal\)\}/);
+  assert.match(panel, /<details key=\{group\.id\} className="fm-seller-price-category">/);
+  assert.match(panel, /Teléfono obligatorio · nombre y zona opcionales/);
 });
 
 test("las reglas vinculan stock con venta y movimiento de la misma transacción", async () => {
