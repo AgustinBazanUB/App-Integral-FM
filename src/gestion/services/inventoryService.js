@@ -23,6 +23,10 @@ import {
 } from "../../modules/inventory/domain/inventory";
 import { can, normalizedRole } from "../permissions";
 import { db } from "./firebase";
+import {
+  invalidateRuntimeCache,
+  withRuntimeCache,
+} from "./runtimeCache";
 
 const docsToArray = (snapshot) => snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
 const userName = (profile) => profile.name || profile.email || "Usuario";
@@ -34,13 +38,15 @@ function assertPermission(profile, moduleId, action, message) {
 }
 
 async function safeProduct(productId) {
-  try {
-    const snapshot = await getDoc(doc(db, "products", productId));
-    return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
-  } catch (error) {
-    if (error?.code === "permission-denied" || error?.code === "firestore/permission-denied") return null;
-    throw error;
-  }
+  return withRuntimeCache(`inventory-product:${productId}`, async () => {
+    try {
+      const snapshot = await getDoc(doc(db, "products", productId));
+      return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+    } catch (error) {
+      if (error?.code === "permission-denied" || error?.code === "firestore/permission-denied") return null;
+      throw error;
+    }
+  }, 60_000);
 }
 
 async function hydrateInventory(items, type) {
@@ -65,6 +71,9 @@ async function hydrateInventory(items, type) {
     })
     .sort((a, b) => String(a.productName || "").localeCompare(String(b.productName || ""), "es"));
 }
+
+export const hydrateLocationInventoryItems = (items = []) =>
+  hydrateInventory(items, INVENTORY_TYPES.LOCATION);
 
 export async function listMasterProductsForInventory(profile, { includeInactive } = {}) {
   const showInactive = includeInactive ?? ["admin", "general_admin"].includes(normalizedRole(profile));
@@ -173,6 +182,7 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
     createdAt: serverTimestamp(),
   });
   await batch.commit();
+  invalidateRuntimeCache(`inventory-product:${productRef.id}`);
   return productRef.id;
 }
 
