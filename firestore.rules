@@ -228,6 +228,9 @@ service cloud.firestore {
       return !("deleted" in request.resource.data)
         || request.resource.data.deleted is bool;
     }
+    function sellableLocationType(data) {
+      return data.type in ["store", "fair", "event"];
+    }
     function customerKeyShape(customerId) {
       return customerId is string
         && customerId.size() == 49
@@ -752,10 +755,12 @@ service cloud.firestore {
     }
     match /locations/{locationId} {
       allow read: if isAdmin() || (canModule("locations", "view") && allowedLocation(locationId));
-      allow create: if canModule("locations", "create");
+      allow create: if canModule("locations", "create")
+        && sellableLocationType(request.resource.data);
       allow update: if isAdmin()
         || (canModule("locations", "edit")
           && allowedLocation(locationId)
+          && (request.resource.data.type == resource.data.type || sellableLocationType(request.resource.data))
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "name", "type", "codePrefix", "dniMode", "active",
             "scheduleStartAt", "scheduleEndAt", "startDateTime", "endDateTime",
