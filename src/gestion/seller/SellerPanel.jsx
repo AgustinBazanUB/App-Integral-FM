@@ -219,6 +219,7 @@ export default function SellerPanel() {
   const [deletePendingTarget, setDeletePendingTarget] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const autoSyncAttempted = useRef(false);
+  const submitLockRef = useRef(false);
 
   const closeCancelDialog = useCallback(() => {
     setCancelTarget(null);
@@ -428,7 +429,9 @@ export default function SellerPanel() {
   }, [selectedLocation, profile, currentItems, appliedDiscounts, summary.total, paymentMethod, payments, selectedCustomer, ticketRequested, pendingSales, resetSale]);
 
   const submitSale = useCallback(async () => {
-    if (submitState.busy) return;
+    // Bloqueo síncrono: evita una segunda transacción aunque dos eventos de
+    // teclado/click entren antes de que React alcance a reflejar loading=true.
+    if (submitLockRef.current || submitState.busy) return;
     if (!selectedLocation) {
       setSubmitState({ busy: false, tone: "error", message: "Elegí una ubicación activa." });
       return;
@@ -456,6 +459,7 @@ export default function SellerPanel() {
       setSubmitState({ busy: false, tone: "error", message: "Necesitás conexión para editar una venta confirmada." });
       return;
     }
+    submitLockRef.current = true;
     setSubmitState({ busy: true, tone: "info", message: online ? "Registrando venta…" : "Guardando pendiente…" });
     try {
       if (!online) {
@@ -481,6 +485,8 @@ export default function SellerPanel() {
       setSubmitState({ busy: false, tone: "success", message: `${result.saleCode} registrada correctamente.` });
     } catch (error) {
       setSubmitState({ busy: false, tone: "error", message: error.message });
+    } finally {
+      submitLockRef.current = false;
     }
   }, [submitState.busy, selectedLocation, currentItems, paymentMethod, payments, summary.total, selectedCustomer, ticketRequested, ticketAllowed, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales]);
 
