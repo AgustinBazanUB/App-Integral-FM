@@ -14,6 +14,7 @@ import { saveMasterProduct } from "../services/inventoryService";
 const emptyForm = {
   name: "",
   abbreviation: "",
+  presentation: "",
   categoryId: "",
   description: "",
   defaultPrice: 0,
@@ -32,6 +33,7 @@ function initialForm(product) {
     ...emptyForm,
     name: product.name || product.productName || "",
     abbreviation: product.abbreviation || "",
+    presentation: product.presentation || "",
     categoryId: product.categoryId || "",
     description: product.description || "",
     defaultPrice: Number(product.defaultPrice || 0),
@@ -129,6 +131,9 @@ export default function ProductForm({ open, product, categories, profile, onClos
         </FormField>
         <FormField label="Abreviación" hint="Hasta 8 caracteres." required>
           <input maxLength="8" value={form.abbreviation} onChange={(event) => setForm({ ...form, abbreviation: event.target.value.toUpperCase() })} />
+        </FormField>
+        <FormField label="Variante / presentación" hint="Opcional. Ej.: 500 ml, Arbequina, 1 kg.">
+          <input value={form.presentation} onChange={(event) => setForm({ ...form, presentation: event.target.value })} />
         </FormField>
         <FormField label="Categoría">
           <Select value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
