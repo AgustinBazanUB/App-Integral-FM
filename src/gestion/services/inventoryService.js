@@ -89,12 +89,9 @@ function productPayload(values, categoryName, profile, editing) {
   const name = String(values.name || "").trim();
   const abbreviation = String(values.abbreviation || "").trim().toUpperCase();
   const defaultPrice = wholeInventoryQuantity(values.defaultPrice || 0, "El precio predeterminado");
-  const yellowAlertQty = wholeInventoryQuantity(values.yellowAlertQty || 0, "La alerta amarilla");
-  const redAlertQty = wholeInventoryQuantity(values.redAlertQty || 0, "La alerta roja");
   if (!name) throw new Error("Ingresá el nombre del producto.");
   if (!abbreviation) throw new Error("Ingresá una abreviación.");
   if (abbreviation.length > 8) throw new Error("La abreviación admite hasta 8 caracteres.");
-  if (yellowAlertQty < redAlertQty) throw new Error("La alerta amarilla debe ser mayor o igual a la roja.");
   return {
     name,
     nameKey: normalizedText(name),
@@ -102,8 +99,6 @@ function productPayload(values, categoryName, profile, editing) {
     abbreviationKey: normalizedText(abbreviation),
     description: String(values.description || "").trim(),
     defaultPrice,
-    yellowAlertQty,
-    redAlertQty,
     categoryId: String(values.categoryId || "").trim(),
     categoryName,
     imageUrl: String(values.imageUrl || "").trim(),
@@ -239,8 +234,8 @@ export async function addProductToLocation({
       masterDefaultPrice: Number(master.defaultPrice || 0),
       initialStock: initial,
       currentStock: initial,
-      yellowAlertQty: Number(master.yellowAlertQty || 0),
-      redAlertQty: Number(master.redAlertQty || 0),
+      yellowAlertQty: 0,
+      redAlertQty: 0,
       active: true,
       deleted: false,
       deletedAt: null,
