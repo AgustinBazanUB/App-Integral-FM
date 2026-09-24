@@ -194,7 +194,7 @@ service cloud.firestore {
         "productId", "productName", "abbreviation", "presentation",
         "categoryId", "categoryName", "imageUrl", "thumbUrl",
         "price", "priceMode", "priceOverride", "masterDefaultPrice",
-        "initialStock", "currentStock", "lastMovementId",
+        "initialStock", "currentStock", "lastSaleId", "lastMovementId",
         "yellowAlertQty", "redAlertQty", "active", "deleted", "deletedAt",
         "productDeleted", "updatedAt", "updatedBy"
       ]);
