@@ -218,6 +218,7 @@ export default function SellerPanel() {
   const [deletePendingTarget, setDeletePendingTarget] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const autoSyncAttempted = useRef(false);
+  const saleAttemptId = useRef("");
 
   const closeCancelDialog = useCallback(() => {
     setCancelTarget(null);
@@ -347,6 +348,7 @@ export default function SellerPanel() {
     setCustomerOpen(false);
     setLastProductId("");
     setEditSale(null);
+    saleAttemptId.current = "";
   }, []);
 
   const changeQuantity = useCallback((product, amount) => {
@@ -466,6 +468,10 @@ export default function SellerPanel() {
         await savePending();
         return;
       }
+      if (!editSale && !saleAttemptId.current) {
+        const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)`;
+        saleAttemptId.current = `sale_${random.replace(/[^A-Za-z0-9_-]/g, "")`;
+      }
       const common = {
         profile,
         items: currentItems,
@@ -478,7 +484,7 @@ export default function SellerPanel() {
       };
       const result = editSale
         ? await updateSellerSale({ ...common, saleId: editSale.id })
-        : await createSellerSale({ ...common, location: selectedLocation });
+        : await createSellerSale({ ...common, location: selectedLocation, requestId: saleAttemptId.current });
       resetSale();
       await dailySales.refresh();
       setReceipt(result);
@@ -716,14 +722,14 @@ export default function SellerPanel() {
               <article key={item.id} className={item.qty > item.stock ? "has-error" : ""}>
                 <img src={item.imageUrl} alt="" loading="lazy" decoding="async" />
                 <div><strong>{item.abbreviation || item.name}</strong><small>{formatMoney(item.price)} c/u · {formatMoney(item.qty * item.price)}</small></div>
-                <div className="fm-quantity-control"><button type="button" aria-label={`Quitar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, -1)}><Icon name="Minus" /></button><output aria-label={`Cantidad de ${item.name}`}>{item.qty}</output><button type="button" aria-label={`Agregar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, 1)} disabled={item.qty >= item.stock}><Icon name="Plus" /></button></div>
+                <div className="fm-quantity-control"><button type="button" aria-label={`Quitar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, -1)}><Icon name="Minus" /></button><output aria-label={`Cantidad de ${item.name}`}>{item.qty}</output><button type="button" aria-label={`Agregar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, 1)}><Icon name="Plus" /></button></div>
                 <button type="button" className="fm-seller-line-remove" aria-label={`Eliminar ${item.name} del carrito`} onClick={() => setCart((current) => { const next = { ...current }; delete next[item.id]; return next; })}><Icon name="X" /></button>
               </article>
             )) : <p className="fm-seller-cart-empty">Tocá un producto o usá la botonera para comenzar.</p>}
           </div>
 
           <div className="fm-seller-discount-summary">
-            <div className="fm-seller-section-head"><strong>Descuentos</strong><button type="button" onClick={() => setDiscountOpen(true)}><Icon name="Percent" />Agregar descuento</button></div>
+            <div className="fm-seller-section-head"><strong>Descuentos</strong><button type="button" disabled={!currentItems.length} onClick={() => setDiscountOpen(true)}><Icon name="Percent" />Agregar descuento</button></div>
             {summary.discounts.length ? summary.discounts.map((discount, index) => <div key={`${discount.discountId}-${discount.type}-${discount.value}-${index}`} className="fm-seller-applied-discount"><span><strong>{discount.name}</strong><small>{discount.type === "percent" ? `${discount.value} %` : "Monto fijo"}</small></span><strong>− {formatMoney(discount.amountApplied)}</strong><button type="button" aria-label={`Quitar ${discount.name}`} onClick={() => removeDiscount(discount)}><Icon name="X" /></button></div>) : <span className="fm-seller-no-discount">Sin descuentos aplicados</span>}
             {summary.discounts.length ? <div className="fm-seller-discount-total"><span>Total descuentos</span><strong>− {formatMoney(summary.discountTotal)}</strong></div> : null}
           </div>
@@ -751,7 +757,7 @@ export default function SellerPanel() {
             ) : (
               <button type="button" className="fm-seller-add-customer" onClick={() => setCustomerOpen(true)}>
                 <Icon name="UserPlus" />
-                <span><strong>Agregar cliente</strong><small>Teléfono · zona · nombre opcional</small></span>
+                <span><strong>Agregar cliente</strong><small>Teléfono obligatorio · nombre y zona opcionales</small></span>
                 <Icon name="ChevronRight" />
               </button>
             )}
@@ -777,7 +783,20 @@ export default function SellerPanel() {
       <div className="fm-seller-view-head"><div><h1>Mis ventas de hoy</h1><p>{selectedLocation?.name || "Ubicación"}</p></div><Button icon="ShoppingCart" onClick={() => setView("sale")}>Nueva venta</Button></div>
       {dailySales.status === "loading" ? <Skeleton lines={5} /> : null}
       {dailySales.status === "error" ? <Toast tone="error">{dailySales.error.message}</Toast> : null}
-      <div className="fm-seller-sales-summary"><span>Monto activo</span><strong>{formatMoney(salesData.filter((sale) => sale.status === "active").reduce((sum, sale) => sum + Number(sale.total || 0), 0))}</strong><small>{salesData.filter((sale) => sale.status === "active").length} ventas activas</small></div>
+      {(() => {
+        const activeSales = salesData.filter((sale) => sale.status === "active");
+        const activeTotal = activeSales.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
+        const cashTotal = activeSales.reduce((sum, sale) => {
+          if (sale.paymentMethod === "cash") return sum + Number(sale.total || 0);
+          if (sale.paymentMethod === "multiple") {
+            return sum + asArray(sale.payments)
+              .filter((payment) => payment.method === "cash")
+              .reduce((paymentSum, payment) => paymentSum + Number(payment.amount || 0), 0);
+          }
+          return sum;
+        }, 0);
+        return <div className="fm-seller-sales-summary"><span>Ventas de hoy</span><strong>{formatMoney(activeTotal)}</strong><small>{activeSales.length} ventas activas · Efectivo {formatMoney(cashTotal)}</small></div>;
+      })()}
       <div className="fm-seller-sale-list">{salesData.length ? salesData.map((sale) => <button key={sale.id} type="button" onClick={() => setDetailSale(sale)}><div><strong>{sale.saleCode}</strong><Badge tone={statusTone(sale.status)}>{sale.status === "cancelled" ? "Anulada" : "Activa"}</Badge></div><span>{formatMoney(sale.total)}</span><small>{formatDateTime(sale.createdAt)}</small></button>) : <EmptyState icon="ReceiptText" title="Todavía no registraste ventas" description="Las ventas confirmadas de esta ubicación aparecerán aquí." />}</div>
     </div>
   );
@@ -795,7 +814,7 @@ export default function SellerPanel() {
   );
 
   const pricesView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Lista de precios</h1><p>Consulta rápida por categorías</p></div></div>{productGroups.map((group) => <section key={group.id} className="fm-seller-price-category"><h2>{group.name}</h2>{group.items.map((product) => <article key={product.id}><div><strong>{product.productName}</strong><span>{product.abbreviation}</span></div><div><strong>{formatMoney(product.price)}</strong><small>Stock {product.availableStock}</small></div></article>)}</section>)}</div>
+    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Lista de precios</h1><p>Consulta rápida por categorías</p></div></div>{productGroups.map((group) => <details key={group.id} className="fm-seller-price-category"><summary><strong>{group.name}</strong><span>{group.items.length} producto{group.items.length === 1 ? "" : "s"}</span></summary>{group.items.map((product) => <article key={product.id}><div><strong>{product.productName}</strong><span>{product.abbreviation}</span></div><div><strong>{formatMoney(product.price)}</strong><small>Stock {product.availableStock}</small></div></article>)}</details>)}</div>
   );
 
   const helpView = (
