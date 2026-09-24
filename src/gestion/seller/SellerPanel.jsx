@@ -277,11 +277,9 @@ export default function SellerPanel() {
   );
   const products = useMemo(() => stockData.map((item) => ({
     ...item,
-    availableStock: Math.max(
-      0,
+    availableStock:
       Number(item.currentStock || 0) - Number(reserved[item.id] || 0) +
       Number(editSale?.items?.find((old) => old.productId === item.id)?.qty || 0),
-    ),
   })), [stockData, reserved, editSale]);
   const productGroups = useMemo(
     () => groupSellerProducts(products, categories),
@@ -361,8 +359,11 @@ export default function SellerPanel() {
         return next;
       }
       if (nextQty > Number(product.availableStock || 0)) {
-        setSubmitState({ busy: false, tone: "error", message: `${product.productName || product.name}: sólo quedan ${product.availableStock ?? product.stock} unidades disponibles.` });
-        return current;
+        setSubmitState({
+          busy: false,
+          tone: "warning",
+          message: `${product.productName || product.name}: el stock digital disponible es ${product.availableStock ?? product.stock}. La venta puede continuar y dejar stock negativo para corregirlo después.`,
+        });
       }
       return {
         ...current,
@@ -440,10 +441,6 @@ export default function SellerPanel() {
       setSubmitState({ busy: false, tone: "error", message: "La venta está vacía." });
       return;
     }
-    if (hasStockConflict) {
-      setSubmitState({ busy: false, tone: "error", message: "El stock cambió. Corregí los productos marcados." });
-      return;
-    }
     if (!paymentMethod) {
       setSubmitState({ busy: false, tone: "error", message: "Elegí una forma de pago." });
       return;
@@ -489,7 +486,7 @@ export default function SellerPanel() {
     } catch (error) {
       setSubmitState({ busy: false, tone: "error", message: error.message });
     }
-  }, [submitState.busy, selectedLocation, currentItems, hasStockConflict, paymentMethod, payments, summary.total, selectedCustomer, ticketRequested, ticketAllowed, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales]);
+  }, [submitState.busy, selectedLocation, currentItems, paymentMethod, payments, summary.total, selectedCustomer, ticketRequested, ticketAllowed, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales]);
 
   const actionShortcuts = useMemo(() => SELLER_ACTION_SHORTCUTS.map((action) => ({
     ...action,
@@ -695,7 +692,7 @@ export default function SellerPanel() {
                     {group.items.map((product) => {
                       const qty = Number(cart[product.id]?.qty || 0);
                       return (
-                        <button key={product.id} type="button" className={qty ? "is-selected" : ""} onClick={() => addProduct(product)} disabled={qty >= Number(product.availableStock || 0)}>
+                        <button key={product.id} type="button" className={qty ? "is-selected" : ""} onClick={() => addProduct(product)}>
                           {product.buttonKey || product.buttonLabel ? <span className="fm-seller-key">{product.buttonLabel || product.buttonKey}</span> : null}
                           <img src={sellerImage(product)} alt="" loading="lazy" decoding="async" />
                           <strong>{product.abbreviation || product.productName}</strong>
@@ -766,8 +763,9 @@ export default function SellerPanel() {
             <span><strong>Agregar ticket</strong><small>{ticketRequested ? "Solicitud pendiente al registrar" : "Preparado para futura integración ARCA"}</small></span>
           </label>
 
+          {hasStockConflict ? <Toast tone="warning">El carrito supera el stock digital disponible en uno o más productos. Podés continuar si verificaste que la mercadería existe físicamente; el stock quedará negativo hasta que un administrador lo ajuste.</Toast> : null}
           {submitState.message ? <Toast tone={submitState.tone}>{submitState.message}</Toast> : null}
-          <div className="fm-seller-sticky-action"><div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div><Button icon="Check" loading={submitState.busy} disabled={!currentItems.length || !paymentMethod || hasStockConflict || !selectedLocation} onClick={submitSale} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Continuar" : "Guardar pendiente"}</Button></div>
+          <div className="fm-seller-sticky-action"><div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div><Button icon="Check" loading={submitState.busy} disabled={!currentItems.length || !paymentMethod || !selectedLocation} onClick={submitSale} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Continuar" : "Guardar pendiente"}</Button></div>
         </Panel>
       </aside>
     </div>
