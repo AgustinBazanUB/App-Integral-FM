@@ -9,6 +9,7 @@ import {
   setDoc,
   writeBatch,
 } from "firebase/firestore";
+import { PRICE_MODES } from "../../modules/inventory/domain/inventory";
 import { locationActivity } from "../../modules/locations/domain/locations";
 import { can, normalizedRole } from "../permissions";
 import { db } from "./firebase";
@@ -110,15 +111,12 @@ export async function saveMasterProductFromLocation({
   }
 
   const name = String(values.name || "").trim();
-  const abbreviation = String(values.abbreviation || "").trim().toUpperCase();
+  const productCode = String(values.productCode ?? values.abbreviation ?? "").trim().toUpperCase();
   const description = String(values.description || "").trim();
   const defaultPrice = integer(values.defaultPrice || 0, "El precio predeterminado");
-  const yellowAlertQty = integer(values.yellowAlertQty || 0, "La alerta amarilla");
-  const redAlertQty = integer(values.redAlertQty || 0, "La alerta roja");
   if (!name) throw new Error("Ingresá el nombre del producto.");
-  if (!abbreviation) throw new Error("Ingresá una abreviación.");
-  if (abbreviation.length > 8) throw new Error("La abreviación admite hasta 8 caracteres.");
-  if (yellowAlertQty < redAlertQty) throw new Error("La alerta amarilla debe ser mayor o igual a la roja.");
+  if (!productCode) throw new Error("Ingresá un ID del producto.");
+  if (productCode.length > 8) throw new Error("El ID del producto admite hasta 8 caracteres.");
 
   const imageUrl = safeImagePath(values.imageUrl);
   const thumbUrl = safeImagePath(values.thumbUrl || values.imageUrl);
@@ -136,16 +134,20 @@ export async function saveMasterProductFromLocation({
   const duplicate = productsSnapshot.docs.find((item) => {
     if (item.id === productId || item.data().deleted === true) return false;
     return normalizedText(item.data().name) === normalizedText(name)
-      || normalizedText(item.data().abbreviation) === normalizedText(abbreviation);
+      || normalizedText(item.data().productCode || item.data().abbreviation) === normalizedText(productCode);
   });
-  if (duplicate) throw new Error("Ya existe un producto con ese nombre o abreviación.");
+  if (duplicate) throw new Error("Ya existe un producto con ese nombre o ID del producto.");
 
   const productRef = productId ? doc(db, "products", productId) : doc(collection(db, "products"));
   const batch = writeBatch(db);
   const productPayload = {
     name,
     nameKey: normalizedText(name),
-    abbreviation,
+    productCode,
+    productCodeKey: normalizedText(productCode),
+    // Alias legacy para ventas e inventarios históricos.
+    abbreviation: productCode,
+    abbreviationKey: normalizedText(productCode),
     description,
     defaultPrice,
     categoryId,
@@ -191,16 +193,20 @@ export async function saveMasterProductFromLocation({
         {
           productId: productRef.id,
           productName: name,
-          abbreviation,
+          productCode,
+          abbreviation: productCode,
           categoryId,
           categoryName,
           imageUrl,
           thumbUrl,
+          priceMode: PRICE_MODES.DEFAULT,
+          priceOverride: null,
           price: defaultPrice,
+          masterDefaultPrice: defaultPrice,
           initialStock: 0,
           currentStock: 0,
-          yellowAlertQty,
-          redAlertQty,
+          yellowAlertQty: 0,
+          redAlertQty: 0,
           active: values.active !== false,
           deleted: false,
           productDeleted: false,
