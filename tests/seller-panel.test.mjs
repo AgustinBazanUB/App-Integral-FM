@@ -167,6 +167,12 @@ test("+2 pagos exige montos no negativos y suma exacta", () => {
   );
 });
 
+test("el Panel Vendedor advierte pero no bloquea ventas fuera del calendario programado", async () => {
+  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
+  assert.match(panel, /outsideProgrammedSchedule/);
+  assert.match(panel, /La venta se registrará igualmente/);
+});
+
 test("la ruta y el cambio entre paneles conservan la misma sesión", async () => {
   const app = await read("../src/gestion/ManagementApp.jsx");
   const shell = await read("../src/gestion/ManagementShell.jsx");
