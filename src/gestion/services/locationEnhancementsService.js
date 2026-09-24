@@ -13,6 +13,7 @@ import { PRICE_MODES } from "../../modules/inventory/domain/inventory";
 import { locationActivity } from "../../modules/locations/domain/locations";
 import { can, normalizedRole } from "../permissions";
 import { db } from "./firebase";
+import { invalidateRuntimeCache } from "./runtimeCache";
 import {
   loadLocationStock,
   saveLocationDiscounts,
@@ -240,6 +241,7 @@ export async function saveMasterProductFromLocation({
     createdAt: serverTimestamp(),
   });
   await batch.commit();
+  invalidateRuntimeCache(`inventory-product:${productRef.id}`);
   return { id: productRef.id, targetLocationIds: targetLocations.map((item) => item.id) };
 }
 
