@@ -101,6 +101,19 @@ export function cartQuantity(cart = {}) {
   return cartItems(cart).reduce((sum, item) => sum + Number(item.qty || 0), 0);
 }
 
+export function sellerDailySummary(sales = []) {
+  const activeSales = (sales || []).filter((sale) => sale?.status === "active");
+  const total = activeSales.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
+  const cash = activeSales.reduce((sum, sale) => {
+    if (sale.paymentMethod === "cash") return sum + Number(sale.total || 0);
+    if (sale.paymentMethod !== "multiple") return sum;
+    return sum + (sale.payments || [])
+      .filter((payment) => payment?.method === "cash")
+      .reduce((cashTotal, payment) => cashTotal + Number(payment.amount || 0), 0);
+  }, 0);
+  return { count: activeSales.length, total, cash };
+}
+
 export function pendingReservedQuantities(pendingSales = [], locationId = "") {
   const reserved = {};
   pendingSales
