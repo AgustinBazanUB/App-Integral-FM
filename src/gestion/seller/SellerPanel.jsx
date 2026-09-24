@@ -227,15 +227,16 @@ export default function SellerPanel() {
 
   const locations = asArray(locationsResult.data);
   const selectedLocation = locations.find((location) => location.id === locationId) || null;
-  const stockResult = useSellerLocationStock(profile, locationId);
-  const dailySales = useSellerDailySales(profile, locationId);
-  const pendingSales = useSellerPendingSales(profile);
   const resources = resourcesResult.data && typeof resourcesResult.data === "object"
     ? resourcesResult.data
     : {};
   const categories = asArray(resources.categories);
   const discounts = asArray(resources.discounts);
+  const masterProducts = asArray(resources.products);
   const customerZones = asArray(resources.zones);
+  const stockResult = useSellerLocationStock(profile, locationId, masterProducts);
+  const dailySales = useSellerDailySales(profile, locationId);
+  const pendingSales = useSellerPendingSales(profile);
 
   useEffect(() => {
     if (!locations.length) {
