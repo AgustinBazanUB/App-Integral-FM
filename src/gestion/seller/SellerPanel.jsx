@@ -18,6 +18,7 @@ import {
 } from "../../design-system";
 import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
 import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
+import { locationActivity } from "../../modules/locations/domain/locations";
 import {
   completeRemainingPayment,
   PAYMENT_LABELS,
@@ -228,6 +229,8 @@ export default function SellerPanel() {
 
   const locations = asArray(locationsResult.data);
   const selectedLocation = locations.find((location) => location.id === locationId) || null;
+  const selectedScheduleState = selectedLocation ? locationActivity(selectedLocation) : null;
+  const outsideProgrammedSchedule = ["future", "ended"].includes(selectedScheduleState?.reason);
   const resources = resourcesResult.data && typeof resourcesResult.data === "object"
     ? resourcesResult.data
     : {};
@@ -687,6 +690,7 @@ export default function SellerPanel() {
           </button>
         </div>
         {!online ? <div className="fm-seller-offline-note"><Icon name="WifiOff" /><span>Sin conexión. La venta quedará pendiente en este dispositivo y no se mostrará como confirmada.</span></div> : null}
+        {outsideProgrammedSchedule ? <div className="fm-seller-offline-note"><Icon name="Clock" /><span>Estás vendiendo fuera del calendario programado de esta ubicación. La venta se registrará igualmente y quedará disponible para métricas y auditoría.</span></div> : null}
         {editSale ? <div className="fm-seller-edit-note"><span>Editando <strong>{editSale.saleCode}</strong></span><button type="button" onClick={resetSale}>Cancelar edición</button></div> : null}
         {resourcesResult.error ? <Toast tone="error">No se pudieron actualizar algunos recursos: {resourcesResult.error.message}</Toast> : null}
         <div className="fm-seller-catalog-scroll" aria-label="Catálogo de productos por categoría">
