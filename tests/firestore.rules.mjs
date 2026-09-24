@@ -39,7 +39,7 @@ before(async () => {
         name: "Vendedor",
         role: "seller",
         active: true,
-        allowedLocationIds: ["loc-1"],
+        allowedLocationIds: ["loc-1", "loc-scheduled"],
       }),
       setDoc(doc(database, "users", "manager-1"), {
         name: "Encargado",
@@ -62,6 +62,14 @@ before(async () => {
         name: "Ubicación ajena",
         active: true,
         deleted: false,
+      }),
+      setDoc(doc(database, "locations", "loc-scheduled"), {
+        name: "Evento fuera de horario",
+        type: "event",
+        active: true,
+        deleted: false,
+        scheduleStartAt: new Date("2026-09-20T10:00:00-03:00"),
+        scheduleEndAt: new Date("2026-09-20T18:00:00-03:00"),
       }),
       setDoc(doc(database, "locationStock", "loc-1", "items", "product-1"), {
         productId: "product-1",
@@ -197,6 +205,25 @@ test("el vendedor no puede ajustar stock fuera de una venta válida", async () =
   }));
   const snapshot = await getDoc(stockRef);
   assert.equal(snapshot.data().currentStock, 5);
+});
+
+test("una venta puede registrarse fuera del horario programado de una ubicación activa", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  await assertSucceeds(setDoc(doc(database, "sales", "sale-outside-schedule"), {
+    saleCode: "FM-EVT-20260924-0001",
+    sellerId: "seller-1",
+    sellerName: "Vendedor",
+    locationId: "loc-scheduled",
+    locationName: "Evento fuera de horario",
+    status: "active",
+    total: 1000,
+    totalItems: 1,
+    items: [{ productId: "product-1", name: "Producto", qty: 1, unitPrice: 1000, subtotal: 1000 }],
+    paymentMethod: "cash",
+    paymentMethodLabel: "Pago eft",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
 });
 
 test("una venta válida actualiza venta, movimiento y stock en la misma transacción", async () => {
