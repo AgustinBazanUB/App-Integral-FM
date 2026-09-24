@@ -57,6 +57,7 @@ import {
   useSellerKeyboard,
   useSellerLocations,
   useSellerLocationStock,
+  useSellerMasterProducts,
   useSellerPendingSales,
   useSellerResources,
 } from "./hooks";
@@ -232,7 +233,9 @@ export default function SellerPanel() {
     : {};
   const categories = asArray(resources.categories);
   const discounts = asArray(resources.discounts);
-  const masterProducts = asArray(resources.products);
+  const warmedMasterProducts = asArray(resources.products);
+  const masterProductsResult = useSellerMasterProducts(warmedMasterProducts);
+  const masterProducts = asArray(masterProductsResult.data);
   const customerZones = asArray(resources.zones);
   const stockResult = useSellerLocationStock(profile, locationId, masterProducts);
   const dailySales = useSellerDailySales(profile, locationId);
