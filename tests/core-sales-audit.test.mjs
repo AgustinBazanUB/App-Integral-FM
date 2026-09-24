@@ -44,6 +44,9 @@ test("el Panel Vendedor advierte diferencias de stock pero no bloquea la venta f
   const rules = await read("../firestore.rules");
 
   assert.match(panel, /stock digital no alcanza/i);
+  assert.match(panel, /submitLockRef\.current/);
+  assert.match(panel, /if \(submitLockRef\.current \|\| submitState\.busy\) return/);
+  assert.match(panel, /finally \{\s*submitLockRef\.current = false/s);
   assert.doesNotMatch(panel, /disabled=\{qty >= Number\(product\.availableStock/);
   assert.doesNotMatch(panel, /\|\| hasStockConflict \|\|/);
   assert.doesNotMatch(service, /insufficientStockError/);
