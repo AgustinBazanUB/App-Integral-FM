@@ -261,6 +261,14 @@ export async function subscribeSellerLocationStock({ profile, locationId, onData
   );
 }
 
+export function subscribeSellerMasterProducts({ onData, onError }) {
+  return onSnapshot(
+    query(collection(db, "products"), where("active", "==", true), orderBy("name")),
+    (snapshot) => onData(docsToArray(snapshot).filter((product) => product.deleted !== true)),
+    onError,
+  );
+}
+
 export const loadSellerResources = (profile) => loadSellerResourcesShared(profile);
 
 export async function listSellerDailySales(profile, locationId) {
