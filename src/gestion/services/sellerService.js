@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
 import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
-import { isLocationActiveNow } from "../../modules/locations/domain/locations";
+import { isLocationSaleEnabled } from "../../modules/locations/domain/locations";
 import { normalizePayment } from "../../modules/locations/domain/payments";
 import {
   addArgentinaDays,
@@ -413,7 +413,7 @@ export async function createSellerSale({
     }
 
     const locationSnapshot = await transaction.get(doc(db, "locations", permittedLocation.id));
-    if (!locationSnapshot.exists() || !isLocationActiveNow({ id: locationSnapshot.id, ...locationSnapshot.data() })) {
+    if (!locationSnapshot.exists() || !isLocationSaleEnabled({ id: locationSnapshot.id, ...locationSnapshot.data() })) {
       throw new Error("La ubicación dejó de estar activa.");
     }
     const customerSnapshot = customerRef ? await transaction.get(customerRef) : null;
