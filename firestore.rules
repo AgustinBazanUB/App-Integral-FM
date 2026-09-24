@@ -217,7 +217,6 @@ service cloud.firestore {
           "currentStock", "lastSaleId", "lastMovementId", "updatedAt"
         ])
         && request.resource.data.currentStock is int
-        && request.resource.data.currentStock >= 0
         && request.resource.data.lastSaleId is string
         && request.resource.data.lastMovementId is string
         && linkedSellerStockMutation(locationId, productId);
@@ -700,23 +699,24 @@ service cloud.firestore {
       return data.userId == request.auth.uid
         && data.productId is string
         && data.previousStock is int
-        && data.previousStock >= 0
         && data.newStock is int
-        && data.newStock >= 0
         && data.qty is int
         && data.saleId is string
-        && ((data.inventoryType == "warehouse"
-            && data.warehouseId is string
-            && canModule("warehouse", "edit"))
-          || (data.inventoryType == "location"
-            && data.locationId is string
-            && allowedLocation(data.locationId)
-            && (canModule("locations", "loadStock")
-              || canModule("locations", "configureLocationProducts")
-              || canModule("warehouse", "transferStock")))
+        && (((data.inventoryType == "warehouse"
+              && data.warehouseId is string
+              && canModule("warehouse", "edit"))
+            || (data.inventoryType == "location"
+              && data.locationId is string
+              && allowedLocation(data.locationId)
+              && (canModule("locations", "loadStock")
+                || canModule("locations", "configureLocationProducts")
+                || canModule("warehouse", "transferStock"))))
+          && data.previousStock >= 0
+          && data.newStock >= 0
           || (data.locationId is string
             && allowedLocation(data.locationId)
-            && quickSalesPermission("edit")));
+            && quickSalesPermission("edit")
+            && data.type in ["sale", "sale_edit", "sale_cancel"]));
     }
 
     match /users/{uid} {
