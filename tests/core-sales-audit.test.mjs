@@ -29,7 +29,7 @@ test("crear un producto desde una ubicación usa el mismo ID y precio maestro", 
   const form = await read("../src/gestion/components/LocationProductForm.jsx");
   const service = await read("../src/gestion/services/locationEnhancementsService.js");
 
-  assert.match(form, />ID del producto</);
+  assert.match(form, /label="ID del producto"/);
   assert.match(form, /form\.productCode/);
   assert.match(service, /productCodeKey/);
   assert.match(service, /abbreviation:\s*productCode/);
