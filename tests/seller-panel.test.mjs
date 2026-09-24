@@ -208,7 +208,9 @@ test("la venta guarda creador, fecha local, descuentos desglosados y ticket", as
     "ticketStatus",
   ]) assert.match(service, new RegExp(field));
   assert.match(service, /runTransaction\(db/);
-  assert.match(service, /previousStock < item\.qty/);
+  assert.doesNotMatch(service, /previousStock < item\.qty/);
+  assert.match(panel, /el stock digital disponible es/);
+  assert.match(panel, /Podés continuar si verificaste que la mercadería existe físicamente/);
   assert.match(service, /lastMovementId/);
   assert.match(service, /sale\.cancelled/);
   assert.match(service, /sale\.updated/);
