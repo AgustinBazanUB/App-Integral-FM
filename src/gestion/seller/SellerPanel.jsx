@@ -68,6 +68,7 @@ import {
   pendingReservedQuantities,
   SELLER_ACTION_SHORTCUTS,
   SELLER_VIEWS,
+  sellerDailySummary,
   sellerImage,
   sellerStockStatus,
 } from "./sellerDomain";
@@ -767,12 +768,17 @@ export default function SellerPanel() {
   );
 
   const salesData = asArray(dailySales.data);
+  const daySummary = sellerDailySummary(salesData);
   const salesView = (
     <div className="fm-seller-view">
       <div className="fm-seller-view-head"><div><h1>Mis ventas de hoy</h1><p>{selectedLocation?.name || "Ubicación"}</p></div><Button icon="ShoppingCart" onClick={() => setView("sale")}>Nueva venta</Button></div>
       {dailySales.status === "loading" ? <Skeleton lines={5} /> : null}
       {dailySales.status === "error" ? <Toast tone="error">{dailySales.error.message}</Toast> : null}
-      <div className="fm-seller-sales-summary"><span>Monto activo</span><strong>{formatMoney(salesData.filter((sale) => sale.status === "active").reduce((sum, sale) => sum + Number(sale.total || 0), 0))}</strong><small>{salesData.filter((sale) => sale.status === "active").length} ventas activas</small></div>
+      <div className="fm-seller-sales-summary">
+        <div><span>Ventas activas</span><strong>{daySummary.count}</strong><small>operaciones de hoy</small></div>
+        <div><span>Total vendido</span><strong>{formatMoney(daySummary.total)}</strong><small>ventas activas</small></div>
+        <div><span>Efectivo cobrado</span><strong>{formatMoney(daySummary.cash)}</strong><small>para rendición</small></div>
+      </div>
       <div className="fm-seller-sale-list">{salesData.length ? salesData.map((sale) => <button key={sale.id} type="button" onClick={() => setDetailSale(sale)}><div><strong>{sale.saleCode}</strong><Badge tone={statusTone(sale.status)}>{sale.status === "cancelled" ? "Anulada" : "Activa"}</Badge></div><span>{formatMoney(sale.total)}</span><small>{formatDateTime(sale.createdAt)}</small></button>) : <EmptyState icon="ReceiptText" title="Todavía no registraste ventas" description="Las ventas confirmadas de esta ubicación aparecerán aquí." />}</div>
     </div>
   );
