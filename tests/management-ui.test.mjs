@@ -76,3 +76,13 @@ test("las alertas de stock se configuran por ubicación y no en el producto maes
   assert.match(inventory, /yellowAlertQty/);
   assert.match(inventory, /redAlertQty/);
 });
+
+
+test("el catálogo maestro contempla variante o presentación sin mezclarla con el stock", async () => {
+  const form = await read("../src/gestion/components/ProductForm.jsx");
+  const products = await read("../src/gestion/pages/ProductsPage.jsx");
+  const inventory = await read("../src/gestion/services/inventoryService.js");
+  assert.match(form, /Variante \/ presentación/);
+  assert.match(inventory, /presentation: String\(values\.presentation/);
+  assert.match(products, /product\.presentation/);
+});
