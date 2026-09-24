@@ -281,7 +281,7 @@ test("la creación online usa un identificador idempotente para evitar ventas du
   assert.match(service, /online_\$\{seller\.id\}_\$\{safeRequestId\}/);
   assert.match(service, /clientRequestId: refs\.requestId/);
   assert.match(service, /alreadySynced: true/);
-  assert.match(panel, /saleAttemptId = useRef\("")/);
+  assert.match(panel, /saleAttemptId = useRef\(""\)/);
   assert.match(panel, /requestId: saleAttemptId\.current/);
 });
 
