@@ -99,6 +99,20 @@ export default function CustomerDialog({
     }
   };
 
+  const customerFromForm = (existing = null) => {
+    const zone = zones.find((item) => item.id === form.zoneId);
+    const draft = buildCustomerDraft({
+      phone: form.phone,
+      name: existing?.name || form.name,
+      zoneId: existing?.zoneId || zone?.id || "",
+      zoneName: existing?.zoneName || existing?.customZone || zone?.name || "",
+      customZone: existing?.zoneName || existing?.customZone
+        ? existing.customZone || ""
+        : form.zoneId === "__custom" ? form.customZone : "",
+    });
+    return existing ? { ...existing, ...draft, persisted: true } : { ...draft, persisted: false };
+  };
+
   const confirm = async () => {
     setError("");
     let existing = foundCustomer;
@@ -106,27 +120,9 @@ export default function CustomerDialog({
       const result = await lookup();
       if (result.status === "error" || result.status === "invalid" || result.status === "stale") return;
       existing = result.customer;
-      if (existing) {
-        onSelect({ ...existing, persisted: true });
-        onClose();
-        return;
-      }
-    }
-    if (existing) {
-      onSelect({ ...existing, persisted: true });
-      onClose();
-      return;
     }
     try {
-      const zone = zones.find((item) => item.id === form.zoneId);
-      const draft = buildCustomerDraft({
-        phone: form.phone,
-        name: form.name,
-        zoneId: zone?.id || "",
-        zoneName: zone?.name || "",
-        customZone: form.zoneId === "__custom" ? form.customZone : "",
-      });
-      onSelect({ ...draft, persisted: false });
+      onSelect(customerFromForm(existing));
       onClose();
     } catch (validationError) {
       setError(validationError.message);
@@ -134,6 +130,8 @@ export default function CustomerDialog({
   };
 
   const existingZone = foundCustomer?.zoneName || foundCustomer?.customZone || "";
+  const existingNeedsName = Boolean(foundCustomer) && !String(foundCustomer.name || "").trim();
+  const existingNeedsZone = Boolean(foundCustomer) && !String(existingZone || "").trim();
 
   return (
     <Modal
@@ -186,21 +184,46 @@ export default function CustomerDialog({
         ) : null}
 
         {foundCustomer ? (
-          <div className="fm-customer-existing-note">
-            <Icon name="ShieldCheck" />
-            <p>Se usarán los datos ya guardados. Esta venta no modifica automáticamente el nombre ni la zona del cliente.</p>
-          </div>
+          <>
+            <div className="fm-customer-existing-note">
+              <Icon name="ShieldCheck" />
+              <p>{existingNeedsName || existingNeedsZone
+                ? "Cliente existente. Podés completar los datos que faltan sin crear un registro duplicado."
+                : "Se usarán los datos ya guardados para esta venta."}</p>
+            </div>
+            {existingNeedsZone ? (
+              <>
+                <FormField label="Zona (opcional)">
+                  <select value={form.zoneId} onChange={(event) => setForm((current) => ({ ...current, zoneId: event.target.value }))}>
+                    <option value="">Completar más adelante</option>
+                    {zones.filter((zone) => zone.active !== false).map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}
+                    <option value="__custom">Nueva zona / Otra zona</option>
+                  </select>
+                </FormField>
+                {form.zoneId === "__custom" ? (
+                  <FormField label="Nueva zona" hint="Opcional. Se guarda sólo en este cliente; no se agrega automáticamente a la lista global.">
+                    <input value={form.customZone} onChange={(event) => setForm((current) => ({ ...current, customZone: event.target.value }))} />
+                  </FormField>
+                ) : null}
+              </>
+            ) : null}
+            {existingNeedsName ? (
+              <FormField label="Nombre (opcional)">
+                <input autoComplete="name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
+              </FormField>
+            ) : null}
+          </>
         ) : (
           <>
-            <FormField label="Zona" required>
+            <FormField label="Zona (opcional)">
               <select value={form.zoneId} onChange={(event) => setForm((current) => ({ ...current, zoneId: event.target.value }))}>
-                <option value="">Elegir zona</option>
+                <option value="">Completar más adelante</option>
                 {zones.filter((zone) => zone.active !== false).map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}
                 <option value="__custom">Nueva zona / Otra zona</option>
               </select>
             </FormField>
             {form.zoneId === "__custom" ? (
-              <FormField label="Nueva zona" required hint="Se guarda sólo en este cliente; no se agrega automáticamente a la lista global.">
+              <FormField label="Nueva zona" hint="Opcional. Se guarda sólo en este cliente; no se agrega automáticamente a la lista global.">
                 <input value={form.customZone} onChange={(event) => setForm((current) => ({ ...current, customZone: event.target.value }))} />
               </FormField>
             ) : null}
