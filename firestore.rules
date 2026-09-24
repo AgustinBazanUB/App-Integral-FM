@@ -256,17 +256,35 @@ service cloud.firestore {
         && request.resource.data.phoneNormalized.size() >= 8
         && request.resource.data.phoneNormalized.size() <= 11
         && request.resource.data.zoneName is string
-        && request.resource.data.zoneName.size() > 0
         && request.resource.data.active == true
         && request.resource.data.deleted == false
         && linkedSellerCustomer(customerId);
     }
     function sellerCustomerUpdate(customerId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let oldNameMissing = !("name" in resource.data)
+        || resource.data.name == null
+        || resource.data.name == "";
+      let oldZoneMissing = (!("zoneName" in resource.data)
+          || resource.data.zoneName == null
+          || resource.data.zoneName == "")
+        && (!("customZone" in resource.data)
+          || resource.data.customZone == null
+          || resource.data.customZone == "");
       return quickSalesPermission("create")
         && customerKeyShape(customerId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          "lastSaleId", "lastPurchaseAt", "updatedAt"
+        && changed.hasOnly([
+          "lastSaleId", "lastPurchaseAt", "updatedAt",
+          "name", "zoneId", "zoneName", "customZone"
         ])
+        && (!changed.hasAny(["name"])
+          || (oldNameMissing
+            && request.resource.data.name is string
+            && request.resource.data.name.size() > 0))
+        && (!changed.hasAny(["zoneId", "zoneName", "customZone"])
+          || (oldZoneMissing
+            && request.resource.data.zoneName is string
+            && request.resource.data.zoneName.size() > 0))
         && linkedSellerCustomer(customerId);
     }
     function whatsappDenied(action) {
