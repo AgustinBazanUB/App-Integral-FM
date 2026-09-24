@@ -723,21 +723,23 @@ service cloud.firestore {
         && data.newStock is int
         && data.qty is int
         && data.saleId is string
-        && (((data.inventoryType == "warehouse"
-              && data.warehouseId is string
-              && canModule("warehouse", "edit"))
-            || (data.inventoryType == "location"
-              && data.locationId is string
-              && allowedLocation(data.locationId)
-              && (canModule("locations", "loadStock")
-                || canModule("locations", "configureLocationProducts")
-                || canModule("warehouse", "transferStock"))))
-          && data.previousStock >= 0
-          && data.newStock >= 0
-          || (data.locationId is string
-            && allowedLocation(data.locationId)
+        && (
+          (data.locationId is string
+            && data.type in ["sale", "sale_edit", "sale_cancel"]
             && quickSalesPermission("edit")
-            && data.type in ["sale", "sale_edit", "sale_cancel"]));
+            && allowedLocation(data.locationId))
+          || (data.previousStock >= 0
+            && data.newStock >= 0
+            && ((data.inventoryType == "warehouse"
+                && data.warehouseId is string
+                && canModule("warehouse", "edit"))
+              || (data.inventoryType == "location"
+                && data.locationId is string
+                && allowedLocation(data.locationId)
+                && (canModule("locations", "loadStock")
+                  || canModule("locations", "configureLocationProducts")
+                  || canModule("warehouse", "transferStock")))))
+        );
     }
 
     match /users/{uid} {
@@ -826,8 +828,8 @@ service cloud.firestore {
             && request.resource.data.productId == productId
             && request.resource.data.currentStock is int
             && request.resource.data.currentStock >= 0);
-        allow update: if isAdmin()
-          || validSellerStockMutation(locationId, productId)
+        allow update: if validSellerStockMutation(locationId, productId)
+          || isAdmin()
           || (canModule("warehouse", "transferStock")
             && allowedLocation(locationId)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -886,19 +888,19 @@ service cloud.firestore {
       allow list: if isAdmin()
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
-      allow create: if isAdmin()
-        || (quickSalesPermission("create")
+      allow create: if (quickSalesPermission("create")
           && activeQuickSalesLocation(request.resource.data.locationId)
-          && validSale(request.resource.data));
-      allow update: if isAdmin()
-        || (quickSalesPermission("edit")
+          && validSale(request.resource.data))
+        || isAdmin();
+      allow update: if (quickSalesPermission("edit")
           && resource.data.sellerId == request.auth.uid
           && request.resource.data.sellerId == resource.data.sellerId
           && request.resource.data.locationId == resource.data.locationId
           && resource.data.status == "active"
           && request.resource.data.status in ["active", "cancelled"]
           && ((request.resource.data.status == "active" && activeQuickSalesLocation(resource.data.locationId))
-            || (request.resource.data.status == "cancelled" && allowedLocation(resource.data.locationId))));
+            || (request.resource.data.status == "cancelled" && allowedLocation(resource.data.locationId))))
+        || isAdmin();
       allow delete: if false;
     }
     match /stockMovements/{movementId} {
