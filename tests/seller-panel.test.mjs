@@ -169,8 +169,11 @@ test("+2 pagos exige montos no negativos y suma exacta", () => {
 
 test("el Panel Vendedor advierte pero no bloquea ventas fuera del calendario programado", async () => {
   const panel = await read("../src/gestion/seller/SellerPanel.jsx");
+  const service = await read("../src/gestion/services/sellerService.js");
   assert.match(panel, /outsideProgrammedSchedule/);
   assert.match(panel, /La venta se registrará igualmente/);
+  assert.match(service, /isLocationSaleEnabled/);
+  assert.doesNotMatch(service, /isLocationActiveNow/);
 });
 
 test("la ruta y el cambio entre paneles conservan la misma sesión", async () => {
