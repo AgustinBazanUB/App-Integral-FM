@@ -333,6 +333,13 @@ export default function SellerPanel() {
   }, [availableDiscounts]);
 
   useEffect(() => {
+    if (currentItems.length) return;
+    setDiscountIds([]);
+    setManualDiscounts([]);
+    setDiscountOpen(false);
+  }, [currentItems.length]);
+
+  useEffect(() => {
     if (paymentMethod === "multiple" && payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0) !== summary.total) {
       setPaymentMethod("");
       setPayments([]);
@@ -506,7 +513,7 @@ export default function SellerPanel() {
   useSellerKeyboard({
     enabled: keyboardActive && view === "sale",
     products,
-    discounts: availableDiscounts,
+    discounts: currentItems.length ? availableDiscounts : [],
     actionShortcuts,
     onProduct: addProduct,
     onDiscount: (discount) => setDiscountIds((current) => current.includes(discount.id) ? current : [...current, discount.id]),
