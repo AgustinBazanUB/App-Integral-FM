@@ -110,16 +110,6 @@ function cleanSaleItems(items = []) {
   return cleaned;
 }
 
-function insufficientStockError(item, available) {
-  const error = new Error(
-    `${item.name}: el stock disponible es ${available}. Corregí el carrito antes de continuar.`,
-  );
-  error.code = "seller/insufficient-stock";
-  error.productId = item.productId;
-  error.availableStock = available;
-  return error;
-}
-
 function normalizeManualDiscount(discount) {
   if (!["fixed", "percent"].includes(discount.type)) {
     throw new Error("El tipo de descuento manual no es válido.");
@@ -403,7 +393,9 @@ export async function createSellerSale({
         throw new Error(`${item.name} ya no está habilitado en esta ubicación.`);
       }
       const previousStock = Number(snapshot.data().currentStock || 0);
-      if (previousStock < item.qty) throw insufficientStockError(item, previousStock);
+      // La venta real tiene prioridad sobre una inconsistencia del stock digital.
+      // Si el vendedor verificó mercadería física, el saldo puede quedar negativo
+      // y funcionar como señal para un ajuste administrativo posterior.
       const newStock = previousStock - item.qty;
       transaction.update(refs.stockRefs[index], stockMutationFields({
         currentStock: newStock,
@@ -563,8 +555,9 @@ export async function updateSellerSale({
       const item = newItems.find((entry) => entry.productId === productId) || sale.items.find((entry) => entry.productId === productId);
       if (!snapshot.exists()) throw new Error(`Falta el stock de ${item.name}.`);
       const previousStock = Number(snapshot.data().currentStock || 0);
+      // Una edición también debe reflejar la operación física real aun cuando
+      // el stock digital resulte negativo.
       const newStock = previousStock + difference;
-      if (newStock < 0) throw insufficientStockError(item, previousStock + (oldQty.get(productId) || 0));
       transaction.update(stockRefs[index], stockMutationFields({
         currentStock: newStock,
         lastSaleId: saleId,
