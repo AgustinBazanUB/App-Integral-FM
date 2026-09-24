@@ -67,7 +67,11 @@ test("las alertas de stock se configuran por ubicación y no en el producto maes
   const inventory = await read("../src/gestion/services/inventoryService.js");
   assert.doesNotMatch(form, /Alerta amarilla|Alerta roja/);
   assert.doesNotMatch(products, />Alertas</);
-  assert.doesNotMatch(inventory, /const yellowAlertQty = wholeInventoryQuantity\(values\.yellowAlertQty/);
+  const productPayload = inventory.slice(
+    inventory.indexOf("function productPayload"),
+    inventory.indexOf("export async function saveMasterProduct"),
+  );
+  assert.doesNotMatch(productPayload, /yellowAlertQty|redAlertQty/);
   assert.match(inventory, /saveLocationProductSettings/);
   assert.match(inventory, /yellowAlertQty/);
   assert.match(inventory, /redAlertQty/);
