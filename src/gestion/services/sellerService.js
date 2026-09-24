@@ -316,7 +316,7 @@ async function verifiedDiscounts({ profile, location, discounts, items }) {
   return [...normalizedSaved, ...normalizedManual];
 }
 
-function saleRefs({ location, saleItems, seller, offlineSale }) {
+function saleRefs({ location, saleItems, seller, offlineSale, requestId }) {
   const dateKey = argentinaDateKey().replaceAll("-", "");
   const prefix = String(location.codePrefix || "LOC")
     .toUpperCase()
@@ -326,14 +326,18 @@ function saleRefs({ location, saleItems, seller, offlineSale }) {
   if (localId && !/^local_[A-Za-z0-9_-]+$/.test(localId)) {
     throw new Error("El identificador de la venta pendiente no es válido.");
   }
+  const safeRequestId = String(requestId || "").trim().replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
   return {
     dateKey,
     prefix,
     localId,
+    requestId: safeRequestId,
     counterRef: doc(db, "counters", `${prefix}_${dateKey}`),
     saleRef: localId
       ? doc(db, "sales", `offline_${seller.id}_${localId}`.replaceAll("/", "_"))
-      : doc(collection(db, "sales")),
+      : safeRequestId
+        ? doc(db, "sales", `online_${seller.id}_${safeRequestId}`.replaceAll("/", "_"))
+        : doc(collection(db, "sales")),
     stockRefs: saleItems.map((item) => doc(db, "locationStock", location.id, "items", item.productId)),
     movementRefs: saleItems.map(() => doc(collection(db, "stockMovements"))),
     auditRef: doc(collection(db, "auditLogs")),
@@ -351,6 +355,7 @@ export async function createSellerSale({
   ticketRequested = false,
   customer = null,
   offlineSale = null,
+  requestId = "",
 }) {
   if (!can(profile, "quick-sales", "create")) {
     throw new Error("No tenés permiso para registrar ventas.");
@@ -365,7 +370,7 @@ export async function createSellerSale({
   const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal);
   const payment = normalizePayment(paymentMethod, paymentMethodLabel, payments, discountSummary.total);
   const preparedCustomer = await prepareSaleCustomer(customer);
-  const refs = saleRefs({ location: permittedLocation, saleItems, seller: profile, offlineSale });
+  const refs = saleRefs({ location: permittedLocation, saleItems, seller: profile, offlineSale, requestId });
   const customerRef = preparedCustomer ? doc(db, "customers", preparedCustomer.id) : null;
   const createdLocallyAt = refs.localId ? new Date(offlineSale.createdLocallyAt) : null;
   if (createdLocallyAt && Number.isNaN(createdLocallyAt.valueOf())) {
@@ -373,12 +378,15 @@ export async function createSellerSale({
   }
 
   return runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
-    if (refs.localId) {
+    if (refs.localId || refs.requestId) {
       const existing = await transaction.get(refs.saleRef);
       if (existing.exists()) {
         const data = existing.data();
-        if (data.offlineLocalId !== refs.localId || data.sellerId !== profile.id) {
-          throw new Error("El identificador pendiente ya está en uso.");
+        const identifierMatches = refs.localId
+          ? data.offlineLocalId === refs.localId
+          : data.clientRequestId === refs.requestId;
+        if (!identifierMatches || data.sellerId !== profile.id || data.locationId !== permittedLocation.id) {
+          throw new Error("El identificador de la venta ya está en uso.");
         }
         return {
           id: refs.saleRef.id,
@@ -476,6 +484,7 @@ export async function createSellerSale({
         createdLocallyAt: createdLocallyAt.toISOString(),
         syncedAt: serverTimestamp(),
       } : {}),
+      ...(refs.requestId ? { clientRequestId: refs.requestId } : {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       deletedAt: null,
