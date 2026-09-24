@@ -115,7 +115,6 @@ export default function ProductsPage() {
                 {product.description ? <p className="fm-inventory-card__description">{product.description}</p> : null}
                 <dl className="fm-inventory-card__stats">
                   <div><dt>Precio predeterminado</dt><dd>{formatMoney(product.defaultPrice || 0)}</dd></div>
-                  <div><dt>Alertas</dt><dd>{Number(product.yellowAlertQty || 0)} / {Number(product.redAlertQty || 0)}</dd></div>
                 </dl>
                 {canEdit ? (
                   <footer className="fm-inventory-card__actions">
