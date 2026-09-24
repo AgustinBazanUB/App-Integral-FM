@@ -23,6 +23,7 @@ import {
 } from "../../modules/inventory/domain/inventory";
 import { can, normalizedRole } from "../permissions";
 import { db } from "./firebase";
+import { invalidateSharedProducts } from "./sharedResources";
 
 const docsToArray = (snapshot) => snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
 const userName = (profile) => profile.name || profile.email || "Usuario";
@@ -170,6 +171,7 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
     createdAt: serverTimestamp(),
   });
   await batch.commit();
+  invalidateSharedProducts();
   return productRef.id;
 }
 
