@@ -78,8 +78,13 @@ export async function listLocationStockCounts(locations) {
 }
 
 export async function listAssignableSellers() {
+  const assignableRoles = new Set(["seller", "admin", "general_admin"]);
   return docsToArray(await getDocs(query(collection(db, "users"), orderBy("name"))))
-    .filter((user) => normalizedRole(user) === "seller" && user.deleted !== true);
+    .filter((user) =>
+      assignableRoles.has(normalizedRole(user))
+      && user.active === true
+      && user.deleted !== true,
+    );
 }
 
 export async function saveManagedLocation(data, profile, locationId = null) {
