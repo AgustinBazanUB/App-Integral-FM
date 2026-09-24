@@ -469,8 +469,8 @@ export default function SellerPanel() {
         return;
       }
       if (!editSale && !saleAttemptId.current) {
-        const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)`;
-        saleAttemptId.current = `sale_${random.replace(/[^A-Za-z0-9_-]/g, "")`;
+        const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        saleAttemptId.current = `sale_${random.replace(/[^A-Za-z0-9_-]/g, "")}`;
       }
       const common = {
         profile,
