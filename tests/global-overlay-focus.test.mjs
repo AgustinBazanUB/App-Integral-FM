@@ -30,7 +30,7 @@ test("los formularios con cierres inline quedan cubiertos por el fix global", ()
   assert.match(locations, /<Modal open=\{modalOpen\} onClose=\{\(\) => !saveState\.busy && setModalOpen\(false\)\}/);
   assert.match(administration, /<Modal open=\{modalOpen\} onClose=\{\(\) => setModalOpen\(false\)\}/);
   assert.match(genericModule, /<Modal open=\{modalOpen\} onClose=\{\(\) => setModalOpen\(false\)\}/);
-  assert.match(locationDetail, /<Modal open=\{Boolean\(configProduct\)\} onClose=\{\(\) => !configState\.busy && setConfigProduct\(null\)\}/);
+  assert.match(locationDetail, /<Modal open=\{open\} onClose=\{\(\) => !state\.busy && onClose\?\.\(\)\}/);
   assert.match(locationDetail, /<Modal open=\{sellerModalOpen\} onClose=\{\(\) => !sellerState\.busy && setSellerModalOpen\(false\)\}/);
   assert.match(locationProductForm, /onClose=\{\(\) => !state\.busy && onClose\?\.\(\)\}/);
 });
