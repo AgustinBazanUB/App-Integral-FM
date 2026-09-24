@@ -381,13 +381,18 @@ test("el vendedor no puede leer stock ni actividad de otra ubicación", async ()
 
 test("un encargado puede cargar stock pero no asignar vendedores ni descuentos", async () => {
   const database = environment.authenticatedContext("manager-1").firestore();
-  await assertSucceeds(setDoc(doc(database, "locationStock", "loc-1", "items", "product-2"), {
-    productId: "product-2",
+  const newStockRef = doc(database, "locationStock", "loc-1", "items", "product-manager-new");
+  await assertSucceeds(setDoc(newStockRef, {
+    productId: "product-manager-new",
     productName: "Producto nuevo",
     currentStock: 3,
     initialStock: 3,
     active: true,
     deleted: false,
+    updatedAt: new Date(),
+  }));
+  await assertSucceeds(updateDoc(doc(database, "locationStock", "loc-1", "items", "product-1"), {
+    currentStock: 6,
     updatedAt: new Date(),
   }));
   await assertFails(updateDoc(doc(database, "locations", "loc-1"), { assignedSellerIds: ["seller-1"], updatedAt: new Date() }));
