@@ -19,6 +19,7 @@ import {
   groupSellerProducts,
   keyMatchesEvent,
   pendingReservedQuantities,
+  sellerDailySummary,
   visibleSellerProducts,
 } from "../src/gestion/seller/sellerDomain.js";
 
@@ -134,6 +135,19 @@ test("las ventas pendientes reservan stock local sin afirmarse confirmadas", () 
     { locationId: "loc-2", status: "pending", items: [{ productId: "p1", qty: 8 }] },
   ], "loc-1");
   assert.deepEqual(reserved, { p1: 3 });
+});
+
+test("el resumen diario incluye ventas, total y efectivo incluso en pagos combinados", () => {
+  const summary = sellerDailySummary([
+    { status: "active", total: 10000, paymentMethod: "cash" },
+    { status: "active", total: 20000, paymentMethod: "debit" },
+    { status: "active", total: 30000, paymentMethod: "multiple", payments: [
+      { method: "cash", amount: 12000 },
+      { method: "credit", amount: 18000 },
+    ] },
+    { status: "cancelled", total: 99999, paymentMethod: "cash" },
+  ]);
+  assert.deepEqual(summary, { count: 3, total: 60000, cash: 22000 });
 });
 
 test("la botonera distingue tecla, código y ubicación física", () => {
