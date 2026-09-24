@@ -176,25 +176,38 @@ function resolvedCustomerFromSnapshot(snapshot, prepared) {
   if (stored.deleted === true || stored.active === false) {
     throw new Error("Este teléfono fue reemplazado en Clientes Fidelizados. Usá el número actualizado.");
   }
+  const storedZone = stored.zoneName || stored.customZone || "";
   return {
     id: snapshot.id,
     phone: stored.phone || prepared.phone,
     phoneNormalized: stored.phoneNormalized || prepared.phoneNormalized,
-    name: stored.name || "",
-    zoneId: stored.zoneId || "",
-    zoneName: stored.zoneName || stored.customZone || prepared.zoneName,
-    customZone: stored.customZone || "",
+    name: stored.name || prepared.name || "",
+    zoneId: stored.zoneId || (!storedZone ? prepared.zoneId : "") || "",
+    zoneName: storedZone || prepared.zoneName || "",
+    customZone: stored.customZone || (!storedZone ? prepared.customZone : "") || "",
   };
 }
 
 function writeCustomerForSale(transaction, customerRef, customerSnapshot, customer, profile, saleId) {
   if (!customerRef || !customer) return;
   if (customerSnapshot.exists()) {
-    transaction.update(customerRef, {
+    const stored = customerSnapshot.data();
+    const updates = {
       lastSaleId: saleId,
       lastPurchaseAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
+    };
+    if (!String(stored.name || "").trim() && String(customer.name || "").trim()) {
+      updates.name = customer.name;
+    }
+    const storedZone = String(stored.zoneName || stored.customZone || "").trim();
+    const nextZone = String(customer.zoneName || customer.customZone || "").trim();
+    if (!storedZone && nextZone) {
+      updates.zoneId = customer.zoneId || "";
+      updates.zoneName = nextZone;
+      updates.customZone = customer.customZone || "";
+    }
+    transaction.update(customerRef, updates);
     return;
   }
   transaction.set(customerRef, {
