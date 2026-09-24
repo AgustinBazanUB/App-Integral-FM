@@ -63,15 +63,17 @@ export const listAssignableSellersShared = (profile) => withRuntimeCache(
 export const loadSellerResourcesShared = (profile) => withRuntimeCache(
   sellerResourcesKey(profile),
   async () => {
-    const [categories, discounts, shortcutsSnapshot, zones] = await Promise.all([
+    const [categories, discounts, products, shortcutsSnapshot, zones] = await Promise.all([
       listProductCategoriesShared(profile),
       listDiscountsShared(profile),
+      listMasterProductsShared(profile),
       getDoc(doc(db, "settings", "keyboardShortcuts")),
       listActiveCustomerZones(),
     ]);
     return {
       categories,
       discounts,
+      products,
       zones,
       shortcuts: shortcutsSnapshot.exists() ? shortcutsSnapshot.data() : { sellerActions: {} },
     };
@@ -85,6 +87,7 @@ export function invalidateSharedLocations() {
 
 export function invalidateSharedProducts() {
   invalidateRuntimeCache("products:");
+  invalidateRuntimeCache("seller-resources:");
 }
 
 export function invalidateSharedCategories() {
