@@ -70,9 +70,10 @@
 .fm-seller-view-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .fm-seller-view-head h1 { margin: 0; font-family: var(--fm-font-display); font-size: 32px; }
 .fm-seller-view-head p { margin: 2px 0 0; color: var(--fm-text-muted); font-size: 11px; }
-.fm-seller-sales-summary { display: grid; max-width: 360px; border: 1px solid var(--fm-border); border-radius: 14px; background: linear-gradient(145deg, #fff, var(--fm-gold-pale)); padding: 17px; }
+.fm-seller-sales-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; max-width: 760px; overflow: hidden; border: 1px solid var(--fm-border); border-radius: 14px; background: var(--fm-border); }
+.fm-seller-sales-summary > div { display: grid; gap: 3px; min-width: 0; background: linear-gradient(145deg, #fff, var(--fm-gold-pale)); padding: 17px; }
 .fm-seller-sales-summary span, .fm-seller-sales-summary small { color: var(--fm-text-muted); font-size: 10px; }
-.fm-seller-sales-summary strong { font-family: var(--fm-font-display); font-size: 31px; color: var(--fm-text-accent); }
+.fm-seller-sales-summary strong { overflow-wrap: anywhere; font-family: var(--fm-font-display); font-size: 28px; color: var(--fm-text-accent); }
 .fm-seller-sale-list, .fm-seller-pending-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .fm-seller-sale-list > button, .fm-seller-pending-list > article { display: grid; gap: 8px; border: 1px solid var(--fm-border); border-radius: 13px; background: #fff; padding: 13px; color: var(--fm-text); text-align: left; }
 .fm-seller-sale-list > button { cursor: pointer; }
