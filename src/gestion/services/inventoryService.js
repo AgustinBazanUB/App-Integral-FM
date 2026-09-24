@@ -89,12 +89,9 @@ function productPayload(values, categoryName, profile, editing) {
   const name = String(values.name || "").trim();
   const productCode = String(values.productCode ?? values.abbreviation ?? "").trim().toUpperCase();
   const defaultPrice = wholeInventoryQuantity(values.defaultPrice || 0, "El precio predeterminado");
-  const yellowAlertQty = wholeInventoryQuantity(values.yellowAlertQty || 0, "La alerta amarilla");
-  const redAlertQty = wholeInventoryQuantity(values.redAlertQty || 0, "La alerta roja");
   if (!name) throw new Error("Ingresá el nombre del producto.");
   if (!productCode) throw new Error("Ingresá un ID del producto.");
   if (productCode.length > 8) throw new Error("El ID del producto admite hasta 8 caracteres.");
-  if (yellowAlertQty < redAlertQty) throw new Error("La alerta amarilla debe ser mayor o igual a la roja.");
   return {
     name,
     nameKey: normalizedText(name),
@@ -105,8 +102,6 @@ function productPayload(values, categoryName, profile, editing) {
     abbreviationKey: normalizedText(productCode),
     description: String(values.description || "").trim(),
     defaultPrice,
-    yellowAlertQty,
-    redAlertQty,
     categoryId: String(values.categoryId || "").trim(),
     categoryName,
     imageUrl: String(values.imageUrl || "").trim(),
@@ -243,8 +238,9 @@ export async function addProductToLocation({
       masterDefaultPrice: Number(master.defaultPrice || 0),
       initialStock: initial,
       currentStock: initial,
-      yellowAlertQty: Number(master.yellowAlertQty || 0),
-      redAlertQty: Number(master.redAlertQty || 0),
+      // Los umbrales son propios de esta ubicación y nacen sin una regla global.
+      yellowAlertQty: 0,
+      redAlertQty: 0,
       active: true,
       deleted: false,
       deletedAt: null,
@@ -719,8 +715,9 @@ export async function transferStock({ originWarehouse, destination, lines, profi
           masterDefaultPrice: Number(item.product.defaultPrice || 0),
           initialStock: item.quantity,
           currentStock: item.quantity,
-          yellowAlertQty: Number(item.product.yellowAlertQty || 0),
-          redAlertQty: Number(item.product.redAlertQty || 0),
+          // Una ubicación nueva no hereda umbrales del catálogo maestro.
+          yellowAlertQty: 0,
+          redAlertQty: 0,
           active: true,
           deleted: false,
           productDeleted: false,
