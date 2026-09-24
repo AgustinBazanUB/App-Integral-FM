@@ -696,30 +696,31 @@ service cloud.firestore {
         ]);
     }
     function validInventoryMovement(data) {
-      let nonNegativeInventoryMovement =
-        data.previousStock >= 0
-        && data.newStock >= 0
-        && ((data.inventoryType == "warehouse"
-            && data.warehouseId is string
-            && canModule("warehouse", "edit"))
-          || (data.inventoryType == "location"
-            && data.locationId is string
-            && allowedLocation(data.locationId)
-            && (canModule("locations", "loadStock")
-              || canModule("locations", "configureLocationProducts")
-              || canModule("warehouse", "transferStock"))));
-      let sellerSaleMovement =
-        data.locationId is string
-        && allowedLocation(data.locationId)
-        && quickSalesPermission("edit")
-        && data.type in ["sale", "sale_edit", "sale_cancel"];
       return data.userId == request.auth.uid
         && data.productId is string
         && data.previousStock is int
         && data.newStock is int
         && data.qty is int
         && data.saleId is string
-        && (nonNegativeInventoryMovement || sellerSaleMovement);
+        && (
+          // Ordenado primero para que las ventas del vendedor cortocircuiten
+          // sin evaluar todas las ramas administrativas de inventario.
+          (data.locationId is string
+            && allowedLocation(data.locationId)
+            && quickSalesPermission("edit")
+            && data.type in ["sale", "sale_edit", "sale_cancel"])
+          || (data.previousStock >= 0
+            && data.newStock >= 0
+            && ((data.inventoryType == "warehouse"
+                && data.warehouseId is string
+                && canModule("warehouse", "edit"))
+              || (data.inventoryType == "location"
+                && data.locationId is string
+                && allowedLocation(data.locationId)
+                && (canModule("locations", "loadStock")
+                  || canModule("locations", "configureLocationProducts")
+                  || canModule("warehouse", "transferStock")))))
+        );
     }
 
     match /users/{uid} {
