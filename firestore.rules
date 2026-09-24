@@ -757,7 +757,8 @@ service cloud.firestore {
       allow read: if isAdmin() || (canModule("locations", "view") && allowedLocation(locationId));
       allow create: if canModule("locations", "create")
         && sellableLocationType(request.resource.data);
-      allow update: if isAdmin()
+      allow update: if (isAdmin()
+          && (request.resource.data.type == resource.data.type || sellableLocationType(request.resource.data)))
         || (canModule("locations", "edit")
           && allowedLocation(locationId)
           && (request.resource.data.type == resource.data.type || sellableLocationType(request.resource.data))
