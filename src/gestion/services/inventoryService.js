@@ -23,6 +23,7 @@ import {
 } from "../../modules/inventory/domain/inventory";
 import { can, normalizedRole } from "../permissions";
 import { db } from "./firebase";
+import { invalidateSharedProducts } from "./sharedResources";
 
 const docsToArray = (snapshot) => snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
 const userName = (profile) => profile.name || profile.email || "Usuario";
@@ -89,21 +90,17 @@ function productPayload(values, categoryName, profile, editing) {
   const name = String(values.name || "").trim();
   const abbreviation = String(values.abbreviation || "").trim().toUpperCase();
   const defaultPrice = wholeInventoryQuantity(values.defaultPrice || 0, "El precio predeterminado");
-  const yellowAlertQty = wholeInventoryQuantity(values.yellowAlertQty || 0, "La alerta amarilla");
-  const redAlertQty = wholeInventoryQuantity(values.redAlertQty || 0, "La alerta roja");
   if (!name) throw new Error("Ingresá el nombre del producto.");
   if (!abbreviation) throw new Error("Ingresá una abreviación.");
   if (abbreviation.length > 8) throw new Error("La abreviación admite hasta 8 caracteres.");
-  if (yellowAlertQty < redAlertQty) throw new Error("La alerta amarilla debe ser mayor o igual a la roja.");
   return {
     name,
     nameKey: normalizedText(name),
     abbreviation,
     abbreviationKey: normalizedText(abbreviation),
+    presentation: String(values.presentation || "").trim(),
     description: String(values.description || "").trim(),
     defaultPrice,
-    yellowAlertQty,
-    redAlertQty,
     categoryId: String(values.categoryId || "").trim(),
     categoryName,
     imageUrl: String(values.imageUrl || "").trim(),
@@ -175,6 +172,7 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
     createdAt: serverTimestamp(),
   });
   await batch.commit();
+  invalidateSharedProducts();
   return productRef.id;
 }
 
@@ -229,6 +227,7 @@ export async function addProductToLocation({
       productId: product.id,
       productName: master.name,
       abbreviation: master.abbreviation || "",
+      presentation: master.presentation || "",
       categoryId: master.categoryId || "",
       categoryName: master.categoryName || "Sin categoría",
       imageUrl: master.imageUrl || "",
@@ -239,8 +238,8 @@ export async function addProductToLocation({
       masterDefaultPrice: Number(master.defaultPrice || 0),
       initialStock: initial,
       currentStock: initial,
-      yellowAlertQty: Number(master.yellowAlertQty || 0),
-      redAlertQty: Number(master.redAlertQty || 0),
+      yellowAlertQty: 0,
+      redAlertQty: 0,
       active: true,
       deleted: false,
       deletedAt: null,
@@ -421,6 +420,7 @@ export async function addProductToWarehouse({ warehouse, product, initialStock, 
       productId: product.id,
       productName: master.name,
       abbreviation: master.abbreviation || "",
+      presentation: master.presentation || "",
       categoryId: master.categoryId || "",
       categoryName: master.categoryName || "Sin categoría",
       imageUrl: master.imageUrl || "",

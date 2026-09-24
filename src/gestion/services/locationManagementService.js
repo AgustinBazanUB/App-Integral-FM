@@ -78,13 +78,26 @@ export async function listLocationStockCounts(locations) {
 }
 
 export async function listAssignableSellers() {
+  const assignableRoles = new Set(["seller", "admin", "general_admin"]);
   return docsToArray(await getDocs(query(collection(db, "users"), orderBy("name"))))
-    .filter((user) => normalizedRole(user) === "seller" && user.deleted !== true);
+    .filter((user) =>
+      assignableRoles.has(normalizedRole(user))
+      && user.active === true
+      && user.deleted !== true,
+    );
 }
 
 export async function saveManagedLocation(data, profile, locationId = null) {
   assertPermission(profile, locationId ? "edit" : "create", "No tenés permiso para guardar ubicaciones.");
+  const supportedTypes = new Set(["store", "fair", "event"]);
   const locationRef = locationId ? doc(db, "locations", locationId) : doc(collection(db, "locations"));
+  if (!supportedTypes.has(data.type)) {
+    if (!locationId) throw new Error("Una ubicación de venta debe ser Local, Feria o Evento.");
+    const current = await getDoc(locationRef);
+    if (!current.exists() || current.data().type !== data.type) {
+      throw new Error("No se puede convertir una ubicación de venta en un depósito u otro tipo legacy.");
+    }
+  }
   const auditRef = doc(collection(db, "auditLogs"));
   const batch = writeBatch(db);
   const scheduleStartAt = localDateTimeToDate(data.scheduleStartAt || data.startDateTime || data.startDate);

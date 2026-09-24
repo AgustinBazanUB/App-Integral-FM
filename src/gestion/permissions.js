@@ -1,4 +1,4 @@
-import { isLocationActiveNow } from "../modules/locations/domain/locations.js";
+import { isLocationSaleEnabled } from "../modules/locations/domain/locations.js";
 import { businessModules } from "./modules.js";
 
 export const ACTIONS = [
@@ -256,7 +256,8 @@ export function effectiveSellerLocations(profile, locations = [], now = new Date
   const allowed = new Set(profile.allowedLocationIds || []);
   return (locations || [])
     .filter((location) => location?.deleted !== true)
-    .filter((location) => isLocationActiveNow(location, now))
+    .filter((location) => location?.type !== "warehouse_store")
+    .filter((location) => isLocationSaleEnabled(location, now))
     .filter((location) =>
       canSeeAll ||
       allowed.has(location.id) ||

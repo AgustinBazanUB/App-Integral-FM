@@ -89,6 +89,19 @@
 .fm-seller-stock-grid article > div > span { color: var(--fm-text-muted); font-size: 10px; }
 .fm-seller-stock-grid b { font-family: var(--fm-font-display); font-size: 24px; }
 .fm-seller-price-category { border: 1px solid var(--fm-border); border-radius: 14px; background: #fff; padding: 15px; }
+.fm-seller-price-category summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  font-family: var(--fm-font-display);
+  font-size: 20px;
+  list-style-position: inside;
+}
+.fm-seller-price-category[open] summary { margin-bottom: 6px; }
+.fm-seller-price-category summary span { font-family: var(--fm-font-body); font-size: 10px; }
 .fm-seller-price-category article { display: flex; min-height: 52px; align-items: center; justify-content: space-between; gap: 15px; border-bottom: 1px solid var(--fm-border-subtle); }
 .fm-seller-price-category article:last-child { border-bottom: 0; }
 .fm-seller-price-category article > div { display: grid; }

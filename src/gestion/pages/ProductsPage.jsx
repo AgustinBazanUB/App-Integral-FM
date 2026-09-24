@@ -50,7 +50,7 @@ export default function ProductsPage() {
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("es");
     return products.filter((product) => {
-      if (term && !`${product.name || ""} ${product.abbreviation || ""} ${product.description || ""}`.toLocaleLowerCase("es").includes(term)) return false;
+      if (term && !`${product.name || ""} ${product.abbreviation || ""} ${product.presentation || ""} ${product.description || ""}`.toLocaleLowerCase("es").includes(term)) return false;
       if (categoryId && product.categoryId !== categoryId) return false;
       if (status === "active" && product.active === false) return false;
       if (status === "inactive" && product.active !== false) return false;
@@ -108,14 +108,13 @@ export default function ProductsPage() {
                   <ProductImage product={product} />
                   <div>
                     <h3>{product.name}</h3>
-                    <p>{product.categoryName || "Sin categoría"}{product.abbreviation ? ` · ${product.abbreviation}` : ""}</p>
+                    <p>{product.categoryName || "Sin categoría"}{product.presentation ? ` · ${product.presentation}` : ""}{product.abbreviation ? ` · ${product.abbreviation}` : ""}</p>
                   </div>
                   <Badge tone={product.active === false ? "neutral" : "success"}>{product.active === false ? "Inactivo" : "Activo"}</Badge>
                 </header>
                 {product.description ? <p className="fm-inventory-card__description">{product.description}</p> : null}
                 <dl className="fm-inventory-card__stats">
                   <div><dt>Precio predeterminado</dt><dd>{formatMoney(product.defaultPrice || 0)}</dd></div>
-                  <div><dt>Alertas</dt><dd>{Number(product.yellowAlertQty || 0)} / {Number(product.redAlertQty || 0)}</dd></div>
                 </dl>
                 {canEdit ? (
                   <footer className="fm-inventory-card__actions">

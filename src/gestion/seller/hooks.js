@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { mergeLocationInventoryItem } from "../../modules/inventory/domain/inventory";
 import { effectiveSellerLocations } from "../permissions";
 import {
   getLocationsSharedCached,
@@ -6,10 +7,10 @@ import {
   listLocationsShared,
   loadSellerResourcesShared,
 } from "../services/sharedResources";
-import { listLocationInventory } from "../services/inventoryService";
 import {
   listSellerDailySales,
   subscribeSellerLocationStock,
+  subscribeSellerMasterProducts,
 } from "../services/sellerService";
 import { listSellerPendingSales } from "./offlineSales";
 import {
@@ -79,8 +80,40 @@ export function useSellerResources(profile) {
   });
 }
 
-export function useSellerLocationStock(profile, locationId) {
+export function useSellerMasterProducts(initialProducts = []) {
+  const [state, setState] = useState(() => ({
+    status: initialProducts.length ? "ready" : "loading",
+    data: initialProducts,
+    error: null,
+  }));
+
+  useEffect(() => {
+    setState((current) => ({
+      ...current,
+      status: current.data?.length ? "ready" : "loading",
+      error: null,
+    }));
+    const unsubscribe = subscribeSellerMasterProducts({
+      onData: (data) => setState({ status: "ready", data, error: null }),
+      onError: (error) => setState((current) => ({
+        status: current.data?.length ? "ready" : "error",
+        data: current.data || [],
+        error,
+      })),
+    });
+    return () => unsubscribe?.();
+  }, []);
+
+  return state;
+}
+
+export function useSellerLocationStock(profile, locationId, masterProducts = []) {
   const [state, setState] = useState({ status: "idle", data: [], error: null });
+  const masterById = useMemo(
+    () => new Map((masterProducts || []).map((product) => [product.id, product])),
+    [masterProducts],
+  );
+
   useEffect(() => {
     if (!locationId) {
       setState({ status: "idle", data: [], error: null });
@@ -88,50 +121,52 @@ export function useSellerLocationStock(profile, locationId) {
     }
     let disposed = false;
     let unsubscribe = null;
-    let hydration = 0;
     setState((current) => ({ ...current, status: current.data?.length ? "ready" : "loading", error: null }));
 
-    const refreshHydratedStock = async () => {
-      const currentHydration = ++hydration;
-      try {
-        const data = (await listLocationInventory(locationId))
-          .filter((item) => item.active !== false && item.masterActive !== false);
-        if (!disposed && currentHydration === hydration) {
-          setState({ status: "ready", data, error: null });
-        }
-      } catch (error) {
-        if (!disposed && currentHydration === hydration) {
-          setState((current) => ({
-            status: current.data?.length ? "ready" : "error",
-            data: current.data || [],
-            error,
-          }));
-        }
-      }
+    const hydrateSnapshot = (stockItems = []) => {
+      const data = stockItems
+        .map((item) => {
+          const product = masterById.get(item.productId || item.id);
+          // El catálogo maestro activo es la autoridad. Si el producto fue
+          // desactivado, deja de estar en esta colección y no debe seguir
+          // apareciendo vendible por una copia local antigua.
+          if (!product) return null;
+          return mergeLocationInventoryItem(product, item);
+        })
+        .filter((item) => item && item.active !== false && item.masterActive !== false)
+        .sort((a, b) => String(a.productName || "").localeCompare(String(b.productName || ""), "es"));
+      if (!disposed) setState({ status: "ready", data, error: null });
     };
 
-    // El listener conserva la actualización inmediata del stock. Cuando cambia una
-    // unidad, hidratamos sólo los productos asignados a esta ubicación con el maestro
-    // para resolver el precio predeterminado vigente sin leer todo el catálogo.
+    // El listener entrega el stock local una sola vez por cambio. Los datos del
+    // catálogo maestro ya están precargados/cachéados al abrir el Panel Vendedor,
+    // evitando una lectura por producto en cada actualización de stock.
     subscribeSellerLocationStock({
       profile,
       locationId,
-      onData: () => refreshHydratedStock(),
-      onError: (error) => !disposed && setState((current) => ({ status: current.data?.length ? "ready" : "error", data: current.data || [], error })),
+      onData: hydrateSnapshot,
+      onError: (error) => !disposed && setState((current) => ({
+        status: current.data?.length ? "ready" : "error",
+        data: current.data || [],
+        error,
+      })),
     })
       .then((cleanup) => {
         if (disposed) cleanup?.();
         else unsubscribe = cleanup;
       })
       .catch((error) => {
-        if (!disposed) setState((current) => ({ status: current.data?.length ? "ready" : "error", data: current.data || [], error }));
+        if (!disposed) setState((current) => ({
+          status: current.data?.length ? "ready" : "error",
+          data: current.data || [],
+          error,
+        }));
       });
     return () => {
       disposed = true;
-      hydration += 1;
       unsubscribe?.();
     };
-  }, [profile.id, locationId]);
+  }, [profile.id, locationId, masterById]);
   return state;
 }
 

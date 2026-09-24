@@ -50,6 +50,7 @@ const locations = [
   { id: "loc-2", name: "Feria", active: true, deleted: false },
   { id: "loc-3", name: "Pausada", active: false, deleted: false },
   { id: "loc-4", name: "Eliminada", active: true, deleted: true },
+  { id: "warehouse-legacy", name: "Depósito legacy", type: "warehouse_store", active: true, deleted: false },
 ];
 
 test("un vendedor puro accede al Panel Vendedor y no al administrativo", () => {
@@ -166,6 +167,15 @@ test("+2 pagos exige montos no negativos y suma exacta", () => {
   );
 });
 
+test("el Panel Vendedor advierte pero no bloquea ventas fuera del calendario programado", async () => {
+  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
+  const service = await read("../src/gestion/services/sellerService.js");
+  assert.match(panel, /outsideProgrammedSchedule/);
+  assert.match(panel, /La venta se registrará igualmente/);
+  assert.match(service, /isLocationSaleEnabled/);
+  assert.doesNotMatch(service, /isLocationActiveNow/);
+});
+
 test("la ruta y el cambio entre paneles conservan la misma sesión", async () => {
   const app = await read("../src/gestion/ManagementApp.jsx");
   const shell = await read("../src/gestion/ManagementShell.jsx");
@@ -196,6 +206,7 @@ test("la interfaz compacta descuentos y prepara ticket sin simular ARCA", async 
 
 test("la venta guarda creador, fecha local, descuentos desglosados y ticket", async () => {
   const service = await read("../src/gestion/services/sellerService.js");
+  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
   for (const field of [
     "createdBy",
     "createdByName",
@@ -208,7 +219,9 @@ test("la venta guarda creador, fecha local, descuentos desglosados y ticket", as
     "ticketStatus",
   ]) assert.match(service, new RegExp(field));
   assert.match(service, /runTransaction\(db/);
-  assert.match(service, /previousStock < item\.qty/);
+  assert.doesNotMatch(service, /previousStock < item\.qty/);
+  assert.match(panel, /el stock digital disponible es/);
+  assert.match(panel, /Podés continuar si verificaste que la mercadería existe físicamente/);
   assert.match(service, /lastMovementId/);
   assert.match(service, /sale\.cancelled/);
   assert.match(service, /sale\.updated/);
@@ -244,8 +257,8 @@ test("Ubicaciones incorpora Ventas y consulta una sola colección paginada", asy
 test("stock, navegación y venta actual tienen reglas responsive compactas", async () => {
   const page = await read("../src/gestion/pages/LocationDetailPage.jsx");
   const css = await read("../src/styles/seller-stage2.css");
-  assert.match(page, /fm-stock-mode-row/);
-  assert.match(page, /fm-stock-reason-input/);
+  assert.match(page, /fm-inventory-picker-filters/);
+  assert.match(page, /fm-stock-calculation/);
   assert.match(css, /grid-template-columns: minmax\(220px/);
   assert.match(css, /#f7f1e8/i);
   assert.match(css, /#2f2924/i);
@@ -255,6 +268,44 @@ test("stock, navegación y venta actual tienen reglas responsive compactas", asy
   assert.match(css, /@media \(max-width: 360px\)/);
   assert.match(css, /min-height: 44px/);
   assert.doesNotMatch(css, /width:\s*100vw/);
+});
+
+
+
+test("un producto desactivado en el catálogo maestro no permanece vendible por datos locales viejos", async () => {
+  const hooks = await read("../src/gestion/seller/hooks.js");
+  assert.match(hooks, /if \(!product\) return null/);
+  assert.match(hooks, /El catálogo maestro activo es la autoridad/);
+});
+
+test("el Panel Vendedor precarga catálogo maestro y evita lecturas N+1 por producto", async () => {
+  const shared = await read("../src/gestion/services/sharedResources.js");
+  const hooks = await read("../src/gestion/seller/hooks.js");
+  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
+  assert.match(shared, /listMasterProductsShared\(profile\)/);
+  assert.match(shared, /products,/);
+  assert.match(hooks, /mergeLocationInventoryItem/);
+  assert.doesNotMatch(hooks, /listLocationInventory/);
+  assert.match(panel, /useSellerLocationStock\(profile, locationId, masterProducts\)/);
+});
+
+test("la creación online usa un identificador idempotente para evitar ventas duplicadas", async () => {
+  const service = await read("../src/gestion/services/sellerService.js");
+  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
+  assert.match(service, /requestId = ""/);
+  assert.match(service, /online_\$\{seller\.id\}_\$\{safeRequestId\}/);
+  assert.match(service, /clientRequestId: refs\.requestId/);
+  assert.match(service, /alreadySynced: true/);
+  assert.match(panel, /saleAttemptId = useRef\(""\)/);
+  assert.match(panel, /requestId: saleAttemptId\.current/);
+});
+
+test("el flujo del vendedor respeta descuentos, métricas diarias y precios por categorías", async () => {
+  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
+  assert.match(panel, /disabled=\{!currentItems\.length\}.*Agregar descuento/s);
+  assert.match(panel, /Efectivo \{formatMoney\(cashTotal\)\}/);
+  assert.match(panel, /<details key=\{group\.id\} className="fm-seller-price-category">/);
+  assert.match(panel, /Teléfono obligatorio · nombre y zona opcionales/);
 });
 
 test("las reglas vinculan stock con venta y movimiento de la misma transacción", async () => {

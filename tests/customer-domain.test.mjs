@@ -41,7 +41,7 @@ test("el contrato WhatsApp no adivina país ni acepta números argentinos ambigu
   assert.equal(canonicalWhatsAppPhone("11 5757-1979", { country: "UY" }), "");
 });
 
-test("el nombre es opcional pero la zona y el teléfono son obligatorios", () => {
+test("el teléfono es obligatorio y nombre y zona son opcionales", () => {
   assert.deepEqual(buildCustomerDraft({
     phone: "11 1234-5678",
     zoneId: "zona-norte",
@@ -54,8 +54,15 @@ test("el nombre es opcional pero la zona y el teléfono son obligatorios", () =>
     zoneName: "Zona Norte",
     customZone: "",
   });
+  assert.deepEqual(buildCustomerDraft({ phone: "11 1234-5678" }), {
+    phone: "11 1234-5678",
+    phoneNormalized: "1112345678",
+    name: "",
+    zoneId: "",
+    zoneName: "",
+    customZone: "",
+  });
   assert.throws(() => buildCustomerDraft({ phone: "123", zoneName: "CABA" }), /teléfono válido/i);
-  assert.throws(() => buildCustomerDraft({ phone: "11 1234-5678" }), /zona/i);
 });
 
 test("la zona libre no crea una referencia a una zona global", () => {

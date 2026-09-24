@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
 import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
-import { isLocationActiveNow } from "../../modules/locations/domain/locations";
+import { isLocationSaleEnabled } from "../../modules/locations/domain/locations";
 import { normalizePayment } from "../../modules/locations/domain/payments";
 import {
   addArgentinaDays,
@@ -176,25 +176,38 @@ function resolvedCustomerFromSnapshot(snapshot, prepared) {
   if (stored.deleted === true || stored.active === false) {
     throw new Error("Este teléfono fue reemplazado en Clientes Fidelizados. Usá el número actualizado.");
   }
+  const storedZone = stored.zoneName || stored.customZone || "";
   return {
     id: snapshot.id,
     phone: stored.phone || prepared.phone,
     phoneNormalized: stored.phoneNormalized || prepared.phoneNormalized,
-    name: stored.name || "",
-    zoneId: stored.zoneId || "",
-    zoneName: stored.zoneName || stored.customZone || prepared.zoneName,
-    customZone: stored.customZone || "",
+    name: stored.name || prepared.name || "",
+    zoneId: stored.zoneId || (!storedZone ? prepared.zoneId : "") || "",
+    zoneName: storedZone || prepared.zoneName || "",
+    customZone: stored.customZone || (!storedZone ? prepared.customZone : "") || "",
   };
 }
 
 function writeCustomerForSale(transaction, customerRef, customerSnapshot, customer, profile, saleId) {
   if (!customerRef || !customer) return;
   if (customerSnapshot.exists()) {
-    transaction.update(customerRef, {
+    const stored = customerSnapshot.data();
+    const updates = {
       lastSaleId: saleId,
       lastPurchaseAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
+    };
+    if (!String(stored.name || "").trim() && String(customer.name || "").trim()) {
+      updates.name = customer.name;
+    }
+    const storedZone = String(stored.zoneName || stored.customZone || "").trim();
+    const nextZone = String(customer.zoneName || customer.customZone || "").trim();
+    if (!storedZone && nextZone) {
+      updates.zoneId = customer.zoneId || "";
+      updates.zoneName = nextZone;
+      updates.customZone = customer.customZone || "";
+    }
+    transaction.update(customerRef, updates);
     return;
   }
   transaction.set(customerRef, {
@@ -244,6 +257,14 @@ export async function subscribeSellerLocationStock({ profile, locationId, onData
         item.active !== false && item.deleted !== true && item.productDeleted !== true,
       ),
     ),
+    onError,
+  );
+}
+
+export function subscribeSellerMasterProducts({ onData, onError }) {
+  return onSnapshot(
+    query(collection(db, "products"), where("active", "==", true), orderBy("name")),
+    (snapshot) => onData(docsToArray(snapshot).filter((product) => product.deleted !== true)),
     onError,
   );
 }
@@ -303,7 +324,7 @@ async function verifiedDiscounts({ profile, location, discounts, items }) {
   return [...normalizedSaved, ...normalizedManual];
 }
 
-function saleRefs({ location, saleItems, seller, offlineSale }) {
+function saleRefs({ location, saleItems, seller, offlineSale, requestId }) {
   const dateKey = argentinaDateKey().replaceAll("-", "");
   const prefix = String(location.codePrefix || "LOC")
     .toUpperCase()
@@ -313,14 +334,18 @@ function saleRefs({ location, saleItems, seller, offlineSale }) {
   if (localId && !/^local_[A-Za-z0-9_-]+$/.test(localId)) {
     throw new Error("El identificador de la venta pendiente no es válido.");
   }
+  const safeRequestId = String(requestId || "").trim().replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
   return {
     dateKey,
     prefix,
     localId,
+    requestId: safeRequestId,
     counterRef: doc(db, "counters", `${prefix}_${dateKey}`),
     saleRef: localId
       ? doc(db, "sales", `offline_${seller.id}_${localId}`.replaceAll("/", "_"))
-      : doc(collection(db, "sales")),
+      : safeRequestId
+        ? doc(db, "sales", `online_${seller.id}_${safeRequestId}`.replaceAll("/", "_"))
+        : doc(collection(db, "sales")),
     stockRefs: saleItems.map((item) => doc(db, "locationStock", location.id, "items", item.productId)),
     movementRefs: saleItems.map(() => doc(collection(db, "stockMovements"))),
     auditRef: doc(collection(db, "auditLogs")),
@@ -338,6 +363,7 @@ export async function createSellerSale({
   ticketRequested = false,
   customer = null,
   offlineSale = null,
+  requestId = "",
 }) {
   if (!can(profile, "quick-sales", "create")) {
     throw new Error("No tenés permiso para registrar ventas.");
@@ -352,7 +378,7 @@ export async function createSellerSale({
   const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal);
   const payment = normalizePayment(paymentMethod, paymentMethodLabel, payments, discountSummary.total);
   const preparedCustomer = await prepareSaleCustomer(customer);
-  const refs = saleRefs({ location: permittedLocation, saleItems, seller: profile, offlineSale });
+  const refs = saleRefs({ location: permittedLocation, saleItems, seller: profile, offlineSale, requestId });
   const customerRef = preparedCustomer ? doc(db, "customers", preparedCustomer.id) : null;
   const createdLocallyAt = refs.localId ? new Date(offlineSale.createdLocallyAt) : null;
   if (createdLocallyAt && Number.isNaN(createdLocallyAt.valueOf())) {
@@ -360,12 +386,15 @@ export async function createSellerSale({
   }
 
   return runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
-    if (refs.localId) {
+    if (refs.localId || refs.requestId) {
       const existing = await transaction.get(refs.saleRef);
       if (existing.exists()) {
         const data = existing.data();
-        if (data.offlineLocalId !== refs.localId || data.sellerId !== profile.id) {
-          throw new Error("El identificador pendiente ya está en uso.");
+        const identifierMatches = refs.localId
+          ? data.offlineLocalId === refs.localId
+          : data.clientRequestId === refs.requestId;
+        if (!identifierMatches || data.sellerId !== profile.id || data.locationId !== permittedLocation.id) {
+          throw new Error("El identificador de la venta ya está en uso.");
         }
         return {
           id: refs.saleRef.id,
@@ -384,7 +413,7 @@ export async function createSellerSale({
     }
 
     const locationSnapshot = await transaction.get(doc(db, "locations", permittedLocation.id));
-    if (!locationSnapshot.exists() || !isLocationActiveNow({ id: locationSnapshot.id, ...locationSnapshot.data() })) {
+    if (!locationSnapshot.exists() || !isLocationSaleEnabled({ id: locationSnapshot.id, ...locationSnapshot.data() })) {
       throw new Error("La ubicación dejó de estar activa.");
     }
     const customerSnapshot = customerRef ? await transaction.get(customerRef) : null;
@@ -403,7 +432,6 @@ export async function createSellerSale({
         throw new Error(`${item.name} ya no está habilitado en esta ubicación.`);
       }
       const previousStock = Number(snapshot.data().currentStock || 0);
-      if (previousStock < item.qty) throw insufficientStockError(item, previousStock);
       const newStock = previousStock - item.qty;
       transaction.update(refs.stockRefs[index], stockMutationFields({
         currentStock: newStock,
@@ -464,6 +492,7 @@ export async function createSellerSale({
         createdLocallyAt: createdLocallyAt.toISOString(),
         syncedAt: serverTimestamp(),
       } : {}),
+      ...(refs.requestId ? { clientRequestId: refs.requestId } : {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       deletedAt: null,
@@ -564,7 +593,6 @@ export async function updateSellerSale({
       if (!snapshot.exists()) throw new Error(`Falta el stock de ${item.name}.`);
       const previousStock = Number(snapshot.data().currentStock || 0);
       const newStock = previousStock + difference;
-      if (newStock < 0) throw insufficientStockError(item, previousStock + (oldQty.get(productId) || 0));
       transaction.update(stockRefs[index], stockMutationFields({
         currentStock: newStock,
         lastSaleId: saleId,

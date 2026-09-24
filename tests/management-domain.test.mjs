@@ -4,6 +4,7 @@ import {
   calculateDiscountSummary,
 } from "../src/modules/locations/domain/discounts.js";
 import {
+  isLocationSaleEnabled,
   locationActivity,
 } from "../src/modules/locations/domain/locations.js";
 import {
@@ -67,6 +68,17 @@ test("una ubicación pausada no se considera activa", () => {
     now,
   );
   assert.equal(state.active, false);
+});
+
+test("el calendario informa el horario pero no bloquea una venta real fuera de programa", () => {
+  const now = new Date("2026-09-24T20:00:00-03:00");
+  const location = {
+    active: true,
+    deleted: false,
+    scheduleEndAt: new Date("2026-09-24T18:00:00-03:00"),
+  };
+  assert.equal(locationActivity(location, now).reason, "ended");
+  assert.equal(isLocationSaleEnabled(location, now), true);
 });
 
 test("un vendedor sólo ve módulos operativos autorizados", () => {

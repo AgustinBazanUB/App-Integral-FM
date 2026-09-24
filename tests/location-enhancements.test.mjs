@@ -6,7 +6,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 
 const locationsPage = read("src/gestion/pages/LocationsPage.jsx");
 const detailPage = read("src/gestion/pages/LocationDetailPage.jsx");
-const productForm = read("src/gestion/components/LocationProductForm.jsx");
+const productForm = read("src/gestion/components/ProductForm.jsx");
 const service = read("src/gestion/services/locationEnhancementsService.js");
 const images = read("src/data/productImages.js");
 const styles = read("src/styles/location-enhancements.css");
@@ -18,36 +18,32 @@ test("las ubicaciones fijadas son personales y tienen límite de cuatro", () => 
   assert.match(service, /slice\(0, 4\)/);
 });
 
-test("cargar stock abre directamente la sección correcta y valida actividad", () => {
+test("cargar stock abre directamente la sección correcta y bloquea ingresos en ubicaciones inactivas", () => {
   assert.match(locationsPage, /\/stock`/);
-  assert.match(detailPage, /loadActiveLocationStock/);
-  assert.match(service, /locationActivity\(location\)\.active/);
-  assert.match(detailPage, /Esta ubicación debe estar activa para cargar stock/);
+  assert.match(detailPage, /disabled=\{!state\.active\}/);
+  assert.match(detailPage, /no ingresar mercadería hasta reactivarla/);
 });
 
-test("los productos se crean desde la ubicación con alcance local predeterminado", () => {
-  assert.match(detailPage, /Agregar nuevo producto/);
-  assert.match(productForm, /scope: "current"/);
-  assert.match(productForm, /Solo esta ubicación/);
-  assert.match(productForm, /Todas las ubicaciones activas/);
-  assert.match(productForm, /El stock inicial será 0/);
-  assert.match(service, /currentStock: 0/);
-  assert.match(service, /productsSnapshot\.docs\.find/);
+test("la ubicación selecciona productos ya existentes del catálogo maestro", () => {
+  assert.match(detailPage, /title="Agregar producto"/);
+  assert.match(detailPage, /producto que ya existe en el catálogo de Flor Mía/);
+  assert.match(detailPage, /listMasterProductsForInventory/);
+  assert.match(detailPage, /addProductToLocation/);
+  assert.doesNotMatch(detailPage, /Agregar nuevo producto/);
 });
 
-test("la vista de productos está agrupada por categoría", () => {
-  assert.match(detailPage, /fm-product-category-groups/);
-  assert.match(detailPage, /<details className="fm-product-category"/);
-  assert.match(detailPage, /group\.items\.length/);
+test("el stock de una ubicación permite búsqueda y filtro por categoría", () => {
+  assert.match(detailPage, /Buscar en esta ubicación/);
+  assert.match(detailPage, /Filtrar stock por categoría/);
+  assert.match(detailPage, /fm-inventory-card-grid/);
+  assert.match(detailPage, /visibleInventory/);
 });
 
-test("el catálogo de imágenes es local y Firestore guarda rutas", () => {
+test("el catálogo maestro usa imágenes locales del proyecto", () => {
   assert.match(images, /\/images\/flor-mia\/logo-flor-mia\.svg/);
   assert.match(images, /product\.image/);
-  assert.match(service, /path\.startsWith\("data:"\)/);
-  assert.match(service, /path\.startsWith\("blob:"\)/);
-  assert.match(service, /path\.startsWith\("\/images\/"\)/);
-  assert.match(productForm, /Imagen del catálogo local/);
+  assert.match(productForm, /Imagen del producto/);
+  assert.match(productForm, /productImages/);
 });
 
 test("vendedores asignados y disponibles se muestran por separado", () => {
@@ -68,4 +64,22 @@ test("los valores de stock usan texto oscuro y controles táctiles", () => {
   assert.match(styles, /#76510f/i);
   assert.match(styles, /min-height: 44px/);
   assert.match(styles, /@media \(max-width: 768px\)/);
+});
+
+
+test("las ubicaciones nuevas se limitan a Local, Feria o Evento y los depósitos legacy no entran al vendedor", () => {
+  const permissions = read("src/gestion/permissions.js");
+  const management = read("src/gestion/services/locationManagementService.js");
+  const rules = read("firestore.rules");
+  assert.match(locationsPage, /sellableLocationTypeOptions = \["store", "fair", "event"\]/);
+  assert.match(management, /supportedTypes = new Set\(\["store", "fair", "event"\]\)/);
+  assert.match(permissions, /location\?\.type !== "warehouse_store"/);
+  assert.match(rules, /sellableLocationType/);
+});
+
+test("la asignación de una ubicación contempla vendedores y administradores activos", () => {
+  const management = read("src/gestion/services/locationManagementService.js");
+  assert.match(management, /new Set\(\["seller", "admin", "general_admin"\]\)/);
+  assert.match(management, /user\.active === true/);
+  assert.match(detailPage, /Asignar vendedor/);
 });

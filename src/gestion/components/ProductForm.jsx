@@ -14,11 +14,10 @@ import { saveMasterProduct } from "../services/inventoryService";
 const emptyForm = {
   name: "",
   abbreviation: "",
+  presentation: "",
   categoryId: "",
   description: "",
   defaultPrice: 0,
-  yellowAlertQty: 0,
-  redAlertQty: 0,
   active: true,
   imageId: "product-placeholder",
   buttonKey: "",
@@ -34,11 +33,10 @@ function initialForm(product) {
     ...emptyForm,
     name: product.name || product.productName || "",
     abbreviation: product.abbreviation || "",
+    presentation: product.presentation || "",
     categoryId: product.categoryId || "",
     description: product.description || "",
     defaultPrice: Number(product.defaultPrice || 0),
-    yellowAlertQty: Number(product.yellowAlertQty || 0),
-    redAlertQty: Number(product.redAlertQty || 0),
     active: product.active !== false,
     imageId: selectedImage?.id || "product-placeholder",
     buttonKey: product.buttonKey || "",
@@ -134,6 +132,9 @@ export default function ProductForm({ open, product, categories, profile, onClos
         <FormField label="Abreviación" hint="Hasta 8 caracteres." required>
           <input maxLength="8" value={form.abbreviation} onChange={(event) => setForm({ ...form, abbreviation: event.target.value.toUpperCase() })} />
         </FormField>
+        <FormField label="Variante / presentación" hint="Opcional. Ej.: 500 ml, Arbequina, 1 kg.">
+          <input value={form.presentation} onChange={(event) => setForm({ ...form, presentation: event.target.value })} />
+        </FormField>
         <FormField label="Categoría">
           <Select value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
             <option value="">Sin categoría</option>
@@ -145,12 +146,6 @@ export default function ProductForm({ open, product, categories, profile, onClos
         </FormField>
         <FormField label="Descripción" className="fm-form-grid__full">
           <textarea rows="3" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
-        </FormField>
-        <FormField label="Alerta amarilla" required>
-          <input type="number" min="0" step="1" inputMode="numeric" value={form.yellowAlertQty} onChange={(event) => setForm({ ...form, yellowAlertQty: event.target.value })} />
-        </FormField>
-        <FormField label="Alerta roja" required>
-          <input type="number" min="0" step="1" inputMode="numeric" value={form.redAlertQty} onChange={(event) => setForm({ ...form, redAlertQty: event.target.value })} />
         </FormField>
 
         <section className="fm-image-picker-section fm-form-grid__full" aria-labelledby="master-product-image-title">

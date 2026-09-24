@@ -109,12 +109,11 @@ export function buildCustomerDraft({ phone, name = "", zoneId = "", zoneName = "
   const cleanCustomZone = cleanZoneName(customZone);
   const cleanConfiguredZone = cleanZoneName(zoneName);
   const resolvedZoneName = cleanCustomZone || cleanConfiguredZone;
-  if (!resolvedZoneName) throw new Error("Elegí una zona o ingresá una nueva zona.");
   return {
     phone: String(phone || "").trim(),
     phoneNormalized,
     name: cleanCustomerName(name),
-    zoneId: cleanCustomZone ? "" : String(zoneId || "").trim(),
+    zoneId: resolvedZoneName && !cleanCustomZone ? String(zoneId || "").trim() : "",
     zoneName: resolvedZoneName,
     customZone: cleanCustomZone,
   };

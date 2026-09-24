@@ -54,6 +54,16 @@ export function locationActivity(location = {}, now = new Date()) {
 
 export const isLocationActiveNow = (location, now = new Date()) => locationActivity(location, now).active;
 
+export function isLocationSaleEnabled(location = {}, now = new Date()) {
+  if (location.deleted === true || location.active !== true) return false;
+  const manualInactiveUntil = dateFromLocationValue(
+    location.manualInactiveUntil || location.manualInactiveUntilDateTime,
+    "end",
+  );
+  if (manualInactiveUntil && manualInactiveUntil > now) return false;
+  return true;
+}
+
 export function toLocalDateTimeInput(value, boundary = "start") {
   const date = dateFromLocationValue(value, boundary);
   if (!date) return "";
