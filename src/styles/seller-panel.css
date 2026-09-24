@@ -151,6 +151,7 @@
 }
 
 @media (max-width: 480px) {
+  .fm-seller-sales-summary { grid-template-columns: 1fr; }
   .fm-seller-pending-chip { min-width: 42px; justify-content: center; padding: 0 8px; font-size: 0; }
   .fm-seller-pending-chip strong { font-size: 11px; }
   .fm-seller-nav button span { display: none; }
