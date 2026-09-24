@@ -126,37 +126,24 @@ service cloud.firestore {
           && (action in user.permissions["quick-sales"] || "admin" in user.permissions["quick-sales"]))
       );
     }
-    function locationStockManagementPermission() {
+    function locationInventoryPermission(action) {
       let user = profile();
       return signedIn() && user.active == true && (
         user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
-        || explicitPermission("locations", "configureLocationProducts")
-        || explicitPermission("locations", "loadStock")
-        || explicitPermission("locations", "adjustStock")
+        || explicitPermission("locations", action)
       );
     }
-    function locationStockConfigurePermission() {
+    function warehouseTransferPermission() {
       let user = profile();
       return signedIn() && user.active == true && (
-        user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
+        user.role in ["admin", "general_admin", "operational_admin", "warehouse_manager", "supplier_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
-        || explicitPermission("locations", "configureLocationProducts")
-      );
-    }
-    function locationStockLoadPermission() {
-      let user = profile();
-      return signedIn() && user.active == true && (
-        user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
-        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
-        || (("isAdmin" in user) && user.isAdmin == true)
-        || (("roles" in user) && ("admin" in user.roles))
-        || explicitPermission("locations", "loadStock")
-        || explicitPermission("locations", "adjustStock")
+        || explicitPermission("warehouse", "transferStock")
       );
     }
     function locationNotDeleted(location) {
@@ -850,22 +837,23 @@ service cloud.firestore {
       allow read, write: if isAdmin();
       match /items/{productId} {
         allow read: if activeUser() && allowedLocation(locationId);
-        allow create: if ((locationStockManagementPermission()
-              || canModule("warehouse", "transferStock"))
+        allow create: if ((locationInventoryPermission("configureLocationProducts")
+              || locationInventoryPermission("loadStock")
+              || locationInventoryPermission("adjustStock")
+              || warehouseTransferPermission())
             && allowedLocation(locationId)
             && request.resource.data.productId == productId
             && request.resource.data.currentStock is int
             && request.resource.data.currentStock >= 0);
         allow update: if validSellerStockMutation(locationId, productId)
-          || isAdmin()
-          || (canModule("warehouse", "transferStock")
+          || (warehouseTransferPermission()
             && allowedLocation(locationId)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               "currentStock", "lastMovementId", "updatedAt", "updatedBy"
             ])
             && request.resource.data.currentStock is int
             && request.resource.data.currentStock >= 0)
-          || (locationStockConfigurePermission()
+          || (locationInventoryPermission("configureLocationProducts")
             && allowedLocation(locationId)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               "productId", "productName", "abbreviation", "categoryId", "categoryName",
@@ -873,7 +861,7 @@ service cloud.firestore {
               "masterDefaultPrice", "yellowAlertQty", "redAlertQty",
               "active", "deleted", "updatedAt", "updatedBy"
             ]))
-          || (locationStockLoadPermission()
+          || ((locationInventoryPermission("loadStock") || locationInventoryPermission("adjustStock"))
             && allowedLocation(locationId)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               "productId", "productName", "abbreviation", "categoryId", "categoryName",
