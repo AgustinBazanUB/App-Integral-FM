@@ -59,3 +59,16 @@ test("Ubicaciones comienza con ubicaciones y eventos, sin tarjetas de métricas"
   assert.match(source, /title="Ubicaciones y eventos"/);
   assert.doesNotMatch(source, /fm-stat-grid/);
 });
+
+
+test("las alertas de stock se configuran por ubicación y no en el producto maestro", async () => {
+  const form = await read("../src/gestion/components/ProductForm.jsx");
+  const products = await read("../src/gestion/pages/ProductsPage.jsx");
+  const inventory = await read("../src/gestion/services/inventoryService.js");
+  assert.doesNotMatch(form, /Alerta amarilla|Alerta roja/);
+  assert.doesNotMatch(products, />Alertas</);
+  assert.doesNotMatch(inventory, /const yellowAlertQty = wholeInventoryQuantity\(values\.yellowAlertQty/);
+  assert.match(inventory, /saveLocationProductSettings/);
+  assert.match(inventory, /yellowAlertQty/);
+  assert.match(inventory, /redAlertQty/);
+});
