@@ -256,6 +256,7 @@ export function effectiveSellerLocations(profile, locations = [], now = new Date
   const allowed = new Set(profile.allowedLocationIds || []);
   return (locations || [])
     .filter((location) => location?.deleted !== true)
+    .filter((location) => location?.type !== "warehouse_store")
     .filter((location) => isLocationActiveNow(location, now))
     .filter((location) =>
       canSeeAll ||
