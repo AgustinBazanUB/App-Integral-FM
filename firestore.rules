@@ -138,10 +138,41 @@ service cloud.firestore {
     function locationInventoryPermission(action) {
       return locationInventoryRoleManager() || explicitPermission("locations", action);
     }
+    function validRoleManagedLocationStockCreate(locationId, productId) {
+      let user = profile();
+      let managerRole = user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles));
+      let locationAllowed = user.role in ["admin", "general_admin", "operational_admin"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles))
+        || (("allowedLocationIds" in user) && locationId in user.allowedLocationIds);
+      return signedIn()
+        && user.active == true
+        && managerRole
+        && locationAllowed
+        && request.resource.data.productId == productId
+        && request.resource.data.currentStock is int
+        && request.resource.data.currentStock >= 0;
+    }
     function validRoleManagedLocationStockMutation(locationId, productId) {
+      let user = profile();
       let changed = request.resource.data.diff(resource.data).affectedKeys();
-      return locationInventoryRoleManager()
-        && allowedLocation(locationId)
+      let managerRole = user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles));
+      let locationAllowed = user.role in ["admin", "general_admin", "operational_admin"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles))
+        || (("allowedLocationIds" in user) && locationId in user.allowedLocationIds);
+      return signedIn()
+        && user.active == true
+        && managerRole
+        && locationAllowed
         && request.resource.data.productId == productId
         && request.resource.data.currentStock is int
         && request.resource.data.currentStock >= 0
@@ -855,11 +886,7 @@ service cloud.firestore {
       allow read, write: if isAdmin();
       match /items/{productId} {
         allow read: if activeUser() && allowedLocation(locationId);
-        allow create: if (locationInventoryRoleManager()
-            && allowedLocation(locationId)
-            && request.resource.data.productId == productId
-            && request.resource.data.currentStock is int
-            && request.resource.data.currentStock >= 0)
+        allow create: if validRoleManagedLocationStockCreate(locationId, productId)
           || ((locationInventoryPermission("configureLocationProducts")
               || locationInventoryPermission("loadStock")
               || locationInventoryPermission("adjustStock")
