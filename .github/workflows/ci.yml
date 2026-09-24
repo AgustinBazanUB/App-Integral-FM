@@ -2,7 +2,7 @@ name: Verificación
 
 on:
   push:
-    branches: [main, "agent/**"]
+    branches: [main, "agent/**", "audit/**"]
   pull_request:
     branches: [main]
 
