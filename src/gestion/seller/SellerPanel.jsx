@@ -703,7 +703,7 @@ export default function SellerPanel() {
                           {product.buttonKey || product.buttonLabel ? <span className="fm-seller-key">{product.buttonLabel || product.buttonKey}</span> : null}
                           <img src={sellerImage(product)} alt="" loading="lazy" decoding="async" />
                           <strong>{product.abbreviation || product.productName}</strong>
-                          <span>{product.productName}</span>
+                          <span>{product.productName}{product.presentation ? ` · ${product.presentation}` : ""}</span>
                           <small>{formatMoney(product.price)} · Stock {product.availableStock}</small>
                           {qty ? <b>{qty}</b> : null}
                         </button>
@@ -815,7 +815,7 @@ export default function SellerPanel() {
   );
 
   const pricesView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Lista de precios</h1><p>Consulta rápida por categorías</p></div></div>{productGroups.map((group) => <details key={group.id} className="fm-seller-price-category"><summary><strong>{group.name}</strong><span>{group.items.length} producto{group.items.length === 1 ? "" : "s"}</span></summary>{group.items.map((product) => <article key={product.id}><div><strong>{product.productName}</strong><span>{product.abbreviation}</span></div><div><strong>{formatMoney(product.price)}</strong><small>Stock {product.availableStock}</small></div></article>)}</details>)}</div>
+    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Lista de precios</h1><p>Consulta rápida por categorías</p></div></div>{productGroups.map((group) => <details key={group.id} className="fm-seller-price-category"><summary><strong>{group.name}</strong><span>{group.items.length} producto{group.items.length === 1 ? "" : "s"}</span></summary>{group.items.map((product) => <article key={product.id}><div><strong>{product.productName}</strong><span>{[product.presentation, product.abbreviation].filter(Boolean).join(" · ")}</span></div><div><strong>{formatMoney(product.price)}</strong><small>Stock {product.availableStock}</small></div></article>)}</details>)}</div>
   );
 
   const helpView = (
