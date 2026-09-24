@@ -196,6 +196,7 @@ test("la interfaz compacta descuentos y prepara ticket sin simular ARCA", async 
 
 test("la venta guarda creador, fecha local, descuentos desglosados y ticket", async () => {
   const service = await read("../src/gestion/services/sellerService.js");
+  const panel = await read("../src/gestion/seller/SellerPanel.jsx");
   for (const field of [
     "createdBy",
     "createdByName",
@@ -246,8 +247,8 @@ test("Ubicaciones incorpora Ventas y consulta una sola colección paginada", asy
 test("stock, navegación y venta actual tienen reglas responsive compactas", async () => {
   const page = await read("../src/gestion/pages/LocationDetailPage.jsx");
   const css = await read("../src/styles/seller-stage2.css");
-  assert.match(page, /fm-stock-mode-row/);
-  assert.match(page, /fm-stock-reason-input/);
+  assert.match(page, /fm-inventory-picker-filters/);
+  assert.match(page, /fm-stock-calculation/);
   assert.match(css, /grid-template-columns: minmax\(220px/);
   assert.match(css, /#f7f1e8/i);
   assert.match(css, /#2f2924/i);
