@@ -126,20 +126,14 @@ export function useSellerLocationStock(profile, locationId, masterProducts = [])
     const hydrateSnapshot = (stockItems = []) => {
       const data = stockItems
         .map((item) => {
-          const product = masterById.get(item.productId || item.id) || {
-            id: item.productId || item.id,
-            name: item.productName,
-            abbreviation: item.abbreviation,
-            categoryId: item.categoryId,
-            categoryName: item.categoryName,
-            imageUrl: item.imageUrl,
-            thumbUrl: item.thumbUrl,
-            defaultPrice: item.masterDefaultPrice ?? item.price ?? 0,
-            active: item.productDeleted !== true,
-          };
+          const product = masterById.get(item.productId || item.id);
+          // El catálogo maestro activo es la autoridad. Si el producto fue
+          // desactivado, deja de estar en esta colección y no debe seguir
+          // apareciendo vendible por una copia local antigua.
+          if (!product) return null;
           return mergeLocationInventoryItem(product, item);
         })
-        .filter((item) => item.active !== false && item.masterActive !== false)
+        .filter((item) => item && item.active !== false && item.masterActive !== false)
         .sort((a, b) => String(a.productName || "").localeCompare(String(b.productName || ""), "es"));
       if (!disposed) setState({ status: "ready", data, error: null });
     };
