@@ -184,6 +184,8 @@ test("la interfaz compacta descuentos y prepara ticket sin simular ARCA", async 
   assert.match(panel, />Agregar descuento</);
   assert.match(panel, />Agregar ticket</);
   assert.match(panel, /"Continuar"/);
+  assert.match(panel, /stock digital no alcanza/i);
+  assert.doesNotMatch(panel, /disabled=\{qty >= Number\(product\.availableStock/);
   assert.match(panel, /ticketRequested/);
   assert.match(dialog, />Descuentos disponibles</);
   assert.match(dialog, />Descuento manual</);
@@ -208,7 +210,8 @@ test("la venta guarda creador, fecha local, descuentos desglosados y ticket", as
     "ticketStatus",
   ]) assert.match(service, new RegExp(field));
   assert.match(service, /runTransaction\(db/);
-  assert.match(service, /previousStock < item\.qty/);
+  assert.doesNotMatch(service, /previousStock < item\.qty/);
+  assert.doesNotMatch(service, /newStock < 0.*insufficient/s);
   assert.match(service, /lastMovementId/);
   assert.match(service, /sale\.cancelled/);
   assert.match(service, /sale\.updated/);
