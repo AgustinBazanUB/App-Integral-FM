@@ -20,12 +20,15 @@ service cloud.firestore {
       );
     }
     function isAdmin() { return activeUser() && adminRole(); }
-    function explicitPermission(moduleId, action) {
-      let user = profile();
+    function explicitPermissionFor(user, moduleId, action) {
       return ("permissions" in user)
         && (moduleId in user.permissions)
         && (user.permissions[moduleId] is list)
         && (action in user.permissions[moduleId] || "admin" in user.permissions[moduleId]);
+    }
+    function explicitPermission(moduleId, action) {
+      let user = profile();
+      return explicitPermissionFor(user, moduleId, action);
     }
     function roleModule(moduleId) {
       let role = profile().role;
@@ -126,74 +129,87 @@ service cloud.firestore {
           && (action in user.permissions["quick-sales"] || "admin" in user.permissions["quick-sales"]))
       );
     }
-    function locationInventoryRoleManager() {
+    function validOperationalLocationStockCreate(locationId, productId) {
       let user = profile();
-      return signedIn() && user.active == true && (
-        user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
+      let locationAllowed = user.role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
-      );
-    }
-    function locationInventoryPermission(action) {
-      return locationInventoryRoleManager() || explicitPermission("locations", action);
-    }
-    function validRoleManagedLocationStockCreate(locationId, productId) {
-      let user = profile();
-      let managerRole = user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
-        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
-        || (("isAdmin" in user) && user.isAdmin == true)
-        || (("roles" in user) && ("admin" in user.roles));
-      let locationAllowed = user.role in ["admin", "general_admin", "operational_admin"]
-        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
-        || (("isAdmin" in user) && user.isAdmin == true)
-        || (("roles" in user) && ("admin" in user.roles))
+        || (("permissions" in user)
+          && ("locations" in user.permissions)
+          && (user.permissions.locations is list)
+          && ("viewAllLocations" in user.permissions.locations || "admin" in user.permissions.locations))
         || (("allowedLocationIds" in user) && locationId in user.allowedLocationIds);
+      let canManage = user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles))
+        || explicitPermissionFor(user, "locations", "configureLocationProducts")
+        || explicitPermissionFor(user, "locations", "loadStock")
+        || explicitPermissionFor(user, "locations", "adjustStock")
+        || user.role in ["warehouse_manager", "supplier_manager"]
+        || explicitPermissionFor(user, "warehouse", "transferStock");
       return signedIn()
         && user.active == true
-        && managerRole
         && locationAllowed
+        && canManage
         && request.resource.data.productId == productId
         && request.resource.data.currentStock is int
         && request.resource.data.currentStock >= 0;
     }
-    function validRoleManagedLocationStockMutation(locationId, productId) {
+    function validOperationalLocationStockMutation(locationId, productId) {
       let user = profile();
       let changed = request.resource.data.diff(resource.data).affectedKeys();
-      let managerRole = user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
-        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
-        || (("isAdmin" in user) && user.isAdmin == true)
-        || (("roles" in user) && ("admin" in user.roles));
-      let locationAllowed = user.role in ["admin", "general_admin", "operational_admin"]
+      let locationAllowed = user.role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
+        || (("permissions" in user)
+          && ("locations" in user.permissions)
+          && (user.permissions.locations is list)
+          && ("viewAllLocations" in user.permissions.locations || "admin" in user.permissions.locations))
         || (("allowedLocationIds" in user) && locationId in user.allowedLocationIds);
+      let commonManager = user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles));
+      let configureAllowed = commonManager
+        || explicitPermissionFor(user, "locations", "configureLocationProducts");
+      let loadAllowed = commonManager
+        || explicitPermissionFor(user, "locations", "loadStock")
+        || explicitPermissionFor(user, "locations", "adjustStock");
+      let transferAllowed = user.role in ["admin", "general_admin", "operational_admin", "warehouse_manager", "supplier_manager"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles))
+        || explicitPermissionFor(user, "warehouse", "transferStock");
+      let configureShape = changed.hasOnly([
+        "productId", "productName", "abbreviation", "presentation",
+        "categoryId", "categoryName", "imageUrl", "thumbUrl",
+        "price", "priceMode", "priceOverride", "masterDefaultPrice",
+        "yellowAlertQty", "redAlertQty", "active", "deleted",
+        "updatedAt", "updatedBy"
+      ]);
+      let loadShape = changed.hasOnly([
+        "productId", "productName", "abbreviation", "presentation",
+        "categoryId", "categoryName", "imageUrl", "thumbUrl",
+        "price", "priceMode", "priceOverride", "masterDefaultPrice",
+        "initialStock", "currentStock", "lastMovementId",
+        "yellowAlertQty", "redAlertQty", "active", "deleted", "deletedAt",
+        "productDeleted", "updatedAt", "updatedBy"
+      ]);
+      let transferShape = changed.hasOnly([
+        "currentStock", "lastMovementId", "updatedAt", "updatedBy"
+      ]);
       return signedIn()
         && user.active == true
-        && managerRole
         && locationAllowed
         && request.resource.data.productId == productId
         && request.resource.data.currentStock is int
         && request.resource.data.currentStock >= 0
-        && changed.hasOnly([
-          "productId", "productName", "abbreviation", "presentation",
-          "categoryId", "categoryName", "imageUrl", "thumbUrl",
-          "price", "priceMode", "priceOverride", "masterDefaultPrice",
-          "initialStock", "currentStock", "lastMovementId",
-          "yellowAlertQty", "redAlertQty", "active", "deleted", "deletedAt",
-          "productDeleted", "updatedAt", "updatedBy"
-        ]);
-    }
-    function warehouseTransferPermission() {
-      let user = profile();
-      return signedIn() && user.active == true && (
-        user.role in ["admin", "general_admin", "operational_admin", "warehouse_manager", "supplier_manager"]
-        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
-        || (("isAdmin" in user) && user.isAdmin == true)
-        || (("roles" in user) && ("admin" in user.roles))
-        || explicitPermission("warehouse", "transferStock")
-      );
+        && ((configureAllowed && configureShape)
+          || (loadAllowed && loadShape)
+          || (transferAllowed && transferShape));
     }
     function locationNotDeleted(location) {
       return !("deleted" in location) || location.deleted != true;
@@ -886,43 +902,9 @@ service cloud.firestore {
       allow read, write: if isAdmin();
       match /items/{productId} {
         allow read: if activeUser() && allowedLocation(locationId);
-        allow create: if validRoleManagedLocationStockCreate(locationId, productId)
-          || ((locationInventoryPermission("configureLocationProducts")
-              || locationInventoryPermission("loadStock")
-              || locationInventoryPermission("adjustStock")
-              || warehouseTransferPermission())
-            && allowedLocation(locationId)
-            && request.resource.data.productId == productId
-            && request.resource.data.currentStock is int
-            && request.resource.data.currentStock >= 0);
-        allow update: if validRoleManagedLocationStockMutation(locationId, productId)
-          || validSellerStockMutation(locationId, productId)
-          || (warehouseTransferPermission()
-            && allowedLocation(locationId)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              "currentStock", "lastMovementId", "updatedAt", "updatedBy"
-            ])
-            && request.resource.data.currentStock is int
-            && request.resource.data.currentStock >= 0)
-          || (locationInventoryPermission("configureLocationProducts")
-            && allowedLocation(locationId)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              "productId", "productName", "abbreviation", "categoryId", "categoryName",
-              "imageUrl", "thumbUrl", "price", "priceMode", "priceOverride",
-              "masterDefaultPrice", "yellowAlertQty", "redAlertQty",
-              "active", "deleted", "updatedAt", "updatedBy"
-            ]))
-          || ((locationInventoryPermission("loadStock") || locationInventoryPermission("adjustStock"))
-            && allowedLocation(locationId)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              "productId", "productName", "abbreviation", "categoryId", "categoryName",
-              "imageUrl", "thumbUrl", "price", "priceMode", "priceOverride",
-              "masterDefaultPrice", "initialStock", "currentStock", "lastMovementId",
-              "yellowAlertQty", "redAlertQty", "active", "deleted", "deletedAt",
-              "productDeleted", "updatedAt", "updatedBy"
-            ])
-            && request.resource.data.currentStock is int
-            && request.resource.data.currentStock >= 0);
+        allow create: if validOperationalLocationStockCreate(locationId, productId);
+        allow update: if validSellerStockMutation(locationId, productId)
+          || validOperationalLocationStockMutation(locationId, productId);
         allow delete: if false;
       }
     }
