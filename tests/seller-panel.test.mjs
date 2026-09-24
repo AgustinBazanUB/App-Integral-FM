@@ -272,6 +272,12 @@ test("stock, navegación y venta actual tienen reglas responsive compactas", asy
 
 
 
+test("un producto desactivado en el catálogo maestro no permanece vendible por datos locales viejos", async () => {
+  const hooks = await read("../src/gestion/seller/hooks.js");
+  assert.match(hooks, /if \(!product\) return null/);
+  assert.match(hooks, /El catálogo maestro activo es la autoridad/);
+});
+
 test("el Panel Vendedor precarga catálogo maestro y evita lecturas N+1 por producto", async () => {
   const shared = await read("../src/gestion/services/sharedResources.js");
   const hooks = await read("../src/gestion/seller/hooks.js");
