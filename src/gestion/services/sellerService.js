@@ -403,7 +403,6 @@ export async function createSellerSale({
         throw new Error(`${item.name} ya no está habilitado en esta ubicación.`);
       }
       const previousStock = Number(snapshot.data().currentStock || 0);
-      if (previousStock < item.qty) throw insufficientStockError(item, previousStock);
       const newStock = previousStock - item.qty;
       transaction.update(refs.stockRefs[index], stockMutationFields({
         currentStock: newStock,
@@ -564,7 +563,6 @@ export async function updateSellerSale({
       if (!snapshot.exists()) throw new Error(`Falta el stock de ${item.name}.`);
       const previousStock = Number(snapshot.data().currentStock || 0);
       const newStock = previousStock + difference;
-      if (newStock < 0) throw insufficientStockError(item, previousStock + (oldQty.get(productId) || 0));
       transaction.update(stockRefs[index], stockMutationFields({
         currentStock: newStock,
         lastSaleId: saleId,
