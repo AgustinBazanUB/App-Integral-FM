@@ -58,10 +58,12 @@ export const locationTypeLabels = {
   store: "Local",
   fair: "Feria",
   event: "Evento",
-  warehouse_store: "Depósito",
-  temporary: "Punto temporal",
-  other: "Otro",
+  warehouse_store: "Depósito (legacy)",
+  temporary: "Punto temporal (legacy)",
+  other: "Otro (legacy)",
 };
+
+const sellableLocationTypeOptions = ["store", "fair", "event"];
 
 function statusKey(location) {
   const state = locationActivity(location);
@@ -122,7 +124,7 @@ function LocationCard({
       </dl>
       <footer>
         {location.deleted !== true ? (
-          <Link className="fm-button fm-button--primary" to={`/gestion/locations/${encodeURIComponent(location.id)}/products`}>
+          <Link className="fm-button fm-button--primary" to={`/gestion/locations/${encodeURIComponent(location.id)}/stock`}>
             <span>Abrir ubicación</span><Icon name="ChevronRight" />
           </Link>
         ) : null}
@@ -306,7 +308,7 @@ export default function LocationsPage() {
       <Modal open={modalOpen} onClose={() => !saveState.busy && setModalOpen(false)} title={editingId ? "Editar ubicación" : form.type === "event" ? "Nuevo evento" : "Nueva ubicación"} description="Los datos se guardan sin alterar ventas ni movimientos históricos.">
         <form className="fm-form-grid" onSubmit={handleSave}>
           <FormField label="Nombre" required><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></FormField>
-          <FormField label="Tipo" required><Select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>{Object.entries(locationTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></FormField>
+          <FormField label="Tipo" required><Select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>{!sellableLocationTypeOptions.includes(form.type) ? <option value={form.type}>{locationTypeLabels[form.type] || "Tipo legacy"}</option> : null}{sellableLocationTypeOptions.map((value) => <option key={value} value={value}>{locationTypeLabels[value]}</option>)}</Select></FormField>
           <FormField label="Prefijo de venta" hint="Hasta 8 letras o números." required><input maxLength="8" value={form.codePrefix} onChange={(event) => setForm({ ...form, codePrefix: event.target.value.replace(/[^a-zA-Z0-9]/g, "") })} /></FormField>
           <FormField label="Solicitud de DNI" required><Select value={form.dniMode} onChange={(event) => setForm({ ...form, dniMode: event.target.value })}><option value="disabled">Desactivado</option><option value="optional">Opcional</option><option value="recommended">Recomendado</option><option value="required">Obligatorio</option></Select></FormField>
           <FormField label="Inicio" hint="Opcional para locales permanentes."><input type="datetime-local" value={form.scheduleStartAt} onChange={(event) => setForm({ ...form, scheduleStartAt: event.target.value })} /></FormField>
