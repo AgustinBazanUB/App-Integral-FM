@@ -116,6 +116,7 @@ export default function ProductsPage() {
                 <dl className="fm-inventory-card__stats">
                   <div><dt>Precio predeterminado</dt><dd>{formatMoney(product.defaultPrice || 0)}</dd></div>
                   <div><dt>Alertas</dt><dd>{Number(product.yellowAlertQty || 0)} / {Number(product.redAlertQty || 0)}</dd></div>
+                  <div><dt>IVA ARCA</dt><dd>{product.arcaVatRate == null ? "Sin configurar" : `${product.arcaVatRate}%`}</dd></div>
                 </dl>
                 {canEdit ? (
                   <footer className="fm-inventory-card__actions">
