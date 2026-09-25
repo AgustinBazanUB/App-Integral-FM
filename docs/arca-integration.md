@@ -339,3 +339,36 @@ La siguiente prueba controlada se realizará exclusivamente en homologación:
 3. solicitar un CAE de prueba para una Factura B de producto, receptor Consumidor Final (`CondicionIVAReceptorId=5`), documento tipo 99 / número 0 y monto pequeño;
 4. si ARCA autoriza, consultar el mismo comprobante con `FECompConsultar` para validar recuperación/idempotencia;
 5. no escribir aún comprobantes en Firestore ni tocar producción.
+
+
+## 15. Primer CAE real de homologación
+
+Prueba end-to-end completada correctamente el 2026-09-25:
+
+- Punto de venta homologación: 3.
+- Tipo de comprobante: Factura B (`CbteTipo=6`).
+- `FECompUltimoAutorizado`: último = 0.
+- Se solicitó comprobante número 1.
+- `FECAESolicitar`: resultado `A` (aprobado).
+- CAE obtenido: registrado únicamente como evidencia de homologación fuera del repositorio.
+- `FECompConsultar`: recuperó el mismo comprobante y el mismo CAE.
+- Verificación de recuperación/idempotencia: OK.
+
+La prueba confirma el flujo técnico completo:
+`certificado -> WSAA -> Token/Sign -> FECompUltimoAutorizado -> FECAESolicitar -> CAE -> FECompConsultar`.
+
+No se emitió ningún comprobante de producción ni se utilizó el punto de venta 8.
+
+## 16. Datos fiscales de productos y receptores
+
+Se incorporó una base de dominio fiscal para:
+
+- ID determinístico de factura por origen;
+- estados del ciclo de facturación;
+- distribución proporcional de descuentos;
+- descomposición de precio final en neto + IVA;
+- rechazo explícito si un producto no tiene alícuota IVA configurada;
+- alícuota IVA ARCA editable en el catálogo maestro de Productos;
+- cliente de Consulta a Padrón Constancia de Inscripción (`ws_sr_constancia_inscripcion`) con `getPersona_v2`.
+
+La aplicación no inferirá la alícuota de un producto por su nombre/categoría ni inventará la condición fiscal de un receptor.
