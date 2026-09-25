@@ -9,8 +9,8 @@
 
 - [x] FASE 1 — Auditoría de la App Integral Flor Mía.
 - [x] FASE 2 — Diseño técnico del motor central de facturación.
-- [ ] FASE 3 — Preparación ARCA / emisor.
-- [ ] FASE 4 — Backend ARCA.
+- [ ] FASE 3 — Preparación ARCA / emisor (CUIT recibido y validado; falta punto de venta/certificado de homologación).
+- [ ] FASE 4 — Backend ARCA (base WSAA + WSFEv1 implementada; falta conexión real con credenciales de homologación).
 - [ ] FASE 5 — Datos fiscales.
 - [ ] FASE 6 — Panel Vendedor.
 - [ ] FASE 7 — Venta rápida.
@@ -252,8 +252,8 @@ Variables server-side previstas (nombres sujetos a implementación final):
 - `ARCA_ENVIRONMENT=homologation|production`
 - `ARCA_ISSUER_CUIT`
 - `ARCA_POINT_OF_SALE`
-- `ARCA_PRIVATE_KEY`
-- `ARCA_CERT`
+- `ARCA_PRIVATE_KEY_PEM`
+- `ARCA_CERTIFICATE_PEM`
 
 Los secretos nunca se definirán como variables `VITE_*`.
 
@@ -277,6 +277,27 @@ Notas verificadas:
 - El QR fiscal contiene los datos oficiales del comprobante y CAE.
 - La emisión por Web Service usa un punto de venta específico y numeración correlativa por punto de venta.
 
-## 9. Próximo bloqueo externo
+## 9. Base backend implementada
 
-Para iniciar la configuración real del emisor en homologación se necesita identificar la CUIT que emitirá los comprobantes de Flor Mía. No se almacenará una clave fiscal ni se solicitará contraseña por chat.
+Se agregó una primera capa server-side en `netlify/functions/_lib/arca/`:
+
+- validación y normalización de CUIT;
+- selección estricta homologación/producción;
+- endpoints oficiales WSAA, WSFEv1 y padrón;
+- generador TRA para WSAA;
+- firma CMS/PKCS#7 server-side con certificado + private key;
+- parser de Ticket de Acceso con cache temporal;
+- cliente SOAP WSFEv1;
+- `FEDummy`;
+- `FEParamGetPtosVenta`;
+- `FECompUltimoAutorizado`;
+- `FEParamGetCondicionIvaReceptor`;
+- `FECAESolicitar`;
+- `FECompConsultar`;
+- pruebas unitarias de dominio.
+
+El CUIT real del emisor no se hardcodea ni se agrega al repositorio: se cargará mediante variable server-side en Netlify.
+
+## 10. Próximo bloqueo externo
+
+El CUIT del emisor ya fue recibido y pasó la validación local de formato/dígito verificador. El siguiente dato necesario para continuar la configuración real es el número de un punto de venta habilitado para facturación electrónica por Web Services. No se solicitarán por chat Clave Fiscal, private keys ni secretos.
