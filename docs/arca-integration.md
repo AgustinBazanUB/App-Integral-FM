@@ -300,4 +300,4 @@ El CUIT real del emisor no se hardcodea ni se agrega al repositorio: se cargará
 
 ## 10. Próximo bloqueo externo
 
-El CUIT del emisor ya fue recibido y pasó la validación local de formato/dígito verificador. El siguiente dato necesario para continuar la configuración real es el número de un punto de venta habilitado para facturación electrónica por Web Services. No se solicitarán por chat Clave Fiscal, private keys ni secretos.
+El CUIT del emisor ya fue recibido y pasó la validación local de formato/dígito verificador. Se seleccionó el punto de venta 8, identificado como `FLOR MIA` y configurado como `RECE para aplicativo y web services`; queda sujeto a la verificación automática de `FEParamGetPtosVenta` cuando estén disponibles las credenciales de homologación. El siguiente bloqueo es obtener/configurar el certificado de testing y autorizar el servicio WSFE en WSASS. No se solicitarán por chat Clave Fiscal, private keys ni secretos.
