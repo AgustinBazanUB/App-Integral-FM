@@ -301,3 +301,15 @@ El CUIT real del emisor no se hardcodea ni se agrega al repositorio: se cargará
 ## 10. Próximo bloqueo externo
 
 El CUIT del emisor ya fue recibido y pasó la validación local de formato/dígito verificador. Se seleccionó el punto de venta 8, identificado como `FLOR MIA` y configurado como `RECE para aplicativo y web services`; queda sujeto a la verificación automática de `FEParamGetPtosVenta` cuando estén disponibles las credenciales de homologación. En WSASS ya figura un certificado de homologación para el alias `florMiaWebApp`. El siguiente bloqueo es crear la autorización de acceso del DN al web service de negocio `Facturación Electrónica` (Ticket WSAA con `service=wsfe`) y luego cargar certificado + private key directamente como secretos server-side en Netlify. No se solicitarán por chat Clave Fiscal, private keys ni secretos.
+
+
+## 11. Proyecto Netlify de homologación
+
+Se creó un proyecto Netlify separado para homologación:
+
+- Proyecto: `flor-mia-arca-homologacion`
+- Rama esperada: `feature/arca-integration`
+- Objetivo: aislar credenciales/certificados de testing del proyecto principal de producción.
+- Estrategia de costo: compatible con plan gratuito; las credenciales se cargarán como variables de entorno del proyecto y sólo serán consumidas por Netlify Functions. Nunca se usarán variables `VITE_*` para secretos ARCA.
+
+Siguiente paso operativo: cargar `ARCA_ENVIRONMENT`, `ARCA_ISSUER_CUIT`, `ARCA_POINT_OF_SALE`, `ARCA_CERTIFICATE_PEM` y `ARCA_PRIVATE_KEY_PEM`, luego realizar un nuevo deploy de la rama de homologación.
