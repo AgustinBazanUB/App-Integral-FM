@@ -379,3 +379,10 @@ La aplicación no inferirá la alícuota de un producto por su nombre/categoría
 El certificado de homologación `florMiaWebApp` ya fue autorizado en WSASS para el servicio `ws_sr_constancia_inscripcion`.
 
 Próxima validación: solicitar un Ticket de Acceso específico para `ws_sr_constancia_inscripcion` y ejecutar `getPersona_v2` contra homologación utilizando la CUIT del propio emisor como caso de prueba.
+
+
+## 18. Compatibilidad de endpoint del Padrón
+
+La documentación oficial vigente V4.1 publica como endpoint primario de testing `awshomo.arca.gob.ar`, mientras documentación oficial anterior y el manual de WSAA siguen documentando el endpoint legado `awshomo.afip.gov.ar` para el mismo servicio.
+
+La primera prueba desde el entorno local devolvió un error de red `fetch failed` antes de recibir respuesta SOAP. Para robustecer la integración, el cliente usa el dominio vigente como primario y reintenta exclusivamente ante errores de conectividad contra el endpoint oficial legado. No se hace fallback ante errores SOAP, de autenticación o de negocio.
