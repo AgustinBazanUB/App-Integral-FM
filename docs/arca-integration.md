@@ -372,3 +372,10 @@ Se incorporó una base de dominio fiscal para:
 - cliente de Consulta a Padrón Constancia de Inscripción (`ws_sr_constancia_inscripcion`) con `getPersona_v2`.
 
 La aplicación no inferirá la alícuota de un producto por su nombre/categoría ni inventará la condición fiscal de un receptor.
+
+
+## 17. Autorización Padrón
+
+El certificado de homologación `florMiaWebApp` ya fue autorizado en WSASS para el servicio `ws_sr_constancia_inscripcion`.
+
+Próxima validación: solicitar un Ticket de Acceso específico para `ws_sr_constancia_inscripcion` y ejecutar `getPersona_v2` contra homologación utilizando la CUIT del propio emisor como caso de prueba.
