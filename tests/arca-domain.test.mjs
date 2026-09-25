@@ -6,6 +6,7 @@ import { buildLoginCmsEnvelope, buildLoginTicketRequest, parseLoginTicketRespons
 import { buildCaeDetail } from "../netlify/functions/_lib/arca/wsfe.mjs";
 import { allocateDiscount, assertSaleMatchesFiscalTotal, buildFiscalAmounts, invoiceIdFor } from "../netlify/functions/_lib/arca/billing.mjs";
 import { escapeXml, xmlTag, xmlTags } from "../netlify/functions/_lib/arca/xml.mjs";
+import { parseTaxpayerResponse } from "../netlify/functions/_lib/arca/registry.mjs";
 
 test("CUIT del emisor informado es válido", () => {
   assert.equal(normalizeCuit("20-12345678-6"), "20123456786");
@@ -107,4 +108,23 @@ test("no inventa alícuota IVA si el producto no está configurado", () => {
     }),
     /alícuota IVA compatible/,
   );
+});
+
+
+test("parser de padrón recupera identidad, domicilio e inscripción IVA", () => {
+  const xml = `<soap:Envelope><soap:Body><getPersona_v2Response><personaReturn>
+    <datosGenerales>
+      <apellido>PEREZ</apellido><nombre>ANA</nombre><estadoClave>ACTIVO</estadoClave>
+      <tipoClave>CUIT</tipoClave><tipoPersona>FISICA</tipoPersona>
+      <domicilioFiscal><direccion>CALLE 123</direccion><localidad>CABA</localidad><codPostal>1000</codPostal><descripcionProvincia>CIUDAD AUTONOMA BUENOS AIRES</descripcionProvincia><idProvincia>0</idProvincia></domicilioFiscal>
+    </datosGenerales>
+    <datosRegimenGeneral><impuesto><descripcionImpuesto>IVA</descripcionImpuesto><estadoImpuesto>AC</estadoImpuesto><idImpuesto>30</idImpuesto><periodo>202001</periodo></impuesto></datosRegimenGeneral>
+  </personaReturn></getPersona_v2Response></soap:Body></soap:Envelope>`;
+  const person = parseTaxpayerResponse(xml, "20-12345678-6");
+  assert.equal(person.cuit, "20123456786");
+  assert.equal(person.firstName, "ANA");
+  assert.equal(person.lastName, "PEREZ");
+  assert.equal(person.fiscalAddress.address, "CALLE 123");
+  assert.equal(person.taxes[0].id, 30);
+  assert.equal(person.taxes[0].description, "IVA");
 });
