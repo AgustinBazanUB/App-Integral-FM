@@ -5,13 +5,13 @@ export const ARCA_ENVIRONMENTS = Object.freeze({
     id: "homologation",
     wsaaUrl: "https://wsaahomo.afip.gov.ar/ws/services/LoginCms",
     wsfeUrl: "https://wswhomo.afip.gov.ar/wsfev1/service.asmx",
-    registryUrl: "https://awshomo.arca.gov.ar/sr-padron/webservices/personaServiceA5",
+    registryUrl: "https://awshomo.arca.gob.ar/sr-padron/webservices/personaServiceA5",
   }),
   production: Object.freeze({
     id: "production",
     wsaaUrl: "https://wsaa.afip.gov.ar/ws/services/LoginCms",
     wsfeUrl: "https://servicios1.afip.gov.ar/wsfev1/service.asmx",
-    registryUrl: "https://aws.arca.gov.ar/sr-padron/webservices/personaServiceA5",
+    registryUrl: "https://aws.arca.gob.ar/sr-padron/webservices/personaServiceA5",
   }),
 });
 
