@@ -128,3 +128,15 @@ test("parser de padrón recupera identidad, domicilio e inscripción IVA", () =>
   assert.equal(person.taxes[0].id, 30);
   assert.equal(person.taxes[0].description, "IVA");
 });
+
+
+test("configuración usa el dominio vigente de Padrón ARCA", () => {
+  assert.equal(
+    ARCA_ENVIRONMENTS.homologation.registryUrl,
+    "https://awshomo.arca.gob.ar/sr-padron/webservices/personaServiceA5",
+  );
+  assert.equal(
+    ARCA_ENVIRONMENTS.production.registryUrl,
+    "https://aws.arca.gob.ar/sr-padron/webservices/personaServiceA5",
+  );
+});
