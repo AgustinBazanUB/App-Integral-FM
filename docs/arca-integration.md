@@ -9,8 +9,8 @@
 
 - [x] FASE 1 — Auditoría de la App Integral Flor Mía.
 - [x] FASE 2 — Diseño técnico del motor central de facturación.
-- [ ] FASE 3 — Preparación ARCA / emisor (CUIT recibido y validado; falta punto de venta/certificado de homologación).
-- [ ] FASE 4 — Backend ARCA (base WSAA + WSFEv1 implementada; falta conexión real con credenciales de homologación).
+- [x] FASE 3 — Preparación ARCA / emisor (CUIT validado, certificado de homologación creado, WSFE autorizado y punto de venta de testing resuelto).
+- [x] FASE 4 — Backend ARCA (WSAA + WSFEv1 conectados realmente en homologación; Token/Sign, FEDummy, puntos de venta y tablas paramétricas verificados).
 - [ ] FASE 5 — Datos fiscales.
 - [ ] FASE 6 — Panel Vendedor.
 - [ ] FASE 7 — Venta rápida.
@@ -300,7 +300,7 @@ El CUIT real del emisor no se hardcodea ni se agrega al repositorio: se cargará
 
 ## 10. Próximo bloqueo externo
 
-El CUIT del emisor ya fue recibido y pasó la validación local de formato/dígito verificador. Para producción se identificó el punto de venta 8, `FLOR MIA`, configurado como `RECE para aplicativo y web services`. En homologación, la consulta real `FEParamGetPtosVenta` devolvió únicamente el punto de venta 3; por lo tanto, homologación usará `ARCA_POINT_OF_SALE=3` y producción conservará el punto 8. En WSASS ya figura un certificado de homologación para el alias `florMiaWebApp`. El siguiente bloqueo es crear la autorización de acceso del DN al web service de negocio `Facturación Electrónica` (Ticket WSAA con `service=wsfe`) y luego cargar certificado + private key directamente como secretos server-side en Netlify. No se solicitarán por chat Clave Fiscal, private keys ni secretos.
+El CUIT del emisor ya fue recibido y pasó la validación local de formato/dígito verificador. Para producción se identificó el punto de venta 8, `FLOR MIA`, configurado como `RECE para aplicativo y web services`. En homologación, la consulta real `FEParamGetPtosVenta` devolvió únicamente el punto de venta 3; por lo tanto, homologación usa `ARCA_POINT_OF_SALE=3` y producción conservará el punto 8. El certificado de homologación del alias `florMiaWebApp` ya fue creado, autorizado para `Facturación Electrónica`, cargado en Netlify y validado mediante una autenticación WSAA real. El siguiente objetivo técnico es verificar correlatividad con `FECompUltimoAutorizado` y obtener el primer CAE de prueba en homologación.
 
 
 ## 11. Proyecto Netlify de homologación
@@ -328,3 +328,14 @@ Resultado de la primera prueba real contra ARCA:
 Configuración resultante:
 - Homologación: `ARCA_POINT_OF_SALE=3`.
 - Producción futura: punto de venta 8, sujeto a validación con certificado y endpoints de producción.
+
+
+## 14. Próxima prueba fiscal
+
+La siguiente prueba controlada se realizará exclusivamente en homologación:
+
+1. consultar `FECompUltimoAutorizado` para Factura B (`CbteTipo=6`) y punto de venta 3;
+2. calcular el siguiente número como último autorizado + 1;
+3. solicitar un CAE de prueba para una Factura B de producto, receptor Consumidor Final (`CondicionIVAReceptorId=5`), documento tipo 99 / número 0 y monto pequeño;
+4. si ARCA autoriza, consultar el mismo comprobante con `FECompConsultar` para validar recuperación/idempotencia;
+5. no escribir aún comprobantes en Firestore ni tocar producción.
