@@ -130,13 +130,21 @@ test("parser de padrón recupera identidad, domicilio e inscripción IVA", () =>
 });
 
 
-test("configuración usa el dominio vigente de Padrón ARCA", () => {
+test("configuración usa dominio vigente y fallback oficial del Padrón ARCA", () => {
   assert.equal(
     ARCA_ENVIRONMENTS.homologation.registryUrl,
     "https://awshomo.arca.gob.ar/sr-padron/webservices/personaServiceA5",
   );
+  assert.deepEqual(
+    ARCA_ENVIRONMENTS.homologation.registryFallbackUrls,
+    ["https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5"],
+  );
   assert.equal(
     ARCA_ENVIRONMENTS.production.registryUrl,
     "https://aws.arca.gob.ar/sr-padron/webservices/personaServiceA5",
+  );
+  assert.deepEqual(
+    ARCA_ENVIRONMENTS.production.registryFallbackUrls,
+    ["https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5"],
   );
 });
