@@ -300,7 +300,7 @@ El CUIT real del emisor no se hardcodea ni se agrega al repositorio: se cargará
 
 ## 10. Próximo bloqueo externo
 
-El CUIT del emisor ya fue recibido y pasó la validación local de formato/dígito verificador. Se seleccionó el punto de venta 8, identificado como `FLOR MIA` y configurado como `RECE para aplicativo y web services`; queda sujeto a la verificación automática de `FEParamGetPtosVenta` cuando estén disponibles las credenciales de homologación. En WSASS ya figura un certificado de homologación para el alias `florMiaWebApp`. El siguiente bloqueo es crear la autorización de acceso del DN al web service de negocio `Facturación Electrónica` (Ticket WSAA con `service=wsfe`) y luego cargar certificado + private key directamente como secretos server-side en Netlify. No se solicitarán por chat Clave Fiscal, private keys ni secretos.
+El CUIT del emisor ya fue recibido y pasó la validación local de formato/dígito verificador. Para producción se identificó el punto de venta 8, `FLOR MIA`, configurado como `RECE para aplicativo y web services`. En homologación, la consulta real `FEParamGetPtosVenta` devolvió únicamente el punto de venta 3; por lo tanto, homologación usará `ARCA_POINT_OF_SALE=3` y producción conservará el punto 8. En WSASS ya figura un certificado de homologación para el alias `florMiaWebApp`. El siguiente bloqueo es crear la autorización de acceso del DN al web service de negocio `Facturación Electrónica` (Ticket WSAA con `service=wsfe`) y luego cargar certificado + private key directamente como secretos server-side en Netlify. No se solicitarán por chat Clave Fiscal, private keys ni secretos.
 
 
 ## 11. Proyecto Netlify de homologación
@@ -313,3 +313,18 @@ Se creó un proyecto Netlify separado para homologación:
 - Estrategia de costo: compatible con plan gratuito; las credenciales se cargarán como variables de entorno del proyecto y sólo serán consumidas por Netlify Functions. Nunca se usarán variables `VITE_*` para secretos ARCA.
 
 Siguiente paso operativo: cargar `ARCA_ENVIRONMENT`, `ARCA_ISSUER_CUIT`, `ARCA_POINT_OF_SALE`, `ARCA_CERTIFICATE_PEM` y `ARCA_PRIVATE_KEY_PEM`, luego realizar un nuevo deploy de la rama de homologación.
+
+
+## 13. Primera conexión real de homologación
+
+Resultado de la primera prueba real contra ARCA:
+
+- `FEDummy`: AppServer OK, DbServer OK, AuthServer OK.
+- WSAA: autenticación correcta; el certificado, la clave privada y la autorización a `wsfe` funcionan.
+- `FEParamGetPtosVenta`: devolvió el punto de venta 3 en homologación.
+- El punto de venta 8 no aparece en homologación y se mantiene reservado para producción.
+- `FEParamGetCondicionIvaReceptor`: devolvió 11 condiciones, confirmando acceso autenticado a WSFEv1.
+
+Configuración resultante:
+- Homologación: `ARCA_POINT_OF_SALE=3`.
+- Producción futura: punto de venta 8, sujeto a validación con certificado y endpoints de producción.
