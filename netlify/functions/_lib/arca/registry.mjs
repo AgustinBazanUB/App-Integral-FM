@@ -5,6 +5,21 @@ import { requestAccessTicket } from "./wsaa.mjs";
 
 const NS = "http://a5.soap.ws.server.puc.sr/";
 
+async function registrySoapRequest({ config, body, timeoutMs, fetchImpl }) {
+  const urls = [config.registryUrl, ...(config.registryFallbackUrls || [])];
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const xml = await soapRequest({ url, body, timeoutMs, fetchImpl });
+      return { xml, url };
+    } catch (error) {
+      lastError = error;
+      if (error?.code !== "arca-network-error") throw error;
+    }
+  }
+  throw lastError || new Error("No se pudo conectar con el Padrón de ARCA.");
+}
+
 function envelope(operation, payload = "") {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -19,13 +34,14 @@ function envelope(operation, payload = "") {
 
 export async function registryDummy({ env = process.env, fetchImpl = fetch } = {}) {
   const config = loadArcaPublicConfig(env, { requirePointOfSale: false });
-  const xml = await soapRequest({
-    url: config.registryUrl,
+  const { xml, url } = await registrySoapRequest({
+    config,
     body: envelope("dummy"),
     timeoutMs: 15000,
     fetchImpl,
   });
   return {
+    endpoint: url,
     appServer: xmlTag(xml, "appserver"),
     dbServer: xmlTag(xml, "dbserver"),
     authServer: xmlTag(xml, "authserver"),
@@ -87,11 +103,11 @@ export async function getTaxpayer(targetCuit, {
     `<cuitRepresentada>${config.issuerCuit}</cuitRepresentada>`,
     `<idPersona>${idPersona}</idPersona>`,
   ].join("");
-  const xml = await soapRequest({
-    url: config.registryUrl,
+  const { xml, url } = await registrySoapRequest({
+    config,
     body: envelope("getPersona_v2", payload),
     timeoutMs: 25000,
     fetchImpl,
   });
-  return parseTaxpayerResponse(xml, idPersona);
+  return { ...parseTaxpayerResponse(xml, idPersona), endpoint: url };
 }
