@@ -54,6 +54,26 @@ function parseTaxes(xml) {
   }));
 }
 
+export function parseTaxpayerResponse(xml, targetCuit) {
+  const idPersona = assertValidCuit(targetCuit, "CUIT consultado");
+  const person = xmlTag(xml, "personaReturn", { required: true });
+  const general = xmlTag(person, "datosGenerales") || "";
+  return {
+    cuit: idPersona,
+    firstName: xmlTag(general, "nombre") || null,
+    lastName: xmlTag(general, "apellido") || null,
+    personType: xmlTag(general, "tipoPersona") || null,
+    keyType: xmlTag(general, "tipoClave") || null,
+    keyStatus: xmlTag(general, "estadoClave") || null,
+    fiscalAddress: parseAddress(general),
+    taxes: parseTaxes(person),
+    monotributo: Boolean(xmlTag(person, "datosMonotributo")),
+    errorConstancia: xmlTag(person, "errorConstancia") || null,
+    errorRegimenGeneral: xmlTag(person, "errorRegimenGeneral") || null,
+    errorMonotributo: xmlTag(person, "errorMonotributo") || null,
+  };
+}
+
 export async function getTaxpayer(targetCuit, {
   env = process.env,
   fetchImpl = fetch,
@@ -73,21 +93,5 @@ export async function getTaxpayer(targetCuit, {
     timeoutMs: 25000,
     fetchImpl,
   });
-  const person = xmlTag(xml, "personaReturn", { required: true });
-  const general = xmlTag(person, "datosGenerales") || "";
-
-  return {
-    cuit: idPersona,
-    firstName: xmlTag(general, "nombre") || null,
-    lastName: xmlTag(general, "apellido") || null,
-    personType: xmlTag(general, "tipoPersona") || null,
-    keyType: xmlTag(general, "tipoClave") || null,
-    keyStatus: xmlTag(general, "estadoClave") || null,
-    fiscalAddress: parseAddress(general),
-    taxes: parseTaxes(person),
-    monotributo: Boolean(xmlTag(person, "datosMonotributo")),
-    errorConstancia: xmlTag(person, "errorConstancia") || null,
-    errorRegimenGeneral: xmlTag(person, "errorRegimenGeneral") || null,
-    errorMonotributo: xmlTag(person, "errorMonotributo") || null,
-  };
+  return parseTaxpayerResponse(xml, idPersona);
 }
