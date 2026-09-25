@@ -4,6 +4,7 @@ import { assertValidCuit, cuitCheckDigit, formatCuit, isValidCuit, normalizeCuit
 import { ARCA_ENVIRONMENTS, arcaSafeStatus, loadArcaPublicConfig } from "../netlify/functions/_lib/arca/config.mjs";
 import { buildLoginCmsEnvelope, buildLoginTicketRequest, parseLoginTicketResponse } from "../netlify/functions/_lib/arca/wsaa.mjs";
 import { buildCaeDetail } from "../netlify/functions/_lib/arca/wsfe.mjs";
+import { allocateDiscount, assertSaleMatchesFiscalTotal, buildFiscalAmounts, invoiceIdFor } from "../netlify/functions/_lib/arca/billing.mjs";
 import { escapeXml, xmlTag, xmlTags } from "../netlify/functions/_lib/arca/xml.mjs";
 
 test("CUIT del emisor informado es válido", () => {
@@ -65,4 +66,45 @@ test("detalle CAE incluye condición IVA del receptor y totales", () => {
   assert.match(xml, /<ar:CondicionIVAReceptorId>5<\/ar:CondicionIVAReceptorId>/);
   assert.match(xml, /<ar:ImpTotal>22000\.00<\/ar:ImpTotal>/);
   assert.match(xml, /<ar:Id>5<\/ar:Id>/);
+});
+
+
+test("dominio fiscal genera ID determinístico por origen", () => {
+  assert.equal(invoiceIdFor("seller_sale", "abc_123"), "invoice_seller_sale_abc_123");
+  assert.equal(invoiceIdFor("seller_sale", "abc_123"), invoiceIdFor("seller_sale", "abc_123"));
+  assert.throws(() => invoiceIdFor("otro", "abc"), /Origen de facturación inválido/);
+});
+
+test("descuento se distribuye sin alterar el total", () => {
+  const rows = allocateDiscount({
+    items: [
+      { productId: "a", qty: 1, unitPrice: 100, subtotal: 100 },
+      { productId: "b", qty: 1, unitPrice: 200, subtotal: 200 },
+    ],
+    discountTotal: 30,
+  });
+  assert.equal(rows.reduce((sum, row) => sum + row.discountCents, 0), 3000);
+  assert.equal(rows.reduce((sum, row) => sum + row.finalGrossCents, 0), 27000);
+});
+
+test("descompone precios finales con IVA explícito por producto", () => {
+  const fiscal = buildFiscalAmounts({
+    items: [{ productId: "a", qty: 1, unitPrice: 121, subtotal: 121 }],
+    vatRateByProduct: { a: 21 },
+  });
+  assert.deepEqual(fiscal.vatBreakdown, [{ id: 5, base: 100, amount: 21 }]);
+  assert.equal(fiscal.total, 121);
+  assert.equal(fiscal.net, 100);
+  assert.equal(fiscal.vat, 21);
+  assert.equal(assertSaleMatchesFiscalTotal({ total: 121 }, fiscal), true);
+});
+
+test("no inventa alícuota IVA si el producto no está configurado", () => {
+  assert.throws(
+    () => buildFiscalAmounts({
+      items: [{ productId: "a", qty: 1, unitPrice: 121, subtotal: 121 }],
+      vatRateByProduct: {},
+    }),
+    /alícuota IVA compatible/,
+  );
 });
