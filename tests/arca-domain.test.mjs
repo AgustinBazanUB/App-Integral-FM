@@ -7,6 +7,7 @@ import { buildCaeDetail } from "../netlify/functions/_lib/arca/wsfe.mjs";
 import { allocateDiscount, assertSaleMatchesFiscalTotal, buildFiscalAmounts, invoiceIdFor } from "../netlify/functions/_lib/arca/billing.mjs";
 import { escapeXml, xmlTag, xmlTags } from "../netlify/functions/_lib/arca/xml.mjs";
 import { parseTaxpayerResponse } from "../netlify/functions/_lib/arca/registry.mjs";
+import { consumerFinalReceiver, inferReceiverVatCondition, validateReceiverConditionAgainstTable } from "../netlify/functions/_lib/arca/receiver.mjs";
 
 test("CUIT del emisor informado es válido", () => {
   assert.equal(normalizeCuit("20-12345678-6"), "20123456786");
@@ -169,4 +170,60 @@ test("parser de padrón marca encontrada una persona con datos generales", () =>
   assert.equal(person.found, true);
   assert.equal(person.keyStatus, "ACTIVO");
   assert.equal(person.personType, "FISICA");
+});
+
+
+test("padrón activo en IVA resuelve Responsable Inscripto", () => {
+  const result = inferReceiverVatCondition({
+    found: true,
+    keyStatus: "ACTIVO",
+    taxes: [{ id: 30, description: "IVA", status: "AC" }],
+    monotributo: false,
+  });
+  assert.equal(result.resolved, true);
+  assert.equal(result.condition.id, 1);
+});
+
+test("monotributo activo resuelve condición general y variantes conocidas", () => {
+  const base = {
+    found: true,
+    keyStatus: "ACTIVO",
+    taxes: [],
+    monotributo: true,
+    monotributoData: {
+      category: { id: 36, description: "B LOCACIONES DE SERVICIO" },
+      taxes: [{ id: 20, description: "MONOTRIBUTO", status: "AC" }],
+    },
+  };
+  assert.equal(inferReceiverVatCondition(base).condition.id, 6);
+  assert.equal(inferReceiverVatCondition({
+    ...base,
+    monotributoData: { ...base.monotributoData, category: { id: 99, description: "B MONOTRIBUTO SOCIAL LOCACION" } },
+  }).condition.id, 13);
+  assert.equal(inferReceiverVatCondition({
+    ...base,
+    monotributoData: { ...base.monotributoData, category: { id: 1, description: "TRABAJADOR INDEPENDIENTE PROMOVIDO" } },
+  }).condition.id, 16);
+});
+
+test("no inventa condición IVA si el padrón no alcanza", () => {
+  const result = inferReceiverVatCondition({
+    found: true,
+    keyStatus: "ACTIVO",
+    taxes: [{ id: 11, status: "AC" }],
+    monotributo: false,
+  });
+  assert.equal(result.resolved, false);
+  assert.equal(result.reason, "registry-insufficient-for-vat-condition");
+});
+
+test("consumidor final y tabla de condiciones se validan explícitamente", () => {
+  assert.equal(consumerFinalReceiver().condition.id, 5);
+  const rows = [
+    { id: 1, voucherClasses: ["A", "B"] },
+    { id: 5, voucherClasses: ["B", "C"] },
+  ];
+  assert.equal(validateReceiverConditionAgainstTable(1, rows, "A"), true);
+  assert.equal(validateReceiverConditionAgainstTable(1, rows, "C"), false);
+  assert.equal(validateReceiverConditionAgainstTable(5, rows, "B"), true);
 });
