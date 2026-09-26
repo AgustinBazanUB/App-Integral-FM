@@ -70,12 +70,25 @@ function parseTaxes(xml) {
   }));
 }
 
+function parseRegistryError(personXml, tagName) {
+  const block = xmlTag(personXml, tagName);
+  if (!block) return null;
+  return {
+    message: xmlTag(block, "error") || String(block).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || null,
+    personId: xmlTag(block, "idPersona") || null,
+  };
+}
+
 export function parseTaxpayerResponse(xml, targetCuit) {
   const idPersona = assertValidCuit(targetCuit, "CUIT consultado");
   const person = xmlTag(xml, "personaReturn", { required: true });
   const general = xmlTag(person, "datosGenerales") || "";
+  const errorConstancia = parseRegistryError(person, "errorConstancia");
+  const errorRegimenGeneral = parseRegistryError(person, "errorRegimenGeneral");
+  const errorMonotributo = parseRegistryError(person, "errorMonotributo");
   return {
     cuit: idPersona,
+    found: Boolean(general),
     firstName: xmlTag(general, "nombre") || null,
     lastName: xmlTag(general, "apellido") || null,
     personType: xmlTag(general, "tipoPersona") || null,
@@ -84,9 +97,9 @@ export function parseTaxpayerResponse(xml, targetCuit) {
     fiscalAddress: parseAddress(general),
     taxes: parseTaxes(person),
     monotributo: Boolean(xmlTag(person, "datosMonotributo")),
-    errorConstancia: xmlTag(person, "errorConstancia") || null,
-    errorRegimenGeneral: xmlTag(person, "errorRegimenGeneral") || null,
-    errorMonotributo: xmlTag(person, "errorMonotributo") || null,
+    errorConstancia,
+    errorRegimenGeneral,
+    errorMonotributo,
   };
 }
 
