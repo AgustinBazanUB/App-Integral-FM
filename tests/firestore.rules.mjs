@@ -93,6 +93,16 @@ before(async () => {
         name: "Entrada protegida",
         createdBy: "admin-1",
       }),
+      setDoc(doc(database, "invoices", "invoice-1"), {
+        sourceType: "seller_sale",
+        sourceId: "seed-sale",
+        status: "authorized",
+        pointOfSale: 3,
+        voucherType: 6,
+        voucherNumber: 1,
+        cae: "00000000000000",
+        createdAt: new Date(),
+      }),
       setDoc(doc(database, "customerZones", "zone-active"), {
         name: "Zona Norte",
         active: true,
@@ -145,6 +155,20 @@ test("finanzas queda restringido al rol autorizado", async () => {
   const sellerDb = environment.authenticatedContext("seller-1").firestore();
   await assertSucceeds(getDoc(doc(adminDb, "financialEntries", "entry-1")));
   await assertFails(getDoc(doc(sellerDb, "financialEntries", "entry-1")));
+});
+
+test("las facturas fiscales sólo pueden mutarse desde el backend", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  await assertSucceeds(getDoc(doc(adminDb, "invoices", "invoice-1")));
+  await assertFails(setDoc(doc(adminDb, "invoices", "invoice-browser"), {
+    sourceType: "seller_sale",
+    sourceId: "browser-sale",
+    status: "pending",
+    createdAt: new Date(),
+  }));
+  await assertFails(updateDoc(doc(adminDb, "invoices", "invoice-1"), {
+    status: "error",
+  }));
 });
 
 test("el vendedor no puede ajustar stock fuera de una venta válida", async () => {
