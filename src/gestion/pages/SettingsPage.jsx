@@ -11,6 +11,22 @@ function statusTone(status) {
   return "neutral";
 }
 
+function stageBadge(stage) {
+  if (stage?.status === "ok") return <Badge tone="success">OK</Badge>;
+  if (stage?.status === "skipped") return <Badge tone="neutral">Omitido</Badge>;
+  if (stage?.status === "error") return <Badge tone="warning">Error</Badge>;
+  return <Badge tone="neutral">Pendiente</Badge>;
+}
+
+function stageMessage(stage, fallback = "") {
+  if (stage?.error) {
+    const status = stage.error.status ? `HTTP ${stage.error.status} · ` : "";
+    const cause = stage.error.causeCode ? ` · ${stage.error.causeCode}` : "";
+    return `${status}${stage.error.code || "error"}${cause} · ${stage.error.message || fallback}`;
+  }
+  return fallback;
+}
+
 export default function SettingsPage() {
   const { profile } = useAuth();
   const isAdmin = canAccessAdministration(profile);
@@ -30,18 +46,8 @@ export default function SettingsPage() {
     }
   };
 
-  const arcaOperational = Boolean(
-    arcaState.result
-      && arcaState.result.pointOfSale?.found === true
-      && arcaState.result.wsfe?.appServer === "OK"
-      && arcaState.result.wsfe?.dbServer === "OK"
-      && arcaState.result.wsfe?.authServer === "OK"
-      && arcaState.result.registry?.appServer === "OK"
-      && arcaState.result.registry?.dbServer === "OK"
-      && arcaState.result.registry?.authServer === "OK"
-      && arcaState.result.firebaseAdmin?.oauth === "ok"
-      && ["ok-document-found", "ok-not-found"].includes(arcaState.result.firebaseAdmin?.firestoreRead),
-  );
+  const arcaOperational = arcaState.result?.ok === true;
+  const pointOfSale = arcaState.result?.pointOfSale?.data;
 
   const rows = [
     ["Proyecto Firebase", firebaseConfig.projectId, "Conectado"],
@@ -51,10 +57,12 @@ export default function SettingsPage() {
     [
       "Facturación ARCA",
       arcaOperational
-        ? `Homologación · punto ${arcaState.result.pointOfSale.selected}`
-        : arcaState.error
-          ? "La última verificación falló"
-          : "Backend de homologación en configuración",
+        ? `Homologación · punto ${pointOfSale?.selected}`
+        : arcaState.result
+          ? "Diagnóstico parcial disponible"
+          : arcaState.error
+            ? "La última verificación falló"
+            : "Backend de homologación en configuración",
       arcaOperational ? "Operativo" : arcaState.error ? "Error" : "En progreso",
     ],
     ["Canales sociales", "Carga manual y enlaces directos", "Primera versión"],
@@ -85,7 +93,7 @@ export default function SettingsPage() {
       {isAdmin ? (
         <Panel
           title="Diagnóstico ARCA"
-          description="Comprueba homologación, punto de venta, Padrón y acceso server-only a Firestore. No emite comprobantes ni muestra secretos."
+          description="Cada comprobación corre de forma independiente. Un 502 de ARCA ya no oculta el estado de Firebase/Firestore. No emite comprobantes ni muestra secretos."
           action={(
             <Button
               variant="secondary"
@@ -105,33 +113,76 @@ export default function SettingsPage() {
                   {arcaState.result.environment}
                 </Badge>
               </div>
+
               <div>
-                <div><strong>WSFE</strong><span>App · DB · Auth</span></div>
-                <Badge tone={arcaState.result.wsfe?.appServer === "OK" && arcaState.result.wsfe?.dbServer === "OK" && arcaState.result.wsfe?.authServer === "OK" ? "success" : "warning"}>
-                  {arcaState.result.wsfe?.appServer === "OK" && arcaState.result.wsfe?.dbServer === "OK" && arcaState.result.wsfe?.authServer === "OK" ? "OK" : "Revisar"}
-                </Badge>
+                <div>
+                  <strong>WSFE</strong>
+                  <span>{stageMessage(
+                    arcaState.result.wsfe,
+                    arcaState.result.wsfe?.data
+                      ? `App ${arcaState.result.wsfe.data.appServer} · DB ${arcaState.result.wsfe.data.dbServer} · Auth ${arcaState.result.wsfe.data.authServer}`
+                      : "Sin respuesta",
+                  )}</span>
+                </div>
+                {stageBadge(arcaState.result.wsfe)}
               </div>
+
               <div>
-                <div><strong>Punto de venta</strong><span>{arcaState.result.pointOfSale?.selected ?? "—"}</span></div>
-                <Badge tone={arcaState.result.pointOfSale?.found ? "success" : "warning"}>
-                  {arcaState.result.pointOfSale?.found ? "Confirmado" : "No encontrado"}
-                </Badge>
+                <div>
+                  <strong>Punto de venta</strong>
+                  <span>{stageMessage(
+                    arcaState.result.pointOfSale,
+                    pointOfSale
+                      ? `Configurado ${pointOfSale.selected} · devueltos: ${pointOfSale.returned.join(", ") || "ninguno"}`
+                      : "Sin respuesta",
+                  )}</span>
+                </div>
+                {stageBadge(arcaState.result.pointOfSale)}
               </div>
+
               <div>
-                <div><strong>Padrón</strong><span>{arcaState.result.registry?.endpoint === "official-legacy" ? "Endpoint oficial compatible" : "Endpoint ARCA vigente"}</span></div>
-                <Badge tone={arcaState.result.registry?.appServer === "OK" ? "success" : "warning"}>
-                  {arcaState.result.registry?.appServer === "OK" ? "OK" : "Revisar"}
-                </Badge>
+                <div>
+                  <strong>Padrón</strong>
+                  <span>{stageMessage(
+                    arcaState.result.registry,
+                    arcaState.result.registry?.data
+                      ? `${arcaState.result.registry.data.endpoint === "official-legacy" ? "Endpoint oficial compatible" : "Endpoint ARCA vigente"} · App ${arcaState.result.registry.data.appServer} · DB ${arcaState.result.registry.data.dbServer} · Auth ${arcaState.result.registry.data.authServer}`
+                      : "Sin respuesta",
+                  )}</span>
+                </div>
+                {stageBadge(arcaState.result.registry)}
               </div>
+
               <div>
-                <div><strong>Firebase backend</strong><span>OAuth + lectura Firestore</span></div>
-                <Badge tone={arcaState.result.firebaseAdmin?.oauth === "ok" && ["ok-document-found", "ok-not-found"].includes(arcaState.result.firebaseAdmin?.firestoreRead) ? "success" : "warning"}>
-                  {arcaState.result.firebaseAdmin?.oauth === "ok" && ["ok-document-found", "ok-not-found"].includes(arcaState.result.firebaseAdmin?.firestoreRead) ? "OK" : "Revisar"}
-                </Badge>
+                <div>
+                  <strong>Firebase Admin OAuth</strong>
+                  <span>{stageMessage(
+                    arcaState.result.firebaseAdmin?.oauth,
+                    arcaState.result.firebaseAdmin?.oauth?.status === "ok"
+                      ? "La cuenta de servicio obtuvo token OAuth."
+                      : "Sin validar",
+                  )}</span>
+                </div>
+                {stageBadge(arcaState.result.firebaseAdmin?.oauth)}
+              </div>
+
+              <div>
+                <div>
+                  <strong>Firestore server-side</strong>
+                  <span>{stageMessage(
+                    arcaState.result.firebaseAdmin?.firestoreRead,
+                    arcaState.result.firebaseAdmin?.firestoreRead?.status === "ok"
+                      ? "Lectura autorizada con la cuenta de servicio."
+                      : arcaState.result.firebaseAdmin?.firestoreRead?.status === "skipped"
+                        ? "No se probó porque falló OAuth."
+                        : "Sin validar",
+                  )}</span>
+                </div>
+                {stageBadge(arcaState.result.firebaseAdmin?.firestoreRead)}
               </div>
             </div>
           ) : (
-            <p>Ejecutá el diagnóstico desde el entorno local de Netlify Dev. La prueba no genera CAE ni modifica ventas.</p>
+            <p>Ejecutá el diagnóstico desde Netlify Dev. La prueba no genera CAE ni modifica ventas.</p>
           )}
         </Panel>
       ) : null}
