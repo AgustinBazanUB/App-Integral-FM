@@ -426,3 +426,19 @@ También se agregó una capa conservadora para inferir la condición IVA del rec
 - si el Padrón no aporta evidencia suficiente, la aplicación no inventa una condición.
 
 WSFEv1 queda preparado además para consultar dinámicamente tipos de comprobante, tipos de alícuota IVA y condiciones IVA de receptor.
+
+
+## 21. Flujo local con Netlify Dev
+
+Para continuar la homologación sin consumir deploys cloud, el proyecto puede ejecutarse con Netlify Dev en `http://localhost:8888`.
+
+El entorno local debe cargar en memoria las variables ARCA y Firebase Admin desde archivos locales ignorados por Git. No es obligatorio vincular el clon al proyecto remoto de Netlify.
+
+Se agregó:
+
+- `netlify/functions/arca-taxpayer.mjs`: Function autenticada para consulta de CUIT y diagnóstico de homologación.
+- `src/gestion/services/arcaService.js`: cliente autenticado desde la app usando Firebase ID Token.
+- Panel `Configuración > Diagnóstico ARCA`, visible sólo a administración.
+- El diagnóstico comprueba WSFE, punto de venta, Padrón y OAuth/lectura server-only de Firestore sin emitir CAE ni escribir ventas.
+
+Las credenciales nunca se devuelven al navegador.
