@@ -442,3 +442,18 @@ Se agregó:
 - El diagnóstico comprueba WSFE, punto de venta, Padrón y OAuth/lectura server-only de Firestore sin emitir CAE ni escribir ventas.
 
 Las credenciales nunca se devuelven al navegador.
+
+
+## 22. Diagnóstico desacoplado por servicio
+
+Durante la prueba local, el primer intento llegó a ARCA pero falló la lectura server-side de Firestore; intentos posteriores recibieron errores de red HTTP 502 desde ARCA.
+
+El diagnóstico de `Configuración > ARCA` ahora ejecuta y reporta de forma independiente:
+
+- WSFE / FEDummy;
+- punto de venta;
+- Padrón;
+- Firebase Admin OAuth;
+- lectura server-side de Firestore.
+
+Un error de red de ARCA ya no impide verificar IAM de la cuenta de servicio de Firebase. La lectura de Firestore continúa siendo no destructiva.
