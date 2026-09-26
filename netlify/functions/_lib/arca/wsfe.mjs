@@ -104,8 +104,16 @@ export async function getLastAuthorized({ voucherType, pointOfSale, ...options }
   };
 }
 
-export async function getReceiverVatConditions(options = {}) {
-  const result = await wsfeCall("FEParamGetCondicionIvaReceptor", () => "", options);
+export async function getReceiverVatConditions({ voucherClass = "", ...options } = {}) {
+  const normalizedClass = String(voucherClass || "").trim().toUpperCase();
+  if (normalizedClass && !["A", "ALEY", "B", "C", "49"].includes(normalizedClass)) {
+    throw new Error("Clase de comprobante inválida.");
+  }
+  const result = await wsfeCall(
+    "FEParamGetCondicionIvaReceptor",
+    () => normalizedClass ? `<ar:ClaseCmp>${escapeXml(normalizedClass)}</ar:ClaseCmp>` : "",
+    options,
+  );
   const blocks = xmlTags(result.xml, "CondicionIvaReceptor");
   return {
     conditions: blocks.map((block) => ({
@@ -222,5 +230,36 @@ export async function consultVoucher({ voucherType, pointOfSale, voucherNumber, 
     errors: result.errors,
     events: result.events,
     rawXml: result.xml,
+  };
+}
+
+
+export async function getVatTypes(options = {}) {
+  const result = await wsfeCall("FEParamGetTiposIva", () => "", options);
+  const blocks = xmlTags(result.xml, "IvaTipo");
+  return {
+    types: blocks.map((block) => ({
+      id: Number(xmlTag(block, "Id") || 0),
+      description: xmlTag(block, "Desc") || "",
+      validFrom: xmlTag(block, "FchDesde") || null,
+      validTo: xmlTag(block, "FchHasta") || null,
+    })).filter((item) => item.id > 0),
+    errors: result.errors,
+    events: result.events,
+  };
+}
+
+export async function getVoucherTypes(options = {}) {
+  const result = await wsfeCall("FEParamGetTiposCbte", () => "", options);
+  const blocks = xmlTags(result.xml, "CbteTipo");
+  return {
+    types: blocks.map((block) => ({
+      id: Number(xmlTag(block, "Id") || 0),
+      description: xmlTag(block, "Desc") || "",
+      validFrom: xmlTag(block, "FchDesde") || null,
+      validTo: xmlTag(block, "FchHasta") || null,
+    })).filter((item) => item.id > 0),
+    errors: result.errors,
+    events: result.events,
   };
 }
