@@ -70,6 +70,27 @@ function parseTaxes(xml) {
   }));
 }
 
+function parseMonotributo(personXml) {
+  const block = xmlTag(personXml, "datosMonotributo");
+  if (!block) return null;
+  const category = xmlTag(block, "categoriaMonotributo");
+  const taxes = xmlTags(block, "impuesto").map((tax) => ({
+    id: Number(xmlTag(tax, "idImpuesto") || 0) || null,
+    description: xmlTag(tax, "descripcionImpuesto") || "",
+    status: xmlTag(tax, "estadoImpuesto") || null,
+    period: xmlTag(tax, "periodo") || null,
+  }));
+  return {
+    category: category ? {
+      id: Number(xmlTag(category, "idCategoria") || 0) || null,
+      description: xmlTag(category, "descripcionCategoria") || null,
+      taxId: Number(xmlTag(category, "idImpuesto") || 0) || null,
+      period: xmlTag(category, "periodo") || null,
+    } : null,
+    taxes,
+  };
+}
+
 function parseRegistryError(personXml, tagName) {
   const block = xmlTag(personXml, tagName);
   if (!block) return null;
@@ -91,12 +112,14 @@ export function parseTaxpayerResponse(xml, targetCuit) {
     found: Boolean(general),
     firstName: xmlTag(general, "nombre") || null,
     lastName: xmlTag(general, "apellido") || null,
+    businessName: xmlTag(general, "razonSocial") || null,
     personType: xmlTag(general, "tipoPersona") || null,
     keyType: xmlTag(general, "tipoClave") || null,
     keyStatus: xmlTag(general, "estadoClave") || null,
     fiscalAddress: parseAddress(general),
     taxes: parseTaxes(person),
     monotributo: Boolean(xmlTag(person, "datosMonotributo")),
+    monotributoData: parseMonotributo(person),
     errorConstancia,
     errorRegimenGeneral,
     errorMonotributo,
