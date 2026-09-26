@@ -184,6 +184,8 @@ Toda solicitud fiscal se normalizará a un contrato equivalente a:
 
 La clave idempotente principal será el origen (`sourceType + sourceId`). Una venta/pedido autorizado debe devolver siempre el comprobante existente y nunca pedir un segundo CAE.
 
+La Function `arca-invoice` implementa la primera etapa de ese contrato para ventas rápidas y ventas del panel vendedor: lee la venta desde Firestore con la cuenta de servicio, valida que esté activa y que tenga una solicitud explícita, y crea `invoices/{invoiceIdFor(sourceType, sourceId)}` mediante creación condicional. Si dos solicitudes coinciden, la segunda recupera el documento existente. Sólo guarda una intención `pending` y un snapshot de los importes e ítems; esta operación no llama a WSAA/WSFE, no reserva numeración y no solicita CAE. El checkout todavía no crea pedidos confirmados y queda fuera de esta etapa.
+
 ### Estados
 
 `not_requested -> pending -> authorizing -> authorized`

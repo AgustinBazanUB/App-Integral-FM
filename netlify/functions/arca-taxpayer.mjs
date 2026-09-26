@@ -100,7 +100,7 @@ async function runDiagnostics() {
 
   if (diagnostics.firebaseAdmin.oauth.status === "ok") {
     try {
-      const firestoreProbe = await adminGetDocument("settings/__arca_diagnostics__", { env: process.env });
+      const firestoreProbe = await adminGetDocument("settings/arca-diagnostics-probe", { env: process.env });
       diagnostics.firebaseAdmin.firestoreRead.status = "ok";
       diagnostics.firebaseAdmin.firestoreRead.result = firestoreProbe ? "document-found" : "not-found";
     } catch (error) {

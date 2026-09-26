@@ -23,6 +23,7 @@ import {
   createQuickSale,
   listLocations,
 } from "../services/managementService";
+import { persistArcaInvoiceIntent } from "../services/arcaBillingService";
 import { listLocationInventory } from "../services/inventoryService";
 import { listDiscounts } from "../services/locationManagementService";
 
@@ -47,7 +48,9 @@ export default function QuickSalesPage() {
   const [invoiceRequested, setInvoiceRequested] = useState(false);
   const [deliveryMethod, setDeliveryMethod] = useState("pickup");
   const [discountIds, setDiscountIds] = useState([]);
-  const [submitState, setSubmitState] = useState({ busy: false, error: "", success: "" });
+  const [submitState, setSubmitState] = useState({ busy: false, error: "", success: "", invoiceError: "" });
+  const [invoiceRetry, setInvoiceRetry] = useState(null);
+  const [invoiceRetryBusy, setInvoiceRetryBusy] = useState(false);
 
   const locations = locationsResult.data || [];
   useEffect(() => {
@@ -96,7 +99,7 @@ export default function QuickSalesPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setSubmitState({ busy: true, error: "", success: "" });
+    setSubmitState({ busy: true, error: "", success: "", invoiceError: "" });
     try {
       const location = selectedLocation;
       const result = await createQuickSale({
@@ -116,14 +119,52 @@ export default function QuickSalesPage() {
       setPaymentMethod("");
       setInvoiceRequested(false);
       setDiscountIds([]);
-      setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.` });
-      const refreshedStock = await listLocationInventory(locationId);
-      setStock({
-        status: "ready",
-        data: refreshedStock.filter((item) => item.active !== false && item.masterActive !== false),
+      let invoiceError = "";
+      if (invoiceRequested) {
+        try {
+          await persistArcaInvoiceIntent({ sourceType: "admin_quick_sale", sourceId: result.id });
+          setInvoiceRetry(null);
+        } catch (error) {
+          invoiceError = `La venta quedó registrada, pero no se pudo guardar su solicitud de factura: ${error.message}`;
+          setInvoiceRetry({ sourceType: "admin_quick_sale", sourceId: result.id });
+        }
+      }
+      const refreshedStock = await listLocationInventory(locationId).catch(() => null);
+      if (refreshedStock) {
+        setStock({
+          status: "ready",
+          data: refreshedStock.filter((item) => item.active !== false && item.masterActive !== false),
+        });
+      }
+      setSubmitState({
+        busy: false,
+        error: "",
+        invoiceError,
+        success: `${result.saleCode} registrada por ${formatMoney(result.total)}.${invoiceRequested && !invoiceError ? " Solicitud de factura guardada como pendiente; no se emitió CAE." : ""}`,
       });
     } catch (error) {
-      setSubmitState({ busy: false, error: error.message, success: "" });
+      setSubmitState({ busy: false, error: error.message, success: "", invoiceError: "" });
+    }
+  };
+
+  const retryInvoiceIntent = async () => {
+    if (!invoiceRetry || invoiceRetryBusy) return;
+    setInvoiceRetryBusy(true);
+    try {
+      await persistArcaInvoiceIntent(invoiceRetry);
+      setInvoiceRetry(null);
+      setSubmitState((current) => ({
+        ...current,
+        invoiceError: "",
+        success: "La solicitud de factura quedó guardada como pendiente; no se emitió CAE.",
+      }));
+    } catch (error) {
+      setSubmitState((current) => ({
+        ...current,
+        invoiceError: `La venta ya está registrada. No se pudo guardar la solicitud de factura: ${error.message}`,
+      }));
+    } finally {
+      setInvoiceRetryBusy(false);
     }
   };
 
@@ -185,6 +226,8 @@ export default function QuickSalesPage() {
             <label className="fm-check-row"><input type="checkbox" checked={invoiceRequested} onChange={(event) => setInvoiceRequested(event.target.checked)} /><span>Solicitar factura manual después de registrar la venta</span></label>
             {submitState.error ? <Toast tone="error">{submitState.error}</Toast> : null}
             {submitState.success ? <Toast tone="success">{submitState.success}</Toast> : null}
+            {submitState.invoiceError ? <Toast tone="error">{submitState.invoiceError}</Toast> : null}
+            {invoiceRetry ? <Button type="button" variant="secondary" loading={invoiceRetryBusy} onClick={retryInvoiceIntent}>Reintentar guardar la solicitud de factura</Button> : null}
             <Button type="submit" icon="Check" loading={submitState.busy} disabled={!cart.length || !paymentMethod} className="fm-sale-submit">Confirmar venta</Button>
             <p className="fm-safe-note"><Badge tone="success" icon="ShieldCheck">Operación atómica</Badge> Si falta stock o se corta la conexión, la venta completa se revierte.</p>
           </Panel>

@@ -44,6 +44,7 @@ import {
   createSellerSale,
   updateSellerSale,
 } from "../services/sellerService";
+import { persistArcaInvoiceIntent } from "../services/arcaBillingService";
 import CustomerDialog from "./CustomerDialog";
 import DiscountDialog from "./DiscountDialog";
 import {
@@ -209,6 +210,7 @@ export default function SellerPanel() {
   const [submitState, setSubmitState] = useState({ busy: false, message: "", tone: "info" });
   const [multipleOpen, setMultipleOpen] = useState(false);
   const [receipt, setReceipt] = useState(null);
+  const [invoiceRetryBusy, setInvoiceRetryBusy] = useState(false);
   const [detailSale, setDetailSale] = useState(null);
   const [locationToApply, setLocationToApply] = useState("");
   const [clearRequested, setClearRequested] = useState(false);
@@ -482,14 +484,45 @@ export default function SellerPanel() {
       const result = editSale
         ? await updateSellerSale({ ...common, saleId: editSale.id })
         : await createSellerSale({ ...common, location: selectedLocation });
+      let invoiceIntentPersisted = false;
+      let invoicePersistenceError = "";
+      if (ticketRequested) {
+        try {
+          await persistArcaInvoiceIntent({ sourceType: "seller_sale", sourceId: result.id });
+          invoiceIntentPersisted = true;
+        } catch (error) {
+          invoicePersistenceError = error.message;
+        }
+      }
       resetSale();
-      await dailySales.refresh();
-      setReceipt(result);
-      setSubmitState({ busy: false, tone: "success", message: `${result.saleCode} registrada correctamente.` });
+      await dailySales.refresh().catch(() => {});
+      setReceipt({ ...result, ticketRequested, invoiceIntentPersisted, invoicePersistenceError });
+      setSubmitState({
+        busy: false,
+        tone: invoicePersistenceError ? "warning" : "success",
+        message: invoicePersistenceError
+          ? `${result.saleCode} registrada. La solicitud de factura quedó pendiente de guardar.`
+          : `${result.saleCode} registrada correctamente.${ticketRequested ? " Solicitud de factura guardada como pendiente; no se emitió CAE." : ""}`,
+      });
     } catch (error) {
       setSubmitState({ busy: false, tone: "error", message: error.message });
     }
   }, [submitState.busy, selectedLocation, currentItems, hasStockConflict, paymentMethod, payments, summary.total, selectedCustomer, ticketRequested, ticketAllowed, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales]);
+
+  const retryInvoiceIntent = useCallback(async () => {
+    if (!receipt?.id || !receipt.ticketRequested || invoiceRetryBusy) return;
+    setInvoiceRetryBusy(true);
+    try {
+      await persistArcaInvoiceIntent({ sourceType: "seller_sale", sourceId: receipt.id });
+      setReceipt((current) => current ? { ...current, invoiceIntentPersisted: true, invoicePersistenceError: "" } : current);
+      setSubmitState({ busy: false, tone: "success", message: "Solicitud de factura guardada como pendiente; no se emitió CAE." });
+    } catch (error) {
+      setReceipt((current) => current ? { ...current, invoicePersistenceError: error.message } : current);
+      setSubmitState({ busy: false, tone: "warning", message: "La venta sigue registrada. No se pudo guardar la solicitud de factura." });
+    } finally {
+      setInvoiceRetryBusy(false);
+    }
+  }, [receipt, invoiceRetryBusy]);
 
   const actionShortcuts = useMemo(() => SELLER_ACTION_SHORTCUTS.map((action) => ({
     ...action,
@@ -531,6 +564,7 @@ export default function SellerPanel() {
     setSyncing(true);
     let synced = 0;
     let failed = 0;
+    let invoiceFailed = 0;
     for (const sale of queue) {
       try {
         const result = await createSellerSale({
@@ -545,6 +579,15 @@ export default function SellerPanel() {
           ticketRequested: sale.ticketRequested === true,
           offlineSale: { localId: sale.localId, createdLocallyAt: sale.createdLocallyAt },
         });
+        if (sale.ticketRequested === true) {
+          try {
+            await persistArcaInvoiceIntent({ sourceType: "seller_sale", sourceId: result.id });
+          } catch (error) {
+            await markSellerPendingError(sale.localId, `La venta está sincronizada; falta guardar la solicitud de factura: ${error.message}`).catch(() => {});
+            invoiceFailed += 1;
+            continue;
+          }
+        }
         await markSellerPendingSynced(sale.localId, result.id);
         await deleteSellerPendingSale(sale.localId);
         synced += 1;
@@ -556,7 +599,14 @@ export default function SellerPanel() {
     setSyncing(false);
     await pendingSales.refresh();
     await dailySales.refresh().catch(() => {});
-    setSubmitState({ busy: false, tone: failed ? "error" : "success", message: failed ? `${synced} sincronizadas y ${failed} pendientes con error. El stock no se modificó para las fallidas.` : `${synced} venta${synced === 1 ? "" : "s"} sincronizada${synced === 1 ? "" : "s"}.` });
+    const syncMessage = failed
+      ? `${synced} sincronizadas y ${failed} pendientes con error. Revisá cada venta antes de volver a intentar.`
+      : `${synced} venta${synced === 1 ? "" : "s"} sincronizada${synced === 1 ? "" : "s"}.`;
+    setSubmitState({
+      busy: false,
+      tone: failed || invoiceFailed ? "warning" : "success",
+      message: `${syncMessage}${invoiceFailed ? ` ${invoiceFailed} solicitud${invoiceFailed === 1 ? "" : "es"} de factura siguen pendientes; al sincronizar de nuevo no se volverá a descontar stock.` : ""}`,
+    });
   }, [syncing, online, pendingSales, profile, dailySales]);
 
   useEffect(() => {
@@ -832,7 +882,7 @@ export default function SellerPanel() {
   </label>
 </Modal>
       <Modal open={Boolean(detailSale)} onClose={() => setDetailSale(null)} title={detailSale?.saleCode || "Detalle de venta"} description={detailSale ? `${formatDateTime(detailSale.createdAt)} · ${detailSale.locationName}` : ""}>{detailSale ? <div className="fm-seller-detail"><div className="fm-seller-detail__summary"><Badge tone={statusTone(detailSale.status)}>{detailSale.status === "cancelled" ? "Anulada" : "Activa"}</Badge><strong>{formatMoney(detailSale.total)}</strong></div><div>{asArray(detailSale.items).map((item) => <p key={item.productId}><span>{item.qty} × {item.name}</span><strong>{formatMoney(item.subtotal)}</strong></p>)}</div>{detailSale.customerPhoneSnapshot ? <div className="fm-seller-detail__customer"><small>Cliente</small><strong>{detailSale.customerPhoneSnapshot}</strong>{detailSale.customerZoneSnapshot ? <span>{detailSale.customerZoneSnapshot}</span> : null}{detailSale.customerNameSnapshot ? <span>{detailSale.customerNameSnapshot}</span> : null}</div> : null}<div className="fm-seller-detail__actions">{detailSale.status !== "cancelled" ? <><Button variant="secondary" icon="Pencil" onClick={() => setEditRequested(detailSale)}>Editar</Button><Button variant="danger" icon="Ban" onClick={() => setCancelTarget(detailSale)}>Anular</Button></> : null}</div></div> : null}</Modal>
-      <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Venta registrada" description={receipt?.saleCode || ""}>{receipt ? <div className="fm-seller-receipt"><Icon name="CircleCheck" /><strong>{formatMoney(receipt.total)}</strong><span>{receipt.saleCode}</span>{receipt.customerPhoneSnapshot ? <small>Cliente: {receipt.customerPhoneSnapshot}</small> : null}{receipt.ticketRequested ? <small>Ticket solicitado · pendiente de integración</small> : null}<Button onClick={() => setReceipt(null)}>Nueva venta</Button></div> : null}</Modal>
+      <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Venta registrada" description={receipt?.saleCode || ""}>{receipt ? <div className="fm-seller-receipt"><Icon name="CircleCheck" /><strong>{formatMoney(receipt.total)}</strong><span>{receipt.saleCode}</span>{receipt.customerPhoneSnapshot ? <small>Cliente: {receipt.customerPhoneSnapshot}</small> : null}{receipt.ticketRequested ? <small>{receipt.invoiceIntentPersisted ? "Solicitud de factura guardada como pendiente; no se emitió CAE." : "Venta registrada; la solicitud de factura todavía no se guardó."}</small> : null}{receipt.ticketRequested && !receipt.invoiceIntentPersisted ? <Button variant="secondary" loading={invoiceRetryBusy} onClick={retryInvoiceIntent}>Reintentar guardar solicitud</Button> : null}<Button onClick={() => setReceipt(null)}>Nueva venta</Button></div> : null}</Modal>
     </div>
   );
 }
