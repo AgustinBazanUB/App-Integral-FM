@@ -400,3 +400,29 @@ La prueba real de homologación confirmó:
 - La CUIT real consultada no devolvió `datosGenerales` ni impuestos dentro del dataset de homologación, por lo que no debe interpretarse como una constancia vacía válida.
 
 El parser ahora distingue explícitamente entre persona encontrada y respuesta con `errorConstancia`. Para validar el mapeo completo de datos fiscales se usará el CUIT de ejemplo `20164755100` publicado por ARCA en el ejemplo oficial de `getPersona_v2`.
+
+
+## 20. Validación completa del Padrón
+
+La segunda prueba real de homologación, usando el CUIT de ejemplo publicado por ARCA (`20164755100`), fue satisfactoria:
+
+- persona encontrada: sí;
+- tipo de persona: física;
+- estado de CUIT: activo;
+- impuestos devueltos: 3;
+- IVA (`idImpuesto=30`): activo;
+- Monotributo: no;
+- `errorConstancia`: ninguno;
+- endpoint utilizado: fallback oficial legado `awshomo.afip.gov.ar`.
+
+Con esto queda validado el circuito:
+`WSAA -> ws_sr_constancia_inscripcion -> getPersona_v2 -> parser de datos fiscales`.
+
+También se agregó una capa conservadora para inferir la condición IVA del receptor:
+- IVA activo (`idImpuesto=30`) -> condición 1, IVA Responsable Inscripto;
+- Monotributo activo (`idImpuesto=20`) -> condición 6;
+- categorías explícitas de Monotributo Social -> condición 13;
+- Trabajador Independiente Promovido -> condición 16;
+- si el Padrón no aporta evidencia suficiente, la aplicación no inventa una condición.
+
+WSFEv1 queda preparado además para consultar dinámicamente tipos de comprobante, tipos de alícuota IVA y condiciones IVA de receptor.
