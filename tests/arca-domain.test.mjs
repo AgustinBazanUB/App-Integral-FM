@@ -1,0 +1,229 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { assertValidCuit, cuitCheckDigit, formatCuit, isValidCuit, normalizeCuit } from "../netlify/functions/_lib/arca/cuit.mjs";
+import { ARCA_ENVIRONMENTS, arcaSafeStatus, loadArcaPublicConfig } from "../netlify/functions/_lib/arca/config.mjs";
+import { buildLoginCmsEnvelope, buildLoginTicketRequest, parseLoginTicketResponse } from "../netlify/functions/_lib/arca/wsaa.mjs";
+import { buildCaeDetail } from "../netlify/functions/_lib/arca/wsfe.mjs";
+import { allocateDiscount, assertSaleMatchesFiscalTotal, buildFiscalAmounts, invoiceIdFor } from "../netlify/functions/_lib/arca/billing.mjs";
+import { escapeXml, xmlTag, xmlTags } from "../netlify/functions/_lib/arca/xml.mjs";
+import { parseTaxpayerResponse } from "../netlify/functions/_lib/arca/registry.mjs";
+import { consumerFinalReceiver, inferReceiverVatCondition, validateReceiverConditionAgainstTable } from "../netlify/functions/_lib/arca/receiver.mjs";
+
+test("CUIT del emisor informado es válido", () => {
+  assert.equal(normalizeCuit("20-12345678-6"), "20123456786");
+  assert.equal(cuitCheckDigit("2012345678"), 6);
+  assert.equal(isValidCuit("20-12345678-6"), true);
+  assert.equal(formatCuit("20123456786"), "20-12345678-6");
+  assert.equal(assertValidCuit("20-12345678-6"), "20123456786");
+});
+
+test("configuración ARCA arranca en homologación y exige punto de venta cuando corresponde", () => {
+  const env = { ARCA_ISSUER_CUIT: "20-12345678-6", ARCA_ENVIRONMENT: "homologation", ARCA_POINT_OF_SALE: "12" };
+  const config = loadArcaPublicConfig(env);
+  assert.equal(config.environment, "homologation");
+  assert.equal(config.issuerCuit, "20123456786");
+  assert.equal(config.pointOfSale, 12);
+  assert.equal(config.wsfeUrl, ARCA_ENVIRONMENTS.homologation.wsfeUrl);
+  assert.equal(arcaSafeStatus({ ARCA_ISSUER_CUIT: "20-12345678-6" }).issuerConfigured, true);
+});
+
+test("TRA WSAA es corto, temporal y específico por servicio", () => {
+  const now = new Date("2026-09-25T14:00:00.000Z");
+  const xml = buildLoginTicketRequest("wsfe", now);
+  assert.match(xml, /<service>wsfe<\/service>/);
+  assert.match(xml, /<generationTime>2026-09-25T13:50:00Z<\/generationTime>/);
+  assert.match(xml, /<expirationTime>2026-09-25T14:10:00Z<\/expirationTime>/);
+});
+
+test("envelope LoginCms escapa CMS y parser recupera token/sign", () => {
+  const envelope = buildLoginCmsEnvelope("abc+/=&");
+  assert.match(envelope, /abc\+\/=\&amp;/);
+  const response = `<soap:Envelope><soap:Body><loginCmsResponse><loginCmsReturn>&lt;loginTicketResponse&gt;&lt;header&gt;&lt;expirationTime&gt;2026-09-26T02:00:00-03:00&lt;/expirationTime&gt;&lt;/header&gt;&lt;credentials&gt;&lt;token&gt;TOKEN&lt;/token&gt;&lt;sign&gt;SIGN&lt;/sign&gt;&lt;/credentials&gt;&lt;/loginTicketResponse&gt;</loginCmsReturn></loginCmsResponse></soap:Body></soap:Envelope>`;
+  const ticket = parseLoginTicketResponse(response);
+  assert.equal(ticket.token, "TOKEN");
+  assert.equal(ticket.sign, "SIGN");
+  assert.equal(ticket.expiresAt.toISOString(), "2026-09-26T05:00:00.000Z");
+});
+
+test("helpers XML soportan namespace y múltiples bloques", () => {
+  assert.equal(escapeXml(`<a x="1">&`), "&lt;a x=&quot;1&quot;&gt;&amp;");
+  const xml = "<x:Root><x:Code>1</x:Code><Err><Code>2</Code></Err><Err><Code>3</Code></Err></x:Root>";
+  assert.equal(xmlTag(xml, "Code"), "1");
+  assert.equal(xmlTags(xml, "Err").length, 2);
+});
+
+test("detalle CAE incluye condición IVA del receptor y totales", () => {
+  const xml = buildCaeDetail({
+    concept: 1,
+    docType: 99,
+    docNumber: 0,
+    voucherFrom: 1,
+    voucherDate: "20260925",
+    total: 22000,
+    net: 18181.82,
+    vat: 3818.18,
+    receiverVatConditionId: 5,
+    vatBreakdown: [{ id: 5, base: 18181.82, amount: 3818.18 }],
+  });
+  assert.match(xml, /<ar:CondicionIVAReceptorId>5<\/ar:CondicionIVAReceptorId>/);
+  assert.match(xml, /<ar:ImpTotal>22000\.00<\/ar:ImpTotal>/);
+  assert.match(xml, /<ar:Id>5<\/ar:Id>/);
+});
+
+
+test("dominio fiscal genera ID determinístico por origen", () => {
+  assert.equal(invoiceIdFor("seller_sale", "abc_123"), "invoice_seller_sale_abc_123");
+  assert.equal(invoiceIdFor("seller_sale", "abc_123"), invoiceIdFor("seller_sale", "abc_123"));
+  assert.throws(() => invoiceIdFor("otro", "abc"), /Origen de facturación inválido/);
+});
+
+test("descuento se distribuye sin alterar el total", () => {
+  const rows = allocateDiscount({
+    items: [
+      { productId: "a", qty: 1, unitPrice: 100, subtotal: 100 },
+      { productId: "b", qty: 1, unitPrice: 200, subtotal: 200 },
+    ],
+    discountTotal: 30,
+  });
+  assert.equal(rows.reduce((sum, row) => sum + row.discountCents, 0), 3000);
+  assert.equal(rows.reduce((sum, row) => sum + row.finalGrossCents, 0), 27000);
+});
+
+test("descompone precios finales con IVA explícito por producto", () => {
+  const fiscal = buildFiscalAmounts({
+    items: [{ productId: "a", qty: 1, unitPrice: 121, subtotal: 121 }],
+    vatRateByProduct: { a: 21 },
+  });
+  assert.deepEqual(fiscal.vatBreakdown, [{ id: 5, base: 100, amount: 21 }]);
+  assert.equal(fiscal.total, 121);
+  assert.equal(fiscal.net, 100);
+  assert.equal(fiscal.vat, 21);
+  assert.equal(assertSaleMatchesFiscalTotal({ total: 121 }, fiscal), true);
+});
+
+test("no inventa alícuota IVA si el producto no está configurado", () => {
+  assert.throws(
+    () => buildFiscalAmounts({
+      items: [{ productId: "a", qty: 1, unitPrice: 121, subtotal: 121 }],
+      vatRateByProduct: {},
+    }),
+    /alícuota IVA compatible/,
+  );
+});
+
+
+test("parser de padrón recupera identidad, domicilio e inscripción IVA", () => {
+  const xml = `<soap:Envelope><soap:Body><getPersona_v2Response><personaReturn>
+    <datosGenerales>
+      <apellido>PEREZ</apellido><nombre>ANA</nombre><estadoClave>ACTIVO</estadoClave>
+      <tipoClave>CUIT</tipoClave><tipoPersona>FISICA</tipoPersona>
+      <domicilioFiscal><direccion>CALLE 123</direccion><localidad>CABA</localidad><codPostal>1000</codPostal><descripcionProvincia>CIUDAD AUTONOMA BUENOS AIRES</descripcionProvincia><idProvincia>0</idProvincia></domicilioFiscal>
+    </datosGenerales>
+    <datosRegimenGeneral><impuesto><descripcionImpuesto>IVA</descripcionImpuesto><estadoImpuesto>AC</estadoImpuesto><idImpuesto>30</idImpuesto><periodo>202001</periodo></impuesto></datosRegimenGeneral>
+  </personaReturn></getPersona_v2Response></soap:Body></soap:Envelope>`;
+  const person = parseTaxpayerResponse(xml, "20-12345678-6");
+  assert.equal(person.cuit, "20123456786");
+  assert.equal(person.firstName, "ANA");
+  assert.equal(person.lastName, "PEREZ");
+  assert.equal(person.fiscalAddress.address, "CALLE 123");
+  assert.equal(person.taxes[0].id, 30);
+  assert.equal(person.taxes[0].description, "IVA");
+});
+
+
+test("configuración usa dominio vigente y fallback oficial del Padrón ARCA", () => {
+  assert.equal(
+    ARCA_ENVIRONMENTS.homologation.registryUrl,
+    "https://awshomo.arca.gob.ar/sr-padron/webservices/personaServiceA5",
+  );
+  assert.deepEqual(
+    ARCA_ENVIRONMENTS.homologation.registryFallbackUrls,
+    ["https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5"],
+  );
+  assert.equal(
+    ARCA_ENVIRONMENTS.production.registryUrl,
+    "https://aws.arca.gob.ar/sr-padron/webservices/personaServiceA5",
+  );
+  assert.deepEqual(
+    ARCA_ENVIRONMENTS.production.registryFallbackUrls,
+    ["https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5"],
+  );
+});
+
+
+test("parser de padrón distingue CUIT inexistente", () => {
+  const xml = `<soap:Envelope><soap:Body><getPersona_v2Response><personaReturn>
+    <errorConstancia><error>No existe persona con ese Id</error><idPersona>20123456786</idPersona></errorConstancia>
+  </personaReturn></getPersona_v2Response></soap:Body></soap:Envelope>`;
+  const person = parseTaxpayerResponse(xml, "20-12345678-6");
+  assert.equal(person.found, false);
+  assert.equal(person.errorConstancia.message, "No existe persona con ese Id");
+  assert.equal(person.errorConstancia.personId, "20123456786");
+  assert.equal(person.taxes.length, 0);
+});
+
+test("parser de padrón marca encontrada una persona con datos generales", () => {
+  const xml = `<soap:Envelope><soap:Body><getPersona_v2Response><personaReturn>
+    <datosGenerales><idPersona>20123456786</idPersona><estadoClave>ACTIVO</estadoClave><tipoPersona>FISICA</tipoPersona></datosGenerales>
+  </personaReturn></getPersona_v2Response></soap:Body></soap:Envelope>`;
+  const person = parseTaxpayerResponse(xml, "20-12345678-6");
+  assert.equal(person.found, true);
+  assert.equal(person.keyStatus, "ACTIVO");
+  assert.equal(person.personType, "FISICA");
+});
+
+
+test("padrón activo en IVA resuelve Responsable Inscripto", () => {
+  const result = inferReceiverVatCondition({
+    found: true,
+    keyStatus: "ACTIVO",
+    taxes: [{ id: 30, description: "IVA", status: "AC" }],
+    monotributo: false,
+  });
+  assert.equal(result.resolved, true);
+  assert.equal(result.condition.id, 1);
+});
+
+test("monotributo activo resuelve condición general y variantes conocidas", () => {
+  const base = {
+    found: true,
+    keyStatus: "ACTIVO",
+    taxes: [],
+    monotributo: true,
+    monotributoData: {
+      category: { id: 36, description: "B LOCACIONES DE SERVICIO" },
+      taxes: [{ id: 20, description: "MONOTRIBUTO", status: "AC" }],
+    },
+  };
+  assert.equal(inferReceiverVatCondition(base).condition.id, 6);
+  assert.equal(inferReceiverVatCondition({
+    ...base,
+    monotributoData: { ...base.monotributoData, category: { id: 99, description: "B MONOTRIBUTO SOCIAL LOCACION" } },
+  }).condition.id, 13);
+  assert.equal(inferReceiverVatCondition({
+    ...base,
+    monotributoData: { ...base.monotributoData, category: { id: 1, description: "TRABAJADOR INDEPENDIENTE PROMOVIDO" } },
+  }).condition.id, 16);
+});
+
+test("no inventa condición IVA si el padrón no alcanza", () => {
+  const result = inferReceiverVatCondition({
+    found: true,
+    keyStatus: "ACTIVO",
+    taxes: [{ id: 11, status: "AC" }],
+    monotributo: false,
+  });
+  assert.equal(result.resolved, false);
+  assert.equal(result.reason, "registry-insufficient-for-vat-condition");
+});
+
+test("consumidor final y tabla de condiciones se validan explícitamente", () => {
+  assert.equal(consumerFinalReceiver().condition.id, 5);
+  const rows = [
+    { id: 1, voucherClasses: ["A", "B"] },
+    { id: 5, voucherClasses: ["B", "C"] },
+  ];
+  assert.equal(validateReceiverConditionAgainstTable(1, rows, "A"), true);
+  assert.equal(validateReceiverConditionAgainstTable(1, rows, "C"), false);
+  assert.equal(validateReceiverConditionAgainstTable(5, rows, "B"), true);
+});

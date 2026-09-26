@@ -973,8 +973,9 @@ service cloud.firestore {
     }
     match /invoices/{invoiceId} {
       allow read: if canModule("finance", "view");
-      allow create, update: if canModule("finance", "edit");
-      allow delete: if false;
+      // CAE, numeración fiscal y estados de autorización son autoridad exclusiva
+      // del backend de facturación. El navegador nunca crea ni muta comprobantes.
+      allow create, update, delete: if false;
     }
     match /financialEntries/{entryId} {
       allow read: if canModule("finance", "view");
