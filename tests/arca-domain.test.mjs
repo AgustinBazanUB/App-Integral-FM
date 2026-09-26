@@ -148,3 +148,25 @@ test("configuración usa dominio vigente y fallback oficial del Padrón ARCA", (
     ["https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5"],
   );
 });
+
+
+test("parser de padrón distingue CUIT inexistente", () => {
+  const xml = `<soap:Envelope><soap:Body><getPersona_v2Response><personaReturn>
+    <errorConstancia><error>No existe persona con ese Id</error><idPersona>20123456786</idPersona></errorConstancia>
+  </personaReturn></getPersona_v2Response></soap:Body></soap:Envelope>`;
+  const person = parseTaxpayerResponse(xml, "20-12345678-6");
+  assert.equal(person.found, false);
+  assert.equal(person.errorConstancia.message, "No existe persona con ese Id");
+  assert.equal(person.errorConstancia.personId, "20123456786");
+  assert.equal(person.taxes.length, 0);
+});
+
+test("parser de padrón marca encontrada una persona con datos generales", () => {
+  const xml = `<soap:Envelope><soap:Body><getPersona_v2Response><personaReturn>
+    <datosGenerales><idPersona>20123456786</idPersona><estadoClave>ACTIVO</estadoClave><tipoPersona>FISICA</tipoPersona></datosGenerales>
+  </personaReturn></getPersona_v2Response></soap:Body></soap:Envelope>`;
+  const person = parseTaxpayerResponse(xml, "20-12345678-6");
+  assert.equal(person.found, true);
+  assert.equal(person.keyStatus, "ACTIVO");
+  assert.equal(person.personType, "FISICA");
+});
