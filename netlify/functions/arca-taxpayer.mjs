@@ -18,7 +18,9 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 function safeError(error) {
   return {
     code: error?.code || "arca-taxpayer-error",
-    message: String(error?.message || "No se pudo consultar el padrón de ARCA.").slice(0, 240),
+    status: Number(error?.status || 0) || null,
+    causeCode: error?.causeCode || null,
+    message: String(error?.message || "No se pudo completar la operación.").slice(0, 240),
   };
 }
 
@@ -32,34 +34,92 @@ async function runDiagnostics() {
   }
 
   const config = loadArcaPublicConfig(process.env);
-  const wsfe = await wsfeDummy({ env: process.env });
-  const points = await getPointsOfSale({ env: process.env });
-  const registry = await registryDummy({ env: process.env });
-
-  await firebaseAdminAccessToken({ env: process.env, forceRefresh: true });
-  const firestoreProbe = await adminGetDocument("settings/__arca_diagnostics__", { env: process.env });
-
-  return {
+  const diagnostics = {
     environment,
     configuration: arcaSafeStatus(process.env),
-    wsfe,
-    pointOfSale: {
+    wsfe: { status: "pending", data: null, error: null },
+    pointOfSale: { status: "pending", data: null, error: null },
+    registry: { status: "pending", data: null, error: null },
+    firebaseAdmin: {
+      oauth: { status: "pending", error: null },
+      firestoreRead: { status: "pending", error: null },
+    },
+  };
+
+  try {
+    diagnostics.wsfe.data = await wsfeDummy({ env: process.env });
+    diagnostics.wsfe.status = "ok";
+  } catch (error) {
+    diagnostics.wsfe.status = "error";
+    diagnostics.wsfe.error = safeError(error);
+  }
+
+  try {
+    const points = await getPointsOfSale({ env: process.env });
+    diagnostics.pointOfSale.data = {
       selected: config.pointOfSale,
       found: points.points.some((point) => point.number === config.pointOfSale),
       returned: points.points.map((point) => point.number),
       errors: points.errors,
-    },
-    registry: {
+    };
+    diagnostics.pointOfSale.status = diagnostics.pointOfSale.data.found ? "ok" : "error";
+    if (!diagnostics.pointOfSale.data.found) {
+      diagnostics.pointOfSale.error = {
+        code: "arca-point-of-sale-not-found",
+        status: null,
+        causeCode: null,
+        message: `ARCA no devolvió el punto de venta configurado (${config.pointOfSale}).`,
+      };
+    }
+  } catch (error) {
+    diagnostics.pointOfSale.status = "error";
+    diagnostics.pointOfSale.error = safeError(error);
+  }
+
+  try {
+    const registry = await registryDummy({ env: process.env });
+    diagnostics.registry.data = {
       appServer: registry.appServer,
       dbServer: registry.dbServer,
       authServer: registry.authServer,
       endpoint: registry.endpoint?.includes("afip.gov.ar") ? "official-legacy" : "arca-current",
-    },
-    firebaseAdmin: {
-      oauth: "ok",
-      firestoreRead: firestoreProbe ? "ok-document-found" : "ok-not-found",
-    },
-  };
+    };
+    diagnostics.registry.status = "ok";
+  } catch (error) {
+    diagnostics.registry.status = "error";
+    diagnostics.registry.error = safeError(error);
+  }
+
+  try {
+    await firebaseAdminAccessToken({ env: process.env, forceRefresh: true });
+    diagnostics.firebaseAdmin.oauth.status = "ok";
+  } catch (error) {
+    diagnostics.firebaseAdmin.oauth.status = "error";
+    diagnostics.firebaseAdmin.oauth.error = safeError(error);
+  }
+
+  if (diagnostics.firebaseAdmin.oauth.status === "ok") {
+    try {
+      const firestoreProbe = await adminGetDocument("settings/__arca_diagnostics__", { env: process.env });
+      diagnostics.firebaseAdmin.firestoreRead.status = "ok";
+      diagnostics.firebaseAdmin.firestoreRead.result = firestoreProbe ? "document-found" : "not-found";
+    } catch (error) {
+      diagnostics.firebaseAdmin.firestoreRead.status = "error";
+      diagnostics.firebaseAdmin.firestoreRead.error = safeError(error);
+    }
+  } else {
+    diagnostics.firebaseAdmin.firestoreRead.status = "skipped";
+  }
+
+  diagnostics.ok = [
+    diagnostics.wsfe.status,
+    diagnostics.pointOfSale.status,
+    diagnostics.registry.status,
+    diagnostics.firebaseAdmin.oauth.status,
+    diagnostics.firebaseAdmin.firestoreRead.status,
+  ].every((status) => status === "ok");
+
+  return diagnostics;
 }
 
 export default async function handler(request) {
