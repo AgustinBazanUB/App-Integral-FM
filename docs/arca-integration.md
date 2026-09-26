@@ -386,3 +386,17 @@ Próxima validación: solicitar un Ticket de Acceso específico para `ws_sr_cons
 La documentación oficial vigente V4.1 publica como endpoint primario de testing `awshomo.arca.gob.ar`, mientras documentación oficial anterior y el manual de WSAA siguen documentando el endpoint legado `awshomo.afip.gov.ar` para el mismo servicio.
 
 La primera prueba desde el entorno local devolvió un error de red `fetch failed` antes de recibir respuesta SOAP. Para robustecer la integración, el cliente usa el dominio vigente como primario y reintenta exclusivamente ante errores de conectividad contra el endpoint oficial legado. No se hace fallback ante errores SOAP, de autenticación o de negocio.
+
+
+## 19. Primera consulta real al Padrón
+
+La prueba real de homologación confirmó:
+
+- `dummy`: AppServer OK, DbServer OK, AuthServer OK.
+- El endpoint primario `awshomo.arca.gob.ar` no respondió desde el entorno local probado.
+- El fallback oficial legado `awshomo.afip.gov.ar` respondió correctamente.
+- WSAA emitió Ticket de Acceso válido para `ws_sr_constancia_inscripcion`.
+- `getPersona_v2` respondió sin error SOAP usando la CUIT representada del emisor.
+- La CUIT real consultada no devolvió `datosGenerales` ni impuestos dentro del dataset de homologación, por lo que no debe interpretarse como una constancia vacía válida.
+
+El parser ahora distingue explícitamente entre persona encontrada y respuesta con `errorConstancia`. Para validar el mapeo completo de datos fiscales se usará el CUIT de ejemplo `20164755100` publicado por ARCA en el ejemplo oficial de `getPersona_v2`.
