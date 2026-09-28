@@ -318,6 +318,12 @@ export default function SettingsPage() {
                           {invoice.authorization.caeExpiration ? ` · vence ${invoice.authorization.caeExpiration}` : ""}
                         </span>
                       ) : null}
+                      {invoice.error?.message ? <span>Error fiscal: {invoice.error.message}</span> : null}
+                      {Array.isArray(invoice.authorization?.observations) && invoice.authorization.observations.length ? (
+                        <span>
+                          Observaciones ARCA: {invoice.authorization.observations.map((item) => `${item.code}: ${item.message}`).join(" · ")}
+                        </span>
+                      ) : null}
                     </div>
                     <div>
                       <Button
