@@ -1,5 +1,5 @@
 import { requireFirebaseAdmin } from "./_lib/firebaseAuth.mjs";
-import { authorizeInvoice, reconcileInvoice, recoverPreCaeInvoice } from "./_lib/arca/authorizer.mjs";
+import { authorizeInvoice, reconcileInvoice, recoverPreCaeInvoice, verifyAuthorizedInvoice } from "./_lib/arca/authorizer.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -42,6 +42,14 @@ export default async function handler(request) {
 
     if (mode === "recover-pre-cae") {
       const result = await recoverPreCaeInvoice({
+        invoiceId,
+        env: process.env,
+      });
+      return json({ ok: true, mode, result });
+    }
+
+    if (mode === "verify-authorized") {
+      const result = await verifyAuthorizedInvoice({
         invoiceId,
         env: process.env,
       });
