@@ -525,3 +525,41 @@ export async function markInvoiceError({
     currentUpdateTime: expectedUpdateTime,
   });
 }
+
+
+export async function markInvoiceVerified({
+  invoiceId,
+  expectedUpdateTime,
+  matched,
+  result,
+  cae,
+  caeExpiration,
+  pointOfSale,
+  voucherType,
+  voucherNumber,
+  errors = [],
+  events = [],
+  env = process.env,
+  now = new Date(),
+  patchDocument = adminPatchDocument,
+} = {}) {
+  const timestamp = nowIso(now);
+  return patchDocument(invoicePathFor(invoiceId), {
+    updatedAt: timestamp,
+    verification: {
+      checkedAt: timestamp,
+      matched: matched === true,
+      result: result || null,
+      cae: cae ? String(cae) : null,
+      caeExpiration: caeExpiration ? String(caeExpiration) : null,
+      pointOfSale: Number(pointOfSale || 0) || null,
+      voucherType: Number(voucherType || 0) || null,
+      voucherNumber: Number(voucherNumber || 0) || null,
+      errors: Array.isArray(errors) ? errors : [],
+      events: Array.isArray(events) ? events : [],
+    },
+  }, {
+    env,
+    currentUpdateTime: expectedUpdateTime,
+  });
+}
