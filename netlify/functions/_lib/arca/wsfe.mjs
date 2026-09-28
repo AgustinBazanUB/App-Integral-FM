@@ -263,3 +263,19 @@ export async function getVoucherTypes(options = {}) {
     events: result.events,
   };
 }
+
+
+export async function getDocumentTypes(options = {}) {
+  const result = await wsfeCall("FEParamGetTiposDoc", () => "", options);
+  const blocks = xmlTags(result.xml, "DocTipo");
+  return {
+    types: blocks.map((block) => ({
+      id: Number(xmlTag(block, "Id") || 0),
+      description: xmlTag(block, "Desc") || "",
+      validFrom: xmlTag(block, "FchDesde") || null,
+      validTo: xmlTag(block, "FchHasta") || null,
+    })).filter((item) => item.id > 0),
+    errors: result.errors,
+    events: result.events,
+  };
+}
