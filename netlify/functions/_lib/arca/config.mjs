@@ -85,6 +85,10 @@ export function arcaSafeStatus(env = process.env) {
     pointOfSaleConfigured: Boolean(String(env.ARCA_POINT_OF_SALE || "").trim()),
     certificateConfigured: Boolean(String(env.ARCA_CERTIFICATE_PEM || "").trim()),
     privateKeyConfigured: Boolean(String(env.ARCA_PRIVATE_KEY_PEM || "").trim()),
+    issuerVatConditionConfigured: Boolean(String(env.ARCA_ISSUER_VAT_CONDITION || "").trim()),
+    defaultProductVatRate: String(env.ARCA_DEFAULT_PRODUCT_VAT_RATE || "").trim() || null,
+    consumerFinalIdThreshold: Number(env.ARCA_CONSUMER_FINAL_ID_THRESHOLD || 0) || null,
+    caeHomologationEnabled: String(env.ARCA_ALLOW_CAE_HOMOLOGATION || "").trim().toLowerCase() === "true",
     publicConfigError,
   };
 }
