@@ -33,6 +33,7 @@ import {
   effectiveSellerLocations,
 } from "../permissions";
 import { db } from "./firebase";
+import { requestPendingArcaInvoice } from "./arcaService";
 import {
   listLocationsShared,
   loadSellerResourcesShared,
@@ -359,7 +360,7 @@ export async function createSellerSale({
     throw new Error("La fecha local de la venta pendiente no es válida.");
   }
 
-  return runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
+  const result = await runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
     if (refs.localId) {
       const existing = await transaction.get(refs.saleRef);
       if (existing.exists()) {
@@ -496,6 +497,27 @@ export async function createSellerSale({
       createdAt: new Date(),
     };
   }));
+
+  if (!ticketRequested) return result;
+
+  try {
+    const invoice = await requestPendingArcaInvoice({
+      sourceType: "seller_sale",
+      sourceId: result.id,
+    });
+    return {
+      ...result,
+      fiscalPreparationStatus: "prepared",
+      fiscalInvoiceId: invoice?.id || null,
+      fiscalReadiness: invoice?.fiscalReadiness || null,
+    };
+  } catch (error) {
+    return {
+      ...result,
+      fiscalPreparationStatus: "error",
+      fiscalPreparationError: String(error?.message || "No se pudo preparar la solicitud fiscal."),
+    };
+  }
 }
 
 export async function updateSellerSale({
