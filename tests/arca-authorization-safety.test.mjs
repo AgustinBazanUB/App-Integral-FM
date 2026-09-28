@@ -122,18 +122,45 @@ test("plan A exige CUIT y conserva cierre fiscal", () => {
   assert.deepEqual(plan.blockers, []);
 });
 
-test("consumidor final anónimo queda bloqueado hasta validar umbral vigente", () => {
+test("consumidor final anónimo debajo del umbral vigente no queda bloqueado", () => {
   const plan = buildAuthorizationPlan({
     invoice,
     issuerVatCondition: "responsable_inscripto",
     receiverVatConditionId: 5,
     anonymousConsumerFinal: true,
     voucherDate: new Date("2026-09-28T12:00:00-03:00"),
+    consumerFinalIdThreshold: 10000000,
   });
   assert.equal(plan.voucherType, 6);
   assert.equal(plan.detailBase.docType, 99);
   assert.equal(plan.detailBase.docNumber, "0");
-  assert.deepEqual(plan.blockers, ["anonymous-consumer-final-amount-threshold"]);
+  assert.deepEqual(plan.blockers, []);
+});
+
+test("consumidor final anónimo en o sobre el umbral exige identificación", () => {
+  const highInvoice = {
+    ...invoice,
+    saleSnapshot: {
+      ...invoice.saleSnapshot,
+      total: 10000000,
+      subtotal: 10000000,
+      items: [{
+        productId: "product-1",
+        name: "Producto",
+        qty: 1,
+        unitPrice: 10000000,
+        subtotal: 10000000,
+      }],
+    },
+  };
+  const plan = buildAuthorizationPlan({
+    invoice: highInvoice,
+    issuerVatCondition: "responsable_inscripto",
+    receiverVatConditionId: 5,
+    anonymousConsumerFinal: true,
+    consumerFinalIdThreshold: 10000000,
+  });
+  assert.deepEqual(plan.blockers, ["consumer-final-identification-required"]);
 });
 
 test("lock de secuencia impide dos autorizaciones simultáneas", async () => {
