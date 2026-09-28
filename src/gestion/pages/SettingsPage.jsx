@@ -7,6 +7,7 @@ import {
   dryRunArcaInvoice,
   listRecentArcaInvoices,
   reconcileArcaInvoice,
+  recoverPreCaeArcaInvoice,
   runArcaDiagnostics,
 } from "../services/arcaService";
 import { firebaseConfig } from "../services/firebase";
@@ -104,6 +105,19 @@ export default function SettingsPage() {
           ...current,
           actionId: "",
           message: `Reconciliación finalizada con estado ${result?.status || "desconocido"}.`,
+        }));
+        return;
+      }
+
+      if (mode === "recover-pre-cae") {
+        const result = await recoverPreCaeArcaInvoice({ invoiceId: invoice.id });
+        await loadInvoices();
+        setInvoiceState((current) => ({
+          ...current,
+          actionId: "",
+          message: result?.recovered
+            ? "Solicitud recuperada a pending. No había número reservado ni CAE."
+            : `La solicitud no se modificó: ${result?.reason || "recuperación no segura"}.`,
         }));
       }
     } catch (error) {
@@ -340,6 +354,17 @@ export default function SettingsPage() {
                           onClick={() => runInvoiceAction(invoice, "authorize")}
                         >
                           Autorizar homologación
+                        </Button>
+                      ) : null}
+                      {invoice.status === "authorizing"
+                        && !invoice.authorization?.voucherNumber
+                        && !invoice.authorization?.cae ? (
+                        <Button
+                          variant="secondary"
+                          loading={invoiceState.actionId === invoice.id}
+                          onClick={() => runInvoiceAction(invoice, "recover-pre-cae")}
+                        >
+                          Recuperar intento pre-CAE
                         </Button>
                       ) : null}
                       {invoice.status === "reconciling" ? (
