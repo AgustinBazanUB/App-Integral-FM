@@ -129,6 +129,13 @@ export default async function handler(request) {
     await requireFirebaseAdmin(request);
     const body = await request.json().catch(() => ({}));
 
+    if (body?.mode === "status") {
+      return json({
+        ok: true,
+        status: arcaSafeStatus(process.env),
+      });
+    }
+
     if (body?.mode === "diagnostics") {
       const diagnostics = await runDiagnostics();
       return json({ ok: true, diagnostics });
