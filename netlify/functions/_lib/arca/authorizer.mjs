@@ -165,15 +165,33 @@ export async function authorizeInvoice({
     };
   }
 
+  const savedReceiver = current.data?.receiverSnapshot || {};
+  const effectiveReceiver = {
+    vatConditionId: receiver?.vatConditionId || savedReceiver.vatConditionId,
+    documentType: receiver?.documentType || savedReceiver.documentType,
+    documentNumber: receiver?.documentNumber || savedReceiver.documentNumber,
+    anonymousConsumerFinal: receiver?.anonymousConsumerFinal === true
+      || (receiver?.anonymousConsumerFinal == null && savedReceiver.anonymousConsumerFinal === true),
+    concept: receiver?.concept || savedReceiver.concept || 1,
+  };
+  const thresholdRaw = String(env.ARCA_CONSUMER_FINAL_ID_THRESHOLD || "10000000").trim();
+  const threshold = Number(thresholdRaw);
+  if (!Number.isFinite(threshold) || threshold <= 0) {
+    const error = new Error("ARCA_CONSUMER_FINAL_ID_THRESHOLD debe ser un importe válido.");
+    error.code = "arca-consumer-final-threshold-invalid";
+    throw error;
+  }
+
   const plan = buildAuthorizationPlan({
     invoice: current.data,
     issuerVatCondition,
-    receiverVatConditionId: receiver?.vatConditionId,
-    documentType: receiver?.documentType,
-    documentNumber: receiver?.documentNumber,
-    anonymousConsumerFinal: receiver?.anonymousConsumerFinal === true,
+    receiverVatConditionId: effectiveReceiver.vatConditionId,
+    documentType: effectiveReceiver.documentType,
+    documentNumber: effectiveReceiver.documentNumber,
+    anonymousConsumerFinal: effectiveReceiver.anonymousConsumerFinal,
     voucherDate: now,
-    concept: receiver?.concept || 1,
+    concept: effectiveReceiver.concept,
+    consumerFinalIdThreshold: threshold,
   });
 
   if (plan.blockers.length) {
