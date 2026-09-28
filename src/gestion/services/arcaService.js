@@ -23,6 +23,11 @@ async function authenticatedPost(payload) {
   return data;
 }
 
+export async function getArcaSafeStatus() {
+  const data = await authenticatedPost({ mode: "status" });
+  return data.status;
+}
+
 export async function runArcaDiagnostics() {
   const data = await authenticatedPost({ mode: "diagnostics" });
   return data.diagnostics;
@@ -135,6 +140,14 @@ export async function reconcileArcaInvoice({ invoiceId }) {
 export async function recoverPreCaeArcaInvoice({ invoiceId }) {
   return arcaAuthorizationPost({
     mode: "recover-pre-cae",
+    invoiceId,
+  });
+}
+
+
+export async function verifyAuthorizedArcaInvoice({ invoiceId }) {
+  return arcaAuthorizationPost({
+    mode: "verify-authorized",
     invoiceId,
   });
 }
