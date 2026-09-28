@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { authorizeInvoice, recoverPreCaeInvoice } from "../netlify/functions/_lib/arca/authorizer.mjs";
+import { authorizeInvoice, recoverPreCaeInvoice, verifyAuthorizedInvoice } from "../netlify/functions/_lib/arca/authorizer.mjs";
 
 const pendingInvoice = {
   status: "pending",
@@ -401,4 +401,107 @@ test("recupera authorizing pre-CAE sólo si no hay número planificado", async (
 
   assert.equal(blocked.recovered, false);
   assert.equal(blocked.reason, "pre-cae-recovery-not-safe");
+});
+
+
+test("FECompConsultar confirma un comprobante autorizado y coincidente", async () => {
+  let persisted = null;
+  const authorizedInvoice = {
+    ...pendingInvoice,
+    status: "authorized",
+    authorization: {
+      pointOfSale: 3,
+      voucherType: 6,
+      voucherNumber: 2,
+      cae: "12345678901234",
+      caeExpiration: "20261008",
+      result: "A",
+    },
+  };
+
+  const result = await verifyAuthorizedInvoice({
+    invoiceId: "invoice-authorized-2",
+    getDocument: async () => ({
+      data: authorizedInvoice,
+      updateTime: "u-authorized",
+    }),
+    consultVoucherFn: async ({ pointOfSale, voucherType, voucherNumber }) => {
+      assert.equal(pointOfSale, 3);
+      assert.equal(voucherType, 6);
+      assert.equal(voucherNumber, 2);
+      return {
+        result: "A",
+        cae: "12345678901234",
+        caeExpiration: "20261008",
+        voucherNumber: 2,
+        errors: [],
+        events: [],
+      };
+    },
+    markVerifiedFn: async (input) => {
+      persisted = input;
+      return {
+        data: {
+          ...authorizedInvoice,
+          verification: {
+            checkedAt: "2026-09-28T22:00:00.000Z",
+            matched: input.matched,
+          },
+        },
+      };
+    },
+  });
+
+  assert.equal(result.verified, true);
+  assert.equal(result.matched, true);
+  assert.equal(persisted.expectedUpdateTime, "u-authorized");
+  assert.equal(persisted.voucherNumber, 2);
+});
+
+test("FECompConsultar detecta CAE distinto sin desautorizar el registro local", async () => {
+  let persistedMatch = null;
+  const authorizedInvoice = {
+    ...pendingInvoice,
+    status: "authorized",
+    authorization: {
+      pointOfSale: 3,
+      voucherType: 6,
+      voucherNumber: 2,
+      cae: "12345678901234",
+      caeExpiration: "20261008",
+      result: "A",
+    },
+  };
+
+  const result = await verifyAuthorizedInvoice({
+    invoiceId: "invoice-authorized-mismatch",
+    getDocument: async () => ({
+      data: authorizedInvoice,
+      updateTime: "u-authorized",
+    }),
+    consultVoucherFn: async () => ({
+      result: "A",
+      cae: "99999999999999",
+      caeExpiration: "20261008",
+      voucherNumber: 2,
+      errors: [],
+      events: [],
+    }),
+    markVerifiedFn: async (input) => {
+      persistedMatch = input.matched;
+      return {
+        data: {
+          ...authorizedInvoice,
+          verification: {
+            matched: input.matched,
+          },
+        },
+      };
+    },
+  });
+
+  assert.equal(result.verified, true);
+  assert.equal(result.matched, false);
+  assert.equal(result.status, "authorized");
+  assert.equal(persistedMatch, false);
 });
