@@ -51,6 +51,13 @@ function compactSaleItems(items = []) {
 }
 
 async function loadFiscalProducts(items, { getDocument, env }) {
+  const defaultVatRateRaw = String(env?.ARCA_DEFAULT_PRODUCT_VAT_RATE ?? "").trim();
+  const defaultVatRate = defaultVatRateRaw === "" ? null : Number(defaultVatRateRaw);
+  if (defaultVatRate != null && ![0, 10.5, 21, 27].includes(defaultVatRate)) {
+    const error = new Error("ARCA_DEFAULT_PRODUCT_VAT_RATE no es una alícuota soportada.");
+    error.code = "arca-default-vat-rate-invalid";
+    throw error;
+  }
   const uniqueIds = [...new Set(items.map((item) => item.productId).filter(Boolean))];
   const products = [];
   for (const productId of uniqueIds) {
@@ -60,7 +67,8 @@ async function loadFiscalProducts(items, { getDocument, env }) {
       productId,
       exists: Boolean(snapshot),
       name: data?.name || items.find((item) => item.productId === productId)?.name || "",
-      arcaVatRate: data?.arcaVatRate ?? null,
+      arcaVatRate: data?.arcaVatRate ?? defaultVatRate,
+      arcaVatRateSource: data?.arcaVatRate != null ? "product" : defaultVatRate != null ? "environment-default" : null,
       active: data?.active !== false,
       deleted: data?.deleted === true,
     });
@@ -145,6 +153,7 @@ export async function ensurePendingInvoice({
   sourceId,
   requestedBy,
   requestedByName = null,
+  receiver = null,
   env = process.env,
   now = new Date(),
   getDocument = adminGetDocument,
@@ -201,6 +210,13 @@ export async function ensurePendingInvoice({
       customer: compactCustomerSnapshot(sale),
     },
     productFiscalSnapshot: fiscalProducts,
+    receiverSnapshot: receiver ? {
+      vatConditionId: Number(receiver.vatConditionId || 0) || null,
+      documentType: Number(receiver.documentType || 0) || null,
+      documentNumber: String(receiver.documentNumber || "").replace(/\D/g, "") || null,
+      anonymousConsumerFinal: receiver.anonymousConsumerFinal === true,
+      concept: Number(receiver.concept || 1),
+    } : null,
     authorization: {
       pointOfSale: null,
       voucherType: null,
