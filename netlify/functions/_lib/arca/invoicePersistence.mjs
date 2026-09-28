@@ -1,6 +1,7 @@
 import {
   adminCreateDocument,
   adminGetDocument,
+  adminPatchDocument,
 } from "../firestoreAdminRest.mjs";
 import {
   BILLING_SOURCE_TYPES,
@@ -232,4 +233,96 @@ export async function ensurePendingInvoice({
       updateTime: raced.updateTime || null,
     };
   }
+}
+
+
+export async function claimPendingInvoice({
+  invoiceId,
+  claimedBy = null,
+  env = process.env,
+  now = new Date(),
+  getDocument = adminGetDocument,
+  patchDocument = adminPatchDocument,
+} = {}) {
+  const current = await getDocument(invoicePathFor(invoiceId), { env });
+  if (!current) {
+    const error = new Error("La solicitud fiscal no existe.");
+    error.code = "arca-invoice-not-found";
+    error.status = 404;
+    throw error;
+  }
+
+  const status = String(current.data?.status || "");
+  if (status !== "pending") {
+    return {
+      claimed: false,
+      invoiceId,
+      invoice: current.data,
+      updateTime: current.updateTime || null,
+      reason: `status-${status || "unknown"}`,
+    };
+  }
+
+  const timestamp = nowIso(now);
+  const attemptId = `attempt_${timestamp.replace(/[^0-9]/g, "").slice(0, 17)}_${String(claimedBy || "system").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40)}`;
+
+  try {
+    const updated = await patchDocument(invoicePathFor(invoiceId), {
+      status: "authorizing",
+      updatedAt: timestamp,
+      authorization: {
+        ...(current.data.authorization || {}),
+        attemptId,
+        attemptStartedAt: timestamp,
+        claimedBy: claimedBy || null,
+      },
+      error: null,
+    }, {
+      env,
+      currentUpdateTime: current.updateTime,
+    });
+
+    return {
+      claimed: true,
+      invoiceId,
+      invoice: updated.data,
+      updateTime: updated.updateTime || null,
+      attemptId,
+      reason: "claimed",
+    };
+  } catch (error) {
+    if (error?.code !== "firebase-admin-precondition-failed") throw error;
+    const raced = await getDocument(invoicePathFor(invoiceId), { env });
+    return {
+      claimed: false,
+      invoiceId,
+      invoice: raced?.data || null,
+      updateTime: raced?.updateTime || null,
+      reason: "concurrent-claim",
+    };
+  }
+}
+
+export async function releaseInvoiceClaim({
+  invoiceId,
+  expectedUpdateTime,
+  errorCode,
+  errorMessage,
+  env = process.env,
+  now = new Date(),
+  patchDocument = adminPatchDocument,
+} = {}) {
+  const timestamp = nowIso(now);
+  return patchDocument(invoicePathFor(invoiceId), {
+    status: "error",
+    updatedAt: timestamp,
+    error: {
+      code: String(errorCode || "arca-authorization-error").slice(0, 120),
+      message: String(errorMessage || "Falló la autorización fiscal.").slice(0, 500),
+      at: timestamp,
+    },
+  }, {
+    env,
+    currentUpdateTime: expectedUpdateTime,
+  });
 }
