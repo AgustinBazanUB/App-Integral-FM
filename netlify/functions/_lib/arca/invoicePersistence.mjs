@@ -458,3 +458,54 @@ export async function markInvoiceReconciling({
     currentUpdateTime: expectedUpdateTime,
   });
 }
+
+
+export async function returnInvoiceToPending({
+  invoiceId,
+  expectedUpdateTime,
+  errorCode = "arca-retry-later",
+  errorMessage = "La autorización fiscal debe reintentarse.",
+  env = process.env,
+  now = new Date(),
+  patchDocument = adminPatchDocument,
+} = {}) {
+  const timestamp = nowIso(now);
+  return patchDocument(invoicePathFor(invoiceId), {
+    status: "pending",
+    updatedAt: timestamp,
+    error: {
+      code: String(errorCode).slice(0, 120),
+      message: String(errorMessage).slice(0, 500),
+      at: timestamp,
+      retryable: true,
+    },
+  }, {
+    env,
+    currentUpdateTime: expectedUpdateTime,
+  });
+}
+
+export async function markInvoiceError({
+  invoiceId,
+  expectedUpdateTime,
+  errorCode = "arca-authorization-error",
+  errorMessage = "Falló la autorización fiscal.",
+  env = process.env,
+  now = new Date(),
+  patchDocument = adminPatchDocument,
+} = {}) {
+  const timestamp = nowIso(now);
+  return patchDocument(invoicePathFor(invoiceId), {
+    status: "error",
+    updatedAt: timestamp,
+    error: {
+      code: String(errorCode).slice(0, 120),
+      message: String(errorMessage).slice(0, 500),
+      at: timestamp,
+      retryable: false,
+    },
+  }, {
+    env,
+    currentUpdateTime: expectedUpdateTime,
+  });
+}
