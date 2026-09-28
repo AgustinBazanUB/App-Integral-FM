@@ -85,6 +85,9 @@ export async function soapRequest({ url, action = "", body, timeoutMs = 20000, f
       timeoutError.status = 504;
       throw timeoutError;
     }
+    if (error?.code && (error.status || error.detail != null)) {
+      throw error;
+    }
     if (!error?.code || !String(error.code).startsWith("arca-")) {
       const networkError = new Error("No se pudo conectar con el servidor de ARCA.");
       networkError.code = "arca-network-error";
