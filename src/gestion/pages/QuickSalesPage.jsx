@@ -25,6 +25,7 @@ import {
 } from "../services/managementService";
 import { listLocationInventory } from "../services/inventoryService";
 import { listDiscounts } from "../services/locationManagementService";
+import { requestPendingArcaInvoice } from "../services/arcaService";
 
 const friendlyPayments = {
   credit: "Crédito",
@@ -111,12 +112,26 @@ export default function QuickSalesPage() {
         invoiceRequested,
         deliveryMethod,
       });
+      let invoiceNotice = "";
+      if (invoiceRequested) {
+        try {
+          const invoice = await requestPendingArcaInvoice({
+            sourceType: "admin_quick_sale",
+            sourceId: result.id,
+          });
+          invoiceNotice = invoice?.fiscalReadiness?.ready === false
+            ? " Solicitud fiscal creada; faltan datos fiscales de uno o más productos antes de autorizarla."
+            : " Solicitud fiscal creada en estado pendiente.";
+        } catch (invoiceError) {
+          invoiceNotice = ` La venta quedó registrada, pero no se pudo preparar la solicitud fiscal: ${invoiceError.message}`;
+        }
+      }
       setQuantities({});
       setCustomerDni("");
       setPaymentMethod("");
       setInvoiceRequested(false);
       setDiscountIds([]);
-      setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.` });
+      setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.${invoiceNotice}` });
       const refreshedStock = await listLocationInventory(locationId);
       setStock({
         status: "ready",
@@ -182,7 +197,7 @@ export default function QuickSalesPage() {
               <FormField label="DNI del cliente" hint="Se completa al final para no frenar la venta."><input inputMode="numeric" value={customerDni} onChange={(event) => setCustomerDni(event.target.value.replace(/\D/g, "").slice(0, 9))} /></FormField>
               <FormField label="Entrega" required><Select value={deliveryMethod} onChange={(event) => setDeliveryMethod(event.target.value)}><option value="pickup">Retiro</option><option value="shipping">Requiere envío</option></Select></FormField>
             </div>
-            <label className="fm-check-row"><input type="checkbox" checked={invoiceRequested} onChange={(event) => setInvoiceRequested(event.target.checked)} /><span>Solicitar factura manual después de registrar la venta</span></label>
+            <label className="fm-check-row"><input type="checkbox" checked={invoiceRequested} onChange={(event) => setInvoiceRequested(event.target.checked)} /><span>Solicitar factura después de registrar la venta</span></label>
             {submitState.error ? <Toast tone="error">{submitState.error}</Toast> : null}
             {submitState.success ? <Toast tone="success">{submitState.success}</Toast> : null}
             <Button type="submit" icon="Check" loading={submitState.busy} disabled={!cart.length || !paymentMethod} className="fm-sale-submit">Confirmar venta</Button>
