@@ -70,13 +70,27 @@ export async function requestAccessTicket(service, {
   const tra = buildLoginTicketRequest(service, now);
   const cmsBase64 = signCmsBase64(tra, secrets);
   const envelope = buildLoginCmsEnvelope(cmsBase64);
-  const soap = await soapRequest({
-    url: environment.wsaaUrl,
-    action: "urn:LoginCms",
-    body: envelope,
-    timeoutMs: 20000,
-    fetchImpl,
-  });
+  let soap;
+  try {
+    soap = await soapRequest({
+      url: environment.wsaaUrl,
+      action: "urn:LoginCms",
+      body: envelope,
+      timeoutMs: 20000,
+      fetchImpl,
+    });
+  } catch (error) {
+    if (String(error?.code || "").includes("alreadyAuthenticated")) {
+      const activeTicketError = new Error(
+        "ARCA ya tiene un Ticket de Acceso vigente para este certificado y servicio. No se solicitará otro hasta que venza."
+      );
+      activeTicketError.code = "arca-wsaa-already-authenticated";
+      activeTicketError.status = 409;
+      activeTicketError.causeCode = error.code;
+      throw activeTicketError;
+    }
+    throw error;
+  }
   const ticket = parseLoginTicketResponse(soap);
   ticketCache.set(cacheKey, ticket);
   return ticket;
