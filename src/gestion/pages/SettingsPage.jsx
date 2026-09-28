@@ -266,6 +266,8 @@ export default function SettingsPage() {
             <p>Ejecutá el diagnóstico desde Netlify Dev. La prueba no genera CAE ni modifica ventas.</p>
           )}
         </Panel>
+      ) : null}
+
       {isAdmin ? (
         <Panel
           title="Homologación fiscal controlada"
