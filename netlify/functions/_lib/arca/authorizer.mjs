@@ -6,6 +6,7 @@ import {
   markInvoiceError,
   markInvoiceReconciling,
   markInvoiceRejected,
+  markInvoiceVerified,
   persistAuthorizationPlan,
   returnInvoiceToPending,
 } from "./invoicePersistence.mjs";
@@ -508,5 +509,105 @@ export async function recoverPreCaeInvoice({
     status: returned.data?.status || "pending",
     recovered: true,
     invoice: returned.data,
+  };
+}
+
+
+export async function verifyAuthorizedInvoice({
+  invoiceId,
+  env = process.env,
+  getDocument = adminGetDocument,
+  consultVoucherFn = consultVoucher,
+  markVerifiedFn = markInvoiceVerified,
+  now = new Date(),
+} = {}) {
+  if (!invoiceId) {
+    const error = new Error("Falta identificar la solicitud fiscal.");
+    error.code = "arca-invoice-id-missing";
+    error.status = 400;
+    throw error;
+  }
+
+  const current = await getDocument(invoicePath(invoiceId), { env });
+  if (!current) {
+    const error = new Error("La solicitud fiscal no existe.");
+    error.code = "arca-invoice-not-found";
+    error.status = 404;
+    throw error;
+  }
+
+  if (current.data?.status !== "authorized") {
+    return {
+      verified: false,
+      matched: false,
+      status: current.data?.status || "unknown",
+      reason: "invoice-not-authorized",
+      invoice: current.data,
+    };
+  }
+
+  const authorization = current.data?.authorization || {};
+  const pointOfSale = Number(authorization.pointOfSale || 0);
+  const voucherType = Number(authorization.voucherType || 0);
+  const voucherNumber = Number(authorization.voucherNumber || 0);
+  const expectedCae = String(authorization.cae || "");
+  const expectedExpiration = String(authorization.caeExpiration || "");
+
+  if (!pointOfSale || !voucherType || !voucherNumber || !expectedCae) {
+    const error = new Error("La factura autorizada no tiene todos los datos necesarios para verificarla.");
+    error.code = "arca-authorized-invoice-incomplete";
+    error.status = 409;
+    throw error;
+  }
+
+  const consulted = await consultVoucherFn({
+    voucherType,
+    pointOfSale,
+    voucherNumber,
+    env,
+  });
+
+  const compactErrors = arcaMessages(consulted?.errors);
+  const compactEvents = arcaMessages(consulted?.events);
+  const consultedCae = String(consulted?.cae || "");
+  const consultedExpiration = String(consulted?.caeExpiration || "");
+  const consultedNumber = Number(consulted?.voucherNumber || 0);
+
+  const matched = (
+    compactErrors.length === 0
+    && consulted?.result === "A"
+    && consultedCae === expectedCae
+    && consultedNumber === voucherNumber
+    && (!expectedExpiration || !consultedExpiration || consultedExpiration === expectedExpiration)
+  );
+
+  const persisted = await markVerifiedFn({
+    invoiceId,
+    expectedUpdateTime: current.updateTime,
+    matched,
+    result: consulted?.result || null,
+    cae: consultedCae || null,
+    caeExpiration: consultedExpiration || null,
+    pointOfSale,
+    voucherType,
+    voucherNumber: consultedNumber || voucherNumber,
+    errors: compactErrors,
+    events: compactEvents,
+    env,
+    now,
+  });
+
+  return {
+    verified: true,
+    matched,
+    status: persisted.data?.status || "authorized",
+    verification: persisted.data?.verification || null,
+    expected: {
+      pointOfSale,
+      voucherType,
+      voucherNumber,
+      cae: expectedCae,
+      caeExpiration: expectedExpiration || null,
+    },
   };
 }
