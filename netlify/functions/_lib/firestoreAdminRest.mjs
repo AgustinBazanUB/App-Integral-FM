@@ -222,17 +222,29 @@ export async function adminCreateDocument(collectionPath, documentId, data, opti
 
 export async function adminPatchDocument(path, data, {
   updateMask = Object.keys(data || {}),
+  currentUpdateTime = null,
+  requireExists = false,
   ...options
 } = {}) {
-  const query = updateMask.length
-    ? `?${updateMask.map((field) => `updateMask.fieldPaths=${encodeURIComponent(field)}`).join("&")}`
-    : "";
+  const queryParts = updateMask.map((field) => `updateMask.fieldPaths=${encodeURIComponent(field)}`);
+  if (currentUpdateTime) {
+    queryParts.push(`currentDocument.updateTime=${encodeURIComponent(currentUpdateTime)}`);
+  } else if (requireExists) {
+    queryParts.push("currentDocument.exists=true");
+  }
+  const query = queryParts.length ? `?${queryParts.join("&")}` : "";
   const { response, payload } = await adminFetch(path, {
     ...options,
     method: "PATCH",
     query,
     body: { fields: fieldsFromObject(data) },
   });
+  if (response.status === 412) {
+    const error = new Error("El documento cambió antes de completar la actualización.");
+    error.code = "firebase-admin-precondition-failed";
+    error.status = 412;
+    throw error;
+  }
   if (!response.ok) {
     const error = new Error("No se pudo actualizar el documento fiscal.");
     error.code = "firebase-admin-update-error";
