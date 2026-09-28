@@ -54,11 +54,22 @@ export default async function handler(request) {
       }, 403);
     }
 
+    const receiver = body?.receiver && typeof body.receiver === "object"
+      ? {
+          vatConditionId: Number(body.receiver.vatConditionId || 0),
+          documentType: Number(body.receiver.documentType || 0),
+          documentNumber: String(body.receiver.documentNumber || "").replace(/\D/g, ""),
+          anonymousConsumerFinal: body.receiver.anonymousConsumerFinal === true,
+          concept: Number(body.receiver.concept || 1),
+        }
+      : null;
+
     const result = await ensurePendingInvoice({
       sourceType,
       sourceId,
       requestedBy: session.uid,
       requestedByName: session.profile?.name || session.email || null,
+      receiver,
       env: process.env,
     });
 
