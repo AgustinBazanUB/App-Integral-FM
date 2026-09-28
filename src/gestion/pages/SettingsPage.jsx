@@ -5,10 +5,12 @@ import { canAccessAdministration } from "../permissions";
 import {
   authorizeArcaInvoice,
   dryRunArcaInvoice,
+  getArcaSafeStatus,
   listRecentArcaInvoices,
   reconcileArcaInvoice,
   recoverPreCaeArcaInvoice,
   runArcaDiagnostics,
+  verifyAuthorizedArcaInvoice,
 } from "../services/arcaService";
 import { firebaseConfig } from "../services/firebase";
 
@@ -50,6 +52,11 @@ export default function SettingsPage() {
     actionId: "",
     dryRuns: {},
   });
+  const [arcaConfigState, setArcaConfigState] = useState({
+    busy: false,
+    result: null,
+    error: "",
+  });
 
   const loadInvoices = async () => {
     setInvoiceState((current) => ({ ...current, busy: true, error: "", message: "" }));
@@ -61,9 +68,20 @@ export default function SettingsPage() {
     }
   };
 
+  const loadSafeArcaConfig = async () => {
+    setArcaConfigState((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const result = await getArcaSafeStatus();
+      setArcaConfigState({ busy: false, result, error: "" });
+    } catch (error) {
+      setArcaConfigState({ busy: false, result: null, error: error.message });
+    }
+  };
+
   useEffect(() => {
     if (!isAdmin) return;
     loadInvoices();
+    loadSafeArcaConfig();
   }, [isAdmin]);
 
   const runInvoiceAction = async (invoice, mode) => {
@@ -119,6 +137,19 @@ export default function SettingsPage() {
             ? "Solicitud recuperada a pending. No había número reservado ni CAE."
             : `La solicitud no se modificó: ${result?.reason || "recuperación no segura"}.`,
         }));
+        return;
+      }
+
+      if (mode === "verify-authorized") {
+        const result = await verifyAuthorizedArcaInvoice({ invoiceId: invoice.id });
+        await loadInvoices();
+        setInvoiceState((current) => ({
+          ...current,
+          actionId: "",
+          message: result?.matched
+            ? "FECompConsultar confirmó que número, CAE y vencimiento coinciden con Firestore."
+            : "FECompConsultar respondió, pero los datos no coinciden. Revisá la verificación antes de continuar.",
+        }));
       }
     } catch (error) {
       setInvoiceState((current) => ({
@@ -141,7 +172,7 @@ export default function SettingsPage() {
 
   const arcaOperational = arcaState.result?.ok === true;
   const pointOfSale = arcaState.result?.pointOfSale?.data;
-  const fiscalConfig = arcaState.result?.configuration || {};
+  const fiscalConfig = arcaState.result?.configuration || arcaConfigState.result || {};
   const caeEnabled = fiscalConfig.caeHomologationEnabled === true;
 
   const rows = [
@@ -302,6 +333,15 @@ export default function SettingsPage() {
                 {caeEnabled ? "Habilitado" : "Bloqueado"}
               </Badge>
             </div>
+            <div>
+              <div>
+                <strong>Estado de configuración</strong>
+                <span>Se lee sin llamar a WSAA ni consumir un Ticket de Acceso.</span>
+              </div>
+              <Button variant="secondary" loading={arcaConfigState.busy} onClick={loadSafeArcaConfig}>
+                Actualizar estado
+              </Button>
+            </div>
           </div>
 
           {invoiceState.error ? <Toast tone="error">{invoiceState.error}</Toast> : null}
@@ -336,6 +376,11 @@ export default function SettingsPage() {
                       {Array.isArray(invoice.authorization?.observations) && invoice.authorization.observations.length ? (
                         <span>
                           Observaciones ARCA: {invoice.authorization.observations.map((item) => `${item.code}: ${item.message}`).join(" · ")}
+                        </span>
+                      ) : null}
+                      {invoice.verification?.checkedAt ? (
+                        <span>
+                          FECompConsultar: {invoice.verification.matched ? "coincide" : "NO coincide"} · verificado {invoice.verification.checkedAt}
                         </span>
                       ) : null}
                     </div>
@@ -374,6 +419,15 @@ export default function SettingsPage() {
                           onClick={() => runInvoiceAction(invoice, "reconcile")}
                         >
                           Reconciliar
+                        </Button>
+                      ) : null}
+                      {invoice.status === "authorized" ? (
+                        <Button
+                          variant="secondary"
+                          loading={invoiceState.actionId === invoice.id}
+                          onClick={() => runInvoiceAction(invoice, "verify-authorized")}
+                        >
+                          Verificar en ARCA
                         </Button>
                       ) : null}
                       <Badge tone={invoice.status === "authorized" ? "success" : invoice.status === "rejected" || invoice.status === "error" ? "warning" : "neutral"}>
