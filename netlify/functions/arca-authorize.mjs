@@ -61,14 +61,16 @@ export default async function handler(request) {
       }, 409);
     }
 
-    const receiver = {
-      vatConditionId: Number(body?.receiver?.vatConditionId || 0),
-      documentType: Number(body?.receiver?.documentType || 0),
-      documentNumber: String(body?.receiver?.documentNumber || "").trim(),
-      anonymousConsumerFinal: body?.receiver?.anonymousConsumerFinal === true,
-      concept: Number(body?.receiver?.concept || 1),
-      requestedBy: session.uid,
-    };
+    const receiver = body?.receiver && typeof body.receiver === "object"
+      ? {
+          vatConditionId: Number(body.receiver.vatConditionId || 0),
+          documentType: Number(body.receiver.documentType || 0),
+          documentNumber: String(body.receiver.documentNumber || "").trim(),
+          anonymousConsumerFinal: body.receiver.anonymousConsumerFinal === true,
+          concept: Number(body.receiver.concept || 1),
+          requestedBy: session.uid,
+        }
+      : { requestedBy: session.uid };
 
     const result = await authorizeInvoice({
       invoiceId,
