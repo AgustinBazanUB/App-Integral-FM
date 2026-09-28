@@ -265,11 +265,30 @@ export async function authorizeInvoice({
       };
     }
 
-    const last = await getLastAuthorizedFn({
-      voucherType: plan.voucherType,
-      pointOfSale: config.pointOfSale,
-      env,
-    });
+    let last;
+    try {
+      last = await getLastAuthorizedFn({
+        voucherType: plan.voucherType,
+        pointOfSale: config.pointOfSale,
+        env,
+      });
+    } catch (error) {
+      const compact = compactError(error);
+      const returned = await returnPendingFn({
+        invoiceId,
+        expectedUpdateTime: claim.updateTime,
+        errorCode: compact.code,
+        errorMessage: `No se pudo consultar el último comprobante autorizado antes de pedir CAE: ${compact.message}`,
+        env,
+        now,
+      });
+      return {
+        status: returned.data?.status || "pending",
+        retryable: true,
+        phase: "last-authorized",
+        error: compact,
+      };
+    }
 
     if (last.errors?.length) {
       const returned = await returnPendingFn({
@@ -431,5 +450,63 @@ export async function reconcileInvoice({
   return {
     status: result.data?.status || "reconciling",
     invoice: result.data,
+  };
+}
+
+
+export async function recoverPreCaeInvoice({
+  invoiceId,
+  env = process.env,
+  getDocument = adminGetDocument,
+  returnPendingFn = returnInvoiceToPending,
+  now = new Date(),
+} = {}) {
+  if (!invoiceId) {
+    const error = new Error("Falta identificar la solicitud fiscal.");
+    error.code = "arca-invoice-id-missing";
+    error.status = 400;
+    throw error;
+  }
+
+  const current = await getDocument(invoicePath(invoiceId), { env });
+  if (!current) {
+    const error = new Error("La solicitud fiscal no existe.");
+    error.code = "arca-invoice-not-found";
+    error.status = 404;
+    throw error;
+  }
+
+  const authorization = current.data?.authorization || {};
+  if (current.data?.status !== "authorizing") {
+    return {
+      status: current.data?.status || "unknown",
+      recovered: false,
+      reason: "invoice-not-authorizing",
+      invoice: current.data,
+    };
+  }
+
+  if (authorization.voucherNumber || authorization.cae || authorization.plannedAt) {
+    return {
+      status: "authorizing",
+      recovered: false,
+      reason: "pre-cae-recovery-not-safe",
+      invoice: current.data,
+    };
+  }
+
+  const returned = await returnPendingFn({
+    invoiceId,
+    expectedUpdateTime: current.updateTime,
+    errorCode: "arca-pre-cae-recovered",
+    errorMessage: "Se recuperó un intento interrumpido antes de reservar número y antes de solicitar CAE. Puede reintentarse cuando ARCA esté disponible.",
+    env,
+    now,
+  });
+
+  return {
+    status: returned.data?.status || "pending",
+    recovered: true,
+    invoice: returned.data,
   };
 }
