@@ -1,4 +1,5 @@
-import { auth } from "./firebase";
+import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { auth, db } from "./firebase";
 
 async function authenticatedPost(payload) {
   const user = auth.currentUser;
@@ -80,4 +81,52 @@ export async function dryRunArcaInvoice({ invoiceId, receiver = null }) {
     throw error;
   }
   return data.result;
+}
+
+
+export async function listRecentArcaInvoices({ pageSize = 10 } = {}) {
+  const safePageSize = Math.min(25, Math.max(1, Number(pageSize) || 10));
+  const snapshot = await getDocs(query(
+    collection(db, "invoices"),
+    orderBy("createdAt", "desc"),
+    limit(safePageSize),
+  ));
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+}
+
+async function arcaAuthorizationPost(payload) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Iniciá sesión para usar la autorización fiscal.");
+  const token = await user.getIdToken();
+  const response = await fetch("/.netlify/functions/arca-authorize", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok !== true) {
+    const error = new Error(data?.message || "No se pudo completar la operación fiscal.");
+    error.code = data?.code || "arca-authorize-error";
+    error.status = response.status;
+    throw error;
+  }
+  return data.result;
+}
+
+export async function authorizeArcaInvoice({ invoiceId, receiver = null }) {
+  return arcaAuthorizationPost({
+    mode: "authorize",
+    invoiceId,
+    ...(receiver ? { receiver } : {}),
+  });
+}
+
+export async function reconcileArcaInvoice({ invoiceId }) {
+  return arcaAuthorizationPost({
+    mode: "reconcile",
+    invoiceId,
+  });
 }
