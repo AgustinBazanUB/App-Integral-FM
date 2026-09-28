@@ -373,6 +373,7 @@ export async function persistAuthorizationPlan({
 export async function markInvoiceAuthorized({
   invoiceId,
   expectedUpdateTime,
+  baseAuthorization = {},
   cae,
   caeExpiration,
   result = "A",
@@ -386,6 +387,7 @@ export async function markInvoiceAuthorized({
     status: "authorized",
     updatedAt: timestamp,
     authorization: {
+      ...(baseAuthorization || {}),
       cae: String(cae || ""),
       caeExpiration: String(caeExpiration || ""),
       result: String(result || "A"),
@@ -403,6 +405,7 @@ export async function markInvoiceAuthorized({
 export async function markInvoiceRejected({
   invoiceId,
   expectedUpdateTime,
+  baseAuthorization = {},
   result = "R",
   observations = [],
   errors = [],
@@ -415,6 +418,7 @@ export async function markInvoiceRejected({
     status: "rejected",
     updatedAt: timestamp,
     authorization: {
+      ...(baseAuthorization || {}),
       result: String(result || "R"),
       observations: Array.isArray(observations) ? observations : [],
       lastAttemptAt: timestamp,
