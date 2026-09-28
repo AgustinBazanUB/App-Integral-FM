@@ -311,6 +311,13 @@ export default function SettingsPage() {
                           Dry-run: Factura {plan.voucherClass} · Neto {Number(plan.fiscal.net).toLocaleString("es-AR", { style: "currency", currency: "ARS" })} · IVA {Number(plan.fiscal.vat).toLocaleString("es-AR", { style: "currency", currency: "ARS" })} · Total {Number(plan.fiscal.total).toLocaleString("es-AR", { style: "currency", currency: "ARS" })}
                         </span>
                       ) : null}
+                      {invoice.authorization?.voucherNumber ? (
+                        <span>
+                          Comprobante: PV {invoice.authorization.pointOfSale} · tipo {invoice.authorization.voucherType} · N° {invoice.authorization.voucherNumber}
+                          {invoice.authorization.cae ? ` · CAE ${invoice.authorization.cae}` : ""}
+                          {invoice.authorization.caeExpiration ? ` · vence ${invoice.authorization.caeExpiration}` : ""}
+                        </span>
+                      ) : null}
                     </div>
                     <div>
                       <Button
