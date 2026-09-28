@@ -8,6 +8,7 @@ export const INVOICE_STATES = Object.freeze([
   "not_requested",
   "pending",
   "authorizing",
+  "reconciling",
   "authorized",
   "rejected",
   "error",
