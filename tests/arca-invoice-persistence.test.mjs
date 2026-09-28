@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   canRequestInvoiceForSale,
+  claimPendingInvoice,
   ensurePendingInvoice,
 } from "../netlify/functions/_lib/arca/invoicePersistence.mjs";
 
@@ -32,6 +33,22 @@ function memoryStore(seed = {}) {
       };
       documents.set(path, document);
       return document;
+    },
+    async patchDocument(path, data, { currentUpdateTime } = {}) {
+      const current = documents.get(path);
+      if (!current || (currentUpdateTime && current.updateTime !== currentUpdateTime)) {
+        const error = new Error("precondition");
+        error.code = "firebase-admin-precondition-failed";
+        error.status = 412;
+        throw error;
+      }
+      const next = {
+        path,
+        data: { ...current.data, ...structuredClone(data) },
+        updateTime: "2026-09-28T12:00:02.000Z",
+      };
+      documents.set(path, next);
+      return next;
     },
   };
 }
@@ -180,4 +197,74 @@ test("vendedor sólo puede pedir factura de su propia venta; administración pue
     sale,
     session: { uid: "admin-1", profile: { role: "admin" } },
   }), true);
+});
+
+
+test("claim exclusivo cambia pending a authorizing una sola vez", async () => {
+  const store = memoryStore({
+    "invoices/invoice_seller_sale_sale-1": {
+      sourceType: "seller_sale",
+      sourceId: "sale-1",
+      status: "pending",
+      authorization: {
+        pointOfSale: null,
+        voucherType: null,
+        voucherNumber: null,
+      },
+    },
+  });
+
+  const first = await claimPendingInvoice({
+    invoiceId: "invoice_seller_sale_sale-1",
+    claimedBy: "worker-1",
+    now: new Date("2026-09-28T13:00:00.000Z"),
+    getDocument: store.getDocument,
+    patchDocument: store.patchDocument,
+  });
+
+  const second = await claimPendingInvoice({
+    invoiceId: "invoice_seller_sale_sale-1",
+    claimedBy: "worker-2",
+    now: new Date("2026-09-28T13:00:01.000Z"),
+    getDocument: store.getDocument,
+    patchDocument: store.patchDocument,
+  });
+
+  assert.equal(first.claimed, true);
+  assert.equal(first.invoice.status, "authorizing");
+  assert.equal(first.invoice.authorization.claimedBy, "worker-1");
+  assert.equal(second.claimed, false);
+  assert.equal(second.reason, "status-authorizing");
+});
+
+test("claim pierde limpiamente ante una precondición concurrente", async () => {
+  const store = memoryStore({
+    "invoices/invoice_seller_sale_sale-2": {
+      sourceType: "seller_sale",
+      sourceId: "sale-2",
+      status: "pending",
+      authorization: {},
+    },
+  });
+
+  const racingPatch = async (path, data, options) => {
+    const current = store.documents.get(path);
+    store.documents.set(path, {
+      ...current,
+      data: { ...current.data, status: "authorizing" },
+      updateTime: "2026-09-28T13:05:01.000Z",
+    });
+    return store.patchDocument(path, data, options);
+  };
+
+  const result = await claimPendingInvoice({
+    invoiceId: "invoice_seller_sale_sale-2",
+    claimedBy: "worker-loser",
+    getDocument: store.getDocument,
+    patchDocument: racingPatch,
+  });
+
+  assert.equal(result.claimed, false);
+  assert.equal(result.reason, "concurrent-claim");
+  assert.equal(result.invoice.status, "authorizing");
 });
