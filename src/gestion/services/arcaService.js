@@ -130,3 +130,11 @@ export async function reconcileArcaInvoice({ invoiceId }) {
     invoiceId,
   });
 }
+
+
+export async function recoverPreCaeArcaInvoice({ invoiceId }) {
+  return arcaAuthorizationPost({
+    mode: "recover-pre-cae",
+    invoiceId,
+  });
+}
