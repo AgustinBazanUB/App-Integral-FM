@@ -119,9 +119,9 @@ export function buildAuthorizationPlan({
   voucherDate = new Date(),
   concept = 1,
 } = {}) {
-  if (!invoice || invoice.status !== "authorizing") {
-    const error = new Error("La solicitud fiscal no está reclamada para autorización.");
-    error.code = "arca-invoice-not-authorizing";
+  if (!invoice || !["pending", "authorizing"].includes(invoice.status)) {
+    const error = new Error("La solicitud fiscal no está disponible para preparar autorización.");
+    error.code = "arca-invoice-not-preparable";
     throw error;
   }
 
