@@ -326,3 +326,131 @@ export async function releaseInvoiceClaim({
     currentUpdateTime: expectedUpdateTime,
   });
 }
+
+
+export async function persistAuthorizationPlan({
+  invoiceId,
+  expectedUpdateTime,
+  pointOfSale,
+  voucherType,
+  voucherNumber,
+  voucherClass,
+  receiverVatConditionId,
+  receiverDocument,
+  fiscal,
+  attemptId,
+  env = process.env,
+  now = new Date(),
+  patchDocument = adminPatchDocument,
+} = {}) {
+  const timestamp = nowIso(now);
+  return patchDocument(invoicePathFor(invoiceId), {
+    status: "authorizing",
+    updatedAt: timestamp,
+    authorization: {
+      pointOfSale: Number(pointOfSale),
+      voucherType: Number(voucherType),
+      voucherClass: String(voucherClass || ""),
+      voucherNumber: Number(voucherNumber),
+      receiverVatConditionId: Number(receiverVatConditionId),
+      receiverDocument: receiverDocument || null,
+      fiscal: fiscal || null,
+      attemptId: attemptId || null,
+      plannedAt: timestamp,
+      lastAttemptAt: timestamp,
+      cae: null,
+      caeExpiration: null,
+      result: null,
+      authorizedAt: null,
+    },
+    error: null,
+  }, {
+    env,
+    currentUpdateTime: expectedUpdateTime,
+  });
+}
+
+export async function markInvoiceAuthorized({
+  invoiceId,
+  expectedUpdateTime,
+  cae,
+  caeExpiration,
+  result = "A",
+  observations = [],
+  env = process.env,
+  now = new Date(),
+  patchDocument = adminPatchDocument,
+} = {}) {
+  const timestamp = nowIso(now);
+  return patchDocument(invoicePathFor(invoiceId), {
+    status: "authorized",
+    updatedAt: timestamp,
+    authorization: {
+      cae: String(cae || ""),
+      caeExpiration: String(caeExpiration || ""),
+      result: String(result || "A"),
+      observations: Array.isArray(observations) ? observations : [],
+      authorizedAt: timestamp,
+      lastAttemptAt: timestamp,
+    },
+    error: null,
+  }, {
+    env,
+    currentUpdateTime: expectedUpdateTime,
+  });
+}
+
+export async function markInvoiceRejected({
+  invoiceId,
+  expectedUpdateTime,
+  result = "R",
+  observations = [],
+  errors = [],
+  env = process.env,
+  now = new Date(),
+  patchDocument = adminPatchDocument,
+} = {}) {
+  const timestamp = nowIso(now);
+  return patchDocument(invoicePathFor(invoiceId), {
+    status: "rejected",
+    updatedAt: timestamp,
+    authorization: {
+      result: String(result || "R"),
+      observations: Array.isArray(observations) ? observations : [],
+      lastAttemptAt: timestamp,
+    },
+    error: {
+      code: "arca-rejected",
+      message: "ARCA rechazó la solicitud de autorización.",
+      details: Array.isArray(errors) ? errors : [],
+      at: timestamp,
+    },
+  }, {
+    env,
+    currentUpdateTime: expectedUpdateTime,
+  });
+}
+
+export async function markInvoiceReconciling({
+  invoiceId,
+  expectedUpdateTime,
+  errorCode,
+  errorMessage,
+  env = process.env,
+  now = new Date(),
+  patchDocument = adminPatchDocument,
+} = {}) {
+  const timestamp = nowIso(now);
+  return patchDocument(invoicePathFor(invoiceId), {
+    status: "reconciling",
+    updatedAt: timestamp,
+    error: {
+      code: String(errorCode || "arca-uncertain-response").slice(0, 120),
+      message: String(errorMessage || "La respuesta de ARCA es incierta y debe reconciliarse antes de reintentar.").slice(0, 500),
+      at: timestamp,
+    },
+  }, {
+    env,
+    currentUpdateTime: expectedUpdateTime,
+  });
+}
