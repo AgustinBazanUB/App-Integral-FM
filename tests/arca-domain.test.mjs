@@ -5,7 +5,7 @@ import { ARCA_ENVIRONMENTS, arcaSafeStatus, loadArcaPublicConfig } from "../netl
 import { buildLoginCmsEnvelope, buildLoginTicketRequest, parseLoginTicketResponse } from "../netlify/functions/_lib/arca/wsaa.mjs";
 import { buildCaeDetail } from "../netlify/functions/_lib/arca/wsfe.mjs";
 import { allocateDiscount, assertSaleMatchesFiscalTotal, buildFiscalAmounts, invoiceIdFor } from "../netlify/functions/_lib/arca/billing.mjs";
-import { escapeXml, xmlTag, xmlTags } from "../netlify/functions/_lib/arca/xml.mjs";
+import { escapeXml, soapRequest, xmlTag, xmlTags } from "../netlify/functions/_lib/arca/xml.mjs";
 import { parseTaxpayerResponse } from "../netlify/functions/_lib/arca/registry.mjs";
 import { consumerFinalReceiver, inferReceiverVatCondition, validateReceiverConditionAgainstTable } from "../netlify/functions/_lib/arca/receiver.mjs";
 
@@ -226,4 +226,36 @@ test("consumidor final y tabla de condiciones se validan explícitamente", () =>
   assert.equal(validateReceiverConditionAgainstTable(1, rows, "A"), true);
   assert.equal(validateReceiverConditionAgainstTable(1, rows, "C"), false);
   assert.equal(validateReceiverConditionAgainstTable(5, rows, "B"), true);
+});
+
+
+test("fault SOAP de WSAA conserva coe.alreadyAuthenticated y no se disfraza de error de red", async () => {
+  const fetchImpl = async () => new Response(
+    `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+      <soapenv:Body>
+        <soapenv:Fault>
+          <faultcode>coe.alreadyAuthenticated</faultcode>
+          <faultstring>El CEE ya dispone de un TA válido.</faultstring>
+          <detail>TA vigente</detail>
+        </soapenv:Fault>
+      </soapenv:Body>
+    </soapenv:Envelope>`,
+    { status: 500, headers: { "Content-Type": "text/xml" } },
+  );
+
+  await assert.rejects(
+    soapRequest({
+      url: "https://example.invalid/wsaa",
+      action: "urn:LoginCms",
+      body: "<x/>",
+      fetchImpl,
+    }),
+    (error) => {
+      assert.equal(error.code, "coe.alreadyAuthenticated");
+      assert.equal(error.status, 500);
+      assert.equal(error.message, "El CEE ya dispone de un TA válido.");
+      return true;
+    },
+  );
 });
