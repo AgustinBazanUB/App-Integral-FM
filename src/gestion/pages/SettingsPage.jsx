@@ -1,8 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge, Button, PageHeader, Panel, Toast } from "../../design-system";
 import { useAuth } from "../AuthContext";
 import { canAccessAdministration } from "../permissions";
-import { runArcaDiagnostics } from "../services/arcaService";
+import {
+  authorizeArcaInvoice,
+  dryRunArcaInvoice,
+  listRecentArcaInvoices,
+  reconcileArcaInvoice,
+  runArcaDiagnostics,
+} from "../services/arcaService";
 import { firebaseConfig } from "../services/firebase";
 
 function statusTone(status) {
@@ -35,6 +41,79 @@ export default function SettingsPage() {
     result: null,
     error: "",
   });
+  const [invoiceState, setInvoiceState] = useState({
+    busy: false,
+    items: [],
+    error: "",
+    message: "",
+    actionId: "",
+    dryRuns: {},
+  });
+
+  const loadInvoices = async () => {
+    setInvoiceState((current) => ({ ...current, busy: true, error: "", message: "" }));
+    try {
+      const items = await listRecentArcaInvoices({ pageSize: 10 });
+      setInvoiceState((current) => ({ ...current, busy: false, items, error: "" }));
+    } catch (error) {
+      setInvoiceState((current) => ({ ...current, busy: false, error: error.message }));
+    }
+  };
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    loadInvoices();
+  }, [isAdmin]);
+
+  const runInvoiceAction = async (invoice, mode) => {
+    setInvoiceState((current) => ({
+      ...current,
+      actionId: invoice.id,
+      error: "",
+      message: "",
+    }));
+    try {
+      if (mode === "dry-run") {
+        const result = await dryRunArcaInvoice({ invoiceId: invoice.id });
+        setInvoiceState((current) => ({
+          ...current,
+          actionId: "",
+          dryRuns: { ...current.dryRuns, [invoice.id]: result },
+          message: `Dry-run fiscal completado para ${invoice.saleSnapshot?.saleCode || invoice.id}.`,
+        }));
+        return;
+      }
+
+      if (mode === "authorize") {
+        const result = await authorizeArcaInvoice({ invoiceId: invoice.id });
+        await loadInvoices();
+        setInvoiceState((current) => ({
+          ...current,
+          actionId: "",
+          message: result?.status === "authorized"
+            ? `ARCA autorizó ${invoice.saleSnapshot?.saleCode || invoice.id}.`
+            : `La solicitud quedó en estado ${result?.status || "desconocido"}.`,
+        }));
+        return;
+      }
+
+      if (mode === "reconcile") {
+        const result = await reconcileArcaInvoice({ invoiceId: invoice.id });
+        await loadInvoices();
+        setInvoiceState((current) => ({
+          ...current,
+          actionId: "",
+          message: `Reconciliación finalizada con estado ${result?.status || "desconocido"}.`,
+        }));
+      }
+    } catch (error) {
+      setInvoiceState((current) => ({
+        ...current,
+        actionId: "",
+        error: error.message,
+      }));
+    }
+  };
 
   const runDiagnostic = async () => {
     setArcaState({ busy: true, result: null, error: "" });
@@ -48,6 +127,8 @@ export default function SettingsPage() {
 
   const arcaOperational = arcaState.result?.ok === true;
   const pointOfSale = arcaState.result?.pointOfSale?.data;
+  const fiscalConfig = arcaState.result?.configuration || {};
+  const caeEnabled = fiscalConfig.caeHomologationEnabled === true;
 
   const rows = [
     ["Proyecto Firebase", firebaseConfig.projectId, "Conectado"],
@@ -183,6 +264,88 @@ export default function SettingsPage() {
             </div>
           ) : (
             <p>Ejecutá el diagnóstico desde Netlify Dev. La prueba no genera CAE ni modifica ventas.</p>
+          )}
+        </Panel>
+      {isAdmin ? (
+        <Panel
+          title="Homologación fiscal controlada"
+          description="Permite revisar solicitudes persistidas, repetir el dry-run y autorizar sólo cuando el interruptor de CAE de homologación está habilitado."
+          action={(
+            <Button variant="secondary" loading={invoiceState.busy} onClick={loadInvoices}>
+              Actualizar solicitudes
+            </Button>
+          )}
+        >
+          <div className="fm-settings-list">
+            <div>
+              <div>
+                <strong>CAE homologación</strong>
+                <span>{caeEnabled ? "Habilitado temporalmente" : "Bloqueado por configuración"}</span>
+              </div>
+              <Badge tone={caeEnabled ? "warning" : "success"}>
+                {caeEnabled ? "Habilitado" : "Bloqueado"}
+              </Badge>
+            </div>
+          </div>
+
+          {invoiceState.error ? <Toast tone="error">{invoiceState.error}</Toast> : null}
+          {invoiceState.message ? <Toast tone="success">{invoiceState.message}</Toast> : null}
+
+          {invoiceState.items.length ? (
+            <div className="fm-settings-list">
+              {invoiceState.items.map((invoice) => {
+                const dryRun = invoiceState.dryRuns[invoice.id];
+                const plan = dryRun?.plan;
+                return (
+                  <div key={invoice.id}>
+                    <div>
+                      <strong>{invoice.saleSnapshot?.saleCode || invoice.id}</strong>
+                      <span>
+                        {invoice.status} · {invoice.sourceType}
+                        {invoice.saleSnapshot?.total != null ? ` · ${Number(invoice.saleSnapshot.total).toLocaleString("es-AR", { style: "currency", currency: "ARS" })}` : ""}
+                      </span>
+                      {plan ? (
+                        <span>
+                          Dry-run: Factura {plan.voucherClass} · Neto {Number(plan.fiscal.net).toLocaleString("es-AR", { style: "currency", currency: "ARS" })} · IVA {Number(plan.fiscal.vat).toLocaleString("es-AR", { style: "currency", currency: "ARS" })} · Total {Number(plan.fiscal.total).toLocaleString("es-AR", { style: "currency", currency: "ARS" })}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div>
+                      <Button
+                        variant="secondary"
+                        loading={invoiceState.actionId === invoice.id}
+                        onClick={() => runInvoiceAction(invoice, "dry-run")}
+                      >
+                        Dry-run
+                      </Button>
+                      {invoice.status === "pending" ? (
+                        <Button
+                          disabled={!caeEnabled || invoiceState.actionId === invoice.id}
+                          loading={invoiceState.actionId === invoice.id}
+                          onClick={() => runInvoiceAction(invoice, "authorize")}
+                        >
+                          Autorizar homologación
+                        </Button>
+                      ) : null}
+                      {invoice.status === "reconciling" ? (
+                        <Button
+                          variant="secondary"
+                          loading={invoiceState.actionId === invoice.id}
+                          onClick={() => runInvoiceAction(invoice, "reconcile")}
+                        >
+                          Reconciliar
+                        </Button>
+                      ) : null}
+                      <Badge tone={invoice.status === "authorized" ? "success" : invoice.status === "rejected" || invoice.status === "error" ? "warning" : "neutral"}>
+                        {invoice.status}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p>No hay solicitudes fiscales recientes para mostrar.</p>
           )}
         </Panel>
       ) : null}
