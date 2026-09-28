@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { authorizeInvoice } from "../netlify/functions/_lib/arca/authorizer.mjs";
+import { authorizeInvoice, recoverPreCaeInvoice } from "../netlify/functions/_lib/arca/authorizer.mjs";
 
 const pendingInvoice = {
   status: "pending",
@@ -277,4 +277,128 @@ test("timeout reconciliado con CAE se marca autorizado sin reenvío", async () =
   assert.equal(consults, 1);
   assert.equal(result.status, "authorized");
   assert.equal(result.reconciled, true);
+});
+
+
+test("502 al consultar último autorizado vuelve a pending sin reservar número ni pedir CAE", async () => {
+  let caeRequests = 0;
+  let returnedPending = 0;
+  const result = await authorizeInvoice({
+    invoiceId: "invoice-preflight-502",
+    issuerVatCondition: "responsable_inscripto",
+    receiver: {
+      vatConditionId: 5,
+      documentType: 99,
+      documentNumber: "0",
+      anonymousConsumerFinal: true,
+      requestedBy: "admin-1",
+    },
+    allowCaeRequest: true,
+    env: {
+      ARCA_ENVIRONMENT: "homologation",
+      ARCA_ISSUER_CUIT: "20123456786",
+      ARCA_POINT_OF_SALE: "3",
+      ARCA_CERTIFICATE_PEM: "cert",
+      ARCA_PRIVATE_KEY_PEM: "key",
+      ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
+    },
+    getDocument: async () => ({
+      data: pendingInvoice,
+      updateTime: "u0",
+    }),
+    claimInvoiceFn: async () => ({
+      claimed: true,
+      attemptId: "attempt-preflight",
+      updateTime: "u1",
+      invoice: { ...pendingInvoice, status: "authorizing" },
+    }),
+    acquireLockFn: async () => ({
+      acquired: true,
+      updateTime: "lock-1",
+    }),
+    releaseLockFn: async () => ({ released: true }),
+    getLastAuthorizedFn: async () => {
+      const error = new Error("No se pudo conectar con el servidor de ARCA.");
+      error.code = "arca-network-error";
+      error.status = 502;
+      throw error;
+    },
+    returnPendingFn: async (input) => {
+      returnedPending += 1;
+      assert.equal(input.expectedUpdateTime, "u1");
+      return {
+        data: {
+          ...pendingInvoice,
+          status: "pending",
+          error: {
+            code: input.errorCode,
+            message: input.errorMessage,
+            retryable: true,
+          },
+        },
+      };
+    },
+    requestCaeFn: async () => {
+      caeRequests += 1;
+      throw new Error("no debe ejecutarse");
+    },
+  });
+
+  assert.equal(result.status, "pending");
+  assert.equal(result.retryable, true);
+  assert.equal(result.phase, "last-authorized");
+  assert.equal(returnedPending, 1);
+  assert.equal(caeRequests, 0);
+});
+
+test("recupera authorizing pre-CAE sólo si no hay número planificado", async () => {
+  let resetCalls = 0;
+  const recovered = await recoverPreCaeInvoice({
+    invoiceId: "invoice-stuck",
+    getDocument: async () => ({
+      data: {
+        ...pendingInvoice,
+        status: "authorizing",
+        authorization: {
+          attemptId: "attempt-stuck",
+          voucherNumber: null,
+          cae: null,
+          plannedAt: null,
+        },
+      },
+      updateTime: "u-stuck",
+    }),
+    returnPendingFn: async (input) => {
+      resetCalls += 1;
+      assert.equal(input.expectedUpdateTime, "u-stuck");
+      return { data: { ...pendingInvoice, status: "pending" } };
+    },
+  });
+
+  assert.equal(recovered.recovered, true);
+  assert.equal(recovered.status, "pending");
+  assert.equal(resetCalls, 1);
+
+  const blocked = await recoverPreCaeInvoice({
+    invoiceId: "invoice-planned",
+    getDocument: async () => ({
+      data: {
+        ...pendingInvoice,
+        status: "authorizing",
+        authorization: {
+          attemptId: "attempt-planned",
+          voucherNumber: 12,
+          cae: null,
+          plannedAt: "2026-09-28T20:00:00.000Z",
+        },
+      },
+      updateTime: "u-planned",
+    }),
+    returnPendingFn: async () => {
+      throw new Error("no debe resetear un plan con número");
+    },
+  });
+
+  assert.equal(blocked.recovered, false);
+  assert.equal(blocked.reason, "pre-cae-recovery-not-safe");
 });
