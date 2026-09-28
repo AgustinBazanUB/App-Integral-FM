@@ -60,6 +60,8 @@ function resolveReceiverDocument({
   documentType,
   documentNumber,
   anonymousConsumerFinal = false,
+  total = 0,
+  consumerFinalIdThreshold = 10000000,
 } = {}) {
   const docType = Number(documentType || 0);
   const docNumber = digits(documentNumber);
@@ -79,7 +81,11 @@ function resolveReceiverDocument({
       error.code = "arca-anonymous-receiver-invalid";
       throw error;
     }
-    return { documentType: 99, documentNumber: "0", requiresAmountThresholdValidation: true };
+    return {
+      documentType: 99,
+      documentNumber: "0",
+      requiresIdentification: Number(total || 0) >= Number(consumerFinalIdThreshold || 10000000),
+    };
   }
 
   if (!docType || !docNumber) {
@@ -118,6 +124,7 @@ export function buildAuthorizationPlan({
   anonymousConsumerFinal = false,
   voucherDate = new Date(),
   concept = 1,
+  consumerFinalIdThreshold = 10000000,
 } = {}) {
   if (!invoice || !["pending", "authorizing"].includes(invoice.status)) {
     const error = new Error("La solicitud fiscal no está disponible para preparar autorización.");
@@ -136,15 +143,16 @@ export function buildAuthorizationPlan({
     receiverVatConditionId,
   });
 
+  const sale = invoice.saleSnapshot || {};
   const receiverDocument = resolveReceiverDocument({
     voucherClass,
     receiverVatConditionId,
     documentType,
     documentNumber,
     anonymousConsumerFinal,
+    total: sale.total,
+    consumerFinalIdThreshold,
   });
-
-  const sale = invoice.saleSnapshot || {};
   const fiscal = buildFiscalAmounts({
     items: sale.items || [],
     discountTotal: Number(sale.discountTotal || 0),
@@ -175,8 +183,8 @@ export function buildAuthorizationPlan({
       currencyQuote: 1,
     },
     fiscal,
-    blockers: receiverDocument.requiresAmountThresholdValidation
-      ? ["anonymous-consumer-final-amount-threshold"]
+    blockers: receiverDocument.requiresIdentification
+      ? ["consumer-final-identification-required"]
       : [],
   };
 }
