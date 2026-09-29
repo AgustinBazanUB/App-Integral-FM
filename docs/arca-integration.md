@@ -994,6 +994,7 @@ Incluye:
 - CAE;
 - vencimiento de CAE;
 - estado de verificación;
+- bloque de “Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)” para Factura B, con IVA contenido y otros impuestos nacionales indirectos;
 - QR fiscal.
 
 El QR usa el formato vigente publicado por ARCA para factura electrónica: JSON versión 1 codificado en Base64 dentro de `https://www.arca.gob.ar/fe/qr/?p=...`. La implementación no usa un servicio QR externo ni expone los datos fiscales a terceros.
@@ -1005,7 +1006,7 @@ El generador QR está embebido server-side y el PDF no agrega dependencias npm n
 Para impedir generar un comprobante incompleto, el PDF queda bloqueado hasta configurar:
 
 - `ARCA_ISSUER_LEGAL_NAME`;
-- `ARCA_ISSUER_FISCAL_ADDRESS`;
+- `ARCA_ISSUER_COMMERCIAL_ADDRESS` (con fallback temporal al campo legado `ARCA_ISSUER_FISCAL_ADDRESS`);
 - `ARCA_ISSUER_GROSS_INCOME`;
 - `ARCA_ISSUER_ACTIVITY_START`;
 - `ARCA_ISSUER_VAT_CONDITION`.
