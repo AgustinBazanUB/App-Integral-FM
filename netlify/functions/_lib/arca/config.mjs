@@ -218,6 +218,7 @@ export function arcaSafeStatus(env = process.env) {
     productionInvoicePreparationEnabled: String(env.ARCA_ALLOW_PRODUCTION_INVOICE_PREPARE || "").trim().toLowerCase() === "true",
     productionTaxpayerLookupEnabled: String(env.ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP || "").trim().toLowerCase() === "true",
     productionCaeEnabled: String(env.ARCA_ALLOW_PRODUCTION_CAE || "").trim().toLowerCase() === "true",
+    productionAutoAuthorizeEnabled: String(env.ARCA_AUTO_AUTHORIZE_PRODUCTION || "").trim().toLowerCase() === "true",
     productionCaeTargetSaleCode: String(env.ARCA_PRODUCTION_CAE_SALE_CODE || "").trim() || null,
     publicConfigError,
   };
