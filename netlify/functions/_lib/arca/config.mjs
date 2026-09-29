@@ -49,6 +49,24 @@ export function arcaEnvironment(env = process.env) {
   return config;
 }
 
+export function assertArcaNetworkAccessAllowed(env = process.env) {
+  const environment = arcaEnvironment(env);
+  if (environment.id !== "production") return environment;
+
+  const allowed = String(env.ARCA_ALLOW_PRODUCTION_READONLY || "")
+    .trim()
+    .toLowerCase() === "true";
+  if (!allowed) {
+    const error = new Error(
+      "Las conexiones ARCA de producción están bloqueadas hasta habilitar ARCA_ALLOW_PRODUCTION_READONLY."
+    );
+    error.code = "arca-production-readonly-disabled";
+    error.status = 409;
+    throw error;
+  }
+  return environment;
+}
+
 export function loadArcaPublicConfig(env = process.env, { requirePointOfSale = true } = {}) {
   const environment = arcaEnvironment(env);
   const issuerCuit = assertValidCuit(required("ARCA_ISSUER_CUIT", env), "CUIT del emisor");
@@ -91,6 +109,8 @@ export function arcaSafeStatus(env = process.env) {
     caeHomologationEnabled: String(env.ARCA_ALLOW_CAE_HOMOLOGATION || "").trim().toLowerCase() === "true",
     taSharedCacheConfigured: Boolean(String(env.ARCA_TA_ENCRYPTION_KEY || "").trim()),
     taSharedCacheRequiredInProduction: true,
+    productionReadonlyEnabled: String(env.ARCA_ALLOW_PRODUCTION_READONLY || "").trim().toLowerCase() === "true",
+    productionCaeEnabled: false,
     publicConfigError,
   };
 }
