@@ -362,6 +362,18 @@ export default async function handler(request) {
       return json({ ok: true, diagnostics });
     }
 
+    const runtimeEnvironment = arcaEnvironment(process.env).id;
+    if (
+      runtimeEnvironment === "production"
+      && String(process.env.ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP || "").trim().toLowerCase() !== "true"
+    ) {
+      return json({
+        ok: false,
+        code: "arca-production-taxpayer-lookup-disabled",
+        message: "La consulta productiva de CUIT está bloqueada por configuración.",
+      }, 409);
+    }
+
     const cuit = String(body?.cuit || "").trim();
     if (!cuit) return json({ ok: false, code: "missing-cuit", message: "Ingresá una CUIT." }, 400);
 
