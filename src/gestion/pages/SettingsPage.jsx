@@ -6,6 +6,7 @@ import {
   authorizeArcaInvoice,
   dryRunArcaInvoice,
   getArcaSafeStatus,
+  getArcaWsaaCacheStatus,
   listRecentArcaInvoices,
   reconcileArcaInvoice,
   recoverPreCaeArcaInvoice,
@@ -57,6 +58,11 @@ export default function SettingsPage() {
     result: null,
     error: "",
   });
+  const [wsaaCacheState, setWsaaCacheState] = useState({
+    busy: false,
+    result: null,
+    error: "",
+  });
 
   const loadInvoices = async () => {
     setInvoiceState((current) => ({ ...current, busy: true, error: "", message: "" }));
@@ -78,10 +84,21 @@ export default function SettingsPage() {
     }
   };
 
+  const loadWsaaCacheStatus = async () => {
+    setWsaaCacheState((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const result = await getArcaWsaaCacheStatus();
+      setWsaaCacheState({ busy: false, result, error: "" });
+    } catch (error) {
+      setWsaaCacheState({ busy: false, result: null, error: error.message });
+    }
+  };
+
   useEffect(() => {
     if (!isAdmin) return;
     loadInvoices();
     loadSafeArcaConfig();
+    loadWsaaCacheStatus();
   }, [isAdmin]);
 
   const runInvoiceAction = async (invoice, mode) => {
@@ -342,8 +359,44 @@ export default function SettingsPage() {
                 Actualizar estado
               </Button>
             </div>
+            <div>
+              <div>
+                <strong>TA compartido WSFE</strong>
+                <span>
+                  {!fiscalConfig.taSharedCacheConfigured
+                    ? "Pendiente de configurar clave de cifrado."
+                    : wsaaCacheState.result?.wsfe?.reusable
+                      ? `Cifrado y reutilizable hasta ${wsaaCacheState.result.wsfe.ticketExpiresAt}.`
+                      : wsaaCacheState.result?.wsfe?.exists
+                        ? "Documento presente, sin TA reutilizable."
+                        : "Caché preparada; todavía no se publicó un TA."}
+                </span>
+              </div>
+              <Badge tone={wsaaCacheState.result?.wsfe?.reusable ? "success" : "neutral"}>
+                {wsaaCacheState.result?.wsfe?.reusable ? "Reutilizable" : fiscalConfig.taSharedCacheConfigured ? "Preparado" : "Pendiente"}
+              </Badge>
+            </div>
+            <div>
+              <div>
+                <strong>TA compartido Padrón</strong>
+                <span>
+                  {!fiscalConfig.taSharedCacheConfigured
+                    ? "Pendiente de configurar clave de cifrado."
+                    : wsaaCacheState.result?.registry?.reusable
+                      ? `Cifrado y reutilizable hasta ${wsaaCacheState.result.registry.ticketExpiresAt}.`
+                      : wsaaCacheState.result?.registry?.exists
+                        ? "Documento presente, sin TA reutilizable."
+                        : "Caché preparada; todavía no se publicó un TA."}
+                </span>
+              </div>
+              <Button variant="secondary" loading={wsaaCacheState.busy} onClick={loadWsaaCacheStatus}>
+                Actualizar caché
+              </Button>
+            </div>
           </div>
 
+          {arcaConfigState.error ? <Toast tone="error">{arcaConfigState.error}</Toast> : null}
+          {wsaaCacheState.error ? <Toast tone="error">{wsaaCacheState.error}</Toast> : null}
           {invoiceState.error ? <Toast tone="error">{invoiceState.error}</Toast> : null}
           {invoiceState.message ? <Toast tone="success">{invoiceState.message}</Toast> : null}
 
