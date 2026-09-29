@@ -222,7 +222,7 @@ test("lease exclusivo evita dos renovaciones y el TA publicado se reutiliza", as
   assert.equal(raw.includes("SIGN-SECRETO-WSAA"), false);
 });
 
-test("producción exige primero gate read-only y luego caché compartida cifrada", async () => {
+test("producción exige un gate de red explícito y luego caché compartida cifrada", async () => {
   clearWsaaTicketCache();
 
   await assert.rejects(
@@ -230,14 +230,14 @@ test("producción exige primero gate read-only y luego caché compartida cifrada
       env: { ARCA_ENVIRONMENT: "production" },
       now: new Date("2026-09-29T12:00:00.000Z"),
     }),
-    (error) => error?.code === "arca-production-readonly-disabled",
+    (error) => error?.code === "arca-production-network-disabled",
   );
 
   await assert.rejects(
     requestAccessTicket("wsfe", {
       env: {
         ARCA_ENVIRONMENT: "production",
-        ARCA_ALLOW_PRODUCTION_READONLY: "true",
+        ARCA_ALLOW_PRODUCTION_CAE: "true",
       },
       now: new Date("2026-09-29T12:00:00.000Z"),
     }),
