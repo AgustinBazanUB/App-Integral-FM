@@ -835,3 +835,24 @@ Para esa prueba:
 - CAE productivo continúa bloqueado por código.
 
 La venta rápida administrativa ya prepara la solicitud fiscal y ejecuta el dry-run sin llamar a WSAA/WSFE, sin consultar correlatividad y sin solicitar CAE. Si el plan cierra correctamente, esa misma solicitud `pending` podrá utilizarse luego para la primera autorización productiva controlada.
+
+
+## 34. Dry-run productivo validado
+
+Se validó una venta real en modo dry-run productivo:
+
+- Factura B;
+- neto $826,45;
+- IVA $173,55;
+- total fiscal $1.000;
+- estado pending;
+- sin solicitud de autorización fiscal.
+
+## 35. Primera autorización productiva controlada
+
+La autorización productiva requiere dos condiciones explícitas:
+
+- un gate booleano de producción;
+- coincidencia exacta con el código de venta configurado.
+
+Una venta distinta queda bloqueada antes de reservar numeración. Tras una autorización exitosa, el sistema ejecuta una consulta de verificación y persiste el resultado. Luego los gates deben volver a su estado seguro.
