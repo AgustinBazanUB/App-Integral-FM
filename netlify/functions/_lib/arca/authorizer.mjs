@@ -235,9 +235,34 @@ export async function authorizeInvoice({
   }
 
   const config = loadArcaPublicConfig(env);
-  if (config.environment !== "homologation") {
-    const error = new Error("La autorización automática está bloqueada fuera de homologación.");
-    error.code = "arca-production-authorization-blocked";
+  if (config.environment === "production") {
+    const productionCaeEnabled = String(env.ARCA_ALLOW_PRODUCTION_CAE || "")
+      .trim()
+      .toLowerCase() === "true";
+    const targetSaleCode = String(env.ARCA_PRODUCTION_CAE_SALE_CODE || "").trim();
+    const invoiceSaleCode = String(current.data?.saleSnapshot?.saleCode || "").trim();
+
+    if (!productionCaeEnabled) {
+      const error = new Error("La autorización de CAE productivo está bloqueada por configuración.");
+      error.code = "arca-production-authorization-blocked";
+      error.status = 409;
+      throw error;
+    }
+    if (!targetSaleCode) {
+      const error = new Error("Falta configurar ARCA_PRODUCTION_CAE_SALE_CODE para una autorización productiva controlada.");
+      error.code = "arca-production-cae-target-missing";
+      error.status = 409;
+      throw error;
+    }
+    if (!invoiceSaleCode || invoiceSaleCode !== targetSaleCode) {
+      const error = new Error("La solicitud fiscal no coincide con la venta productiva habilitada para CAE.");
+      error.code = "arca-production-cae-target-mismatch";
+      error.status = 409;
+      throw error;
+    }
+  } else if (config.environment !== "homologation") {
+    const error = new Error("Entorno fiscal no autorizado para emisión.");
+    error.code = "arca-authorization-environment-blocked";
     error.status = 409;
     throw error;
   }
