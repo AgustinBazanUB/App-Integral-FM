@@ -587,3 +587,23 @@ Los tests ARCA cubren:
 - inspección segura sin exposición de secretos.
 
 Próxima prueba real: configurar una clave sólo en homologación, crear/reutilizar un TA sin emitir CAE, reiniciar Netlify Dev para borrar la caché en memoria y confirmar que una segunda operación autenticada reutiliza el TA cifrado persistido.
+
+
+### Endurecimiento adicional del TA compartido
+
+La AAD de AES-GCM quedó vinculada también al CUIT del emisor configurado. Un payload cifrado para otro emisor no puede descifrarse ni reutilizarse aunque comparta entorno, servicio y clave de cifrado.
+
+Se agregó además un smoke test administrativo específico de homologación:
+
+`FEParamGetPtosVenta -> requestAccessTicket -> caché WSAA compartida`
+
+Esta prueba:
+
+- es autenticada contra WSFE;
+- no llama a `FECAESolicitar`;
+- no crea comprobantes;
+- informa si creó/renovó el TA o reutilizó uno ya persistido;
+- permite validar un cold start reiniciando Netlify Dev y repitiendo la prueba;
+- confirma la reutilización si `updatedAt` y `ticketExpiresAt` permanecen iguales.
+
+La pantalla de Configuración puede inspeccionar el estado de TA de WSFE y Padrón sin mostrar Token/Sign ni la clave.
