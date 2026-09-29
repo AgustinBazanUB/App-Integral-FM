@@ -126,6 +126,15 @@ function receiverVatLabel(id) {
   })[Number(id)] || `Condición ${id || "-"}`;
 }
 
+function receiverDocumentLabel(type, number) {
+  const docType = Number(type || 0);
+  const docNumber = String(number || "").replace(/\D/g, "");
+  if (docType === 80) return `CUIT · ${docNumber || "-"}`;
+  if (docType === 96) return `DNI · ${docNumber || "-"}`;
+  if (docType === 99) return "Consumidor Final";
+  return `${docType || "Documento"} · ${docNumber || "-"}`;
+}
+
 function requiredIssuer(env = {}) {
   const issuer = {
     legalName: String(env.ARCA_ISSUER_LEGAL_NAME || "").trim(),
@@ -227,14 +236,14 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
   next(8);
   text(50, "RECEPTOR", 10, true);
   next();
-  const customerName = sale.customer?.name || (Number(receiver.vatConditionId) === 5 ? "CONSUMIDOR FINAL" : "NR");
+  const customerName = sale.customer?.name || (Number(receiver.vatConditionId) === 5 ? "A CONSUMIDOR FINAL" : "NR");
   text(50, `Nombre / Razón social: ${customerName}`);
   next();
   text(50, `Condición IVA: ${receiverVatLabel(receiver.vatConditionId || auth.receiverVatConditionId)}`);
   next();
   const docType = auth.receiverDocument?.documentType ?? receiver.documentType;
   const docNumber = auth.receiverDocument?.documentNumber ?? receiver.documentNumber;
-  text(50, `Documento: ${docType || "-"} · ${docNumber || "0"}`);
+  text(50, `Documento: ${receiverDocumentLabel(docType, docNumber)}`);
   next();
   text(50, `Venta origen: ${sale.saleCode || invoice.sourceId || "-"}`);
   next(22);
