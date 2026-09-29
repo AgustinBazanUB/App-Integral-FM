@@ -11,6 +11,7 @@ import {
   reconcileArcaInvoice,
   recoverPreCaeArcaInvoice,
   runArcaDiagnostics,
+  runArcaWsaaSharedSmoke,
   verifyAuthorizedArcaInvoice,
 } from "../services/arcaService";
 import { firebaseConfig } from "../services/firebase";
@@ -63,6 +64,11 @@ export default function SettingsPage() {
     result: null,
     error: "",
   });
+  const [wsaaSmokeState, setWsaaSmokeState] = useState({
+    busy: false,
+    result: null,
+    error: "",
+  });
 
   const loadInvoices = async () => {
     setInvoiceState((current) => ({ ...current, busy: true, error: "", message: "" }));
@@ -91,6 +97,17 @@ export default function SettingsPage() {
       setWsaaCacheState({ busy: false, result, error: "" });
     } catch (error) {
       setWsaaCacheState({ busy: false, result: null, error: error.message });
+    }
+  };
+
+  const runWsaaSharedSmoke = async () => {
+    setWsaaSmokeState({ busy: true, result: null, error: "" });
+    try {
+      const result = await runArcaWsaaSharedSmoke();
+      setWsaaSmokeState({ busy: false, result, error: "" });
+      await loadWsaaCacheStatus();
+    } catch (error) {
+      setWsaaSmokeState({ busy: false, result: null, error: error.message });
     }
   };
 
@@ -393,10 +410,33 @@ export default function SettingsPage() {
                 Actualizar caché
               </Button>
             </div>
+            <div>
+              <div>
+                <strong>Prueba compartida WSFE</strong>
+                <span>
+                  {wsaaSmokeState.result
+                    ? wsaaSmokeState.result.reusedExistingTicket
+                      ? "OK: FEDummy reutilizó el TA persistido; no se creó otro LoginCms."
+                      : wsaaSmokeState.result.createdOrRenewedTicket
+                        ? "OK: FEDummy creó/renovó un TA y lo publicó cifrado."
+                        : "FEDummy respondió; revisar metadata de caché."
+                    : "FEDummy + caché compartida. No genera CAE ni comprobantes."}
+                </span>
+              </div>
+              <Button
+                variant="secondary"
+                disabled={!fiscalConfig.taSharedCacheConfigured}
+                loading={wsaaSmokeState.busy}
+                onClick={runWsaaSharedSmoke}
+              >
+                Probar TA compartido
+              </Button>
+            </div>
           </div>
 
           {arcaConfigState.error ? <Toast tone="error">{arcaConfigState.error}</Toast> : null}
           {wsaaCacheState.error ? <Toast tone="error">{wsaaCacheState.error}</Toast> : null}
+          {wsaaSmokeState.error ? <Toast tone="error">{wsaaSmokeState.error}</Toast> : null}
           {invoiceState.error ? <Toast tone="error">{invoiceState.error}</Toast> : null}
           {invoiceState.message ? <Toast tone="success">{invoiceState.message}</Toast> : null}
 
