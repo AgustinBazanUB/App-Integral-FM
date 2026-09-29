@@ -48,6 +48,11 @@ export async function runArcaDiagnostics() {
   return data.diagnostics;
 }
 
+export async function runArcaProductionReadonlyPreflight() {
+  const data = await authenticatedPost({ mode: "production-readonly-preflight" });
+  return data.preflight;
+}
+
 export async function lookupArcaTaxpayer(cuit) {
   const data = await authenticatedPost({ cuit: String(cuit || "").trim() });
   return data;
