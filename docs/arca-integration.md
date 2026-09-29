@@ -799,3 +799,39 @@ También se amplió el preflight productivo read-only para validar antes del go-
 - último número autorizado de Factura B en PV 8.
 
 Ninguna de estas consultas emite comprobantes.
+
+
+## 33. Preflight productivo ampliado validado
+
+Se ejecutó nuevamente el preflight productivo read-only con detalle completo y resultado general `Listo`.
+
+Resultado validado:
+
+- WSFE: OK;
+- PV 8: encontrado, operativo, no bloqueado y sin fecha de baja;
+- Factura A: disponible;
+- Factura B: disponible;
+- IVA 21%: disponible;
+- documentos 80 / 96 / 99: disponibles;
+- último Factura A en PV 8: 113;
+- último Factura B en PV 8: 318;
+- emisor: ACTIVO;
+- TA WSFE: reutilizable;
+- TA Padrón: reutilizable;
+- sin etapas con error;
+- CAE productivo: bloqueado.
+
+Luego se restauró `ARCA_ALLOW_PRODUCTION_READONLY=false`.
+
+### Siguiente prueba controlada
+
+El siguiente checkpoint es un dry-run productivo sobre una venta real que efectivamente corresponda facturar.
+
+Para esa prueba:
+
+- `ARCA_ALLOW_PRODUCTION_INVOICE_PREPARE=true`;
+- `ARCA_ALLOW_PRODUCTION_READONLY=false`;
+- `ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP=false`;
+- CAE productivo continúa bloqueado por código.
+
+La venta rápida administrativa ya prepara la solicitud fiscal y ejecuta el dry-run sin llamar a WSAA/WSFE, sin consultar correlatividad y sin solicitar CAE. Si el plan cierra correctamente, esa misma solicitud `pending` podrá utilizarse luego para la primera autorización productiva controlada.
