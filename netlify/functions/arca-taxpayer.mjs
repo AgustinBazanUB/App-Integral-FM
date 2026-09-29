@@ -5,6 +5,7 @@ import { arcaEnvironment, arcaSafeStatus, loadArcaPublicConfig } from "./_lib/ar
 import { wsfeDummy, getPointsOfSale } from "./_lib/arca/wsfe.mjs";
 import { registryDummy } from "./_lib/arca/registry.mjs";
 import { firebaseAdminAccessToken, adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
+import { inspectSharedWsaaCache } from "./_lib/arca/wsaaSharedCache.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -133,6 +134,30 @@ export default async function handler(request) {
       return json({
         ok: true,
         status: arcaSafeStatus(process.env),
+      });
+    }
+
+    if (body?.mode === "wsaa-cache-status") {
+      const environment = arcaEnvironment(process.env).id;
+      const [wsfe, registry] = await Promise.all([
+        inspectSharedWsaaCache({
+          environmentId: environment,
+          service: "wsfe",
+          env: process.env,
+        }),
+        inspectSharedWsaaCache({
+          environmentId: environment,
+          service: "ws_sr_constancia_inscripcion",
+          env: process.env,
+        }),
+      ]);
+      return json({
+        ok: true,
+        cache: {
+          environment,
+          wsfe,
+          registry,
+        },
       });
     }
 
