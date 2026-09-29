@@ -6,6 +6,7 @@ import {
   acquireWsaaRenewalLease,
   decryptWsaaTicket,
   encryptWsaaTicket,
+  inspectSharedWsaaCache,
   parseWsaaEncryptionKey,
   readSharedWsaaTicket,
   storeSharedWsaaTicket,
@@ -251,4 +252,47 @@ test("requestAccessTicket reutiliza TA compartido tras perder la caché en memor
   assert.equal(reused.token, "TOKEN-SECRETO-WSAA");
   assert.equal(reused.sign, "SIGN-SECRETO-WSAA");
   assert.equal(fetchCalls, 0);
+});
+
+
+test("inspección segura reporta metadata sin Token/Sign", async () => {
+  const db = memoryStore();
+  const lease = await acquireWsaaRenewalLease({
+    environmentId: "homologation",
+    service: "wsfe",
+    holder: "inspect-worker",
+    env: ENV,
+    now: new Date("2026-09-29T12:00:00.000Z"),
+    getDocument: db.getDocument,
+    createDocument: db.createDocument,
+    patchDocument: db.patchDocument,
+  });
+  await storeSharedWsaaTicket({
+    environmentId: "homologation",
+    service: "wsfe",
+    holder: "inspect-worker",
+    ticket: ticket(),
+    expectedUpdateTime: lease.updateTime,
+    env: ENV,
+    now: new Date("2026-09-29T12:00:10.000Z"),
+    getDocument: db.getDocument,
+    patchDocument: db.patchDocument,
+  });
+
+  const status = await inspectSharedWsaaCache({
+    environmentId: "homologation",
+    service: "wsfe",
+    env: ENV,
+    now: new Date("2026-09-29T12:01:00.000Z"),
+    getDocument: db.getDocument,
+  });
+
+  assert.equal(status.configured, true);
+  assert.equal(status.exists, true);
+  assert.equal(status.decryptable, true);
+  assert.equal(status.reusable, true);
+  assert.equal(status.ticketExpiresAt, "2026-09-29T13:00:00.000Z");
+  const serialized = JSON.stringify(status);
+  assert.equal(serialized.includes("TOKEN-SECRETO-WSAA"), false);
+  assert.equal(serialized.includes("SIGN-SECRETO-WSAA"), false);
 });
