@@ -2,7 +2,15 @@ import { requireFirebaseAdmin } from "./_lib/firebaseAuth.mjs";
 import { getTaxpayer } from "./_lib/arca/registry.mjs";
 import { inferReceiverVatCondition } from "./_lib/arca/receiver.mjs";
 import { arcaEnvironment, arcaSafeStatus, assertArcaCredentialPairReady, loadArcaPublicConfig } from "./_lib/arca/config.mjs";
-import { wsfeDummy, getPointsOfSale } from "./_lib/arca/wsfe.mjs";
+import {
+  getDocumentTypes,
+  getLastAuthorized,
+  getPointsOfSale,
+  getReceiverVatConditions,
+  getVatTypes,
+  getVoucherTypes,
+  wsfeDummy,
+} from "./_lib/arca/wsfe.mjs";
 import { registryDummy } from "./_lib/arca/registry.mjs";
 import { firebaseAdminAccessToken, adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
 import { inspectSharedWsaaCache } from "./_lib/arca/wsaaSharedCache.mjs";
@@ -304,6 +312,22 @@ export default async function handler(request) {
       const config = loadArcaPublicConfig(process.env);
       const wsfe = await wsfeDummy({ env: process.env });
       const points = await getPointsOfSale({ env: process.env });
+      const selectedPoint = points.points.find((point) => point.number === config.pointOfSale) || null;
+      const voucherTypes = await getVoucherTypes({ env: process.env });
+      const vatTypes = await getVatTypes({ env: process.env });
+      const documentTypes = await getDocumentTypes({ env: process.env });
+      const receiverA = await getReceiverVatConditions({ voucherClass: "A", env: process.env });
+      const receiverB = await getReceiverVatConditions({ voucherClass: "B", env: process.env });
+      const lastA = await getLastAuthorized({
+        voucherType: 1,
+        pointOfSale: config.pointOfSale,
+        env: process.env,
+      });
+      const lastB = await getLastAuthorized({
+        voucherType: 6,
+        pointOfSale: config.pointOfSale,
+        env: process.env,
+      });
       const issuer = await getTaxpayer(config.issuerCuit, { env: process.env });
       const [wsfeCache, registryCache] = await Promise.all([
         inspectSharedWsaaCache({
@@ -318,24 +342,95 @@ export default async function handler(request) {
         }),
       ]);
 
-      const pointFound = points.points.some((point) => point.number === config.pointOfSale);
+      const pointFound = Boolean(selectedPoint);
+      const pointOperational = Boolean(
+        selectedPoint
+        && String(selectedPoint.blocked || "").toUpperCase() !== "S"
+        && !selectedPoint.dropDate
+      );
       const issuerActive = issuer.found === true && issuer.keyStatus === "ACTIVO";
       const cacheReady = wsfeCache.reusable === true && registryCache.reusable === true;
+      const voucherIds = new Set(voucherTypes.types.map((item) => item.id));
+      const vatIds = new Set(vatTypes.types.map((item) => item.id));
+      const documentIds = new Set(documentTypes.types.map((item) => item.id));
+      const receiverAIds = new Set(receiverA.conditions.map((item) => item.id));
+      const receiverBIds = new Set(receiverB.conditions.map((item) => item.id));
+      const fiscalTablesReady = (
+        voucherIds.has(1)
+        && voucherIds.has(6)
+        && vatIds.has(5)
+        && documentIds.has(80)
+        && documentIds.has(96)
+        && documentIds.has(99)
+        && receiverAIds.has(1)
+        && receiverAIds.has(6)
+        && receiverBIds.has(4)
+        && receiverBIds.has(5)
+      );
+      const sequencesReady = lastA.errors.length === 0 && lastB.errors.length === 0;
+      const wsfeHealthy = [wsfe.appServer, wsfe.dbServer, wsfe.authServer]
+        .every((value) => String(value || "").toUpperCase() === "OK");
+      const ready = (
+        wsfeHealthy
+        && pointFound
+        && pointOperational
+        && issuerActive
+        && cacheReady
+        && fiscalTablesReady
+        && sequencesReady
+      );
 
       return json({
-        ok: pointFound && issuerActive && cacheReady,
+        ok: ready,
         preflight: {
           environment,
           wsfe: {
             appServer: wsfe.appServer,
             dbServer: wsfe.dbServer,
             authServer: wsfe.authServer,
+            healthy: wsfeHealthy,
           },
           pointOfSale: {
             selected: config.pointOfSale,
             found: pointFound,
+            operational: pointOperational,
+            emissionType: selectedPoint?.emissionType || null,
+            blocked: selectedPoint?.blocked || null,
+            dropDate: selectedPoint?.dropDate || null,
             returned: points.points.map((point) => point.number),
             errors: points.errors,
+          },
+          fiscalTables: {
+            ready: fiscalTablesReady,
+            voucherTypes: {
+              facturaA: voucherIds.has(1),
+              facturaB: voucherIds.has(6),
+            },
+            vat21: vatIds.has(5),
+            documentTypes: {
+              cuit80: documentIds.has(80),
+              dni96: documentIds.has(96),
+              consumidorFinal99: documentIds.has(99),
+            },
+            receiverConditions: {
+              responsableInscriptoA: receiverAIds.has(1),
+              monotributoA: receiverAIds.has(6),
+              exentoB: receiverBIds.has(4),
+              consumidorFinalB: receiverBIds.has(5),
+            },
+          },
+          sequences: {
+            ready: sequencesReady,
+            facturaA: {
+              voucherType: 1,
+              lastAuthorized: lastA.number,
+              errors: lastA.errors,
+            },
+            facturaB: {
+              voucherType: 6,
+              lastAuthorized: lastB.number,
+              errors: lastB.errors,
+            },
           },
           issuer: {
             found: issuer.found,
@@ -352,9 +447,16 @@ export default async function handler(request) {
             validTo: safeStatus.certificateValidTo,
             fingerprint256: safeStatus.certificateFingerprint256,
           },
+          productionCapabilities: {
+            readonly: safeStatus.productionReadonlyEnabled,
+            invoicePreparation: safeStatus.productionInvoicePreparationEnabled,
+            taxpayerLookup: safeStatus.productionTaxpayerLookupEnabled,
+            cae: false,
+          },
+          ready,
           caeProductionEnabled: false,
         },
-      }, pointFound && issuerActive && cacheReady ? 200 : 409);
+      }, ready ? 200 : 409);
     }
 
     if (body?.mode === "diagnostics") {
