@@ -285,7 +285,7 @@ export default function SettingsPage() {
         </div>
       </Panel>
 
-      {isAdmin ? (
+      {isAdmin && !productionEnvironment ? (
         <Panel
           title="Diagnóstico ARCA"
           description="Cada comprobación corre de forma independiente. Un 502 de ARCA ya no oculta el estado de Firebase/Firestore. No emite comprobantes ni muestra secretos."
@@ -382,7 +382,7 @@ export default function SettingsPage() {
         </Panel>
       ) : null}
 
-      {isAdmin ? (
+      {isAdmin && !productionEnvironment ? (
         <Panel
           title="Homologación fiscal controlada"
           description="Permite revisar solicitudes persistidas, repetir el dry-run y autorizar sólo cuando el interruptor de CAE de homologación está habilitado."
@@ -627,6 +627,21 @@ export default function SettingsPage() {
           )}
         >
           <div className="fm-settings-list">
+            <div>
+              <div>
+                <strong>Certificado productivo</strong>
+                <span>
+                  {fiscalConfig.credentialsReady
+                    ? `Par certificado/clave válido hasta ${fiscalConfig.certificateValidTo || "fecha no informada"}.`
+                    : fiscalConfig.credentialErrorCode
+                      ? `No listo: ${fiscalConfig.credentialErrorCode}.`
+                      : "Sin validar."}
+                </span>
+              </div>
+              <Badge tone={fiscalConfig.credentialsReady ? "success" : "warning"}>
+                {fiscalConfig.credentialsReady ? "Listo" : "Pendiente"}
+              </Badge>
+            </div>
             <div>
               <div>
                 <strong>Conexiones producción</strong>
