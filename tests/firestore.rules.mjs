@@ -199,6 +199,21 @@ test("la caché WSAA compartida es invisible e inmutable para cualquier cliente"
   }));
 });
 
+test("los locks fiscales también son exclusivos del backend", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const sellerDb = environment.authenticatedContext("seller-1").firestore();
+  const lockId = "production_pos_8_type_6";
+
+  await assertFails(getDoc(doc(adminDb, "arcaSequenceLocks", lockId)));
+  await assertFails(getDoc(doc(sellerDb, "arcaSequenceLocks", lockId)));
+  await assertFails(setDoc(doc(adminDb, "arcaSequenceLocks", lockId), {
+    environment: "production",
+    pointOfSale: 8,
+    voucherType: 6,
+    holder: "browser",
+  }));
+});
+
 test("el vendedor no puede ajustar stock fuera de una venta válida", async () => {
   const database = environment.authenticatedContext("seller-1").firestore();
   const stockRef = doc(database, "locationStock", "loc-1", "items", "product-1");
