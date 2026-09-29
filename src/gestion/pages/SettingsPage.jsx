@@ -698,14 +698,17 @@ export default function SettingsPage() {
                 <div>
                   <strong>Resultado</strong>
                   <span>
-                    PV {productionPreflightState.result.pointOfSale?.selected}: {productionPreflightState.result.pointOfSale?.found ? "OK" : "no encontrado"} ·
+                    PV {productionPreflightState.result.pointOfSale?.selected}: {productionPreflightState.result.pointOfSale?.operational ? "operativo" : "revisar"} ·
                     Emisor: {productionPreflightState.result.issuer?.keyStatus || "sin estado"} ·
+                    Tablas fiscales: {productionPreflightState.result.fiscalTables?.ready ? "OK" : "revisar"} ·
+                    Secuencia A: {productionPreflightState.result.sequences?.facturaA?.lastAuthorized ?? "?"} ·
+                    Secuencia B: {productionPreflightState.result.sequences?.facturaB?.lastAuthorized ?? "?"} ·
                     TA WSFE: {productionPreflightState.result.cache?.wsfe?.reusable ? "reutilizable" : "no reutilizable"} ·
                     TA Padrón: {productionPreflightState.result.cache?.registry?.reusable ? "reutilizable" : "no reutilizable"}
                   </span>
                 </div>
-                <Badge tone={productionPreflightState.result.pointOfSale?.found && productionPreflightState.result.issuer?.keyStatus === "ACTIVO" ? "success" : "warning"}>
-                  Preflight
+                <Badge tone={productionPreflightState.result.ready ? "success" : "warning"}>
+                  {productionPreflightState.result.ready ? "Listo" : "Revisar"}
                 </Badge>
               </div>
             ) : null}
