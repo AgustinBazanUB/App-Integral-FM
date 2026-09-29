@@ -38,6 +38,11 @@ export async function runArcaWsaaSharedSmoke() {
   return data.smoke;
 }
 
+export async function runArcaWsaaRegistrySharedSmoke() {
+  const data = await authenticatedPost({ mode: "wsaa-registry-shared-smoke" });
+  return data.smoke;
+}
+
 export async function runArcaDiagnostics() {
   const data = await authenticatedPost({ mode: "diagnostics" });
   return data.diagnostics;
