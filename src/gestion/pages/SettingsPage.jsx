@@ -255,6 +255,10 @@ export default function SettingsPage() {
     && fiscalConfig.pointOfSaleConfigured === true
   );
   const productionCaeTargetSaleCode = String(fiscalConfig.productionCaeTargetSaleCode || "").trim();
+  const productionAutoAuthorizeEnabled = fiscalConfig.productionAutoAuthorizeEnabled === true;
+  const productionAutoAuthorizeSources = Array.isArray(fiscalConfig.productionAutoAuthorizeSources)
+    ? fiscalConfig.productionAutoAuthorizeSources
+    : [];
   const productionInvoices = invoiceState.items.filter((invoice) => (
     String(invoice.fiscalEnvironment || "").toLowerCase() === "production"
   ));
@@ -700,13 +704,28 @@ export default function SettingsPage() {
                 <span>
                   {fiscalConfig.productionCaeEnabled
                     ? productionCaeTargetSaleCode
-                      ? `Armado únicamente para la venta ${productionCaeTargetSaleCode}.`
-                      : "Gate habilitado, pero falta la venta objetivo exacta."
+                      ? `Armado manualmente sólo para la venta ${productionCaeTargetSaleCode}.`
+                      : productionAutoAuthorizeEnabled
+                        ? "Gate CAE habilitado para el flujo automático acotado por allowlist."
+                        : "Gate habilitado, pero no hay venta objetivo manual ni modo automático habilitado."
                     : "Bloqueado por configuración."}
                 </span>
               </div>
               <Badge tone={fiscalConfig.productionCaeEnabled ? "warning" : "success"}>
                 {fiscalConfig.productionCaeEnabled ? "Armado" : "Bloqueado"}
+              </Badge>
+            </div>
+            <div>
+              <div>
+                <strong>Autorización automática productiva</strong>
+                <span>
+                  {productionAutoAuthorizeEnabled
+                    ? `Habilitada para: ${productionAutoAuthorizeSources.length ? productionAutoAuthorizeSources.join(", ") : "ningún origen"}.`
+                    : "Bloqueada por configuración. La etapa inicial debe limitarse a Venta Rápida."}
+                </span>
+              </div>
+              <Badge tone={productionAutoAuthorizeEnabled ? "warning" : "success"}>
+                {productionAutoAuthorizeEnabled ? "Automático" : "Bloqueado"}
               </Badge>
             </div>
             {productionPreflightState.result ? (
