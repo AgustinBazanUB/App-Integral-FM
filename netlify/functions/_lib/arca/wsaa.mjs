@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { signCmsBase64 } from "./cms.mjs";
-import { assertArcaNetworkAccessAllowed, loadArcaSecrets, arcaEnvironment } from "./config.mjs";
+import { assertArcaCredentialPairReady, assertArcaNetworkAccessAllowed, loadArcaSecrets, arcaEnvironment } from "./config.mjs";
 import { escapeXml, soapRequest, xmlTag } from "./xml.mjs";
 import {
   acquireWsaaRenewalLease,
@@ -68,6 +68,7 @@ async function requestFreshAccessTicket(service, {
   fetchImpl = fetch,
 } = {}) {
   const environment = arcaEnvironment(env);
+  assertArcaCredentialPairReady(env, { now });
   const secrets = loadArcaSecrets(env);
   const tra = buildLoginTicketRequest(service, now);
   const cmsBase64 = signCmsBase64(tra, secrets);
