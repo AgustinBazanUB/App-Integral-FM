@@ -6,7 +6,9 @@ import {
 import {
   BILLING_SOURCE_TYPES,
   invoiceIdFor,
+  invoiceIdForEnvironment,
 } from "./billing.mjs";
+import { arcaEnvironment } from "./config.mjs";
 import { ARCA_BILLING_VERSION } from "./billingVersion.mjs";
 
 function nowIso(now = new Date()) {
@@ -19,6 +21,13 @@ function salePathFor(sourceId) {
 
 function invoicePathFor(invoiceId) {
   return `invoices/${invoiceId}`;
+}
+
+function fiscalScope(env = process.env) {
+  const environment = arcaEnvironment(env).id;
+  const issuerCuit = String(env.ARCA_ISSUER_CUIT || "").replace(/\D/g, "") || null;
+  const pointOfSale = Number(env.ARCA_POINT_OF_SALE || 0) || null;
+  return { environment, issuerCuit, pointOfSale };
 }
 
 function compactCustomerSnapshot(sale = {}) {
@@ -159,7 +168,8 @@ export async function ensurePendingInvoice({
   getDocument = adminGetDocument,
   createDocument = adminCreateDocument,
 } = {}) {
-  const invoiceId = invoiceIdFor(sourceType, sourceId);
+  const scope = fiscalScope(env);
+  const invoiceId = invoiceIdForEnvironment(scope.environment, sourceType, sourceId);
   const existing = await getDocument(invoicePathFor(invoiceId), { env });
   if (existing) {
     return {
@@ -168,6 +178,20 @@ export async function ensurePendingInvoice({
       invoice: existing.data,
       updateTime: existing.updateTime || null,
     };
+  }
+
+  if (scope.environment === "homologation") {
+    const legacyInvoiceId = invoiceIdFor(sourceType, sourceId);
+    const legacy = await getDocument(invoicePathFor(legacyInvoiceId), { env });
+    if (legacy && (!legacy.data?.fiscalEnvironment || legacy.data.fiscalEnvironment === "homologation")) {
+      return {
+        created: false,
+        invoiceId: legacyInvoiceId,
+        invoice: legacy.data,
+        updateTime: legacy.updateTime || null,
+        legacy: true,
+      };
+    }
   }
 
   const saleSnapshot = await getDocument(salePathFor(sourceId), { env });
@@ -180,8 +204,11 @@ export async function ensurePendingInvoice({
   const timestamp = nowIso(now);
 
   const payload = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     billingVersion: ARCA_BILLING_VERSION,
+    fiscalEnvironment: scope.environment,
+    issuerCuit: scope.issuerCuit,
+    pointOfSaleSnapshot: scope.pointOfSale,
     sourceType,
     sourceId,
     status: "pending",
