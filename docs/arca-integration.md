@@ -728,3 +728,31 @@ La arquitectura homologación ya valida:
 - CAE productivo bloqueado.
 
 El siguiente bloqueo ya no es de código: para probar producción en modo read-only hace falta un certificado de producción emitido por ARCA y asociado a los servicios `wsfe` y `ws_sr_constancia_inscripcion`, además del punto de venta productivo configurado.
+
+
+## 31. Certificado productivo recibido y siguiente preflight
+
+El certificado productivo fue creado fuera del repositorio y asociado en ARCA a:
+
+- `wsfe`;
+- `ws_sr_constancia_inscripcion`.
+
+Alias productivo informado: `florMiaWebAppProduccion`.
+
+La homologación local permanece separada y con CAE deshabilitado.
+
+Antes de la primera conexión productiva deben cumplirse todos los prerrequisitos locales:
+
+- `ARCA_ENVIRONMENT=production`;
+- `ARCA_POINT_OF_SALE` productivo configurado;
+- certificado productivo cargado en `ARCA_CERTIFICATE_PEM`;
+- private key productiva correspondiente cargada en `ARCA_PRIVATE_KEY_PEM`;
+- una clave de cifrado TA exclusiva del perfil productivo en `ARCA_TA_ENCRYPTION_KEY`;
+- `ARCA_ALLOW_PRODUCTION_READONLY=true`;
+- `ARCA_ALLOW_CAE_HOMOLOGATION=false`.
+
+El preflight valida offline el par certificado/private key y la presencia de la clave de cifrado antes de realizar cualquier request a ARCA.
+
+La pantalla de producción read-only no muestra los controles de homologación y el botón de preflight permanece deshabilitado hasta que certificado, clave, cifrado TA y punto de venta estén configurados.
+
+La emisión de CAE productivo sigue bloqueada por código.
