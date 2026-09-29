@@ -45,6 +45,17 @@ export function invoiceIdFor(sourceType, sourceId) {
   return `invoice_${sourceType}_${cleanSourceId(sourceId)}`;
 }
 
+export function invoiceIdForEnvironment(environment, sourceType, sourceId) {
+  const environmentId = String(environment || "").trim().toLowerCase();
+  if (!["homologation", "production"].includes(environmentId)) {
+    const error = new Error("Entorno fiscal inválido.");
+    error.code = "arca-billing-environment-invalid";
+    throw error;
+  }
+  if (!BILLING_SOURCE_TYPES.includes(sourceType)) throw new Error("Origen de facturación inválido.");
+  return `invoice_${environmentId}_${sourceType}_${cleanSourceId(sourceId)}`;
+}
+
 export function normalizeVatRate(value) {
   const numeric = Number(value);
   const key = Number.isInteger(numeric) ? String(numeric) : String(numeric);
