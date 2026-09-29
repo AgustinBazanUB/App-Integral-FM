@@ -10,7 +10,8 @@ import {
 } from "../firestoreAdminRest.mjs";
 
 const COLLECTION = "arcaWsaaTickets";
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
+const LEGACY_SCHEMA_VERSION = 1;
 const CIPHER = "aes-256-gcm";
 const KEY_BYTES = 32;
 const IV_BYTES = 12;
@@ -95,11 +96,24 @@ function issuerScope(env = process.env) {
   return issuerCuit;
 }
 
-function aad(environmentId, service, env) {
-  return Buffer.from(
-    `arca-wsaa-ticket:v${SCHEMA_VERSION}:${environmentKey(environmentId)}:${serviceKey(service)}:${issuerScope(env)}`,
-    "utf8",
-  );
+function aadForSchema(schemaVersion, environmentId, service, env) {
+  const envId = environmentKey(environmentId);
+  const serviceId = serviceKey(service);
+  if (Number(schemaVersion) === LEGACY_SCHEMA_VERSION) {
+    return Buffer.from(
+      `arca-wsaa-ticket:v${LEGACY_SCHEMA_VERSION}:${envId}:${serviceId}`,
+      "utf8",
+    );
+  }
+  if (Number(schemaVersion) === SCHEMA_VERSION) {
+    return Buffer.from(
+      `arca-wsaa-ticket:v${SCHEMA_VERSION}:${envId}:${serviceId}:${issuerScope(env)}`,
+      "utf8",
+    );
+  }
+  const error = new Error("Versión de caché WSAA no soportada.");
+  error.code = "arca-wsaa-cache-schema-unsupported";
+  throw error;
 }
 
 export function encryptWsaaTicket(ticket, {
@@ -120,7 +134,7 @@ export function encryptWsaaTicket(ticket, {
   }
 
   const cipher = createCipheriv(CIPHER, key, iv);
-  cipher.setAAD(aad(environmentId, service, env));
+  cipher.setAAD(aadForSchema(SCHEMA_VERSION, environmentId, service, env));
   const plaintext = Buffer.from(JSON.stringify({
     token: String(ticket.token),
     sign: String(ticket.sign),
@@ -130,6 +144,7 @@ export function encryptWsaaTicket(ticket, {
   const authTag = cipher.getAuthTag();
 
   return {
+    schemaVersion: SCHEMA_VERSION,
     cipher: CIPHER,
     ciphertext: ciphertext.toString("base64"),
     iv: iv.toString("base64"),
@@ -156,7 +171,7 @@ export function decryptWsaaTicket(record, {
       key,
       Buffer.from(record.iv, "base64"),
     );
-    decipher.setAAD(aad(environmentId, service, env));
+    decipher.setAAD(aadForSchema(Number(record.schemaVersion || LEGACY_SCHEMA_VERSION), environmentId, service, env));
     decipher.setAuthTag(Buffer.from(record.authTag, "base64"));
     const plaintext = Buffer.concat([
       decipher.update(Buffer.from(record.ciphertext, "base64")),
@@ -202,7 +217,8 @@ export async function readSharedWsaaTicket({
   if (!document) return { ticket: null, document: null, reason: "missing" };
 
   const data = document.data || {};
-  if (data.schemaVersion !== SCHEMA_VERSION
+  const schemaVersion = Number(data.schemaVersion || LEGACY_SCHEMA_VERSION);
+  if (![LEGACY_SCHEMA_VERSION, SCHEMA_VERSION].includes(schemaVersion)
     || data.environment !== environmentKey(environmentId)
     || data.service !== serviceKey(service)) {
     const error = new Error("El documento compartido WSAA no coincide con el entorno/servicio esperado.");
@@ -360,6 +376,7 @@ export async function storeSharedWsaaTicket({
   const encrypted = encryptWsaaTicket(ticket, { environmentId, service, env });
 
   const patch = async (updateTime) => patchDocument(path, {
+    schemaVersion: SCHEMA_VERSION,
     ...encrypted,
     leaseHolder: null,
     leaseExpiresAt: null,
@@ -517,6 +534,8 @@ export async function inspectSharedWsaaCache({
     exists: true,
     decryptable,
     reusable,
+    schemaVersion: Number(data.schemaVersion || LEGACY_SCHEMA_VERSION),
+    needsMigration: Number(data.schemaVersion || LEGACY_SCHEMA_VERSION) !== SCHEMA_VERSION,
     ticketExpiresAt: data.ticketExpiresAt || null,
     leaseBusy,
     leaseExpiresAt,
