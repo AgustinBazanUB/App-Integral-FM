@@ -1,5 +1,5 @@
 import { assertValidCuit } from "./cuit.mjs";
-import { loadArcaPublicConfig } from "./config.mjs";
+import { assertArcaNetworkAccessAllowed, loadArcaPublicConfig } from "./config.mjs";
 import { escapeXml, soapRequest, xmlTag, xmlTags } from "./xml.mjs";
 import { requestAccessTicket } from "./wsaa.mjs";
 
@@ -33,6 +33,7 @@ function envelope(operation, payload = "") {
 }
 
 export async function registryDummy({ env = process.env, fetchImpl = fetch } = {}) {
+  assertArcaNetworkAccessAllowed(env);
   const config = loadArcaPublicConfig(env, { requirePointOfSale: false });
   const { xml, url } = await registrySoapRequest({
     config,
