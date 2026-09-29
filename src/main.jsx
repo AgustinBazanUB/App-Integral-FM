@@ -1,7 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
-import { CartProvider } from "./context/CartContext";
+import Surface from "@flormia/surface";
 import { RouterProvider } from "./router";
 import "@fontsource/cormorant-garamond/latin-500.css";
 import "@fontsource/cormorant-garamond/latin-600.css";
@@ -35,16 +34,15 @@ import "./styles/inventory.css";
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <RouterProvider>
-      <CartProvider>
-        <App />
-      </CartProvider>
+      <Surface />
     </RouterProvider>
   </React.StrictMode>,
 );
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch(() => {
+    const surface = import.meta.env.VITE_APP_SURFACE || "unified";
+    navigator.serviceWorker.register(`/service-worker.js?surface=${surface}`).catch(() => {
       // La app sigue operativa en navegadores que bloquean el service worker.
     });
   });

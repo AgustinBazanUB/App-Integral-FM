@@ -27,12 +27,13 @@ function ScrollManager() {
 }
 
 export default function Storefront() {
-  return (
-    <StorePreviewGate>
+  const content = (
+    <>
       <ScrollManager />
       <AnnouncementBar />
       <Header />
       <Routes>
+        <Route path="/" element={<HomePage />} />
         <Route path="/tienda" element={<HomePage />} />
         <Route path="/productos" element={<CatalogPage />} />
         <Route path="/producto/:slug" element={<ProductPage />} />
@@ -42,6 +43,10 @@ export default function Storefront() {
       </Routes>
       <Footer />
       <CartDrawer />
-    </StorePreviewGate>
+    </>
   );
+
+  return import.meta.env.VITE_STOREFRONT_PUBLIC === "true"
+    ? content
+    : <StorePreviewGate>{content}</StorePreviewGate>;
 }

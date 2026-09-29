@@ -4,6 +4,10 @@ import { brand, footerNavigation } from "../data/brand";
 
 export default function Footer() {
   const { contact } = brand;
+  const managementUrl = String(import.meta.env.VITE_MANAGEMENT_URL || "").trim();
+  const managementLink = managementUrl || (
+    import.meta.env.VITE_STOREFRONT_PUBLIC === "true" ? "" : "/gestion"
+  );
   const hasContactInformation = Boolean(
     contact.address ||
       contact.openingHours ||
@@ -109,7 +113,7 @@ export default function Footer() {
       <div className="container footer-legal">
         <span>© {new Date().getFullYear()} Flor Mía</span>
         <span>Productos regionales de Mendoza</span>
-        <Link to="/gestion">Acceso de gestión</Link>
+        {managementLink ? <Link to={managementLink}>Acceso de gestión</Link> : null}
       </div>
     </footer>
   );
