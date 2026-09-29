@@ -239,6 +239,9 @@ export async function authorizeInvoice({
     const productionCaeEnabled = String(env.ARCA_ALLOW_PRODUCTION_CAE || "")
       .trim()
       .toLowerCase() === "true";
+    const automaticProduction = String(env.ARCA_AUTO_AUTHORIZE_PRODUCTION || "")
+      .trim()
+      .toLowerCase() === "true";
     const targetSaleCode = String(env.ARCA_PRODUCTION_CAE_SALE_CODE || "").trim();
     const invoiceSaleCode = String(current.data?.saleSnapshot?.saleCode || "").trim();
 
@@ -248,15 +251,17 @@ export async function authorizeInvoice({
       error.status = 409;
       throw error;
     }
-    if (!targetSaleCode) {
-      const error = new Error("Falta configurar ARCA_PRODUCTION_CAE_SALE_CODE para una autorización productiva controlada.");
-      error.code = "arca-production-cae-target-missing";
-      error.status = 409;
-      throw error;
-    }
-    if (!invoiceSaleCode || invoiceSaleCode !== targetSaleCode) {
-      const error = new Error("La solicitud fiscal no coincide con la venta productiva habilitada para CAE.");
-      error.code = "arca-production-cae-target-mismatch";
+
+    if (targetSaleCode) {
+      if (!invoiceSaleCode || invoiceSaleCode !== targetSaleCode) {
+        const error = new Error("La solicitud fiscal no coincide con la venta productiva habilitada para CAE.");
+        error.code = "arca-production-cae-target-mismatch";
+        error.status = 409;
+        throw error;
+      }
+    } else if (!automaticProduction) {
+      const error = new Error("Producción exige una venta objetivo exacta o el modo automático explícitamente habilitado.");
+      error.code = "arca-production-cae-scope-missing";
       error.status = 409;
       throw error;
     }
