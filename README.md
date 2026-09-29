@@ -77,7 +77,7 @@ La plataforma usa el proyecto Firebase separado `app-integral-fm`. El sistema an
 
 ## Netlify
 
-`netlify.toml` conserva el despliegue unificado durante la transición. Los dos sitios definitivos deben usar los builds y directorios independientes descritos en [Superficies y despliegues](docs/DEPLOYMENT-SURFACES.md). Los Pull Requests continúan generando Deploy Previews antes del merge.
+`netlify.toml` conserva el despliegue unificado durante la transición. El [preview separado de E-commerce](https://flor-mia-ecommerce-preview.netlify.app/) ya usa el build público; su configuración, verificación y límites están en [Superficies y despliegues](docs/DEPLOYMENT-SURFACES.md). Gestión sigue en el sitio existente hasta completar su migración. Los Pull Requests continúan generando Deploy Previews antes del merge.
 
 ## Documentación
 

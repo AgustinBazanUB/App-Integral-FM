@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build:ecommerce"
+  command = "npm run build:ecommerce && node deploy/ecommerce/prepare-preview.mjs"
   publish = "dist/ecommerce"
 
 [build.environment]
@@ -28,6 +28,7 @@
   for = "/*"
   [headers.values]
     Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    X-Robots-Tag = "noindex, nofollow"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"

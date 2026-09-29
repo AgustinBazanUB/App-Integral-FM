@@ -21,7 +21,7 @@ El build histórico `npm run build` continúa generando la aplicación unificada
 
 ## Configuración en Netlify
 
-Crear dos sitios conectados al mismo repositorio y asignar configuraciones distintas:
+El E-commerce ya tiene un proyecto propio. El sitio de Gestión existente conserva por ahora el build unificado; su migración al build exclusivo de Gestión es un paso separado.
 
 ### Sitio de Gestión
 
@@ -33,14 +33,23 @@ Crear dos sitios conectados al mismo repositorio y asignar configuraciones disti
 
 ### Sitio de E-commerce
 
-- Build command: `npm run build:ecommerce`
-- Publish directory: `dist/ecommerce`
-- No publicar `netlify/functions` administrativas en este sitio.
+Proyecto: [`flor-mia-ecommerce-preview`](https://app.netlify.com/projects/flor-mia-ecommerce-preview), ID `4fd3acc0-c340-4c1b-879a-b4b832f5df5d`. URL pública: <https://flor-mia-ecommerce-preview.netlify.app/>. Está conectado a `AgustinBazanUB/App-Integral-FM` y usa la rama `codex/arca-marketing-ecommerce-split` como producción mientras el PR de integración siga abierto.
+
+El sitio público usa [`deploy/ecommerce/netlify.toml`](../deploy/ecommerce/netlify.toml). En Project configuration → Developer settings → Build settings, dejar **Base directory** en `/` y establecer **Package directory** en `deploy/ecommerce`. Netlify toma así la configuración de ese paquete antes que el `netlify.toml` raíz. Los valores de la interfaz deben reflejar los del archivo:
+
+- Build command: `npm run build:ecommerce && node deploy/ecommerce/prepare-preview.mjs`.
+- Publish directory: `dist/ecommerce`.
+- Functions directory: `deploy/ecommerce/functions`, vacío a propósito. No se publican las Functions administrativas de `netlify/functions`.
+- Rama inicial de producción: `codex/arca-marketing-ecommerce-split`. Cuando la integración se fusione a `main`, cambiar la rama de producción del sitio a `main`.
 - No copiar credenciales de ARCA, OpenAI, Google Drive ni Firebase Admin.
 - Variable pública opcional `VITE_MANAGEMENT_URL`: URL absoluta del sitio de Gestión si se desea mostrar ese acceso en el pie. Si se omite, el e-commerce público no muestra el enlace.
 - Dominio sugerido: `www.<dominio-de-flor-mia>`.
 
-Ambos sitios necesitan fallback SPA (`/* → /index.html 200`) y las cabeceras de seguridad vigentes. Hasta crear el segundo sitio, el `netlify.toml` raíz conserva el despliegue unificado actual.
+La configuración específica incluye fallback SPA (`/* → /index.html 200`) y cabeceras de seguridad para la tienda. Mientras sea un preview, [`prepare-preview.mjs`](../deploy/ecommerce/prepare-preview.mjs) elimina el sitemap heredado de otro dominio y publica `robots.txt` con `Disallow: /`; la cabecera `X-Robots-Tag` agrega `noindex, nofollow`. Antes de usar un dominio comercial, definir URLs canónicas y sitemap del dominio real y retirar el bloqueo de indexación. El `netlify.toml` raíz conserva el despliegue unificado actual hasta completar la transición de Gestión.
+
+El primer build al crear el proyecto usó temporalmente `deploy/ecommerce` como base y falló porque allí no está `package.json`. Se corrigió con base `/` y package directory `deploy/ecommerce`; el siguiente deploy de `3eabeb8` publicó correctamente la tienda. Si se recrea el sitio, configurar ambos directorios antes de evaluar el primer build.
+
+Para verificar el sitio publicado, abrir `/`, `/productos` y `/checkout`, recargar una ruta profunda, confirmar que no aparece el gate administrativo y comprobar que `/.netlify/functions/arca-authorize` no está desplegada. En el deploy del 29/09/2026 se verificaron la portada, `/producto/aceite-oliva-5l` con recarga, `/checkout`, la página 404 de `/gestion` y la ausencia de la Function ARCA en su URL. El checkout actual es una demostración: no genera órdenes ni cobra pagos.
 
 ## Estado actual honesto
 
