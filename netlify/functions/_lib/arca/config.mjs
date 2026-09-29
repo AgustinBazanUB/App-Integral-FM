@@ -50,6 +50,16 @@ export function arcaEnvironment(env = process.env) {
   return config;
 }
 
+export function productionAutoAuthorizeSources(env = process.env) {
+  const configured = String(
+    env.ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES ?? "admin_quick_sale",
+  )
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  return [...new Set(configured)];
+}
+
 export function assertArcaNetworkAccessAllowed(env = process.env) {
   const environment = arcaEnvironment(env);
   if (environment.id !== "production") return environment;
@@ -219,6 +229,7 @@ export function arcaSafeStatus(env = process.env) {
     productionTaxpayerLookupEnabled: String(env.ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP || "").trim().toLowerCase() === "true",
     productionCaeEnabled: String(env.ARCA_ALLOW_PRODUCTION_CAE || "").trim().toLowerCase() === "true",
     productionAutoAuthorizeEnabled: String(env.ARCA_AUTO_AUTHORIZE_PRODUCTION || "").trim().toLowerCase() === "true",
+    productionAutoAuthorizeSources: productionAutoAuthorizeSources(env),
     productionCaeTargetSaleCode: String(env.ARCA_PRODUCTION_CAE_SALE_CODE || "").trim() || null,
     publicConfigError,
   };
