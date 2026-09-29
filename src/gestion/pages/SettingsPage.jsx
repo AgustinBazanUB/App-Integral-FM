@@ -178,7 +178,11 @@ export default function SettingsPage() {
           ...current,
           actionId: "",
           message: result?.status === "authorized"
-            ? `ARCA autorizó ${invoice.saleSnapshot?.saleCode || invoice.id}.`
+            ? result?.postAuthorizationVerification?.matched
+              ? `ARCA autorizó ${invoice.saleSnapshot?.saleCode || invoice.id} y FECompConsultar confirmó número, CAE y vencimiento.`
+              : result?.postAuthorizationVerification?.verified === false
+                ? `ARCA autorizó ${invoice.saleSnapshot?.saleCode || invoice.id}, pero la verificación posterior necesita revisión.`
+                : `ARCA autorizó ${invoice.saleSnapshot?.saleCode || invoice.id}.`
             : `La solicitud quedó en estado ${result?.status || "desconocido"}.`,
         }));
         return;
@@ -250,6 +254,10 @@ export default function SettingsPage() {
     && fiscalConfig.taSharedCacheConfigured === true
     && fiscalConfig.pointOfSaleConfigured === true
   );
+  const productionCaeTargetSaleCode = String(fiscalConfig.productionCaeTargetSaleCode || "").trim();
+  const productionInvoices = invoiceState.items.filter((invoice) => (
+    String(invoice.fiscalEnvironment || "").toLowerCase() === "production"
+  ));
 
   const rows = [
     ["Proyecto Firebase", firebaseConfig.projectId, "Conectado"],
@@ -689,9 +697,17 @@ export default function SettingsPage() {
             <div>
               <div>
                 <strong>CAE producción</strong>
-                <span>Bloqueado por código. Este preflight no puede emitir comprobantes.</span>
+                <span>
+                  {fiscalConfig.productionCaeEnabled
+                    ? productionCaeTargetSaleCode
+                      ? `Armado únicamente para la venta ${productionCaeTargetSaleCode}.`
+                      : "Gate habilitado, pero falta la venta objetivo exacta."
+                    : "Bloqueado por configuración."}
+                </span>
               </div>
-              <Badge tone="success">Bloqueado</Badge>
+              <Badge tone={fiscalConfig.productionCaeEnabled ? "warning" : "success"}>
+                {fiscalConfig.productionCaeEnabled ? "Armado" : "Bloqueado"}
+              </Badge>
             </div>
             {productionPreflightState.result ? (
               <>
@@ -787,6 +803,86 @@ export default function SettingsPage() {
             ) : null}
           </div>
           {productionPreflightState.error ? <Toast tone="error">{productionPreflightState.error}</Toast> : null}
+        </Panel>
+      ) : null}
+
+      {isAdmin && productionEnvironment ? (
+        <Panel
+          title="Autorización productiva controlada"
+          description="Sólo una venta puede quedar armada por código exacto. La autorización consulta correlatividad, solicita CAE y luego verifica el comprobante con FECompConsultar."
+          action={(
+            <Button variant="secondary" loading={invoiceState.busy} onClick={loadInvoices}>
+              Actualizar solicitudes
+            </Button>
+          )}
+        >
+          <div className="fm-settings-list">
+            {productionInvoices.length ? productionInvoices.map((invoice) => {
+              const saleCode = invoice.saleSnapshot?.saleCode || invoice.id;
+              const isTarget = Boolean(
+                fiscalConfig.productionCaeEnabled
+                && productionCaeTargetSaleCode
+                && saleCode === productionCaeTargetSaleCode
+              );
+              const verification = invoice.verification;
+              return (
+                <div key={invoice.id}>
+                  <div>
+                    <strong>{saleCode}</strong>
+                    <span>
+                      {invoice.status} · {invoice.saleSnapshot?.total != null
+                        ? Number(invoice.saleSnapshot.total).toLocaleString("es-AR", { style: "currency", currency: "ARS" })
+                        : "sin total"}
+                      {invoice.authorization?.voucherNumber
+                        ? ` · PV ${invoice.authorization.pointOfSale} · tipo ${invoice.authorization.voucherType} · N° ${invoice.authorization.voucherNumber}`
+                        : ""}
+                    </span>
+                    {verification?.checkedAt ? (
+                      <span>
+                        FECompConsultar: {verification.matched ? "coincide" : "NO coincide"} · {verification.checkedAt}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div>
+                    {invoice.status === "pending" ? (
+                      <Button
+                        disabled={!isTarget || invoiceState.actionId === invoice.id}
+                        loading={invoiceState.actionId === invoice.id}
+                        onClick={() => runInvoiceAction(invoice, "authorize")}
+                      >
+                        Autorizar venta objetivo
+                      </Button>
+                    ) : null}
+                    {invoice.status === "reconciling" ? (
+                      <Button
+                        variant="secondary"
+                        loading={invoiceState.actionId === invoice.id}
+                        onClick={() => runInvoiceAction(invoice, "reconcile")}
+                      >
+                        Reconciliar
+                      </Button>
+                    ) : null}
+                    {invoice.status === "authorized" ? (
+                      <Button
+                        variant="secondary"
+                        loading={invoiceState.actionId === invoice.id}
+                        onClick={() => runInvoiceAction(invoice, "verify-authorized")}
+                      >
+                        Verificar en ARCA
+                      </Button>
+                    ) : null}
+                    <Badge tone={invoice.status === "authorized" ? "success" : invoice.status === "rejected" || invoice.status === "error" ? "warning" : "neutral"}>
+                      {isTarget && invoice.status === "pending" ? "Objetivo armado" : invoice.status}
+                    </Badge>
+                  </div>
+                </div>
+              );
+            }) : (
+              <p>No hay solicitudes fiscales productivas recientes.</p>
+            )}
+          </div>
+          {invoiceState.error ? <Toast tone="error">{invoiceState.error}</Toast> : null}
+          {invoiceState.message ? <Toast tone="success">{invoiceState.message}</Toast> : null}
         </Panel>
       ) : null}
     </div>
