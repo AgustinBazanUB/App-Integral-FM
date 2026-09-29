@@ -11,6 +11,7 @@ import {
   buildInvoicePdf,
   inspectInvoicePdfReadiness,
 } from "../netlify/functions/_lib/arca/invoicePdf.mjs";
+import { syncInvoiceToSale } from "../netlify/functions/_lib/arca/invoicePersistence.mjs";
 
 const issuerEnv = {
   ARCA_ISSUER_CUIT: "20123456786",
@@ -87,4 +88,38 @@ test("PDF fiscal exige datos del emisor y factura verificada", () => {
   assert.equal(result.filename, "Factura_B_00008-00000320.pdf");
   assert.equal(result.pdf.subarray(0, 8).toString("latin1"), "%PDF-1.4");
   assert.match(result.pdf.toString("latin1"), /CAE: 12345678901234/);
+});
+
+
+test("syncInvoiceToSale persiste el vínculo fiscal en la venta", async () => {
+  const documents = new Map([
+    ["invoices/invoice-production", { data: invoice, updateTime: "u1" }],
+    ["sales/sale-1", { data: { saleCode: "FM-FMLV-20260929-0002" }, updateTime: "s1" }],
+  ]);
+  let patched = null;
+  const getDocument = async (path) => documents.get(path) || null;
+  const patchDocument = async (path, data) => {
+    patched = { path, data };
+    const current = documents.get(path);
+    documents.set(path, {
+      data: { ...(current?.data || {}), ...structuredClone(data) },
+      updateTime: "s2",
+    });
+    return documents.get(path);
+  };
+
+  const result = await syncInvoiceToSale({
+    invoiceId: "invoice-production",
+    now: new Date("2026-09-29T13:00:00.000Z"),
+    getDocument,
+    patchDocument,
+  });
+
+  assert.equal(result.sourceId, "sale-1");
+  assert.equal(patched.path, "sales/sale-1");
+  assert.equal(patched.data.fiscalInvoiceId, "invoice-production");
+  assert.equal(patched.data.invoiceStatus, "authorized");
+  assert.equal(patched.data.fiscalInvoice.voucherClass, "B");
+  assert.equal(patched.data.fiscalInvoice.voucherNumber, 320);
+  assert.equal(patched.data.fiscalInvoice.verificationMatched, true);
 });
