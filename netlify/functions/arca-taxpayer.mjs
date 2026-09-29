@@ -184,7 +184,7 @@ export default async function handler(request) {
         }, 409);
       }
 
-      const dummy = await wsfeDummy({ env: process.env });
+      const points = await getPointsOfSale({ env: process.env });
       const after = await inspectSharedWsaaCache({
         environmentId: environment,
         service: "wsfe",
@@ -196,9 +196,9 @@ export default async function handler(request) {
         smoke: {
           environment,
           wsfe: {
-            appServer: dummy.appServer,
-            dbServer: dummy.dbServer,
-            authServer: dummy.authServer,
+            operation: "FEParamGetPtosVenta",
+            pointOfSales: points.points.map((point) => point.number),
+            errors: points.errors,
           },
           cache: after,
           reusedExistingTicket: Boolean(
