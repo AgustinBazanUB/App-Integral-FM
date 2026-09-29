@@ -195,10 +195,73 @@ export default async function handler(request) {
         ok: true,
         smoke: {
           environment,
-          wsfe: {
-            operation: "FEParamGetPtosVenta",
+          service: "wsfe",
+          operation: "FEParamGetPtosVenta",
+          result: {
             pointOfSales: points.points.map((point) => point.number),
             errors: points.errors,
+          },
+          cache: after,
+          reusedExistingTicket: Boolean(
+            before.reusable
+            && after.reusable
+            && before.updatedAt
+            && before.updatedAt === after.updatedAt
+            && before.ticketExpiresAt === after.ticketExpiresAt
+          ),
+          createdOrRenewedTicket: Boolean(
+            after.reusable
+            && (!before.reusable
+              || before.updatedAt !== after.updatedAt
+              || before.ticketExpiresAt !== after.ticketExpiresAt)
+          ),
+        },
+      });
+    }
+
+    if (body?.mode === "wsaa-registry-shared-smoke") {
+      const environment = arcaEnvironment(process.env).id;
+      if (environment !== "homologation") {
+        return json({
+          ok: false,
+          code: "homologation-only",
+          message: "La prueba compartida del Padrón está habilitada sólo en homologación.",
+        }, 409);
+      }
+
+      const service = "ws_sr_constancia_inscripcion";
+      const before = await inspectSharedWsaaCache({
+        environmentId: environment,
+        service,
+        env: process.env,
+      });
+      if (!before.configured) {
+        return json({
+          ok: false,
+          code: "arca-wsaa-cache-key-missing",
+          message: "Configurá ARCA_TA_ENCRYPTION_KEY antes de ejecutar la prueba compartida.",
+        }, 409);
+      }
+
+      // CUIT de ejemplo publicado por ARCA para homologación; no usa datos de clientes.
+      const taxpayer = await getTaxpayer("20164755100", { env: process.env });
+      const after = await inspectSharedWsaaCache({
+        environmentId: environment,
+        service,
+        env: process.env,
+      });
+
+      return json({
+        ok: true,
+        smoke: {
+          environment,
+          service,
+          operation: "getPersona_v2",
+          result: {
+            found: taxpayer.found,
+            keyStatus: taxpayer.keyStatus,
+            personType: taxpayer.personType,
+            endpoint: taxpayer.endpoint?.includes("afip.gov.ar") ? "official-legacy" : "arca-current",
           },
           cache: after,
           reusedExistingTicket: Boolean(
