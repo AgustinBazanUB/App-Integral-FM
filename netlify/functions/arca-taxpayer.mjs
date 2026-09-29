@@ -366,10 +366,14 @@ export default async function handler(request) {
 
       const pointFound = Boolean(selectedPoint);
       const normalizedDropDate = String(selectedPoint?.dropDate || "").trim().toUpperCase();
+      const hasDropDate = Boolean(
+        normalizedDropDate
+        && !["NULL", "N/A", "00000000", "0000-00-00"].includes(normalizedDropDate)
+      );
       const pointOperational = Boolean(
         selectedPoint
         && String(selectedPoint.blocked || "").toUpperCase() !== "S"
-        && !["S", "SI", "TRUE"].includes(normalizedDropDate)
+        && !hasDropDate
       );
       const issuerActive = stages.issuer.status === "ok"
         && issuer.found === true
