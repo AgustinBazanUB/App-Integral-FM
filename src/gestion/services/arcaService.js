@@ -33,6 +33,11 @@ export async function getArcaWsaaCacheStatus() {
   return data.cache;
 }
 
+export async function runArcaWsaaSharedSmoke() {
+  const data = await authenticatedPost({ mode: "wsaa-shared-smoke" });
+  return data.smoke;
+}
+
 export async function runArcaDiagnostics() {
   const data = await authenticatedPost({ mode: "diagnostics" });
   return data.diagnostics;
