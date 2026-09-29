@@ -457,3 +457,51 @@ El diagnóstico de `Configuración > ARCA` ahora ejecuta y reporta de forma inde
 - lectura server-side de Firestore.
 
 Un error de red de ARCA ya no impide verificar IAM de la cuenta de servicio de Firebase. La lectura de Firestore continúa siendo no destructiva.
+
+
+## 24. Primera factura emitida desde la Web App y verificada
+
+Prueba end-to-end integrada completada correctamente en homologación el 2026-09-28 desde la Web App:
+
+- venta origen: `FM-FMLV-20260928-0001`;
+- punto de venta: 3;
+- tipo: Factura B (`CbteTipo=6`);
+- número autorizado: 2;
+- resultado de autorización: `A`;
+- CAE: obtenido y persistido server-side;
+- vencimiento de CAE: 2026-10-08;
+- estado persistido: `authorized`;
+- `FECompConsultar`: coincidencia completa con Firestore;
+- punto de venta, tipo, número, CAE y vencimiento: coincidentes;
+- no hubo observaciones de ARCA.
+
+La prueba confirma el circuito integrado de la aplicación:
+
+`venta -> invoice pending -> dry-run fiscal -> claim exclusivo -> lock de secuencia -> FECompUltimoAutorizado -> FECAESolicitar -> authorized -> FECompConsultar -> verification.matched=true`.
+
+No se utilizó producción ni el punto de venta productivo.
+
+### Robustez observada durante homologación
+
+Antes de la autorización exitosa se detectó un `coe.alreadyAuthenticated` de WSAA. El parser SOAP estaba clasificándolo incorrectamente como un falso HTTP 502 de red. Se corrigió para conservar el código SOAP real.
+
+También se corrigió el caso de un fallo anterior a reservar número de comprobante: si `FECompUltimoAutorizado` falla antes de `FECAESolicitar`, la solicitud vuelve a `pending` y queda reintentable; no permanece trabada en `authorizing`.
+
+La consola administrativa dispone además de una recuperación explícita para intentos `authorizing` interrumpidos antes de reservar número y antes de solicitar CAE.
+
+### Estado seguro de configuración
+
+La UI puede consultar si el interruptor de CAE de homologación está habilitado mediante un endpoint de estado seguro que no llama a WSAA ni consume un Ticket de Acceso. Esto evita ejecutar el diagnóstico sólo para habilitar botones fiscales.
+
+### Próxima etapa técnica obligatoria antes de producción
+
+La caché actual de Ticket de Acceso WSAA es en memoria del proceso. Eso es suficiente para pruebas controladas, pero no es una solución final para un entorno serverless con múltiples instancias/cold starts.
+
+Antes de producción debe implementarse una estrategia compartida y segura para reutilización de TA WSAA sin exponer Token/Sign al navegador, sin guardar secretos en colecciones accesibles al cliente y sin solicitar tickets duplicados mientras exista uno vigente.
+
+Hasta completar esa etapa:
+
+- `ARCA_ALLOW_CAE_HOMOLOGATION` debe permanecer en `false` salvo pruebas controladas;
+- no se habilita emisión automática en producción;
+- no se cambia `ARCA_ENVIRONMENT` a `production`;
+- el PR #26 permanece sin merge.
