@@ -194,6 +194,18 @@ export async function requestAccessTicket(service, {
     });
 
     if (!lease.acquired) {
+      const latest = await readSharedWsaaTicket({
+        environmentId: environment.id,
+        service,
+        env,
+        now: retryNow,
+        ...(getDocument ? { getDocument } : {}),
+      });
+      if (latest.ticket) {
+        ticketCache.set(cacheKey, latest.ticket);
+        return latest.ticket;
+      }
+
       const error = new Error(
         "Otra instancia está renovando el Ticket de Acceso WSAA. Reintentá la operación en unos segundos."
       );
