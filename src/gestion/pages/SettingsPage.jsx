@@ -243,6 +243,13 @@ export default function SettingsPage() {
   const fiscalConfig = arcaState.result?.configuration || arcaConfigState.result || {};
   const caeEnabled = fiscalConfig.caeHomologationEnabled === true;
   const productionEnvironment = fiscalConfig.environment === "production";
+  const productionPreflightReady = (
+    productionEnvironment
+    && fiscalConfig.productionReadonlyEnabled === true
+    && fiscalConfig.credentialsReady === true
+    && fiscalConfig.taSharedCacheConfigured === true
+    && fiscalConfig.pointOfSaleConfigured === true
+  );
 
   const rows = [
     ["Proyecto Firebase", firebaseConfig.projectId, "Conectado"],
@@ -618,7 +625,7 @@ export default function SettingsPage() {
           action={(
             <Button
               variant="secondary"
-              disabled={!fiscalConfig.productionReadonlyEnabled}
+              disabled={!productionPreflightReady}
               loading={productionPreflightState.busy}
               onClick={runProductionReadonlyPreflight}
             >
@@ -645,7 +652,17 @@ export default function SettingsPage() {
             <div>
               <div>
                 <strong>Conexiones producción</strong>
-                <span>{fiscalConfig.productionReadonlyEnabled ? "Read-only habilitado explícitamente." : "Bloqueadas por configuración."}</span>
+                <span>
+                  {!fiscalConfig.productionReadonlyEnabled
+                    ? "Bloqueadas por configuración."
+                    : !fiscalConfig.credentialsReady
+                      ? "Read-only habilitado, pero certificado/clave no están listos."
+                      : !fiscalConfig.taSharedCacheConfigured
+                        ? "Read-only habilitado, falta clave de cifrado TA."
+                        : !fiscalConfig.pointOfSaleConfigured
+                          ? "Read-only habilitado, falta punto de venta."
+                          : "Read-only listo para ejecutar el preflight."}
+                </span>
               </div>
               <Badge tone={fiscalConfig.productionReadonlyEnabled ? "warning" : "success"}>
                 {fiscalConfig.productionReadonlyEnabled ? "Read-only" : "Bloqueado"}
