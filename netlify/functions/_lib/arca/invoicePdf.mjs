@@ -107,6 +107,12 @@ function assemblePdf(pageStreams) {
   return Buffer.concat(chunks);
 }
 
+function issuerVatLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "responsable_inscripto") return "IVA Responsable Inscripto";
+  return String(value || "").replaceAll("_", " ");
+}
+
 function receiverVatLabel(id) {
   return ({
     1: "IVA Responsable Inscripto",
@@ -210,7 +216,7 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
     text(50, line);
     next();
   }
-  text(50, `Condición IVA: ${issuer.vatCondition}`);
+  text(50, `Condición IVA: ${issuerVatLabel(issuer.vatCondition)}`);
   next();
   text(50, `Ingresos Brutos: ${issuer.grossIncome}`);
   next();
