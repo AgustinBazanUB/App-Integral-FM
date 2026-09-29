@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assertValidCuit, cuitCheckDigit, formatCuit, isValidCuit, normalizeCuit } from "../netlify/functions/_lib/arca/cuit.mjs";
-import { ARCA_ENVIRONMENTS, arcaSafeStatus, loadArcaPublicConfig } from "../netlify/functions/_lib/arca/config.mjs";
+import { ARCA_ENVIRONMENTS, arcaSafeStatus, assertArcaNetworkAccessAllowed, loadArcaPublicConfig } from "../netlify/functions/_lib/arca/config.mjs";
 import { buildLoginCmsEnvelope, buildLoginTicketRequest, parseLoginTicketResponse } from "../netlify/functions/_lib/arca/wsaa.mjs";
 import { buildCaeDetail } from "../netlify/functions/_lib/arca/wsfe.mjs";
 import { allocateDiscount, assertSaleMatchesFiscalTotal, buildFiscalAmounts, invoiceIdFor } from "../netlify/functions/_lib/arca/billing.mjs";
@@ -258,4 +258,18 @@ test("fault SOAP de WSAA conserva coe.alreadyAuthenticated y no se disfraza de e
       return true;
     },
   );
+});
+
+
+test("producción queda bloqueada por defecto y requiere habilitación read-only explícita", () => {
+  assert.throws(
+    () => assertArcaNetworkAccessAllowed({ ARCA_ENVIRONMENT: "production" }),
+    (error) => error?.code === "arca-production-readonly-disabled",
+  );
+
+  const environment = assertArcaNetworkAccessAllowed({
+    ARCA_ENVIRONMENT: "production",
+    ARCA_ALLOW_PRODUCTION_READONLY: "true",
+  });
+  assert.equal(environment.id, "production");
 });
