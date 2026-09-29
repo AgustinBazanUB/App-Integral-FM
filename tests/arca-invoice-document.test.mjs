@@ -16,7 +16,7 @@ import { syncInvoiceToSale } from "../netlify/functions/_lib/arca/invoicePersist
 const issuerEnv = {
   ARCA_ISSUER_CUIT: "20123456786",
   ARCA_ISSUER_LEGAL_NAME: "Flor Mia",
-  ARCA_ISSUER_FISCAL_ADDRESS: "Domicilio fiscal de prueba",
+  ARCA_ISSUER_COMMERCIAL_ADDRESS: "Domicilio comercial de prueba",
   ARCA_ISSUER_GROSS_INCOME: "123456789",
   ARCA_ISSUER_ACTIVITY_START: "01/01/2020",
   ARCA_ISSUER_VAT_CONDITION: "responsable_inscripto",
@@ -88,6 +88,9 @@ test("PDF fiscal exige datos del emisor y factura verificada", () => {
   assert.equal(result.filename, "Factura_B_00008-00000320.pdf");
   assert.equal(result.pdf.subarray(0, 8).toString("latin1"), "%PDF-1.4");
   assert.match(result.pdf.toString("latin1"), /CAE: 12345678901234/);
+  assert.match(result.pdf.toString("latin1"), /Régimen de Transparencia Fiscal al Consumidor/);
+  assert.match(result.pdf.toString("latin1"), /IVA Contenido:/);
+  assert.match(result.pdf.toString("latin1"), /A CONSUMIDOR FINAL/);
 });
 
 
