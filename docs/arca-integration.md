@@ -607,3 +607,35 @@ Esta prueba:
 - confirma la reutilización si `updatedAt` y `ticketExpiresAt` permanecen iguales.
 
 La pantalla de Configuración puede inspeccionar el estado de TA de WSFE y Padrón sin mostrar Token/Sign ni la clave.
+
+
+## 26. TA compartido WSFE validado en cold start real
+
+La arquitectura de caché WSAA compartida fue validada en homologación con una clave AES-256-GCM configurada fuera del repositorio.
+
+Prueba real:
+
+1. `ARCA_ALLOW_CAE_HOMOLOGATION=false`.
+2. Primera llamada autenticada a `FEParamGetPtosVenta`:
+   - creó/renovó un TA `wsfe`;
+   - el TA fue publicado cifrado en Firestore.
+3. Se detuvo y reinició Netlify Dev para vaciar deliberadamente la caché en memoria.
+4. Segunda llamada a `FEParamGetPtosVenta`:
+   - reutilizó el TA persistido;
+   - no ejecutó otro `LoginCms`;
+   - no apareció `coe.alreadyAuthenticated`.
+5. El estado seguro informó `TA compartido WSFE: reutilizable`.
+
+Con esto queda validado el caso de cold start real para `wsfe` sin emitir CAE ni comprobantes.
+
+## 27. Preparación adicional antes de producción
+
+Se agregó un gate separado para conexiones a endpoints productivos:
+
+`ARCA_ALLOW_PRODUCTION_READONLY=false`
+
+Mientras permanezca en `false`, WSAA/WSFE/Padrón de producción no pueden ser contactados accidentalmente.
+
+Incluso con el gate read-only habilitado, el autorizador de CAE continúa bloqueando producción por código. La futura validación productiva debe comenzar únicamente con operaciones de lectura/conectividad.
+
+También se agregó un smoke compartido independiente para `ws_sr_constancia_inscripcion`, usando sólo el CUIT de ejemplo de homologación publicado por ARCA y sin consultar clientes reales.
