@@ -299,3 +299,25 @@ test("inspección segura reporta metadata sin Token/Sign", async () => {
   assert.equal(serialized.includes("TOKEN-SECRETO-WSAA"), false);
   assert.equal(serialized.includes("SIGN-SECRETO-WSAA"), false);
 });
+
+
+test("AAD también aísla por CUIT emisor", () => {
+  const encrypted = encryptWsaaTicket(ticket(), {
+    environmentId: "homologation",
+    service: "wsfe",
+    env: ENV,
+    iv: Buffer.alloc(12, 5),
+  });
+
+  assert.throws(
+    () => decryptWsaaTicket(encrypted, {
+      environmentId: "homologation",
+      service: "wsfe",
+      env: {
+        ...ENV,
+        ARCA_ISSUER_CUIT: "20-87654321-4",
+      },
+    }),
+    (error) => error?.code === "arca-wsaa-cache-decrypt-error",
+  );
+});
