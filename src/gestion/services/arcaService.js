@@ -28,6 +28,11 @@ export async function getArcaSafeStatus() {
   return data.status;
 }
 
+export async function getArcaWsaaCacheStatus() {
+  const data = await authenticatedPost({ mode: "wsaa-cache-status" });
+  return data.cache;
+}
+
 export async function runArcaDiagnostics() {
   const data = await authenticatedPost({ mode: "diagnostics" });
   return data.diagnostics;
