@@ -138,6 +138,7 @@ export default async function handler(request) {
           },
         });
       } catch (verificationError) {
+        await syncInvoiceToSale({ invoiceId, env: process.env });
         return json({
           ok: true,
           mode,
