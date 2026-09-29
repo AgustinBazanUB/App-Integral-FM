@@ -5,6 +5,7 @@ import { authorizeInvoice, verifyAuthorizedInvoice } from "./_lib/arca/authorize
 import {
   canRequestInvoiceForSale,
   ensurePendingInvoice,
+  syncInvoiceToSale,
 } from "./_lib/arca/invoicePersistence.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
@@ -87,6 +88,11 @@ export default async function handler(request) {
       env: process.env,
     });
 
+    await syncInvoiceToSale({
+      invoiceId: result.invoiceId,
+      env: process.env,
+    });
+
     let autoAuthorization = null;
     const autoSources = productionAutoAuthorizeSources(process.env);
     const autoProduction = (
@@ -131,6 +137,11 @@ export default async function handler(request) {
           };
         }
       }
+
+      await syncInvoiceToSale({
+        invoiceId: result.invoiceId,
+        env: process.env,
+      });
 
       autoAuthorization = {
         attempted: true,
