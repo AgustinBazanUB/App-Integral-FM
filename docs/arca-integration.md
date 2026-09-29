@@ -879,3 +879,39 @@ El circuito productivo validado quedó:
 `venta -> pending -> correlatividad -> FECAESolicitar -> authorized -> FECompConsultar -> verification.matched=true`.
 
 A partir de este hito se habilita la siguiente etapa de producto: autorización automática de ventas fiscales elegibles, todavía detrás de un gate explícito y con verificación posterior inmediata.
+
+
+## 37. Autorización automática productiva acotada a Venta Rápida
+
+La primera etapa de automatización productiva quedó limitada deliberadamente al origen `admin_quick_sale`.
+
+Nuevas reglas de seguridad:
+
+- `ARCA_AUTO_AUTHORIZE_PRODUCTION=false` mantiene el modo automático apagado por defecto;
+- `ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=admin_quick_sale` define el allowlist inicial;
+- aunque el modo automático esté habilitado, una autorización manual productiva sigue requiriendo `ARCA_PRODUCTION_CAE_SALE_CODE` exacto;
+- el flag automático no convierte el endpoint manual en un permiso general de emisión;
+- `seller_sale` y `ecommerce` permanecen fuera del auto-CAE hasta validar sus flujos por separado;
+- la autorización automática sólo intenta CAE si la solicitud ya está `pending`, tiene `fiscalReadiness.ready=true` y el gate `ARCA_ALLOW_PRODUCTION_CAE=true` está activo;
+- después de un CAE autorizado se ejecuta la verificación inmediata con `FECompConsultar`.
+
+La pantalla de Configuración muestra ahora si el modo automático está habilitado y qué orígenes forman parte del allowlist.
+
+### Próximo checkpoint controlado
+
+La siguiente prueba real debe hacerse localmente y sólo con una Venta Rápida que corresponda facturar:
+
+- `ARCA_ENVIRONMENT=production`;
+- `ARCA_ALLOW_PRODUCTION_INVOICE_PREPARE=true`;
+- `ARCA_ALLOW_PRODUCTION_CAE=true`;
+- `ARCA_AUTO_AUTHORIZE_PRODUCTION=true`;
+- `ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=admin_quick_sale`;
+- `ARCA_PRODUCTION_CAE_SALE_CODE=` vacío;
+- `ARCA_ALLOW_PRODUCTION_READONLY=false`;
+- `ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP=false`, salvo que se esté probando explícitamente Padrón.
+
+El resultado esperado es:
+
+`Venta Rápida -> solicitud fiscal pending -> autorización automática -> CAE -> FECompConsultar -> authorized + verification.matched=true`.
+
+Después de una única validación controlada, los gates de CAE y auto-autorización deben volver a `false` hasta revisar el resultado.
