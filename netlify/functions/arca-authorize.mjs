@@ -40,10 +40,7 @@ export default async function handler(request) {
         env: process.env,
       });
       await syncInvoiceToSale({ invoiceId, env: process.env });
-      if (mode === "authorize") {
-      await syncInvoiceToSale({ invoiceId, env: process.env });
-    }
-    return json({ ok: true, mode, result });
+      return json({ ok: true, mode, result });
     }
 
     if (mode === "recover-pre-cae") {
@@ -156,6 +153,9 @@ export default async function handler(request) {
       }
     }
 
+    if (mode === "authorize") {
+      await syncInvoiceToSale({ invoiceId, env: process.env });
+    }
     return json({ ok: true, mode, result });
   } catch (error) {
     return json(
