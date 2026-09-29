@@ -11,6 +11,7 @@ import {
   reconcileArcaInvoice,
   recoverPreCaeArcaInvoice,
   runArcaDiagnostics,
+  runArcaWsaaRegistrySharedSmoke,
   runArcaWsaaSharedSmoke,
   verifyAuthorizedArcaInvoice,
 } from "../services/arcaService";
@@ -69,6 +70,11 @@ export default function SettingsPage() {
     result: null,
     error: "",
   });
+  const [registrySmokeState, setRegistrySmokeState] = useState({
+    busy: false,
+    result: null,
+    error: "",
+  });
 
   const loadInvoices = async () => {
     setInvoiceState((current) => ({ ...current, busy: true, error: "", message: "" }));
@@ -108,6 +114,17 @@ export default function SettingsPage() {
       await loadWsaaCacheStatus();
     } catch (error) {
       setWsaaSmokeState({ busy: false, result: null, error: error.message });
+    }
+  };
+
+  const runRegistrySharedSmoke = async () => {
+    setRegistrySmokeState({ busy: true, result: null, error: "" });
+    try {
+      const result = await runArcaWsaaRegistrySharedSmoke();
+      setRegistrySmokeState({ busy: false, result, error: "" });
+      await loadWsaaCacheStatus();
+    } catch (error) {
+      setRegistrySmokeState({ busy: false, result: null, error: error.message });
     }
   };
 
@@ -432,11 +449,34 @@ export default function SettingsPage() {
                 Probar TA compartido
               </Button>
             </div>
+            <div>
+              <div>
+                <strong>Prueba compartida Padrón</strong>
+                <span>
+                  {registrySmokeState.result
+                    ? registrySmokeState.result.reusedExistingTicket
+                      ? "OK: getPersona_v2 reutilizó el TA persistido del Padrón."
+                      : registrySmokeState.result.createdOrRenewedTicket
+                        ? "OK: getPersona_v2 creó/renovó el TA del Padrón y lo publicó cifrado."
+                        : "getPersona_v2 respondió; revisar metadata de caché."
+                    : "Usa el CUIT de ejemplo de homologación de ARCA; no consulta clientes reales."}
+                </span>
+              </div>
+              <Button
+                variant="secondary"
+                disabled={!fiscalConfig.taSharedCacheConfigured}
+                loading={registrySmokeState.busy}
+                onClick={runRegistrySharedSmoke}
+              >
+                Probar TA Padrón
+              </Button>
+            </div>
           </div>
 
           {arcaConfigState.error ? <Toast tone="error">{arcaConfigState.error}</Toast> : null}
           {wsaaCacheState.error ? <Toast tone="error">{wsaaCacheState.error}</Toast> : null}
           {wsaaSmokeState.error ? <Toast tone="error">{wsaaSmokeState.error}</Toast> : null}
+          {registrySmokeState.error ? <Toast tone="error">{registrySmokeState.error}</Toast> : null}
           {invoiceState.error ? <Toast tone="error">{invoiceState.error}</Toast> : null}
           {invoiceState.message ? <Toast tone="success">{invoiceState.message}</Toast> : null}
 
