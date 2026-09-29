@@ -1,6 +1,7 @@
 import { requireFirebaseAdmin } from "./_lib/firebaseAuth.mjs";
 import { authorizeInvoice, reconcileInvoice, recoverPreCaeInvoice, verifyAuthorizedInvoice } from "./_lib/arca/authorizer.mjs";
 import { arcaEnvironment } from "./_lib/arca/config.mjs";
+import { syncInvoiceToSale } from "./_lib/arca/invoicePersistence.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -38,7 +39,11 @@ export default async function handler(request) {
         invoiceId,
         env: process.env,
       });
-      return json({ ok: true, mode, result });
+      await syncInvoiceToSale({ invoiceId, env: process.env });
+      if (mode === "authorize") {
+      await syncInvoiceToSale({ invoiceId, env: process.env });
+    }
+    return json({ ok: true, mode, result });
     }
 
     if (mode === "recover-pre-cae") {
@@ -46,6 +51,7 @@ export default async function handler(request) {
         invoiceId,
         env: process.env,
       });
+      await syncInvoiceToSale({ invoiceId, env: process.env });
       return json({ ok: true, mode, result });
     }
 
@@ -54,6 +60,7 @@ export default async function handler(request) {
         invoiceId,
         env: process.env,
       });
+      await syncInvoiceToSale({ invoiceId, env: process.env });
       return json({ ok: true, mode, result });
     }
 
@@ -124,6 +131,7 @@ export default async function handler(request) {
           invoiceId,
           env: process.env,
         });
+        await syncInvoiceToSale({ invoiceId, env: process.env });
         return json({
           ok: true,
           mode,
