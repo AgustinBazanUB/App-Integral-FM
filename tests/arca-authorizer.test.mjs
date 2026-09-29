@@ -530,7 +530,7 @@ test("producción nunca solicita CAE aunque el gate read-only esté habilitado",
         ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
       },
       getDocument: async () => ({
-        data: pendingInvoice,
+        data: { ...pendingInvoice, fiscalEnvironment: "production" },
         updateTime: "u0",
       }),
       requestCaeFn: async () => {
@@ -542,4 +542,30 @@ test("producción nunca solicita CAE aunque el gate read-only esté habilitado",
   );
 
   assert.equal(caeRequests, 0);
+});
+
+
+test("factura de homologación no puede operarse desde runtime productivo", async () => {
+  await assert.rejects(
+    authorizeInvoice({
+      invoiceId: "invoice-env-mismatch",
+      issuerVatCondition: "responsable_inscripto",
+      receiver: {
+        vatConditionId: 5,
+        documentType: 99,
+        documentNumber: "0",
+        anonymousConsumerFinal: true,
+      },
+      allowCaeRequest: false,
+      env: {
+        ARCA_ENVIRONMENT: "production",
+        ARCA_POINT_OF_SALE: "8",
+      },
+      getDocument: async () => ({
+        data: { ...pendingInvoice, fiscalEnvironment: "homologation" },
+        updateTime: "u0",
+      }),
+    }),
+    (error) => error?.code === "arca-invoice-environment-mismatch",
+  );
 });
