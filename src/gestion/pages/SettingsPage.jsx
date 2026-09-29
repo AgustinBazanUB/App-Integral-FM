@@ -694,25 +694,99 @@ export default function SettingsPage() {
               <Badge tone="success">Bloqueado</Badge>
             </div>
             {productionPreflightState.result ? (
-              <div>
+              <>
                 <div>
-                  <strong>Resultado</strong>
-                  <span>
-                    PV {productionPreflightState.result.pointOfSale?.selected}: {productionPreflightState.result.pointOfSale?.operational ? "operativo" : "revisar"} ·
-                    Emisor: {productionPreflightState.result.issuer?.keyStatus || "sin estado"} ·
-                    Tablas fiscales: {productionPreflightState.result.fiscalTables?.ready ? "OK" : "revisar"} ·
-                    Secuencia A: {productionPreflightState.result.sequences?.facturaA?.lastAuthorized ?? "?"} ·
-                    Secuencia B: {productionPreflightState.result.sequences?.facturaB?.lastAuthorized ?? "?"} ·
-                    TA WSFE: {productionPreflightState.result.cache?.wsfe?.reusable ? "reutilizable" : "no reutilizable"} ·
-                    TA Padrón: {productionPreflightState.result.cache?.registry?.reusable ? "reutilizable" : "no reutilizable"}
-                  </span>
+                  <div>
+                    <strong>Resultado general</strong>
+                    <span>{productionPreflightState.result.ready ? "Todos los controles productivos read-only pasaron." : "Hay uno o más controles para revisar; no se habilitó ninguna emisión."}</span>
+                  </div>
+                  <Badge tone={productionPreflightState.result.ready ? "success" : "warning"}>
+                    {productionPreflightState.result.ready ? "Listo" : "Revisar"}
+                  </Badge>
                 </div>
-                <Badge tone={productionPreflightState.result.ready ? "success" : "warning"}>
-                  {productionPreflightState.result.ready ? "Listo" : "Revisar"}
-                </Badge>
-              </div>
+                <div>
+                  <div>
+                    <strong>WSFE</strong>
+                    <span>
+                      {productionPreflightState.result.wsfe?.stageStatus === "ok"
+                        ? `App ${productionPreflightState.result.wsfe.appServer} · DB ${productionPreflightState.result.wsfe.dbServer} · Auth ${productionPreflightState.result.wsfe.authServer}`
+                        : "La etapa WSFE falló."}
+                    </span>
+                  </div>
+                  <Badge tone={productionPreflightState.result.wsfe?.healthy ? "success" : "warning"}>
+                    {productionPreflightState.result.wsfe?.healthy ? "OK" : "Revisar"}
+                  </Badge>
+                </div>
+                <div>
+                  <div>
+                    <strong>Punto de venta {productionPreflightState.result.pointOfSale?.selected}</strong>
+                    <span>
+                      Encontrado: {productionPreflightState.result.pointOfSale?.found ? "sí" : "no"} ·
+                      operativo: {productionPreflightState.result.pointOfSale?.operational ? "sí" : "no"} ·
+                      bloqueado: {productionPreflightState.result.pointOfSale?.blocked || "sin dato"} ·
+                      baja: {productionPreflightState.result.pointOfSale?.dropDate || "sin fecha"}
+                    </span>
+                  </div>
+                  <Badge tone={productionPreflightState.result.pointOfSale?.operational ? "success" : "warning"}>
+                    {productionPreflightState.result.pointOfSale?.operational ? "Operativo" : "Revisar"}
+                  </Badge>
+                </div>
+                <div>
+                  <div>
+                    <strong>Tablas fiscales</strong>
+                    <span>
+                      A: {productionPreflightState.result.fiscalTables?.voucherTypes?.facturaA ? "sí" : "no"} ·
+                      B: {productionPreflightState.result.fiscalTables?.voucherTypes?.facturaB ? "sí" : "no"} ·
+                      IVA 21%: {productionPreflightState.result.fiscalTables?.vat21 ? "sí" : "no"} ·
+                      Doc 80/96/99: {productionPreflightState.result.fiscalTables?.documentTypes?.cuit80 && productionPreflightState.result.fiscalTables?.documentTypes?.dni96 && productionPreflightState.result.fiscalTables?.documentTypes?.consumidorFinal99 ? "sí" : "no"}
+                    </span>
+                  </div>
+                  <Badge tone={productionPreflightState.result.fiscalTables?.ready ? "success" : "warning"}>
+                    {productionPreflightState.result.fiscalTables?.ready ? "OK" : "Revisar"}
+                  </Badge>
+                </div>
+                <div>
+                  <div>
+                    <strong>Correlatividad</strong>
+                    <span>
+                      Factura A último: {productionPreflightState.result.sequences?.facturaA?.lastAuthorized ?? "sin dato"} ·
+                      Factura B último: {productionPreflightState.result.sequences?.facturaB?.lastAuthorized ?? "sin dato"}
+                    </span>
+                  </div>
+                  <Badge tone={productionPreflightState.result.sequences?.ready ? "success" : "warning"}>
+                    {productionPreflightState.result.sequences?.ready ? "OK" : "Revisar"}
+                  </Badge>
+                </div>
+                <div>
+                  <div>
+                    <strong>Emisor y TA</strong>
+                    <span>
+                      Emisor: {productionPreflightState.result.issuer?.keyStatus || "sin estado"} ·
+                      TA WSFE: {productionPreflightState.result.cache?.wsfe?.reusable ? "reutilizable" : "no reutilizable"} ·
+                      TA Padrón: {productionPreflightState.result.cache?.registry?.reusable ? "reutilizable" : "no reutilizable"}
+                    </span>
+                  </div>
+                  <Badge tone={productionPreflightState.result.issuer?.keyStatus === "ACTIVO" && productionPreflightState.result.cache?.wsfe?.reusable && productionPreflightState.result.cache?.registry?.reusable ? "success" : "warning"}>
+                    Verificación
+                  </Badge>
+                </div>
+                {Array.isArray(productionPreflightState.result.failedStages) && productionPreflightState.result.failedStages.length ? (
+                  <div>
+                    <div>
+                      <strong>Etapas con error</strong>
+                      <span>
+                        {productionPreflightState.result.failedStages
+                          .map((item) => `${item.stage}: ${item.code || "error"} · ${item.message}`)
+                          .join(" | ")}
+                      </span>
+                    </div>
+                    <Badge tone="warning">{productionPreflightState.result.failedStages.length} error(es)</Badge>
+                  </div>
+                ) : null}
+              </>
             ) : null}
           </div>
+          {productionPreflightState.error ? <Toast tone="error">{productionPreflightState.error}</Toast> : null}
         </Panel>
       ) : null}
     </div>
