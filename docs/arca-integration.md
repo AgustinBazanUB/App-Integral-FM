@@ -756,3 +756,46 @@ El preflight valida offline el par certificado/private key y la presencia de la 
 La pantalla de producción read-only no muestra los controles de homologación y el botón de preflight permanece deshabilitado hasta que certificado, clave, cifrado TA y punto de venta estén configurados.
 
 La emisión de CAE productivo sigue bloqueada por código.
+
+
+## 32. Preflight productivo real validado
+
+Se completó correctamente el primer preflight contra producción, sin emitir comprobantes.
+
+Resultado informado:
+
+- certificado productivo local: listo;
+- WSFE: OK;
+- punto de venta productivo 8: encontrado;
+- emisor: ACTIVO;
+- TA compartido WSFE: reutilizable;
+- TA compartido Padrón: reutilizable;
+- CAE productivo: bloqueado por código.
+
+Después de la prueba se restauró `ARCA_ALLOW_PRODUCTION_READONLY=false` y se detuvo Netlify Dev.
+
+### Endurecimiento posterior al preflight
+
+A partir de este checkpoint se agregaron nuevas barreras antes del primer CAE real:
+
+- las solicitudes de factura nuevas quedan separadas por `fiscalEnvironment`;
+- los IDs nuevos usan `invoice_<environment>_<sourceType>_<sourceId>`;
+- facturas legacy sin entorno se interpretan exclusivamente como homologación;
+- una factura de homologación no puede operarse desde runtime productivo;
+- los locks de numeración se separan por entorno + punto de venta + tipo;
+- preparar una solicitud fiscal productiva requiere `ARCA_ALLOW_PRODUCTION_INVOICE_PREPARE=true`;
+- consultar clientes en Padrón productivo requiere `ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP=true`;
+- ambos gates permanecen en `false` por defecto;
+- el CAE productivo continúa bloqueado por código.
+
+También se amplió el preflight productivo read-only para validar antes del go-live:
+
+- estado operativo detallado del punto de venta;
+- tipos de comprobante A/B;
+- alícuota IVA 21%;
+- tipos de documento 80/96/99;
+- condiciones IVA receptor utilizadas por el sistema;
+- último número autorizado de Factura A en PV 8;
+- último número autorizado de Factura B en PV 8.
+
+Ninguna de estas consultas emite comprobantes.
