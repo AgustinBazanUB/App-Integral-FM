@@ -939,3 +939,121 @@ El circuito automático productivo validado quedó:
 Este hito confirma que el modo automático limitado a `admin_quick_sale` funciona de extremo a extremo en producción.
 
 Después de la validación controlada, los gates productivos de CAE, auto-autorización y preparación deben volver a `false` hasta la siguiente etapa de implementación.
+
+
+## 39. Venta vinculada, PDF fiscal y reenvío manual
+
+Después de validar la primera autorización automática productiva, se completó el bloque de producto que transforma la autorización ARCA en un comprobante utilizable desde la venta.
+
+### Vínculo permanente venta ↔ factura
+
+El backend sincroniza en `sales/{saleId}` una referencia compacta server-authoritative:
+
+- `fiscalInvoiceId`;
+- `fiscalEnvironment`;
+- `invoiceStatus`;
+- `fiscalInvoice.voucherClass`;
+- punto de venta;
+- tipo y número de comprobante;
+- CAE y vencimiento;
+- fecha de autorización;
+- estado y fecha de `FECompConsultar`.
+
+La colección `invoices` continúa siendo la fuente fiscal completa. La copia dentro de `sales` existe para navegación y UX; el navegador no puede alterar CAE, numeración ni estados fiscales.
+
+La sincronización se ejecuta al preparar una factura, después de autorizar, verificar, reconciliar o recuperar un intento, y también cuando se consulta el comprobante. Esto permite backfill progresivo de ventas productivas ya existentes, incluida la primera factura automática.
+
+### Endpoint de documento fiscal
+
+Se agregó:
+
+`netlify/functions/arca-document.mjs`
+
+Modos:
+
+- `metadata`: devuelve únicamente metadatos seguros necesarios para la UI;
+- `pdf`: genera el comprobante PDF sólo si la factura está `authorized` y `verification.matched=true`.
+
+El endpoint exige sesión activa y valida acceso a la venta. No devuelve secretos, certificado, private key ni Ticket de Acceso.
+
+### PDF fiscal
+
+El PDF se genera server-side y no vuelve a solicitar CAE. Utiliza exclusivamente la factura ya persistida y verificada.
+
+Incluye:
+
+- clase de comprobante;
+- PV y número;
+- fecha;
+- CUIT y datos visibles del emisor;
+- condición IVA;
+- receptor;
+- productos;
+- importes;
+- neto e IVA;
+- CAE;
+- vencimiento de CAE;
+- estado de verificación;
+- QR fiscal.
+
+El QR usa el formato vigente publicado por ARCA para factura electrónica: JSON versión 1 codificado en Base64 dentro de `https://www.arca.gob.ar/fe/qr/?p=...`. La implementación no usa un servicio QR externo ni expone los datos fiscales a terceros.
+
+El generador QR está embebido server-side y el PDF no agrega dependencias npm nuevas.
+
+### Datos visibles del emisor
+
+Para impedir generar un comprobante incompleto, el PDF queda bloqueado hasta configurar:
+
+- `ARCA_ISSUER_LEGAL_NAME`;
+- `ARCA_ISSUER_FISCAL_ADDRESS`;
+- `ARCA_ISSUER_GROSS_INCOME`;
+- `ARCA_ISSUER_ACTIVITY_START`;
+- `ARCA_ISSUER_VAT_CONDITION`.
+
+Configuración muestra sólo readiness y nombres de campos faltantes; nunca expone valores sensibles.
+
+### UX en Ubicaciones → Ventas
+
+El detalle de venta ahora consulta y backfillea su factura fiscal y muestra:
+
+- Factura A/B;
+- PV;
+- número;
+- CAE;
+- vencimiento;
+- estado;
+- coincidencia de `FECompConsultar`;
+- entorno fiscal.
+
+Cuando el PDF está listo aparecen:
+
+- `Ver factura`;
+- `Descargar PDF`;
+- `Compartir / reenviar`.
+
+`Compartir / reenviar` utiliza Web Share cuando el navegador permite compartir archivos PDF —por ejemplo hacia WhatsApp en dispositivos compatibles— y cae de forma segura a descarga del PDF cuando esa capacidad no existe.
+
+Esto todavía no equivale al envío automático por WhatsApp. La automatización de entrega por WhatsApp queda como siguiente bloque y podrá reutilizar exactamente el mismo PDF fiscal ya generado, sin volver a facturar.
+
+### Seguridad e idempotencia
+
+- generar, abrir, descargar o compartir el PDF nunca llama a `FECAESolicitar`;
+- ninguna acción de documento cambia numeración;
+- el PDF sólo se habilita después de verificación positiva;
+- la asociación venta-factura es idempotente;
+- una factura existente se reutiliza por ID determinístico;
+- la copia fiscal en `sales` se escribe sólo desde backend;
+- los gates de emisión pueden permanecer en `false` para consultar y descargar comprobantes ya autorizados.
+
+### Validación
+
+Los tests ARCA cubren ahora:
+
+- payload QR;
+- matriz QR;
+- readiness de datos del emisor;
+- bloqueo de PDF no verificado;
+- generación de PDF;
+- vínculo persistente venta-factura.
+
+Además del test automatizado, se validó localmente el PDF renderizado en A4 y se verificó que el QR dibujado dentro del PDF pueda volver a decodificarse correctamente.
