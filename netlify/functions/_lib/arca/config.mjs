@@ -211,6 +211,8 @@ export function arcaSafeStatus(env = process.env) {
     taSharedCacheConfigured: Boolean(String(env.ARCA_TA_ENCRYPTION_KEY || "").trim()),
     taSharedCacheRequiredInProduction: true,
     productionReadonlyEnabled: String(env.ARCA_ALLOW_PRODUCTION_READONLY || "").trim().toLowerCase() === "true",
+    productionInvoicePreparationEnabled: String(env.ARCA_ALLOW_PRODUCTION_INVOICE_PREPARE || "").trim().toLowerCase() === "true",
+    productionTaxpayerLookupEnabled: String(env.ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP || "").trim().toLowerCase() === "true",
     productionCaeEnabled: false,
     publicConfigError,
   };
