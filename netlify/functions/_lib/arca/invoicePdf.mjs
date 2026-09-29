@@ -138,7 +138,9 @@ function receiverDocumentLabel(type, number) {
 function requiredIssuer(env = {}) {
   const issuer = {
     legalName: String(env.ARCA_ISSUER_LEGAL_NAME || "").trim(),
-    fiscalAddress: String(env.ARCA_ISSUER_FISCAL_ADDRESS || "").trim(),
+    commercialAddress: String(
+      env.ARCA_ISSUER_COMMERCIAL_ADDRESS || env.ARCA_ISSUER_FISCAL_ADDRESS || "",
+    ).trim(),
     grossIncome: String(env.ARCA_ISSUER_GROSS_INCOME || "").trim(),
     activityStart: String(env.ARCA_ISSUER_ACTIVITY_START || "").trim(),
     vatCondition: String(env.ARCA_ISSUER_VAT_CONDITION || "").trim(),
@@ -216,12 +218,13 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
   text(50, issuer.legalName, 16, true);
   stream += commandText(275, 755, 34, voucherClass || "-", true);
   stream += commandText(390, 775, 13, `FACTURA ${voucherClass}`, true);
-  stream += commandText(390, 756, 10, `PV ${String(auth.pointOfSale || "").padStart(5, "0")}  Nro ${String(auth.voucherNumber || "").padStart(8, "0")}`, true);
-  stream += commandText(390, 738, 9, `Fecha: ${dmy(issueDate)}`);
+  stream += commandText(390, 760, 8, `Código ${String(auth.voucherType || "").padStart(3, "0")} · ORIGINAL`);
+  stream += commandText(390, 744, 10, `PV ${String(auth.pointOfSale || "").padStart(5, "0")}  Nro ${String(auth.voucherNumber || "").padStart(8, "0")}`, true);
+  stream += commandText(390, 728, 9, `Fecha: ${dmy(issueDate)}`);
   y = 720;
   text(50, `CUIT: ${invoice.issuerCuit || env.ARCA_ISSUER_CUIT}`);
   next();
-  for (const line of wrap(`Domicilio fiscal: ${issuer.fiscalAddress}`, 55)) {
+  for (const line of wrap(`Domicilio comercial: ${issuer.commercialAddress}`, 55)) {
     text(50, line);
     next();
   }
@@ -308,9 +311,15 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
   stream += commandText(350, y, 11, "TOTAL:", true);
   stream += commandText(470, y, 11, `$ ${money(fiscal.total ?? sale.total)}`, true);
 
+  if (voucherClass === "B") {
+    stream += commandText(55, 224, 8, "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)", true);
+    stream += commandText(55, 208, 8, `IVA Contenido: $ ${money(fiscal.vat)}`);
+    stream += commandText(55, 193, 8, `Otros Impuestos Nacionales Indirectos: $ ${money(fiscal.tributes || 0)}`);
+  }
+
   const qrModule = 2.05;
   const qrX = 55;
-  const qrY = 65;
+  const qrY = 55;
   stream += "0 g\n";
   for (let row = 0; row < matrix.length; row += 1) {
     for (let col = 0; col < matrix[row].length; col += 1) {
@@ -320,10 +329,10 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
       stream += `${x.toFixed(2)} ${yy.toFixed(2)} ${qrModule.toFixed(2)} ${qrModule.toFixed(2)} re f\n`;
     }
   }
-  stream += commandText(205, 168, 10, "Comprobante autorizado por ARCA", true);
-  stream += commandText(205, 148, 9, `CAE: ${auth.cae || "-"}`);
-  stream += commandText(205, 131, 9, `Vencimiento CAE: ${dmy(auth.caeExpiration)}`);
-  stream += commandText(205, 114, 8, `Verificación: ${invoice.verification?.matched === true ? "coincide con FECompConsultar" : "pendiente"}`);
+  stream += commandText(205, 176, 10, "Comprobante autorizado por ARCA", true);
+  stream += commandText(205, 156, 9, `CAE: ${auth.cae || "-"}`);
+  stream += commandText(205, 139, 9, `Vencimiento CAE: ${dmy(auth.caeExpiration)}`);
+  stream += commandText(205, 122, 8, `Verificación: ${invoice.verification?.matched === true ? "coincide con FECompConsultar" : "pendiente"}`);
   stream += commandText(205, 91, 7, "El código QR permite verificar los datos fiscales del comprobante.");
   stream += commandText(205, 74, 7, invoice.fiscalEnvironment === "production" ? "Documento fiscal electrónico" : "HOMOLOGACIÓN - SIN VALIDEZ FISCAL", true);
 
