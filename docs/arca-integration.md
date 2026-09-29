@@ -639,3 +639,27 @@ Mientras permanezca en `false`, WSAA/WSFE/Padrón de producción no pueden ser c
 Incluso con el gate read-only habilitado, el autorizador de CAE continúa bloqueando producción por código. La futura validación productiva debe comenzar únicamente con operaciones de lectura/conectividad.
 
 También se agregó un smoke compartido independiente para `ws_sr_constancia_inscripcion`, usando sólo el CUIT de ejemplo de homologación publicado por ARCA y sin consultar clientes reales.
+
+
+## 28. Preflight productivo read-only preparado
+
+Antes de cualquier habilitación de CAE productivo se incorporó una etapa explícita de sólo lectura.
+
+Nuevo gate:
+
+`ARCA_ALLOW_PRODUCTION_READONLY=false`
+
+Mientras permanezca en `false`, cualquier conexión a WSAA/WSFE/Padrón productivo queda bloqueada por código. Homologación no requiere este gate.
+
+Cuando en el futuro se configure un entorno productivo separado con certificado/autorizaciones reales, el preflight podrá validar sin emitir comprobantes:
+
+- `FEDummy`;
+- `FEParamGetPtosVenta`;
+- presencia del punto de venta productivo configurado;
+- `getPersona_v2` sobre el propio CUIT emisor;
+- TA compartido `wsfe`;
+- TA compartido `ws_sr_constancia_inscripcion`.
+
+El resultado sólo expone metadatos operativos. No devuelve Token, Sign, certificado, clave privada ni datos fiscales detallados.
+
+La emisión de CAE en producción continúa explícitamente bloqueada dentro del autorizador aunque el gate read-only esté habilitado.
