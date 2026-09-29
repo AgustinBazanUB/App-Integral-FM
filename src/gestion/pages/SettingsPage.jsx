@@ -413,6 +413,21 @@ export default function SettingsPage() {
             </div>
             <div>
               <div>
+                <strong>Certificado + clave privada</strong>
+                <span>
+                  {fiscalConfig.credentialsReady
+                    ? `Par válido y vigente hasta ${fiscalConfig.certificateValidTo || "fecha no informada"}.`
+                    : fiscalConfig.credentialErrorCode
+                      ? `No listo: ${fiscalConfig.credentialErrorCode}.`
+                      : "Sin validar."}
+                </span>
+              </div>
+              <Badge tone={fiscalConfig.credentialsReady ? "success" : "neutral"}>
+                {fiscalConfig.credentialsReady ? "Listo" : "Pendiente"}
+              </Badge>
+            </div>
+            <div>
+              <div>
                 <strong>TA compartido WSFE</strong>
                 <span>
                   {!fiscalConfig.taSharedCacheConfigured
