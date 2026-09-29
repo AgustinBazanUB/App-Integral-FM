@@ -1,7 +1,7 @@
 import { requireFirebaseAdmin } from "./_lib/firebaseAuth.mjs";
 import { getTaxpayer } from "./_lib/arca/registry.mjs";
 import { inferReceiverVatCondition } from "./_lib/arca/receiver.mjs";
-import { arcaEnvironment, arcaSafeStatus, loadArcaPublicConfig } from "./_lib/arca/config.mjs";
+import { arcaEnvironment, arcaSafeStatus, assertArcaCredentialPairReady, loadArcaPublicConfig } from "./_lib/arca/config.mjs";
 import { wsfeDummy, getPointsOfSale } from "./_lib/arca/wsfe.mjs";
 import { registryDummy } from "./_lib/arca/registry.mjs";
 import { firebaseAdminAccessToken, adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
@@ -291,6 +291,16 @@ export default async function handler(request) {
         }, 409);
       }
 
+      const safeStatus = arcaSafeStatus(process.env);
+      assertArcaCredentialPairReady(process.env);
+      if (!safeStatus.taSharedCacheConfigured) {
+        return json({
+          ok: false,
+          code: "arca-wsaa-cache-key-missing",
+          message: "Producción read-only exige una clave propia ARCA_TA_ENCRYPTION_KEY antes de contactar ARCA.",
+        }, 409);
+      }
+
       const config = loadArcaPublicConfig(process.env);
       const wsfe = await wsfeDummy({ env: process.env });
       const points = await getPointsOfSale({ env: process.env });
@@ -336,6 +346,11 @@ export default async function handler(request) {
           cache: {
             wsfe: wsfeCache,
             registry: registryCache,
+          },
+          credentials: {
+            ready: safeStatus.credentialsReady,
+            validTo: safeStatus.certificateValidTo,
+            fingerprint256: safeStatus.certificateFingerprint256,
           },
           caeProductionEnabled: false,
         },
