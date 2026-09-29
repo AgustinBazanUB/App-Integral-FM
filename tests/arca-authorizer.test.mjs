@@ -569,3 +569,49 @@ test("factura de homologación no puede operarse desde runtime productivo", asyn
     (error) => error?.code === "arca-invoice-environment-mismatch",
   );
 });
+
+
+test("dry-run productivo arma el plan sin llamar a ARCA", async () => {
+  let caeRequests = 0;
+  let sequenceReads = 0;
+
+  const result = await authorizeInvoice({
+    invoiceId: "invoice-production-dry-run",
+    issuerVatCondition: "responsable_inscripto",
+    receiver: {
+      vatConditionId: 5,
+      documentType: 99,
+      documentNumber: "0",
+      anonymousConsumerFinal: true,
+      requestedBy: "admin-1",
+    },
+    allowCaeRequest: false,
+    env: {
+      ARCA_ENVIRONMENT: "production",
+      ARCA_ISSUER_CUIT: "20123456786",
+      ARCA_POINT_OF_SALE: "8",
+      ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
+    },
+    getDocument: async () => ({
+      data: { ...pendingInvoice, fiscalEnvironment: "production" },
+      updateTime: "u0",
+    }),
+    getLastAuthorizedFn: async () => {
+      sequenceReads += 1;
+      throw new Error("no debe consultar ARCA en dry-run");
+    },
+    requestCaeFn: async () => {
+      caeRequests += 1;
+      throw new Error("no debe pedir CAE en dry-run");
+    },
+  });
+
+  assert.equal(result.dryRun, true);
+  assert.equal(result.status, "pending");
+  assert.equal(result.plan.voucherClass, "B");
+  assert.equal(result.plan.detailBase.docType, 99);
+  assert.equal(result.plan.detailBase.docNumber, "0");
+  assert.equal(result.plan.fiscal.total, 1210);
+  assert.equal(sequenceReads, 0);
+  assert.equal(caeRequests, 0);
+});
