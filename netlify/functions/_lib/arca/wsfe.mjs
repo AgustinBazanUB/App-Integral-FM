@@ -1,4 +1,4 @@
-import { loadArcaPublicConfig } from "./config.mjs";
+import { assertArcaNetworkAccessAllowed, loadArcaPublicConfig } from "./config.mjs";
 import { escapeXml, soapRequest, xmlTag, xmlTags } from "./xml.mjs";
 import { requestAccessTicket } from "./wsaa.mjs";
 
@@ -60,6 +60,7 @@ async function wsfeCall(operation, payloadBuilder, {
 }
 
 export async function wsfeDummy({ env = process.env, fetchImpl = fetch } = {}) {
+  assertArcaNetworkAccessAllowed(env);
   const config = loadArcaPublicConfig(env, { requirePointOfSale: false });
   const xml = await soapRequest({
     url: config.wsfeUrl,
