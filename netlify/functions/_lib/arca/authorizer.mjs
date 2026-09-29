@@ -19,10 +19,30 @@ import {
   getLastAuthorized,
   requestCae,
 } from "./wsfe.mjs";
-import { loadArcaPublicConfig } from "./config.mjs";
+import { arcaEnvironment, loadArcaPublicConfig } from "./config.mjs";
 
 function invoicePath(invoiceId) {
   return `invoices/${invoiceId}`;
+}
+
+function invoiceEnvironment(invoice = {}) {
+  return String(invoice.fiscalEnvironment || "homologation").trim().toLowerCase();
+}
+
+function assertInvoiceEnvironment(invoice, env = process.env) {
+  const runtimeEnvironment = arcaEnvironment(env).id;
+  const storedEnvironment = invoiceEnvironment(invoice);
+  if (storedEnvironment !== runtimeEnvironment) {
+    const error = new Error(
+      `La solicitud fiscal pertenece a ${storedEnvironment} y no puede operarse desde ${runtimeEnvironment}.`
+    );
+    error.code = "arca-invoice-environment-mismatch";
+    error.status = 409;
+    error.invoiceEnvironment = storedEnvironment;
+    error.runtimeEnvironment = runtimeEnvironment;
+    throw error;
+  }
+  return storedEnvironment;
 }
 
 function isNetworkUncertain(error) {
@@ -140,6 +160,8 @@ export async function authorizeInvoice({
     error.status = 404;
     throw error;
   }
+
+  assertInvoiceEnvironment(current.data, env);
 
   if (current.data?.status === "authorized") {
     return {
@@ -428,6 +450,7 @@ export async function reconcileInvoice({
     error.status = 404;
     throw error;
   }
+  assertInvoiceEnvironment(current.data, env);
   if (current.data?.status === "authorized") {
     return { status: "authorized", alreadyAuthorized: true, invoice: current.data };
   }
@@ -476,6 +499,8 @@ export async function recoverPreCaeInvoice({
     error.status = 404;
     throw error;
   }
+
+  assertInvoiceEnvironment(current.data, env);
 
   const authorization = current.data?.authorization || {};
   if (current.data?.status !== "authorizing") {
@@ -535,6 +560,8 @@ export async function verifyAuthorizedInvoice({
     error.status = 404;
     throw error;
   }
+
+  assertInvoiceEnvironment(current.data, env);
 
   if (current.data?.status !== "authorized") {
     return {
