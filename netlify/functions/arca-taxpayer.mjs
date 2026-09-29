@@ -33,6 +33,15 @@ function safeError(error) {
   };
 }
 
+async function preflightStage(name, operation) {
+  try {
+    const data = await operation();
+    return { name, status: "ok", data, error: null };
+  } catch (error) {
+    return { name, status: "error", data: null, error: safeError(error) };
+  }
+}
+
 async function runDiagnostics() {
   const environment = arcaEnvironment(process.env).id;
   if (environment !== "homologation") {
@@ -310,53 +319,79 @@ export default async function handler(request) {
       }
 
       const config = loadArcaPublicConfig(process.env);
-      const wsfe = await wsfeDummy({ env: process.env });
-      const points = await getPointsOfSale({ env: process.env });
-      const selectedPoint = points.points.find((point) => point.number === config.pointOfSale) || null;
-      const voucherTypes = await getVoucherTypes({ env: process.env });
-      const vatTypes = await getVatTypes({ env: process.env });
-      const documentTypes = await getDocumentTypes({ env: process.env });
-      const receiverA = await getReceiverVatConditions({ voucherClass: "A", env: process.env });
-      const receiverB = await getReceiverVatConditions({ voucherClass: "B", env: process.env });
-      const lastA = await getLastAuthorized({
+
+      const stages = {};
+      stages.wsfe = await preflightStage("wsfe", () => wsfeDummy({ env: process.env }));
+      stages.points = await preflightStage("points", () => getPointsOfSale({ env: process.env }));
+      stages.voucherTypes = await preflightStage("voucherTypes", () => getVoucherTypes({ env: process.env }));
+      stages.vatTypes = await preflightStage("vatTypes", () => getVatTypes({ env: process.env }));
+      stages.documentTypes = await preflightStage("documentTypes", () => getDocumentTypes({ env: process.env }));
+      stages.receiverA = await preflightStage("receiverA", () => getReceiverVatConditions({ voucherClass: "A", env: process.env }));
+      stages.receiverB = await preflightStage("receiverB", () => getReceiverVatConditions({ voucherClass: "B", env: process.env }));
+      stages.lastA = await preflightStage("lastA", () => getLastAuthorized({
         voucherType: 1,
         pointOfSale: config.pointOfSale,
         env: process.env,
-      });
-      const lastB = await getLastAuthorized({
+      }));
+      stages.lastB = await preflightStage("lastB", () => getLastAuthorized({
         voucherType: 6,
         pointOfSale: config.pointOfSale,
         env: process.env,
-      });
-      const issuer = await getTaxpayer(config.issuerCuit, { env: process.env });
-      const [wsfeCache, registryCache] = await Promise.all([
-        inspectSharedWsaaCache({
-          environmentId: environment,
-          service: "wsfe",
-          env: process.env,
-        }),
-        inspectSharedWsaaCache({
-          environmentId: environment,
-          service: "ws_sr_constancia_inscripcion",
-          env: process.env,
-        }),
-      ]);
+      }));
+      stages.issuer = await preflightStage("issuer", () => getTaxpayer(config.issuerCuit, { env: process.env }));
+      stages.wsfeCache = await preflightStage("wsfeCache", () => inspectSharedWsaaCache({
+        environmentId: environment,
+        service: "wsfe",
+        env: process.env,
+      }));
+      stages.registryCache = await preflightStage("registryCache", () => inspectSharedWsaaCache({
+        environmentId: environment,
+        service: "ws_sr_constancia_inscripcion",
+        env: process.env,
+      }));
+
+      const wsfe = stages.wsfe.data || {};
+      const points = stages.points.data || { points: [], errors: [] };
+      const selectedPoint = points.points?.find((point) => point.number === config.pointOfSale) || null;
+      const voucherTypes = stages.voucherTypes.data || { types: [] };
+      const vatTypes = stages.vatTypes.data || { types: [] };
+      const documentTypes = stages.documentTypes.data || { types: [] };
+      const receiverA = stages.receiverA.data || { conditions: [] };
+      const receiverB = stages.receiverB.data || { conditions: [] };
+      const lastA = stages.lastA.data || { number: null, errors: [] };
+      const lastB = stages.lastB.data || { number: null, errors: [] };
+      const issuer = stages.issuer.data || {};
+      const wsfeCache = stages.wsfeCache.data || {};
+      const registryCache = stages.registryCache.data || {};
 
       const pointFound = Boolean(selectedPoint);
+      const normalizedDropDate = String(selectedPoint?.dropDate || "").trim().toUpperCase();
       const pointOperational = Boolean(
         selectedPoint
         && String(selectedPoint.blocked || "").toUpperCase() !== "S"
-        && !selectedPoint.dropDate
+        && !["S", "SI", "TRUE"].includes(normalizedDropDate)
       );
-      const issuerActive = issuer.found === true && issuer.keyStatus === "ACTIVO";
-      const cacheReady = wsfeCache.reusable === true && registryCache.reusable === true;
-      const voucherIds = new Set(voucherTypes.types.map((item) => item.id));
-      const vatIds = new Set(vatTypes.types.map((item) => item.id));
-      const documentIds = new Set(documentTypes.types.map((item) => item.id));
-      const receiverAIds = new Set(receiverA.conditions.map((item) => item.id));
-      const receiverBIds = new Set(receiverB.conditions.map((item) => item.id));
+      const issuerActive = stages.issuer.status === "ok"
+        && issuer.found === true
+        && issuer.keyStatus === "ACTIVO";
+      const cacheReady = stages.wsfeCache.status === "ok"
+        && stages.registryCache.status === "ok"
+        && wsfeCache.reusable === true
+        && registryCache.reusable === true;
+
+      const voucherIds = new Set((voucherTypes.types || []).map((item) => item.id));
+      const vatIds = new Set((vatTypes.types || []).map((item) => item.id));
+      const documentIds = new Set((documentTypes.types || []).map((item) => item.id));
+      const receiverAIds = new Set((receiverA.conditions || []).map((item) => item.id));
+      const receiverBIds = new Set((receiverB.conditions || []).map((item) => item.id));
+
       const fiscalTablesReady = (
-        voucherIds.has(1)
+        stages.voucherTypes.status === "ok"
+        && stages.vatTypes.status === "ok"
+        && stages.documentTypes.status === "ok"
+        && stages.receiverA.status === "ok"
+        && stages.receiverB.status === "ok"
+        && voucherIds.has(1)
         && voucherIds.has(6)
         && vatIds.has(5)
         && documentIds.has(80)
@@ -367,11 +402,23 @@ export default async function handler(request) {
         && receiverBIds.has(4)
         && receiverBIds.has(5)
       );
-      const sequencesReady = lastA.errors.length === 0 && lastB.errors.length === 0;
-      const wsfeHealthy = [wsfe.appServer, wsfe.dbServer, wsfe.authServer]
-        .every((value) => String(value || "").toUpperCase() === "OK");
+
+      const sequencesReady = (
+        stages.lastA.status === "ok"
+        && stages.lastB.status === "ok"
+        && (lastA.errors || []).length === 0
+        && (lastB.errors || []).length === 0
+      );
+
+      const wsfeHealthy = (
+        stages.wsfe.status === "ok"
+        && [wsfe.appServer, wsfe.dbServer, wsfe.authServer]
+          .every((value) => String(value || "").toUpperCase() === "OK")
+      );
+
       const ready = (
         wsfeHealthy
+        && stages.points.status === "ok"
         && pointFound
         && pointOperational
         && issuerActive
@@ -380,15 +427,26 @@ export default async function handler(request) {
         && sequencesReady
       );
 
+      const failedStages = Object.values(stages)
+        .filter((stage) => stage.status === "error")
+        .map((stage) => ({
+          stage: stage.name,
+          code: stage.error?.code || null,
+          status: stage.error?.status || null,
+          causeCode: stage.error?.causeCode || null,
+          message: stage.error?.message || "Error sin detalle.",
+        }));
+
       return json({
-        ok: ready,
+        ok: true,
         preflight: {
           environment,
           wsfe: {
-            appServer: wsfe.appServer,
-            dbServer: wsfe.dbServer,
-            authServer: wsfe.authServer,
+            appServer: wsfe.appServer || null,
+            dbServer: wsfe.dbServer || null,
+            authServer: wsfe.authServer || null,
             healthy: wsfeHealthy,
+            stageStatus: stages.wsfe.status,
           },
           pointOfSale: {
             selected: config.pointOfSale,
@@ -397,50 +455,61 @@ export default async function handler(request) {
             emissionType: selectedPoint?.emissionType || null,
             blocked: selectedPoint?.blocked || null,
             dropDate: selectedPoint?.dropDate || null,
-            returned: points.points.map((point) => point.number),
-            errors: points.errors,
+            returned: (points.points || []).map((point) => point.number),
+            errors: points.errors || [],
+            stageStatus: stages.points.status,
           },
           fiscalTables: {
             ready: fiscalTablesReady,
             voucherTypes: {
               facturaA: voucherIds.has(1),
               facturaB: voucherIds.has(6),
+              stageStatus: stages.voucherTypes.status,
             },
             vat21: vatIds.has(5),
+            vatStageStatus: stages.vatTypes.status,
             documentTypes: {
               cuit80: documentIds.has(80),
               dni96: documentIds.has(96),
               consumidorFinal99: documentIds.has(99),
+              stageStatus: stages.documentTypes.status,
             },
             receiverConditions: {
               responsableInscriptoA: receiverAIds.has(1),
               monotributoA: receiverAIds.has(6),
               exentoB: receiverBIds.has(4),
               consumidorFinalB: receiverBIds.has(5),
+              stageAStatus: stages.receiverA.status,
+              stageBStatus: stages.receiverB.status,
             },
           },
           sequences: {
             ready: sequencesReady,
             facturaA: {
               voucherType: 1,
-              lastAuthorized: lastA.number,
-              errors: lastA.errors,
+              lastAuthorized: lastA.number ?? null,
+              errors: lastA.errors || [],
+              stageStatus: stages.lastA.status,
             },
             facturaB: {
               voucherType: 6,
-              lastAuthorized: lastB.number,
-              errors: lastB.errors,
+              lastAuthorized: lastB.number ?? null,
+              errors: lastB.errors || [],
+              stageStatus: stages.lastB.status,
             },
           },
           issuer: {
-            found: issuer.found,
-            keyStatus: issuer.keyStatus,
-            personType: issuer.personType,
-            endpoint: issuer.endpoint?.includes("afip.gov.ar") ? "official-legacy" : "arca-current",
+            found: issuer.found === true,
+            keyStatus: issuer.keyStatus || null,
+            personType: issuer.personType || null,
+            endpoint: issuer.endpoint?.includes("afip.gov.ar") ? "official-legacy" : issuer.endpoint ? "arca-current" : null,
+            stageStatus: stages.issuer.status,
           },
           cache: {
             wsfe: wsfeCache,
             registry: registryCache,
+            wsfeStageStatus: stages.wsfeCache.status,
+            registryStageStatus: stages.registryCache.status,
           },
           credentials: {
             ready: safeStatus.credentialsReady,
@@ -453,10 +522,11 @@ export default async function handler(request) {
             taxpayerLookup: safeStatus.productionTaxpayerLookupEnabled,
             cae: false,
           },
+          failedStages,
           ready,
           caeProductionEnabled: false,
         },
-      }, ready ? 200 : 409);
+      });
     }
 
     if (body?.mode === "diagnostics") {
