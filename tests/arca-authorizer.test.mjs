@@ -505,3 +505,41 @@ test("FECompConsultar detecta CAE distinto sin desautorizar el registro local", 
   assert.equal(result.status, "authorized");
   assert.equal(persistedMatch, false);
 });
+
+
+test("producción nunca solicita CAE aunque el gate read-only esté habilitado", async () => {
+  let caeRequests = 0;
+
+  await assert.rejects(
+    authorizeInvoice({
+      invoiceId: "invoice-production-block",
+      issuerVatCondition: "responsable_inscripto",
+      receiver: {
+        vatConditionId: 5,
+        documentType: 99,
+        documentNumber: "0",
+        anonymousConsumerFinal: true,
+        requestedBy: "admin-1",
+      },
+      allowCaeRequest: true,
+      env: {
+        ARCA_ENVIRONMENT: "production",
+        ARCA_ALLOW_PRODUCTION_READONLY: "true",
+        ARCA_ISSUER_CUIT: "20123456786",
+        ARCA_POINT_OF_SALE: "8",
+        ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
+      },
+      getDocument: async () => ({
+        data: pendingInvoice,
+        updateTime: "u0",
+      }),
+      requestCaeFn: async () => {
+        caeRequests += 1;
+        throw new Error("no debe ejecutarse");
+      },
+    }),
+    (error) => error?.code === "arca-production-authorization-blocked",
+  );
+
+  assert.equal(caeRequests, 0);
+});
