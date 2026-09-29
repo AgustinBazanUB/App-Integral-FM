@@ -198,7 +198,9 @@ export function assertArcaCredentialPairReady(env = process.env, options = {}) {
 export function arcaSafeStatus(env = process.env) {
   const pdfIssuerFields = {
     legalName: String(env.ARCA_ISSUER_LEGAL_NAME || "").trim(),
-    fiscalAddress: String(env.ARCA_ISSUER_FISCAL_ADDRESS || "").trim(),
+    commercialAddress: String(
+      env.ARCA_ISSUER_COMMERCIAL_ADDRESS || env.ARCA_ISSUER_FISCAL_ADDRESS || "",
+    ).trim(),
     grossIncome: String(env.ARCA_ISSUER_GROSS_INCOME || "").trim(),
     activityStart: String(env.ARCA_ISSUER_ACTIVITY_START || "").trim(),
   };
