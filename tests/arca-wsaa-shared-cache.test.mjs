@@ -201,3 +201,54 @@ test("producción rechaza WSAA si la caché compartida cifrada no está configur
     (error) => error?.code === "arca-wsaa-shared-cache-required",
   );
 });
+
+
+test("requestAccessTicket reutiliza TA compartido tras perder la caché en memoria", async () => {
+  const db = memoryStore();
+  const now = new Date("2026-09-29T12:00:00.000Z");
+  const firstLease = await acquireWsaaRenewalLease({
+    environmentId: "homologation",
+    service: "wsfe",
+    holder: "bootstrap-worker",
+    env: ENV,
+    now,
+    getDocument: db.getDocument,
+    createDocument: db.createDocument,
+    patchDocument: db.patchDocument,
+  });
+  await storeSharedWsaaTicket({
+    environmentId: "homologation",
+    service: "wsfe",
+    holder: "bootstrap-worker",
+    ticket: ticket(),
+    expectedUpdateTime: firstLease.updateTime,
+    env: ENV,
+    now,
+    getDocument: db.getDocument,
+    patchDocument: db.patchDocument,
+  });
+
+  clearWsaaTicketCache();
+  let fetchCalls = 0;
+  const reused = await requestAccessTicket("wsfe", {
+    env: {
+      ...ENV,
+      ARCA_ENVIRONMENT: "homologation",
+    },
+    now: new Date("2026-09-29T12:01:00.000Z"),
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      throw new Error("WSAA no debe ser invocado si existe un TA compartido vigente");
+    },
+    sharedCache: {
+      getDocument: db.getDocument,
+      createDocument: db.createDocument,
+      patchDocument: db.patchDocument,
+      sleepImpl: async () => {},
+    },
+  });
+
+  assert.equal(reused.token, "TOKEN-SECRETO-WSAA");
+  assert.equal(reused.sign, "SIGN-SECRETO-WSAA");
+  assert.equal(fetchCalls, 0);
+});
