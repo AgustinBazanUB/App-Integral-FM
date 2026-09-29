@@ -679,3 +679,52 @@ Para no invalidar ese TA existente al actualizar código:
 - en la siguiente renovación natural, el documento se reescribe automáticamente como v2.
 
 Así, un deploy nuevo no rompe el TA compartido que ya fue validado en homologación.
+
+
+## 29. TA compartido de Padrón validado en cold start real
+
+La caché WSAA compartida también fue validada en homologación para el servicio `ws_sr_constancia_inscripcion`.
+
+Prueba real:
+
+1. primera ejecución de `getPersona_v2` contra el CUIT de ejemplo oficial de homologación;
+2. creación/renovación del TA específico de Padrón;
+3. persistencia cifrada en Firestore;
+4. reinicio completo de Netlify Dev para borrar la caché en memoria;
+5. segunda ejecución de `getPersona_v2`;
+6. reutilización del TA persistido, sin nuevo `LoginCms`;
+7. estado seguro: `TA compartido Padrón: reutilizable`.
+
+Con esto quedan validados en cold start real los dos servicios WSAA usados actualmente por la integración:
+
+- `wsfe`;
+- `ws_sr_constancia_inscripcion`.
+
+## 30. Validación offline de certificado y clave
+
+Antes de solicitar un TA nuevo, el backend valida localmente el par criptográfico configurado:
+
+- el certificado debe parsear como X.509;
+- la private key debe parsear correctamente;
+- la clave pública derivada de la private key debe coincidir con la del certificado;
+- el certificado debe estar dentro de su período de vigencia.
+
+El estado seguro puede mostrar vigencia y fingerprint del certificado, pero nunca devuelve certificado completo ni private key.
+
+Esta validación será especialmente útil antes del primer preflight read-only de producción.
+
+### Próximo bloqueo externo
+
+La arquitectura homologación ya valida:
+
+- emisión y verificación de CAE;
+- idempotencia y reconciliación;
+- WSAA compartido WSFE;
+- WSAA compartido Padrón;
+- cold starts;
+- cifrado server-only;
+- reglas Firestore;
+- gate productivo de sólo lectura;
+- CAE productivo bloqueado.
+
+El siguiente bloqueo ya no es de código: para probar producción en modo read-only hace falta un certificado de producción emitido por ARCA y asociado a los servicios `wsfe` y `ws_sr_constancia_inscripcion`, además del punto de venta productivo configurado.
