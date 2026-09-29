@@ -728,6 +728,19 @@ export default function SettingsPage() {
                 {productionAutoAuthorizeEnabled ? "Automático" : "Bloqueado"}
               </Badge>
             </div>
+            <div>
+              <div>
+                <strong>PDF fiscal</strong>
+                <span>
+                  {fiscalConfig.invoicePdfIssuerReady
+                    ? "Datos visibles del emisor configurados; PDF habilitable para facturas autorizadas y verificadas."
+                    : `Faltan datos del emisor: ${(fiscalConfig.invoicePdfIssuerMissingFields || []).join(", ") || "configuración pendiente"}.`}
+                </span>
+              </div>
+              <Badge tone={fiscalConfig.invoicePdfIssuerReady ? "success" : "warning"}>
+                {fiscalConfig.invoicePdfIssuerReady ? "Listo" : "Incompleto"}
+              </Badge>
+            </div>
             {productionPreflightState.result ? (
               <>
                 <div>
