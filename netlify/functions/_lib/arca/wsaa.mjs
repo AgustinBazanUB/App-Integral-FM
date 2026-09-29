@@ -1,6 +1,14 @@
+import { randomUUID } from "node:crypto";
 import { signCmsBase64 } from "./cms.mjs";
 import { loadArcaSecrets, arcaEnvironment } from "./config.mjs";
 import { escapeXml, soapRequest, xmlTag } from "./xml.mjs";
+import {
+  acquireWsaaRenewalLease,
+  readSharedWsaaTicket,
+  storeSharedWsaaTicket,
+  waitForSharedWsaaTicket,
+  wsaaSharedCacheConfigured,
+} from "./wsaaSharedCache.mjs";
 
 const ticketCache = new Map();
 
@@ -54,18 +62,12 @@ export function parseLoginTicketResponse(soapXml) {
   return { token, sign, expirationTime, expiresAt };
 }
 
-export async function requestAccessTicket(service, {
+async function requestFreshAccessTicket(service, {
   env = process.env,
   now = new Date(),
   fetchImpl = fetch,
-  forceRefresh = false,
 } = {}) {
   const environment = arcaEnvironment(env);
-  const cacheKey = `${environment.id}:${service}`;
-  const cached = ticketCache.get(cacheKey);
-  if (!forceRefresh && cached && cached.expiresAt.getTime() - now.getTime() > 5 * 60 * 1000) {
-    return cached;
-  }
   const secrets = loadArcaSecrets(env);
   const tra = buildLoginTicketRequest(service, now);
   const cmsBase64 = signCmsBase64(tra, secrets);
@@ -91,9 +93,132 @@ export async function requestAccessTicket(service, {
     }
     throw error;
   }
-  const ticket = parseLoginTicketResponse(soap);
-  ticketCache.set(cacheKey, ticket);
-  return ticket;
+  return parseLoginTicketResponse(soap);
+}
+
+function ticketIsReusable(ticket, now) {
+  return Boolean(
+    ticket?.expiresAt
+    && ticket.expiresAt.getTime() - now.getTime() > 5 * 60 * 1000
+  );
+}
+
+function sharedCacheRequired(environmentId) {
+  return environmentId === "production";
+}
+
+export async function requestAccessTicket(service, {
+  env = process.env,
+  now = new Date(),
+  fetchImpl = fetch,
+  forceRefresh = false,
+  sharedCache = {},
+} = {}) {
+  const environment = arcaEnvironment(env);
+  const cacheKey = `${environment.id}:${service}`;
+  const cached = ticketCache.get(cacheKey);
+
+  if (!forceRefresh && ticketIsReusable(cached, now)) {
+    return cached;
+  }
+
+  const sharedConfigured = wsaaSharedCacheConfigured(env);
+  if (sharedCacheRequired(environment.id) && !sharedConfigured) {
+    const error = new Error(
+      "Producción exige ARCA_TA_ENCRYPTION_KEY para reutilizar Ticket de Acceso WSAA entre instancias."
+    );
+    error.code = "arca-wsaa-shared-cache-required";
+    error.status = 503;
+    throw error;
+  }
+
+  if (!sharedConfigured) {
+    const fresh = await requestFreshAccessTicket(service, { env, now, fetchImpl });
+    ticketCache.set(cacheKey, fresh);
+    return fresh;
+  }
+
+  const getDocument = sharedCache.getDocument;
+  const createDocument = sharedCache.createDocument;
+  const patchDocument = sharedCache.patchDocument;
+  const sleepImpl = sharedCache.sleepImpl;
+
+  const shared = await readSharedWsaaTicket({
+    environmentId: environment.id,
+    service,
+    env,
+    now,
+    ...(getDocument ? { getDocument } : {}),
+  });
+  if (shared.ticket) {
+    ticketCache.set(cacheKey, shared.ticket);
+    return shared.ticket;
+  }
+
+  const holder = `wsaa_${randomUUID()}`;
+  let lease = await acquireWsaaRenewalLease({
+    environmentId: environment.id,
+    service,
+    holder,
+    env,
+    now,
+    ...(getDocument ? { getDocument } : {}),
+    ...(createDocument ? { createDocument } : {}),
+    ...(patchDocument ? { patchDocument } : {}),
+  });
+
+  if (!lease.acquired) {
+    const waited = await waitForSharedWsaaTicket({
+      environmentId: environment.id,
+      service,
+      env,
+      now,
+      ...(getDocument ? { getDocument } : {}),
+      ...(sleepImpl ? { sleepImpl } : {}),
+    });
+    if (waited.ticket) {
+      ticketCache.set(cacheKey, waited.ticket);
+      return waited.ticket;
+    }
+
+    const retryNow = new Date(now.getTime() + 6500);
+    lease = await acquireWsaaRenewalLease({
+      environmentId: environment.id,
+      service,
+      holder,
+      env,
+      now: retryNow,
+      ...(getDocument ? { getDocument } : {}),
+      ...(createDocument ? { createDocument } : {}),
+      ...(patchDocument ? { patchDocument } : {}),
+    });
+
+    if (!lease.acquired) {
+      const error = new Error(
+        "Otra instancia está renovando el Ticket de Acceso WSAA. Reintentá la operación en unos segundos."
+      );
+      error.code = "arca-wsaa-renewal-busy";
+      error.status = 503;
+      throw error;
+    }
+  }
+
+  const fresh = await requestFreshAccessTicket(service, { env, now, fetchImpl });
+
+  await storeSharedWsaaTicket({
+    environmentId: environment.id,
+    service,
+    holder,
+    ticket: fresh,
+    expectedUpdateTime: lease.updateTime,
+    env,
+    now,
+    ...(getDocument ? { getDocument } : {}),
+    ...(patchDocument ? { patchDocument } : {}),
+  });
+
+  ticketCache.set(cacheKey, fresh);
+  return fresh;
 }
 
 export function clearWsaaTicketCache() {
