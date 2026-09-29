@@ -222,6 +222,7 @@ export async function acquireWsaaRenewalLease({
   env = process.env,
   now = new Date(),
   leaseMs = DEFAULT_LEASE_MS,
+  minValidityMs = DEFAULT_MIN_VALIDITY_MS,
   getDocument = adminGetDocument,
   createDocument = adminCreateDocument,
   patchDocument = adminPatchDocument,
@@ -279,6 +280,17 @@ export async function acquireWsaaRenewalLease({
   }
 
   const data = current.data || {};
+  if (validTicketMetadata(data, now, Number(minValidityMs))) {
+    return {
+      acquired: false,
+      path,
+      holder: data.leaseHolder || null,
+      updateTime: current.updateTime || null,
+      leaseExpiresAt: data.leaseExpiresAt || null,
+      reason: "ticket-available",
+    };
+  }
+
   if (leaseIsBusy(data, cleanHolder, now)) {
     return {
       acquired: false,
