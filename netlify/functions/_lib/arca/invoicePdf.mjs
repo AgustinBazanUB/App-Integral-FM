@@ -312,14 +312,14 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
   stream += commandText(470, y, 11, `$ ${money(fiscal.total ?? sale.total)}`, true);
 
   if (voucherClass === "B") {
-    stream += commandText(55, 224, 8, "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)", true);
-    stream += commandText(55, 208, 8, `IVA Contenido: $ ${money(fiscal.vat)}`);
-    stream += commandText(55, 193, 8, `Otros Impuestos Nacionales Indirectos: $ ${money(fiscal.tributes || 0)}`);
+    stream += commandText(55, 242, 8, "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)", true);
+    stream += commandText(55, 226, 8, `IVA Contenido: $ ${money(fiscal.vat)}`);
+    stream += commandText(55, 211, 8, `Otros Impuestos Nacionales Indirectos: $ ${money(fiscal.tributes || 0)}`);
   }
 
   const qrModule = 2.05;
   const qrX = 55;
-  const qrY = 55;
+  const qrY = 65;
   stream += "0 g\n";
   for (let row = 0; row < matrix.length; row += 1) {
     for (let col = 0; col < matrix[row].length; col += 1) {
