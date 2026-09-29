@@ -202,7 +202,7 @@ test("lock de secuencia impide dos autorizaciones simultáneas", async () => {
 
 test("lock vencido puede ser tomado por otro intento", async () => {
   const store = memoryStore({
-    "arcaSequenceLocks/pos_3_type_6": {
+    "arcaSequenceLocks/homologation_pos_3_type_6": {
       pointOfSale: 3,
       voucherType: 6,
       holder: "old-attempt",
@@ -222,4 +222,34 @@ test("lock vencido puede ser tomado por otro intento", async () => {
 
   assert.equal(result.acquired, true);
   assert.equal(result.holder, "new-attempt");
+});
+
+
+test("locks de homologación y producción quedan separados aunque coincidan PV y tipo", async () => {
+  const store = memoryStore();
+
+  const homo = await acquireSequenceLock({
+    pointOfSale: 8,
+    voucherType: 6,
+    holder: "homo-attempt",
+    env: { ARCA_ENVIRONMENT: "homologation" },
+    getDocument: store.getDocument,
+    createDocument: store.createDocument,
+    patchDocument: store.patchDocument,
+  });
+
+  const prod = await acquireSequenceLock({
+    pointOfSale: 8,
+    voucherType: 6,
+    holder: "prod-attempt",
+    env: { ARCA_ENVIRONMENT: "production" },
+    getDocument: store.getDocument,
+    createDocument: store.createDocument,
+    patchDocument: store.patchDocument,
+  });
+
+  assert.equal(homo.acquired, true);
+  assert.equal(prod.acquired, true);
+  assert.equal(store.documents.has("arcaSequenceLocks/homologation_pos_8_type_6"), true);
+  assert.equal(store.documents.has("arcaSequenceLocks/production_pos_8_type_6"), true);
 });
