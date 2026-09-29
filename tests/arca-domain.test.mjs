@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assertValidCuit, cuitCheckDigit, formatCuit, isValidCuit, normalizeCuit } from "../netlify/functions/_lib/arca/cuit.mjs";
-import { ARCA_ENVIRONMENTS, arcaSafeStatus, assertArcaNetworkAccessAllowed, loadArcaPublicConfig } from "../netlify/functions/_lib/arca/config.mjs";
+import { ARCA_ENVIRONMENTS, arcaSafeStatus, assertArcaNetworkAccessAllowed, inspectArcaCredentialPair, loadArcaPublicConfig } from "../netlify/functions/_lib/arca/config.mjs";
 import { buildLoginCmsEnvelope, buildLoginTicketRequest, parseLoginTicketResponse } from "../netlify/functions/_lib/arca/wsaa.mjs";
 import { buildCaeDetail } from "../netlify/functions/_lib/arca/wsfe.mjs";
 import { allocateDiscount, assertSaleMatchesFiscalTotal, buildFiscalAmounts, invoiceIdFor } from "../netlify/functions/_lib/arca/billing.mjs";
@@ -272,4 +272,28 @@ test("producción queda bloqueada por defecto y requiere habilitación read-only
     ARCA_ALLOW_PRODUCTION_READONLY: "true",
   });
   assert.equal(environment.id, "production");
+});
+
+
+test("credenciales ARCA seguras reportan faltantes e inválidos sin exponer secretos", () => {
+  const missing = inspectArcaCredentialPair({});
+  assert.equal(missing.ready, false);
+  assert.equal(missing.errorCode, "arca-credentials-missing");
+
+  const invalidCert = inspectArcaCredentialPair({
+    ARCA_CERTIFICATE_PEM: "CERTIFICADO INVALIDO",
+    ARCA_PRIVATE_KEY_PEM: "CLAVE INVALIDA",
+  });
+  assert.equal(invalidCert.ready, false);
+  assert.equal(invalidCert.errorCode, "arca-certificate-invalid");
+
+  const safe = arcaSafeStatus({
+    ARCA_ISSUER_CUIT: "20-12345678-6",
+    ARCA_CERTIFICATE_PEM: "CERTIFICADO INVALIDO",
+    ARCA_PRIVATE_KEY_PEM: "CLAVE INVALIDA",
+  });
+  const serialized = JSON.stringify(safe);
+  assert.equal(serialized.includes("CERTIFICADO INVALIDO"), false);
+  assert.equal(serialized.includes("CLAVE INVALIDA"), false);
+  assert.equal(safe.credentialsReady, false);
 });
