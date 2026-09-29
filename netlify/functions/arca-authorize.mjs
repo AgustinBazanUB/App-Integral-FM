@@ -1,5 +1,6 @@
 import { requireFirebaseAdmin } from "./_lib/firebaseAuth.mjs";
 import { authorizeInvoice, reconcileInvoice, recoverPreCaeInvoice, verifyAuthorizedInvoice } from "./_lib/arca/authorizer.mjs";
+import { arcaEnvironment } from "./_lib/arca/config.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -60,12 +61,29 @@ export default async function handler(request) {
       return json({ ok: false, code: "invalid-mode", message: "Modo fiscal inválido." }, 400);
     }
 
-    if (mode === "authorize" && process.env.ARCA_ALLOW_CAE_HOMOLOGATION !== "true") {
-      return json({
-        ok: false,
-        code: "arca-cae-disabled",
-        message: "La solicitud de CAE está deshabilitada en este entorno.",
-      }, 409);
+    if (mode === "authorize") {
+      const environment = arcaEnvironment(process.env).id;
+      const homologationEnabled = String(process.env.ARCA_ALLOW_CAE_HOMOLOGATION || "")
+        .trim()
+        .toLowerCase() === "true";
+      const productionEnabled = String(process.env.ARCA_ALLOW_PRODUCTION_CAE || "")
+        .trim()
+        .toLowerCase() === "true";
+
+      if (environment === "homologation" && !homologationEnabled) {
+        return json({
+          ok: false,
+          code: "arca-cae-disabled",
+          message: "La solicitud de CAE de homologación está deshabilitada.",
+        }, 409);
+      }
+      if (environment === "production" && !productionEnabled) {
+        return json({
+          ok: false,
+          code: "arca-production-authorization-blocked",
+          message: "La solicitud de CAE productivo está deshabilitada.",
+        }, 409);
+      }
     }
 
     const issuerVatCondition = String(process.env.ARCA_ISSUER_VAT_CONDITION || "").trim();
@@ -95,6 +113,40 @@ export default async function handler(request) {
       allowCaeRequest: mode === "authorize",
       env: process.env,
     });
+
+    if (
+      mode === "authorize"
+      && arcaEnvironment(process.env).id === "production"
+      && result?.status === "authorized"
+    ) {
+      try {
+        const verification = await verifyAuthorizedInvoice({
+          invoiceId,
+          env: process.env,
+        });
+        return json({
+          ok: true,
+          mode,
+          result: {
+            ...result,
+            postAuthorizationVerification: verification,
+          },
+        });
+      } catch (verificationError) {
+        return json({
+          ok: true,
+          mode,
+          result: {
+            ...result,
+            postAuthorizationVerification: {
+              verified: false,
+              matched: false,
+              error: safeError(verificationError),
+            },
+          },
+        });
+      }
+    }
 
     return json({ ok: true, mode, result });
   } catch (error) {
