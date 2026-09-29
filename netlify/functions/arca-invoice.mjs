@@ -1,6 +1,6 @@
 import { requireFirebaseActiveProfile } from "./_lib/firebaseAuth.mjs";
 import { adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
-import { arcaEnvironment } from "./_lib/arca/config.mjs";
+import { arcaEnvironment, productionAutoAuthorizeSources } from "./_lib/arca/config.mjs";
 import { authorizeInvoice, verifyAuthorizedInvoice } from "./_lib/arca/authorizer.mjs";
 import {
   canRequestInvoiceForSale,
@@ -88,10 +88,12 @@ export default async function handler(request) {
     });
 
     let autoAuthorization = null;
+    const autoSources = productionAutoAuthorizeSources(process.env);
     const autoProduction = (
       environment === "production"
       && String(process.env.ARCA_AUTO_AUTHORIZE_PRODUCTION || "").trim().toLowerCase() === "true"
       && String(process.env.ARCA_ALLOW_PRODUCTION_CAE || "").trim().toLowerCase() === "true"
+      && autoSources.includes(sourceType)
       && result.invoice?.status === "pending"
       && result.invoice?.fiscalReadiness?.ready === true
     );
@@ -110,6 +112,7 @@ export default async function handler(request) {
         issuerVatCondition,
         receiver: { requestedBy: session.uid },
         allowCaeRequest: true,
+        automaticRequest: true,
         env: process.env,
       });
 
