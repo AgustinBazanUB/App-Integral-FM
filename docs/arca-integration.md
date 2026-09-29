@@ -856,3 +856,26 @@ La autorización productiva requiere dos condiciones explícitas:
 - coincidencia exacta con el código de venta configurado.
 
 Una venta distinta queda bloqueada antes de reservar numeración. Tras una autorización exitosa, el sistema ejecuta una consulta de verificación y persiste el resultado. Luego los gates deben volver a su estado seguro.
+
+
+## 36. Primera factura productiva emitida y verificada
+
+Se completó correctamente la primera autorización real desde Flor Mía contra ARCA producción.
+
+Resultado:
+
+- venta origen: `FM-FMLV-20260929-0001`;
+- comprobante: Factura B;
+- punto de venta: 8;
+- número autorizado: 319;
+- CAE: obtenido y persistido server-side;
+- vencimiento de CAE: 09/10/2026;
+- observaciones ARCA: ninguna;
+- estado persistido: `authorized`;
+- `FECompConsultar`: coincidencia completa.
+
+El circuito productivo validado quedó:
+
+`venta -> pending -> correlatividad -> FECAESolicitar -> authorized -> FECompConsultar -> verification.matched=true`.
+
+A partir de este hito se habilita la siguiente etapa de producto: autorización automática de ventas fiscales elegibles, todavía detrás de un gate explícito y con verificación posterior inmediata.
