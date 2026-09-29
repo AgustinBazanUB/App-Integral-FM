@@ -281,6 +281,67 @@ export default async function handler(request) {
       });
     }
 
+    if (body?.mode === "production-readonly-preflight") {
+      const environment = arcaEnvironment(process.env).id;
+      if (environment !== "production") {
+        return json({
+          ok: false,
+          code: "production-only",
+          message: "El preflight productivo sólo puede ejecutarse con ARCA_ENVIRONMENT=production.",
+        }, 409);
+      }
+
+      const config = loadArcaPublicConfig(process.env);
+      const wsfe = await wsfeDummy({ env: process.env });
+      const points = await getPointsOfSale({ env: process.env });
+      const issuer = await getTaxpayer(config.issuerCuit, { env: process.env });
+      const [wsfeCache, registryCache] = await Promise.all([
+        inspectSharedWsaaCache({
+          environmentId: environment,
+          service: "wsfe",
+          env: process.env,
+        }),
+        inspectSharedWsaaCache({
+          environmentId: environment,
+          service: "ws_sr_constancia_inscripcion",
+          env: process.env,
+        }),
+      ]);
+
+      const pointFound = points.points.some((point) => point.number === config.pointOfSale);
+      const issuerActive = issuer.found === true && issuer.keyStatus === "ACTIVO";
+      const cacheReady = wsfeCache.reusable === true && registryCache.reusable === true;
+
+      return json({
+        ok: pointFound && issuerActive && cacheReady,
+        preflight: {
+          environment,
+          wsfe: {
+            appServer: wsfe.appServer,
+            dbServer: wsfe.dbServer,
+            authServer: wsfe.authServer,
+          },
+          pointOfSale: {
+            selected: config.pointOfSale,
+            found: pointFound,
+            returned: points.points.map((point) => point.number),
+            errors: points.errors,
+          },
+          issuer: {
+            found: issuer.found,
+            keyStatus: issuer.keyStatus,
+            personType: issuer.personType,
+            endpoint: issuer.endpoint?.includes("afip.gov.ar") ? "official-legacy" : "arca-current",
+          },
+          cache: {
+            wsfe: wsfeCache,
+            registry: registryCache,
+          },
+          caeProductionEnabled: false,
+        },
+      }, pointFound && issuerActive && cacheReady ? 200 : 409);
+    }
+
     if (body?.mode === "diagnostics") {
       const diagnostics = await runDiagnostics();
       return json({ ok: true, diagnostics });
