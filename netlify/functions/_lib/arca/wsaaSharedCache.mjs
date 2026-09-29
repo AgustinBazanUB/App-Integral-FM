@@ -439,3 +439,74 @@ export const WSAA_SHARED_CACHE_DEFAULTS = Object.freeze({
   minValidityMs: DEFAULT_MIN_VALIDITY_MS,
   leaseMs: DEFAULT_LEASE_MS,
 });
+
+
+export async function inspectSharedWsaaCache({
+  environmentId,
+  service,
+  env = process.env,
+  now = new Date(),
+  getDocument = adminGetDocument,
+} = {}) {
+  const configured = Boolean(String(env.ARCA_TA_ENCRYPTION_KEY || "").trim());
+  if (!configured) {
+    return {
+      configured: false,
+      exists: false,
+      decryptable: false,
+      reusable: false,
+      ticketExpiresAt: null,
+      leaseBusy: false,
+      leaseExpiresAt: null,
+    };
+  }
+
+  parseWsaaEncryptionKey(env, { required: true });
+  const path = ticketPath(environmentId, service);
+  const document = await getDocument(path, { env });
+  if (!document) {
+    return {
+      configured: true,
+      exists: false,
+      decryptable: false,
+      reusable: false,
+      ticketExpiresAt: null,
+      leaseBusy: false,
+      leaseExpiresAt: null,
+    };
+  }
+
+  const data = document.data || {};
+  let decryptable = false;
+  let reusable = false;
+  if (data.ciphertext && data.iv && data.authTag) {
+    try {
+      const ticket = decryptWsaaTicket(data, { environmentId, service, env });
+      decryptable = true;
+      reusable = ticket.expiresAt.getTime() - now.getTime() > DEFAULT_MIN_VALIDITY_MS;
+    } catch {
+      decryptable = false;
+      reusable = false;
+    }
+  }
+
+  const leaseExpiresAt = data.leaseExpiresAt || null;
+  const leaseDate = leaseExpiresAt ? new Date(leaseExpiresAt) : null;
+  const leaseBusy = Boolean(
+    data.leaseHolder
+    && leaseDate
+    && !Number.isNaN(leaseDate.valueOf())
+    && leaseDate.getTime() > now.getTime()
+  );
+
+  return {
+    configured: true,
+    exists: true,
+    decryptable,
+    reusable,
+    ticketExpiresAt: data.ticketExpiresAt || null,
+    leaseBusy,
+    leaseExpiresAt,
+    updatedAt: data.updatedAt || null,
+  };
+}
