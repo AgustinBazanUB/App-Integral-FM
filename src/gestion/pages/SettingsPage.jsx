@@ -11,6 +11,7 @@ import {
   reconcileArcaInvoice,
   recoverPreCaeArcaInvoice,
   runArcaDiagnostics,
+  runArcaProductionReadonlyPreflight,
   runArcaWsaaRegistrySharedSmoke,
   runArcaWsaaSharedSmoke,
   verifyAuthorizedArcaInvoice,
@@ -75,6 +76,11 @@ export default function SettingsPage() {
     result: null,
     error: "",
   });
+  const [productionPreflightState, setProductionPreflightState] = useState({
+    busy: false,
+    result: null,
+    error: "",
+  });
 
   const loadInvoices = async () => {
     setInvoiceState((current) => ({ ...current, busy: true, error: "", message: "" }));
@@ -125,6 +131,17 @@ export default function SettingsPage() {
       await loadWsaaCacheStatus();
     } catch (error) {
       setRegistrySmokeState({ busy: false, result: null, error: error.message });
+    }
+  };
+
+  const runProductionReadonlyPreflight = async () => {
+    setProductionPreflightState({ busy: true, result: null, error: "" });
+    try {
+      const result = await runArcaProductionReadonlyPreflight();
+      setProductionPreflightState({ busy: false, result, error: "" });
+      await loadWsaaCacheStatus();
+    } catch (error) {
+      setProductionPreflightState({ busy: false, result: null, error: error.message });
     }
   };
 
@@ -225,6 +242,7 @@ export default function SettingsPage() {
   const pointOfSale = arcaState.result?.pointOfSale?.data;
   const fiscalConfig = arcaState.result?.configuration || arcaConfigState.result || {};
   const caeEnabled = fiscalConfig.caeHomologationEnabled === true;
+  const productionEnvironment = fiscalConfig.environment === "production";
 
   const rows = [
     ["Proyecto Firebase", firebaseConfig.projectId, "Conectado"],
@@ -477,6 +495,7 @@ export default function SettingsPage() {
           {wsaaCacheState.error ? <Toast tone="error">{wsaaCacheState.error}</Toast> : null}
           {wsaaSmokeState.error ? <Toast tone="error">{wsaaSmokeState.error}</Toast> : null}
           {registrySmokeState.error ? <Toast tone="error">{registrySmokeState.error}</Toast> : null}
+          {productionPreflightState.error ? <Toast tone="error">{productionPreflightState.error}</Toast> : null}
           {invoiceState.error ? <Toast tone="error">{invoiceState.error}</Toast> : null}
           {invoiceState.message ? <Toast tone="success">{invoiceState.message}</Toast> : null}
 
@@ -574,6 +593,58 @@ export default function SettingsPage() {
           ) : (
             <p>No hay solicitudes fiscales recientes para mostrar.</p>
           )}
+        </Panel>
+      ) : null}
+
+      {isAdmin && productionEnvironment ? (
+        <Panel
+          title="Preflight ARCA producción"
+          description="Sólo lectura: valida WSFE, punto de venta, Padrón del propio emisor y TA compartidos. La emisión de CAE en producción sigue bloqueada por código."
+          action={(
+            <Button
+              variant="secondary"
+              disabled={!fiscalConfig.productionReadonlyEnabled}
+              loading={productionPreflightState.busy}
+              onClick={runProductionReadonlyPreflight}
+            >
+              Ejecutar preflight
+            </Button>
+          )}
+        >
+          <div className="fm-settings-list">
+            <div>
+              <div>
+                <strong>Conexiones producción</strong>
+                <span>{fiscalConfig.productionReadonlyEnabled ? "Read-only habilitado explícitamente." : "Bloqueadas por configuración."}</span>
+              </div>
+              <Badge tone={fiscalConfig.productionReadonlyEnabled ? "warning" : "success"}>
+                {fiscalConfig.productionReadonlyEnabled ? "Read-only" : "Bloqueado"}
+              </Badge>
+            </div>
+            <div>
+              <div>
+                <strong>CAE producción</strong>
+                <span>Bloqueado por código. Este preflight no puede emitir comprobantes.</span>
+              </div>
+              <Badge tone="success">Bloqueado</Badge>
+            </div>
+            {productionPreflightState.result ? (
+              <div>
+                <div>
+                  <strong>Resultado</strong>
+                  <span>
+                    PV {productionPreflightState.result.pointOfSale?.selected}: {productionPreflightState.result.pointOfSale?.found ? "OK" : "no encontrado"} ·
+                    Emisor: {productionPreflightState.result.issuer?.keyStatus || "sin estado"} ·
+                    TA WSFE: {productionPreflightState.result.cache?.wsfe?.reusable ? "reutilizable" : "no reutilizable"} ·
+                    TA Padrón: {productionPreflightState.result.cache?.registry?.reusable ? "reutilizable" : "no reutilizable"}
+                  </span>
+                </div>
+                <Badge tone={productionPreflightState.result.pointOfSale?.found && productionPreflightState.result.issuer?.keyStatus === "ACTIVO" ? "success" : "warning"}>
+                  Preflight
+                </Badge>
+              </div>
+            ) : null}
+          </div>
         </Panel>
       ) : null}
     </div>
