@@ -1,5 +1,6 @@
 import { requireFirebaseActiveProfile } from "./_lib/firebaseAuth.mjs";
 import { adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
+import { arcaEnvironment } from "./_lib/arca/config.mjs";
 import {
   canRequestInvoiceForSale,
   ensurePendingInvoice,
@@ -28,6 +29,18 @@ export default async function handler(request) {
 
   try {
     const session = await requireFirebaseActiveProfile(request);
+    const environment = arcaEnvironment(process.env).id;
+    if (
+      environment === "production"
+      && String(process.env.ARCA_ALLOW_PRODUCTION_INVOICE_PREPARE || "").trim().toLowerCase() !== "true"
+    ) {
+      return json({
+        ok: false,
+        code: "arca-production-invoice-prepare-disabled",
+        message: "La preparación de facturas productivas está bloqueada por configuración.",
+      }, 409);
+    }
+
     const body = await request.json().catch(() => ({}));
     const sourceType = String(body?.sourceType || "").trim();
     const sourceId = String(body?.sourceId || "").trim();
