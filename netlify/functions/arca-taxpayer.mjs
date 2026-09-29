@@ -176,6 +176,14 @@ export default async function handler(request) {
         service: "wsfe",
         env: process.env,
       });
+      if (!before.configured) {
+        return json({
+          ok: false,
+          code: "arca-wsaa-cache-key-missing",
+          message: "Configurá ARCA_TA_ENCRYPTION_KEY antes de ejecutar la prueba compartida.",
+        }, 409);
+      }
+
       const dummy = await wsfeDummy({ env: process.env });
       const after = await inspectSharedWsaaCache({
         environmentId: environment,
