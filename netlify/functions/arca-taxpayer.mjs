@@ -161,6 +161,55 @@ export default async function handler(request) {
       });
     }
 
+    if (body?.mode === "wsaa-shared-smoke") {
+      const environment = arcaEnvironment(process.env).id;
+      if (environment !== "homologation") {
+        return json({
+          ok: false,
+          code: "homologation-only",
+          message: "La prueba de TA compartido está habilitada sólo en homologación.",
+        }, 409);
+      }
+
+      const before = await inspectSharedWsaaCache({
+        environmentId: environment,
+        service: "wsfe",
+        env: process.env,
+      });
+      const dummy = await wsfeDummy({ env: process.env });
+      const after = await inspectSharedWsaaCache({
+        environmentId: environment,
+        service: "wsfe",
+        env: process.env,
+      });
+
+      return json({
+        ok: true,
+        smoke: {
+          environment,
+          wsfe: {
+            appServer: dummy.appServer,
+            dbServer: dummy.dbServer,
+            authServer: dummy.authServer,
+          },
+          cache: after,
+          reusedExistingTicket: Boolean(
+            before.reusable
+            && after.reusable
+            && before.updatedAt
+            && before.updatedAt === after.updatedAt
+            && before.ticketExpiresAt === after.ticketExpiresAt
+          ),
+          createdOrRenewedTicket: Boolean(
+            after.reusable
+            && (!before.reusable
+              || before.updatedAt !== after.updatedAt
+              || before.ticketExpiresAt !== after.ticketExpiresAt)
+          ),
+        },
+      });
+    }
+
     if (body?.mode === "diagnostics") {
       const diagnostics = await runDiagnostics();
       return json({ ok: true, diagnostics });
