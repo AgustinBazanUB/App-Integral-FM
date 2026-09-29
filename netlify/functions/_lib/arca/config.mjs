@@ -54,14 +54,18 @@ export function assertArcaNetworkAccessAllowed(env = process.env) {
   const environment = arcaEnvironment(env);
   if (environment.id !== "production") return environment;
 
-  const allowed = String(env.ARCA_ALLOW_PRODUCTION_READONLY || "")
+  const readonlyAllowed = String(env.ARCA_ALLOW_PRODUCTION_READONLY || "")
     .trim()
     .toLowerCase() === "true";
-  if (!allowed) {
+  const caeAllowed = String(env.ARCA_ALLOW_PRODUCTION_CAE || "")
+    .trim()
+    .toLowerCase() === "true";
+
+  if (!readonlyAllowed && !caeAllowed) {
     const error = new Error(
-      "Las conexiones ARCA de producción están bloqueadas hasta habilitar ARCA_ALLOW_PRODUCTION_READONLY."
+      "Las conexiones ARCA de producción están bloqueadas. Habilitá explícitamente read-only o el gate controlado de CAE."
     );
-    error.code = "arca-production-readonly-disabled";
+    error.code = "arca-production-network-disabled";
     error.status = 409;
     throw error;
   }
@@ -213,7 +217,8 @@ export function arcaSafeStatus(env = process.env) {
     productionReadonlyEnabled: String(env.ARCA_ALLOW_PRODUCTION_READONLY || "").trim().toLowerCase() === "true",
     productionInvoicePreparationEnabled: String(env.ARCA_ALLOW_PRODUCTION_INVOICE_PREPARE || "").trim().toLowerCase() === "true",
     productionTaxpayerLookupEnabled: String(env.ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP || "").trim().toLowerCase() === "true",
-    productionCaeEnabled: false,
+    productionCaeEnabled: String(env.ARCA_ALLOW_PRODUCTION_CAE || "").trim().toLowerCase() === "true",
+    productionCaeTargetSaleCode: String(env.ARCA_PRODUCTION_CAE_SALE_CODE || "").trim() || null,
     publicConfigError,
   };
 }
