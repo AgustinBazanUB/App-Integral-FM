@@ -663,3 +663,19 @@ Cuando en el futuro se configure un entorno productivo separado con certificado/
 El resultado sólo expone metadatos operativos. No devuelve Token, Sign, certificado, clave privada ni datos fiscales detallados.
 
 La emisión de CAE en producción continúa explícitamente bloqueada dentro del autorizador aunque el gate read-only esté habilitado.
+
+
+### Compatibilidad de migración del primer TA cifrado
+
+La primera validación real de cold start creó un documento de caché con esquema v1, antes de vincular la AAD al CUIT emisor.
+
+Para no invalidar ese TA existente al actualizar código:
+
+- el esquema actual de escritura es v2;
+- el lector acepta temporalmente v1 y v2;
+- v1 se descifra con la AAD histórica exacta;
+- v2 usa AAD ligada a entorno + servicio + CUIT emisor;
+- el diagnóstico marca `needsMigration=true` para v1;
+- en la siguiente renovación natural, el documento se reescribe automáticamente como v2.
+
+Así, un deploy nuevo no rompe el TA compartido que ya fue validado en homologación.
