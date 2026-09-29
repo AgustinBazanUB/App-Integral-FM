@@ -1,6 +1,7 @@
 import { requireFirebaseActiveProfile } from "./_lib/firebaseAuth.mjs";
 import { adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
 import { arcaEnvironment } from "./_lib/arca/config.mjs";
+import { authorizeInvoice, verifyAuthorizedInvoice } from "./_lib/arca/authorizer.mjs";
 import {
   canRequestInvoiceForSale,
   ensurePendingInvoice,
@@ -86,15 +87,76 @@ export default async function handler(request) {
       env: process.env,
     });
 
+    let autoAuthorization = null;
+    const autoProduction = (
+      environment === "production"
+      && String(process.env.ARCA_AUTO_AUTHORIZE_PRODUCTION || "").trim().toLowerCase() === "true"
+      && String(process.env.ARCA_ALLOW_PRODUCTION_CAE || "").trim().toLowerCase() === "true"
+      && result.invoice?.status === "pending"
+      && result.invoice?.fiscalReadiness?.ready === true
+    );
+
+    if (autoProduction) {
+      const issuerVatCondition = String(process.env.ARCA_ISSUER_VAT_CONDITION || "").trim();
+      if (!issuerVatCondition) {
+        const error = new Error("Falta configurar la condición IVA del emisor.");
+        error.code = "arca-issuer-vat-condition-missing";
+        error.status = 409;
+        throw error;
+      }
+
+      const authorization = await authorizeInvoice({
+        invoiceId: result.invoiceId,
+        issuerVatCondition,
+        receiver: { requestedBy: session.uid },
+        allowCaeRequest: true,
+        env: process.env,
+      });
+
+      let verification = null;
+      if (authorization?.status === "authorized") {
+        try {
+          verification = await verifyAuthorizedInvoice({
+            invoiceId: result.invoiceId,
+            env: process.env,
+          });
+        } catch (verificationError) {
+          verification = {
+            verified: false,
+            matched: false,
+            error: safeError(verificationError),
+          };
+        }
+      }
+
+      autoAuthorization = {
+        attempted: true,
+        status: authorization?.status || "unknown",
+        blocked: authorization?.blocked === true,
+        reason: authorization?.reason || null,
+        verification,
+        authorization: authorization?.invoice?.authorization
+          ? {
+              voucherClass: authorization.invoice.authorization.voucherClass || null,
+              pointOfSale: authorization.invoice.authorization.pointOfSale || null,
+              voucherType: authorization.invoice.authorization.voucherType || null,
+              voucherNumber: authorization.invoice.authorization.voucherNumber || null,
+              caeExpiration: authorization.invoice.authorization.caeExpiration || null,
+            }
+          : null,
+      };
+    }
+
     return json({
       ok: true,
       created: result.created,
       invoice: {
         id: result.invoiceId,
-        status: result.invoice?.status || "pending",
+        status: autoAuthorization?.status || result.invoice?.status || "pending",
         fiscalReadiness: result.invoice?.fiscalReadiness || null,
         sourceType: result.invoice?.sourceType || sourceType,
         sourceId: result.invoice?.sourceId || sourceId,
+        autoAuthorization,
       },
     });
   } catch (error) {
