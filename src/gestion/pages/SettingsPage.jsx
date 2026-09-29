@@ -416,11 +416,11 @@ export default function SettingsPage() {
                 <span>
                   {wsaaSmokeState.result
                     ? wsaaSmokeState.result.reusedExistingTicket
-                      ? "OK: FEDummy reutilizó el TA persistido; no se creó otro LoginCms."
+                      ? "OK: FEParamGetPtosVenta reutilizó el TA persistido; no se creó otro LoginCms."
                       : wsaaSmokeState.result.createdOrRenewedTicket
-                        ? "OK: FEDummy creó/renovó un TA y lo publicó cifrado."
-                        : "FEDummy respondió; revisar metadata de caché."
-                    : "FEDummy + caché compartida. No genera CAE ni comprobantes."}
+                        ? "OK: FEParamGetPtosVenta creó/renovó un TA y lo publicó cifrado."
+                        : "FEParamGetPtosVenta respondió; revisar metadata de caché."
+                    : "FEParamGetPtosVenta + caché compartida. No genera CAE ni comprobantes."}
                 </span>
               </div>
               <Button
