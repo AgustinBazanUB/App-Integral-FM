@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { signCmsBase64 } from "./cms.mjs";
-import { loadArcaSecrets, arcaEnvironment } from "./config.mjs";
+import { assertArcaNetworkAccessAllowed, loadArcaSecrets, arcaEnvironment } from "./config.mjs";
 import { escapeXml, soapRequest, xmlTag } from "./xml.mjs";
 import {
   acquireWsaaRenewalLease,
@@ -114,7 +114,7 @@ export async function requestAccessTicket(service, {
   forceRefresh = false,
   sharedCache = {},
 } = {}) {
-  const environment = arcaEnvironment(env);
+  const environment = assertArcaNetworkAccessAllowed(env);
   const cacheKey = `${environment.id}:${service}`;
   const cached = ticketCache.get(cacheKey);
 
