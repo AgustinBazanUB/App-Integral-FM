@@ -505,3 +505,85 @@ Hasta completar esa etapa:
 - no se habilita emisión automática en producción;
 - no se cambia `ARCA_ENVIRONMENT` a `production`;
 - el PR #26 permanece sin merge.
+
+
+## 25. Caché WSAA compartida cifrada
+
+Se implementó la capa previa a producción para evitar que distintas Netlify Functions soliciten Ticket de Acceso WSAA de forma independiente.
+
+### Arquitectura
+
+La resolución de TA ahora sigue este orden:
+
+1. caché caliente en memoria del proceso;
+2. caché compartida server-side en Firestore;
+3. lease exclusivo de renovación;
+4. sólo el holder del lease puede llamar a `LoginCms`;
+5. el TA resultante se cifra antes de persistirse;
+6. otras instancias reutilizan el TA compartido.
+
+Colección backend:
+
+`arcaWsaaTickets/{environment}_{service}`
+
+El navegador tiene lectura y escritura explícitamente denegadas por reglas Firestore. La cuenta de servicio del backend accede mediante la API administrativa.
+
+### Cifrado
+
+Token y Sign no se persisten en claro.
+
+Se usa:
+
+- AES-256-GCM;
+- IV aleatorio de 96 bits;
+- authentication tag de GCM;
+- AAD ligada a versión, entorno y servicio;
+- clave de 32 bytes Base64 en `ARCA_TA_ENCRYPTION_KEY`.
+
+La AAD evita reutilizar un ciphertext de un entorno/servicio como si perteneciera a otro.
+
+### Concurrencia
+
+La renovación utiliza un lease con CAS basado en `updateTime` de Firestore.
+
+Si dos instancias intentan renovar simultáneamente:
+
+- una adquiere el lease;
+- la otra espera y consulta el documento compartido;
+- cuando el primer worker publica el TA, el segundo lo reutiliza;
+- si otro worker publicó un TA entre lectura y adquisición del lease, no se vuelve a llamar WSAA.
+
+### Producción
+
+`requestAccessTicket` rechaza el uso de producción si no existe `ARCA_TA_ENCRYPTION_KEY`.
+
+En homologación se mantiene temporalmente compatibilidad con caché en memoria si la clave todavía no está configurada, para permitir migración controlada.
+
+### Inspección segura
+
+Se agregó un diagnóstico de caché que informa únicamente:
+
+- configurada/no configurada;
+- documento presente;
+- payload descifrable;
+- TA reutilizable;
+- vencimiento;
+- lease activo y su vencimiento.
+
+Nunca devuelve Token, Sign ni la clave de cifrado.
+
+### Validación automatizada
+
+Los tests ARCA cubren:
+
+- longitud/formato de la clave;
+- round-trip AES-256-GCM;
+- ausencia de Token/Sign en el documento serializado;
+- fallo de autenticación GCM si se intenta usar el payload para otro servicio;
+- exclusión mutua del lease;
+- reutilización del TA publicado;
+- cold start simulado: caché de memoria vacía + reutilización desde Firestore sin llamar WSAA;
+- bloqueo de producción sin caché compartida;
+- inspección segura sin exposición de secretos.
+
+Próxima prueba real: configurar una clave sólo en homologación, crear/reutilizar un TA sin emitir CAE, reiniciar Netlify Dev para borrar la caché en memoria y confirmar que una segunda operación autenticada reutiliza el TA cifrado persistido.
