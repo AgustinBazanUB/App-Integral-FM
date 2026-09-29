@@ -85,8 +85,21 @@ export function wsaaSharedCacheConfigured(env = process.env) {
   return Boolean(parseWsaaEncryptionKey(env, { required: false }));
 }
 
-function aad(environmentId, service) {
-  return Buffer.from(`arca-wsaa-ticket:v${SCHEMA_VERSION}:${environmentKey(environmentId)}:${serviceKey(service)}`, "utf8");
+function issuerScope(env = process.env) {
+  const issuerCuit = String(env.ARCA_ISSUER_CUIT || "").replace(/\D/g, "");
+  if (!/^\d{11}$/.test(issuerCuit)) {
+    const error = new Error("ARCA_ISSUER_CUIT es obligatorio para aislar la caché WSAA compartida.");
+    error.code = "arca-wsaa-cache-issuer-missing";
+    throw error;
+  }
+  return issuerCuit;
+}
+
+function aad(environmentId, service, env) {
+  return Buffer.from(
+    `arca-wsaa-ticket:v${SCHEMA_VERSION}:${environmentKey(environmentId)}:${serviceKey(service)}:${issuerScope(env)}`,
+    "utf8",
+  );
 }
 
 export function encryptWsaaTicket(ticket, {
@@ -107,7 +120,7 @@ export function encryptWsaaTicket(ticket, {
   }
 
   const cipher = createCipheriv(CIPHER, key, iv);
-  cipher.setAAD(aad(environmentId, service));
+  cipher.setAAD(aad(environmentId, service, env));
   const plaintext = Buffer.from(JSON.stringify({
     token: String(ticket.token),
     sign: String(ticket.sign),
@@ -143,7 +156,7 @@ export function decryptWsaaTicket(record, {
       key,
       Buffer.from(record.iv, "base64"),
     );
-    decipher.setAAD(aad(environmentId, service));
+    decipher.setAAD(aad(environmentId, service, env));
     decipher.setAuthTag(Buffer.from(record.authTag, "base64"));
     const plaintext = Buffer.concat([
       decipher.update(Buffer.from(record.ciphertext, "base64")),
