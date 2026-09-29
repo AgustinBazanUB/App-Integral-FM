@@ -3,6 +3,7 @@ import {
   adminGetDocument,
   adminPatchDocument,
 } from "../firestoreAdminRest.mjs";
+import { arcaEnvironment } from "./config.mjs";
 
 function positiveInteger(value, label) {
   const number = Number(value);
@@ -14,12 +15,18 @@ function positiveInteger(value, label) {
   return number;
 }
 
-function lockDocumentId(pointOfSale, voucherType) {
-  return `pos_${positiveInteger(pointOfSale, "Punto de venta")}_type_${positiveInteger(voucherType, "Tipo de comprobante")}`;
+function lockDocumentId(environment, pointOfSale, voucherType) {
+  const environmentId = String(environment || "").trim().toLowerCase();
+  if (!["homologation", "production"].includes(environmentId)) {
+    const error = new Error("Entorno inválido para lock fiscal.");
+    error.code = "arca-sequence-lock-environment-invalid";
+    throw error;
+  }
+  return `${environmentId}_pos_${positiveInteger(pointOfSale, "Punto de venta")}_type_${positiveInteger(voucherType, "Tipo de comprobante")}`;
 }
 
-function lockPath(pointOfSale, voucherType) {
-  return `arcaSequenceLocks/${lockDocumentId(pointOfSale, voucherType)}`;
+function lockPath(environment, pointOfSale, voucherType) {
+  return `arcaSequenceLocks/${lockDocumentId(environment, pointOfSale, voucherType)}`;
 }
 
 function iso(value) {
@@ -49,14 +56,16 @@ export async function acquireSequenceLock({
     throw error;
   }
 
-  const documentId = lockDocumentId(pointOfSale, voucherType);
-  const path = lockPath(pointOfSale, voucherType);
+  const environment = arcaEnvironment(env).id;
+  const documentId = lockDocumentId(environment, pointOfSale, voucherType);
+  const path = lockPath(environment, pointOfSale, voucherType);
   const leaseExpiresAt = iso(new Date(now.getTime() + Number(leaseMs || 60000)));
   const current = await getDocument(path, { env });
 
   if (!current) {
     try {
       const created = await createDocument("arcaSequenceLocks", documentId, {
+        environment,
         pointOfSale: Number(pointOfSale),
         voucherType: Number(voucherType),
         holder: cleanHolder,
@@ -136,7 +145,8 @@ export async function releaseSequenceLock({
   getDocument = adminGetDocument,
   patchDocument = adminPatchDocument,
 } = {}) {
-  const path = lockPath(pointOfSale, voucherType);
+  const environment = arcaEnvironment(env).id;
+  const path = lockPath(environment, pointOfSale, voucherType);
   const current = await getDocument(path, { env });
   if (!current) return { released: true, reason: "missing" };
 
