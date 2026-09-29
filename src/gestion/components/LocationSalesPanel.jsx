@@ -22,6 +22,11 @@ import {
   toDate,
 } from "../formatters";
 import { cancelSellerSale } from "../services/sellerService";
+import {
+  arcaSourceTypeForSale,
+  fetchArcaInvoicePdf,
+  getArcaInvoiceForSale,
+} from "../services/arcaService";
 import { listLocationSalesPage } from "../services/locationSalesService";
 import { Icon } from "./icons";
 
@@ -67,6 +72,8 @@ export default function LocationSalesPanel({ profile, location, products = [] })
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelReason, setCancelReason] = useState("");
   const [actionState, setActionState] = useState({ busy: false, error: "", success: "" });
+  const [fiscalState, setFiscalState] = useState({ status: "idle", invoice: null, error: "" });
+  const [documentState, setDocumentState] = useState({ busy: false, error: "", success: "" });
 
   const loadFirstPage = useCallback(async () => {
     setState({ status: "loading", items: [], cursor: null, hasMore: false, error: null });
@@ -81,6 +88,84 @@ export default function LocationSalesPanel({ profile, location, products = [] })
   useEffect(() => {
     loadFirstPage();
   }, [loadFirstPage]);
+
+  useEffect(() => {
+    let active = true;
+    if (!detail) {
+      setFiscalState({ status: "idle", invoice: null, error: "" });
+      setDocumentState({ busy: false, error: "", success: "" });
+      return () => {
+        active = false;
+      };
+    }
+
+    const requested = Boolean(
+      detail.fiscalInvoiceId
+      || detail.fiscalInvoice
+      || detail.ticketRequested === true
+      || (detail.invoiceStatus && detail.invoiceStatus !== "not_requested")
+    );
+    if (!requested) {
+      setFiscalState({ status: "ready", invoice: null, error: "" });
+      return () => {
+        active = false;
+      };
+    }
+
+    setFiscalState({
+      status: "loading",
+      invoice: detail.fiscalInvoice ? {
+        id: detail.fiscalInvoiceId || detail.fiscalInvoice.id || null,
+        status: detail.fiscalInvoice.status,
+        fiscalEnvironment: detail.fiscalInvoice.environment,
+        sourceType: detail.fiscalInvoice.sourceType,
+        authorization: detail.fiscalInvoice,
+        verification: {
+          matched: detail.fiscalInvoice.verificationMatched,
+          checkedAt: detail.fiscalInvoice.verificationCheckedAt,
+        },
+        pdf: { ready: false, issuerDataReady: false, missingIssuerFields: [] },
+      } : null,
+      error: "",
+    });
+
+    getArcaInvoiceForSale({
+      saleId: detail.id,
+      sourceType: arcaSourceTypeForSale(detail),
+      invoiceId: detail.fiscalInvoiceId || null,
+    })
+      .then((invoice) => {
+        if (!active) return;
+        setFiscalState({ status: "ready", invoice, error: "" });
+        setState((current) => ({
+          ...current,
+          items: current.items.map((sale) => sale.id === detail.id
+            ? {
+                ...sale,
+                fiscalInvoiceId: invoice.id,
+                invoiceStatus: invoice.status,
+                fiscalInvoice: {
+                  id: invoice.id,
+                  environment: invoice.fiscalEnvironment,
+                  sourceType: invoice.sourceType,
+                  status: invoice.status,
+                  ...invoice.authorization,
+                  verificationMatched: invoice.verification?.matched,
+                  verificationCheckedAt: invoice.verification?.checkedAt,
+                },
+              }
+            : sale),
+        }));
+      })
+      .catch((error) => {
+        if (!active) return;
+        setFiscalState({ status: "error", invoice: null, error: error.message });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [detail?.id]);
 
   const loadMore = async () => {
     if (!state.hasMore || loadingMore) return;
@@ -149,6 +234,88 @@ export default function LocationSalesPanel({ profile, location, products = [] })
   const detailDiscountTotals = storedDiscountTotals(detail || {});
   const detailPayments = salePaymentParts(detail || {});
   const detailTicket = ticketStatus(detail || {});
+  const detailInvoice = fiscalState.invoice || null;
+
+  const fetchDetailPdf = async (disposition = "inline") => fetchArcaInvoicePdf({
+    saleId: detail.id,
+    sourceType: arcaSourceTypeForSale(detail),
+    invoiceId: detailInvoice?.id || detail.fiscalInvoiceId || null,
+    disposition,
+  });
+
+  const viewInvoicePdf = async () => {
+    if (!detail || !detailInvoice) return;
+    const previewWindow = window.open("", "_blank");
+    setDocumentState({ busy: true, error: "", success: "" });
+    try {
+      const { blob } = await fetchDetailPdf("inline");
+      const url = URL.createObjectURL(blob);
+      if (previewWindow) previewWindow.location.href = url;
+      else window.open(url, "_blank");
+      window.setTimeout(() => URL.revokeObjectURL(url), 120000);
+      setDocumentState({ busy: false, error: "", success: "" });
+    } catch (error) {
+      previewWindow?.close();
+      setDocumentState({ busy: false, error: error.message, success: "" });
+    }
+  };
+
+  const downloadInvoicePdf = async () => {
+    if (!detail || !detailInvoice) return;
+    setDocumentState({ busy: true, error: "", success: "" });
+    try {
+      const { blob, filename } = await fetchDetailPdf("attachment");
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+      setDocumentState({ busy: false, error: "", success: "PDF descargado correctamente." });
+    } catch (error) {
+      setDocumentState({ busy: false, error: error.message, success: "" });
+    }
+  };
+
+  const shareInvoicePdf = async () => {
+    if (!detail || !detailInvoice) return;
+    setDocumentState({ busy: true, error: "", success: "" });
+    try {
+      const { blob, filename } = await fetchDetailPdf("attachment");
+      const file = typeof File !== "undefined" ? new File([blob], filename, { type: "application/pdf" }) : null;
+      if (file && navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: `Factura ${detailInvoice.authorization?.voucherClass || ""} ${detailInvoice.authorization?.pointOfSale || ""}-${detailInvoice.authorization?.voucherNumber || ""}`,
+          text: `Comprobante de la venta ${detail.saleCode || detail.id}`,
+          files: [file],
+        });
+        setDocumentState({ busy: false, error: "", success: "Comprobante compartido." });
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+      setDocumentState({
+        busy: false,
+        error: "",
+        success: "Tu navegador no permite compartir archivos directamente. Descargué el PDF para que puedas reenviarlo por WhatsApp u otro canal.",
+      });
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        setDocumentState({ busy: false, error: "", success: "" });
+        return;
+      }
+      setDocumentState({ busy: false, error: error.message, success: "" });
+    }
+  };
 
   return (
     <div className="fm-location-sales">
@@ -182,7 +349,7 @@ export default function LocationSalesPanel({ profile, location, products = [] })
                 <div className="fm-location-sale__seller"><Icon name="UserRound" /><span>{sale.sellerName || "Vendedor"}</span></div>
                 <div className="fm-location-sale__meta"><span>{Number(sale.totalItems || 0)} productos</span><span>{paymentLabels[sale.paymentMethod] || sale.paymentMethodLabel || "Sin pago"}</span></div>
                 <strong className="fm-location-sale__total">{formatMoney(sale.total)}</strong>
-                <div className="fm-location-sale__badges"><Badge tone={statusTone(sale.status)}>{saleStatusLabel(sale.status)}</Badge>{sale.ticketRequested ? <Badge tone={ticket.tone}>Ticket {ticket.label}</Badge> : null}</div>
+                <div className="fm-location-sale__badges"><Badge tone={statusTone(sale.status)}>{saleStatusLabel(sale.status)}</Badge>{sale.ticketRequested ? <Badge tone={ticket.tone}>Ticket {ticket.label}</Badge> : null}{sale.fiscalInvoice?.status === "authorized" || sale.invoiceStatus === "authorized" ? <Badge tone="success">Factura ARCA</Badge> : sale.invoiceStatus === "pending" ? <Badge tone="warning">Factura pendiente</Badge> : null}</div>
               </button>
             );
           })}
@@ -223,6 +390,48 @@ export default function LocationSalesPanel({ profile, location, products = [] })
             </section>
 
             <section><h3>Ticket</h3><div className="fm-location-sale-detail__ticket"><Icon name="ReceiptText" /><span>{detail.ticketRequested ? "Solicitado" : "No solicitado"}</span><Badge tone={detailTicket.tone}>{detailTicket.label}</Badge></div></section>
+
+            <section>
+              <h3>Factura ARCA</h3>
+              {fiscalState.status === "loading" ? <Skeleton lines={3} /> : null}
+              {fiscalState.status === "error" ? <Toast tone="error">{fiscalState.error}</Toast> : null}
+              {fiscalState.status === "ready" && !detailInvoice ? <p className="fm-muted">Esta venta no tiene comprobante fiscal asociado.</p> : null}
+              {detailInvoice ? (
+                <>
+                  <div className="fm-location-sale-detail__ticket">
+                    <Icon name="ReceiptText" />
+                    <span>
+                      {detailInvoice.authorization?.voucherClass
+                        ? `Factura ${detailInvoice.authorization.voucherClass} · PV ${detailInvoice.authorization.pointOfSale || "-"} · N.º ${detailInvoice.authorization.voucherNumber || "-"}`
+                        : "Solicitud fiscal"}
+                    </span>
+                    <Badge tone={detailInvoice.status === "authorized" ? "success" : detailInvoice.status === "rejected" || detailInvoice.status === "error" ? "error" : "warning"}>
+                      {detailInvoice.status || "pendiente"}
+                    </Badge>
+                  </div>
+                  <dl className="fm-location-sale-detail__audit">
+                    <div><dt>CAE</dt><dd>{detailInvoice.authorization?.cae || "Pendiente"}</dd></div>
+                    <div><dt>Vencimiento CAE</dt><dd>{detailInvoice.authorization?.caeExpiration || "Pendiente"}</dd></div>
+                    <div><dt>Verificación ARCA</dt><dd>{detailInvoice.verification?.matched === true ? "FECompConsultar coincide" : detailInvoice.verification?.matched === false ? "Requiere revisión" : "Pendiente"}</dd></div>
+                    <div><dt>Entorno fiscal</dt><dd>{detailInvoice.fiscalEnvironment || "Sin dato"}</dd></div>
+                  </dl>
+                  {detailInvoice.status === "authorized" ? (
+                    <>
+                      {!detailInvoice.pdf?.issuerDataReady ? (
+                        <p className="fm-muted">El comprobante está autorizado, pero faltan datos del emisor para habilitar el PDF: {(detailInvoice.pdf?.missingIssuerFields || []).join(", ") || "configuración fiscal del emisor"}.</p>
+                      ) : null}
+                      {documentState.error ? <Toast tone="error">{documentState.error}</Toast> : null}
+                      {documentState.success ? <Toast tone="success">{documentState.success}</Toast> : null}
+                      <div className="fm-dialog-actions">
+                        <Button type="button" variant="secondary" loading={documentState.busy} disabled={!detailInvoice.pdf?.ready || documentState.busy} onClick={viewInvoicePdf}>Ver factura</Button>
+                        <Button type="button" variant="secondary" loading={documentState.busy} disabled={!detailInvoice.pdf?.ready || documentState.busy} onClick={downloadInvoicePdf}>Descargar PDF</Button>
+                        <Button type="button" loading={documentState.busy} disabled={!detailInvoice.pdf?.ready || documentState.busy} onClick={shareInvoicePdf}>Compartir / reenviar</Button>
+                      </div>
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+            </section>
 
             <section><h3>Auditoría</h3><dl className="fm-location-sale-detail__audit"><div><dt>Usuario creador</dt><dd>{detail.createdByName || detail.sellerName || detail.createdBy || detail.sellerId || "Sin dato"}</dd></div><div><dt>Creación</dt><dd>{formatDateTime(detail.createdAt)}</dd></div>{detail.editedAt ? <><div><dt>Última edición</dt><dd>{formatDateTime(detail.editedAt)}</dd></div><div><dt>Editado por</dt><dd>{detail.editedByName || detail.editedBy || "Sin dato"}</dd></div></> : null}{detail.cancelledAt ? <><div><dt>Anulación</dt><dd>{formatDateTime(detail.cancelledAt)}</dd></div><div><dt>Anulada por</dt><dd>{detail.cancelledByName || detail.cancelledBy || "Sin dato"}</dd></div><div><dt>Motivo</dt><dd>{detail.cancelReason || "Sin dato"}</dd></div></> : null}</dl></section>
           </div>
