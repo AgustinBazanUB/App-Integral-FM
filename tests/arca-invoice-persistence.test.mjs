@@ -108,7 +108,7 @@ test("crea una sola solicitud pending y reutiliza el ID determinístico", async 
 
   assert.equal(first.created, true);
   assert.equal(second.created, false);
-  assert.equal(first.invoiceId, "invoice_seller_sale_sale-1");
+  assert.equal(first.invoiceId, "invoice_homologation_seller_sale_sale-1");
   assert.equal(second.invoiceId, first.invoiceId);
   assert.equal(store.documents.size, 3);
   assert.equal(first.invoice.status, "pending");
@@ -267,4 +267,83 @@ test("claim pierde limpiamente ante una precondición concurrente", async () => 
   assert.equal(result.claimed, false);
   assert.equal(result.reason, "concurrent-claim");
   assert.equal(result.invoice.status, "authorizing");
+});
+
+
+test("misma venta puede tener solicitudes separadas por entorno fiscal", async () => {
+  const store = memoryStore({
+    "sales/sale-env": sale,
+    "products/product-1": {
+      name: "Producto",
+      arcaVatRate: 21,
+      active: true,
+      deleted: false,
+    },
+  });
+
+  const homo = await ensurePendingInvoice({
+    sourceType: "seller_sale",
+    sourceId: "sale-env",
+    requestedBy: "seller-1",
+    env: {
+      ARCA_ENVIRONMENT: "homologation",
+      ARCA_POINT_OF_SALE: "3",
+    },
+    getDocument: store.getDocument,
+    createDocument: store.createDocument,
+  });
+
+  const prod = await ensurePendingInvoice({
+    sourceType: "seller_sale",
+    sourceId: "sale-env",
+    requestedBy: "seller-1",
+    env: {
+      ARCA_ENVIRONMENT: "production",
+      ARCA_POINT_OF_SALE: "8",
+    },
+    getDocument: store.getDocument,
+    createDocument: store.createDocument,
+  });
+
+  assert.equal(homo.invoiceId, "invoice_homologation_seller_sale_sale-env");
+  assert.equal(prod.invoiceId, "invoice_production_seller_sale_sale-env");
+  assert.equal(homo.invoice.fiscalEnvironment, "homologation");
+  assert.equal(prod.invoice.fiscalEnvironment, "production");
+  assert.equal(homo.invoice.pointOfSaleSnapshot, 3);
+  assert.equal(prod.invoice.pointOfSaleSnapshot, 8);
+});
+
+test("homologación reutiliza factura legacy, producción no la adopta", async () => {
+  const store = memoryStore({
+    "sales/sale-legacy": sale,
+    "products/product-1": { name: "Producto", arcaVatRate: 21 },
+    "invoices/invoice_seller_sale_sale-legacy": {
+      sourceType: "seller_sale",
+      sourceId: "sale-legacy",
+      status: "authorized",
+    },
+  });
+
+  const homo = await ensurePendingInvoice({
+    sourceType: "seller_sale",
+    sourceId: "sale-legacy",
+    requestedBy: "seller-1",
+    env: { ARCA_ENVIRONMENT: "homologation" },
+    getDocument: store.getDocument,
+    createDocument: store.createDocument,
+  });
+
+  const prod = await ensurePendingInvoice({
+    sourceType: "seller_sale",
+    sourceId: "sale-legacy",
+    requestedBy: "seller-1",
+    env: { ARCA_ENVIRONMENT: "production" },
+    getDocument: store.getDocument,
+    createDocument: store.createDocument,
+  });
+
+  assert.equal(homo.invoiceId, "invoice_seller_sale_sale-legacy");
+  assert.equal(homo.legacy, true);
+  assert.equal(prod.invoiceId, "invoice_production_seller_sale_sale-legacy");
+  assert.equal(prod.created, true);
 });
