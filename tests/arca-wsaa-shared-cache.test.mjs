@@ -1,4 +1,5 @@
 import test from "node:test";
+import { createCipheriv } from "node:crypto";
 import assert from "node:assert/strict";
 
 import { requestAccessTicket, clearWsaaTicketCache } from "../netlify/functions/_lib/arca/wsaa.mjs";
@@ -73,6 +74,32 @@ function ticket() {
     sign: "SIGN-SECRETO-WSAA",
     expirationTime,
     expiresAt: new Date(expirationTime),
+  };
+}
+
+function legacyV1Record() {
+  const key = Buffer.from(KEY, "base64");
+  const iv = Buffer.alloc(12, 9);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  cipher.setAAD(Buffer.from("arca-wsaa-ticket:v1:homologation:wsfe", "utf8"));
+  const plaintext = Buffer.from(JSON.stringify({
+    token: "TOKEN-SECRETO-WSAA",
+    sign: "SIGN-SECRETO-WSAA",
+    expirationTime: "2026-09-29T13:00:00.000Z",
+  }), "utf8");
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  return {
+    schemaVersion: 1,
+    environment: "homologation",
+    service: "wsfe",
+    cipher: "aes-256-gcm",
+    ciphertext: ciphertext.toString("base64"),
+    iv: iv.toString("base64"),
+    authTag: cipher.getAuthTag().toString("base64"),
+    ticketExpiresAt: "2026-09-29T13:00:00.000Z",
+    leaseHolder: null,
+    leaseExpiresAt: null,
+    updatedAt: "2026-09-29T11:59:00.000Z",
   };
 }
 
@@ -332,4 +359,40 @@ test("AAD también aísla por CUIT emisor", () => {
     }),
     (error) => error?.code === "arca-wsaa-cache-decrypt-error",
   );
+});
+
+
+test("caché v1 real se sigue descifrando tras agregar aislamiento por CUIT", async () => {
+  const db = memoryStore();
+  const path = "arcaWsaaTickets/homologation_wsfe";
+  db.documents.set(path, {
+    path,
+    data: legacyV1Record(),
+    createTime: "c-legacy",
+    updateTime: "u-legacy",
+  });
+
+  const shared = await readSharedWsaaTicket({
+    environmentId: "homologation",
+    service: "wsfe",
+    env: ENV,
+    now: new Date("2026-09-29T12:00:00.000Z"),
+    getDocument: db.getDocument,
+  });
+
+  assert.equal(shared.ticket.token, "TOKEN-SECRETO-WSAA");
+  assert.equal(shared.ticket.sign, "SIGN-SECRETO-WSAA");
+
+  const status = await inspectSharedWsaaCache({
+    environmentId: "homologation",
+    service: "wsfe",
+    env: ENV,
+    now: new Date("2026-09-29T12:00:00.000Z"),
+    getDocument: db.getDocument,
+  });
+
+  assert.equal(status.decryptable, true);
+  assert.equal(status.reusable, true);
+  assert.equal(status.schemaVersion, 1);
+  assert.equal(status.needsMigration, true);
 });
