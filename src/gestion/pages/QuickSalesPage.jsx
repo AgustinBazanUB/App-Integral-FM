@@ -136,6 +136,12 @@ export default function QuickSalesPage() {
           });
           if (invoice?.fiscalReadiness?.ready === false) {
             invoiceNotice = " Solicitud fiscal creada; faltan datos fiscales de uno o más productos antes de autorizarla.";
+          } else if (invoice?.autoAuthorization?.status === "authorized") {
+            const auth = invoice.autoAuthorization.authorization || {};
+            const verified = invoice.autoAuthorization.verification?.matched === true;
+            invoiceNotice = ` Factura ${auth.voucherClass || ""} autorizada · PV ${auth.pointOfSale || "-"} · N° ${auth.voucherNumber || "-"}${verified ? " · verificada en ARCA" : " · pendiente de verificación"}.`;
+          } else if (invoice?.autoAuthorization?.attempted) {
+            invoiceNotice = ` Solicitud fiscal en estado ${invoice.autoAuthorization.status || invoice.status || "pendiente"}; revisar antes de continuar.`;
           } else {
             const dryRun = await dryRunArcaInvoice({ invoiceId: invoice.id });
             if (dryRun?.blocked) {
