@@ -14,7 +14,10 @@ import {
 } from "../netlify/functions/_lib/arca/wsaaSharedCache.mjs";
 
 const KEY = Buffer.alloc(32, 7).toString("base64");
-const ENV = { ARCA_TA_ENCRYPTION_KEY: KEY };
+const ENV = {
+  ARCA_TA_ENCRYPTION_KEY: KEY,
+  ARCA_ISSUER_CUIT: "20-12345678-6",
+};
 
 function memoryStore() {
   const documents = new Map();
