@@ -103,6 +103,16 @@ before(async () => {
         cae: "00000000000000",
         createdAt: new Date(),
       }),
+      setDoc(doc(database, "arcaWsaaTickets", "homologation_wsfe"), {
+        schemaVersion: 1,
+        environment: "homologation",
+        service: "wsfe",
+        cipher: "aes-256-gcm",
+        ciphertext: "opaque",
+        iv: "opaque",
+        authTag: "opaque",
+        ticketExpiresAt: new Date(),
+      }),
       setDoc(doc(database, "customerZones", "zone-active"), {
         name: "Zona Norte",
         active: true,
@@ -168,6 +178,24 @@ test("las facturas fiscales sólo pueden mutarse desde el backend", async () => 
   }));
   await assertFails(updateDoc(doc(adminDb, "invoices", "invoice-1"), {
     status: "error",
+  }));
+});
+
+test("la caché WSAA compartida es invisible e inmutable para cualquier cliente", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const sellerDb = environment.authenticatedContext("seller-1").firestore();
+  const adminRef = doc(adminDb, "arcaWsaaTickets", "homologation_wsfe");
+  const sellerRef = doc(sellerDb, "arcaWsaaTickets", "homologation_wsfe");
+
+  await assertFails(getDoc(adminRef));
+  await assertFails(getDoc(sellerRef));
+  await assertFails(setDoc(doc(adminDb, "arcaWsaaTickets", "browser-created"), {
+    environment: "homologation",
+    service: "wsfe",
+    ciphertext: "forbidden",
+  }));
+  await assertFails(updateDoc(adminRef, {
+    ciphertext: "forbidden-update",
   }));
 });
 
