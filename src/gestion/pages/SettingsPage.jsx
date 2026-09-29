@@ -670,6 +670,24 @@ export default function SettingsPage() {
             </div>
             <div>
               <div>
+                <strong>Preparación de facturas productivas</strong>
+                <span>{fiscalConfig.productionInvoicePreparationEnabled ? "Habilitada explícitamente." : "Bloqueada por configuración."}</span>
+              </div>
+              <Badge tone={fiscalConfig.productionInvoicePreparationEnabled ? "warning" : "success"}>
+                {fiscalConfig.productionInvoicePreparationEnabled ? "Habilitada" : "Bloqueada"}
+              </Badge>
+            </div>
+            <div>
+              <div>
+                <strong>Padrón productivo de clientes</strong>
+                <span>{fiscalConfig.productionTaxpayerLookupEnabled ? "Habilitado explícitamente." : "Bloqueado por configuración."}</span>
+              </div>
+              <Badge tone={fiscalConfig.productionTaxpayerLookupEnabled ? "warning" : "success"}>
+                {fiscalConfig.productionTaxpayerLookupEnabled ? "Habilitado" : "Bloqueado"}
+              </Badge>
+            </div>
+            <div>
+              <div>
                 <strong>CAE producción</strong>
                 <span>Bloqueado por código. Este preflight no puede emitir comprobantes.</span>
               </div>
