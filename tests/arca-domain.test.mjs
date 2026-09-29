@@ -261,17 +261,23 @@ test("fault SOAP de WSAA conserva coe.alreadyAuthenticated y no se disfraza de e
 });
 
 
-test("producción queda bloqueada por defecto y requiere habilitación read-only explícita", () => {
+test("producción queda bloqueada por defecto y acepta gates explícitos separados", () => {
   assert.throws(
     () => assertArcaNetworkAccessAllowed({ ARCA_ENVIRONMENT: "production" }),
-    (error) => error?.code === "arca-production-readonly-disabled",
+    (error) => error?.code === "arca-production-network-disabled",
   );
 
-  const environment = assertArcaNetworkAccessAllowed({
+  const readonlyEnvironment = assertArcaNetworkAccessAllowed({
     ARCA_ENVIRONMENT: "production",
     ARCA_ALLOW_PRODUCTION_READONLY: "true",
   });
-  assert.equal(environment.id, "production");
+  assert.equal(readonlyEnvironment.id, "production");
+
+  const caeEnvironment = assertArcaNetworkAccessAllowed({
+    ARCA_ENVIRONMENT: "production",
+    ARCA_ALLOW_PRODUCTION_CAE: "true",
+  });
+  assert.equal(caeEnvironment.id, "production");
 });
 
 
