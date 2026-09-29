@@ -977,6 +977,11 @@ service cloud.firestore {
       // del backend de facturación. El navegador nunca crea ni muta comprobantes.
       allow create, update, delete: if false;
     }
+    match /arcaWsaaTickets/{ticketId} {
+      // Contiene únicamente payload WSAA cifrado + metadatos de lease.
+      // Es exclusivo del backend con cuenta de servicio; ningún cliente lo lee/escribe.
+      allow read, write: if false;
+    }
     match /financialEntries/{entryId} {
       allow read: if canModule("finance", "view");
       allow create: if canModule("finance", "create") && ownsNewRecord();
