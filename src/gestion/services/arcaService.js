@@ -171,3 +171,76 @@ export async function verifyAuthorizedArcaInvoice({ invoiceId }) {
     invoiceId,
   });
 }
+
+
+async function arcaDocumentPost(payload, { expectPdf = false } = {}) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Iniciá sesión para consultar el comprobante fiscal.");
+  const token = await user.getIdToken();
+  const response = await fetch("/.netlify/functions/arca-document", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (expectPdf) {
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const error = new Error(data?.message || "No se pudo generar el PDF fiscal.");
+      error.code = data?.code || "arca-pdf-error";
+      error.status = response.status;
+      error.missing = data?.missing || [];
+      throw error;
+    }
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    return {
+      blob: await response.blob(),
+      filename: match?.[1] || "Factura_ARCA.pdf",
+    };
+  }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok !== true) {
+    const error = new Error(data?.message || "No se pudo consultar el comprobante fiscal.");
+    error.code = data?.code || "arca-document-error";
+    error.status = response.status;
+    error.missing = data?.missing || [];
+    throw error;
+  }
+  return data;
+}
+
+export function arcaSourceTypeForSale(sale = {}) {
+  if (sale?.fiscalInvoice?.sourceType) return sale.fiscalInvoice.sourceType;
+  if (sale?.ticketRequested === true || "ticketStatus" in sale) return "seller_sale";
+  return "admin_quick_sale";
+}
+
+export async function getArcaInvoiceForSale({ saleId, sourceType, invoiceId = null }) {
+  const data = await arcaDocumentPost({
+    mode: "metadata",
+    invoiceId,
+    sourceType,
+    sourceId: saleId,
+  });
+  return data.invoice;
+}
+
+export async function fetchArcaInvoicePdf({
+  saleId,
+  sourceType,
+  invoiceId = null,
+  disposition = "inline",
+}) {
+  return arcaDocumentPost({
+    mode: "pdf",
+    invoiceId,
+    sourceType,
+    sourceId: saleId,
+    disposition,
+  }, { expectPdf: true });
+}
