@@ -89,6 +89,8 @@ export function arcaSafeStatus(env = process.env) {
     defaultProductVatRate: String(env.ARCA_DEFAULT_PRODUCT_VAT_RATE || "").trim() || null,
     consumerFinalIdThreshold: Number(env.ARCA_CONSUMER_FINAL_ID_THRESHOLD || 0) || null,
     caeHomologationEnabled: String(env.ARCA_ALLOW_CAE_HOMOLOGATION || "").trim().toLowerCase() === "true",
+    taSharedCacheConfigured: Boolean(String(env.ARCA_TA_ENCRYPTION_KEY || "").trim()),
+    taSharedCacheRequiredInProduction: true,
     publicConfigError,
   };
 }
