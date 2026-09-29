@@ -982,6 +982,10 @@ service cloud.firestore {
       // Es exclusivo del backend con cuenta de servicio; ningún cliente lo lee/escribe.
       allow read, write: if false;
     }
+    match /arcaSequenceLocks/{lockId} {
+      // Serializa numeración fiscal por entorno/PV/tipo. Autoridad exclusiva del backend.
+      allow read, write: if false;
+    }
     match /financialEntries/{entryId} {
       allow read: if canModule("finance", "view");
       allow create: if canModule("finance", "create") && ownsNewRecord();
