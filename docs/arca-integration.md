@@ -915,3 +915,27 @@ El resultado esperado es:
 `Venta Rápida -> solicitud fiscal pending -> autorización automática -> CAE -> FECompConsultar -> authorized + verification.matched=true`.
 
 Después de una única validación controlada, los gates de CAE y auto-autorización deben volver a `false` hasta revisar el resultado.
+
+
+## 38. Primera autorización automática productiva validada desde Venta Rápida
+
+El 2026-09-29 se completó correctamente la primera emisión automática productiva desde el flujo real de Venta Rápida administrativa.
+
+Resultado informado por la prueba controlada:
+
+- venta origen: `FM-FMLV-20260929-0002`;
+- comprobante: Factura B;
+- punto de venta: 8;
+- número autorizado: 320;
+- total de la venta: $1.000;
+- estado persistido: `authorized`;
+- `FECompConsultar`: coincidencia completa;
+- mensaje final de Venta Rápida: `Registrada por $1.000. Factura B autorizada · PV 8 · N.º 320 · verificada en ARCA`.
+
+El circuito automático productivo validado quedó:
+
+`Venta Rápida -> venta persistida -> solicitud fiscal pending -> auto-autorización -> FECAESolicitar -> authorized -> FECompConsultar -> verification.matched=true`.
+
+Este hito confirma que el modo automático limitado a `admin_quick_sale` funciona de extremo a extremo en producción.
+
+Después de la validación controlada, los gates productivos de CAE, auto-autorización y preparación deben volver a `false` hasta la siguiente etapa de implementación.
