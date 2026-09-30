@@ -79,16 +79,12 @@ test("la barra informativa conserva los tres mensajes aprobados", () => {
   ]);
 });
 
-test("la navegación de escritorio conserva sus accesos actuales", () => {
+test("la navegación de escritorio muestra solo las cinco opciones visibles", () => {
   assert.deepEqual(
     navigation.map(({ label, to }) => [label, to]),
     [
-      ["Inicio", "/tienda"],
       ["Tienda", "/productos"],
-      ["Aceites de oliva", "/productos?categoria=olive_oil"],
-      ["Frutos secos", "/productos?categoria=nuts"],
-      ["Aceitunas", "/productos?categoria=olives"],
-      ["Mermeladas", "/productos?categoria=jams"],
+      ["Aceite de oliva", "/productos?categoria=olive_oil"],
       ["Regalos", "/productos?categoria=gifts"],
       ["Nosotros", "/nosotros"],
       ["Contacto", "/tienda#contacto"],
@@ -96,27 +92,13 @@ test("la navegación de escritorio conserva sus accesos actuales", () => {
   );
 });
 
-test("el menú mobile tiene el orden y destinos solicitados", () => {
+test("el menú mobile muestra las mismas cinco opciones", () => {
   assert.deepEqual(
     mobileNavigation.map(({ label, to }) => [label, to]),
-    [
-      ["Inicio", "/tienda"],
-      ["Tienda", "/productos"],
-      ["AOVE", "/productos?categoria=olive_oil"],
-      ["Frutos secos", "/productos?categoria=nuts"],
-      ["Vinos", "/productos?categoria=wines"],
-      ["Productos Regionales Mdz", "/productos?coleccion=regionales"],
-      ["Regalos pre-armados", "/productos?categoria=gifts"],
-      ["Nosotros", "/nosotros"],
-      ["Contacto", "/tienda#contacto"],
-    ],
+    navigation.map(({ label, to }) => [label, to]),
   );
   assert.equal(
-    mobileNavigation.some(({ label }) => label === "Aceitunas"),
-    false,
-  );
-  assert.equal(
-    mobileNavigation.some(({ label }) => label === "Mermeladas"),
+    mobileNavigation.some(({ label }) => label === "Inicio"),
     false,
   );
 });
