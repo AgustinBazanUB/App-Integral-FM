@@ -2,10 +2,10 @@
 
 Repositorio único para la tienda y la gestión integral de Flor Mía, con builds independientes para publicar cada superficie en un sitio distinto. Integra el diseño y contenido aprobado de `flor-mia-web-fiel-v3` con la lógica comprobada de `FM-stock-y-ventas`, sin modificar esos sistemas productivos anteriores.
 
-- Acceso inicial: <https://app-integral-fm.netlify.app/>
-- Gestión: <https://app-integral-fm.netlify.app/gestion>
-- Panel Vendedor: <https://app-integral-fm.netlify.app/vendedor>
-- Vista de tienda para administradores: <https://app-integral-fm.netlify.app/tienda>
+- Acceso inicial: <https://appintegralflormia.netlify.app/>
+- Gestión: <https://appintegralflormia.netlify.app/gestion>
+- Panel Vendedor: <https://appintegralflormia.netlify.app/vendedor>
+- Vista de tienda para administradores: <https://appintegralflormia.netlify.app/tienda>
 - Repositorio: <https://github.com/AgustinBazanUB/App-Integral-FM>
 
 ## Qué incluye

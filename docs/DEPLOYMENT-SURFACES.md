@@ -21,9 +21,11 @@ El build histórico `npm run build` continúa generando la aplicación unificada
 
 ## Configuración en Netlify
 
-El E-commerce ya tiene un proyecto propio. El sitio de Gestión existente conserva por ahora el build unificado; su migración al build exclusivo de Gestión es un paso separado.
+El E-commerce ya tiene un proyecto propio. El sitio de Gestión existente es [`appintegralflormia`](https://app.netlify.com/projects/appintegralflormia) y conserva por ahora el build unificado; su migración al build exclusivo de Gestión es un paso separado. Durante el desarrollo local de ARCA, los builds automáticos de ambos sitios permanecen detenidos.
 
 ### Sitio de Gestión
+
+Configuración actual: `npm run build`, `dist`, `netlify/functions` (app unificada). Para migrar luego a la superficie exclusiva de Gestión:
 
 - Build command: `npm run build:gestion`
 - Publish directory: `dist/gestion`

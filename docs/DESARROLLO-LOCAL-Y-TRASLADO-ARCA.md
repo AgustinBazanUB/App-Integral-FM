@@ -132,11 +132,15 @@ afectan datos reales aunque la app esté en `localhost`.
 ## Publicar al final
 
 La gestión y el E-commerce son **dos sitios Netlify**. Un único deploy puede
-actualizar uno de ellos; actualizar ambos requiere dos deploys. Para un deploy
-de Gestión, compilar `build:gestion`, publicar `dist/gestion` con
-`netlify/functions`, confirmar los secretos server-side y los gates seguros del
-sitio, y verificar login, Marketing y rutas ARCA después de publicar. Para el
-E-commerce usar `build:ecommerce`, `dist/ecommerce` y
+actualizar uno de ellos; actualizar ambos requiere dos deploys. El sitio de
+Gestión actual es [`appintegralflormia`](https://app.netlify.com/projects/appintegralflormia)
+y conserva el build unificado `npm run build` en `dist`. Para publicar allí una
+sola vez con el artefacto construido localmente, incluir `dist` y
+`netlify/functions`; confirmar antes los secretos server-side que se quiera
+habilitar y los gates seguros del sitio. Verificar login, Marketing y rutas ARCA
+después de publicar. La futura separación exclusiva de Gestión usaría
+`build:gestion` y `dist/gestion`, pero requiere cambiar la configuración del
+sitio de manera coordinada. Para el E-commerce usar `build:ecommerce`, `dist/ecommerce` y
 `deploy/ecommerce/functions` vacío; no copiar secretos de ARCA ni Firebase
 Admin. La publicación cloud nunca debe depender del launcher local.
 
