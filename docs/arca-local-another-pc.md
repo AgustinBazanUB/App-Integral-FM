@@ -66,6 +66,8 @@ La Etapa 2 prepara un componente reutilizable; su conexión definitiva a Venta R
 
 Los comandos anteriores no despliegan ni consumen builds cloud. El sitio publicado de esta entrega es `flor-mia-arca-homologacion`, no el sitio de producción. No ejecutar deploys mientras se trabaja localmente.
 
+Checkpoint de código publicado: `5f2e7f514a9db645b0a0ff28df5b40be3f6a3ee1`. [Entrega inmutable](https://6abd7ece26ed9768d7397eed--flor-mia-arca-homologacion.netlify.app), confirmada Published. Los builds automáticos quedaron detenidos; el HEAD posterior contiene esta evidencia documental. Detalles y límites en [arca-stage2-close.md](arca-stage2-close.md).
+
 **Netlify no publica `firestore.rules`.** Las reglas de este checkpoint pasan el emulador, pero su publicación al Firebase compartido requiere coordinar antes el frontend productivo: versiones anteriores aún envían `invoiceStatus` desde el navegador y las nuevas reglas lo rechazan. No publicar esas reglas aisladas contra `app-integral-fm` ni cambiar main durante estas pruebas. La futura publicación productiva debe migrar cliente y reglas de manera coordinada.
 
 La suite general del repositorio tiene cinco fallos de interfaz previos, reproducidos en la base; están enumerados en el informe de cierre. No confundirlos con los tests ARCA/Firestore que pasan.

@@ -63,4 +63,14 @@ Pasos ejecutables, rutas reemplazables, controles seguros y restricciones de pub
 
 ## Publicación
 
-La evidencia de SHA, deploy y URL se completa tras confirmar el estado Published. Proyecto destino exclusivo: `flor-mia-arca-homologacion`. Main y el proyecto productivo permanecen intactos. Se restablece la pausa de builds al terminar para seguir desarrollando localmente sin nuevos deploys automáticos.
+- Commit de código publicado: `5f2e7f514a9db645b0a0ff28df5b40be3f6a3ee1`, rama `feature/arca-integration`.
+- Netlify: **Published**, 30/09/2026 18:28 (Argentina). Build 21 s; deploy total 27 s; siete Functions publicadas.
+- Deploy ID: `6abd7ece26ed9768d7397eed`.
+- [Sitio de homologación](https://flor-mia-arca-homologacion.netlify.app).
+- [Permalink del checkpoint](https://6abd7ece26ed9768d7397eed--flor-mia-arca-homologacion.netlify.app).
+- [Detalle del deploy](https://app.netlify.com/projects/flor-mia-arca-homologacion/deploys/6abd7ece26ed9768d7397eed).
+- GitHub Actions [ARCA homologación](https://github.com/AgustinBazanUB/App-Integral-FM/actions/runs/36779459191): **SUCCESS**. El workflow general [Verificación](https://github.com/AgustinBazanUB/App-Integral-FM/actions/runs/36779459215) ejecutó 344 tests: 339 PASS y los mismos cinco FAIL preexistentes enumerados arriba.
+- Verificación web publicada: pantalla de ingreso real renderizada; GET de `arca-receiver` devuelve `method-not-allowed` controlado detrás de la protección existente de Netlify. No se retiró esa protección. El diagnóstico cloud con sesión Firebase no se ejecutó: requiere ingresar a la aplicación publicada; no se presenta como aprobado.
+- Builds de homologación restablecidos a **Stopped** después del deploy. El commit posterior de esta evidencia modifica sólo documentación y no requiere otro build. Main permanece en `36c7eb010b4c7b7246edbbc4ba471c0862a14ac8`; el sitio productivo y sus builds detenidos no se modificaron.
+
+Las reglas siguen verificadas/versionadas, sin publicación al Firebase compartido. Las credenciales y gates no se cambiaron. No se solicitó CAE. El cierre es del código de Etapa 2 y su entrega en homologación, con los límites operativos descritos; no aprueba emisión productiva.
