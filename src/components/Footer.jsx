@@ -1,4 +1,11 @@
-import { Clock3, Instagram, Mail, MapPin, Phone } from "lucide-react";
+import {
+  Clock3,
+  Instagram,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Phone,
+} from "lucide-react";
 import { Link } from "../router";
 import { brand, footerNavigation } from "../data/brand";
 
@@ -57,7 +64,19 @@ export default function Footer() {
             className="footer-local"
             aria-labelledby="footer-local-title"
           >
-            <h2 id="footer-local-title">Retirá en nuestro local</h2>
+            <h2 id="footer-local-title">Contacto</h2>
+
+            {contact.whatsappUrl ? (
+              <a
+                className="footer-whatsapp"
+                href={contact.whatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <MessageCircle size={17} aria-hidden="true" />
+                Escribinos por WhatsApp
+              </a>
+            ) : null}
 
             {contact.address ? (
               <div className="footer-contact-item">
@@ -98,6 +117,13 @@ export default function Footer() {
                 </a>
               </div>
             ) : null}
+
+            <div className="footer-contact-item">
+              <Instagram size={16} aria-hidden="true" />
+              <a href={brand.instagram} target="_blank" rel="noreferrer">
+                @flormia.mdz
+              </a>
+            </div>
 
             {!hasContactInformation ? (
               <p className="footer-pending">{contact.pendingMessage}</p>
