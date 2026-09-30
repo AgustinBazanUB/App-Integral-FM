@@ -229,6 +229,20 @@ service cloud.firestore {
       return !("deleted" in request.resource.data)
         || request.resource.data.deleted is bool;
     }
+    function noClientFiscalSaleFields(data) {
+      return !data.keys().hasAny([
+        "fiscalInvoiceId", "fiscalEnvironment", "invoiceStatus", "fiscalInvoice",
+        "fiscalUpdatedAt", "verificationMatched", "verificationCheckedAt",
+        "cae", "caeExpiration", "voucherNumber", "voucherType", "pointOfSale"
+      ]);
+    }
+    function fiscalSaleFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        "fiscalInvoiceId", "fiscalEnvironment", "invoiceStatus", "fiscalInvoice",
+        "fiscalUpdatedAt", "verificationMatched", "verificationCheckedAt",
+        "cae", "caeExpiration", "voucherNumber", "voucherType", "pointOfSale"
+      ]);
+    }
     function customerKeyShape(customerId) {
       return customerId is string
         && customerId.size() == 49
@@ -697,6 +711,8 @@ service cloud.firestore {
         ]);
     }
     function validInventoryMovement(data) {
+      // Existing quick-sale permission first: avoid evaluating unrelated role matrices
+      // in a three-document sale transaction (Firestore limit: 1000 expressions).
       return data.userId == request.auth.uid
         && data.productId is string
         && data.previousStock is int
@@ -705,7 +721,10 @@ service cloud.firestore {
         && data.newStock >= 0
         && data.qty is int
         && data.saleId is string
-        && ((data.inventoryType == "warehouse"
+        && ((data.locationId is string
+            && allowedLocation(data.locationId)
+            && quickSalesPermission("edit"))
+          || (data.inventoryType == "warehouse"
             && data.warehouseId is string
             && canModule("warehouse", "edit"))
           || (data.inventoryType == "location"
@@ -713,10 +732,7 @@ service cloud.firestore {
             && allowedLocation(data.locationId)
             && (canModule("locations", "loadStock")
               || canModule("locations", "configureLocationProducts")
-              || canModule("warehouse", "transferStock")))
-          || (data.locationId is string
-            && allowedLocation(data.locationId)
-            && quickSalesPermission("edit")));
+              || canModule("warehouse", "transferStock"))));
     }
 
     match /users/{uid} {
@@ -856,25 +872,30 @@ service cloud.firestore {
       }
     }
     match /sales/{saleId} {
+      function fiscalFields() {
+        return ["fiscalInvoiceId", "fiscalEnvironment", "invoiceStatus", "fiscalInvoice", "fiscalUpdatedAt", "cae", "voucherNumber"];
+      }
       allow get: if isAdmin()
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
       allow list: if isAdmin()
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
-      allow create: if isAdmin()
-        || (quickSalesPermission("create")
-          && activeQuickSalesLocation(request.resource.data.locationId)
-          && validSale(request.resource.data));
-      allow update: if isAdmin()
-        || (quickSalesPermission("edit")
-          && resource.data.sellerId == request.auth.uid
-          && request.resource.data.sellerId == resource.data.sellerId
-          && request.resource.data.locationId == resource.data.locationId
-          && resource.data.status == "active"
-          && request.resource.data.status in ["active", "cancelled"]
-          && ((request.resource.data.status == "active" && activeQuickSalesLocation(resource.data.locationId))
-            || (request.resource.data.status == "cancelled" && allowedLocation(resource.data.locationId))));
+      allow create: if noClientFiscalSaleFields(request.resource.data)
+        && (isAdmin()
+          || (quickSalesPermission("create")
+            && activeQuickSalesLocation(request.resource.data.locationId)
+            && validSale(request.resource.data)));
+      allow update: if fiscalSaleFieldsUnchanged()
+        && (isAdmin()
+          || (quickSalesPermission("edit")
+            && resource.data.sellerId == request.auth.uid
+            && request.resource.data.sellerId == resource.data.sellerId
+            && request.resource.data.locationId == resource.data.locationId
+            && resource.data.status == "active"
+            && request.resource.data.status in ["active", "cancelled"]
+            && ((request.resource.data.status == "active" && activeQuickSalesLocation(resource.data.locationId))
+              || (request.resource.data.status == "cancelled" && allowedLocation(resource.data.locationId)))));
       allow delete: if false;
     }
     match /stockMovements/{movementId} {
@@ -973,8 +994,18 @@ service cloud.firestore {
     }
     match /invoices/{invoiceId} {
       allow read: if canModule("finance", "view");
-      allow create, update: if canModule("finance", "edit");
-      allow delete: if false;
+      // CAE, numeración fiscal y estados de autorización son autoridad exclusiva
+      // del backend de facturación. El navegador nunca crea ni muta comprobantes.
+      allow create, update, delete: if false;
+    }
+    match /arcaWsaaTickets/{ticketId} {
+      // Contiene únicamente payload WSAA cifrado + metadatos de lease.
+      // Es exclusivo del backend con cuenta de servicio; ningún cliente lo lee/escribe.
+      allow read, write: if false;
+    }
+    match /arcaSequenceLocks/{lockId} {
+      // Serializa numeración fiscal por entorno/PV/tipo. Autoridad exclusiva del backend.
+      allow read, write: if false;
     }
     match /financialEntries/{entryId} {
       allow read: if canModule("finance", "view");

@@ -91,6 +91,8 @@ function productPayload(values, categoryName, profile, editing) {
   const defaultPrice = wholeInventoryQuantity(values.defaultPrice || 0, "El precio predeterminado");
   const yellowAlertQty = wholeInventoryQuantity(values.yellowAlertQty || 0, "La alerta amarilla");
   const redAlertQty = wholeInventoryQuantity(values.redAlertQty || 0, "La alerta roja");
+  const arcaVatRate = values.arcaVatRate === "" || values.arcaVatRate == null ? null : Number(values.arcaVatRate);
+  if (arcaVatRate != null && ![0, 10.5, 21, 27].includes(arcaVatRate)) throw new Error("La alícuota IVA ARCA no es válida.");
   if (!name) throw new Error("Ingresá el nombre del producto.");
   if (!abbreviation) throw new Error("Ingresá una abreviación.");
   if (abbreviation.length > 8) throw new Error("La abreviación admite hasta 8 caracteres.");
@@ -102,6 +104,7 @@ function productPayload(values, categoryName, profile, editing) {
     abbreviationKey: normalizedText(abbreviation),
     description: String(values.description || "").trim(),
     defaultPrice,
+    arcaVatRate,
     yellowAlertQty,
     redAlertQty,
     categoryId: String(values.categoryId || "").trim(),

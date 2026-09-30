@@ -382,7 +382,6 @@ export async function createQuickSale({
       status: "active",
       sourceChannel: channel,
       customerDni: customerDni.trim() || null,
-      invoiceStatus: invoiceRequested ? "pending" : "not_requested",
       deliveryMethod,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

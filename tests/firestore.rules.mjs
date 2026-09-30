@@ -8,6 +8,8 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   collection,
+  deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -93,6 +95,51 @@ before(async () => {
         name: "Entrada protegida",
         createdBy: "admin-1",
       }),
+      setDoc(doc(database, "invoices", "invoice-1"), {
+        sourceType: "seller_sale",
+        sourceId: "seed-sale",
+        status: "authorized",
+        pointOfSale: 3,
+        voucherType: 6,
+        voucherNumber: 1,
+        cae: "00000000000000",
+        createdAt: new Date(),
+      }),
+      setDoc(doc(database, "sales", "fiscal-sale"), {
+        saleCode: "FM-TEST-FISCAL",
+        sellerId: "admin-1",
+        locationId: "loc-1",
+        status: "active",
+        total: 1000,
+        notes: "original",
+        fiscalInvoiceId: "invoice-1",
+        fiscalEnvironment: "production",
+        invoiceStatus: "authorized",
+        fiscalUpdatedAt: new Date(),
+        fiscalInvoice: {
+          id: "invoice-1",
+          environment: "production",
+          sourceType: "admin_quick_sale",
+          status: "authorized",
+          voucherClass: "B",
+          pointOfSale: 8,
+          voucherType: 6,
+          voucherNumber: 320,
+          cae: "00000000000000",
+          caeExpiration: "20261010",
+          verificationMatched: true,
+        },
+      }),
+      setDoc(doc(database, "arcaWsaaTickets", "homologation_wsfe"), {
+        schemaVersion: 1,
+        environment: "homologation",
+        service: "wsfe",
+        cipher: "aes-256-gcm",
+        ciphertext: "opaque",
+        iv: "opaque",
+        authTag: "opaque",
+        ticketExpiresAt: new Date(),
+      }),
       setDoc(doc(database, "customerZones", "zone-active"), {
         name: "Zona Norte",
         active: true,
@@ -145,6 +192,134 @@ test("finanzas queda restringido al rol autorizado", async () => {
   const sellerDb = environment.authenticatedContext("seller-1").firestore();
   await assertSucceeds(getDoc(doc(adminDb, "financialEntries", "entry-1")));
   await assertFails(getDoc(doc(sellerDb, "financialEntries", "entry-1")));
+});
+
+test("las facturas fiscales sólo pueden mutarse desde el backend", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  await assertSucceeds(getDoc(doc(adminDb, "invoices", "invoice-1")));
+  await assertFails(setDoc(doc(adminDb, "invoices", "invoice-browser"), {
+    sourceType: "seller_sale",
+    sourceId: "browser-sale",
+    status: "pending",
+    createdAt: new Date(),
+  }));
+  await assertFails(updateDoc(doc(adminDb, "invoices", "invoice-1"), {
+    status: "error",
+  }));
+  await assertFails(deleteDoc(doc(adminDb, "invoices", "invoice-1")));
+});
+
+
+test("facturas fiscales: los espejos de sales no pueden falsificarse desde el navegador ni siquiera como admin", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const saleRef = doc(adminDb, "sales", "fiscal-sale");
+
+  await assertFails(updateDoc(saleRef, {
+    fiscalInvoiceId: "invoice-falsa",
+  }));
+  await assertFails(updateDoc(saleRef, {
+    "fiscalInvoice.cae": "99999999999999",
+  }));
+  await assertFails(updateDoc(saleRef, {
+    "fiscalInvoice.verificationMatched": false,
+  }));
+  await assertFails(updateDoc(saleRef, {
+    fiscalInvoice: deleteField(),
+  }));
+  await assertFails(updateDoc(saleRef, {
+    fiscalUpdatedAt: deleteField(),
+  }));
+
+  await assertSucceeds(updateDoc(saleRef, {
+    notes: "cambio comercial permitido",
+  }));
+  const snapshot = await getDoc(saleRef);
+  assert.equal(snapshot.data().notes, "cambio comercial permitido");
+  assert.equal(snapshot.data().fiscalInvoiceId, "invoice-1");
+  assert.equal(snapshot.data().fiscalInvoice.cae, "00000000000000");
+});
+
+test("facturas fiscales: el cliente no puede crear una venta precargada con campos fiscales reservados", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+
+  await assertFails(setDoc(doc(adminDb, "sales", "browser-fiscal-sale"), {
+    sellerId: "admin-1",
+    locationId: "loc-1",
+    status: "active",
+    total: 1000,
+    fiscalInvoiceId: "invoice-forjada",
+  }));
+
+  await assertSucceeds(setDoc(doc(adminDb, "sales", "browser-commercial-sale"), {
+    sellerId: "admin-1",
+    locationId: "loc-1",
+    status: "active",
+    total: 1000,
+    notes: "venta sin espejo fiscal",
+  }));
+});
+
+test("facturas fiscales: todos los campos reservados rechazan create, update y borrado cliente", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const fields = ["fiscalInvoiceId", "fiscalEnvironment", "invoiceStatus", "fiscalInvoice", "fiscalUpdatedAt", "verificationMatched", "verificationCheckedAt", "cae", "caeExpiration", "voucherNumber", "voucherType", "pointOfSale"];
+  for (const field of fields) {
+    const forged = field === "fiscalInvoice" ? { cae: "99999999999999" } : "forjado";
+    await assertFails(setDoc(doc(adminDb, "sales", `fiscal-forged-${field}`), {
+      sellerId: "admin-1", locationId: "loc-1", status: "active", total: 1000, [field]: forged,
+    }));
+    await assertFails(updateDoc(doc(adminDb, "sales", "fiscal-sale"), { [field]: forged }));
+    // A backend-seeded value lets deletion exercise an actual affected key.
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), "sales", "fiscal-sale"), { [field]: forged });
+    });
+    await assertFails(updateDoc(doc(adminDb, "sales", "fiscal-sale"), { [field]: deleteField() }));
+  }
+  await assertSucceeds(updateDoc(doc(adminDb, "sales", "fiscal-sale"), { notes: "comercial intacto" }));
+});
+
+test("facturas fiscales: Venta Rápida conserva creación comercial con el payload del servicio", async () => {
+  const source = await readFile(new URL("../src/gestion/services/managementService.js", import.meta.url), "utf8");
+  const payload = { sellerId: "admin-1", locationId: "loc-1", status: "active", total: 1000 };
+  // Reproduces the fiscal field emitted by the pre-checkpoint client.
+  if (/invoiceStatus:\s*invoiceRequested/.test(source)) payload.invoiceStatus = "pending";
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  await assertSucceeds(setDoc(doc(adminDb, "sales", "quick-sale-service"), payload));
+});
+
+test("la caché WSAA compartida es invisible e inmutable para cualquier cliente", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const sellerDb = environment.authenticatedContext("seller-1").firestore();
+  const adminRef = doc(adminDb, "arcaWsaaTickets", "homologation_wsfe");
+  const sellerRef = doc(sellerDb, "arcaWsaaTickets", "homologation_wsfe");
+
+  await assertFails(getDoc(adminRef));
+  await assertFails(getDoc(sellerRef));
+  await assertFails(setDoc(doc(adminDb, "arcaWsaaTickets", "browser-created"), {
+    environment: "homologation",
+    service: "wsfe",
+    ciphertext: "forbidden",
+  }));
+  await assertFails(updateDoc(adminRef, {
+    ciphertext: "forbidden-update",
+  }));
+  await assertFails(deleteDoc(adminRef));
+});
+
+test("facturas fiscales: los locks fiscales también son exclusivos del backend", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const sellerDb = environment.authenticatedContext("seller-1").firestore();
+  const lockId = "production_pos_8_type_6";
+
+  await assertFails(getDoc(doc(adminDb, "arcaSequenceLocks", lockId)));
+  await assertFails(getDoc(doc(sellerDb, "arcaSequenceLocks", lockId)));
+  await assertFails(updateDoc(doc(adminDb, "arcaSequenceLocks", lockId), { holder: "forjado" }));
+  await assertFails(deleteDoc(doc(adminDb, "arcaSequenceLocks", lockId)));
+  await assertFails(setDoc(doc(adminDb, "arcaSequenceLocks", lockId), {
+    environment: "production",
+    pointOfSale: 8,
+    voucherType: 6,
+    holder: "browser",
+  }));
 });
 
 test("el vendedor no puede ajustar stock fuera de una venta válida", async () => {
@@ -456,4 +631,27 @@ test("reglas respetan denegación específica de envío WhatsApp", async () => {
     lastExtensionUpdateAt: new Date(),
     updatedAt: new Date(),
   }));
+});
+
+test("espejo fiscal de ventas sólo admite escrituras server-side", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const saleRef = doc(adminDb, "sales", "fiscal-mirror-test");
+  await assertFails(setDoc(saleRef, { sellerId: "admin-1", status: "active", invoiceStatus: "pending" }));
+  await assertSucceeds(setDoc(saleRef, { sellerId: "admin-1", status: "active" }));
+  await assertFails(setDoc(doc(adminDb, "sales", "forged-mirror"), { fiscalInvoice: { cae: "FAKE", voucherNumber: 999 } }));
+  await assertFails(setDoc(doc(adminDb, "sales", "forged-status"), { invoiceStatus: "authorized" }));
+  const protectedFields = ["fiscalInvoiceId", "fiscalEnvironment", "fiscalInvoice", "fiscalUpdatedAt", "invoiceStatus", "cae", "voucherNumber"];
+  for (const field of protectedFields) {
+    await assertFails(updateDoc(saleRef, { [field]: field === "fiscalInvoice" ? { cae: "FAKE" } : "FORGED" }));
+  }
+  await environment.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), "sales", "fiscal-mirror-test"), {
+      fiscalInvoiceId: "server-invoice", invoiceStatus: "authorized",
+      fiscalInvoice: { cae: "SYNTHETIC", voucherNumber: 1 },
+    });
+  });
+  await assertFails(updateDoc(saleRef, { fiscalInvoice: deleteField() }));
+  await assertFails(updateDoc(saleRef, { "fiscalInvoice.cae": "FORGED" }));
+  await assertSucceeds(updateDoc(saleRef, { status: "cancelled", updatedAt: new Date() }));
+  assert.equal((await getDoc(saleRef)).data().fiscalInvoiceId, "server-invoice");
 });

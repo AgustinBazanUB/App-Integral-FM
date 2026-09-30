@@ -5,7 +5,18 @@ dist/
 graphify-out/
 .env
 .env.local
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*service-account*.json
+*serviceAccount*.json
+app-integral-fm-*.json
 *.log
 .DS_Store
 Thumbs.db
+# Netlify Dev puede generar este lock local aunque el proyecto use Node para Functions.
+deno.lock
 
