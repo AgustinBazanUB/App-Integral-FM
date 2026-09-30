@@ -102,6 +102,15 @@ emitir un comprobante real: no habilitarla como parte del traslado o de una
 prueba de UI. Mantener el launcher de homologación también con
 `ARCA_ALLOW_CAE_HOMOLOGATION=false`.
 
+Las Functions de Marketing usan además `FIREBASE_SERVICE_ACCOUNT_JSON` para
+acceder a Firestore desde el servidor y `OPENAI_API_KEY` para las funciones de
+IA. El launcher de la otra PC debe cargar el JSON desde su archivo privado;
+`FIREBASE_ADMIN_CLIENT_EMAIL` y `FIREBASE_ADMIN_PRIVATE_KEY` por sí solos no
+alimentan ese módulo de Marketing. La conexión de Google Drive requiere también
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` y
+`GOOGLE_TOKEN_ENCRYPTION_KEY`; si no están configuradas, esa función mostrará
+que Drive no está disponible. No copiar esos secretos al repositorio.
+
 ## Ejecutar y comprobar localmente
 
 Desde el repositorio, tras cargar el launcher seguro:
@@ -153,8 +162,11 @@ cerrar una entrega. El CLI actual preparó ocho Functions en el modo moderno de
 Netlify. Un intento anterior con CLI 26.1.0 falló antes de publicar por el
 límite de variables de 4 KB; no cambiar las Functions ni reducir secretos para
 sortear ese error sin revisar primero la versión del CLI. Confirmar antes los
-secretos server-side y todos los gates fiscales en `false`; verificar login,
-Marketing y rutas ARCA después de publicar. La futura separación exclusiva de Gestión usaría
+secretos server-side de ARCA/Firebase y, para las operaciones server-side de
+Marketing, `FIREBASE_SERVICE_ACCOUNT_JSON` y sus demás variables necesarias.
+Confirmar todos los gates fiscales en `false`; verificar login, Marketing y
+rutas ARCA después de publicar. Cambiar variables del sitio requiere otro build
+y deploy para aplicarlas. La futura separación exclusiva de Gestión usaría
 `build:gestion` y `dist/gestion`, pero requiere cambiar la configuración del
 sitio de manera coordinada. Para el E-commerce usar `build:ecommerce`, `dist/ecommerce` y
 `deploy/ecommerce/functions` vacío; no copiar secretos de ARCA ni Firebase
