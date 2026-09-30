@@ -110,6 +110,7 @@ function OilProfileCard({ profile }) {
 export default function OliveOilGuide({
   id = "guia-aceites",
   introCta = true,
+  titleAs: TitleTag = "h2",
 }) {
   const [selectedIntensity, setSelectedIntensity] = useState("Suave");
   const titleId = `${id}-title`;
@@ -135,9 +136,9 @@ export default function OliveOilGuide({
           />
           <div className="fm-oil-guide__copy">
             <p className="fm-kicker">ACEITES DE OLIVA SELECCIONADOS</p>
-            <h2 id={titleId}>
+            <TitleTag id={titleId}>
               Elegí el oliva ideal para cada ocasión.
-            </h2>
+            </TitleTag>
             <p>
               Descubrí nuestras variedades y encontrá el perfil ideal para cada
               momento.

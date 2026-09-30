@@ -2239,6 +2239,12 @@ input::placeholder {
   font-size: 18px;
 }
 
+.page-hero--gifts {
+  background:
+    radial-gradient(circle at 72% 30%, rgba(199, 163, 90, 0.2), transparent 26rem),
+    var(--bg-secondary);
+}
+
 .catalog-controls {
   position: sticky;
   z-index: 50;

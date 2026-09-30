@@ -278,3 +278,44 @@ export const productsByOccasion = {
   gift: ["oil-blend", "nuts-pistachios", "jam-pending"],
   everyday: ["oil-arbequina", "oil-arbosana", "olives-selection", "nuts-almonds"],
 };
+
+// Ocasiones de regalo pedidas por el cliente: cada entrada sugiere productos
+// reales del catálogo como selección individual (no son packs comerciales).
+export const giftOccasions = [
+  {
+    id: "empresarial",
+    label: "Regalos empresariales",
+    description: "Detalles cuidados para clientes y equipos.",
+    productIds: ["oil-blend", "oil-arbequina", "nuts-pistachios"],
+  },
+  {
+    id: "cumpleanos",
+    label: "Cumpleaños",
+    description: "Un presente dulce y original.",
+    productIds: ["jam-pending", "nuts-pistachios", "oil-blend"],
+  },
+  {
+    id: "agradecimiento",
+    label: "Agradecimientos",
+    description: "Para decir gracias con algo especial.",
+    productIds: ["jam-pending", "nuts-almonds", "oil-arbequina"],
+  },
+  {
+    id: "reunion",
+    label: "Reuniones",
+    description: "Sabores para compartir alrededor de la mesa.",
+    productIds: ["olives-selection", "nuts-pistachios", "oil-blend", "salt-malbec"],
+  },
+  {
+    id: "personal",
+    label: "Regalos personales",
+    description: "Un detalle pensado para esa persona.",
+    productIds: ["oil-arbequina", "jam-pending", "nuts-almonds"],
+  },
+  {
+    id: "fecha-especial",
+    label: "Fechas especiales",
+    description: "Celebraciones con productos de la tierra.",
+    productIds: ["oil-blend", "olives-selection", "nuts-pistachios"],
+  },
+];
