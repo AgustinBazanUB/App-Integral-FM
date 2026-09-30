@@ -4,6 +4,7 @@ import { parseWsaaEncryptionKey } from "./wsaaSharedCache.mjs";
 
 // Never forward upstream text or identifiers: SOAP/OAuth faults can echo credentials.
 const PUBLIC_ERRORS = Object.freeze({
+  "arca-wsaa-already-authenticated": "WSAA ya tiene un ticket vigente que esta instancia no conserva. Falta recuperar el ticket desde la caché; no es una caída de ARCA.",
   "coe.alreadyAuthenticated": "WSAA informa un ticket todavía vigente. Falta recuperar ese ticket del caché; no es una caída temporal de ARCA.",
   "coe.notAuthorized": "WSAA rechazó la autorización del certificado para este servicio.",
   "cms.cert.expired": "WSAA rechazó un certificado vencido.",
@@ -76,7 +77,7 @@ function stageReady(stage) {
 function temporaryFailure(error = {}) {
   const status = Number(error?.status || 0);
   const code = String(error?.code || "").toLowerCase();
-  if (["coe.alreadyauthenticated", "coe.notauthorized", "cms.cert.expired", "cms.cert.invalid", "arca-wsaa-shared-cache-required", "arca-wsaa-cache-key-missing", "arca-wsaa-cache-key-invalid", "firebase-admin-config-missing", "firebase-project-mismatch"].includes(code)) return false;
+  if (["arca-production-network-disabled", "arca-wsaa-already-authenticated", "coe.alreadyauthenticated", "coe.notauthorized", "cms.cert.expired", "cms.cert.invalid", "arca-wsaa-shared-cache-required", "arca-wsaa-cache-key-missing", "arca-wsaa-cache-key-invalid", "firebase-admin-config-missing", "firebase-project-mismatch"].includes(code)) return false;
   return status >= 500
     || code.includes("network")
     || code.includes("timeout")

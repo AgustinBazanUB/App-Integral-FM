@@ -15,9 +15,11 @@ import { registryDummy } from "./_lib/arca/registry.mjs";
 import { firebaseAdminAccessToken, adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
 import { inspectSharedWsaaCache } from "./_lib/arca/wsaaSharedCache.mjs";
 import { requestAccessTicket } from "./_lib/arca/wsaa.mjs";
-import { buildArcaOperationalStatus } from "./_lib/arca/readiness.mjs";
+import { buildArcaOperationalStatus, publicArcaError } from "./_lib/arca/readiness.mjs";
 import { assertTaxpayerLookupAllowed } from "./_lib/arca/config.mjs";
 import { toPublicArcaError } from "./_lib/arca/publicError.mjs";
+
+import { publicFiscalMessages } from "./_lib/arca/publicInvoice.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -37,7 +39,7 @@ async function preflightStage(name, operation) {
     const data = await operation();
     return { name, status: "ok", data, error: null };
   } catch (error) {
-    return { name, status: "error", data: null, error: safeError(error) };
+    return { name, status: "error", data: null, error: publicArcaError(error) };
   }
 }
 
@@ -77,9 +79,9 @@ async function runDiagnostics() {
       selected: config.pointOfSale,
       found: points.points.some((point) => point.number === config.pointOfSale),
       returned: points.points.map((point) => point.number),
-      errors: points.errors,
+      errors: publicFiscalMessages(points.errors),
     };
-    diagnostics.pointOfSale.status = diagnostics.pointOfSale.data.found ? "ok" : "error";
+    diagnostics.pointOfSale.status = diagnostics.pointOfSale.data.found && !points.errors?.length ? "ok" : "error";
     if (!diagnostics.pointOfSale.data.found) {
       diagnostics.pointOfSale.error = {
         code: "arca-point-of-sale-not-found",
@@ -379,7 +381,7 @@ export default async function handler(request) {
           operation: "FEParamGetPtosVenta",
           result: {
             pointOfSales: points.points.map((point) => point.number),
-            errors: points.errors,
+            errors: publicFiscalMessages(points.errors),
           },
           cache: after,
           reusedExistingTicket: Boolean(
@@ -623,7 +625,7 @@ export default async function handler(request) {
             blocked: selectedPoint?.blocked || null,
             dropDate: selectedPoint?.dropDate || null,
             returned: (points.points || []).map((point) => point.number),
-            errors: points.errors || [],
+            errors: publicFiscalMessages(points.errors),
             stageStatus: stages.points.status,
           },
           fiscalTables: {
@@ -655,13 +657,13 @@ export default async function handler(request) {
             facturaA: {
               voucherType: 1,
               lastAuthorized: lastA.number ?? null,
-              errors: lastA.errors || [],
+              errors: publicFiscalMessages(lastA.errors),
               stageStatus: stages.lastA.status,
             },
             facturaB: {
               voucherType: 6,
               lastAuthorized: lastB.number ?? null,
-              errors: lastB.errors || [],
+              errors: publicFiscalMessages(lastB.errors),
               stageStatus: stages.lastB.status,
             },
           },

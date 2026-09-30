@@ -9,6 +9,8 @@ import {
 } from "./_lib/arca/invoicePersistence.mjs";
 import { toPublicArcaError } from "./_lib/arca/publicError.mjs";
 
+import { publicAuthorizationResult, publicFiscalReadiness } from "./_lib/arca/publicInvoice.mjs";
+
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
   headers: {
@@ -146,7 +148,7 @@ export default async function handler(request) {
         status: authorization?.status || "unknown",
         blocked: authorization?.blocked === true,
         reason: authorization?.reason || null,
-        verification,
+        verification: publicAuthorizationResult(verification),
         authorization: authorization?.invoice?.authorization
           ? {
               voucherClass: authorization.invoice.authorization.voucherClass || null,
@@ -165,7 +167,7 @@ export default async function handler(request) {
       invoice: {
         id: result.invoiceId,
         status: autoAuthorization?.status || result.invoice?.status || "pending",
-        fiscalReadiness: result.invoice?.fiscalReadiness || null,
+        fiscalReadiness: publicFiscalReadiness(result.invoice?.fiscalReadiness),
         sourceType: result.invoice?.sourceType || sourceType,
         sourceId: result.invoice?.sourceId || sourceId,
         autoAuthorization,

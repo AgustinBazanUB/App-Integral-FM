@@ -1237,3 +1237,8 @@ El commit inicial `735478e3be28911978d22257da88e3fe7d1eeee1` no superó la audit
 Se proyectan errores mediante códigos y mensajes estáticos permitidos, sin copiar texto remoto. Un HTTP 5xx de configuración WSAA no equivale a indisponibilidad temporal. La configuración exige PV en rango y clave de caché válida; un listado de PV con errores nunca habilita operatividad.
 
 Las rules protegen también el espejo fiscal de `sales` (incluyendo cambios/borrados de campos). El navegador no puede crear ni modificar `invoiceStatus`; los datos de autorización y su actualización son server-side. Esta protección corrige una debilidad previa, no modifica la invoice autoritativa ni la autorización.
+
+
+## 42. Cierre correctivo de Etapa 2
+
+El cierre integra las correcciones de Etapa 1, sanea resultados exitosos e históricos y resuelve el límite de evaluación de las transacciones comerciales sin relajar permisos fiscales. Informe completo: [arca-stage2-close.md](arca-stage2-close.md). Continuidad en otra PC: [arca-local-another-pc.md](arca-local-another-pc.md). El checkpoint acredita el componente de receptor y sus pruebas; no declara emisión productiva habilitada ni un lookup real de Padrón exitoso en la nueva instancia. Las rules versionadas no se publican al Firebase compartido mediante Netlify: su publicación requiere coordinar previamente los clientes productivos.

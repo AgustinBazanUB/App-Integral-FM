@@ -1,4 +1,5 @@
 const PUBLIC_ERROR_CATALOG = Object.freeze({
+  "arca-wsaa-already-authenticated": { category: "CONFIGURATION_ERROR", status: 409, message: "WSAA ya tiene un ticket vigente que esta instancia no conserva. Falta recuperar el ticket desde la caché; no es una caída de ARCA." },
   "arca-cuit-invalid": { category: "VALIDATION_ERROR", status: 400, message: "La CUIT ingresada es inválida." },
   "missing-cuit": { category: "VALIDATION_ERROR", status: 400, message: "Ingresá una CUIT." },
   "fiscal-sale-total-required": { category: "VALIDATION_ERROR", status: 400, message: "Falta el total de la venta para resolver Consumidor Final de forma segura." },
@@ -89,6 +90,8 @@ export function toPublicArcaError(error = {}) {
     code,
     category,
     status: known?.status || inferredStatus,
-    message: known?.message || fallbackMessage(category),
+    message: code === "arca-config-missing" && error?.field === "ARCA_CONSUMER_FINAL_ID_THRESHOLD"
+      ? "Falta configurar el umbral de identificación de Consumidor Final."
+      : known?.message || fallbackMessage(category),
   };
 }

@@ -4,7 +4,9 @@ import { arcaEnvironment } from "./_lib/arca/config.mjs";
 import { syncInvoiceToSale } from "./_lib/arca/invoicePersistence.mjs";
 import { toPublicArcaError } from "./_lib/arca/publicError.mjs";
 
-const json = (body, status = 200) => new Response(JSON.stringify(body), {
+import { publicAuthorizationResult } from "./_lib/arca/publicInvoice.mjs";
+
+const json = (body, status = 200) => new Response(JSON.stringify(body?.ok === true && body.result ? { ...body, result: publicAuthorizationResult(body.result) } : body), {
   status,
   headers: {
     "Content-Type": "application/json; charset=utf-8",

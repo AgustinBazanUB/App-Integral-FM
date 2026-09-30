@@ -711,6 +711,8 @@ service cloud.firestore {
         ]);
     }
     function validInventoryMovement(data) {
+      // Existing quick-sale permission first: avoid evaluating unrelated role matrices
+      // in a three-document sale transaction (Firestore limit: 1000 expressions).
       return data.userId == request.auth.uid
         && data.productId is string
         && data.previousStock is int
@@ -719,7 +721,10 @@ service cloud.firestore {
         && data.newStock >= 0
         && data.qty is int
         && data.saleId is string
-        && ((data.inventoryType == "warehouse"
+        && ((data.locationId is string
+            && allowedLocation(data.locationId)
+            && quickSalesPermission("edit"))
+          || (data.inventoryType == "warehouse"
             && data.warehouseId is string
             && canModule("warehouse", "edit"))
           || (data.inventoryType == "location"
@@ -727,10 +732,7 @@ service cloud.firestore {
             && allowedLocation(data.locationId)
             && (canModule("locations", "loadStock")
               || canModule("locations", "configureLocationProducts")
-              || canModule("warehouse", "transferStock")))
-          || (data.locationId is string
-            && allowedLocation(data.locationId)
-            && quickSalesPermission("edit")));
+              || canModule("warehouse", "transferStock"))));
     }
 
     match /users/{uid} {

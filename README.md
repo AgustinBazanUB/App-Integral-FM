@@ -92,3 +92,8 @@ La plataforma usa el proyecto Firebase separado `app-integral-fm`. El sistema an
 ## Estado honesto de integraciones
 
 La app no procesa pagos online, no emite comprobantes ARCA, no envía mensajes ni automatiza redes. El recibo del Panel Vendedor es interno y no reemplaza un comprobante fiscal. Esas integraciones se activarán únicamente al recibir proveedores, credenciales y reglas comerciales reales.
+
+
+### Checkpoint ARCA Etapa 2
+
+[Cierre y evidencia](docs/arca-stage2-close.md) · [Continuar y probar en otra PC sin deploy](docs/arca-local-another-pc.md).

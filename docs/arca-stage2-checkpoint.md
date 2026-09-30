@@ -1,3 +1,5 @@
+> Informe histórico de la auditoría inicial. El cierre posterior autorizado por el usuario está en [arca-stage2-close.md](arca-stage2-close.md).
+
 # Auditoría local de Etapa 2 ARCA — 30/09/2026
 
 ## Veredicto

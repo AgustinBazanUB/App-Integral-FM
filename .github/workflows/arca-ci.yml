@@ -30,10 +30,16 @@ jobs:
         with:
           node-version: "20"
           cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - run: npm ci
       - name: Tests ARCA
-        run: node --test tests/arca*.test.mjs
+        run: npm run test:arca
       - name: Reglas Firestore fiscales
-        run: npx firebase-tools@14.12.0 emulators:exec --only firestore --project demo-flor-mia-integral "node --test --test-name-pattern='facturas fiscales|caché WSAA' tests/firestore.rules.mjs"
+        run: npm run test:rules:fiscal
+      - name: Reglas comerciales y regresiones de stock
+        run: npm run test:rules:core
       - name: Build
         run: npm run build

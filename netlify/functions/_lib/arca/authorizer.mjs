@@ -25,6 +25,9 @@ import {
   productionAutoAuthorizeSources,
 } from "./config.mjs";
 
+import { toPublicArcaError } from "./publicError.mjs";
+import { publicFiscalMessages } from "./publicInvoice.mjs";
+
 function invoicePath(invoiceId) {
   return `invoices/${invoiceId}`;
 }
@@ -53,19 +56,9 @@ function isNetworkUncertain(error) {
   return ["arca-network-error", "arca-timeout"].includes(error?.code);
 }
 
-function compactError(error) {
-  return {
-    code: error?.code || "arca-authorization-error",
-    message: String(error?.message || "Falló la autorización fiscal.").slice(0, 500),
-  };
-}
+function compactError(error) { return toPublicArcaError(error); }
 
-function arcaMessages(list = []) {
-  return (Array.isArray(list) ? list : []).map((item) => ({
-    code: Number(item?.code || 0),
-    message: String(item?.message || "").slice(0, 500),
-  }));
-}
+function arcaMessages(list = []) { return publicFiscalMessages(list); }
 
 async function reconcilePlannedVoucher({
   invoiceId,
@@ -122,8 +115,8 @@ async function reconcilePlannedVoucher({
     return markReconcilingFn({
       invoiceId,
       expectedUpdateTime: plannedDocument.updateTime,
-      errorCode: error?.code || "arca-reconciliation-error",
-      errorMessage: error?.message || "No se pudo reconciliar la respuesta incierta de ARCA.",
+      errorCode: toPublicArcaError(error).code,
+      errorMessage: toPublicArcaError(error).message,
       env,
     });
   }
@@ -368,7 +361,7 @@ export async function authorizeInvoice({
         invoiceId,
         expectedUpdateTime: claim.updateTime,
         errorCode: "arca-last-authorized-error",
-        errorMessage: last.errors.map((item) => item.message).join(" · "),
+        errorMessage: "ARCA rechazó la consulta de numeración fiscal. Revisá los códigos de respuesta.",
         env,
         now,
       });

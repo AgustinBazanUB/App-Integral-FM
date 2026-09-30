@@ -6,6 +6,8 @@ import { syncInvoiceToSale } from "./_lib/arca/invoicePersistence.mjs";
 import { buildInvoicePdf, inspectInvoicePdfReadiness } from "./_lib/arca/invoicePdf.mjs";
 import { toPublicArcaError } from "./_lib/arca/publicError.mjs";
 
+import { publicReceiver } from "./_lib/arca/publicInvoice.mjs";
+
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
   headers: {
@@ -127,7 +129,7 @@ function compactMetadata(invoiceId, invoice, env) {
       matched: verification.checkedAt ? verification.matched === true : null,
       checkedAt: verification.checkedAt || null,
     },
-    receiver: invoice.receiverSnapshot || null,
+    receiver: publicReceiver(invoice.receiverSnapshot),
     pdf: {
       ready: readiness.ready
         && invoice.status === "authorized"

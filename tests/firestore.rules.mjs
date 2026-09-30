@@ -636,7 +636,8 @@ test("reglas respetan denegación específica de envío WhatsApp", async () => {
 test("espejo fiscal de ventas sólo admite escrituras server-side", async () => {
   const adminDb = environment.authenticatedContext("admin-1").firestore();
   const saleRef = doc(adminDb, "sales", "fiscal-mirror-test");
-  await assertSucceeds(setDoc(saleRef, { sellerId: "admin-1", status: "active", invoiceStatus: "pending" }));
+  await assertFails(setDoc(saleRef, { sellerId: "admin-1", status: "active", invoiceStatus: "pending" }));
+  await assertSucceeds(setDoc(saleRef, { sellerId: "admin-1", status: "active" }));
   await assertFails(setDoc(doc(adminDb, "sales", "forged-mirror"), { fiscalInvoice: { cae: "FAKE", voucherNumber: 999 } }));
   await assertFails(setDoc(doc(adminDb, "sales", "forged-status"), { invoiceStatus: "authorized" }));
   const protectedFields = ["fiscalInvoiceId", "fiscalEnvironment", "fiscalInvoice", "fiscalUpdatedAt", "invoiceStatus", "cae", "voucherNumber"];

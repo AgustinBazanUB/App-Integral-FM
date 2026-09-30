@@ -17,7 +17,7 @@ function addressLabel(address) {
 function errorLabel(error) {
   const category = String(error?.category || "").trim();
   if (category === "TEMPORARY_UPSTREAM_ERROR") return "ARCA no está disponible temporalmente.";
-  if (category === "CONFIGURATION_ERROR") return "La configuración ARCA requiere revisión.";
+  if (category === "CONFIGURATION_ERROR") return error?.message || "La configuración ARCA requiere revisión.";
   if (category === "CREDENTIAL_ERROR") return "Las credenciales ARCA requieren revisión.";
   if (category === "PERMISSION_ERROR") return "No tenés permisos para esta operación.";
   if (category === "VALIDATION_ERROR") return error?.message || "Revisá los datos fiscales ingresados.";
@@ -30,6 +30,7 @@ export default function FiscalInvoiceDialog({
   onResolved,
   saleTotal,
   sourceType = "admin_quick_sale",
+  resolveReceiver = resolveArcaFiscalReceiver,
 }) {
   const [mode, setMode] = useState("consumer_final");
   const [cuit, setCuit] = useState("");
@@ -61,7 +62,7 @@ export default function FiscalInvoiceDialog({
     setState({ busy: true, error: null, resolution: null });
     const version = requestGuard.current.begin();
     try {
-      const resolution = await resolveArcaFiscalReceiver({ mode, cuit: normalizedCuit, saleTotal, concept: 1 });
+      const resolution = await resolveReceiver({ mode, cuit: normalizedCuit, saleTotal, concept: 1 });
       if (!requestGuard.current.isCurrent(version)) return;
       setState({ busy: false, error: null, resolution });
     } catch (error) {
