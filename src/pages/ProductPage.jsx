@@ -8,7 +8,8 @@ import { categoryById } from "../data/categories";
 import { products } from "../data/products";
 import { getProductAsset } from "../data/assetsManifest";
 import { trackEvent } from "../utils/analytics";
-import { useEffect } from "react";
+import { formatPrice } from "../utils/format";
+import { useEffect, useState } from "react";
 
 const crossSellByCategory = {
   olive_oil: ["olives", "nuts", "seasoned_salts"],
@@ -22,6 +23,7 @@ export default function ProductPage() {
   const { slug } = useParams();
   const product = products.find((item) => item.slug === slug);
   const { addItem, openCart } = useCart();
+  const [format, setFormat] = useState(product?.formats?.[0] ?? "");
 
   useEffect(() => {
     if (!product) return;
@@ -58,8 +60,11 @@ export default function ProductPage() {
     )
     .slice(0, 3);
 
+  const price = formatPrice(product.price);
+  const promoPrice = formatPrice(product.promoPrice);
+
   const addAndOpen = () => {
-    addItem(product);
+    addItem(product, { format });
     openCart();
   };
 
@@ -142,13 +147,31 @@ export default function ProductPage() {
           <h1>{product.name}</h1>
           <p className="product-detail__description">{product.description}</p>
 
-          <div className="pending-panel">
-            <strong>Ficha comercial pendiente</strong>
-            <p>
-              Precio, stock y datos técnicos deben ser confirmados por Flor Mía
-              antes de vender.
-            </p>
-          </div>
+          {price ? (
+            <div className="product-price">
+              {product.promoLabel ? (
+                <span className="product-card__promo-label">
+                  {product.promoLabel}
+                </span>
+              ) : null}
+              {promoPrice ? (
+                <>
+                  <strong>{promoPrice}</strong>
+                  <s>{price}</s>
+                </>
+              ) : (
+                <strong>{price}</strong>
+              )}
+            </div>
+          ) : (
+            <div className="pending-panel">
+              <strong>Ficha comercial pendiente</strong>
+              <p>
+                Precio, stock y datos técnicos deben ser confirmados por Flor
+                Mía antes de vender.
+              </p>
+            </div>
+          )}
 
           <dl className="product-facts">
             <div>
@@ -161,15 +184,38 @@ export default function ProductPage() {
                 <dd>{value}</dd>
               </div>
             ))}
-            <div>
-              <dt>Presentación</dt>
-              <dd>{product.formats[0]}</dd>
-            </div>
+            {product.formats.length === 1 ? (
+              <div>
+                <dt>Presentación</dt>
+                <dd>{product.formats[0]}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>Stock</dt>
-              <dd>A confirmar</dd>
+              <dd>
+                {product.stock && product.stock !== "unknown"
+                  ? product.stock
+                  : "A confirmar"}
+              </dd>
             </div>
           </dl>
+
+          {product.formats.length > 1 ? (
+            <label className="field-label product-detail__format">
+              Presentación
+              <select
+                value={format}
+                onChange={(event) => setFormat(event.target.value)}
+                aria-label={`Presentación de ${product.name}`}
+              >
+                {product.formats.map((option) => (
+                  <option value={option} key={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           <button className="button button--gold button--block" type="button" onClick={addAndOpen}>
             <ShoppingBag size={19} aria-hidden="true" />

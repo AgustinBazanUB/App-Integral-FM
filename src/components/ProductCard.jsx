@@ -4,15 +4,7 @@ import { Link } from "../router";
 import { categoryById } from "../data/categories";
 import { getProductAsset } from "../data/assetsManifest";
 import { useCart } from "../context/CartContext";
-
-function formatPrice(price) {
-  if (typeof price !== "number") return null;
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(price);
-}
+import { formatPrice } from "../utils/format";
 
 export default function ProductCard({ product, compact = false }) {
   const { addItem } = useCart();
@@ -21,6 +13,7 @@ export default function ProductCard({ product, compact = false }) {
   const category = categoryById[product.categoryId];
   const imageAsset = getProductAsset(product.id);
   const price = formatPrice(product.price);
+  const promoPrice = formatPrice(product.promoPrice);
   const unavailable = product.stock === "out" || product.active === false;
 
   useEffect(() => {
@@ -92,7 +85,21 @@ export default function ProductCard({ product, compact = false }) {
         ) : null}
 
         <div className="product-card__purchase">
-          {price ? <strong>{price}</strong> : <span aria-hidden="true" />}
+          <div className="product-card__pricing">
+            {product.promoLabel ? (
+              <span className="product-card__promo-label">{product.promoLabel}</span>
+            ) : null}
+            {promoPrice && price ? (
+              <>
+                <strong>{promoPrice}</strong>
+                <s>{price}</s>
+              </>
+            ) : price ? (
+              <strong>{price}</strong>
+            ) : (
+              <span className="product-card__price-pending">A confirmar</span>
+            )}
+          </div>
           <button
             className={`product-card__add${added ? " is-added" : ""}`}
             type="button"

@@ -8,7 +8,12 @@ import {
   catalogCollections,
   virtualCatalogCategories,
 } from "../src/data/catalogViews.js";
-import { productById, products } from "../src/data/products.js";
+import {
+  complementaryByCategory,
+  giftOccasions,
+  productById,
+  products,
+} from "../src/data/products.js";
 import { oliveProfiles } from "../src/data/oliveProfiles.js";
 import {
   announcementMessages,
@@ -40,6 +45,37 @@ test("los datos comerciales desconocidos permanecen explícitamente pendientes",
     assert.equal(product.price, null, `${product.id} no debe inventar precio`);
     assert.equal(product.stock, "unknown", `${product.id} no debe inventar stock`);
     assert.equal(product.dataStatus, "pending");
+    assert.ok(
+      product.promoPrice === null || typeof product.promoPrice === "number",
+      `${product.id} promoPrice debe ser null o number`,
+    );
+    if (typeof product.promoPrice === "number") {
+      assert.equal(
+        typeof product.price,
+        "number",
+        `${product.id} necesita precio normal para tener promo`,
+      );
+      assert.ok(
+        product.promoPrice < product.price,
+        `${product.id} promo debe ser menor al precio normal`,
+      );
+    }
+  }
+});
+
+test("las sugerencias del carrito y las ocasiones de regalo usan productos reales", () => {
+  for (const ids of Object.values(complementaryByCategory)) {
+    for (const id of ids) {
+      assert.ok(productById[id], `${id} debe existir en el catálogo`);
+    }
+  }
+  for (const occasion of giftOccasions) {
+    assert.ok(occasion.id);
+    assert.ok(occasion.label);
+    assert.ok(occasion.productIds.length > 0, occasion.id);
+    for (const id of occasion.productIds) {
+      assert.ok(productById[id], `${occasion.id}: ${id} debe existir`);
+    }
   }
 });
 

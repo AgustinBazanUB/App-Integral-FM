@@ -85,7 +85,7 @@ export function CartProvider({ children }) {
           format,
           variant,
           quantity: 1,
-          price: product.price,
+          price: product.promoPrice ?? product.price,
           dataStatus: product.dataStatus,
         },
       ];

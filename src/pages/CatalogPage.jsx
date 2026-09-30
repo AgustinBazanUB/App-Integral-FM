@@ -296,7 +296,11 @@ export default function CatalogPage() {
               title={catalogHeading}
               body={catalogDescription}
             />
-            <span className="badge">DATOS COMERCIALES PENDIENTES</span>
+            {filteredProducts.some(
+              (product) => product.dataStatus === "pending",
+            ) ? (
+              <span className="badge">DATOS COMERCIALES PENDIENTES</span>
+            ) : null}
           </div>
 
           {filteredProducts.length ? (

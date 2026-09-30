@@ -1,23 +1,17 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { Link } from "../router";
 import { categoryById } from "../data/categories";
-import { productById } from "../data/products";
+import { complementaryByCategory, productById } from "../data/products";
 import { useCart } from "../context/CartContext";
 import { useFocusTrap } from "../hooks/useFocusTrap";
-
-const suggestionByCategory = {
-  olive_oil: "olives-selection",
-  nuts: "oil-blend",
-  olives: "salt-malbec",
-  jams: "nuts-almonds",
-  seasoned_salts: "oil-blend",
-};
+import { formatPrice } from "../utils/format";
 
 export default function CartDrawer() {
   const {
     items,
     unitCount,
+    knownSubtotal,
     isCartOpen,
     closeCart,
     updateQuantity,
@@ -27,6 +21,7 @@ export default function CartDrawer() {
   } = useCart();
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
+  const [addedIds, setAddedIds] = useState(() => new Set());
 
   useFocusTrap({
     active: isCartOpen,
@@ -37,13 +32,19 @@ export default function CartDrawer() {
 
   if (!isCartOpen) return null;
 
-  const suggestionId = items[0]
-    ? suggestionByCategory[items[0].categoryId]
-    : null;
-  const suggestion =
-    suggestionId && !items.some((item) => item.productId === suggestionId)
-      ? productById[suggestionId]
-      : null;
+  const cartProductIds = new Set(items.map((item) => item.productId));
+  const cartCategories = [...new Set(items.map((item) => item.categoryId))];
+  const suggestions = cartCategories
+    .flatMap((categoryId) => complementaryByCategory[categoryId] ?? [])
+    .filter((id, index, ids) => ids.indexOf(id) === index)
+    .filter((id) => !cartProductIds.has(id) && productById[id])
+    .map((id) => productById[id])
+    .slice(0, 3);
+
+  const onAddSuggestion = (suggestion) => {
+    addItem(suggestion);
+    setAddedIds((current) => new Set(current).add(suggestion.id));
+  };
 
   return (
     <div
@@ -95,12 +96,7 @@ export default function CartDrawer() {
                       {[item.variant, item.format].filter(Boolean).join(" · ")}
                     </p>
                     <strong>
-                      {typeof item.price === "number"
-                        ? new Intl.NumberFormat("es-AR", {
-                            style: "currency",
-                            currency: "ARS",
-                          }).format(item.price)
-                        : "Precio pendiente"}
+                      {formatPrice(item.price) ?? "Precio pendiente"}
                     </strong>
                     <div className="quantity-control">
                       <button
@@ -138,20 +134,43 @@ export default function CartDrawer() {
               ))}
             </div>
 
-            {suggestion ? (
-              <div className="cart-suggestion">
-                <div>
-                  <span>También puede acompañar</span>
-                  <strong>{suggestion.name}</strong>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => addItem(suggestion)}
-                  aria-label={`Agregar ${suggestion.name}`}
-                >
-                  <Plus size={17} aria-hidden="true" />
-                  Agregar
-                </button>
+            {suggestions.length ? (
+              <div className="cart-suggestions">
+                <p className="cart-suggestions__title">Completá tu pedido</p>
+                {suggestions.map((suggestion) => {
+                  const isAdded = addedIds.has(suggestion.id);
+                  return (
+                    <div className="cart-suggestion" key={suggestion.id}>
+                      {suggestion.image ? (
+                        <img
+                          src={suggestion.image}
+                          alt=""
+                          width="48"
+                          height="60"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : null}
+                      <div className="cart-suggestion__info">
+                        <strong>{suggestion.name}</strong>
+                        <span>
+                          {formatPrice(
+                            suggestion.promoPrice ?? suggestion.price,
+                          ) ?? "Precio a confirmar"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className={isAdded ? "is-added" : undefined}
+                        onClick={() => onAddSuggestion(suggestion)}
+                        aria-label={`Agregar ${suggestion.name} al carrito`}
+                      >
+                        <Plus size={15} aria-hidden="true" />
+                        {isAdded ? "Agregado" : "Agregar"}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
 
@@ -159,7 +178,7 @@ export default function CartDrawer() {
               <div className="cart-total">
                 <span>Subtotal</span>
                 <strong>
-                  {hasPendingPrices ? "A confirmar" : "$ 0"}
+                  {hasPendingPrices ? "A confirmar" : formatPrice(knownSubtotal)}
                 </strong>
               </div>
               <p>
