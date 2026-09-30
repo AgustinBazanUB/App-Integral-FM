@@ -77,13 +77,15 @@ La plataforma usa el proyecto Firebase separado `app-integral-fm`. El sistema an
 
 ## Netlify
 
-`netlify.toml` conserva el despliegue unificado durante la transición. El [preview separado de E-commerce](https://flor-mia-ecommerce-preview.netlify.app/) ya usa el build público; su configuración, verificación y límites están en [Superficies y despliegues](docs/DEPLOYMENT-SURFACES.md). Gestión sigue en el sitio existente hasta completar su migración. Los Pull Requests continúan generando Deploy Previews antes del merge.
+`netlify.toml` conserva el despliegue unificado durante la transición. El [preview separado de E-commerce](https://flor-mia-ecommerce-preview.netlify.app/) usa el build público; su configuración, verificación y límites están en [Superficies y despliegues](docs/DEPLOYMENT-SURFACES.md). Gestión sigue en el sitio existente hasta completar su migración. Durante el desarrollo local de ARCA, los builds automáticos de Netlify deben permanecer detenidos; las pruebas se hacen con Netlify Dev en la PC.
 
 ## Documentación
 
 - [Auditoría de los proyectos](docs/AUDITORIA.md)
 - [Arquitectura, rutas y permisos](docs/ARQUITECTURA.md)
 - [Superficies, despliegues y contrato e-commerce](docs/DEPLOYMENT-SURFACES.md)
+- [Desarrollo local y traslado de ARCA a otra PC](docs/DESARROLLO-LOCAL-Y-TRASLADO-ARCA.md)
+- [Integración ARCA](docs/arca-integration.md)
 - [Modelo de datos Firestore](docs/FIRESTORE-MODEL.md)
 - [Separación y estrategia de migración](docs/MIGRACION.md)
 - [Manual de administrador](docs/MANUAL-ADMINISTRADOR.md)
@@ -101,4 +103,4 @@ La plataforma usa el proyecto Firebase separado `app-integral-fm`. El sistema an
 
 ## Estado honesto de integraciones
 
-La app no procesa pagos online, no emite comprobantes ARCA, no envía mensajes ni automatiza redes. El recibo del Panel Vendedor es interno y no reemplaza un comprobante fiscal. Esas integraciones se activarán únicamente al recibir proveedores, credenciales y reglas comerciales reales.
+El E-commerce público aún no procesa pagos ni crea pedidos. Gestión incorpora la integración ARCA server-side para preparar, autorizar y verificar comprobantes fiscales cuando las credenciales y los gates del entorno están configurados. Las pruebas locales ya incluyeron comprobantes reales; un deploy cloud requiere configurar sus propios secretos y mantener los gates de emisión deshabilitados hasta validarlo. El recibo del Panel Vendedor es interno y no reemplaza un comprobante fiscal.
