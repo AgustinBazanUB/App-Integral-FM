@@ -19,8 +19,9 @@ según el plan. Mantener **Stopped builds** en los sitios conectados al reposito
 evita los builds automáticos por push. No ejecutar `netlify deploy`,
 `netlify deploy --prod` ni `netlify build --context production` durante el ciclo
 local. Tampoco hacer merge a la rama que publica automáticamente sin revisar el
-estado de los builds. `[skip netlify]` en un commit es una segunda protección,
-no reemplaza la configuración del sitio.
+estado de los builds. **No confiar en `[skip netlify]` como bloqueo**: un push de
+esta integración llegó a crear un Deploy Preview. Comprobar `Stopped builds` en
+**ambos** sitios Netlify es el control efectivo.
 
 ## Copiar el trabajo a la otra PC
 
@@ -50,8 +51,10 @@ no reemplaza la configuración del sitio.
    corresponde a ese certificado, archivo con la clave de cifrado del TA, y
    credencial JSON de Firebase Admin. Llevar también el launcher local, que
    contiene rutas y datos del emisor; revisarlo antes de usarlo en la otra PC.
-   No subir esos archivos a GitHub, Netlify, un issue ni un chat. No copiar
-   `.env` con secretos dentro del proyecto.
+   No subir esos **archivos** a GitHub, a un deploy estático, a un issue ni a un
+   chat. Las credenciales de producción que deban usar las Functions se cargan
+   como variables secretas de Netlify, limitadas al contexto `production`; no
+   copiar `.env` con secretos dentro del proyecto.
 4. La clave `ARCA_TA_ENCRYPTION_KEY` **debe ser la misma para el mismo entorno y
    emisor** si se quiere reutilizar el TA ya cifrado en Firestore. No usar la
    clave de homologación en producción. Si la otra PC conserva un certificado
@@ -135,10 +138,23 @@ La gestión y el E-commerce son **dos sitios Netlify**. Un único deploy puede
 actualizar uno de ellos; actualizar ambos requiere dos deploys. El sitio de
 Gestión actual es [`appintegralflormia`](https://app.netlify.com/projects/appintegralflormia)
 y conserva el build unificado `npm run build` en `dist`. Para publicar allí una
-sola vez con el artefacto construido localmente, incluir `dist` y
-`netlify/functions`; confirmar antes los secretos server-side que se quiera
-habilitar y los gates seguros del sitio. Verificar login, Marketing y rutas ARCA
-después de publicar. La futura separación exclusiva de Gestión usaría
+sola vez con el artefacto construido localmente, preparar `dist` y las Functions
+con el CLI actual. El procedimiento comprobado en esta PC fue:
+
+```bash
+npx netlify-cli@latest build --context production
+npx netlify-cli@latest deploy --prod --no-build --dir dist \
+  --site 8b6e2130-3336-4f04-9ab8-a58dffd96bf7
+```
+
+El primer comando **sólo construye localmente** y lee las variables del sitio;
+el segundo **sí publica** y puede consumir créditos. Ejecutarlo únicamente al
+cerrar una entrega. El CLI actual preparó ocho Functions en el modo moderno de
+Netlify. Un intento anterior con CLI 26.1.0 falló antes de publicar por el
+límite de variables de 4 KB; no cambiar las Functions ni reducir secretos para
+sortear ese error sin revisar primero la versión del CLI. Confirmar antes los
+secretos server-side y todos los gates fiscales en `false`; verificar login,
+Marketing y rutas ARCA después de publicar. La futura separación exclusiva de Gestión usaría
 `build:gestion` y `dist/gestion`, pero requiere cambiar la configuración del
 sitio de manera coordinada. Para el E-commerce usar `build:ecommerce`, `dist/ecommerce` y
 `deploy/ecommerce/functions` vacío; no copiar secretos de ARCA ni Firebase
