@@ -19,7 +19,11 @@ import {
   getLastAuthorized,
   requestCae,
 } from "./wsfe.mjs";
-import { arcaEnvironment, loadArcaPublicConfig } from "./config.mjs";
+import {
+  arcaEnvironment,
+  loadArcaPublicConfig,
+  productionAutoAuthorizeSources,
+} from "./config.mjs";
 
 function invoicePath(invoiceId) {
   return `invoices/${invoiceId}`;
@@ -130,6 +134,7 @@ export async function authorizeInvoice({
   issuerVatCondition,
   receiver,
   allowCaeRequest = false,
+  automaticRequest = false,
   env = process.env,
   now = new Date(),
   getDocument = adminGetDocument,
@@ -242,8 +247,10 @@ export async function authorizeInvoice({
     const automaticProduction = String(env.ARCA_AUTO_AUTHORIZE_PRODUCTION || "")
       .trim()
       .toLowerCase() === "true";
+    const automaticSources = productionAutoAuthorizeSources(env);
     const targetSaleCode = String(env.ARCA_PRODUCTION_CAE_SALE_CODE || "").trim();
     const invoiceSaleCode = String(current.data?.saleSnapshot?.saleCode || "").trim();
+    const invoiceSourceType = String(current.data?.sourceType || "").trim().toLowerCase();
 
     if (!productionCaeEnabled) {
       const error = new Error("La autorización de CAE productivo está bloqueada por configuración.");
@@ -259,8 +266,21 @@ export async function authorizeInvoice({
         error.status = 409;
         throw error;
       }
-    } else if (!automaticProduction) {
-      const error = new Error("Producción exige una venta objetivo exacta o el modo automático explícitamente habilitado.");
+    } else if (automaticRequest === true) {
+      if (!automaticProduction) {
+        const error = new Error("La autorización automática productiva está deshabilitada.");
+        error.code = "arca-production-auto-disabled";
+        error.status = 409;
+        throw error;
+      }
+      if (!automaticSources.includes(invoiceSourceType)) {
+        const error = new Error("El origen de esta venta no está habilitado para autorización automática productiva.");
+        error.code = "arca-production-auto-source-blocked";
+        error.status = 409;
+        throw error;
+      }
+    } else {
+      const error = new Error("La autorización manual productiva exige una venta objetivo exacta.");
       error.code = "arca-production-cae-scope-missing";
       error.status = 409;
       throw error;

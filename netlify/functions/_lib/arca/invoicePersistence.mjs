@@ -590,3 +590,81 @@ export async function markInvoiceVerified({
     currentUpdateTime: expectedUpdateTime,
   });
 }
+
+
+export async function syncInvoiceToSale({
+  invoiceId,
+  env = process.env,
+  now = new Date(),
+  getDocument = adminGetDocument,
+  patchDocument = adminPatchDocument,
+} = {}) {
+  if (!invoiceId) {
+    const error = new Error("Falta identificar la solicitud fiscal.");
+    error.code = "arca-invoice-id-missing";
+    error.status = 400;
+    throw error;
+  }
+
+  const invoiceDocument = await getDocument(invoicePathFor(invoiceId), { env });
+  if (!invoiceDocument?.data) {
+    const error = new Error("La solicitud fiscal no existe.");
+    error.code = "arca-invoice-not-found";
+    error.status = 404;
+    throw error;
+  }
+
+  const invoice = invoiceDocument.data;
+  const sourceId = String(invoice.sourceId || "").trim();
+  if (!sourceId) {
+    const error = new Error("La solicitud fiscal no tiene una venta de origen asociada.");
+    error.code = "arca-invoice-source-missing";
+    error.status = 409;
+    throw error;
+  }
+
+  const saleDocument = await getDocument(salePathFor(sourceId), { env });
+  if (!saleDocument?.data) {
+    const error = new Error("La venta asociada a la factura ya no existe.");
+    error.code = "arca-sale-not-found";
+    error.status = 404;
+    throw error;
+  }
+
+  const authorization = invoice.authorization || {};
+  const verification = invoice.verification || {};
+  const timestamp = nowIso(now);
+  const fiscalInvoice = {
+    id: invoiceId,
+    environment: invoice.fiscalEnvironment || "homologation",
+    sourceType: invoice.sourceType || null,
+    status: invoice.status || "pending",
+    voucherClass: authorization.voucherClass || null,
+    pointOfSale: Number(authorization.pointOfSale || invoice.pointOfSaleSnapshot || 0) || null,
+    voucherType: Number(authorization.voucherType || 0) || null,
+    voucherNumber: Number(authorization.voucherNumber || 0) || null,
+    cae: authorization.cae ? String(authorization.cae) : null,
+    caeExpiration: authorization.caeExpiration ? String(authorization.caeExpiration) : null,
+    authorizedAt: authorization.authorizedAt || null,
+    verificationMatched: verification.checkedAt ? verification.matched === true : null,
+    verificationCheckedAt: verification.checkedAt || null,
+    updatedAt: timestamp,
+  };
+
+  await patchDocument(salePathFor(sourceId), {
+    fiscalInvoiceId: invoiceId,
+    fiscalEnvironment: fiscalInvoice.environment,
+    invoiceStatus: fiscalInvoice.status,
+    fiscalInvoice,
+    fiscalUpdatedAt: timestamp,
+  }, {
+    env,
+    requireExists: true,
+  });
+
+  return {
+    invoiceId,
+    sourceId,
+    fiscalInvoice,
+  };
+}

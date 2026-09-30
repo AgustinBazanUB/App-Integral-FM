@@ -879,3 +879,183 @@ El circuito productivo validado quedó:
 `venta -> pending -> correlatividad -> FECAESolicitar -> authorized -> FECompConsultar -> verification.matched=true`.
 
 A partir de este hito se habilita la siguiente etapa de producto: autorización automática de ventas fiscales elegibles, todavía detrás de un gate explícito y con verificación posterior inmediata.
+
+
+## 37. Autorización automática productiva acotada a Venta Rápida
+
+La primera etapa de automatización productiva quedó limitada deliberadamente al origen `admin_quick_sale`.
+
+Nuevas reglas de seguridad:
+
+- `ARCA_AUTO_AUTHORIZE_PRODUCTION=false` mantiene el modo automático apagado por defecto;
+- `ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=admin_quick_sale` define el allowlist inicial;
+- aunque el modo automático esté habilitado, una autorización manual productiva sigue requiriendo `ARCA_PRODUCTION_CAE_SALE_CODE` exacto;
+- el flag automático no convierte el endpoint manual en un permiso general de emisión;
+- `seller_sale` y `ecommerce` permanecen fuera del auto-CAE hasta validar sus flujos por separado;
+- la autorización automática sólo intenta CAE si la solicitud ya está `pending`, tiene `fiscalReadiness.ready=true` y el gate `ARCA_ALLOW_PRODUCTION_CAE=true` está activo;
+- después de un CAE autorizado se ejecuta la verificación inmediata con `FECompConsultar`.
+
+La pantalla de Configuración muestra ahora si el modo automático está habilitado y qué orígenes forman parte del allowlist.
+
+### Próximo checkpoint controlado
+
+La siguiente prueba real debe hacerse localmente y sólo con una Venta Rápida que corresponda facturar:
+
+- `ARCA_ENVIRONMENT=production`;
+- `ARCA_ALLOW_PRODUCTION_INVOICE_PREPARE=true`;
+- `ARCA_ALLOW_PRODUCTION_CAE=true`;
+- `ARCA_AUTO_AUTHORIZE_PRODUCTION=true`;
+- `ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=admin_quick_sale`;
+- `ARCA_PRODUCTION_CAE_SALE_CODE=` vacío;
+- `ARCA_ALLOW_PRODUCTION_READONLY=false`;
+- `ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP=false`, salvo que se esté probando explícitamente Padrón.
+
+El resultado esperado es:
+
+`Venta Rápida -> solicitud fiscal pending -> autorización automática -> CAE -> FECompConsultar -> authorized + verification.matched=true`.
+
+Después de una única validación controlada, los gates de CAE y auto-autorización deben volver a `false` hasta revisar el resultado.
+
+
+## 38. Primera autorización automática productiva validada desde Venta Rápida
+
+El 2026-09-29 se completó correctamente la primera emisión automática productiva desde el flujo real de Venta Rápida administrativa.
+
+Resultado informado por la prueba controlada:
+
+- venta origen: `FM-FMLV-20260929-0002`;
+- comprobante: Factura B;
+- punto de venta: 8;
+- número autorizado: 320;
+- total de la venta: $1.000;
+- estado persistido: `authorized`;
+- `FECompConsultar`: coincidencia completa;
+- mensaje final de Venta Rápida: `Registrada por $1.000. Factura B autorizada · PV 8 · N.º 320 · verificada en ARCA`.
+
+El circuito automático productivo validado quedó:
+
+`Venta Rápida -> venta persistida -> solicitud fiscal pending -> auto-autorización -> FECAESolicitar -> authorized -> FECompConsultar -> verification.matched=true`.
+
+Este hito confirma que el modo automático limitado a `admin_quick_sale` funciona de extremo a extremo en producción.
+
+Después de la validación controlada, los gates productivos de CAE, auto-autorización y preparación deben volver a `false` hasta la siguiente etapa de implementación.
+
+
+## 39. Venta vinculada, PDF fiscal y reenvío manual
+
+Después de validar la primera autorización automática productiva, se completó el bloque de producto que transforma la autorización ARCA en un comprobante utilizable desde la venta.
+
+### Vínculo permanente venta ↔ factura
+
+El backend sincroniza en `sales/{saleId}` una referencia compacta server-authoritative:
+
+- `fiscalInvoiceId`;
+- `fiscalEnvironment`;
+- `invoiceStatus`;
+- `fiscalInvoice.voucherClass`;
+- punto de venta;
+- tipo y número de comprobante;
+- CAE y vencimiento;
+- fecha de autorización;
+- estado y fecha de `FECompConsultar`.
+
+La colección `invoices` continúa siendo la fuente fiscal completa. La copia dentro de `sales` existe para navegación y UX; el navegador no puede alterar CAE, numeración ni estados fiscales.
+
+La sincronización se ejecuta al preparar una factura, después de autorizar, verificar, reconciliar o recuperar un intento, y también cuando se consulta el comprobante. Esto permite backfill progresivo de ventas productivas ya existentes, incluida la primera factura automática.
+
+### Endpoint de documento fiscal
+
+Se agregó:
+
+`netlify/functions/arca-document.mjs`
+
+Modos:
+
+- `metadata`: devuelve únicamente metadatos seguros necesarios para la UI;
+- `pdf`: genera el comprobante PDF sólo si la factura está `authorized` y `verification.matched=true`.
+
+El endpoint exige sesión activa y valida acceso a la venta. No devuelve secretos, certificado, private key ni Ticket de Acceso.
+
+### PDF fiscal
+
+El PDF se genera server-side y no vuelve a solicitar CAE. Utiliza exclusivamente la factura ya persistida y verificada.
+
+Incluye:
+
+- clase de comprobante;
+- PV y número;
+- fecha;
+- CUIT y datos visibles del emisor;
+- condición IVA;
+- receptor;
+- productos;
+- importes;
+- neto e IVA;
+- CAE;
+- vencimiento de CAE;
+- estado de verificación;
+- bloque de “Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)” para Factura B, con IVA contenido y otros impuestos nacionales indirectos;
+- QR fiscal.
+
+El QR usa el formato vigente publicado por ARCA para factura electrónica: JSON versión 1 codificado en Base64 dentro de `https://www.arca.gob.ar/fe/qr/?p=...`. La implementación no usa un servicio QR externo ni expone los datos fiscales a terceros.
+
+El generador QR está embebido server-side y el PDF no agrega dependencias npm nuevas.
+
+### Datos visibles del emisor
+
+Para impedir generar un comprobante incompleto, el PDF queda bloqueado hasta configurar:
+
+- `ARCA_ISSUER_LEGAL_NAME`;
+- `ARCA_ISSUER_COMMERCIAL_ADDRESS` (con fallback temporal al campo legado `ARCA_ISSUER_FISCAL_ADDRESS`);
+- `ARCA_ISSUER_FISCAL_ADDRESS` es opcional y, cuando está configurado, se muestra por separado del domicilio comercial en el PDF;
+- `ARCA_ISSUER_GROSS_INCOME`;
+- `ARCA_ISSUER_ACTIVITY_START`;
+- `ARCA_ISSUER_VAT_CONDITION`.
+
+Configuración muestra sólo readiness y nombres de campos faltantes; nunca expone valores sensibles.
+
+### UX en Ubicaciones → Ventas
+
+El detalle de venta ahora consulta y backfillea su factura fiscal y muestra:
+
+- Factura A/B;
+- PV;
+- número;
+- CAE;
+- vencimiento;
+- estado;
+- coincidencia de `FECompConsultar`;
+- entorno fiscal.
+
+Cuando el PDF está listo aparecen:
+
+- `Ver factura`;
+- `Descargar PDF`;
+- `Compartir / reenviar`.
+
+`Compartir / reenviar` utiliza Web Share cuando el navegador permite compartir archivos PDF —por ejemplo hacia WhatsApp en dispositivos compatibles— y cae de forma segura a descarga del PDF cuando esa capacidad no existe.
+
+Esto todavía no equivale al envío automático por WhatsApp. La automatización de entrega por WhatsApp queda como siguiente bloque y podrá reutilizar exactamente el mismo PDF fiscal ya generado, sin volver a facturar.
+
+### Seguridad e idempotencia
+
+- generar, abrir, descargar o compartir el PDF nunca llama a `FECAESolicitar`;
+- ninguna acción de documento cambia numeración;
+- el PDF sólo se habilita después de verificación positiva;
+- la asociación venta-factura es idempotente;
+- una factura existente se reutiliza por ID determinístico;
+- la copia fiscal en `sales` se escribe sólo desde backend;
+- los gates de emisión pueden permanecer en `false` para consultar y descargar comprobantes ya autorizados.
+
+### Validación
+
+Los tests ARCA cubren ahora:
+
+- payload QR;
+- matriz QR;
+- readiness de datos del emisor;
+- bloqueo de PDF no verificado;
+- generación de PDF;
+- vínculo persistente venta-factura.
+
+Además del test automatizado, se validó localmente el PDF renderizado en A4 y se verificó que el QR dibujado dentro del PDF pueda volver a decodificarse correctamente.

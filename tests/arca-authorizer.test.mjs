@@ -662,6 +662,191 @@ test("producción bloquea CAE si la venta objetivo no coincide", async () => {
   assert.equal(caeRequests, 0);
 });
 
+test("el modo automático no abre la autorización manual productiva sin venta objetivo", async () => {
+  let caeRequests = 0;
+
+  await assert.rejects(
+    authorizeInvoice({
+      invoiceId: "invoice-production-manual-with-auto-flag",
+      issuerVatCondition: "responsable_inscripto",
+      receiver: {
+        vatConditionId: 5,
+        documentType: 99,
+        documentNumber: "0",
+        anonymousConsumerFinal: true,
+        requestedBy: "admin-1",
+      },
+      allowCaeRequest: true,
+      env: {
+        ARCA_ENVIRONMENT: "production",
+        ARCA_ALLOW_PRODUCTION_CAE: "true",
+        ARCA_AUTO_AUTHORIZE_PRODUCTION: "true",
+        ARCA_ISSUER_CUIT: "20123456786",
+        ARCA_POINT_OF_SALE: "8",
+        ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
+      },
+      getDocument: async () => ({
+        data: {
+          ...pendingInvoice,
+          sourceType: "admin_quick_sale",
+          fiscalEnvironment: "production",
+        },
+        updateTime: "u0",
+      }),
+      requestCaeFn: async () => {
+        caeRequests += 1;
+        throw new Error("no debe ejecutarse");
+      },
+    }),
+    (error) => error?.code === "arca-production-cae-scope-missing",
+  );
+
+  assert.equal(caeRequests, 0);
+});
+
+test("autorización automática productiva permite Venta Rápida cuando los gates están habilitados", async () => {
+  const calls = [];
+  const automaticInvoice = {
+    ...pendingInvoice,
+    sourceType: "admin_quick_sale",
+    fiscalEnvironment: "production",
+    saleSnapshot: {
+      ...pendingInvoice.saleSnapshot,
+      saleCode: "FM-FMLV-20260929-0002",
+      total: 1000,
+      subtotal: 1000,
+      items: [{
+        productId: "product-1",
+        name: "Producto",
+        qty: 1,
+        unitPrice: 1000,
+        subtotal: 1000,
+      }],
+    },
+  };
+
+  const result = await authorizeInvoice({
+    invoiceId: "invoice-production-auto-quick-sale",
+    issuerVatCondition: "responsable_inscripto",
+    receiver: {
+      vatConditionId: 5,
+      documentType: 99,
+      documentNumber: "0",
+      anonymousConsumerFinal: true,
+      requestedBy: "admin-1",
+    },
+    allowCaeRequest: true,
+    automaticRequest: true,
+    env: {
+      ARCA_ENVIRONMENT: "production",
+      ARCA_ALLOW_PRODUCTION_CAE: "true",
+      ARCA_AUTO_AUTHORIZE_PRODUCTION: "true",
+      ARCA_ISSUER_CUIT: "20123456786",
+      ARCA_POINT_OF_SALE: "8",
+      ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
+    },
+    getDocument: async () => ({
+      data: automaticInvoice,
+      updateTime: "u0",
+    }),
+    claimInvoiceFn: async () => ({
+      claimed: true,
+      attemptId: "attempt-auto-prod",
+      updateTime: "u1",
+      invoice: { ...automaticInvoice, status: "authorizing" },
+    }),
+    acquireLockFn: async () => ({ acquired: true, updateTime: "lock-auto-prod" }),
+    releaseLockFn: async () => ({ released: true }),
+    getLastAuthorizedFn: async () => ({
+      number: 319,
+      errors: [],
+      events: [],
+    }),
+    persistPlanFn: async (input) => ({
+      updateTime: "u2",
+      data: {
+        ...automaticInvoice,
+        status: "authorizing",
+        authorization: {
+          pointOfSale: 8,
+          voucherType: 6,
+          voucherNumber: input.voucherNumber,
+          voucherClass: "B",
+        },
+      },
+    }),
+    requestCaeFn: async ({ details }) => {
+      calls.push(["cae", details[0].voucherFrom, details[0].total]);
+      return {
+        result: "A",
+        cae: "12345678901235",
+        caeExpiration: "20261009",
+        observations: [],
+        errors: [],
+      };
+    },
+    markAuthorizedFn: async (input) => ({
+      data: {
+        ...automaticInvoice,
+        status: "authorized",
+        authorization: {
+          ...input.baseAuthorization,
+          cae: input.cae,
+          caeExpiration: input.caeExpiration,
+          result: input.result,
+        },
+      },
+    }),
+  });
+
+  assert.equal(result.status, "authorized");
+  assert.deepEqual(calls, [["cae", 320, 1000]]);
+});
+
+test("autorización automática productiva bloquea fuentes no incluidas en el allowlist", async () => {
+  let caeRequests = 0;
+
+  await assert.rejects(
+    authorizeInvoice({
+      invoiceId: "invoice-production-auto-seller-blocked",
+      issuerVatCondition: "responsable_inscripto",
+      receiver: {
+        vatConditionId: 5,
+        documentType: 99,
+        documentNumber: "0",
+        anonymousConsumerFinal: true,
+        requestedBy: "seller-1",
+      },
+      allowCaeRequest: true,
+      automaticRequest: true,
+      env: {
+        ARCA_ENVIRONMENT: "production",
+        ARCA_ALLOW_PRODUCTION_CAE: "true",
+        ARCA_AUTO_AUTHORIZE_PRODUCTION: "true",
+        ARCA_ISSUER_CUIT: "20123456786",
+        ARCA_POINT_OF_SALE: "8",
+        ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
+      },
+      getDocument: async () => ({
+        data: {
+          ...pendingInvoice,
+          sourceType: "seller_sale",
+          fiscalEnvironment: "production",
+        },
+        updateTime: "u0",
+      }),
+      requestCaeFn: async () => {
+        caeRequests += 1;
+        throw new Error("no debe ejecutarse");
+      },
+    }),
+    (error) => error?.code === "arca-production-auto-source-blocked",
+  );
+
+  assert.equal(caeRequests, 0);
+});
+
+
 test("producción permite una única venta objetivo cuando el gate exacto está armado", async () => {
   const calls = [];
 
