@@ -87,13 +87,19 @@ function explicitAction(profile, action) {
   return false;
 }
 
+const MARKETING_MANAGER_META_ADS_ACTIONS = new Set([
+  "metaAdsView", "metaAdsCreateProject", "metaAdsEditProject", "metaAdsArchiveProject",
+  "metaAdsManageKnowledge", "metaAdsManageTheory", "metaAdsPlanCampaign", "metaAdsApprovePlan",
+  "metaAdsViewCreativeWorkspace", "metaAdsUploadCreative",
+]);
+
 function allowedAction(profile, action) {
   if (profile?.active !== true) return false;
   const denied = new Set(profile.permissionDeny?.marketing || []);
   if (denied.has(action)) return false;
   const role = normalizedRole(profile);
   if (role === "admin" || role === "general_admin") return true;
-  if (role === "marketing_manager") return true;
+  if (role === "marketing_manager") return MARKETING_MANAGER_META_ADS_ACTIONS.has(action);
   if (explicitAction(profile, action)) return true;
   return (profile.permissionAllow?.marketing || []).includes(action);
 }
@@ -126,4 +132,43 @@ export async function requireFirebaseMetaAdsPermission(request, action) {
 
 export function publicFirebaseProjectId() {
   return FIREBASE_PROJECT_ID;
+}
+
+
+export async function requireFirebaseActiveProfile(request) {
+  const configuredProject = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID;
+  if (configuredProject !== FIREBASE_PROJECT_ID) {
+    const error = new Error("Configuración Firebase inválida.");
+    error.code = "firebase-project-mismatch";
+    error.status = 500;
+    throw error;
+  }
+  const idToken = bearerToken(request);
+  if (!idToken) {
+    const error = new Error("Falta una sesión válida.");
+    error.code = "unauthenticated";
+    error.status = 401;
+    throw error;
+  }
+  const identity = await lookupFirebaseUser(idToken);
+  const profile = await loadOwnProfile(idToken, identity.localId);
+  if (profile?.active !== true) {
+    const error = new Error("El perfil no está activo.");
+    error.code = "permission-denied";
+    error.status = 403;
+    throw error;
+  }
+  return { idToken, uid: identity.localId, email: identity.email || null, profile };
+}
+
+export async function requireFirebaseAdmin(request) {
+  const session = await requireFirebaseActiveProfile(request);
+  const role = normalizedRole(session.profile);
+  if (!["admin", "general_admin"].includes(role)) {
+    const error = new Error("Esta operación requiere permisos de administración.");
+    error.code = "permission-denied";
+    error.status = 403;
+    throw error;
+  }
+  return session;
 }

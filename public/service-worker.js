@@ -1,9 +1,12 @@
-const CACHE_NAME = "flor-mia-integral-v2";
+const surface = new URL(self.location.href).searchParams.get("surface") || "unified";
+const CACHE_NAME = `flor-mia-${surface}-v3`;
+const APP_SHELL_BY_SURFACE = {
+  gestion: ["/", "/gestion", "/manifest.gestion.webmanifest"],
+  ecommerce: ["/", "/productos", "/manifest.ecommerce.webmanifest"],
+  unified: ["/", "/gestion", "/tienda", "/manifest.webmanifest"],
+};
 const APP_SHELL = [
-  "/",
-  "/gestion",
-  "/tienda",
-  "/manifest.webmanifest",
+  ...(APP_SHELL_BY_SURFACE[surface] || APP_SHELL_BY_SURFACE.unified),
   "/images/flor-mia/logo-flor-mia.svg",
 ];
 

@@ -90,6 +90,24 @@ test("las denegaciones individuales prevalecen sobre la plantilla de rol", () =>
   assert.equal(can(profile, "locations", "create"), false);
 });
 
+test("Campaign Planner permite admin y marketing manager pero no seller", () => {
+  const admin = { id: "admin-meta", active: true, role: "admin" };
+  const marketing = { id: "marketing-meta", active: true, role: "marketing_manager" };
+  const seller = { id: "seller-meta", active: true, role: "seller" };
+  const denied = {
+    ...marketing,
+    permissionDeny: { marketing: ["metaAdsPlanCampaign", "metaAdsApprovePlan"] },
+  };
+
+  for (const action of ["metaAdsView", "metaAdsPlanCampaign", "metaAdsApprovePlan"]) {
+    assert.equal(can(admin, "marketing", action), true);
+    assert.equal(can(marketing, "marketing", action), true);
+    assert.equal(can(seller, "marketing", action), false);
+  }
+  assert.equal(can(denied, "marketing", "metaAdsPlanCampaign"), false);
+  assert.equal(can(denied, "marketing", "metaAdsApprovePlan"), false);
+});
+
 test("los meses se delimitan a medianoche de Argentina sin corrimiento UTC", () => {
   const range = argentinaMonthRange("2026-08");
   assert.equal(range.start.toISOString(), "2026-08-01T03:00:00.000Z");

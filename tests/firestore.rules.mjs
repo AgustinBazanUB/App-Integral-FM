@@ -93,6 +93,26 @@ before(async () => {
         name: "Entrada protegida",
         createdBy: "admin-1",
       }),
+      setDoc(doc(database, "invoices", "invoice-1"), {
+        sourceType: "seller_sale",
+        sourceId: "seed-sale",
+        status: "authorized",
+        pointOfSale: 3,
+        voucherType: 6,
+        voucherNumber: 1,
+        cae: "00000000000000",
+        createdAt: new Date(),
+      }),
+      setDoc(doc(database, "arcaWsaaTickets", "homologation_wsfe"), {
+        schemaVersion: 1,
+        environment: "homologation",
+        service: "wsfe",
+        cipher: "aes-256-gcm",
+        ciphertext: "opaque",
+        iv: "opaque",
+        authTag: "opaque",
+        ticketExpiresAt: new Date(),
+      }),
       setDoc(doc(database, "customerZones", "zone-active"), {
         name: "Zona Norte",
         active: true,
@@ -145,6 +165,53 @@ test("finanzas queda restringido al rol autorizado", async () => {
   const sellerDb = environment.authenticatedContext("seller-1").firestore();
   await assertSucceeds(getDoc(doc(adminDb, "financialEntries", "entry-1")));
   await assertFails(getDoc(doc(sellerDb, "financialEntries", "entry-1")));
+});
+
+test("las facturas fiscales sólo pueden mutarse desde el backend", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  await assertSucceeds(getDoc(doc(adminDb, "invoices", "invoice-1")));
+  await assertFails(setDoc(doc(adminDb, "invoices", "invoice-browser"), {
+    sourceType: "seller_sale",
+    sourceId: "browser-sale",
+    status: "pending",
+    createdAt: new Date(),
+  }));
+  await assertFails(updateDoc(doc(adminDb, "invoices", "invoice-1"), {
+    status: "error",
+  }));
+});
+
+test("la caché WSAA compartida es invisible e inmutable para cualquier cliente", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const sellerDb = environment.authenticatedContext("seller-1").firestore();
+  const adminRef = doc(adminDb, "arcaWsaaTickets", "homologation_wsfe");
+  const sellerRef = doc(sellerDb, "arcaWsaaTickets", "homologation_wsfe");
+
+  await assertFails(getDoc(adminRef));
+  await assertFails(getDoc(sellerRef));
+  await assertFails(setDoc(doc(adminDb, "arcaWsaaTickets", "browser-created"), {
+    environment: "homologation",
+    service: "wsfe",
+    ciphertext: "forbidden",
+  }));
+  await assertFails(updateDoc(adminRef, {
+    ciphertext: "forbidden-update",
+  }));
+});
+
+test("los locks fiscales también son exclusivos del backend", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const sellerDb = environment.authenticatedContext("seller-1").firestore();
+  const lockId = "production_pos_8_type_6";
+
+  await assertFails(getDoc(doc(adminDb, "arcaSequenceLocks", lockId)));
+  await assertFails(getDoc(doc(sellerDb, "arcaSequenceLocks", lockId)));
+  await assertFails(setDoc(doc(adminDb, "arcaSequenceLocks", lockId), {
+    environment: "production",
+    pointOfSale: 8,
+    voucherType: 6,
+    holder: "browser",
+  }));
 });
 
 test("el vendedor no puede ajustar stock fuera de una venta válida", async () => {

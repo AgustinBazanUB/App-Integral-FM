@@ -8,4 +8,6 @@ graphify-out/
 *.log
 .DS_Store
 Thumbs.db
+# Netlify Dev puede generar este lock local aunque el proyecto use Node para Functions.
+deno.lock
 
