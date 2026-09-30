@@ -229,6 +229,20 @@ service cloud.firestore {
       return !("deleted" in request.resource.data)
         || request.resource.data.deleted is bool;
     }
+    function noClientFiscalSaleFields(data) {
+      return !data.keys().hasAny([
+        "fiscalInvoiceId", "fiscalEnvironment", "invoiceStatus", "fiscalInvoice",
+        "fiscalUpdatedAt", "verificationMatched", "verificationCheckedAt",
+        "cae", "caeExpiration", "voucherNumber", "voucherType", "pointOfSale"
+      ]);
+    }
+    function fiscalSaleFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        "fiscalInvoiceId", "fiscalEnvironment", "invoiceStatus", "fiscalInvoice",
+        "fiscalUpdatedAt", "verificationMatched", "verificationCheckedAt",
+        "cae", "caeExpiration", "voucherNumber", "voucherType", "pointOfSale"
+      ]);
+    }
     function customerKeyShape(customerId) {
       return customerId is string
         && customerId.size() == 49
@@ -862,19 +876,21 @@ service cloud.firestore {
       allow list: if isAdmin()
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
-      allow create: if isAdmin()
-        || (quickSalesPermission("create")
-          && activeQuickSalesLocation(request.resource.data.locationId)
-          && validSale(request.resource.data));
-      allow update: if isAdmin()
-        || (quickSalesPermission("edit")
-          && resource.data.sellerId == request.auth.uid
-          && request.resource.data.sellerId == resource.data.sellerId
-          && request.resource.data.locationId == resource.data.locationId
-          && resource.data.status == "active"
-          && request.resource.data.status in ["active", "cancelled"]
-          && ((request.resource.data.status == "active" && activeQuickSalesLocation(resource.data.locationId))
-            || (request.resource.data.status == "cancelled" && allowedLocation(resource.data.locationId))));
+      allow create: if noClientFiscalSaleFields(request.resource.data)
+        && (isAdmin()
+          || (quickSalesPermission("create")
+            && activeQuickSalesLocation(request.resource.data.locationId)
+            && validSale(request.resource.data)));
+      allow update: if fiscalSaleFieldsUnchanged()
+        && (isAdmin()
+          || (quickSalesPermission("edit")
+            && resource.data.sellerId == request.auth.uid
+            && request.resource.data.sellerId == resource.data.sellerId
+            && request.resource.data.locationId == resource.data.locationId
+            && resource.data.status == "active"
+            && request.resource.data.status in ["active", "cancelled"]
+            && ((request.resource.data.status == "active" && activeQuickSalesLocation(resource.data.locationId))
+              || (request.resource.data.status == "cancelled" && allowedLocation(resource.data.locationId)))));
       allow delete: if false;
     }
     match /stockMovements/{movementId} {

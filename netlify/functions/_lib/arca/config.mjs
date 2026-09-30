@@ -60,6 +60,23 @@ export function productionAutoAuthorizeSources(env = process.env) {
   return [...new Set(configured)];
 }
 
+export function productionTaxpayerLookupEnabled(env = process.env) {
+  return String(env.ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP || "")
+    .trim()
+    .toLowerCase() === "true";
+}
+
+export function assertTaxpayerLookupAllowed(env = process.env) {
+  const environment = arcaEnvironment(env);
+  if (environment.id !== "production") return environment;
+  if (productionTaxpayerLookupEnabled(env)) return environment;
+
+  const error = new Error("La consulta productiva de CUIT no está habilitada.");
+  error.code = "arca-production-taxpayer-lookup-disabled";
+  error.status = 409;
+  throw error;
+}
+
 export function assertArcaNetworkAccessAllowed(env = process.env) {
   const environment = arcaEnvironment(env);
   if (environment.id !== "production") return environment;
@@ -240,7 +257,7 @@ export function arcaSafeStatus(env = process.env) {
     taSharedCacheRequiredInProduction: true,
     productionReadonlyEnabled: String(env.ARCA_ALLOW_PRODUCTION_READONLY || "").trim().toLowerCase() === "true",
     productionInvoicePreparationEnabled: String(env.ARCA_ALLOW_PRODUCTION_INVOICE_PREPARE || "").trim().toLowerCase() === "true",
-    productionTaxpayerLookupEnabled: String(env.ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP || "").trim().toLowerCase() === "true",
+    productionTaxpayerLookupEnabled: productionTaxpayerLookupEnabled(env),
     productionCaeEnabled: String(env.ARCA_ALLOW_PRODUCTION_CAE || "").trim().toLowerCase() === "true",
     productionAutoAuthorizeEnabled: String(env.ARCA_AUTO_AUTHORIZE_PRODUCTION || "").trim().toLowerCase() === "true",
     productionAutoAuthorizeSources: productionAutoAuthorizeSources(env),

@@ -9,6 +9,8 @@ on:
       - "netlify/functions/_lib/arca/**"
       - "netlify/functions/arca-*.mjs"
       - "src/gestion/services/arcaService.js"
+      - "src/gestion/fiscal/**"
+      - "src/shared/fiscal/**"
       - "src/gestion/pages/SettingsPage.jsx"
       - "src/gestion/pages/QuickSalesPage.jsx"
       - "src/gestion/services/sellerService.js"

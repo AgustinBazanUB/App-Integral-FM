@@ -4,6 +4,7 @@ import { invoiceIdForEnvironment } from "./_lib/arca/billing.mjs";
 import { arcaEnvironment } from "./_lib/arca/config.mjs";
 import { syncInvoiceToSale } from "./_lib/arca/invoicePersistence.mjs";
 import { buildInvoicePdf, inspectInvoicePdfReadiness } from "./_lib/arca/invoicePdf.mjs";
+import { toPublicArcaError } from "./_lib/arca/publicError.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -15,11 +16,18 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 function safeError(error) {
-  return {
-    code: error?.code || "arca-document-error",
-    message: String(error?.message || "No se pudo obtener el comprobante fiscal.").slice(0, 400),
-    ...(Array.isArray(error?.missing) ? { missing: error.missing } : {}),
-  };
+  const safe = toPublicArcaError(error);
+  const allowedMissing = new Set([
+    "legalName",
+    "commercialAddress",
+    "grossIncome",
+    "activityStart",
+    "vatCondition",
+  ]);
+  const missing = Array.isArray(error?.missing)
+    ? error.missing.filter((value) => allowedMissing.has(String(value)))
+    : [];
+  return missing.length ? { ...safe, missing } : safe;
 }
 
 function isAdmin(session) {
@@ -191,6 +199,7 @@ export default async function handler(request) {
       },
     });
   } catch (error) {
-    return json({ ok: false, ...safeError(error) }, Number(error?.status || 0) || 500);
+    const safe = safeError(error);
+    return json({ ok: false, ...safe }, safe.status);
   }
 }

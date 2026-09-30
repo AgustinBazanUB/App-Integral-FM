@@ -7,6 +7,7 @@ import {
   ensurePendingInvoice,
   syncInvoiceToSale,
 } from "./_lib/arca/invoicePersistence.mjs";
+import { toPublicArcaError } from "./_lib/arca/publicError.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -18,10 +19,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 function safeError(error) {
-  return {
-    code: error?.code || "arca-invoice-error",
-    message: String(error?.message || "No se pudo preparar la facturación.").slice(0, 240),
-  };
+  return toPublicArcaError(error);
 }
 
 export default async function handler(request) {
@@ -174,7 +172,7 @@ export default async function handler(request) {
       },
     });
   } catch (error) {
-    const status = Number(error?.status || 0) || 500;
-    return json({ ok: false, ...safeError(error) }, status);
+    const safe = safeError(error);
+    return json({ ok: false, ...safe }, safe.status);
   }
 }

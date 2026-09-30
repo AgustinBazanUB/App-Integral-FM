@@ -8,6 +8,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -103,6 +104,31 @@ before(async () => {
         cae: "00000000000000",
         createdAt: new Date(),
       }),
+      setDoc(doc(database, "sales", "fiscal-sale"), {
+        saleCode: "FM-TEST-FISCAL",
+        sellerId: "admin-1",
+        locationId: "loc-1",
+        status: "active",
+        total: 1000,
+        notes: "original",
+        fiscalInvoiceId: "invoice-1",
+        fiscalEnvironment: "production",
+        invoiceStatus: "authorized",
+        fiscalUpdatedAt: new Date(),
+        fiscalInvoice: {
+          id: "invoice-1",
+          environment: "production",
+          sourceType: "admin_quick_sale",
+          status: "authorized",
+          voucherClass: "B",
+          pointOfSale: 8,
+          voucherType: 6,
+          voucherNumber: 320,
+          cae: "00000000000000",
+          caeExpiration: "20261010",
+          verificationMatched: true,
+        },
+      }),
       setDoc(doc(database, "arcaWsaaTickets", "homologation_wsfe"), {
         schemaVersion: 1,
         environment: "homologation",
@@ -178,6 +204,56 @@ test("las facturas fiscales sólo pueden mutarse desde el backend", async () => 
   }));
   await assertFails(updateDoc(doc(adminDb, "invoices", "invoice-1"), {
     status: "error",
+  }));
+});
+
+
+test("facturas fiscales: los espejos de sales no pueden falsificarse desde el navegador ni siquiera como admin", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const saleRef = doc(adminDb, "sales", "fiscal-sale");
+
+  await assertFails(updateDoc(saleRef, {
+    fiscalInvoiceId: "invoice-falsa",
+  }));
+  await assertFails(updateDoc(saleRef, {
+    "fiscalInvoice.cae": "99999999999999",
+  }));
+  await assertFails(updateDoc(saleRef, {
+    "fiscalInvoice.verificationMatched": false,
+  }));
+  await assertFails(updateDoc(saleRef, {
+    fiscalInvoice: deleteField(),
+  }));
+  await assertFails(updateDoc(saleRef, {
+    fiscalUpdatedAt: deleteField(),
+  }));
+
+  await assertSucceeds(updateDoc(saleRef, {
+    notes: "cambio comercial permitido",
+  }));
+  const snapshot = await getDoc(saleRef);
+  assert.equal(snapshot.data().notes, "cambio comercial permitido");
+  assert.equal(snapshot.data().fiscalInvoiceId, "invoice-1");
+  assert.equal(snapshot.data().fiscalInvoice.cae, "00000000000000");
+});
+
+test("facturas fiscales: el cliente no puede crear una venta precargada con campos fiscales reservados", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+
+  await assertFails(setDoc(doc(adminDb, "sales", "browser-fiscal-sale"), {
+    sellerId: "admin-1",
+    locationId: "loc-1",
+    status: "active",
+    total: 1000,
+    fiscalInvoiceId: "invoice-forjada",
+  }));
+
+  await assertSucceeds(setDoc(doc(adminDb, "sales", "browser-commercial-sale"), {
+    sellerId: "admin-1",
+    locationId: "loc-1",
+    status: "active",
+    total: 1000,
+    notes: "venta sin espejo fiscal",
   }));
 });
 

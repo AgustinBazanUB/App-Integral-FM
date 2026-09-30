@@ -15,6 +15,8 @@ import { registryDummy } from "./_lib/arca/registry.mjs";
 import { firebaseAdminAccessToken, adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
 import { inspectSharedWsaaCache } from "./_lib/arca/wsaaSharedCache.mjs";
 import { buildArcaOperationalStatus } from "./_lib/arca/readiness.mjs";
+import { assertTaxpayerLookupAllowed } from "./_lib/arca/config.mjs";
+import { toPublicArcaError } from "./_lib/arca/publicError.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -26,12 +28,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 function safeError(error) {
-  return {
-    code: error?.code || "arca-taxpayer-error",
-    status: Number(error?.status || 0) || null,
-    causeCode: error?.causeCode || null,
-    message: String(error?.message || "No se pudo completar la operación.").slice(0, 240),
-  };
+  return toPublicArcaError(error);
 }
 
 async function preflightStage(name, operation) {
@@ -686,17 +683,7 @@ export default async function handler(request) {
       return json({ ok: true, diagnostics });
     }
 
-    const runtimeEnvironment = arcaEnvironment(process.env).id;
-    if (
-      runtimeEnvironment === "production"
-      && String(process.env.ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP || "").trim().toLowerCase() !== "true"
-    ) {
-      return json({
-        ok: false,
-        code: "arca-production-taxpayer-lookup-disabled",
-        message: "La consulta productiva de CUIT está bloqueada por configuración.",
-      }, 409);
-    }
+    assertTaxpayerLookupAllowed(process.env);
 
     const cuit = String(body?.cuit || "").trim();
     if (!cuit) return json({ ok: false, code: "missing-cuit", message: "Ingresá una CUIT." }, 400);
@@ -722,16 +709,16 @@ export default async function handler(request) {
         monotributo: taxpayer.monotributo,
         monotributoCategory: taxpayer.monotributoData?.category || null,
         errors: {
-          constancia: taxpayer.errorConstancia?.message || null,
-          regimenGeneral: taxpayer.errorRegimenGeneral?.message || null,
-          monotributo: taxpayer.errorMonotributo?.message || null,
+          constancia: taxpayer.errorConstancia ? "ARCA informó una observación sobre la constancia." : null,
+          regimenGeneral: taxpayer.errorRegimenGeneral ? "ARCA informó una observación sobre el régimen general." : null,
+          monotributo: taxpayer.errorMonotributo ? "ARCA informó una observación sobre Monotributo." : null,
         },
       },
       receiverVatCondition: inferred.resolved ? inferred.condition : null,
       receiverVatConditionReason: inferred.reason,
     });
   } catch (error) {
-    const status = Number(error?.status || 0) || 500;
-    return json({ ok: false, ...safeError(error) }, status);
+    const safe = safeError(error);
+    return json({ ok: false, ...safe }, safe.status);
   }
 }

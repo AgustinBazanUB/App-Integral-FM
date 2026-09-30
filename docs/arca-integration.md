@@ -1133,3 +1133,91 @@ No se modifica el ID determinístico de factura por origen, la asociación perma
 Código preparado sin cambiar credenciales, secretos ni valores de gates. No se solicita CAE desde el readiness. No se habilita `seller_sale` ni `ecommerce`.
 
 Las pruebas nuevas de readiness cubren configuración completa/incompleta, no exposición de secretos, auto off, CAE off, PDF y Consulta CUIT. Las pruebas existentes de `arca-authorizer` continúan cubriendo autorización manual protegida y source no autorizada.
+
+
+## 41. Componente fiscal compartido de receptor — Etapa 2
+
+Esta etapa agrega un flujo reutilizable para resolver el **receptor fiscal** antes de preparar o autorizar una factura. El objetivo es que Venta Rápida, Panel Vendedor y Ecommerce puedan reutilizar la misma resolución de receptor sin duplicar lógica ni acoplarla a `FECAESolicitar`.
+
+### Arquitectura
+
+Se incorporan cuatro piezas:
+
+- `src/shared/fiscal/cuit.js`: helpers puros de CUIT compartidos por frontend y backend;
+- `netlify/functions/_lib/arca/fiscalReceiverResolver.mjs`: dominio server-side que resuelve Consumidor Final o CUIT;
+- `netlify/functions/arca-receiver.mjs`: endpoint autenticado de resolución, sin autorización fiscal;
+- `src/gestion/fiscal/FiscalInvoiceDialog.jsx`: diálogo reutilizable para seleccionar receptor, consultar CUIT y revisar los datos antes de continuar.
+
+El wrapper histórico `netlify/functions/_lib/arca/cuit.mjs` conserva la misma API y reexporta los helpers compartidos, evitando duplicar el algoritmo de CUIT.
+
+### Consumidor Final
+
+El resolver genera el receiver normalizado:
+
+```js
+{
+  vatConditionId: 5,
+  documentType: 99,
+  documentNumber: "0",
+  anonymousConsumerFinal: true,
+  concept: 1
+}
+```
+
+Antes de hacerlo exige un total de venta válido y el valor explícito de `ARCA_CONSUMER_FINAL_ID_THRESHOLD`. Si el total alcanza o supera el umbral, devuelve `consumer-final-identification-required` y no inventa una identificación.
+
+La forma concreta de identificar Consumidor Final por encima del umbral queda **PENDIENTE DE DEFINIR** en una etapa específica; este componente no agrega una regla fiscal no respaldada por la arquitectura actual.
+
+### CUIT
+
+El flujo con CUIT:
+
+1. normaliza y valida estructura + dígito verificador;
+2. comprueba el gate productivo de lookup;
+3. consulta Padrón;
+4. diferencia contribuyente inexistente, inactivo, condición IVA no resoluble y fallo técnico;
+5. reutiliza `inferReceiverVatCondition`;
+6. devuelve un receiver normalizado con documento tipo 80;
+7. devuelve además una vista de revisión con CUIT, nombre/razón social, estado, domicilio fiscal y condición IVA.
+
+El usuario debe confirmar explícitamente el resultado desde el diálogo antes de que el canal llamador lo use.
+
+### Errores públicos
+
+Se agregó `publicError.mjs` con categorías:
+
+- `CONFIGURATION_ERROR`;
+- `CREDENTIAL_ERROR`;
+- `PERMISSION_ERROR`;
+- `TEMPORARY_UPSTREAM_ERROR`;
+- `VALIDATION_ERROR`.
+
+Los endpoints modificados no reflejan directamente `error.message`, SOAP Faults, `detail`, stack traces ni errores arbitrarios de terceros hacia el navegador. Las observaciones de Padrón expuestas por `arca-taxpayer` se convierten en mensajes públicos genéricos.
+
+### Seguridad Firestore de sales
+
+La auditoría detectó un riesgo preexistente: un usuario administrador autenticado podía modificar desde el navegador los campos fiscales espejo de `sales`.
+
+Las reglas ahora reservan al backend los campos:
+
+- `fiscalInvoiceId`;
+- `fiscalEnvironment`;
+- `invoiceStatus`;
+- `fiscalInvoice`;
+- `fiscalUpdatedAt`;
+- campos fiscales directos equivalentes de CAE, verificación, numeración y PV.
+
+La protección cubre create, update, nested update y deleteField. Las modificaciones comerciales que no tocan esos campos continúan permitidas según los permisos existentes. Firebase Admin server-side continúa pudiendo sincronizar el espejo porque no está sujeto a las reglas cliente.
+
+### Límites de esta etapa
+
+- no se conecta todavía el diálogo a Venta Rápida;
+- no se conecta todavía a Panel Vendedor;
+- no se conecta todavía a Ecommerce;
+- no se agrega `seller_sale` ni `ecommerce` a la allowlist automática;
+- no se modifica el authorizer;
+- no se llama `requestCae`;
+- no se llama `FECAESolicitar`;
+- no se habilita ningún gate productivo.
+
+El componente queda preparado para que cada canal entregue su venta y reciba un `receiver`, pero la autorización fiscal sigue siendo responsabilidad exclusiva del motor ARCA existente.

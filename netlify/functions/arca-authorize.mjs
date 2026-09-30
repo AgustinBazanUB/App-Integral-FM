@@ -2,6 +2,7 @@ import { requireFirebaseAdmin } from "./_lib/firebaseAuth.mjs";
 import { authorizeInvoice, reconcileInvoice, recoverPreCaeInvoice, verifyAuthorizedInvoice } from "./_lib/arca/authorizer.mjs";
 import { arcaEnvironment } from "./_lib/arca/config.mjs";
 import { syncInvoiceToSale } from "./_lib/arca/invoicePersistence.mjs";
+import { toPublicArcaError } from "./_lib/arca/publicError.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -13,10 +14,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 function safeError(error) {
-  return {
-    code: error?.code || "arca-authorize-error",
-    message: String(error?.message || "No se pudo completar la operación fiscal.").slice(0, 300),
-  };
+  return toPublicArcaError(error);
 }
 
 export default async function handler(request) {
@@ -159,9 +157,7 @@ export default async function handler(request) {
     }
     return json({ ok: true, mode, result });
   } catch (error) {
-    return json(
-      { ok: false, ...safeError(error) },
-      Number(error?.status || 0) || 500,
-    );
+    const safe = safeError(error);
+    return json({ ok: false, ...safe }, safe.status);
   }
 }

@@ -63,6 +63,48 @@ export async function lookupArcaTaxpayer(cuit) {
   return data;
 }
 
+export async function resolveArcaFiscalReceiver({
+  mode,
+  cuit = "",
+  saleTotal = null,
+  concept = 1,
+} = {}) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Iniciá sesión para resolver los datos fiscales.");
+  const token = await user.getIdToken();
+  let response;
+  try {
+    response = await fetch("/.netlify/functions/arca-receiver", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        mode,
+        cuit: String(cuit || "").trim(),
+        saleTotal,
+        concept,
+      }),
+    });
+  } catch {
+    const error = new Error("No se pudo conectar con el servicio fiscal.");
+    error.code = "arca-network-error";
+    error.category = "TEMPORARY_UPSTREAM_ERROR";
+    error.status = 503;
+    throw error;
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok !== true) {
+    const error = new Error(data?.message || "No se pudo resolver el receptor fiscal.");
+    error.code = data?.code || "arca-receiver-error";
+    error.category = data?.category || null;
+    error.status = response.status;
+    throw error;
+  }
+  return data.resolution;
+}
+
 
 export async function requestPendingArcaInvoice({ sourceType, sourceId, receiver = null }) {
   const user = auth.currentUser;
