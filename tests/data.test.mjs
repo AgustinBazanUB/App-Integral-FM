@@ -17,7 +17,7 @@ import {
   trustItems,
 } from "../src/data/brand.js";
 import { assetsManifest } from "../src/data/assetsManifest.js";
-import { promotions } from "../src/data/promotions.js";
+import { promoShowcase, promotions } from "../src/data/promotions.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDirectory, "..");
@@ -135,16 +135,31 @@ test("los CTAs y el título AOVE usan los textos aprobados", () => {
     resolve(projectRoot, "src/pages/HomePage.jsx"),
     "utf8",
   );
+  const oilGuideSource = readFileSync(
+    resolve(projectRoot, "src/components/OliveOilGuide.jsx"),
+    "utf8",
+  );
   assert.match(homePageSource, /CONOCÉ TU AOVE/);
   assert.match(homePageSource, /CONOCER MÁS PRODUCTOS/);
   assert.match(homePageSource, /fm-button--black/);
   assert.match(
-    homePageSource,
+    oilGuideSource,
     /Elegí el oliva ideal para cada ocasión\./,
   );
-  assert.doesNotMatch(homePageSource, /Elegí el aceite que mejor va con vos\./);
+  assert.doesNotMatch(oilGuideSource, /Elegí el aceite que mejor va con vos\./);
   assert.match(homePageSource, /scrollIntoView/);
   assert.match(homePageSource, /prefers-reduced-motion/);
+});
+
+test("la home ya no muestra categorías ni destacados y sí la sección de promociones", () => {
+  const homePageSource = readFileSync(
+    resolve(projectRoot, "src/pages/HomePage.jsx"),
+    "utf8",
+  );
+  assert.match(homePageSource, /<PromoShowcase \/>/);
+  assert.match(homePageSource, /<OliveOilGuide \/>/);
+  assert.doesNotMatch(homePageSource, /fm-categories/);
+  assert.doesNotMatch(homePageSource, /fm-featured/);
 });
 
 test("la home solo publica las dos promociones aprobadas", () => {
@@ -155,6 +170,24 @@ test("la home solo publica las dos promociones aprobadas", () => {
       ["3 cuotas sin interés", "Miércoles y sábados"],
     ],
   );
+});
+
+test("el showcase de promociones referencia productos reales sin inventar precios", () => {
+  for (const offer of promoShowcase.offers) {
+    const product = productById[offer.productId];
+    assert.ok(product, `${offer.productId} debe existir en el catálogo`);
+    if (typeof product.price === "number") {
+      assert.equal(typeof offer.promoPrice, "number", offer.productId);
+      assert.ok(
+        offer.promoPrice < product.price,
+        `${offer.productId} promo debe ser menor al precio normal`,
+      );
+    }
+  }
+  for (const campaign of promoShowcase.campaigns) {
+    assert.ok(campaign.id);
+    assert.ok(campaign.title);
+  }
 });
 
 test("los seis varietales tienen intensidad y producto de 500 cc", () => {

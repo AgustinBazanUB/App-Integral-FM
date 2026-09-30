@@ -497,126 +497,244 @@ body::before {
   line-height: 1.15;
 }
 
-/* Category discovery */
-.fm-categories {
-  min-height: 286px;
-  padding: 18px 0 28px;
-  background: #f7f3ea;
+/* Promo showcase — sección protagonista de la home */
+.fm-promo-showcase {
+  padding: 30px 0 42px;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(199, 163, 90, 0.12), transparent 42%),
+    #f7f3ea;
   border-top: 1px solid rgba(38, 49, 31, 0.06);
+  color: var(--fm-text-dark);
 }
 
-.fm-category-grid {
+.fm-promo-showcase .fm-rule-heading {
+  margin-bottom: 10px;
+}
+
+.fm-promo-showcase__intro {
+  margin: 0 0 24px;
+  color: var(--fm-muted-dark);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 19px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.fm-promo-benefits {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.fm-category-card {
-  position: relative;
+.fm-promo-benefit {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  border: 1px solid rgba(38, 49, 31, 0.14);
-  background: #f7f3ea;
-  color: var(--fm-text-dark);
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px 20px;
+  border: 1px solid rgba(199, 163, 90, 0.4);
+  border-radius: 12px;
+  background: rgba(255, 253, 248, 0.55);
+  box-shadow: 0 8px 26px rgba(40, 33, 20, 0.04);
   transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
     border-color 320ms ease,
-    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow 320ms ease;
 }
 
-.fm-category-card:hover {
+.fm-promo-benefit:hover {
+  border-color: rgba(199, 163, 90, 0.72);
+  box-shadow: 0 14px 34px rgba(40, 33, 20, 0.09);
+  transform: translateY(-3px);
+}
+
+.fm-promo-benefit__icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgba(199, 163, 90, 0.55);
+  border-radius: 50%;
+  background: #fbf6ea;
+  color: var(--fm-gold);
+}
+
+.fm-promo-benefit h3 {
+  margin: 0 0 2px;
+  color: var(--fm-text-dark);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.05;
+}
+
+.fm-promo-benefit strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--fm-gold);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fm-promo-benefit p {
+  margin: 0;
+  color: rgba(23, 25, 18, 0.68);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+/* Ofertas de producto con precio promocional */
+.fm-promo-offers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.fm-promo-offer {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(217, 194, 140, 0.28);
+  border-radius: 12px;
+  background: var(--fm-card);
+  color: #fff;
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 320ms ease;
+}
+
+.fm-promo-offer:hover {
   border-color: rgba(199, 163, 90, 0.72);
   transform: translateY(-3px);
 }
 
-.fm-category-card__media {
-  position: relative;
-  display: block;
-  height: 155px;
+.fm-promo-offer__media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
-  background: #d9cfbf;
+  background: #171914;
 }
 
-.fm-category-card__media > img {
+.fm-promo-offer__media img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center 44%;
+  object-fit: contain;
+  object-position: center bottom;
   transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.fm-category-card:hover .fm-category-card__media > img {
-  transform: scale(1.025);
+.fm-promo-offer:hover .fm-promo-offer__media img {
+  transform: scale(1.04);
 }
 
-.fm-category-card__gift-collage {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  grid-template-columns: repeat(3, 1fr);
-  overflow: hidden;
-  background: #b9a98e;
-}
-
-.fm-category-card__gift-collage img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.fm-category-card__gift-collage img:first-child {
-  object-position: center 34%;
-}
-
-.fm-category-card__gift-collage img:last-child {
-  object-position: center 28%;
-}
-
-.fm-category-card__icon {
-  z-index: 2;
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  align-self: center;
-  margin-top: -20px;
-  border: 1px solid rgba(199, 163, 90, 0.48);
-  border-radius: 50%;
-  background: #fbf8f1;
-  color: var(--fm-gold);
-}
-
-.fm-category-card__label {
+.fm-promo-offer__content {
   display: flex;
-  min-height: 58px;
-  align-items: center;
-  justify-content: center;
-  padding: 7px 9px 13px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: center;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 16px 18px;
+}
+
+.fm-promo-offer__badge {
+  align-self: flex-start;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--fm-gold);
+  color: var(--fm-ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
-/* Featured products */
-.fm-featured {
-  min-height: 468px;
-  padding: 24px 0 34px;
+.fm-promo-offer h3 {
+  margin: 0;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.fm-promo-offer h3 a:hover {
+  color: var(--fm-gold-soft);
+}
+
+.fm-promo-offer__prices {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.fm-promo-offer__prices strong {
+  color: var(--fm-gold-soft);
+  font-size: 17px;
+}
+
+.fm-promo-offer__prices s {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+}
+
+.fm-promo-offer__ends {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 10px;
+}
+
+/* Campañas temporales */
+.fm-promo-campaign {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  margin-top: 22px;
+  padding: 24px 26px;
+  border: 1px solid rgba(199, 163, 90, 0.55);
+  border-radius: 12px;
   background:
-    radial-gradient(circle at 50% 0, rgba(85, 107, 61, 0.08), transparent 36%),
-    var(--fm-ink);
+    radial-gradient(circle at 85% 50%, rgba(199, 163, 90, 0.14), transparent 24rem),
+    var(--fm-ink-soft);
   color: #fff;
 }
 
-.fm-featured .fm-rule-heading {
-  margin-bottom: 16px;
+.fm-promo-campaign__badge {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  border: 1px solid rgba(199, 163, 90, 0.6);
+  border-radius: 999px;
+  color: var(--fm-gold-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.fm-featured-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
+.fm-promo-campaign__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.fm-promo-campaign h3 {
+  margin: 0 0 5px;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 500;
+  line-height: 1.05;
+}
+
+.fm-promo-campaign p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fm-promo-campaign .fm-button {
+  flex: 0 0 auto;
 }
 
 .product-card {
@@ -1338,17 +1456,8 @@ body::before {
     font-size: 54px;
   }
 
-  .fm-category-grid,
-  .fm-featured-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .fm-category-card__media {
-    height: 190px;
-  }
-
-  .fm-featured-grid {
-    gap: 14px;
+  .fm-promo-benefits {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .product-card__image-link {
@@ -1599,10 +1708,14 @@ body::before {
     font-size: 17px;
   }
 
-  .fm-categories,
-  .fm-featured {
+  .fm-promo-showcase {
     padding-top: 24px;
     padding-bottom: 30px;
+  }
+
+  .fm-promo-showcase__intro {
+    margin-bottom: 18px;
+    font-size: 17px;
   }
 
   .fm-rule-heading {
@@ -1616,38 +1729,26 @@ body::before {
     text-align: center;
   }
 
-  .fm-category-grid,
-  .fm-featured-grid {
-    display: grid;
-    width: calc(100% + 16px);
-    grid-auto-flow: column;
-    grid-auto-columns: min(82vw, 330px);
-    grid-template-columns: none;
-    gap: 12px;
-    padding: 0 16px 12px 0;
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    scroll-padding-inline: 16px;
-    scroll-snap-type: inline mandatory;
-    scrollbar-width: thin;
+  .fm-promo-benefit {
+    padding: 18px 16px;
   }
 
-  .fm-category-card,
-  .fm-featured-grid .product-card {
-    scroll-snap-align: start;
+  .fm-promo-benefit h3 {
+    font-size: 21px;
   }
 
-  .fm-category-card__media {
-    height: 215px;
+  .fm-promo-offers {
+    grid-template-columns: 1fr;
   }
 
-  .fm-category-card__label {
-    min-height: 64px;
-    font-size: 12px;
+  .fm-promo-campaign {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
   }
 
-  .fm-featured-grid {
-    grid-auto-columns: min(86vw, 350px);
+  .fm-promo-campaign .fm-button {
+    width: 100%;
   }
 
   .product-card {
@@ -1874,6 +1975,14 @@ body::before {
   .site-header .mobile-menu-button {
     width: 42px;
     min-width: 42px;
+  }
+
+  .fm-promo-benefits {
+    grid-template-columns: 1fr;
+  }
+
+  .fm-promo-offer {
+    grid-template-columns: 92px minmax(0, 1fr);
   }
 
   .fm-kicker--line::after {
