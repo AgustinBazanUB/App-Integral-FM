@@ -1221,3 +1221,11 @@ La protección cubre create, update, nested update y deleteField. Las modificaci
 - no se habilita ningún gate productivo.
 
 El componente queda preparado para que cada canal entregue su venta y reciba un `receiver`, pero la autorización fiscal sigue siendo responsabilidad exclusiva del motor ARCA existente.
+
+### Checkpoint local del 30/09/2026
+
+El SHA `2909605b4d87f1fdc93529ed1d4f9d5af9943e0d` se auditó en checkout detached. Los correctivos locales evitan códigos de error arbitrarios, distinguen códigos de configuración/credenciales WSAA, rechazan totales de tipos inválidos y descartan respuestas del diálogo tras cambiar/cerrar el flujo. Venta Rápida deja de crear `invoiceStatus` desde el navegador: ese espejo pertenece al backend, que ya lo sincroniza al preparar la solicitud. No se relajaron las reglas fiscales ni se cambió el authorizer.
+
+Las comprobaciones de esta etapa pasan localmente, pero el checkpoint completo queda **NO APROBADO**: su parent es la Etapa 1 original y no incorpora el correctivo local `6c196097ac88b3ead425ed1cf571cf0899777626`. Se reprodujeron cuatro fallos heredados de readiness, dos fallos previos de reglas comerciales y una reflexión de `invoice.error.message` en respuestas exitosas de `arca-authorize` para solicitudes `reconciling`. El catálogo de errores sólo sanea excepciones; no sanea todos los resultados históricos del authorizer. Por ese motivo no debe afirmarse que toda respuesta de los endpoints está libre de mensajes externos.
+
+La evidencia, límites y pasos para un cierre posterior están en `docs/arca-stage2-checkpoint.md`. No hubo push, PR, deploy, cambios de secretos/gates ni CAE real.

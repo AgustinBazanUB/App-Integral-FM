@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, FormField, Modal, Select, Toast } from "../../design-system";
 import { formatCuit, isValidCuit, normalizeCuit } from "../../shared/fiscal/cuit.js";
 import { resolveArcaFiscalReceiver } from "../services/arcaService";
+import { createReceiverRequestGuard } from "./receiverRequestGuard.js";
 
 function addressLabel(address) {
   if (!address) return "No informado";
@@ -33,13 +34,17 @@ export default function FiscalInvoiceDialog({
   const [mode, setMode] = useState("consumer_final");
   const [cuit, setCuit] = useState("");
   const [state, setState] = useState({ busy: false, error: null, resolution: null });
+  const requestGuard = useRef(null);
+  if (!requestGuard.current) requestGuard.current = createReceiverRequestGuard();
 
   useEffect(() => {
+    requestGuard.current.invalidate();
     if (!open) return;
     setMode("consumer_final");
     setCuit("");
     setState({ busy: false, error: null, resolution: null });
-  }, [open]);
+    return () => { requestGuard.current.invalidate(); };
+  }, [open, saleTotal, sourceType]);
 
   const normalizedCuit = useMemo(() => normalizeCuit(cuit), [cuit]);
   const cuitLooksValid = isValidCuit(normalizedCuit);
@@ -54,10 +59,13 @@ export default function FiscalInvoiceDialog({
       return;
     }
     setState({ busy: true, error: null, resolution: null });
+    const version = requestGuard.current.begin();
     try {
       const resolution = await resolveArcaFiscalReceiver({ mode, cuit: normalizedCuit, saleTotal, concept: 1 });
+      if (!requestGuard.current.isCurrent(version)) return;
       setState({ busy: false, error: null, resolution });
     } catch (error) {
+      if (!requestGuard.current.isCurrent(version)) return;
       setState({ busy: false, error, resolution: null });
     }
   };
@@ -85,7 +93,8 @@ export default function FiscalInvoiceDialog({
     >
       <div className="fm-form-grid">
         <FormField label="Tipo de receptor" required>
-          <Select value={mode} onChange={(event) => {
+          <Select value={mode} disabled={state.busy} onChange={(event) => {
+            requestGuard.current.invalidate();
             setMode(event.target.value);
             setState({ busy: false, error: null, resolution: null });
           }}>
@@ -104,8 +113,10 @@ export default function FiscalInvoiceDialog({
             <input
               inputMode="numeric"
               autoComplete="off"
+              disabled={state.busy}
               value={cuit}
               onChange={(event) => {
+                requestGuard.current.invalidate();
                 setCuit(event.target.value.replace(/\D/g, "").slice(0, 11));
                 setState((current) => ({ ...current, error: null, resolution: null }));
               }}

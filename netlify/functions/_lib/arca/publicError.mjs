@@ -26,6 +26,15 @@ const PUBLIC_ERROR_CATALOG = Object.freeze({
   "firebase-admin-token-error": { category: "PERMISSION_ERROR", status: 503, message: "El backend no pudo autenticarse con Firebase Admin." },
   "firebase-admin-read-error": { category: "PERMISSION_ERROR", status: 503, message: "El backend no pudo acceder a los datos requeridos." },
   "arca-network-error": { category: "TEMPORARY_UPSTREAM_ERROR", status: 503, message: "ARCA no está disponible temporalmente. Reintentá más tarde." },
+  "arca-timeout": { category: "TEMPORARY_UPSTREAM_ERROR", status: 504, message: "ARCA tardó demasiado en responder. Reintentá más tarde." },
+  "arca-production-network-disabled": { category: "CONFIGURATION_ERROR", status: 409, message: "Las consultas productivas ARCA no están habilitadas." },
+  "arca-wsaa-shared-cache-required": { category: "CONFIGURATION_ERROR", status: 409, message: "Falta configurar la caché compartida WSAA requerida." },
+  "arca-wsaa-cache-key-missing": { category: "CONFIGURATION_ERROR", status: 409, message: "Falta configurar el cifrado de la caché WSAA." },
+  "arca-wsaa-cache-key-invalid": { category: "CONFIGURATION_ERROR", status: 409, message: "La configuración de cifrado de la caché WSAA no es válida." },
+  "cms.cert.untrusted": { category: "CREDENTIAL_ERROR", status: 409, message: "WSAA no reconoce el certificado configurado." },
+  "cms.cert.expired": { category: "CREDENTIAL_ERROR", status: 409, message: "El certificado configurado está vencido." },
+  "cms.sign.invalid": { category: "CREDENTIAL_ERROR", status: 409, message: "WSAA no pudo validar la firma de la solicitud." },
+  "coe.notAuthorized": { category: "PERMISSION_ERROR", status: 403, message: "El certificado no está autorizado para el servicio solicitado." },
   "arca-soap-http-error": { category: "TEMPORARY_UPSTREAM_ERROR", status: 503, message: "ARCA no pudo completar la consulta en este momento." },
   "arca-production-invoice-prepare-disabled": { category: "CONFIGURATION_ERROR", status: 409, message: "La preparación productiva de facturas no está habilitada." },
   "arca-production-authorization-blocked": { category: "CONFIGURATION_ERROR", status: 409, message: "La emisión productiva de CAE no está habilitada." },
@@ -52,8 +61,8 @@ const PUBLIC_ERROR_CATALOG = Object.freeze({
 });
 
 function safeCode(value) {
-  const code = String(value || "").trim();
-  return /^[A-Za-z0-9._-]{1,120}$/.test(code) ? code : "arca-request-error";
+  const code = String(value || "").trim().replace(/^[A-Za-z0-9_-]+:/, "");
+  return Object.hasOwn(PUBLIC_ERROR_CATALOG, code) ? code : "arca-request-error";
 }
 function fallbackCategory(status) {
   if (status === 401 || status === 403) return "PERMISSION_ERROR";

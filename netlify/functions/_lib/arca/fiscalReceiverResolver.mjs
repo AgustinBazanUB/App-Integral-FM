@@ -15,7 +15,7 @@ function requiredConsumerFinalThreshold(env = process.env) {
   return threshold;
 }
 function normalizedTotal(value) {
-  if (value === null || value === undefined || value === "") {
+  if (!(["number", "string"].includes(typeof value)) || String(value).trim() === "") {
     const error = new Error("Falta el total de la venta.");
     error.code = "fiscal-sale-total-required";
     error.status = 400;
