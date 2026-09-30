@@ -109,13 +109,13 @@ function assemblePdf(pageStreams) {
 
 function issuerVatLabel(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "responsable_inscripto") return "IVA Responsable Inscripto";
+  if (normalized === "responsable_inscripto") return "Responsable Inscripto";
   return String(value || "").replaceAll("_", " ");
 }
 
 function receiverVatLabel(id) {
   return ({
-    1: "IVA Responsable Inscripto",
+    1: "Responsable Inscripto",
     4: "IVA Sujeto Exento",
     5: "Consumidor Final",
     6: "Responsable Monotributo",
@@ -138,6 +138,7 @@ function receiverDocumentLabel(type, number) {
 function requiredIssuer(env = {}) {
   const issuer = {
     legalName: String(env.ARCA_ISSUER_LEGAL_NAME || "").trim(),
+    fiscalAddress: String(env.ARCA_ISSUER_FISCAL_ADDRESS || "").trim(),
     commercialAddress: String(
       env.ARCA_ISSUER_COMMERCIAL_ADDRESS || env.ARCA_ISSUER_FISCAL_ADDRESS || "",
     ).trim(),
@@ -145,7 +146,9 @@ function requiredIssuer(env = {}) {
     activityStart: String(env.ARCA_ISSUER_ACTIVITY_START || "").trim(),
     vatCondition: String(env.ARCA_ISSUER_VAT_CONDITION || "").trim(),
   };
-  const missing = Object.entries(issuer).filter(([, value]) => !value).map(([key]) => key);
+  const missing = Object.entries(issuer)
+    .filter(([key, value]) => key !== "fiscalAddress" && !value)
+    .map(([key]) => key);
   if (missing.length) {
     const error = new Error(`Faltan datos del emisor para generar un comprobante PDF completo: ${missing.join(", ")}.`);
     error.code = "arca-pdf-issuer-data-missing";
@@ -197,129 +200,160 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
     cae: auth.cae,
   });
   const matrix = qrMatrix(qr.url);
+  const voucherClass = String(auth.voucherClass || "").toUpperCase();
+  const voucherCode = String(auth.voucherType || "").padStart(2, "0");
+  const issuerCuit = String(invoice.issuerCuit || env.ARCA_ISSUER_CUIT || "").replace(/\D/g, "");
+  const displayedCuit = issuerCuit.length === 11
+    ? `${issuerCuit.slice(0, 2)}-${issuerCuit.slice(2, 10)}-${issuerCuit.slice(10)}`
+    : issuerCuit;
   const pages = [];
   let stream = "";
-  let y = 790;
   const pushPage = () => {
     pages.push(stream);
     stream = "";
-    y = 790;
-  };
-  const text = (x, value, size = 9, bold = false) => {
-    stream += commandText(x, y, size, value, bold);
-  };
-  const next = (amount = 16) => {
-    y -= amount;
   };
 
-  const voucherClass = String(auth.voucherClass || "").toUpperCase();
-  stream += commandRect(35, 55, 525, 745);
-  stream += commandLine(35, 690, 560, 690);
-  text(50, issuer.legalName, 16, true);
-  stream += commandText(275, 755, 34, voucherClass || "-", true);
-  stream += commandText(390, 775, 13, `FACTURA ${voucherClass}`, true);
-  stream += commandText(390, 760, 8, `Código ${String(auth.voucherType || "").padStart(3, "0")} · ORIGINAL`);
-  stream += commandText(390, 744, 10, `PV ${String(auth.pointOfSale || "").padStart(5, "0")}  Nro ${String(auth.voucherNumber || "").padStart(8, "0")}`, true);
-  stream += commandText(390, 728, 9, `Fecha: ${dmy(issueDate)}`);
-  y = 720;
-  text(50, `CUIT: ${invoice.issuerCuit || env.ARCA_ISSUER_CUIT}`);
-  next();
-  for (const line of wrap(`Domicilio comercial: ${issuer.commercialAddress}`, 55)) {
-    text(50, line);
-    next();
+  // Match the supplied paper invoice's three-part composition: boxed issuer,
+  // open transaction detail, and a separate authorization/QR footer.
+  stream += commandRect(30, 694, 535, 116);
+  stream += commandRect(263, 740, 69, 70);
+  stream += commandText(285, 770, 34, voucherClass || "-", true);
+  stream += commandText(275, 750, 9, `Código ${voucherCode}`);
+  stream += commandText(39, 790, 8, "Razón social:", true);
+  stream += commandText(101, 790, 8, issuer.legalName);
+  if (issuer.fiscalAddress) {
+    stream += commandText(39, 773, 8, "Dirección fiscal:", true);
+    stream += commandText(111, 773, 8, issuer.fiscalAddress);
   }
-  text(50, `Condición IVA: ${issuerVatLabel(issuer.vatCondition)}`);
-  next();
-  text(50, `Ingresos Brutos: ${issuer.grossIncome}`);
-  next();
-  text(50, `Inicio de actividades: ${issuer.activityStart}`);
-  next(20);
+  stream += commandText(39, 755, 8, "Dirección comercial:", true);
+  const addressLines = wrap(issuer.commercialAddress, 28);
+  if (addressLines.length > 3) {
+    const error = new Error("El domicilio comercial excede el espacio disponible en el encabezado del PDF.");
+    error.code = "arca-pdf-issuer-address-too-long";
+    error.status = 409;
+    throw error;
+  }
+  addressLines.forEach((line, index) => {
+    stream += commandText(index ? 39 : 130, 755 - index * 13, 8, line);
+  });
+  stream += commandText(39, 705, 8, "Condición de IVA:", true);
+  stream += commandText(117, 705, 8, issuerVatLabel(issuer.vatCondition));
+  stream += commandText(394, 790, 12, "FACTURA", true);
+  stream += commandText(394, 774, 8, `PV: ${String(auth.pointOfSale || "").padStart(5, "0")} - N° ${String(auth.voucherNumber || "").padStart(8, "0")}`, true);
+  stream += commandText(394, 757, 8, `Fecha Emisión: ${dmy(issueDate)}`, true);
+  stream += commandText(394, 740, 8, `CUIT: ${displayedCuit}`, true);
+  stream += commandText(394, 723, 8, `Ingresos Brutos: ${issuer.grossIncome}`, true);
+  stream += commandText(394, 706, 8, `Inicio de Actividades: ${issuer.activityStart}`, true);
 
-  stream += commandLine(35, y + 5, 560, y + 5);
-  next(8);
-  text(50, "RECEPTOR", 10, true);
-  next();
   const customerName = sale.customer?.name || (Number(receiver.vatConditionId) === 5 ? "A CONSUMIDOR FINAL" : "NR");
-  text(50, `Nombre / Razón social: ${customerName}`);
-  next();
-  text(50, `Condición IVA: ${receiverVatLabel(receiver.vatConditionId || auth.receiverVatConditionId)}`);
-  next();
   const docType = auth.receiverDocument?.documentType ?? receiver.documentType;
   const docNumber = auth.receiverDocument?.documentNumber ?? receiver.documentNumber;
-  text(50, `Documento: ${receiverDocumentLabel(docType, docNumber)}`);
-  next();
-  text(50, `Venta origen: ${sale.saleCode || invoice.sourceId || "-"}`);
-  next(22);
+  stream += commandText(39, 673, 8, "Razón social:", true);
+  stream += commandText(110, 673, 8, customerName);
+  stream += commandText(39, 655, 8, "Cond. de IVA:", true);
+  stream += commandText(110, 655, 8, receiverVatLabel(receiver.vatConditionId || auth.receiverVatConditionId));
+  stream += commandText(39, 637, 8, "Documento:", true);
+  stream += commandText(110, 637, 8, receiverDocumentLabel(docType, docNumber));
+  stream += commandText(307, 673, 8, "Venta origen:", true);
+  stream += commandText(374, 673, 8, sale.saleCode || invoice.sourceId || "-");
+  if (sale.payment?.label || sale.payment?.method) {
+    stream += commandText(307, 655, 8, "Cond. de venta:", true);
+    stream += commandText(385, 655, 8, sale.payment.label || sale.payment.method);
+  }
+  if (sale.locationName) {
+    stream += commandText(307, 637, 8, "Ubicación:", true);
+    stream += commandText(361, 637, 8, sale.locationName);
+  }
 
-  stream += commandLine(35, y + 7, 560, y + 7);
-  text(50, "Cant.", 9, true);
-  stream += commandText(95, y, 9, "Descripción", true);
-  stream += commandText(360, y, 9, "P. Unit.", true);
-  stream += commandText(470, y, 9, "Subtotal", true);
-  next(17);
-  stream += commandLine(35, y + 7, 560, y + 7);
+  stream += commandText(39, 500, 9, "Cantidad", true);
+  stream += commandText(100, 500, 9, "Detalle", true);
+  stream += commandText(362, 500, 9, "P. Unitario", true);
+  stream += commandText(477, 500, 9, "Subtotal", true);
+  stream += commandLine(35, 489, 560, 489);
+  let y = 470;
 
   const items = Array.isArray(sale.items) ? sale.items : [];
+  const fiscalProducts = Array.isArray(invoice.productFiscalSnapshot) ? invoice.productFiscalSnapshot : [];
+  const vatRateByProduct = new Map(fiscalProducts.map((product) => [String(product.productId || ""), product.arcaVatRate]));
   for (const item of items) {
-    if (y < 235) {
-      stream += commandText(50, 80, 8, "Continúa en la página siguiente.");
+    const rate = vatRateByProduct.get(String(item.productId || ""));
+    const rateLabel = rate == null || !Number.isFinite(Number(rate))
+      ? ""
+      : ` (IVA ${Number(rate).toLocaleString("es-AR", { maximumFractionDigits: 1 })}%)`;
+    const descriptionLines = wrap(`${item.name || item.productName || "Producto"}${rateLabel}`, 43);
+    if (y - (descriptionLines.length - 1) * 12 < 320) {
+      stream += commandText(39, 275, 8, "Continúa en la página siguiente.");
       pushPage();
-      stream += commandRect(35, 55, 525, 745);
-      stream += commandText(50, 780, 11, `${issuer.legalName} · Factura ${voucherClass} ${auth.pointOfSale}-${auth.voucherNumber}`, true);
-      y = 748;
-      text(50, "Cant.", 9, true);
-      stream += commandText(95, y, 9, "Descripción", true);
-      stream += commandText(360, y, 9, "P. Unit.", true);
-      stream += commandText(470, y, 9, "Subtotal", true);
-      next(17);
-      stream += commandLine(35, y + 7, 560, y + 7);
+      stream += commandText(39, 790, 10, `${issuer.legalName} · Factura ${voucherClass} ${auth.pointOfSale}-${auth.voucherNumber}`, true);
+      stream += commandLine(35, 776, 560, 776);
+      stream += commandText(39, 755, 9, "Cantidad", true);
+      stream += commandText(100, 755, 9, "Detalle", true);
+      stream += commandText(362, 755, 9, "P. Unitario", true);
+      stream += commandText(477, 755, 9, "Subtotal", true);
+      stream += commandLine(35, 744, 560, 744);
+      y = 725;
     }
-    const descriptionLines = wrap(item.name || item.productName || "Producto", 45).slice(0, 2);
-    stream += commandText(50, y, 9, String(item.qty || 0));
-    stream += commandText(95, y, 9, descriptionLines[0]);
-    stream += commandText(360, y, 9, `$ ${money(item.unitPrice)}`);
-    stream += commandText(470, y, 9, `$ ${money(item.subtotal)}`);
-    if (descriptionLines[1]) {
-      next(12);
-      stream += commandText(95, y, 8, descriptionLines[1]);
-    }
-    next(17);
+    stream += commandText(58, y, 9, String(item.qty || 0));
+    descriptionLines.forEach((line, index) => {
+      stream += commandText(100, y - index * 12, index ? 8 : 9, line);
+    });
+    stream += commandText(362, y, 9, `$ ${money(item.unitPrice)}`);
+    stream += commandText(477, y, 9, `$ ${money(item.subtotal)}`);
+    y -= 22 + (descriptionLines.length - 1) * 12;
   }
 
-  if (y < 315) {
+  const appliedDiscounts = Array.isArray(sale.discounts)
+    ? sale.discounts.filter((discount) => Number(discount?.amountApplied || 0) > 0)
+    : [];
+  for (const discount of appliedDiscounts) {
+    const labelLines = wrap(`Descuento: ${discount.name || "Descuento aplicado"}`, 43);
+    if (y - (labelLines.length - 1) * 12 < 320) {
+      pushPage();
+      stream += commandText(39, 790, 10, `${issuer.legalName} · Factura ${voucherClass} ${auth.pointOfSale}-${auth.voucherNumber}`, true);
+      stream += commandLine(35, 776, 560, 776);
+      y = 725;
+    }
+    labelLines.forEach((line, index) => {
+      stream += commandText(100, y - index * 12, index ? 8 : 9, line);
+    });
+    stream += commandText(477, y, 9, `- $ ${money(discount.amountApplied)}`);
+    y -= 22 + (labelLines.length - 1) * 12;
+  }
+
+  if (y < 320) {
     pushPage();
-    stream += commandRect(35, 55, 525, 745);
-    stream += commandText(50, 780, 11, `${issuer.legalName} · Factura ${voucherClass} ${auth.pointOfSale}-${auth.voucherNumber}`, true);
-    y = 735;
+    stream += commandText(39, 790, 10, `${issuer.legalName} · Factura ${voucherClass} ${auth.pointOfSale}-${auth.voucherNumber}`, true);
+    stream += commandLine(35, 776, 560, 776);
+    y = 700;
   }
-  stream += commandLine(330, y + 8, 550, y + 8);
-  next(5);
-  stream += commandText(350, y, 9, "Subtotal:", true);
-  stream += commandText(470, y, 9, `$ ${money(sale.subtotal ?? sale.totalBeforeDiscounts ?? sale.total)}`);
-  next(16);
+  y = Math.min(y - 32, 405);
+  stream += commandText(354, y, 9, "Sub-Total:", true);
+  stream += commandText(477, y, 9, `$ ${money(sale.subtotal ?? sale.totalBeforeDiscounts ?? sale.total)}`);
+  y -= 19;
   if (Number(sale.discountTotal || 0) > 0) {
-    stream += commandText(350, y, 9, "Descuentos:");
-    stream += commandText(470, y, 9, `- $ ${money(sale.discountTotal)}`);
-    next(16);
+    stream += commandText(354, y, 9, "Descuentos:");
+    stream += commandText(477, y, 9, `- $ ${money(sale.discountTotal)}`);
+    y -= 19;
   }
-  stream += commandText(350, y, 9, "Neto gravado:");
-  stream += commandText(470, y, 9, `$ ${money(fiscal.net)}`);
-  next(16);
-  stream += commandText(350, y, 9, "IVA:");
-  stream += commandText(470, y, 9, `$ ${money(fiscal.vat)}`);
-  next(18);
-  stream += commandText(350, y, 11, "TOTAL:", true);
-  stream += commandText(470, y, 11, `$ ${money(fiscal.total ?? sale.total)}`, true);
+  stream += commandText(354, y, 9, "Neto gravado:");
+  stream += commandText(477, y, 9, `$ ${money(fiscal.net)}`);
+  y -= 19;
+  stream += commandText(354, y, 9, "IVA:");
+  stream += commandText(477, y, 9, `$ ${money(fiscal.vat)}`);
+  y -= 25;
+  stream += commandText(354, y, 11, "Total:", true);
+  stream += commandText(477, y, 11, `$ ${money(fiscal.total ?? sale.total)}`, true);
 
   if (voucherClass === "B") {
-    stream += commandText(55, 242, 8, "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)", true);
-    stream += commandText(55, 226, 8, `IVA Contenido: $ ${money(fiscal.vat)}`);
-    stream += commandText(55, 211, 8, `Otros Impuestos Nacionales Indirectos: $ ${money(fiscal.tributes || 0)}`);
+    stream += commandText(39, 239, 8, "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)", true);
+    stream += commandText(39, 223, 8, `IVA Contenido: $ ${money(fiscal.vat)}`);
+    stream += commandText(39, 208, 8, `Otros Impuestos Nacionales Indirectos: $ ${money(fiscal.tributes || 0)}`);
   }
 
-  const qrModule = 2.05;
-  const qrX = 55;
-  const qrY = 65;
+  stream += commandRect(30, 55, 535, 105);
+  const qrModule = 1.15;
+  const qrX = 47;
+  const qrY = 73;
   stream += "0 g\n";
   for (let row = 0; row < matrix.length; row += 1) {
     for (let col = 0; col < matrix[row].length; col += 1) {
@@ -329,12 +363,13 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
       stream += `${x.toFixed(2)} ${yy.toFixed(2)} ${qrModule.toFixed(2)} ${qrModule.toFixed(2)} re f\n`;
     }
   }
-  stream += commandText(205, 176, 10, "Comprobante autorizado por ARCA", true);
-  stream += commandText(205, 156, 9, `CAE: ${auth.cae || "-"}`);
-  stream += commandText(205, 139, 9, `Vencimiento CAE: ${dmy(auth.caeExpiration)}`);
-  stream += commandText(205, 122, 8, `Verificación: ${invoice.verification?.matched === true ? "coincide con FECompConsultar" : "pendiente"}`);
-  stream += commandText(205, 91, 7, "El código QR permite verificar los datos fiscales del comprobante.");
-  stream += commandText(205, 74, 7, invoice.fiscalEnvironment === "production" ? "Documento fiscal electrónico" : "HOMOLOGACIÓN - SIN VALIDEZ FISCAL", true);
+  stream += commandText(133, 130, 10, `CAE N°: ${auth.cae || "-"}`, true);
+  stream += commandText(133, 109, 10, `VTO. CAE: ${dmy(auth.caeExpiration)}`, true);
+  stream += commandText(133, 73, 7, `Hoja: ${pages.length + 1} de ${pages.length + 1}`);
+  stream += commandText(508, 73, 8, "ORIGINAL");
+  if (invoice.fiscalEnvironment !== "production") {
+    stream += commandText(235, 93, 8, "HOMOLOGACIÓN - SIN VALIDEZ FISCAL", true);
+  }
 
   pushPage();
   const output = assemblePdf(pages);

@@ -16,6 +16,7 @@ import { syncInvoiceToSale } from "../netlify/functions/_lib/arca/invoicePersist
 const issuerEnv = {
   ARCA_ISSUER_CUIT: "20123456786",
   ARCA_ISSUER_LEGAL_NAME: "Flor Mia",
+  ARCA_ISSUER_FISCAL_ADDRESS: "Domicilio fiscal de prueba",
   ARCA_ISSUER_COMMERCIAL_ADDRESS: "Domicilio comercial de prueba",
   ARCA_ISSUER_GROSS_INCOME: "123456789",
   ARCA_ISSUER_ACTIVITY_START: "01/01/2020",
@@ -87,10 +88,39 @@ test("PDF fiscal exige datos del emisor y factura verificada", () => {
   const result = buildInvoicePdf({ invoice, env: issuerEnv });
   assert.equal(result.filename, "Factura_B_00008-00000320.pdf");
   assert.equal(result.pdf.subarray(0, 8).toString("latin1"), "%PDF-1.4");
-  assert.match(result.pdf.toString("latin1"), /CAE: 12345678901234/);
+  assert.match(result.pdf.toString("latin1"), /CAE N°: 12345678901234/);
   assert.match(result.pdf.toString("latin1"), /Régimen de Transparencia Fiscal al Consumidor/);
   assert.match(result.pdf.toString("latin1"), /IVA Contenido:/);
   assert.match(result.pdf.toString("latin1"), /A CONSUMIDOR FINAL/);
+  assert.match(result.pdf.toString("latin1"), /Dirección fiscal:/);
+  assert.match(result.pdf.toString("latin1"), /Dirección comercial:/);
+  assert.match(result.pdf.toString("latin1"), /Código 06/);
+  assert.match(result.pdf.toString("latin1"), /PV: 00008 - N° 00000320/);
+  assert.match(result.pdf.toString("latin1"), /30 694 535 116 re S/);
+  assert.match(result.pdf.toString("latin1"), /30 55 535 105 re S/);
+});
+
+test("PDF detalla el producto, su IVA y el descuento de la venta autorizada", () => {
+  const detailedInvoice = structuredClone(invoice);
+  detailedInvoice.saleSnapshot.subtotal = 10000;
+  detailedInvoice.saleSnapshot.discountTotal = 9000;
+  detailedInvoice.saleSnapshot.items = [{
+    productId: "product-1",
+    name: "Almendras Tostadas y Saladas 200g",
+    qty: 1,
+    unitPrice: 10000,
+    subtotal: 10000,
+  }];
+  detailedInvoice.saleSnapshot.discounts = [{ name: "Promo 3 AOVE", amountApplied: 9000 }];
+  detailedInvoice.productFiscalSnapshot = [{ productId: "product-1", arcaVatRate: 21 }];
+
+  const content = buildInvoicePdf({ invoice: detailedInvoice, env: issuerEnv }).pdf.toString("latin1");
+  assert.match(content, /Almendras Tostadas y Saladas 200g/);
+  assert.match(content, /IVA 21%/);
+  assert.match(content, /Descuento: Promo 3 AOVE/);
+  assert.match(content, /10\.000,00/);
+  assert.match(content, /9\.000,00/);
+  assert.match(content, /1\.000,00/);
 });
 
 

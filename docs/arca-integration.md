@@ -1007,6 +1007,7 @@ Para impedir generar un comprobante incompleto, el PDF queda bloqueado hasta con
 
 - `ARCA_ISSUER_LEGAL_NAME`;
 - `ARCA_ISSUER_COMMERCIAL_ADDRESS` (con fallback temporal al campo legado `ARCA_ISSUER_FISCAL_ADDRESS`);
+- `ARCA_ISSUER_FISCAL_ADDRESS` es opcional y, cuando está configurado, se muestra por separado del domicilio comercial en el PDF;
 - `ARCA_ISSUER_GROSS_INCOME`;
 - `ARCA_ISSUER_ACTIVITY_START`;
 - `ARCA_ISSUER_VAT_CONDITION`.
