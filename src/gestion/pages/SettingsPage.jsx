@@ -5,7 +5,7 @@ import { canAccessAdministration } from "../permissions";
 import {
   authorizeArcaInvoice,
   dryRunArcaInvoice,
-  getArcaSafeStatus,
+  getArcaOperationalStatus,
   getArcaWsaaCacheStatus,
   listRecentArcaInvoices,
   reconcileArcaInvoice,
@@ -95,7 +95,7 @@ export default function SettingsPage() {
   const loadSafeArcaConfig = async () => {
     setArcaConfigState((current) => ({ ...current, busy: true, error: "" }));
     try {
-      const result = await getArcaSafeStatus();
+      const result = await getArcaOperationalStatus();
       setArcaConfigState({ busy: false, result, error: "" });
     } catch (error) {
       setArcaConfigState({ busy: false, result: null, error: error.message });
@@ -242,9 +242,26 @@ export default function SettingsPage() {
     }
   };
 
-  const arcaOperational = arcaState.result?.ok === true;
+  const operationalStatus = arcaConfigState.result || null;
+  const arcaOperational = operationalStatus?.operational === true;
   const pointOfSale = arcaState.result?.pointOfSale?.data;
-  const fiscalConfig = arcaState.result?.configuration || arcaConfigState.result || {};
+  const fiscalConfig = operationalStatus?.configuration || arcaState.result?.configuration || {};
+  const readinessServices = operationalStatus?.services || {};
+  const readinessBlockers = Array.isArray(operationalStatus?.blockers) ? operationalStatus.blockers : [];
+  const readinessSources = Array.isArray(operationalStatus?.automaticSources) ? operationalStatus.automaticSources : [];
+  const readinessLabel = (serviceState) => {
+    const value = String(serviceState?.status || "unknown").toLowerCase();
+    if (["ok", "ready", "enabled"].includes(value)) return "Listo";
+    if (value === "disabled") return "Deshabilitado";
+    if (value === "error") return "Con error";
+    return "Sin verificar";
+  };
+  const readinessTone = (serviceState) => {
+    const value = String(serviceState?.status || "unknown").toLowerCase();
+    if (["ok", "ready", "enabled"].includes(value)) return "success";
+    if (["disabled", "error"].includes(value)) return "warning";
+    return "neutral";
+  };
   const caeEnabled = fiscalConfig.caeHomologationEnabled === true;
   const productionEnvironment = fiscalConfig.environment === "production";
   const productionPreflightReady = (
@@ -270,14 +287,10 @@ export default function SettingsPage() {
     ["Pagos online", "Proveedor pendiente", "No integrado"],
     [
       "Facturación ARCA",
-      arcaOperational
-        ? `Homologación · punto ${pointOfSale?.selected}`
-        : arcaState.result
-          ? "Diagnóstico parcial disponible"
-          : arcaState.error
-            ? "La última verificación falló"
-            : "Backend de homologación en configuración",
-      arcaOperational ? "Operativo" : arcaState.error ? "Error" : "En progreso",
+      operationalStatus
+        ? `${String(operationalStatus.environment || "ARCA").toUpperCase()} · punto ${operationalStatus.pointOfSale || "-"}`
+        : "Readiness central pendiente de verificar",
+      arcaOperational ? "Operativo" : operationalStatus ? "No operativo" : "En progreso",
     ],
     ["Canales sociales", "Carga manual y enlaces directos", "Primera versión"],
   ];
@@ -303,6 +316,103 @@ export default function SettingsPage() {
           ))}
         </div>
       </Panel>
+
+
+      {isAdmin ? (
+        <Panel
+          title={`ARCA ${String(operationalStatus?.environment || fiscalConfig.environment || "sin verificar").toUpperCase()}`}
+          description="Readiness fiscal central. Distingue configuración, operatividad y habilitación de emisión sin exponer credenciales ni solicitar un CAE."
+          action={(
+            <Button variant="secondary" loading={arcaConfigState.busy} onClick={loadSafeArcaConfig}>
+              Actualizar estado ARCA
+            </Button>
+          )}
+        >
+          {arcaConfigState.error ? <Toast tone="error">{arcaConfigState.error}</Toast> : null}
+          <div className="fm-settings-list">
+            <div>
+              <div>
+                <strong>Estado general</strong>
+                <span>
+                  {operationalStatus
+                    ? operationalStatus.operational
+                      ? "La integración fiscal está operativa. La emisión depende de los interruptores de seguridad."
+                      : operationalStatus.availability === "unavailable"
+                        ? "ARCA está temporalmente no disponible o una dependencia remota no respondió."
+                        : readinessBlockers[0]?.message || "La integración fiscal todavía no está operativa."
+                    : "Verificando readiness fiscal..."}
+                </span>
+              </div>
+              <Badge tone={arcaOperational ? "success" : operationalStatus ? "warning" : "neutral"}>
+                {arcaOperational ? "OPERATIVO" : operationalStatus ? "NO OPERATIVO" : "VERIFICANDO"}
+              </Badge>
+            </div>
+            <div>
+              <div><strong>Certificado</strong><span>{readinessServices.certificate?.message || "Sin verificar."}</span></div>
+              <Badge tone={readinessTone(readinessServices.certificate)}>{readinessLabel(readinessServices.certificate)}</Badge>
+            </div>
+            <div>
+              <div>
+                <strong>Punto de Venta</strong>
+                <span>{readinessServices.pointOfSale?.message || (operationalStatus?.pointOfSale ? `PV ${operationalStatus.pointOfSale}` : "Sin verificar.")}</span>
+              </div>
+              <Badge tone={readinessTone(readinessServices.pointOfSale)}>{readinessLabel(readinessServices.pointOfSale)}</Badge>
+            </div>
+            <div>
+              <div><strong>WSAA</strong><span>{readinessServices.wsaa?.message || "Sin verificar."}</span></div>
+              <Badge tone={readinessTone(readinessServices.wsaa)}>{readinessLabel(readinessServices.wsaa)}</Badge>
+            </div>
+            <div>
+              <div><strong>WSFE</strong><span>{readinessServices.wsfe?.message || "Sin verificar."}</span></div>
+              <Badge tone={readinessTone(readinessServices.wsfe)}>{readinessLabel(readinessServices.wsfe)}</Badge>
+            </div>
+            <div>
+              <div><strong>Firebase Admin</strong><span>{readinessServices.firebaseAdmin?.message || "Sin verificar."}</span></div>
+              <Badge tone={readinessTone(readinessServices.firebaseAdmin)}>{readinessLabel(readinessServices.firebaseAdmin)}</Badge>
+            </div>
+            <div>
+              <div><strong>Consulta CUIT</strong><span>{readinessServices.taxpayerLookup?.message || "Sin verificar."}</span></div>
+              <Badge tone={readinessTone(readinessServices.taxpayerLookup)}>{readinessLabel(readinessServices.taxpayerLookup)}</Badge>
+            </div>
+            <div>
+              <div><strong>Facturación automática</strong><span>{readinessServices.automaticBilling?.message || "Sin verificar."}</span></div>
+              <Badge tone={readinessTone(readinessServices.automaticBilling)}>{readinessLabel(readinessServices.automaticBilling)}</Badge>
+            </div>
+            <div>
+              <div><strong>PDF fiscal</strong><span>{readinessServices.pdf?.message || "Sin verificar."}</span></div>
+              <Badge tone={readinessTone(readinessServices.pdf)}>{readinessLabel(readinessServices.pdf)}</Badge>
+            </div>
+            <div>
+              <div>
+                <strong>Fuentes habilitadas</strong>
+                <span>{readinessSources.length ? readinessSources.join(", ") : "Ninguna fuente automática habilitada."}</span>
+              </div>
+              <Badge tone={readinessSources.length ? "success" : "neutral"}>{readinessSources.length ? readinessSources.length : "0"}</Badge>
+            </div>
+            <div>
+              <div>
+                <strong>Emisión productiva</strong>
+                <span>
+                  {operationalStatus?.environment === "production"
+                    ? operationalStatus.emissionEnabled
+                      ? "Los gates de preparación + CAE permiten emisión; el origen sigue limitado por allowlist/idempotencia."
+                      : "Deshabilitada por interruptores de seguridad."
+                    : "No aplica al entorno actual."}
+                </span>
+              </div>
+              <Badge tone={operationalStatus?.emissionEnabled ? "warning" : "neutral"}>
+                {operationalStatus?.emissionEnabled ? "Habilitada" : "Deshabilitada"}
+              </Badge>
+            </div>
+          </div>
+          {readinessBlockers.length ? (
+            <p>
+              <strong>Qué falta:</strong>{" "}
+              {readinessBlockers.slice(0, 4).map((item) => item.message).join(" · ")}
+            </p>
+          ) : null}
+        </Panel>
+      ) : null}
 
       {isAdmin && !productionEnvironment ? (
         <Panel
@@ -415,16 +525,16 @@ export default function SettingsPage() {
             <div>
               <div>
                 <strong>CAE homologación</strong>
-                <span>{caeEnabled ? "Habilitado temporalmente" : "Bloqueado por configuración"}</span>
+                <span>{caeEnabled ? "Habilitado temporalmente" : "Deshabilitado por configuración"}</span>
               </div>
               <Badge tone={caeEnabled ? "warning" : "success"}>
-                {caeEnabled ? "Habilitado" : "Bloqueado"}
+                {caeEnabled ? "Habilitado" : "Deshabilitado"}
               </Badge>
             </div>
             <div>
               <div>
                 <strong>Estado de configuración</strong>
-                <span>Se lee sin llamar a WSAA ni consumir un Ticket de Acceso.</span>
+                <span>Usa el readiness central y puede ejecutar comprobaciones read-only; nunca solicita un CAE.</span>
               </div>
               <Button variant="secondary" loading={arcaConfigState.busy} onClick={loadSafeArcaConfig}>
                 Actualizar estado
@@ -633,7 +743,7 @@ export default function SettingsPage() {
       {isAdmin && productionEnvironment ? (
         <Panel
           title="Preflight ARCA producción"
-          description="Sólo lectura: valida WSFE, punto de venta, Padrón del propio emisor y TA compartidos. La emisión de CAE en producción sigue bloqueada por código."
+          description="Sólo lectura: valida WSFE, punto de venta, Padrón del propio emisor y TA compartidos. La emisión de CAE en producción permanece deshabilitada salvo que sus interruptores de seguridad estén habilitados."
           action={(
             <Button
               variant="secondary"
@@ -666,7 +776,7 @@ export default function SettingsPage() {
                 <strong>Conexiones producción</strong>
                 <span>
                   {!fiscalConfig.productionReadonlyEnabled
-                    ? "Bloqueadas por configuración."
+                    ? "Deshabilitadas por configuración."
                     : !fiscalConfig.credentialsReady
                       ? "Read-only habilitado, pero certificado/clave no están listos."
                       : !fiscalConfig.taSharedCacheConfigured
@@ -677,25 +787,25 @@ export default function SettingsPage() {
                 </span>
               </div>
               <Badge tone={fiscalConfig.productionReadonlyEnabled ? "warning" : "success"}>
-                {fiscalConfig.productionReadonlyEnabled ? "Read-only" : "Bloqueado"}
+                {fiscalConfig.productionReadonlyEnabled ? "Read-only" : "Deshabilitado"}
               </Badge>
             </div>
             <div>
               <div>
                 <strong>Preparación de facturas productivas</strong>
-                <span>{fiscalConfig.productionInvoicePreparationEnabled ? "Habilitada explícitamente." : "Bloqueada por configuración."}</span>
+                <span>{fiscalConfig.productionInvoicePreparationEnabled ? "Habilitada explícitamente." : "Deshabilitada por configuración."}</span>
               </div>
               <Badge tone={fiscalConfig.productionInvoicePreparationEnabled ? "warning" : "success"}>
-                {fiscalConfig.productionInvoicePreparationEnabled ? "Habilitada" : "Bloqueada"}
+                {fiscalConfig.productionInvoicePreparationEnabled ? "Habilitada" : "Deshabilitada"}
               </Badge>
             </div>
             <div>
               <div>
                 <strong>Padrón productivo de clientes</strong>
-                <span>{fiscalConfig.productionTaxpayerLookupEnabled ? "Habilitado explícitamente." : "Bloqueado por configuración."}</span>
+                <span>{fiscalConfig.productionTaxpayerLookupEnabled ? "Habilitado explícitamente." : "Deshabilitado por configuración."}</span>
               </div>
               <Badge tone={fiscalConfig.productionTaxpayerLookupEnabled ? "warning" : "success"}>
-                {fiscalConfig.productionTaxpayerLookupEnabled ? "Habilitado" : "Bloqueado"}
+                {fiscalConfig.productionTaxpayerLookupEnabled ? "Habilitado" : "Deshabilitado"}
               </Badge>
             </div>
             <div>
@@ -708,11 +818,11 @@ export default function SettingsPage() {
                       : productionAutoAuthorizeEnabled
                         ? "Gate CAE habilitado para el flujo automático acotado por allowlist."
                         : "Gate habilitado, pero no hay venta objetivo manual ni modo automático habilitado."
-                    : "Bloqueado por configuración."}
+                    : "Deshabilitado por configuración."}
                 </span>
               </div>
               <Badge tone={fiscalConfig.productionCaeEnabled ? "warning" : "success"}>
-                {fiscalConfig.productionCaeEnabled ? "Armado" : "Bloqueado"}
+                {fiscalConfig.productionCaeEnabled ? "Armado" : "Deshabilitado"}
               </Badge>
             </div>
             <div>
@@ -721,11 +831,11 @@ export default function SettingsPage() {
                 <span>
                   {productionAutoAuthorizeEnabled
                     ? `Habilitada para: ${productionAutoAuthorizeSources.length ? productionAutoAuthorizeSources.join(", ") : "ningún origen"}.`
-                    : "Bloqueada por configuración. La etapa inicial debe limitarse a Venta Rápida."}
+                    : "Deshabilitada por configuración. La etapa inicial debe limitarse a Venta Rápida."}
                 </span>
               </div>
               <Badge tone={productionAutoAuthorizeEnabled ? "warning" : "success"}>
-                {productionAutoAuthorizeEnabled ? "Automático" : "Bloqueado"}
+                {productionAutoAuthorizeEnabled ? "Automático" : "Deshabilitado"}
               </Badge>
             </div>
             <div>
@@ -771,7 +881,7 @@ export default function SettingsPage() {
                     <span>
                       Encontrado: {productionPreflightState.result.pointOfSale?.found ? "sí" : "no"} ·
                       operativo: {productionPreflightState.result.pointOfSale?.operational ? "sí" : "no"} ·
-                      bloqueado: {productionPreflightState.result.pointOfSale?.blocked || "sin dato"} ·
+                      indicador ARCA: {productionPreflightState.result.pointOfSale?.blocked || "sin dato"} ·
                       baja: {productionPreflightState.result.pointOfSale?.dropDate || "sin fecha"}
                     </span>
                   </div>

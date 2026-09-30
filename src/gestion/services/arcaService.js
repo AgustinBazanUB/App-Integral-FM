@@ -23,6 +23,11 @@ async function authenticatedPost(payload) {
   return data;
 }
 
+export async function getArcaOperationalStatus() {
+  const data = await authenticatedPost({ mode: "operational-status" });
+  return data.status;
+}
+
 export async function getArcaSafeStatus() {
   const data = await authenticatedPost({ mode: "status" });
   return data.status;

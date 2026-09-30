@@ -1,6 +1,6 @@
 # Integración ARCA — Flor Mía
 
-> Estado: en implementación. Documento vivo.
+> Estado: integración productiva validada y en preparación para operación cotidiana. Documento vivo.
 > Rama de trabajo: `feature/arca-integration`.
 > Base auditada: `main` @ `36c7eb010b4c7b7246edbbc4ba471c0862a14ac8`.
 > Última verificación documental ARCA: 2026-09-25.
@@ -1058,3 +1058,78 @@ Los tests ARCA cubren ahora:
 - vínculo persistente venta-factura.
 
 Además del test automatizado, se validó localmente el PDF renderizado en A4 y se verificó que el QR dibujado dentro del PDF pueda volver a decodificarse correctamente.
+
+## 40. Readiness operativo central — Etapa 1
+
+Esta etapa transforma los conceptos históricos de “prueba controlada” en una lectura operativa permanente sin habilitar por sí sola ninguna emisión nueva.
+
+### Fuente única de verdad
+
+El readiness se centraliza server-side en `netlify/functions/_lib/arca/readiness.mjs` y se expone, sólo para Administrador autenticado, a través de `arca-taxpayer` con `mode=operational-status`.
+
+La respuesta segura distingue:
+
+- `configured`: credenciales/estructura base presentes y válidas;
+- `operational`: núcleo fiscal usable en este momento (credenciales, PV, WSAA, WSFE, Firebase Admin y datos de PDF);
+- `productionReady`: el núcleo fiscal productivo está operativo; Consulta CUIT se informa por separado;
+- `emissionEnabled`: los kill switches de preparación + CAE permiten emisión en el entorno actual;
+- `taxpayerLookupEnabled`;
+- `taxpayerLookupReady`;
+- `pdfReady`;
+- `automaticSources`;
+- `automaticBillingEnabled`;
+- `availability`: `available | degraded | unavailable`;
+- `blockers[]` con faltantes concretos y sin secretos.
+
+El readiness no devuelve certificado PEM, private key, Token/Sign, TA cifrado, clave de cifrado ni credenciales de Firebase.
+
+### Comprobaciones read-only
+
+El endpoint central puede comprobar, sin pedir CAE:
+
+- salud de WSFE (`FEDummy`);
+- autenticación WSAA mediante una consulta autenticada de puntos de venta;
+- existencia/estado operativo del PV configurado;
+- OAuth + lectura server-side de Firebase Admin/Firestore;
+- Consulta CUIT usando el CUIT del propio emisor, únicamente cuando esa capacidad está habilitada;
+- datos mínimos del emisor requeridos para PDF fiscal.
+
+Una falla temporal de red/5xx se distingue de un faltante de configuración y puede mostrarse como “ARCA temporalmente no disponible”.
+
+### Configuración → ARCA
+
+La UI muestra primero un panel único:
+
+`ARCA PRODUCCIÓN` (o el entorno real) → `OPERATIVO / NO OPERATIVO`
+
+y debajo estados independientes para Certificado, Punto de Venta, WSAA, WSFE, Firebase Admin, Consulta CUIT, Facturación automática, PDF fiscal, Fuentes habilitadas y Emisión productiva.
+
+Los faltantes se muestran de forma específica, por ejemplo `Falta: domicilio comercial del emisor`, evitando usar “Bloqueado” como etiqueta genérica.
+
+### Kill switches operativos
+
+Se conservan sin modificar sus valores:
+
+- `ARCA_ALLOW_PRODUCTION_INVOICE_PREPARE`;
+- `ARCA_ALLOW_PRODUCTION_CAE`;
+- `ARCA_AUTO_AUTHORIZE_PRODUCTION`.
+
+En operación cotidiana son interruptores de seguridad, no un “modo prueba”.
+
+La autorización automática sigue requiriendo simultáneamente PREPARE, CAE, AUTO_AUTHORIZE, sourceType en allowlist, factura pending, fiscalReadiness.ready=true e idempotencia + sequence lock.
+
+`ARCA_PRODUCTION_CAE_SALE_CODE` conserva una función distinta: habilita una venta exacta para autorización MANUAL productiva. Si queda vacío, la autorización manual productiva permanece cerrada aunque la automatización esté habilitada. Por eso habilitar `ARCA_AUTO_AUTHORIZE_PRODUCTION` no abre indiscriminadamente el endpoint manual.
+
+### Fuentes
+
+En esta etapa no se habilitan fuentes nuevas. La allowlist continúa, por defecto documental, con `admin_quick_sale`. `seller_sale` y `ecommerce` permanecen fuera de la autorización automática hasta una etapa específica posterior.
+
+### Seguridad e integridad
+
+No se modifica el ID determinístico de factura por origen, la asociación permanente invoice ↔ sale, los estados pending/authorizing/reconciling/authorized/rejected/error, sequence lock, reconciliación, FECompConsultar, la autoridad server-side de invoices ni la regla de PDF sólo para factura autorizada y verificada.
+
+### Estado de esta etapa
+
+Código preparado sin cambiar credenciales, secretos ni valores de gates. No se solicita CAE desde el readiness. No se habilita `seller_sale` ni `ecommerce`.
+
+Las pruebas nuevas de readiness cubren configuración completa/incompleta, no exposición de secretos, auto off, CAE off, PDF y Consulta CUIT. Las pruebas existentes de `arca-authorizer` continúan cubriendo autorización manual protegida y source no autorizada.

@@ -14,6 +14,7 @@ import {
 import { registryDummy } from "./_lib/arca/registry.mjs";
 import { firebaseAdminAccessToken, adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
 import { inspectSharedWsaaCache } from "./_lib/arca/wsaaSharedCache.mjs";
+import { buildArcaOperationalStatus } from "./_lib/arca/readiness.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -140,6 +141,146 @@ async function runDiagnostics() {
   return diagnostics;
 }
 
+async function runOperationalStatus() {
+  const safeStatus = arcaSafeStatus(process.env);
+  const environment = arcaEnvironment(process.env).id;
+  let config = null;
+  let configError = null;
+  try {
+    config = loadArcaPublicConfig(process.env);
+  } catch (error) {
+    configError = safeError(error);
+  }
+
+  const taxpayerEnabled = environment !== "production"
+    || String(process.env.ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP || "").trim().toLowerCase() === "true";
+
+  const [wsfeStage, pointsStage, firebaseStage, taxpayerStage] = await Promise.all([
+    preflightStage("wsfe", () => wsfeDummy({ env: process.env })),
+    config
+      ? preflightStage("points", () => getPointsOfSale({ env: process.env }))
+      : Promise.resolve({ name: "points", status: "error", data: null, error: configError }),
+    preflightStage("firebaseAdmin", async () => {
+      await firebaseAdminAccessToken({ env: process.env });
+      const probe = await adminGetDocument("settings/arca_readiness_probe", { env: process.env });
+      return { read: true, probe: probe ? "document-found" : "not-found" };
+    }),
+    taxpayerEnabled && config?.issuerCuit
+      ? preflightStage("taxpayerLookup", () => getTaxpayer(config.issuerCuit, { env: process.env }))
+      : Promise.resolve({
+          name: "taxpayerLookup",
+          status: taxpayerEnabled ? "error" : "disabled",
+          data: null,
+          error: taxpayerEnabled ? configError : null,
+        }),
+  ]);
+
+  const wsfeHealthy = wsfeStage.status === "ok"
+    && [wsfeStage.data?.appServer, wsfeStage.data?.dbServer, wsfeStage.data?.authServer]
+      .every((value) => String(value || "").toUpperCase() === "OK");
+  const wsfeRuntime = wsfeHealthy
+    ? { status: "ok", message: "WSFE respondió correctamente." }
+    : {
+        status: "error",
+        error: wsfeStage.error || {
+          code: "arca-wsfe-healthcheck-failed",
+          status: null,
+          message: "WSFE respondió pero alguno de sus servicios no está OK.",
+        },
+      };
+
+  const points = pointsStage.data?.points || [];
+  const selectedPoint = config
+    ? points.find((point) => point.number === config.pointOfSale) || null
+    : null;
+  const normalizedDropDate = String(selectedPoint?.dropDate || "").trim().toUpperCase();
+  const hasDropDate = Boolean(
+    normalizedDropDate
+    && !["NULL", "N/A", "00000000", "0000-00-00"].includes(normalizedDropDate)
+  );
+  const pointOperational = Boolean(
+    selectedPoint
+    && String(selectedPoint.blocked || "").toUpperCase() !== "S"
+    && !hasDropDate
+  );
+
+  let pointRuntime;
+  if (pointsStage.status !== "ok") {
+    pointRuntime = { status: "error", error: pointsStage.error, selected: config?.pointOfSale || null };
+  } else if (!selectedPoint) {
+    pointRuntime = {
+      status: "error",
+      selected: config?.pointOfSale || null,
+      found: false,
+      operational: false,
+      error: {
+        code: "arca-point-of-sale-not-found",
+        status: null,
+        message: "ARCA no devolvió el punto de venta configurado.",
+      },
+    };
+  } else if (!pointOperational) {
+    pointRuntime = {
+      status: "error",
+      selected: config.pointOfSale,
+      found: true,
+      operational: false,
+      error: {
+        code: "arca-point-of-sale-not-operational",
+        status: null,
+        message: "ARCA devolvió el punto de venta, pero no figura operativo.",
+      },
+    };
+  } else {
+    pointRuntime = {
+      status: "ok",
+      selected: config.pointOfSale,
+      found: true,
+      operational: true,
+      message: "Punto de venta validado contra ARCA.",
+    };
+  }
+
+  const wsaaRuntime = pointsStage.status === "ok"
+    ? { status: "ok", message: "WSAA autenticó correctamente la consulta de WSFE." }
+    : { status: "error", error: pointsStage.error || configError };
+
+  let taxpayerRuntime;
+  if (!taxpayerEnabled) {
+    taxpayerRuntime = { status: "disabled" };
+  } else if (taxpayerStage.status !== "ok") {
+    taxpayerRuntime = { status: "error", error: taxpayerStage.error || configError };
+  } else if (taxpayerStage.data?.found !== true || taxpayerStage.data?.keyStatus !== "ACTIVO") {
+    taxpayerRuntime = {
+      status: "error",
+      error: {
+        code: "arca-taxpayer-self-check-failed",
+        status: null,
+        message: "El Padrón respondió, pero el CUIT del emisor no quedó validado como ACTIVO.",
+      },
+    };
+  } else {
+    taxpayerRuntime = {
+      status: "ok",
+      message: "Consulta CUIT validada con el CUIT del propio emisor.",
+    };
+  }
+
+  return buildArcaOperationalStatus({
+    env: process.env,
+    safeStatus,
+    runtime: {
+      wsaa: wsaaRuntime,
+      wsfe: wsfeRuntime,
+      pointOfSale: pointRuntime,
+      firebaseAdmin: firebaseStage.status === "ok"
+        ? { status: "ok", message: "Firebase Admin obtuvo OAuth y pudo leer Firestore." }
+        : { status: "error", error: firebaseStage.error },
+      taxpayerLookup: taxpayerRuntime,
+    },
+  });
+}
+
 export default async function handler(request) {
   if (request.method !== "POST") return json({ ok: false, code: "method-not-allowed" }, 405);
 
@@ -147,7 +288,14 @@ export default async function handler(request) {
     await requireFirebaseAdmin(request);
     const body = await request.json().catch(() => ({}));
 
-    if (body?.mode === "status") {
+    if (body?.mode === "operational-status") {
+      return json({
+        ok: true,
+        status: await runOperationalStatus(),
+      });
+    }
+
+    if (body?.mode === "status" || body?.mode === "configuration-status") {
       return json({
         ok: true,
         status: arcaSafeStatus(process.env),
