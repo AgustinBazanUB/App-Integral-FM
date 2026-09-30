@@ -98,7 +98,7 @@ export default function SettingsPage() {
       const result = await getArcaOperationalStatus();
       setArcaConfigState({ busy: false, result, error: "" });
     } catch (error) {
-      setArcaConfigState({ busy: false, result: null, error: error.message });
+      setArcaConfigState((current) => ({ ...current, busy: false, error: error.message }));
     }
   };
 
@@ -243,7 +243,7 @@ export default function SettingsPage() {
   };
 
   const operationalStatus = arcaConfigState.result || null;
-  const arcaOperational = operationalStatus?.operational === true;
+  const arcaOperational = !arcaConfigState.error && operationalStatus?.operational === true;
   const pointOfSale = arcaState.result?.pointOfSale?.data;
   const fiscalConfig = operationalStatus?.configuration || arcaState.result?.configuration || {};
   const readinessServices = operationalStatus?.services || {};
@@ -264,6 +264,7 @@ export default function SettingsPage() {
   };
   const caeEnabled = fiscalConfig.caeHomologationEnabled === true;
   const productionEnvironment = fiscalConfig.environment === "production";
+  const homologationEnvironment = fiscalConfig.environment === "homologation";
   const productionPreflightReady = (
     productionEnvironment
     && fiscalConfig.productionReadonlyEnabled === true
@@ -290,7 +291,7 @@ export default function SettingsPage() {
       operationalStatus
         ? `${String(operationalStatus.environment || "ARCA").toUpperCase()} · punto ${operationalStatus.pointOfSale || "-"}`
         : "Readiness central pendiente de verificar",
-      arcaOperational ? "Operativo" : operationalStatus ? "No operativo" : "En progreso",
+      arcaConfigState.error ? "Sin verificar" : arcaOperational ? "Operativo" : operationalStatus ? "No operativo" : "En progreso",
     ],
     ["Canales sociales", "Carga manual y enlaces directos", "Primera versión"],
   ];
@@ -320,7 +321,7 @@ export default function SettingsPage() {
 
       {isAdmin ? (
         <Panel
-          title={`ARCA ${String(operationalStatus?.environment || fiscalConfig.environment || "sin verificar").toUpperCase()}`}
+          title={`ARCA ${operationalStatus?.environment === "production" ? "PRODUCCIÓN" : operationalStatus?.environment === "homologation" ? "HOMOLOGACIÓN" : "SIN VERIFICAR"}`}
           description="Readiness fiscal central. Distingue configuración, operatividad y habilitación de emisión sin exponer credenciales ni solicitar un CAE."
           action={(
             <Button variant="secondary" loading={arcaConfigState.busy} onClick={loadSafeArcaConfig}>
@@ -334,17 +335,19 @@ export default function SettingsPage() {
               <div>
                 <strong>Estado general</strong>
                 <span>
-                  {operationalStatus
+                  {arcaConfigState.error
+                    ? "No se pudo actualizar el estado. Los datos anteriores, si existen, no confirman la disponibilidad actual."
+                    : operationalStatus
                     ? operationalStatus.operational
                       ? "La integración fiscal está operativa. La emisión depende de los interruptores de seguridad."
                       : operationalStatus.availability === "unavailable"
                         ? "ARCA está temporalmente no disponible o una dependencia remota no respondió."
                         : readinessBlockers[0]?.message || "La integración fiscal todavía no está operativa."
-                    : "Verificando readiness fiscal..."}
+                    : arcaConfigState.busy ? "Verificando readiness fiscal..." : "Estado todavía no verificado."}
                 </span>
               </div>
-              <Badge tone={arcaOperational ? "success" : operationalStatus ? "warning" : "neutral"}>
-                {arcaOperational ? "OPERATIVO" : operationalStatus ? "NO OPERATIVO" : "VERIFICANDO"}
+              <Badge tone={arcaConfigState.error ? "warning" : arcaOperational ? "success" : operationalStatus ? "warning" : "neutral"}>
+                {arcaConfigState.busy ? "VERIFICANDO" : arcaConfigState.error ? "NO VERIFICADO" : arcaOperational ? "OPERATIVO" : operationalStatus ? "NO OPERATIVO" : "NO VERIFICADO"}
               </Badge>
             </div>
             <div>
@@ -395,7 +398,7 @@ export default function SettingsPage() {
                 <span>
                   {operationalStatus?.environment === "production"
                     ? operationalStatus.emissionEnabled
-                      ? "Los gates de preparación + CAE permiten emisión; el origen sigue limitado por allowlist/idempotencia."
+                      ? "Existe un alcance autorizado de emisión; cada solicitud sigue sujeta a los gates, fuente o venta objetivo e idempotencia."
                       : "Deshabilitada por interruptores de seguridad."
                     : "No aplica al entorno actual."}
                 </span>
@@ -407,14 +410,14 @@ export default function SettingsPage() {
           </div>
           {readinessBlockers.length ? (
             <p>
-              <strong>Qué falta:</strong>{" "}
-              {readinessBlockers.slice(0, 4).map((item) => item.message).join(" · ")}
+              <strong>Detalle del estado:</strong>{" "}
+              {readinessBlockers.map((item) => item.message).join(" · ")}
             </p>
           ) : null}
         </Panel>
       ) : null}
 
-      {isAdmin && !productionEnvironment ? (
+      {isAdmin && homologationEnvironment ? (
         <Panel
           title="Diagnóstico ARCA"
           description="Cada comprobación corre de forma independiente. Un 502 de ARCA ya no oculta el estado de Firebase/Firestore. No emite comprobantes ni muestra secretos."
@@ -511,7 +514,7 @@ export default function SettingsPage() {
         </Panel>
       ) : null}
 
-      {isAdmin && !productionEnvironment ? (
+      {isAdmin && homologationEnvironment ? (
         <Panel
           title="Homologación fiscal controlada"
           description="Permite revisar solicitudes persistidas, repetir el dry-run y autorizar sólo cuando el interruptor de CAE de homologación está habilitado."

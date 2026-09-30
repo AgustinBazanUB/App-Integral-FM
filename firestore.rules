@@ -870,6 +870,9 @@ service cloud.firestore {
       }
     }
     match /sales/{saleId} {
+      function fiscalFields() {
+        return ["fiscalInvoiceId", "fiscalEnvironment", "invoiceStatus", "fiscalInvoice", "fiscalUpdatedAt", "cae", "voucherNumber"];
+      }
       allow get: if isAdmin()
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));

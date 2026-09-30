@@ -1072,7 +1072,7 @@ La respuesta segura distingue:
 - `configured`: credenciales/estructura base presentes y válidas;
 - `operational`: núcleo fiscal usable en este momento (credenciales, PV, WSAA, WSFE, Firebase Admin y datos de PDF);
 - `productionReady`: el núcleo fiscal productivo está operativo; Consulta CUIT se informa por separado;
-- `emissionEnabled`: los kill switches de preparación + CAE permiten emisión en el entorno actual;
+- `emissionEnabled`: en producción exige CAE y un alcance vigente (venta objetivo manual o autorización automática con fuentes). Preparar solicitudes nuevas sigue requiriendo su gate independiente; una solicitud pendiente manual no depende de ese gate;
 - `taxpayerLookupEnabled`;
 - `taxpayerLookupReady`;
 - `pdfReady`;
@@ -1088,7 +1088,7 @@ El readiness no devuelve certificado PEM, private key, Token/Sign, TA cifrado, c
 El endpoint central puede comprobar, sin pedir CAE:
 
 - salud de WSFE (`FEDummy`);
-- autenticación WSAA mediante una consulta autenticada de puntos de venta;
+- autenticación WSAA separada de la posterior consulta autenticada de puntos de venta;
 - existencia/estado operativo del PV configurado;
 - OAuth + lectura server-side de Firebase Admin/Firestore;
 - Consulta CUIT usando el CUIT del propio emisor, únicamente cuando esa capacidad está habilitada;
@@ -1229,3 +1229,11 @@ El SHA `2909605b4d87f1fdc93529ed1d4f9d5af9943e0d` se auditó en checkout detache
 Las comprobaciones de esta etapa pasan localmente, pero el checkpoint completo queda **NO APROBADO**: su parent es la Etapa 1 original y no incorpora el correctivo local `6c196097ac88b3ead425ed1cf571cf0899777626`. Se reprodujeron cuatro fallos heredados de readiness, dos fallos previos de reglas comerciales y una reflexión de `invoice.error.message` en respuestas exitosas de `arca-authorize` para solicitudes `reconciling`. El catálogo de errores sólo sanea excepciones; no sanea todos los resultados históricos del authorizer. Por ese motivo no debe afirmarse que toda respuesta de los endpoints está libre de mensajes externos.
 
 La evidencia, límites y pasos para un cierre posterior están en `docs/arca-stage2-checkpoint.md`. No hubo push, PR, deploy, cambios de secretos/gates ni CAE real.
+
+### Checkpoint correctivo de seguridad (30/09/2026)
+
+El commit inicial `735478e3be28911978d22257da88e3fe7d1eeee1` no superó la auditoría. Las correcciones locales y sus límites están documentados en [arca-stage1-checkpoint.md](arca-stage1-checkpoint.md).
+
+Se proyectan errores mediante códigos y mensajes estáticos permitidos, sin copiar texto remoto. Un HTTP 5xx de configuración WSAA no equivale a indisponibilidad temporal. La configuración exige PV en rango y clave de caché válida; un listado de PV con errores nunca habilita operatividad.
+
+Las rules protegen también el espejo fiscal de `sales` (incluyendo cambios/borrados de campos). El navegador no puede crear ni modificar `invoiceStatus`; los datos de autorización y su actualización son server-side. Esta protección corrige una debilidad previa, no modifica la invoice autoritativa ni la autorización.

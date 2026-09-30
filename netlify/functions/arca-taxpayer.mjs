@@ -14,6 +14,7 @@ import {
 import { registryDummy } from "./_lib/arca/registry.mjs";
 import { firebaseAdminAccessToken, adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
 import { inspectSharedWsaaCache } from "./_lib/arca/wsaaSharedCache.mjs";
+import { requestAccessTicket } from "./_lib/arca/wsaa.mjs";
 import { buildArcaOperationalStatus } from "./_lib/arca/readiness.mjs";
 import { assertTaxpayerLookupAllowed } from "./_lib/arca/config.mjs";
 import { toPublicArcaError } from "./_lib/arca/publicError.mjs";
@@ -152,11 +153,28 @@ async function runOperationalStatus() {
   const taxpayerEnabled = environment !== "production"
     || String(process.env.ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP || "").trim().toLowerCase() === "true";
 
-  const [wsfeStage, pointsStage, firebaseStage, taxpayerStage] = await Promise.all([
+  const wsaaPromise = config
+    ? preflightStage("wsaa", async () => {
+        await requestAccessTicket("wsfe", { env: process.env });
+        return null; // Never retain the ticket in the diagnostic response.
+      })
+    : Promise.resolve({ name: "wsaa", status: "error", data: null, error: configError });
+  const pointsPromise = wsaaPromise.then((stage) => stage.status === "ok"
+    ? preflightStage("points", async () => {
+        const result = await getPointsOfSale({ env: process.env });
+        if (result.errors?.length) {
+          const error = new Error("ARCA rechazó la consulta de puntos de venta.");
+          error.code = "arca-point-of-sale-response-errors";
+          throw error;
+        }
+        return result;
+      })
+    : { name: "points", status: "error", data: null, error: stage.error });
+
+  const [wsfeStage, wsaaStage, pointsStage, firebaseStage, taxpayerStage] = await Promise.all([
     preflightStage("wsfe", () => wsfeDummy({ env: process.env })),
-    config
-      ? preflightStage("points", () => getPointsOfSale({ env: process.env }))
-      : Promise.resolve({ name: "points", status: "error", data: null, error: configError }),
+    wsaaPromise,
+    pointsPromise,
     preflightStage("firebaseAdmin", async () => {
       await firebaseAdminAccessToken({ env: process.env });
       const probe = await adminGetDocument("settings/arca_readiness_probe", { env: process.env });
@@ -238,9 +256,9 @@ async function runOperationalStatus() {
     };
   }
 
-  const wsaaRuntime = pointsStage.status === "ok"
+  const wsaaRuntime = wsaaStage.status === "ok"
     ? { status: "ok", message: "WSAA autenticó correctamente la consulta de WSFE." }
-    : { status: "error", error: pointsStage.error || configError };
+    : { status: "error", error: wsaaStage.error || configError };
 
   let taxpayerRuntime;
   if (!taxpayerEnabled) {

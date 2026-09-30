@@ -632,3 +632,25 @@ test("reglas respetan denegación específica de envío WhatsApp", async () => {
     updatedAt: new Date(),
   }));
 });
+
+test("espejo fiscal de ventas sólo admite escrituras server-side", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const saleRef = doc(adminDb, "sales", "fiscal-mirror-test");
+  await assertSucceeds(setDoc(saleRef, { sellerId: "admin-1", status: "active", invoiceStatus: "pending" }));
+  await assertFails(setDoc(doc(adminDb, "sales", "forged-mirror"), { fiscalInvoice: { cae: "FAKE", voucherNumber: 999 } }));
+  await assertFails(setDoc(doc(adminDb, "sales", "forged-status"), { invoiceStatus: "authorized" }));
+  const protectedFields = ["fiscalInvoiceId", "fiscalEnvironment", "fiscalInvoice", "fiscalUpdatedAt", "invoiceStatus", "cae", "voucherNumber"];
+  for (const field of protectedFields) {
+    await assertFails(updateDoc(saleRef, { [field]: field === "fiscalInvoice" ? { cae: "FAKE" } : "FORGED" }));
+  }
+  await environment.withSecurityRulesDisabled(async context => {
+    await updateDoc(doc(context.firestore(), "sales", "fiscal-mirror-test"), {
+      fiscalInvoiceId: "server-invoice", invoiceStatus: "authorized",
+      fiscalInvoice: { cae: "SYNTHETIC", voucherNumber: 1 },
+    });
+  });
+  await assertFails(updateDoc(saleRef, { fiscalInvoice: deleteField() }));
+  await assertFails(updateDoc(saleRef, { "fiscalInvoice.cae": "FORGED" }));
+  await assertSucceeds(updateDoc(saleRef, { status: "cancelled", updatedAt: new Date() }));
+  assert.equal((await getDoc(saleRef)).data().fiscalInvoiceId, "server-invoice");
+});

@@ -44,7 +44,10 @@ function readyRuntime(overrides = {}) {
   };
 }
 
-const baseEnv = { ARCA_ENVIRONMENT: "production", ARCA_POINT_OF_SALE: "8" };
+const baseEnv = {
+  ARCA_ENVIRONMENT: "production", ARCA_POINT_OF_SALE: "8",
+  ARCA_TA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
+};
 
 test("readiness productivo completo distingue configurado, operativo y emisión habilitada", () => {
   const status = buildArcaOperationalStatus({
@@ -106,7 +109,7 @@ test("readiness nunca expone certificado, private key, TA ni service account", (
 test("production auto off no vuelve no-operativa la integración ni habilita automatización", () => {
   const status = buildArcaOperationalStatus({
     env: baseEnv,
-    safeStatus: readySafeStatus({ productionAutoAuthorizeEnabled: false }),
+    safeStatus: readySafeStatus({ productionAutoAuthorizeEnabled: false, productionCaeTargetSaleCode: "TEST-TARGET" }),
     pdfStatus: { ready: true, missing: [] },
     runtime: readyRuntime(),
   });
@@ -178,4 +181,83 @@ test("taxpayer lookup readiness distingue deshabilitado, error temporal y listo"
   });
   assert.equal(ready.taxpayerLookupReady, true);
   assert.equal(ready.productionReady, true);
+});
+
+test("readiness refleja alcance manual pendiente sin depender del gate de preparación", () => {
+  const status = buildArcaOperationalStatus({
+    env: baseEnv, safeStatus: readySafeStatus({
+      productionInvoicePreparationEnabled: false,
+      productionAutoAuthorizeEnabled: false,
+      productionCaeTargetSaleCode: "TEST-TARGET",
+    }), pdfStatus: { ready: true, missing: [] }, runtime: readyRuntime(),
+  });
+  assert.equal(status.emissionEnabled, true);
+  assert.equal(status.automaticBillingEnabled, false);
+});
+
+test("CAE sin venta objetivo ni autorización automática no declara emisión habilitada", () => {
+  const status = buildArcaOperationalStatus({
+    env: baseEnv, safeStatus: readySafeStatus({ productionAutoAuthorizeEnabled: false }),
+    pdfStatus: { ready: true, missing: [] }, runtime: readyRuntime(),
+  });
+  assert.equal(status.emissionEnabled, false);
+});
+
+test("mensajes, códigos y causas remotos se proyectan sin reflejar datos", () => {
+  const sentinel = "NEVER_PUBLIC_TOKEN_SIGN_PRIVATE_KEY";
+  const status = buildArcaOperationalStatus({
+    env: baseEnv, safeStatus: readySafeStatus(), pdfStatus: { ready: true, missing: [] },
+    runtime: readyRuntime({
+      wsaa: { status: "ok", message: sentinel },
+      wsfe: { status: "error", error: { code: sentinel, causeCode: sentinel, message: sentinel, status: 500 } },
+    }),
+  });
+  assert.equal(JSON.stringify(status).includes(sentinel), false);
+  assert.equal(status.services.wsfe.code, "arca-service-error");
+  assert.equal(status.services.wsfe.temporary, true);
+});
+
+test("automatización sin PREPARE ni objetivo manual no declara emisión habilitada", () => {
+  const status = buildArcaOperationalStatus({
+    env: baseEnv, safeStatus: readySafeStatus({ productionInvoicePreparationEnabled: false }),
+    pdfStatus: { ready: true, missing: [] }, runtime: readyRuntime(),
+  });
+  assert.equal(status.emissionEnabled, false);
+  assert.equal(status.automaticBillingEnabled, false);
+});
+
+test("fault conocido de configuración WSAA conserva diagnóstico seguro sin marcar caída", () => {
+  const status = buildArcaOperationalStatus({
+    env: baseEnv, safeStatus: readySafeStatus(), pdfStatus: { ready: true, missing: [] },
+    runtime: readyRuntime({ wsaa: { status: "error", error: {
+      code: "ns1:coe.alreadyAuthenticated", status: 500, message: "NEVER_PUBLIC_RAW_TICKET",
+    } } }),
+  });
+  assert.equal(status.services.wsaa.code, "coe.alreadyAuthenticated");
+  assert.equal(status.services.wsaa.temporary, false);
+  assert.equal(status.availability, "degraded");
+  assert.equal(JSON.stringify(status).includes("NEVER_PUBLIC_RAW_TICKET"), false);
+});
+
+test("caché opcional de homologación inválido también invalida configured", () => {
+  const status = buildArcaOperationalStatus({
+    env: { ...baseEnv, ARCA_ENVIRONMENT: "homologation", ARCA_TA_ENCRYPTION_KEY: "invalid-key" },
+    safeStatus: readySafeStatus({ environment: "homologation" }),
+    pdfStatus: { ready: true, missing: [] }, runtime: readyRuntime(),
+  });
+  assert.equal(status.configured, false);
+  assert.equal(status.blockers.some(item => item.code === "arca-wsaa-cache-key-invalid"), true);
+});
+
+test("fetch nativo de Firebase con causa de red no se confunde con configuración faltante", () => {
+  const status = buildArcaOperationalStatus({
+    env: baseEnv, safeStatus: readySafeStatus(), pdfStatus: { ready: true, missing: [] },
+    runtime: readyRuntime({ firebaseAdmin: { status: "error", error: {
+      name: "TypeError", message: "fetch failed NEVER_PUBLIC", cause: { code: "ENOTFOUND" },
+    } } }),
+  });
+  assert.equal(status.services.firebaseAdmin.code, "arca-network-error");
+  assert.equal(status.services.firebaseAdmin.temporary, true);
+  assert.equal(status.availability, "unavailable");
+  assert.equal(JSON.stringify(status).includes("NEVER_PUBLIC"), false);
 });

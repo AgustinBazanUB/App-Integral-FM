@@ -1,5 +1,58 @@
-import { arcaSafeStatus, loadArcaPublicConfig } from "./config.mjs";
+import { arcaSafeStatus } from "./config.mjs";
 import { inspectInvoicePdfReadiness } from "./invoicePdf.mjs";
+import { parseWsaaEncryptionKey } from "./wsaaSharedCache.mjs";
+
+// Never forward upstream text or identifiers: SOAP/OAuth faults can echo credentials.
+const PUBLIC_ERRORS = Object.freeze({
+  "coe.alreadyAuthenticated": "WSAA informa un ticket todavía vigente. Falta recuperar ese ticket del caché; no es una caída temporal de ARCA.",
+  "coe.notAuthorized": "WSAA rechazó la autorización del certificado para este servicio.",
+  "cms.cert.expired": "WSAA rechazó un certificado vencido.",
+  "cms.cert.invalid": "WSAA rechazó el certificado configurado.",
+  "unauthenticated": "Iniciá sesión para consultar el estado ARCA.",
+  "permission-denied": "Esta operación requiere un administrador autorizado.",
+  "profile-unavailable": "No se pudo verificar el perfil del usuario.",
+  "arca-config-missing": "Falta configuración ARCA requerida.",
+  "arca-environment-invalid": "El entorno ARCA configurado no es válido.",
+  "arca-point-of-sale-invalid": "El punto de venta debe estar entre 1 y 99999.",
+  "arca-point-of-sale-not-found": "ARCA no devolvió el punto de venta configurado.",
+  "arca-point-of-sale-not-operational": "El punto de venta no figura operativo en ARCA.",
+  "arca-point-of-sale-response-errors": "ARCA rechazó la consulta de puntos de venta.",
+  "arca-wsaa-shared-cache-required": "Falta configurar el caché cifrado de WSAA requerido en producción.",
+  "arca-wsaa-cache-key-missing": "Falta configurar la clave del caché cifrado de WSAA.",
+  "arca-wsaa-cache-key-invalid": "La clave del caché WSAA debe ser Base64 de 32 bytes.",
+  "arca-credentials-missing": "Falta certificado o clave privada ARCA.",
+  "arca-certificate-invalid": "El certificado ARCA no es válido.",
+  "arca-private-key-invalid": "La clave privada ARCA no es válida.",
+  "arca-certificate-key-mismatch": "La clave privada no corresponde al certificado ARCA.",
+  "arca-certificate-not-currently-valid": "El certificado ARCA está fuera de vigencia.",
+  "arca-production-network-disabled": "La consulta productiva está deshabilitada por configuración.",
+  "arca-taxpayer-self-check-failed": "El CUIT del emisor no quedó validado como ACTIVO.",
+  "arca-wsfe-healthcheck-failed": "WSFE respondió, pero alguno de sus servicios no está OK.",
+  "firebase-admin-config-missing": "Falta configuración de Firebase Admin.",
+  "firebase-project-mismatch": "La cuenta de Firebase corresponde a otro proyecto.",
+  "firebase-admin-token-error": "Firebase Admin no pudo obtener autorización OAuth.",
+  "firebase-admin-read-error": "Firebase Admin no pudo completar la lectura de Firestore.",
+  "arca-timeout": "La consulta remota agotó el tiempo de espera.",
+  "arca-network-error": "No se pudo conectar con el servicio remoto.",
+  "arca-soap-http-error": "El servicio remoto devolvió un error HTTP.",
+  "arca-wsaa-renewal-busy": "La renovación del ticket WSAA está temporalmente ocupada.",
+});
+
+export function publicArcaError(error = {}) {
+  const candidate = String(error?.code || "").split(":").pop();
+  const cause = String(error?.causeCode || error?.cause?.code || error?.code || "");
+  const timeout = error?.name === "AbortError" || error?.name === "TimeoutError";
+  const network = ["ENOTFOUND", "ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT"].includes(cause);
+  const code = Object.hasOwn(PUBLIC_ERRORS, candidate) ? candidate
+    : timeout ? "arca-timeout" : network ? "arca-network-error" : "arca-service-error";
+  const status = Number(error?.status || 0);
+  return {
+    code,
+    status: Number.isInteger(status) && status >= 400 && status <= 599 ? status : timeout ? 504 : network ? 502 : null,
+    causeCode: ["ENOTFOUND", "ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT", "CERT_HAS_EXPIRED", "UNABLE_TO_VERIFY_LEAF_SIGNATURE"].includes(cause) ? cause : null,
+    message: PUBLIC_ERRORS[code] || "No se pudo completar la verificación del servicio.",
+  };
+}
 
 const CORE_RUNTIME_SERVICES = Object.freeze(["wsaa", "wsfe", "firebaseAdmin", "pointOfSale"]);
 
@@ -23,6 +76,7 @@ function stageReady(stage) {
 function temporaryFailure(error = {}) {
   const status = Number(error?.status || 0);
   const code = String(error?.code || "").toLowerCase();
+  if (["coe.alreadyauthenticated", "coe.notauthorized", "cms.cert.expired", "cms.cert.invalid", "arca-wsaa-shared-cache-required", "arca-wsaa-cache-key-missing", "arca-wsaa-cache-key-invalid", "firebase-admin-config-missing", "firebase-project-mismatch"].includes(code)) return false;
   return status >= 500
     || code.includes("network")
     || code.includes("timeout")
@@ -30,30 +84,23 @@ function temporaryFailure(error = {}) {
     || code === "fetch-failed";
 }
 
-function publicStage(stage, fallbackMessage = "") {
+function publicStage(stage, fallbackMessage = "", readyMessage = "Verificación completada.") {
   const status = stageStatus(stage);
-  const error = stage?.error && typeof stage.error === "object" ? stage.error : null;
+  const error = stage?.error && typeof stage.error === "object" ? publicArcaError(stage.error) : null;
   return {
     status,
     message: error?.message
       ? String(error.message).slice(0, 240)
-      : String(stage?.message || fallbackMessage || "").slice(0, 240) || null,
+      : stageReady(stage) ? readyMessage : fallbackMessage || null,
     code: error?.code ? String(error.code).slice(0, 120) : null,
     temporary: status === "error" && temporaryFailure(error),
   };
 }
 
-function safePointOfSale(env, safeStatus, runtimePoint) {
-  let selected = Number(runtimePoint?.selected || 0) || null;
-  if (!selected && safeStatus?.pointOfSaleConfigured) {
-    try {
-      selected = loadArcaPublicConfig(env).pointOfSale;
-    } catch {
-      const raw = Number(env.ARCA_POINT_OF_SALE || 0);
-      selected = Number.isInteger(raw) && raw > 0 ? raw : null;
-    }
-  }
-  return selected;
+function safePointOfSale(env, safeStatus) {
+  if (!safeStatus?.pointOfSaleConfigured) return null;
+  const selected = Number(env.ARCA_POINT_OF_SALE || 0);
+  return Number.isInteger(selected) && selected >= 1 && selected <= 99999 ? selected : null;
 }
 
 function configurationView(safeStatus = {}) {
@@ -105,7 +152,15 @@ export function buildArcaOperationalStatus({
       .map((value) => String(value || "").trim().toLowerCase())
       .filter(Boolean),
   )];
-  const pointOfSale = safePointOfSale(env, configuration, runtime.pointOfSale);
+  const pointOfSale = safePointOfSale(env, configuration);
+  configuration.pointOfSaleConfigured = Boolean(pointOfSale);
+  let cacheError = null;
+  try {
+    configuration.taSharedCacheConfigured = Boolean(parseWsaaEncryptionKey(env, { required: production }));
+  } catch (error) {
+    configuration.taSharedCacheConfigured = false;
+    cacheError = publicArcaError(error);
+  }
 
   const pdfReady = pdfStatus?.ready === true;
   const missingPdfFields = Array.isArray(pdfStatus?.missing) ? [...pdfStatus.missing] : [];
@@ -114,11 +169,14 @@ export function buildArcaOperationalStatus({
     && configuration.pointOfSaleConfigured
     && configuration.credentialsReady
     && configuration.issuerVatConditionConfigured
+    && !cacheError
     && (!production || configuration.taSharedCacheConfigured),
   );
 
   const emissionEnabled = production
-    ? configuration.productionInvoicePreparationEnabled && configuration.productionCaeEnabled
+    ? configuration.productionCaeEnabled && Boolean(configuration.productionCaeTargetSaleCode
+      || (configuration.productionInvoicePreparationEnabled
+        && configuration.productionAutoAuthorizeEnabled && automaticSources.length))
     : configuration.caeHomologationEnabled;
   const taxpayerLookupEnabled = production
     ? configuration.productionTaxpayerLookupEnabled
@@ -126,16 +184,17 @@ export function buildArcaOperationalStatus({
   const automaticBillingEnabled = Boolean(
     production
     && emissionEnabled
+    && configuration.productionInvoicePreparationEnabled
     && configuration.productionAutoAuthorizeEnabled
     && automaticSources.length,
   );
 
-  const wsaa = publicStage(runtime.wsaa, "WSAA todavía no fue verificado.");
-  const wsfe = publicStage(runtime.wsfe, "WSFE todavía no fue verificado.");
-  const firebaseAdmin = publicStage(runtime.firebaseAdmin, "Firebase Admin todavía no fue verificado.");
-  const runtimePoint = publicStage(runtime.pointOfSale, "El punto de venta todavía no fue verificado contra ARCA.");
+  const wsaa = publicStage(runtime.wsaa, "WSAA todavía no fue verificado.", "WSAA autenticó correctamente la consulta de WSFE.");
+  const wsfe = publicStage(runtime.wsfe, "WSFE todavía no fue verificado.", "WSFE respondió correctamente.");
+  const firebaseAdmin = publicStage(runtime.firebaseAdmin, "Firebase Admin todavía no fue verificado.", "Firebase Admin obtuvo OAuth y pudo leer Firestore.");
+  const runtimePoint = publicStage(runtime.pointOfSale, "El punto de venta todavía no fue verificado contra ARCA.", "Punto de venta validado contra ARCA.");
   const taxpayerLookup = taxpayerLookupEnabled
-    ? publicStage(runtime.taxpayerLookup, "La consulta de CUIT todavía no fue verificada.")
+    ? publicStage(runtime.taxpayerLookup, "La consulta de CUIT todavía no fue verificada.", "Consulta CUIT validada con el CUIT del propio emisor.")
     : {
         status: "disabled",
         message: "Consulta CUIT deshabilitada por el interruptor de seguridad productivo.",
@@ -145,6 +204,7 @@ export function buildArcaOperationalStatus({
 
   const blockers = [];
   const addBlocker = (code, message, scope = "operational", temporary = false) => {
+    if (blockers.some((item) => item.scope === scope && item.message === message)) return;
     blockers.push({ code, message, scope, temporary: temporary === true });
   };
 
@@ -168,8 +228,8 @@ export function buildArcaOperationalStatus({
   if (!configuration.issuerVatConditionConfigured) {
     addBlocker("arca-issuer-vat-condition-missing", "Falta: condición IVA del emisor.");
   }
-  if (production && !configuration.taSharedCacheConfigured) {
-    addBlocker("arca-wsaa-cache-key-missing", "Falta: configuración del caché cifrado de WSAA.");
+  if (cacheError || (production && !configuration.taSharedCacheConfigured)) {
+    addBlocker(cacheError?.code || "arca-wsaa-cache-key-missing", cacheError?.message || "Falta: configuración del caché cifrado de WSAA.");
   }
   if (!pdfReady) {
     for (const field of missingPdfFields) {
