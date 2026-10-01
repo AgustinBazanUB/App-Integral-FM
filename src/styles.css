@@ -2351,20 +2351,59 @@ input::placeholder {
 }
 
 .catalog-controls > .container {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) 2fr auto;
-  align-items: end;
-  gap: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.catalog-search {
+  flex: 0 0 auto;
 }
 
 .catalog-search .search-field {
-  min-height: 50px;
-  padding: 0 16px;
+  width: min(300px, 60vw);
+  min-height: 44px;
+  padding: 0 8px 0 14px;
   box-shadow: none;
 }
 
 .catalog-search .search-field input {
-  min-height: 48px;
+  min-height: 42px;
+}
+
+.catalog-search__close {
+  display: inline-flex;
+  min-width: 36px;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.catalog-search-toggle {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    color 200ms ease;
+}
+
+.catalog-search-toggle:hover,
+.catalog-search-toggle:focus-visible {
+  border-color: var(--border-gold);
+  color: var(--gold-soft);
 }
 
 .catalog-category-pills {
@@ -2374,8 +2413,12 @@ input::placeholder {
   overflow-x: auto;
 }
 
-.catalog-category-pills button,
-.clear-filters {
+.catalog-category-pills {
+  flex: 1;
+  min-width: 0;
+}
+
+.catalog-category-pills button {
   min-height: 44px;
   padding: 9px 14px;
   border: 1px solid var(--border);
@@ -2391,28 +2434,6 @@ input::placeholder {
   border-color: var(--border-gold);
   background: var(--olive-deep);
   color: var(--gold-soft);
-}
-
-.catalog-secondary-filter {
-  display: flex;
-  min-height: 46px;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-secondary);
-  font-size: 11px;
-}
-
-.catalog-secondary-filter select {
-  width: auto;
-  min-height: 44px;
-  border-radius: 999px;
-  font-size: 12px;
-}
-
-.clear-filters {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
 }
 
 .catalog-results__header {
@@ -3072,13 +3093,6 @@ input::placeholder {
     display: none;
   }
 
-  .catalog-controls > .container {
-    grid-template-columns: minmax(230px, 0.8fr) 1.7fr;
-  }
-
-  .catalog-secondary-filter {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 1099px) {
@@ -3199,18 +3213,6 @@ input::placeholder {
 
   .catalog-controls {
     top: var(--header-height);
-  }
-
-  .catalog-controls > .container {
-    grid-template-columns: 1fr;
-  }
-
-  .catalog-category-pills {
-    order: 3;
-  }
-
-  .catalog-secondary-filter {
-    grid-column: auto;
   }
 
   .product-detail {
@@ -3657,10 +3659,6 @@ input::placeholder {
   .catalog-controls {
     position: relative;
     top: auto;
-  }
-
-  .catalog-secondary-filter {
-    flex-wrap: wrap;
   }
 
   .catalog-results__header {

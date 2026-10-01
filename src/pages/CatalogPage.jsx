@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, X } from "lucide-react";
 import { Link, useSearchParams } from "../router";
 import OccasionBuilder from "../components/OccasionBuilder";
 import OliveOilGuide from "../components/OliveOilGuide";
@@ -28,14 +28,6 @@ const categoryAliases = {
   vinos: "wines",
 };
 
-const occasions = [
-  ["", "Todas las ocasiones"],
-  ["picada", "Para una picada"],
-  ["breakfast", "Desayuno o merienda"],
-  ["gift", "Para regalar"],
-  ["everyday", "Todos los días"],
-];
-
 const oliveVarietyOrder = oliveProfiles.map((profile) => profile.productId);
 const oliveFormatOrder = { "500 cc": 0, "2 L": 1, "5 L": 2 };
 
@@ -52,7 +44,8 @@ export default function CatalogPage() {
   const categoryId = categoryAliases[rawCategory] ?? rawCategory;
   const collectionId = searchParams.get("coleccion") ?? "";
   const query = searchParams.get("q") ?? "";
-  const occasion = searchParams.get("ocasion") ?? "";
+  const [searchOpen, setSearchOpen] = useState(Boolean(query));
+  const searchInputRef = useRef(null);
   const activeCategory =
     categoryById[categoryId] ?? virtualCatalogCategories[categoryId];
   const activeCollection = catalogCollections[collectionId];
@@ -68,25 +61,18 @@ export default function CatalogPage() {
           !categoryId || product.categoryId === categoryId;
         const matchesCollection =
           !activeCollection || collectionCategoryIds.includes(product.categoryId);
-        const matchesOccasion =
-          !occasion || product.occasions.includes(occasion);
         const matchesQuery = matchesSearch(
           product,
           categoryById[product.categoryId],
           query,
         );
-        return (
-          matchesCategory &&
-          matchesCollection &&
-          matchesOccasion &&
-          matchesQuery
-        );
+        return matchesCategory && matchesCollection && matchesQuery;
       });
       return isOliveOilView
         ? [...matches].sort((a, b) => oliveSortKey(a) - oliveSortKey(b))
         : matches;
     },
-    [activeCollection, categoryId, collectionCategoryIds, isOliveOilView, occasion, query],
+    [activeCollection, categoryId, collectionCategoryIds, isOliveOilView, query],
   );
 
   useEffect(() => {
@@ -126,7 +112,16 @@ export default function CatalogPage() {
     setSearchParams(next, { replace: true });
   };
 
-  const hasFilters = Boolean(categoryId || collectionId || query || occasion);
+  const openSearch = () => {
+    setSearchOpen(true);
+    requestAnimationFrame(() => searchInputRef.current?.focus());
+  };
+
+  const closeSearch = () => {
+    updateParam("q", "");
+    setSearchOpen(false);
+  };
+
   const catalogHeading =
     activeCollection?.name ?? activeCategory?.name ?? "Toda la selección.";
   const catalogDescription =
@@ -189,22 +184,6 @@ export default function CatalogPage() {
       {!isOliveOilView ? (
       <section className="catalog-controls" aria-label="Filtros del catálogo">
         <div className="container">
-          <div className="catalog-search">
-            <label className="field-label" htmlFor="catalog-search">
-              Buscar en el catálogo
-            </label>
-            <div className="search-field">
-              <Search size={20} aria-hidden="true" />
-              <input
-                id="catalog-search"
-                type="search"
-                value={query}
-                onChange={(event) => updateParam("q", event.target.value)}
-                placeholder="Aceite, pistachos, aceitunas…"
-              />
-            </div>
-          </div>
-
           <div className="catalog-category-pills" aria-label="Categorías">
             <button
               type="button"
@@ -225,31 +204,39 @@ export default function CatalogPage() {
             ))}
           </div>
 
-          <div className="catalog-secondary-filter">
-            <SlidersHorizontal size={18} aria-hidden="true" />
-            <label htmlFor="occasion-filter">Ocasión</label>
-            <select
-              id="occasion-filter"
-              value={occasion}
-              onChange={(event) => updateParam("ocasion", event.target.value)}
+          {searchOpen ? (
+            <div className="catalog-search">
+              <div className="search-field">
+                <Search size={18} aria-hidden="true" />
+                <input
+                  ref={searchInputRef}
+                  id="catalog-search"
+                  type="search"
+                  value={query}
+                  onChange={(event) => updateParam("q", event.target.value)}
+                  placeholder="Aceite, pistachos, aceitunas…"
+                  aria-label="Buscar en el catálogo"
+                />
+                <button
+                  type="button"
+                  className="catalog-search__close"
+                  onClick={closeSearch}
+                  aria-label="Cerrar búsqueda"
+                >
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="catalog-search-toggle"
+              onClick={openSearch}
+              aria-label="Buscar en el catálogo"
             >
-              {occasions.map(([value, label]) => (
-                <option value={value} key={value || "all"}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            {hasFilters ? (
-              <button
-                type="button"
-                className="clear-filters"
-                onClick={() => setSearchParams({}, { replace: true })}
-              >
-                <X size={16} aria-hidden="true" />
-                Limpiar
-              </button>
-            ) : null}
-          </div>
+              <Search size={18} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </section>
       ) : null}
