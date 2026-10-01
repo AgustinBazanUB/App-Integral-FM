@@ -4,8 +4,8 @@ import PageMeta from "../components/PageMeta";
 import PlaceholderImage from "../components/PlaceholderImage";
 import ProductCard from "../components/ProductCard";
 import { useCart } from "../context/CartContext";
+import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import { categoryById } from "../data/categories";
-import { products } from "../data/products";
 import { getProductAsset } from "../data/assetsManifest";
 import { trackEvent } from "../utils/analytics";
 import { useEffect } from "react";
@@ -18,9 +18,19 @@ const crossSellByCategory = {
   seasoned_salts: ["olive_oil", "olives"],
 };
 
+function formatPrice(price) {
+  if (typeof price !== "number") return "Precio no disponible";
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(price);
+}
+
 export default function ProductPage() {
   const { slug } = useParams();
-  const product = products.find((item) => item.slug === slug);
+  const { bySlug, products, status } = useCommerceCatalog();
+  const product = bySlug[slug] || null;
   const { addItem, openCart } = useCart();
 
   useEffect(() => {
@@ -33,92 +43,69 @@ export default function ProductPage() {
     });
   }, [product]);
 
+  if (status === "loading") {
+    return (
+      <main id="main-content" className="page-shell">
+        <section className="section"><div className="container pending-panel">Cargando producto…</div></section>
+      </main>
+    );
+  }
+
   if (!product) {
     return (
       <main id="main-content" className="page-shell">
         <section className="section">
           <div className="container empty-state">
-            <h1>Ese producto todavía no está en el catálogo.</h1>
-            <Link className="button" to="/productos">
-              Volver a productos
-            </Link>
+            <h1>Ese producto no está disponible en el catálogo comercial.</h1>
+            <Link className="button" to="/productos">Volver a productos</Link>
           </div>
         </section>
       </main>
     );
   }
 
-  const category = categoryById[product.categoryId];
-  const productAsset = getProductAsset(product.id);
+  const category = categoryById[product.categoryId] || {
+    id: product.categoryId,
+    name: product.categoryName || "Producto",
+  };
+  const productAsset = getProductAsset(product.editorialId || product.id);
   const relatedCategories = crossSellByCategory[product.categoryId] ?? [];
   const relatedProducts = products
-    .filter(
-      (item) =>
-        item.id !== product.id && relatedCategories.includes(item.categoryId),
-    )
+    .filter((item) => item.id !== product.id && relatedCategories.includes(item.categoryId))
     .slice(0, 3);
 
   const addAndOpen = () => {
-    addItem(product);
-    openCart();
+    if (addItem(product)) openCart();
   };
 
   const structuredData = {
     "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          {
-            "@type": "ListItem",
-            position: 1,
-            name: "Productos",
-            item: `${window.location.origin}/productos`,
-          },
-          {
-            "@type": "ListItem",
-            position: 2,
-            name: category.name,
-            item: `${window.location.origin}/productos?categoria=${category.id}`,
-          },
-          {
-            "@type": "ListItem",
-            position: 3,
-            name: product.name,
-            item: window.location.href,
-          },
-        ],
+    "@type": "Product",
+    name: product.name,
+    description: product.description,
+    image: product.image ? `${window.location.origin}${product.image}` : undefined,
+    category: category.name,
+    sku: product.id,
+    brand: { "@type": "Brand", name: "Flor Mía" },
+    ...(typeof product.price === "number" ? {
+      offers: {
+        "@type": "Offer",
+        priceCurrency: "ARS",
+        price: product.price,
+        availability: product.commercialReady
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
       },
-      {
-        "@type": "Product",
-        name: product.name,
-        description: product.description,
-        image: `${window.location.origin}${product.image}`,
-        category: category.name,
-        sku: product.id,
-        brand: {
-          "@type": "Brand",
-          name: "Flor Mía",
-        },
-      },
-    ],
+    } : {}),
   };
 
   return (
     <main id="main-content" className="page-shell product-page">
-      <PageMeta
-        title={`${product.name} | Flor Mía`}
-        description={`${product.description} Datos comerciales pendientes de confirmación.`}
-      />
-      <script type="application/ld+json">
-        {JSON.stringify(structuredData)}
-      </script>
+      <PageMeta title={`${product.name} | Flor Mía`} description={product.description} />
+      <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
 
       <div className="container breadcrumbs" aria-label="Migas de pan">
-        <Link to="/productos">
-          <ArrowLeft size={16} aria-hidden="true" />
-          Productos
-        </Link>
+        <Link to="/productos"><ArrowLeft size={16} aria-hidden="true" />Productos</Link>
         <span aria-hidden="true">/</span>
         <Link to={`/productos?categoria=${category.id}`}>{category.name}</Link>
         <span aria-hidden="true">/</span>
@@ -128,7 +115,7 @@ export default function ProductPage() {
       <section className="container product-detail">
         <PlaceholderImage
           src={product.image}
-          alt={product.imageAlt ?? `Fotografía real de ${product.name}`}
+          alt={product.imageAlt ?? `Fotografía de ${product.name}`}
           className="product-detail__media"
           aspectRatio="4 / 5"
           eager
@@ -138,52 +125,37 @@ export default function ProductPage() {
         />
         <div className="product-detail__content">
           <p className="eyebrow">{category.name.toUpperCase()}</p>
-          <span className="badge">{product.badge}</span>
           <h1>{product.name}</h1>
           <p className="product-detail__description">{product.description}</p>
+          <strong className="product-detail__price">{formatPrice(product.price)}</strong>
 
-          <div className="pending-panel">
-            <strong>Ficha comercial pendiente</strong>
-            <p>
-              Precio, stock y datos técnicos deben ser confirmados por Flor Mía
-              antes de vender.
-            </p>
-          </div>
+          {!product.commercialReady ? (
+            <div className="pending-panel">
+              <strong>Producto no disponible para checkout</strong>
+              <p>Precio, stock o dato fiscal todavía no están completamente configurados.</p>
+            </div>
+          ) : null}
 
           <dl className="product-facts">
-            <div>
-              <dt>Categoría</dt>
-              <dd>{category.name}</dd>
-            </div>
-            {Object.entries(product.attributes).map(([key, value]) => (
-              <div key={key}>
-                <dt>{key.replaceAll("_", " ")}</dt>
-                <dd>{value}</dd>
-              </div>
+            <div><dt>Categoría</dt><dd>{category.name}</dd></div>
+            {Object.entries(product.attributes || {}).map(([key, value]) => (
+              <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{value}</dd></div>
             ))}
-            <div>
-              <dt>Presentación</dt>
-              <dd>{product.formats[0]}</dd>
-            </div>
-            <div>
-              <dt>Stock</dt>
-              <dd>A confirmar</dd>
-            </div>
+            <div><dt>Stock disponible</dt><dd>{Number.isInteger(product.stock) ? product.stock : "No disponible"}</dd></div>
           </dl>
 
-          <button className="button button--gold button--block" type="button" onClick={addAndOpen}>
+          <button
+            className="button button--gold button--block"
+            type="button"
+            onClick={addAndOpen}
+            disabled={!product.commercialReady}
+          >
             <ShoppingBag size={19} aria-hidden="true" />
-            Agregar a mi selección
+            {product.commercialReady ? "Agregar al carrito" : "No disponible"}
           </button>
           <ul className="product-assurances">
-            <li>
-              <Check size={16} aria-hidden="true" />
-              Se guarda en este dispositivo
-            </li>
-            <li>
-              <Check size={16} aria-hidden="true" />
-              No se procesa ningún pago todavía
-            </li>
+            <li><Check size={16} aria-hidden="true" />Precio y stock se validan nuevamente al confirmar</li>
+            <li><Check size={16} aria-hidden="true" />El checkout no emite factura ARCA</li>
           </ul>
         </div>
       </section>
@@ -193,14 +165,9 @@ export default function ProductPage() {
           <div className="section-heading">
             <p className="eyebrow">PARA COMBINAR</p>
             <h2>Otros sabores para tu mesa.</h2>
-            <p className="section-heading__body">
-              Sugerencias configurables. Nada se agrega automáticamente.
-            </p>
           </div>
           <div className="catalog-grid catalog-grid--three">
-            {relatedProducts.map((item) => (
-              <ProductCard product={item} key={item.id} />
-            ))}
+            {relatedProducts.map((item) => <ProductCard product={item} key={item.id} />)}
           </div>
         </div>
       </section>

@@ -6,11 +6,11 @@ import {
   useMemo,
   useState,
 } from "react";
-import { productById } from "../data/products";
+import { useCommerceCatalog } from "./CommerceCatalogContext";
 import { trackEvent } from "../utils/analytics";
 
-const STORAGE_KEY = "flor-mia-cart-v1";
-const STORAGE_VERSION = 1;
+const STORAGE_KEY = "flor-mia-cart-v2";
+const STORAGE_VERSION = 2;
 const CartContext = createContext(null);
 
 function safeReadCart() {
@@ -21,25 +21,20 @@ function safeReadCart() {
     if (parsed?.version !== STORAGE_VERSION || !Array.isArray(parsed.items)) {
       return [];
     }
-
     return parsed.items.filter(
       (item) =>
-        typeof item?.lineId === "string" &&
-        typeof item?.productId === "string" &&
-        Number.isInteger(item?.quantity) &&
-        item.quantity > 0 &&
-        productById[item.productId],
+        typeof item?.productId === "string"
+        && Number.isInteger(item?.quantity)
+        && item.quantity > 0
+        && item.quantity <= 99,
     );
   } catch {
     return [];
   }
 }
 
-function makeLineId(productId, format, variant) {
-  return [productId, format ?? "", variant ?? ""].join("::");
-}
-
 export function CartProvider({ children }) {
+  const { byId, resolveProduct, status: catalogStatus } = useCommerceCatalog();
   const [items, setItems] = useState(safeReadCart);
   const [isCartOpen, setCartOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -48,7 +43,10 @@ export function CartProvider({ children }) {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ version: STORAGE_VERSION, items }),
+        JSON.stringify({
+          version: STORAGE_VERSION,
+          items: items.map(({ productId, quantity }) => ({ productId, quantity })),
+        }),
       );
     } catch {
       setStatusMessage(
@@ -57,88 +55,72 @@ export function CartProvider({ children }) {
     }
   }, [items]);
 
-  const addItem = useCallback((product, options = {}) => {
-    const format = options.format ?? product.formats?.[0] ?? "";
-    const variant =
-      options.variant ??
-      product.attributes?.variety ??
-      product.attributes?.flavor ??
-      "";
-    const lineId = makeLineId(product.id, format, variant);
+  const addItem = useCallback((candidate) => {
+    const product = resolveProduct(candidate);
+    if (!product) {
+      setStatusMessage("Ese producto todavía no está vinculado al catálogo comercial.");
+      return false;
+    }
+    if (product.commercialReady !== true || product.active === false) {
+      setStatusMessage(`${product.name} todavía no está disponible para comprar.`);
+      return false;
+    }
 
     setItems((currentItems) => {
-      const existing = currentItems.find((item) => item.lineId === lineId);
+      const existing = currentItems.find((item) => item.productId === product.id);
       if (existing) {
         return currentItems.map((item) =>
-          item.lineId === lineId
+          item.productId === product.id
             ? { ...item, quantity: Math.min(item.quantity + 1, 99) }
             : item,
         );
       }
-
-      return [
-        ...currentItems,
-        {
-          lineId,
-          productId: product.id,
-          categoryId: product.categoryId,
-          format,
-          variant,
-          quantity: 1,
-          price: product.price,
-          dataStatus: product.dataStatus,
-        },
-      ];
+      return [...currentItems, { productId: product.id, quantity: 1 }];
     });
 
-    setStatusMessage(`${product.name} se agregó a tu selección.`);
+    setStatusMessage(`${product.name} se agregó al carrito.`);
     trackEvent("add_to_cart", {
       item_id: product.id,
       item_name: product.name,
       item_category: product.categoryId,
-      item_variant: variant || format,
       price: product.price,
       quantity: 1,
     });
-  }, []);
+    return true;
+  }, [resolveProduct]);
 
-  const updateQuantity = useCallback((lineId, quantity) => {
+  const updateQuantity = useCallback((productId, quantity) => {
     const safeQuantity = Math.max(0, Math.min(Number(quantity) || 0, 99));
     setItems((currentItems) =>
       safeQuantity === 0
-        ? currentItems.filter((item) => item.lineId !== lineId)
+        ? currentItems.filter((item) => item.productId !== productId)
         : currentItems.map((item) =>
-            item.lineId === lineId ? { ...item, quantity: safeQuantity } : item,
+            item.productId === productId ? { ...item, quantity: safeQuantity } : item,
           ),
     );
   }, []);
 
-  const removeItem = useCallback((lineId) => {
+  const removeItem = useCallback((productId) => {
     setItems((currentItems) =>
-      currentItems.filter((item) => item.lineId !== lineId),
+      currentItems.filter((item) => item.productId !== productId),
     );
-    setStatusMessage("El producto se quitó de tu selección.");
+    setStatusMessage("El producto se quitó del carrito.");
   }, []);
 
   const clearCart = useCallback(() => {
     setItems([]);
-    setStatusMessage("Tu selección quedó vacía.");
-  }, []);
-
-  const openCart = useCallback(() => {
-    setCartOpen(true);
-  }, []);
-
-  const closeCart = useCallback(() => {
-    setCartOpen(false);
+    setStatusMessage("Tu carrito quedó vacío.");
   }, []);
 
   const detailedItems = useMemo(
-    () =>
-      items
-        .map((item) => ({ ...item, product: productById[item.productId] }))
-        .filter((item) => item.product),
-    [items],
+    () => items.map((item) => ({
+      ...item,
+      product: byId[item.productId] || null,
+      price: byId[item.productId]?.price ?? null,
+      categoryId: byId[item.productId]?.categoryId || "",
+      lineId: item.productId,
+    })),
+    [byId, items],
   );
 
   const unitCount = useMemo(
@@ -147,14 +129,13 @@ export function CartProvider({ children }) {
   );
 
   const knownSubtotal = useMemo(
-    () =>
-      detailedItems.reduce(
-        (total, item) =>
-          typeof item.price === "number"
-            ? total + item.price * item.quantity
-            : total,
-        0,
-      ),
+    () => detailedItems.reduce(
+      (total, item) =>
+        typeof item.price === "number" && item.product
+          ? total + item.price * item.quantity
+          : total,
+      0,
+    ),
     [detailedItems],
   );
 
@@ -162,42 +143,45 @@ export function CartProvider({ children }) {
     (item) => typeof item.price !== "number",
   );
 
-  const value = useMemo(
-    () => ({
-      items: detailedItems,
-      unitCount,
-      knownSubtotal,
-      hasPendingPrices,
-      isCartOpen,
-      statusMessage,
-      setStatusMessage,
-      openCart: () => {
-        openCart();
-        trackEvent("view_cart", { quantity: unitCount });
-      },
-      closeCart,
-      addItem,
-      updateQuantity,
-      removeItem,
-      clearCart,
-      storageKey: STORAGE_KEY,
-      storageVersion: STORAGE_VERSION,
-    }),
-    [
-      detailedItems,
-      unitCount,
-      knownSubtotal,
-      hasPendingPrices,
-      isCartOpen,
-      statusMessage,
-      addItem,
-      updateQuantity,
-      removeItem,
-      clearCart,
-      openCart,
-      closeCart,
-    ],
+  const hasUnavailableItems = detailedItems.some(
+    (item) => !item.product || item.product.commercialReady !== true,
   );
+
+  const value = useMemo(() => ({
+    items: detailedItems,
+    unitCount,
+    knownSubtotal,
+    hasPendingPrices,
+    hasUnavailableItems,
+    catalogStatus,
+    isCartOpen,
+    statusMessage,
+    setStatusMessage,
+    openCart: () => {
+      setCartOpen(true);
+      trackEvent("view_cart", { quantity: unitCount });
+    },
+    closeCart: () => setCartOpen(false),
+    addItem,
+    updateQuantity,
+    removeItem,
+    clearCart,
+    storageKey: STORAGE_KEY,
+    storageVersion: STORAGE_VERSION,
+  }), [
+    detailedItems,
+    unitCount,
+    knownSubtotal,
+    hasPendingPrices,
+    hasUnavailableItems,
+    catalogStatus,
+    isCartOpen,
+    statusMessage,
+    addItem,
+    updateQuantity,
+    removeItem,
+    clearCart,
+  ]);
 
   return (
     <CartContext.Provider value={value}>

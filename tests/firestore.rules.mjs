@@ -93,6 +93,33 @@ before(async () => {
         name: "Entrada protegida",
         createdBy: "admin-1",
       }),
+      setDoc(doc(database, "orders", "order-ecommerce-1"), {
+        sourceType: "ecommerce",
+        status: "pending_payment",
+        paymentStatus: "pending",
+        invoiceStatus: "not_requested",
+        total: 22000,
+      }),
+      setDoc(doc(database, "payments", "payment-ecommerce-1"), {
+        sourceType: "ecommerce",
+        orderId: "order-ecommerce-1",
+        status: "pending",
+        amount: 22000,
+      }),
+      setDoc(doc(database, "sales", "sale-ecommerce-1"), {
+        sourceType: "ecommerce",
+        sourceChannel: "ecommerce",
+        locationId: "loc-1",
+        locationName: "Ubicación autorizada",
+        sellerId: null,
+        status: "active",
+        paymentStatus: "simulated_approved",
+        invoiceStatus: "not_requested",
+        total: 22000,
+        totalItems: 1,
+        items: [{ productId: "product-1", name: "Producto", qty: 1, unitPrice: 22000, subtotal: 22000 }],
+        createdAt: new Date(),
+      }),
       setDoc(doc(database, "invoices", "invoice-1"), {
         sourceType: "seller_sale",
         sourceId: "seed-sale",
@@ -522,5 +549,76 @@ test("reglas respetan denegación específica de envío WhatsApp", async () => {
     lastExtensionSequence: 1,
     lastExtensionUpdateAt: new Date(),
     updatedAt: new Date(),
+  }));
+});
+
+
+test("order y payment Ecommerce son autoridad exclusiva del backend", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+  const sellerDb = environment.authenticatedContext("seller-1").firestore();
+
+  await assertSucceeds(getDoc(doc(adminDb, "orders", "order-ecommerce-1")));
+  await assertSucceeds(getDoc(doc(adminDb, "payments", "payment-ecommerce-1")));
+
+  await assertFails(setDoc(doc(adminDb, "orders", "browser-order"), {
+    sourceType: "ecommerce",
+    status: "pending_payment",
+    paymentStatus: "approved",
+    invoiceStatus: "not_requested",
+    total: 1,
+  }));
+  await assertFails(updateDoc(doc(adminDb, "orders", "order-ecommerce-1"), {
+    total: 1,
+    paymentStatus: "approved",
+  }));
+  await assertFails(setDoc(doc(sellerDb, "payments", "browser-payment"), {
+    sourceType: "ecommerce",
+    orderId: "browser-order",
+    status: "approved",
+    amount: 1,
+  }));
+  await assertFails(updateDoc(doc(adminDb, "payments", "payment-ecommerce-1"), {
+    status: "approved",
+  }));
+});
+
+test("sales Ecommerce no pueden crearse ni mutarse desde navegador", async () => {
+  const adminDb = environment.authenticatedContext("admin-1").firestore();
+
+  await assertSucceeds(getDoc(doc(adminDb, "sales", "sale-ecommerce-1")));
+  await assertFails(setDoc(doc(adminDb, "sales", "browser-ecommerce-sale"), {
+    sourceType: "ecommerce",
+    sourceChannel: "ecommerce",
+    locationId: "loc-1",
+    locationName: "Ubicación autorizada",
+    sellerId: null,
+    status: "active",
+    paymentStatus: "approved",
+    invoiceStatus: "not_requested",
+    total: 1,
+    totalItems: 1,
+    items: [{ productId: "product-1", name: "Producto", qty: 1, unitPrice: 1, subtotal: 1 }],
+    createdAt: new Date(),
+  }));
+  await assertFails(updateDoc(doc(adminDb, "sales", "sale-ecommerce-1"), {
+    total: 1,
+    invoiceStatus: "authorized",
+    fiscalInvoiceId: "fake",
+  }));
+
+  await setDoc(doc(adminDb, "sales", "regular-admin-sale"), {
+    locationId: "loc-1",
+    locationName: "Ubicación autorizada",
+    sellerId: "admin-1",
+    sellerName: "Administrador",
+    status: "active",
+    total: 22000,
+    totalItems: 1,
+    items: [{ productId: "product-1", name: "Producto", qty: 1, unitPrice: 22000, subtotal: 22000 }],
+    createdAt: new Date(),
+  });
+  await assertFails(updateDoc(doc(adminDb, "sales", "regular-admin-sale"), {
+    sourceType: "ecommerce",
+    paymentStatus: "approved",
   }));
 });

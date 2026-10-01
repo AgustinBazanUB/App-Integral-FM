@@ -1,15 +1,14 @@
 import { useEffect, useMemo } from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
-import { Link, useSearchParams } from "../router";
+import { Search, X } from "lucide-react";
+import { useSearchParams } from "../router";
 import PageMeta from "../components/PageMeta";
 import ProductCard from "../components/ProductCard";
-import SectionHeading from "../components/SectionHeading";
 import { categories, categoryById } from "../data/categories";
 import {
   catalogCollections,
   virtualCatalogCategories,
 } from "../data/catalogViews";
-import { products } from "../data/products";
+import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import { matchesSearch } from "../utils/search";
 import { trackEvent } from "../utils/analytics";
 
@@ -32,6 +31,7 @@ const occasions = [
 ];
 
 export default function CatalogPage() {
+  const { products, status, error, ready, pending, location } = useCommerceCatalog();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawCategory = searchParams.get("categoria") ?? "";
   const categoryId = categoryAliases[rawCategory] ?? rawCategory;
@@ -51,23 +51,19 @@ export default function CatalogPage() {
         const matchesCollection =
           !activeCollection || collectionCategoryIds.includes(product.categoryId);
         const matchesOccasion =
-          !occasion || product.occasions.includes(occasion);
+          !occasion || (product.occasions || []).includes(occasion);
         const matchesQuery = matchesSearch(
           product,
           categoryById[product.categoryId],
           query,
         );
-        return (
-          matchesCategory &&
-          matchesCollection &&
-          matchesOccasion &&
-          matchesQuery
-        );
+        return matchesCategory && matchesCollection && matchesOccasion && matchesQuery;
       }),
-    [activeCollection, categoryId, collectionCategoryIds, occasion, query],
+    [activeCollection, categoryId, collectionCategoryIds, occasion, products, query],
   );
 
   useEffect(() => {
+    if (status !== "ready") return;
     trackEvent("view_item_list", {
       item_list_name:
         activeCollection?.name ??
@@ -80,7 +76,7 @@ export default function CatalogPage() {
         price: product.price,
       })),
     });
-  }, [activeCategory, activeCollection, filteredProducts]);
+  }, [activeCategory, activeCollection, filteredProducts, status]);
 
   const updateParam = (key, value) => {
     const next = new URLSearchParams(searchParams);
@@ -110,25 +106,36 @@ export default function CatalogPage() {
   const catalogDescription =
     activeCollection?.description ??
     activeCategory?.description ??
-    "Productos de distintas categorías preparados para una compra combinada.";
-  const isEmptyWineCategory = activeCategory?.id === "wines";
+    "Productos del catálogo maestro de Flor Mía con precio y stock validados por el backend.";
 
   return (
     <main id="main-content" className="page-shell catalog-page">
       <PageMeta
         title={`${activeCollection?.name ?? activeCategory?.name ?? "Productos"} | Flor Mía`}
-        description="Explorá la selección editable de aceites, frutos secos, aceitunas, mermeladas y sales de Flor Mía."
+        description="Explorá el catálogo comercial de Flor Mía con precio y disponibilidad actualizados."
       />
 
       <section className="page-hero page-hero--catalog">
         <div className="container">
           <p className="eyebrow">CATÁLOGO FLOR MÍA</p>
-          <h1>Sabores mendocinos para elegir a tu manera.</h1>
+          <h1>Productos reales, con precio y stock comercial.</h1>
           <p>
-            Buscá por producto, categoría u ocasión. Las fotografías y
-            presentaciones visibles corresponden al catálogo recibido; los
-            precios y el stock siguen pendientes.
+            Las descripciones e imágenes pueden ser editoriales. El ID, precio,
+            disponibilidad y dato fiscal provienen del catálogo maestro y de la
+            ubicación Ecommerce configurada.
           </p>
+          {!ready ? (
+            <div className="pending-panel">
+              <strong>Configuración comercial incompleta</strong>
+              <p>
+                {pending.includes("ECOMMERCE_LOCATION_ID")
+                  ? "La ubicación de stock Ecommerce está PENDIENTE DE DEFINIR."
+                  : "Algunas decisiones comerciales siguen pendientes."}
+              </p>
+            </div>
+          ) : location ? (
+            <p className="catalog-source-note">Stock Ecommerce: {location.name}</p>
+          ) : null}
         </div>
       </section>
 
@@ -151,101 +158,66 @@ export default function CatalogPage() {
           </div>
 
           <div className="catalog-category-pills" aria-label="Categorías">
-            <button
-              type="button"
-              className={!categoryId && !collectionId ? "is-selected" : ""}
-              onClick={clearCatalogView}
-            >
-              Todo
+            <button type="button" className={!categoryId && !collectionId ? "is-active" : ""} onClick={clearCatalogView}>
+              Todos
             </button>
             {categories.map((category) => (
               <button
                 type="button"
-                className={categoryId === category.id ? "is-selected" : ""}
+                className={categoryId === category.id ? "is-active" : ""}
                 onClick={() => updateCategory(category.id)}
                 key={category.id}
               >
-                {category.shortName}
+                {category.shortName ?? category.name}
               </button>
             ))}
           </div>
 
-          <div className="catalog-secondary-filter">
-            <SlidersHorizontal size={18} aria-hidden="true" />
-            <label htmlFor="occasion-filter">Ocasión</label>
-            <select
-              id="occasion-filter"
-              value={occasion}
-              onChange={(event) => updateParam("ocasion", event.target.value)}
-            >
-              {occasions.map(([value, label]) => (
-                <option value={value} key={value || "all"}>
-                  {label}
-                </option>
-              ))}
-            </select>
+          <div className="catalog-secondary-filters">
+            <label className="field-label">
+              Ocasión
+              <select value={occasion} onChange={(event) => updateParam("ocasion", event.target.value)}>
+                {occasions.map(([value, label]) => <option key={value || "all"} value={value}>{label}</option>)}
+              </select>
+            </label>
             {hasFilters ? (
-              <button
-                type="button"
-                className="clear-filters"
-                onClick={() => setSearchParams({}, { replace: true })}
-              >
+              <button className="text-button" type="button" onClick={() => setSearchParams(new URLSearchParams(), { replace: true })}>
                 <X size={16} aria-hidden="true" />
-                Limpiar
+                Limpiar filtros
               </button>
             ) : null}
           </div>
         </div>
       </section>
 
-      <section className="section catalog-results">
+      <section className="section">
         <div className="container">
-          <div className="catalog-results__header">
-            <SectionHeading
-              eyebrow={`${filteredProducts.length} RESULTADOS`}
-              title={catalogHeading}
-              body={catalogDescription}
-            />
-            <span className="badge">DATOS COMERCIALES PENDIENTES</span>
+          <div className="section-heading">
+            <p className="eyebrow">SELECCIÓN COMERCIAL</p>
+            <h2>{catalogHeading}</h2>
+            <p className="section-heading__body">{catalogDescription}</p>
           </div>
 
-          {filteredProducts.length ? (
+          {status === "loading" ? <div className="pending-panel"><strong>Cargando catálogo comercial…</strong></div> : null}
+          {status === "error" ? (
+            <div className="pending-panel">
+              <strong>No se pudo cargar el catálogo comercial.</strong>
+              <p>{error?.message || "Reintentá cuando el backend esté disponible."}</p>
+            </div>
+          ) : null}
+
+          {status === "ready" && filteredProducts.length ? (
             <div className="catalog-grid">
-              {filteredProducts.map((product) => (
-                <ProductCard product={product} key={product.id} />
-              ))}
+              {filteredProducts.map((product) => <ProductCard product={product} key={product.id} />)}
             </div>
-          ) : (
-            <div className="empty-state">
-              <h2>
-                {isEmptyWineCategory
-                  ? "Los vinos todavía no están cargados."
-                  : "No encontramos productos con esos filtros."}
-              </h2>
-              <p>
-                {isEmptyWineCategory
-                  ? "La categoría está preparada para incorporar vinos cuando se confirmen sus datos comerciales, sin inventar productos, precios ni stock."
-                  : "Probá otra categoría o limpiá la búsqueda. Las categorías vacías no se muestran como si tuvieran stock."}
-              </p>
-              <button
-                className="button"
-                type="button"
-                onClick={() => setSearchParams({}, { replace: true })}
-              >
-                Ver todo el catálogo
-              </button>
-            </div>
-          )}
+          ) : null}
 
-          <div className="catalog-note">
-            <h2>¿Falta un producto?</h2>
-            <p>
-              El catálogo fue preparado para crecer sin cambiar el diseño.
-              Sabores de mermelada, packs, tamaños, precios y stock se cargarán
-              desde los archivos de datos cuando Flor Mía los confirme.
-            </p>
-            <Link to="/nosotros">Ver cómo se administra el contenido</Link>
-          </div>
+          {status === "ready" && !filteredProducts.length ? (
+            <div className="empty-state">
+              <h3>No encontramos productos con esos filtros.</h3>
+              <p>Probá otra categoría o búsqueda.</p>
+            </div>
+          ) : null}
         </div>
       </section>
     </main>

@@ -253,3 +253,122 @@ export async function adminPatchDocument(path, data, {
   }
   return documentFromResponse(payload, path);
 }
+
+
+export async function adminListDocuments(collectionPath, {
+  pageSize = 500,
+  env = process.env,
+  fetchImpl = fetch,
+} = {}) {
+  const safePageSize = Math.min(500, Math.max(1, Number(pageSize) || 500));
+  const { response, payload } = await adminFetch(collectionPath, {
+    env,
+    fetchImpl,
+    query: `?pageSize=${safePageSize}`,
+  });
+  if (!response.ok) {
+    const error = new Error("No se pudo listar Firestore desde el backend.");
+    error.code = "firebase-admin-read-error";
+    error.status = response.status;
+    throw error;
+  }
+  return (payload?.documents || []).map((document) => {
+    const parsed = documentFromResponse(document, collectionPath);
+    return {
+      id: document.name.split("/").at(-1),
+      ...parsed.data,
+      __createTime: parsed.createTime,
+      __updateTime: parsed.updateTime,
+    };
+  });
+}
+
+function qualifiedDocumentName(projectId, path) {
+  return `projects/${projectId}/databases/(default)/documents/${String(path || "").split("/").map(encodeURIComponent).join("/")}`;
+}
+
+function commitWriteForOperation(operation, projectId) {
+  const type = String(operation?.type || "").trim();
+  const path = String(operation?.path || "").trim();
+  if (!path) {
+    const error = new Error("Falta la ruta de una escritura Firestore.");
+    error.code = "firebase-admin-commit-invalid";
+    error.status = 500;
+    throw error;
+  }
+  const name = qualifiedDocumentName(projectId, path);
+  if (type === "create") {
+    return {
+      update: {
+        name,
+        fields: fieldsFromObject(operation.data || {}),
+      },
+      currentDocument: { exists: false },
+    };
+  }
+  if (type === "update") {
+    const data = operation.data || {};
+    const updateMask = operation.updateMask || Object.keys(data);
+    const write = {
+      update: {
+        name,
+        fields: fieldsFromObject(data),
+      },
+      updateMask: {
+        fieldPaths: updateMask,
+      },
+    };
+    if (operation.currentUpdateTime) {
+      write.currentDocument = { updateTime: operation.currentUpdateTime };
+    } else {
+      write.currentDocument = { exists: true };
+    }
+    return write;
+  }
+  const error = new Error("Tipo de escritura Firestore no soportado.");
+  error.code = "firebase-admin-commit-invalid";
+  error.status = 500;
+  throw error;
+}
+
+export async function adminCommitDocuments(operations = [], {
+  env = process.env,
+  fetchImpl = fetch,
+} = {}) {
+  if (!Array.isArray(operations) || !operations.length) return { writeResults: [] };
+  const config = adminConfig(env);
+  const token = await firebaseAdminAccessToken({ env, fetchImpl });
+  const writes = operations.map((operation) => commitWriteForOperation(operation, config.projectId));
+  const response = await fetchImpl(
+    `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents:commit`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ writes }),
+    },
+  );
+  const payload = await response.json().catch(() => ({}));
+  if (response.status === 409 || payload?.error?.status === "ALREADY_EXISTS") {
+    const error = new Error("Uno de los documentos ya existe.");
+    error.code = "firebase-admin-already-exists";
+    error.status = 409;
+    throw error;
+  }
+  if (response.status === 412 || payload?.error?.status === "FAILED_PRECONDITION" || payload?.error?.status === "ABORTED") {
+    const error = new Error("Los datos cambiaron antes de completar la escritura.");
+    error.code = "firebase-admin-precondition-failed";
+    error.status = 409;
+    throw error;
+  }
+  if (!response.ok) {
+    const error = new Error("No se pudo guardar la operación comercial.");
+    error.code = "firebase-admin-commit-error";
+    error.status = response.status || 500;
+    throw error;
+  }
+  return payload;
+}
