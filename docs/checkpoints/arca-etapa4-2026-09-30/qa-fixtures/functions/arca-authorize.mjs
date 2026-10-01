@@ -1,0 +1,1 @@
+export default async function handler(req){await fetch('http://127.0.0.1:5181/__qa/record',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'FORBIDDEN_AUTHORIZATION_ATTEMPT',endpoint:'arca-authorize'})});return Response.json({ok:false,message:'Emisión prohibida en auditoría'},{status:500})}

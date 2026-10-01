@@ -1,0 +1,3 @@
+import actual from '../../../netlify/functions/arca-invoice.mjs';
+
+export default async function handler(req){await fetch('http://127.0.0.1:5181/__qa/record',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'http',endpoint:'arca-invoice',body:await req.clone().json()})});const s=await fetch('http://127.0.0.1:5181/__qa/state').then(r=>r.json());if(s.settings.invoiceDelay)await new Promise(r=>setTimeout(r,s.settings.invoiceDelay));if(s.settings.invoiceError)return Response.json({ok:false,message:'Error fiscal QA',code:'arca-test-error'},{status:503});return actual(req)}

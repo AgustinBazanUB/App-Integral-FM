@@ -1,0 +1,21 @@
+{
+  "scope": "Synthetic fixtures only; real React/handlers with local Firestore transport",
+  "httpByEndpoint": [
+    {
+      "endpoint": "arca-document",
+      "count": 10
+    },
+    {
+      "endpoint": "arca-invoice",
+      "count": 13
+    },
+    {
+      "endpoint": "arca-receiver",
+      "count": 11
+    }
+  ],
+  "authorizationAttempts": 0,
+  "commercialCommits": 7,
+  "currentStock": 16,
+  "stockMovements": 7
+}

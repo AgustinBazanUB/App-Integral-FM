@@ -1,0 +1,150 @@
+[
+  {
+    "name": "standard",
+    "status": 200,
+    "body": {
+      "ok": true,
+      "created": true,
+      "invoice": {
+        "id": "invoice_homologation_seller_sale_backend-standard",
+        "status": "pending",
+        "fiscalReadiness": {
+          "ready": true,
+          "missingProducts": [],
+          "missingVatRate": []
+        },
+        "sourceType": "seller_sale",
+        "sourceId": "backend-standard",
+        "autoAuthorization": null
+      }
+    }
+  },
+  {
+    "name": "deny",
+    "status": 403,
+    "body": {
+      "ok": false,
+      "code": "permission-denied",
+      "message": "No tenés permiso para preparar la factura de esta venta."
+    }
+  },
+  {
+    "name": "explicit-missing",
+    "status": 403,
+    "body": {
+      "ok": false,
+      "code": "permission-denied",
+      "message": "No tenés permiso para preparar la factura de esta venta."
+    }
+  },
+  {
+    "name": "explicit-present",
+    "status": 200,
+    "body": {
+      "ok": true,
+      "created": true,
+      "invoice": {
+        "id": "invoice_homologation_seller_sale_backend-explicit-present",
+        "status": "pending",
+        "fiscalReadiness": {
+          "ready": true,
+          "missingProducts": [],
+          "missingVatRate": []
+        },
+        "sourceType": "seller_sale",
+        "sourceId": "backend-explicit-present",
+        "autoAuthorization": null
+      }
+    }
+  },
+  {
+    "name": "other-owner",
+    "status": 403,
+    "body": {
+      "ok": false,
+      "code": "permission-denied",
+      "message": "No tenés permiso para preparar la factura de esta venta."
+    }
+  },
+  {
+    "name": "wrong-source",
+    "status": 403,
+    "body": {
+      "ok": false,
+      "code": "permission-denied",
+      "message": "No tenés permiso para preparar la factura de esta venta."
+    }
+  },
+  {
+    "name": "ecommerce",
+    "status": 403,
+    "body": {
+      "ok": false,
+      "code": "permission-denied",
+      "message": "No tenés permiso para preparar la factura de esta venta."
+    }
+  },
+  {
+    "name": "concurrent",
+    "responses": [
+      {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "created": true,
+          "invoice": {
+            "id": "invoice_homologation_seller_sale_backend-concurrent",
+            "status": "pending",
+            "fiscalReadiness": {
+              "ready": true,
+              "missingProducts": [],
+              "missingVatRate": []
+            },
+            "sourceType": "seller_sale",
+            "sourceId": "backend-concurrent",
+            "autoAuthorization": null
+          }
+        }
+      },
+      {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "created": false,
+          "invoice": {
+            "id": "invoice_homologation_seller_sale_backend-concurrent",
+            "status": "pending",
+            "fiscalReadiness": {
+              "ready": true,
+              "missingProducts": [],
+              "missingVatRate": []
+            },
+            "sourceType": "seller_sale",
+            "sourceId": "backend-concurrent",
+            "autoAuthorization": null
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "authorized-terminal",
+    "status": 200,
+    "body": {
+      "ok": true,
+      "created": false,
+      "invoice": {
+        "id": "invoice_homologation_seller_sale_backend-concurrent",
+        "status": "authorized",
+        "fiscalReadiness": {
+          "ready": true,
+          "missingProducts": [],
+          "missingVatRate": []
+        },
+        "sourceType": "seller_sale",
+        "sourceId": "backend-concurrent",
+        "autoAuthorization": null
+      }
+    }
+  }
+]

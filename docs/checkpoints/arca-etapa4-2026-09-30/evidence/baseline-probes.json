@@ -1,0 +1,14 @@
+{
+  "parent": {
+    "declared-ecommerce": "ACCEPTED",
+    "declared-seller_sale": "ACCEPTED",
+    "associationConflict": "REUSED_CONFLICT",
+    "base64ExcessPadding": "ACCEPTED"
+  },
+  "stage4": {
+    "declared-ecommerce": "ACCEPTED",
+    "declared-seller_sale": "ACCEPTED",
+    "associationConflict": "REUSED_CONFLICT",
+    "base64ExcessPadding": "ACCEPTED"
+  }
+}
