@@ -2,6 +2,29 @@ import { Check } from "lucide-react";
 import { useState } from "react";
 import { oliveProfiles, sensoryDimensions } from "../data/oliveProfiles";
 
+const dimensionValue = (profile, dimension) => {
+  switch (dimension) {
+    case "Frutado":
+      return typeof profile.fruitiness === "number"
+        ? `${profile.fruitiness} / 5`
+        : null;
+    case "Amargor":
+      return typeof profile.bitterness === "number"
+        ? `${profile.bitterness} / 5`
+        : null;
+    case "Picor":
+      return typeof profile.pungency === "number"
+        ? `${profile.pungency} / 5`
+        : null;
+    case "Intensidad general":
+      return profile.intensity ?? null;
+    case "Uso sugerido":
+      return profile.use ?? null;
+    default:
+      return null;
+  }
+};
+
 export default function SensoryComparison() {
   const [selectedIds, setSelectedIds] = useState(["arbequina", "blend"]);
 
@@ -45,8 +68,8 @@ export default function SensoryComparison() {
       </div>
 
       <p className="comparison-note">
-        Los perfiles sensoriales todavía no fueron validados. La herramienta
-        está lista para recibir los datos reales de Flor Mía.
+        Los valores describen el perfil típico de cada variedad (escala 0 a 5).
+        Flor Mía aún tiene que confirmar el perfil exacto de sus aceites.
       </p>
 
       <div className="comparison-table" role="table" aria-label="Comparador sensorial">
@@ -61,11 +84,18 @@ export default function SensoryComparison() {
         {sensoryDimensions.map((dimension) => (
           <div className="comparison-table__row" role="row" key={dimension}>
             <span role="rowheader">{dimension}</span>
-            {selectedProfiles.map((profile) => (
-              <div role="cell" key={`${profile.id}-${dimension}`}>
-                <span className="pending-value">Pendiente de validación</span>
-              </div>
-            ))}
+            {selectedProfiles.map((profile) => {
+              const value = dimensionValue(profile, dimension);
+              return (
+                <div role="cell" key={`${profile.id}-${dimension}`}>
+                  {value ? (
+                    <span>{value}</span>
+                  ) : (
+                    <span className="pending-value">Pendiente de validación</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>

@@ -96,6 +96,9 @@ function OilProfileCard({ profile }) {
           )}
         </h3>
         <p>{profile.descriptor ?? "Perfil por validar"}</p>
+        {profile.summary ? (
+          <p className="fm-variety-card__summary">{profile.summary}</p>
+        ) : null}
         <button
           className={`fm-variety-card__add${added ? " is-added" : ""}`}
           type="button"
