@@ -31,6 +31,7 @@ export const announcementMessages = [
 ];
 
 export const navigation = [
+  { label: "Inicio", to: "/tienda" },
   { label: "Tienda", to: "/productos" },
   { label: "Aceite de oliva", to: "/productos?categoria=olive_oil" },
   { label: "Regalos", to: "/productos?categoria=gifts" },
@@ -39,6 +40,7 @@ export const navigation = [
 ];
 
 export const mobileNavigation = [
+  { label: "Inicio", to: "/tienda" },
   { label: "Tienda", to: "/productos" },
   { label: "Aceite de oliva", to: "/productos?categoria=olive_oil" },
   { label: "Regalos", to: "/productos?categoria=gifts" },

@@ -115,10 +115,11 @@ test("la barra informativa conserva los tres mensajes aprobados", () => {
   ]);
 });
 
-test("la navegación de escritorio muestra solo las cinco opciones visibles", () => {
+test("la navegación de escritorio muestra las seis opciones visibles", () => {
   assert.deepEqual(
     navigation.map(({ label, to }) => [label, to]),
     [
+      ["Inicio", "/tienda"],
       ["Tienda", "/productos"],
       ["Aceite de oliva", "/productos?categoria=olive_oil"],
       ["Regalos", "/productos?categoria=gifts"],
@@ -128,14 +129,10 @@ test("la navegación de escritorio muestra solo las cinco opciones visibles", ()
   );
 });
 
-test("el menú mobile muestra las mismas cinco opciones", () => {
+test("el menú mobile muestra las mismas seis opciones", () => {
   assert.deepEqual(
     mobileNavigation.map(({ label, to }) => [label, to]),
     navigation.map(({ label, to }) => [label, to]),
-  );
-  assert.equal(
-    mobileNavigation.some(({ label }) => label === "Inicio"),
-    false,
   );
 });
 
