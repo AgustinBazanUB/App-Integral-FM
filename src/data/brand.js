@@ -34,7 +34,6 @@ export const navigation = [
   { label: "Inicio", to: "/tienda" },
   { label: "Tienda", to: "/productos" },
   { label: "Aceite de oliva", to: "/productos?categoria=olive_oil" },
-  { label: "Regalos", to: "/productos?categoria=gifts" },
   { label: "Nosotros", to: "/nosotros" },
   { label: "Contacto", to: "/tienda#contacto" },
 ];
@@ -43,7 +42,6 @@ export const mobileNavigation = [
   { label: "Inicio", to: "/tienda" },
   { label: "Tienda", to: "/productos" },
   { label: "Aceite de oliva", to: "/productos?categoria=olive_oil" },
-  { label: "Regalos", to: "/productos?categoria=gifts" },
   { label: "Nosotros", to: "/nosotros" },
   { label: "Contacto", to: "/tienda#contacto" },
 ];

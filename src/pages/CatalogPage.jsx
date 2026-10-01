@@ -252,24 +252,6 @@ export default function CatalogPage() {
         </div>
       </section>
 
-      {isOliveOilView ? (
-        <Reveal
-          as="section"
-          className="section comparison-section"
-          aria-labelledby="comparison-title"
-        >
-          <div className="container">
-            <SectionHeading
-              eyebrow="COMPARÁ VARIETALES"
-              title="Encontrá tu perfil."
-              body="Elegí hasta tres varietales y comparalos por frutado, amargor, picor, intensidad y uso sugerido."
-              as="h2"
-            />
-            <SensoryComparison />
-          </div>
-        </Reveal>
-      ) : null}
-
       {isGiftsView ? (
         <Reveal
           as="section"
@@ -345,6 +327,24 @@ export default function CatalogPage() {
           </div>
         </div>
       </section>
+
+      {isOliveOilView ? (
+        <Reveal
+          as="section"
+          className="section comparison-section"
+          aria-labelledby="comparison-title"
+        >
+          <div className="container">
+            <SectionHeading
+              eyebrow="COMPARÁ VARIETALES"
+              title="Encontrá tu perfil."
+              body="Elegí hasta tres varietales y comparalos por frutado, amargor, picor, intensidad y uso sugerido."
+              as="h2"
+            />
+            <SensoryComparison />
+          </div>
+        </Reveal>
+      ) : null}
     </main>
   );
 }
