@@ -59,22 +59,42 @@ function OilProfileCard({ profile }) {
     setFeedbackVersion((current) => current + 1);
   };
 
+  const productImage = (
+    <img
+      src={profile.image}
+      alt={
+        profile.imageStatus === "verified-product"
+          ? `Botella real de aceite Flor Mía variedad ${profile.name}`
+          : `Fotografía editorial de aceites Flor Mía; imagen específica de ${profile.name} pendiente`
+      }
+      width="900"
+      height="1350"
+      loading="lazy"
+      decoding="async"
+    />
+  );
+
   return (
     <article className="fm-variety-card">
-      <img
-        src={profile.image}
-        alt={
-          profile.imageStatus === "verified-product"
-            ? `Botella real de aceite Flor Mía variedad ${profile.name}`
-            : `Fotografía editorial de aceites Flor Mía; imagen específica de ${profile.name} pendiente`
-        }
-        width="900"
-        height="1350"
-        loading="lazy"
-        decoding="async"
-      />
+      {product ? (
+        <Link
+          className="fm-variety-card__link"
+          to={`/producto/${product.slug}`}
+          aria-label={`Ver aceite ${profile.name}`}
+        >
+          {productImage}
+        </Link>
+      ) : (
+        productImage
+      )}
       <div className="fm-variety-card__content">
-        <h3>{profile.name}</h3>
+        <h3>
+          {product ? (
+            <Link to={`/producto/${product.slug}`}>{profile.name}</Link>
+          ) : (
+            profile.name
+          )}
+        </h3>
         <p>{profile.descriptor ?? "Perfil por validar"}</p>
         <button
           className={`fm-variety-card__add${added ? " is-added" : ""}`}

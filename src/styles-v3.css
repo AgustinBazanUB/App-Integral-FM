@@ -1056,6 +1056,39 @@ body::before {
   margin: auto 0 5px;
   object-fit: contain;
   object-position: center bottom;
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fm-variety-card__link {
+  display: flex;
+  width: 100%;
+  margin: auto 0 5px;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.fm-variety-card__link img {
+  margin: 0;
+}
+
+.fm-variety-card__link:hover img,
+.fm-variety-card__link:focus-visible img {
+  transform: scale(1.05);
+}
+
+.fm-variety-card__link:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--fm-gold);
+  outline-offset: 2px;
+}
+
+.fm-variety-card h3 a {
+  color: inherit;
+}
+
+.fm-variety-card h3 a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .fm-variety-card h3 {
