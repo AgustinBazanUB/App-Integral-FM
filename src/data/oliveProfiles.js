@@ -41,7 +41,7 @@ export const oliveProfiles = [
     name: "Blend IG",
     descriptor: "Equilibrio mendocino",
     summary:
-      "Blend con Indicación Geográfica Mendoza: combina varietales suaves con un porcentaje de Arauco (entre el 20% y el 50%, como pide el sello) que le da cuerpo, amargor y picor medios.",
+      "Blend con Indicación Geográfica Mendoza: 50% Arbequina aporta la base suave y frutada, 30% Arauco el carácter criollo y 20% Coratina el amargor y picor que lo ubican en intensidad media.",
     use: "Versátil: cocina, picadas, panes y finalización de platos.",
     intensity: "Intermedio",
     fruitiness: 4,
@@ -50,7 +50,7 @@ export const oliveProfiles = [
     image: productImage("aceite-blend-500cc.webp"),
     imageStatus: "verified-product",
     productId: "oil-blend",
-    verified: false,
+    verified: true,
   },
   {
     id: "coratina",
