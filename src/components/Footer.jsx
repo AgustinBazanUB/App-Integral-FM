@@ -7,6 +7,7 @@ import {
   Phone,
 } from "lucide-react";
 import { Link } from "../router";
+import Reveal from "./Reveal";
 import { brand, footerNavigation } from "../data/brand";
 
 export default function Footer() {
@@ -20,7 +21,7 @@ export default function Footer() {
 
   return (
     <footer className="site-footer" id="contacto">
-      <div className="container site-footer__top">
+      <Reveal className="container site-footer__top">
         <div className="footer-intro">
           <Link
             className="wordmark footer-logo"
@@ -130,7 +131,7 @@ export default function Footer() {
             ) : null}
           </section>
         </div>
-      </div>
+      </Reveal>
 
       <div className="container footer-legal">
         <span>© {new Date().getFullYear()} Flor Mía</span>

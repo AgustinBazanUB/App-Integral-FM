@@ -777,6 +777,11 @@ body::before {
   height: 100%;
   object-fit: contain;
   object-position: center bottom;
+  transition: transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.product-card:hover .product-card__image {
+  transform: scale(1.04);
 }
 
 .product-card__image-missing {

@@ -14,6 +14,7 @@ import { assetsManifest } from "../data/assetsManifest";
 import { oliveProfileById } from "../data/oliveProfiles";
 import { productById } from "../data/products";
 import { useCart } from "../context/CartContext";
+import { useReveal } from "../hooks/useReveal";
 
 const intensityOptions = [
   {
@@ -113,6 +114,7 @@ export default function OliveOilGuide({
   titleAs: TitleTag = "h2",
 }) {
   const [selectedIntensity, setSelectedIntensity] = useState("Suave");
+  const revealRef = useReveal();
   const titleId = `${id}-title`;
   const selectedOption =
     intensityOptions.find((option) => option.value === selectedIntensity) ??
@@ -122,7 +124,12 @@ export default function OliveOilGuide({
     .filter(Boolean);
 
   return (
-    <section className="fm-oil-guide" id={id} aria-labelledby={titleId}>
+    <section
+      className="fm-oil-guide reveal"
+      id={id}
+      aria-labelledby={titleId}
+      ref={revealRef}
+    >
       <div className="fm-page fm-oil-guide__layout">
         <div className="fm-oil-guide__intro">
           <img

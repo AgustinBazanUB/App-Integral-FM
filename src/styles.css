@@ -2992,6 +2992,69 @@ input::placeholder {
   }
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal.is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+.reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal-stagger.is-revealed > * {
+  opacity: 1;
+  transform: none;
+}
+
+.reveal-stagger.is-revealed > :nth-child(2) {
+  transition-delay: 60ms;
+}
+
+.reveal-stagger.is-revealed > :nth-child(3) {
+  transition-delay: 120ms;
+}
+
+.reveal-stagger.is-revealed > :nth-child(4) {
+  transition-delay: 180ms;
+}
+
+.reveal-stagger.is-revealed > :nth-child(5) {
+  transition-delay: 240ms;
+}
+
+.reveal-stagger.is-revealed > :nth-child(6) {
+  transition-delay: 300ms;
+}
+
+.reveal-stagger.is-revealed > :nth-child(n + 7) {
+  transition-delay: 340ms;
+}
+
+.cart-backdrop {
+  animation: fadeIn 260ms ease;
+}
+
 @media (max-width: 1180px) {
   .desktop-nav {
     gap: 12px;

@@ -1,5 +1,6 @@
 import { Link } from "../router";
 import PageMeta from "../components/PageMeta";
+import Reveal from "../components/Reveal";
 import { assetsManifest } from "../data/assetsManifest";
 
 export default function AboutPage() {
@@ -24,7 +25,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="section" id="origen">
+      <Reveal as="section" className="section" id="origen">
         <div className="container story-grid">
           <img
             className="about-local-image"
@@ -54,9 +55,9 @@ export default function AboutPage() {
             </Link>
           </div>
         </div>
-      </section>
+      </Reveal>
 
-      <section className="section about-editorial" aria-labelledby="about-editorial-title">
+      <Reveal as="section" className="section about-editorial" aria-labelledby="about-editorial-title">
         <div className="container">
           <p className="eyebrow">MENDOZA, EN IMÁGENES</p>
           <h2 id="about-editorial-title">Del productor a tu mesa.</h2>
@@ -64,7 +65,7 @@ export default function AboutPage() {
             Acercamos una selección de productos mendocinos directamente de
             sus productores, cuidando el origen y la elección de cada uno.
           </p>
-          <div className="about-editorial__grid">
+          <Reveal className="about-editorial__grid" stagger>
             <img
               src={local.hero.src}
               srcSet={local.hero.srcSet}
@@ -91,18 +92,18 @@ export default function AboutPage() {
               loading="lazy"
               decoding="async"
             />
-          </div>
+          </Reveal>
           <p className="about-editorial__note">
             Esta fila está preparada para sumar fotografía editorial de la
             próxima sesión (origen, proceso y presentación de regalos).
           </p>
         </div>
-      </section>
+      </Reveal>
 
-      <section className="section about-principles" id="local">
+      <Reveal as="section" className="section about-principles" id="local">
         <div className="container">
           <p className="eyebrow">LO QUE GUÍA ESTA EXPERIENCIA</p>
-          <div className="principles-grid">
+          <Reveal className="principles-grid" stagger>
             <article>
               <span>01</span>
               <h2>Origen claro</h2>
@@ -127,11 +128,11 @@ export default function AboutPage() {
                 inventadas.
               </p>
             </article>
-          </div>
+          </Reveal>
         </div>
-      </section>
+      </Reveal>
 
-      <section className="section about-cta">
+      <Reveal as="section" className="section about-cta">
         <div className="container">
           <h2>Empezá por el aceite de oliva.</h2>
           <p>
@@ -142,7 +143,7 @@ export default function AboutPage() {
             Conocer los varietales
           </Link>
         </div>
-      </section>
+      </Reveal>
     </main>
   );
 }

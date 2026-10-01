@@ -5,6 +5,7 @@ import OccasionBuilder from "../components/OccasionBuilder";
 import OliveOilGuide from "../components/OliveOilGuide";
 import PageMeta from "../components/PageMeta";
 import ProductCard from "../components/ProductCard";
+import Reveal from "../components/Reveal";
 import SectionHeading from "../components/SectionHeading";
 import SensoryComparison from "../components/SensoryComparison";
 import { categories, categoryById } from "../data/categories";
@@ -252,7 +253,8 @@ export default function CatalogPage() {
       </section>
 
       {isOliveOilView ? (
-        <section
+        <Reveal
+          as="section"
           className="section comparison-section"
           aria-labelledby="comparison-title"
         >
@@ -265,11 +267,12 @@ export default function CatalogPage() {
             />
             <SensoryComparison />
           </div>
-        </section>
+        </Reveal>
       ) : null}
 
       {isGiftsView ? (
-        <section
+        <Reveal
+          as="section"
           className="section occasion-section"
           aria-labelledby="occasion-title"
         >
@@ -285,7 +288,7 @@ export default function CatalogPage() {
               note="Selección individual de productos reales; no es un pack comercial. Los formatos y la presentación del regalo se coordinan al comprar."
             />
           </div>
-        </section>
+        </Reveal>
       ) : null}
 
       <section className="section catalog-results">
@@ -304,11 +307,11 @@ export default function CatalogPage() {
           </div>
 
           {filteredProducts.length ? (
-            <div className="catalog-grid">
+            <Reveal className="catalog-grid" stagger>
               {filteredProducts.map((product) => (
                 <ProductCard product={product} key={product.id} />
               ))}
-            </div>
+            </Reveal>
           ) : (
             <div className="empty-state">
               <h2>

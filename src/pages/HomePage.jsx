@@ -13,6 +13,7 @@ import { promotions } from "../data/promotions";
 import OliveOilGuide from "../components/OliveOilGuide";
 import PageMeta from "../components/PageMeta";
 import PromoShowcase from "../components/PromoShowcase";
+import Reveal from "../components/Reveal";
 
 const promotionIcons = {
   truck: Truck,
@@ -173,7 +174,8 @@ export default function HomePage() {
 
         <OliveOilGuide />
 
-        <section
+        <Reveal
+          as="section"
           className="fm-table"
           id="mesa-mendocina"
           aria-labelledby="table-title"
@@ -215,9 +217,10 @@ export default function HomePage() {
               </span>
             </div>
           </div>
-        </section>
+        </Reveal>
 
-        <section
+        <Reveal
+          as="section"
           className="fm-story"
           id="historia"
           aria-labelledby="story-title"
@@ -241,7 +244,7 @@ export default function HomePage() {
               </ul>
             </div>
           </div>
-        </section>
+        </Reveal>
       </main>
     </>
   );

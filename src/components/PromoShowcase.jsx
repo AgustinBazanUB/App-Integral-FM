@@ -1,4 +1,5 @@
 import { CreditCard, HeartHandshake, Sprout, Truck } from "lucide-react";
+import Reveal from "./Reveal";
 import { Link } from "../router";
 import { trustItems } from "../data/brand";
 import { productById } from "../data/products";
@@ -28,7 +29,8 @@ export default function PromoShowcase() {
   );
 
   return (
-    <section
+    <Reveal
+      as="section"
       className="fm-promo-showcase"
       id="promociones"
       aria-labelledby="promo-showcase-title"
@@ -43,7 +45,7 @@ export default function PromoShowcase() {
           Beneficios vigentes y ofertas seleccionadas para tu mesa mendocina.
         </p>
 
-        <div className="fm-promo-benefits">
+        <Reveal className="fm-promo-benefits" stagger>
           {trustItems.map(({ id, icon, title, subtitle, detail }) => {
             const Icon = benefitIcons[icon] ?? Sprout;
             return (
@@ -59,10 +61,10 @@ export default function PromoShowcase() {
               </article>
             );
           })}
-        </div>
+        </Reveal>
 
         {offers.length ? (
-          <div className="fm-promo-offers">
+          <Reveal className="fm-promo-offers" stagger>
             {offers.map(({ product, promoPrice, label, endsAt }) => (
               <article className="fm-promo-offer" key={product.id}>
                 <Link
@@ -96,7 +98,7 @@ export default function PromoShowcase() {
                 </div>
               </article>
             ))}
-          </div>
+          </Reveal>
         ) : null}
 
         {campaigns.map(
@@ -118,6 +120,6 @@ export default function PromoShowcase() {
           ),
         )}
       </div>
-    </section>
+    </Reveal>
   );
 }
