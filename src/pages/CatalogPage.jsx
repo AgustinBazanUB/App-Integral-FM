@@ -186,6 +186,7 @@ export default function CatalogPage() {
         </section>
       )}
 
+      {!isOliveOilView ? (
       <section className="catalog-controls" aria-label="Filtros del catálogo">
         <div className="container">
           <div className="catalog-search">
@@ -251,6 +252,7 @@ export default function CatalogPage() {
           </div>
         </div>
       </section>
+      ) : null}
 
       {isGiftsView ? (
         <Reveal
