@@ -462,17 +462,9 @@ input::placeholder {
   width: min(calc(100% - 48px), var(--page-container));
   height: 100%;
   margin-inline: auto;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 150px 1fr auto;
   align-items: center;
   gap: 24px;
-}
-
-.site-header__inner > .desktop-nav {
-  justify-self: center;
-}
-
-.site-header__inner > .header-actions {
-  justify-self: end;
 }
 
 .wordmark {
@@ -496,7 +488,7 @@ input::placeholder {
   position: relative;
   padding: 12px 0;
   color: rgba(245, 241, 232, 0.82);
-  font-size: 14.4px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -3069,11 +3061,11 @@ input::placeholder {
   }
 
   .desktop-nav a {
-    font-size: 12px;
+    font-size: 10px;
   }
 
   .site-header__inner {
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: 120px 1fr auto;
   }
 
   .header-actions .button {
