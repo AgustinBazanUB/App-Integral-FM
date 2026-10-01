@@ -57,15 +57,19 @@ export default function ProductCard({ product, compact = false }) {
       </Link>
 
       <div className="product-card__content">
-        <span className="product-card__category">
-          {category?.name ?? product.subcategory}
-        </span>
+        {compact ? (
+          <span className="product-card__category">
+            {category?.name ?? product.subcategory}
+          </span>
+        ) : null}
         <h3>
           <Link to={`/producto/${product.slug}`}>{product.name}</Link>
         </h3>
-        <p className="product-card__description">{product.description}</p>
+        {compact ? (
+          <p className="product-card__description">{product.description}</p>
+        ) : null}
 
-        {!compact && product.formats?.length > 1 ? (
+        {product.formats?.length > 1 ? (
           <label className="field-label product-card__format">
             Presentación
             <select
@@ -80,7 +84,7 @@ export default function ProductCard({ product, compact = false }) {
               ))}
             </select>
           </label>
-        ) : format ? (
+        ) : compact && format ? (
           <span className="product-card__format-text">{format}</span>
         ) : null}
 

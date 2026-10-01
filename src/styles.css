@@ -2424,7 +2424,7 @@ input::placeholder {
 
 .catalog-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 18px;
 }
 
@@ -3560,7 +3560,7 @@ input::placeholder {
   .purchase-grid,
   .catalog-grid,
   .catalog-grid--three {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .purchase-card {
