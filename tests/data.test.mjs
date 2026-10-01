@@ -42,7 +42,10 @@ test("cada producto pertenece a una categoría existente", () => {
 
 test("los datos comerciales desconocidos permanecen explícitamente pendientes", () => {
   for (const product of products) {
-    assert.equal(product.price, null, `${product.id} no debe inventar precio`);
+    assert.ok(
+      product.price === null || product.price > 0,
+      `${product.id} el precio es null o un monto positivo confirmado`,
+    );
     assert.equal(product.stock, "unknown", `${product.id} no debe inventar stock`);
     assert.equal(product.dataStatus, "pending");
     assert.ok(
@@ -246,7 +249,10 @@ test("los seis varietales tienen intensidad y producto de 500 cc", () => {
     assert.equal(product.categoryId, "olive_oil");
     assert.deepEqual(product.formats, ["500 cc"]);
     assert.equal(product.active, true);
-    assert.equal(product.price, null);
+    assert.ok(
+      typeof product.price === "number" && product.price > 0,
+      `${profile.id} tiene precio confirmado`,
+    );
     assert.equal(product.stock, "unknown");
   }
 
