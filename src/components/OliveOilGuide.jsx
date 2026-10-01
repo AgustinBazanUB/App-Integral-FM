@@ -15,6 +15,7 @@ import { oliveProfileById } from "../data/oliveProfiles";
 import { productById } from "../data/products";
 import { useCart } from "../context/CartContext";
 import { useReveal } from "../hooks/useReveal";
+import { formatPrice } from "../utils/format";
 
 const intensityOptions = [
   {
@@ -98,6 +99,12 @@ function OilProfileCard({ profile }) {
         <p>{profile.descriptor ?? "Perfil por validar"}</p>
         {profile.summary ? (
           <p className="fm-variety-card__summary">{profile.summary}</p>
+        ) : null}
+        {product ? (
+          <span className="fm-variety-card__price">
+            {formatPrice(product.promoPrice ?? product.price) ??
+              "Precio a confirmar"}
+          </span>
         ) : null}
         <button
           className={`fm-variety-card__add${added ? " is-added" : ""}`}

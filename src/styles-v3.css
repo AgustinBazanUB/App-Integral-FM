@@ -1117,6 +1117,14 @@ body::before {
   line-height: 1.4;
 }
 
+.fm-variety-card__price {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--fm-gold-soft);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .fm-guide-badges {
   display: flex;
   align-items: center;
