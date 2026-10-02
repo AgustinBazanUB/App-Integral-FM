@@ -32,6 +32,7 @@ before(async () => {
       rules: await readFile(new URL("../firestore.rules", import.meta.url), "utf8"),
     },
   });
+  await environment.clearFirestore();
   await environment.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
     await Promise.all([

@@ -116,7 +116,23 @@ function requestedBySource(sourceType, sale = {}) {
   return false;
 }
 
+function saleMatchesDeclaredSource(sourceType, sale) {
+  return Boolean(sale)
+    && (!Object.hasOwn(sale, "sourceType") || sale.sourceType === sourceType)
+    && (sale.sourceChannel !== "ecommerce" || sourceType === "ecommerce");
+}
+
+function assertDeclaredSaleSource(sourceType, sale) {
+  if (sale && !saleMatchesDeclaredSource(sourceType, sale)) {
+    const error = new Error("El origen fiscal solicitado no coincide con el origen declarado de la venta.");
+    error.code = "arca-sale-source-mismatch";
+    error.status = 409;
+    throw error;
+  }
+}
+
 function validateSaleForInvoice(sourceType, sourceId, sale) {
+  assertDeclaredSaleSource(sourceType, sale);
   if (!BILLING_SOURCE_TYPES.includes(sourceType)) {
     const error = new Error("Origen de facturación inválido.");
     error.code = "arca-invalid-source";
@@ -169,6 +185,7 @@ function validateSaleForInvoice(sourceType, sourceId, sale) {
 }
 
 export function canRequestInvoiceForSale({ sourceType, sale, session }) {
+  if (!saleMatchesDeclaredSource(sourceType, sale)) return false;
   const profile = session?.profile || {};
   const role = String(profile.role || profile.roles?.[0] || "").trim().toLowerCase().replaceAll(" ", "_");
   const admin = role === "admin"
@@ -195,12 +212,24 @@ export async function ensurePendingInvoice({
 } = {}) {
   const scope = fiscalScope(env);
   const invoiceId = invoiceIdForEnvironment(scope.environment, sourceType, sourceId);
-  const existing = await getDocument(invoicePathFor(invoiceId), { env });
-  if (existing && sourceType === "ecommerce") {
+  const sourceSale = await getDocument(salePathFor(sourceId), { env });
+  assertDeclaredSaleSource(sourceType, sourceSale?.data);
+  const assertInvoiceAssociation = async (candidateId, candidate) => {
     const currentSale = await getDocument(salePathFor(sourceId), { env });
-    validateSaleForInvoice(sourceType, sourceId, currentSale?.data || null);
-  }
+    assertDeclaredSaleSource(sourceType, currentSale?.data);
+    if (sourceType === "ecommerce") validateSaleForInvoice(sourceType, sourceId, currentSale?.data || null);
+    const sale = currentSale?.data || {};
+    const links = [{id:sale.fiscalInvoiceId, environment:sale.fiscalEnvironment}, {id:sale.fiscalInvoice?.id, environment:sale.fiscalInvoice?.environment}];
+    if (links.some((link) => link.id && link.id !== candidateId && (!link.environment || link.environment === scope.environment)) || (candidate && (candidate.sourceType !== sourceType || candidate.sourceId !== sourceId || (candidate.fiscalEnvironment && candidate.fiscalEnvironment !== scope.environment)))) {
+      const error = new Error("La asociación fiscal de la venta no coincide.");
+      error.code = "arca-sale-invoice-conflict";
+      error.status = 409;
+      throw error;
+    }
+  };
+  const existing = await getDocument(invoicePathFor(invoiceId), { env });
   if (existing) {
+    await assertInvoiceAssociation(invoiceId, existing.data);
     return {
       created: false,
       invoiceId,
@@ -213,6 +242,7 @@ export async function ensurePendingInvoice({
     const legacyInvoiceId = invoiceIdFor(sourceType, sourceId);
     const legacy = await getDocument(invoicePathFor(legacyInvoiceId), { env });
     if (legacy && (!legacy.data?.fiscalEnvironment || legacy.data.fiscalEnvironment === "homologation")) {
+      await assertInvoiceAssociation(legacyInvoiceId, legacy.data);
       return {
         created: false,
         invoiceId: legacyInvoiceId,
@@ -226,9 +256,13 @@ export async function ensurePendingInvoice({
   const saleSnapshot = await getDocument(salePathFor(sourceId), { env });
   const sale = saleSnapshot?.data || null;
   validateSaleForInvoice(sourceType, sourceId, sale);
+  await assertInvoiceAssociation(invoiceId, null);
 
   const items = compactSaleItems(sale.items);
-  const fiscalProducts = await loadFiscalProducts(items, { getDocument, env });
+  // Paid Ecommerce Sales already contain the authoritative VAT snapshot.
+  const fiscalProducts = sourceType === "ecommerce"
+    ? sale.items.map((item) => ({productId:item.productId, exists:true, name:item.name || "", arcaVatRate:item.arcaVatRate, arcaVatRateSource:"paid-sale", active:true, deleted:false}))
+    : await loadFiscalProducts(items, { getDocument, env });
   const readiness = fiscalReadiness(fiscalProducts);
   const timestamp = nowIso(now);
 
@@ -298,6 +332,7 @@ export async function ensurePendingInvoice({
     if (error?.code !== "firebase-admin-already-exists") throw error;
     const raced = await getDocument(invoicePathFor(invoiceId), { env });
     if (!raced) throw error;
+    await assertInvoiceAssociation(invoiceId, raced.data);
     return {
       created: false,
       invoiceId,

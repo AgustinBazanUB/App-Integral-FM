@@ -107,7 +107,7 @@ test("Etapa 6: UI advierte pago simulado y no usa VITE para habilitar backend", 
   ]);
   assert.match(checkout, /Este checkout no procesa un pago real/);
   assert.match(checkout, /La acción simulará un pago aprobado/);
-  assert.match(checkout, /La factura fiscal puede ser real si la emisión productiva está habilitada/);
+  assert.match(checkout, /Se preparará un plan fiscal de prueba sin solicitar CAE/);
   assert.match(service, /ecommerce-simulated-payment/);
   assert.match(env, /^ECOMMERCE_SIMULATED_PAYMENT_ENABLED=false$/m);
   assert.doesNotMatch(checkout + service + env, /VITE_.*SIMULATED_PAYMENT/);

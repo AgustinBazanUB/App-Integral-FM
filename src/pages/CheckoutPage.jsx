@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Link } from "../router";
 import PageMeta from "../components/PageMeta";
@@ -67,12 +67,13 @@ export default function CheckoutPage() {
     clearCart,
   } = useCart();
   const { ready: catalogReady, config, pending, refresh: refreshCatalog } = useCommerceCatalog();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => readDraft().pendingOrder ? 3 : 0);
   const [draft, setDraft] = useState(readDraft);
   const [errors, setErrors] = useState({});
   const [storageMessage, setStorageMessage] = useState("");
   const [submitState, setSubmitState] = useState({ busy: false, error: "" });
   const [orderResult, setOrderResult] = useState(null);
+  const submitting = useRef(false);
   const [simulationCapability, setSimulationCapability] = useState({
     enabled: false,
     localRuntime: false,
@@ -154,8 +155,12 @@ export default function CheckoutPage() {
   };
 
   const submitOrder = async ({ simulatePayment = false } = {}) => {
+    if (submitting.current) return;
+    submitting.current = true;
     setSubmitState({ busy: true, error: "" });
     try {
+      let result = draft.pendingOrder ? { order: draft.pendingOrder } : null;
+      if (!result) {
       const latestCatalog = await refreshCatalog();
       if (!latestCatalog?.ready && latestCatalog?.pending?.includes("ECOMMERCE_LOCATION_ID")) {
         throw new Error("La ubicación de stock Ecommerce está PENDIENTE DE DEFINIR.");
@@ -164,7 +169,7 @@ export default function CheckoutPage() {
         throw new Error("El carrito cambió. Revisá precio y disponibilidad antes de confirmar.");
       }
 
-      const result = await createEcommerceOrder({
+      result = await createEcommerceOrder({
         requestId: draft.requestId,
         items: items.map((item) => ({
           productId: item.productId,
@@ -182,13 +187,15 @@ export default function CheckoutPage() {
         // Sólo diagnóstico: el backend NO usa este total como autoridad.
         clientTotal: knownSubtotal,
       });
+      setDraft((current) => ({ ...current, pendingOrder: result.order }));
+      }
 
       let finalOrder = result.order;
       let simulation = null;
       if (simulatePayment) {
         simulation = await simulateApprovedEcommercePayment({
           orderId: result.order.id,
-          idempotencyKey: draft.requestId,
+          idempotencyKey: result.order.idempotencyKey || draft.requestId,
           receiverCuit: draft.fiscalCuit,
         });
         finalOrder = {
@@ -212,19 +219,30 @@ export default function CheckoutPage() {
         payment_status: result.order.paymentStatus,
       });
     } catch (error) {
+      if (error?.phase === "invoice") {
+        setDraft((current) => ({ ...current, pendingOrder: current.pendingOrder ? {
+          ...current.pendingOrder, paymentStatus: error.payment?.status || current.pendingOrder.paymentStatus,
+          saleId: error.payment?.saleId || current.pendingOrder.saleId,
+          fiscalRetryPending: true,
+        } : null }));
+      }
       setSubmitState({
         busy: false,
-        error: error?.message || "No se pudo registrar el pedido.",
+        error: error?.phase === "invoice"
+          ? `El pago simulado y la venta quedaron registrados. Reintentá la preparación fiscal: ${error.message}`
+          : error?.message || "No se pudo registrar el pedido.",
       });
+    } finally {
+      submitting.current = false;
     }
   };
 
   const checkoutBlocked =
-    !catalogReady
+    !draft.pendingOrder && (!catalogReady
     || hasPendingPrices
     || hasUnavailableItems
     || (draft.deliveryMethod === "pickup" && !config.pickupEnabled)
-    || draft.deliveryMethod === "delivery";
+    || draft.deliveryMethod === "delivery");
 
   return (
     <main id="main-content" className="page-shell checkout-page">
@@ -285,7 +303,7 @@ export default function CheckoutPage() {
                 )}
                 <Link className="button button--gold" to="/productos">Seguir comprando</Link>
               </div>
-            ) : items.length ? (
+            ) : items.length || draft.pendingOrder ? (
               <>
                 {step === 0 ? (
                   <form onSubmit={(event) => event.preventDefault()}>
@@ -377,7 +395,7 @@ export default function CheckoutPage() {
                         <p>
                           Este checkout no procesa un pago real.
                           La acción simulará un pago aprobado.
-                          La factura fiscal puede ser real si la emisión productiva está habilitada.
+                          Se preparará un plan fiscal de prueba sin solicitar CAE.
                         </p>
                         <label className="field-label">
                           CUIT para facturación (opcional)
@@ -403,6 +421,9 @@ export default function CheckoutPage() {
                   <div>
                     <p className="eyebrow">PASO 4 DE 4</p>
                     <h2>Confirmar pedido</h2>
+                    {draft.pendingOrder?.fiscalRetryPending ? (
+                      <p role="status">El pago simulado y la venta ya están registrados. Podés reintentar el plan fiscal para este mismo pedido.</p>
+                    ) : null}
                     {checkoutBlocked ? (
                       <div className="pending-panel">
                         <strong>No se puede confirmar todavía.</strong>
@@ -436,10 +457,11 @@ export default function CheckoutPage() {
                       {step === 2 ? "Revisar pedido" : "Continuar"}
                     </button>
                   ) : (
+                    <>
                     <button
                       type="button"
                       className="button button--gold"
-                      disabled={checkoutBlocked || submitState.busy}
+                      disabled={checkoutBlocked || submitState.busy || Boolean(draft.pendingOrder)}
                       onClick={() => submitOrder()}
                     >
                       {submitState.busy ? "Registrando…" : "Crear pedido"}
@@ -451,9 +473,10 @@ export default function CheckoutPage() {
                         disabled={checkoutBlocked || submitState.busy}
                         onClick={() => submitOrder({ simulatePayment: true })}
                       >
-                        {submitState.busy ? "Procesando…" : "Simular pago aprobado + factura"}
+                        {submitState.busy ? "Procesando…" : draft.pendingOrder ? "Reintentar pago simulado + plan fiscal" : "Simular pago aprobado + factura"}
                       </button>
                     ) : null}
+                    </>
                   )}
                 </div>
               </>

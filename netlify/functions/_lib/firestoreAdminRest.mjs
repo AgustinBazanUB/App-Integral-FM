@@ -169,7 +169,11 @@ async function adminFetch(path, {
   method = "GET",
   query = "",
   body,
+  transaction,
 } = {}) {
+  if (transaction && method === "GET") {
+    query += `${query ? "&" : "?"}transaction=${encodeURIComponent(transaction)}`;
+  }
   const config = adminConfig(env);
   const token = await firebaseAdminAccessToken({ env, fetchImpl });
   const response = await fetchImpl(`${firestoreBase(config.projectId)}/${encodePath(path)}${query}`, {
@@ -186,6 +190,29 @@ async function adminFetch(path, {
 }
 
 export async function adminGetDocument(path, options = {}) {
+  if (options.transaction) {
+    const config = adminConfig(options.env);
+    const token = await firebaseAdminAccessToken(options);
+    const response = await (options.fetchImpl || fetch)(`${firestoreBase(config.projectId)}:batchGet`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ documents: [qualifiedDocumentName(config.projectId, path)], transaction: options.transaction }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error("No se pudo leer el snapshot comercial.");
+      error.code = ["ABORTED", "FAILED_PRECONDITION"].includes(payload.error?.status)
+        ? "firebase-admin-precondition-failed" : "firebase-admin-read-error";
+      error.status = response.status;
+      error.retryable = payload.error?.status === "ABORTED";
+      throw error;
+    }
+    const result = (Array.isArray(payload) ? payload : [payload]).find((entry) => entry.found || entry.missing);
+    if (result?.missing) return null;
+    if (result?.found) return documentFromResponse(result.found, path);
+    throw new Error("Firestore did not return the requested document.");
+  }
   const { response, payload } = await adminFetch(path, options);
   if (response.status === 404) return null;
   if (!response.ok) {
@@ -226,10 +253,14 @@ export async function adminPatchDocument(path, data, {
   requireExists = false,
   ...options
 } = {}) {
-  const queryParts = updateMask.map((field) => `updateMask.fieldPaths=${encodeURIComponent(field)}`);
   if (currentUpdateTime) {
-    queryParts.push(`currentDocument.updateTime=${encodeURIComponent(currentUpdateTime)}`);
-  } else if (requireExists) {
+    // Keep the compare-and-swap timestamp in the JSON precondition, avoiding
+    // query-string timestamp parsing differences in Firestore REST runtimes.
+    await adminCommitDocuments([{ type: "update", path, data, updateMask, currentUpdateTime }], options);
+    return adminGetDocument(path, options);
+  }
+  const queryParts = updateMask.map((field) => `updateMask.fieldPaths=${encodeURIComponent(field)}`);
+  if (requireExists) {
     queryParts.push("currentDocument.exists=true");
   }
   const query = queryParts.length ? `?${queryParts.join("&")}` : "";
@@ -259,12 +290,17 @@ export async function adminListDocuments(collectionPath, {
   pageSize = 500,
   env = process.env,
   fetchImpl = fetch,
+  transaction,
 } = {}) {
   const safePageSize = Math.min(500, Math.max(1, Number(pageSize) || 500));
+  const documents = [];
+  let pageToken = "";
+  do {
   const { response, payload } = await adminFetch(collectionPath, {
     env,
     fetchImpl,
-    query: `?pageSize=${safePageSize}`,
+    transaction,
+    query: `?pageSize=${safePageSize}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`,
   });
   if (!response.ok) {
     const error = new Error("No se pudo listar Firestore desde el backend.");
@@ -272,19 +308,22 @@ export async function adminListDocuments(collectionPath, {
     error.status = response.status;
     throw error;
   }
-  return (payload?.documents || []).map((document) => {
+  documents.push(...(payload?.documents || []).map((document) => {
     const parsed = documentFromResponse(document, collectionPath);
     return {
-      id: document.name.split("/").at(-1),
       ...parsed.data,
+      id: document.name.split("/").at(-1),
       __createTime: parsed.createTime,
       __updateTime: parsed.updateTime,
     };
-  });
+  }));
+  pageToken = payload.nextPageToken || "";
+  } while (pageToken);
+  return documents;
 }
 
 function qualifiedDocumentName(projectId, path) {
-  return `projects/${projectId}/databases/(default)/documents/${String(path || "").split("/").map(encodeURIComponent).join("/")}`;
+  return `projects/${projectId}/databases/(default)/documents/${String(path || "")}`;
 }
 
 function commitWriteForOperation(operation, projectId) {
@@ -334,8 +373,10 @@ function commitWriteForOperation(operation, projectId) {
 export async function adminCommitDocuments(operations = [], {
   env = process.env,
   fetchImpl = fetch,
+  transaction,
 } = {}) {
-  if (!Array.isArray(operations) || !operations.length) return { writeResults: [] };
+  if (!Array.isArray(operations)) throw new TypeError("Firestore operations must be an array.");
+  if (!operations.length && !transaction) return { writeResults: [] };
   const config = adminConfig(env);
   const token = await firebaseAdminAccessToken({ env, fetchImpl });
   const writes = operations.map((operation) => commitWriteForOperation(operation, config.projectId));
@@ -348,11 +389,11 @@ export async function adminCommitDocuments(operations = [], {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ writes }),
+      body: JSON.stringify({ writes, ...(transaction ? { transaction } : {}) }),
     },
   );
   const payload = await response.json().catch(() => ({}));
-  if (response.status === 409 || payload?.error?.status === "ALREADY_EXISTS") {
+  if (payload?.error?.status === "ALREADY_EXISTS" || (response.status === 409 && !payload?.error?.status)) {
     const error = new Error("Uno de los documentos ya existe.");
     error.code = "firebase-admin-already-exists";
     error.status = 409;
@@ -362,6 +403,7 @@ export async function adminCommitDocuments(operations = [], {
     const error = new Error("Los datos cambiaron antes de completar la escritura.");
     error.code = "firebase-admin-precondition-failed";
     error.status = 409;
+    error.retryable = payload?.error?.status === "ABORTED";
     throw error;
   }
   if (!response.ok) {
@@ -371,4 +413,62 @@ export async function adminCommitDocuments(operations = [], {
     throw error;
   }
   return payload;
+}
+
+// All commercial reads use the same read/write transaction. Firestore checks
+// its read set at commit, including documents that are not being written.
+async function runTransactionAttempt(work, { env = process.env, fetchImpl = fetch } = {}) {
+  const config = adminConfig(env);
+  const token = await firebaseAdminAccessToken({ env, fetchImpl });
+  const request = async (action, body) => {
+    const response = await fetchImpl(`${firestoreBase(config.projectId)}:${action}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error("No se pudo completar la transacción comercial.");
+      error.code = ["ABORTED", "FAILED_PRECONDITION"].includes(payload.error?.status)
+        ? "firebase-admin-precondition-failed" : "firebase-admin-transaction-error";
+      error.status = response.status;
+      error.retryable = payload.error?.status === "ABORTED";
+      throw error;
+    }
+    return payload;
+  };
+  const { transaction } = await request("beginTransaction", { options: { readWrite: {} } });
+  if (!transaction) throw new Error("Firestore did not provide a transaction.");
+  let committed = false;
+  const options = { env, fetchImpl, transaction };
+  try {
+    return await work({
+      getDocument: (path) => {
+        if (committed) throw new Error("Transaction reads must precede writes.");
+        return adminGetDocument(path, options);
+      },
+      listDocuments: (path) => {
+        if (committed) throw new Error("Transaction reads must precede writes.");
+        return adminListDocuments(path, options);
+      },
+      commitDocuments: async (operations) => {
+        if (committed) throw new Error("Transaction already committed.");
+        const result = await adminCommitDocuments(operations, options);
+        committed = true;
+        return result;
+      },
+    });
+  } finally {
+    if (!committed) await request("rollback", { transaction }).catch(() => {});
+  }
+}
+
+export async function adminRunTransaction(work, options = {}) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try { return await runTransactionAttempt(work, options); }
+    catch (error) {
+      if (!error.retryable || attempt === 2) throw error;
+      await new Promise((resolve) => setTimeout(resolve, (30 + Math.floor(Math.random() * 60)) * (attempt + 1)));
+    }
+  }
 }

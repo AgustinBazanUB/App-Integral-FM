@@ -67,7 +67,7 @@ test("simulación Etapa 6 exige capability backend, admin y advertencia fiscal e
   ]);
   assert.match(checkout, /Este checkout no procesa un pago real/);
   assert.match(checkout, /La acción simulará un pago aprobado/);
-  assert.match(checkout, /La factura fiscal puede ser real si la emisión productiva está habilitada/);
+  assert.match(checkout, /Se preparará un plan fiscal de prueba sin solicitar CAE/);
   assert.match(service, /ecommerce-simulated-payment/);
   assert.match(endpoint, /requireFirebaseAdmin/);
   assert.match(endpoint, /provider: "simulation"/);

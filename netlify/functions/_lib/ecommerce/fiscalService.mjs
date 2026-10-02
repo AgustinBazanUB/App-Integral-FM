@@ -65,8 +65,10 @@ async function receiverForCuit(cuit, {
 }
 
 export async function resolveEcommerceReceiver({ cuit = "" } = {}, options = {}) {
-  const digits = String(cuit || "").replace(/\D/g, "");
-  if (!digits) return receiverForConsumerFinal();
+  if (typeof cuit !== "string") throw commerceError("ecommerce-receiver-cuit-invalid", "El CUIT debe ser texto válido.", 400);
+  if (!cuit.trim()) return receiverForConsumerFinal();
+  if (!/^\d{2}-?\d{8}-?\d$/.test(cuit.trim())) throw commerceError("ecommerce-receiver-cuit-invalid", "Ingresá un CUIT válido o dejalo vacío.", 400);
+  const digits = cuit.replace(/\D/g, "");
   return receiverForCuit(digits, options);
 }
 
@@ -102,7 +104,7 @@ function assertPaidEcommerceOperation({ order, payment, sale, idempotencyKey }) 
       ? order.paymentProvider === "simulation"
       : order.paymentStatus === "approved" && order.paymentProvider === "payway"
   );
-  if (!allowedPayment || payment.status !== order.paymentStatus || sale.paymentStatus !== order.paymentStatus) {
+  if (!allowedPayment || order.status !== "confirmed" || payment.currency !== "ARS" || payment.provider !== order.paymentProvider || sale.paymentProvider !== order.paymentProvider || payment.status !== order.paymentStatus || sale.paymentStatus !== order.paymentStatus) {
     throw commerceError("ecommerce-payment-not-approved", "La venta no tiene un pago aprobado válido para facturar.", 409);
   }
   if (order.saleId !== sale.id || payment.saleId !== sale.id) {
@@ -134,18 +136,19 @@ export async function prepareEcommerceInvoiceFiscal({
   mockAuthorizeFn = null,
 } = {}) {
   assertProductionPrepareGate(env);
+  if (typeof mockAuthorizeFn === "function" && env.NODE_ENV !== "test") throw commerceError("ecommerce-mock-authorize-test-only", "El mock fiscal sólo se permite en tests.", 403);
   const stableKey = normalizeEcommerceRequestId(idempotencyKey);
   const safeOrderId = String(orderId || "").trim();
   const orderSnapshot = await getDocument(`orders/${safeOrderId}`, { env });
-  const order = orderSnapshot?.data ? { id: safeOrderId, ...orderSnapshot.data } : null;
+  const order = orderSnapshot?.data ? { ...orderSnapshot.data, id: safeOrderId } : null;
   const paymentId = String(order?.paymentId || "").trim();
   const saleId = String(order?.saleId || "").trim();
   const [paymentSnapshot, saleSnapshot] = await Promise.all([
     paymentId ? getDocument(`payments/${paymentId}`, { env }) : null,
     saleId ? getDocument(`sales/${saleId}`, { env }) : null,
   ]);
-  const payment = paymentSnapshot?.data ? { id: paymentId, ...paymentSnapshot.data } : null;
-  const sale = saleSnapshot?.data ? { id: saleId, ...saleSnapshot.data } : null;
+  const payment = paymentSnapshot?.data ? { ...paymentSnapshot.data, id: paymentId } : null;
+  const sale = saleSnapshot?.data ? { ...saleSnapshot.data, id: saleId } : null;
   assertPaidEcommerceOperation({ order, payment, sale, idempotencyKey: stableKey });
 
   const receiver = await resolveEcommerceReceiver({ cuit: receiverCuit }, {
@@ -164,6 +167,11 @@ export async function prepareEcommerceInvoiceFiscal({
     now,
     getDocument,
   });
+
+  const snapshot = invoiceResult.invoice?.receiverSnapshot;
+  if (!snapshot || snapshot.vatConditionId !== receiver.vatConditionId || snapshot.documentType !== receiver.documentType || snapshot.documentNumber !== receiver.documentNumber || snapshot.anonymousConsumerFinal !== receiver.anonymousConsumerFinal) {
+    throw commerceError("ecommerce-invoice-receiver-conflict", "La factura existente pertenece a otro receptor. No se creó otra factura.", 409);
+  }
 
   await syncInvoiceFn({
     invoiceId: invoiceResult.invoiceId,

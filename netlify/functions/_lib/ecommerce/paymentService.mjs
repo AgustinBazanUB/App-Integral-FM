@@ -1,6 +1,7 @@
 import {
   adminCommitDocuments,
   adminGetDocument,
+  adminRunTransaction,
 } from "../firestoreAdminRest.mjs";
 import {
   commerceError,
@@ -9,6 +10,7 @@ import {
   normalizeEcommerceRequestId,
   prepareAuthoritativeCheckout,
 } from "./commerceDomain.mjs";
+import { createHash } from "node:crypto";
 import { confirmPayment } from "./paymentContract.mjs";
 
 function saleCodeFor(requestId) {
@@ -24,10 +26,10 @@ async function loadAuthoritativeInputs({ requestedItems, locationId, env, getDoc
     ]);
     return [
       productId,
-      productSnapshot ? { id: productId, ...productSnapshot.data } : null,
+      productSnapshot ? { ...productSnapshot.data, id: productId } : null,
       stockSnapshot ? {
-        id: productId,
         ...stockSnapshot.data,
+        id: productId,
         __updateTime: stockSnapshot.updateTime || stockSnapshot.data?.__updateTime || null,
       } : null,
     ];
@@ -39,7 +41,7 @@ async function loadAuthoritativeInputs({ requestedItems, locationId, env, getDoc
 }
 
 function publicOrder(orderId, order = {}) {
-  return { id: orderId, ...order };
+  return { ...order, id: orderId };
 }
 
 function normalizedOrderItems(items = []) {
@@ -123,6 +125,9 @@ export async function confirmEcommercePayment({
   getDocument = adminGetDocument,
   commitDocuments = adminCommitDocuments,
 } = {}) {
+  if (getDocument === adminGetDocument && commitDocuments === adminCommitDocuments) {
+    return adminRunTransaction((transaction) => confirmEcommercePayment({ orderId, idempotencyKey, provider, status, reference, actor, env, now, ...transaction }), {env});
+  }
   const safeOrderId = String(orderId || "").trim();
   if (!/^ecommerce_order_[A-Za-z0-9_-]{8,96}$/.test(safeOrderId)) {
     throw commerceError("ecommerce-order-id-invalid", "El pedido Ecommerce no es válido.", 400);
@@ -149,10 +154,8 @@ export async function confirmEcommercePayment({
       409,
     );
   }
-  if (sameFinalPayment(order, confirmation)) {
-    return paymentResult(safeOrderId, order, { idempotent: true });
-  }
-  if (["approved", "simulated_approved", "rejected", "cancelled"].includes(String(order.paymentStatus || ""))) {
+  const replay = sameFinalPayment(order, confirmation);
+  if (!replay && ["approved", "simulated_approved", "rejected", "cancelled"].includes(String(order.paymentStatus || ""))) {
     throw commerceError(
       "ecommerce-payment-transition-conflict",
       "El pago ya tiene un estado final incompatible con esta confirmación.",
@@ -163,13 +166,22 @@ export async function confirmEcommercePayment({
   const paymentId = String(order.paymentId || "").trim();
   const paymentSnapshot = paymentId ? await getDocument(`payments/${paymentId}`, { env }) : null;
   const payment = paymentSnapshot?.data || null;
-  if (!payment || payment.orderId !== safeOrderId || String(payment.idempotencyKey || "") !== stableKey) {
+  if (!payment || paymentId !== `ecommerce_payment_${stableKey}` || payment.sourceType !== "ecommerce" || payment.orderId !== safeOrderId || String(payment.idempotencyKey || "") !== stableKey) {
     throw commerceError("ecommerce-payment-invalid", "El pago asociado al pedido no es válido.", 409);
   }
   if (Number(payment.amount) !== Number(order.total) || payment.currency !== "ARS") {
     throw commerceError("ecommerce-payment-amount-conflict", "El monto del pago no coincide con el pedido.", 409);
   }
 
+  if (replay) {
+    if (payment.status !== confirmation.paymentStatus || payment.provider !== confirmation.paymentProvider || payment.providerReference !== confirmation.reference || payment.saleId !== order.saleId) {
+      throw commerceError("ecommerce-payment-transition-conflict", "El pago persistido no coincide con el pedido.", 409);
+    }
+    return paymentResult(safeOrderId, order, {idempotent:true});
+  }
+  if (payment.status !== "pending" || order.paymentStatus !== "pending" || order.status !== "pending_payment") {
+    throw commerceError("ecommerce-payment-transition-conflict", "El pago o pedido no está pendiente.", 409);
+  }
   const timestamp = now instanceof Date ? now : new Date(now);
   const approved = ["approved", "simulated_approved"].includes(confirmation.paymentStatus);
   const operations = [];
@@ -255,7 +267,7 @@ export async function confirmEcommercePayment({
     for (const item of prepared.items) {
       const stock = stocksById[item.productId];
       const newStock = item.availableStock - item.quantity;
-      const safeProductId = item.productId.replace(/[^A-Za-z0-9_-]/g, "_");
+      const safeProductId = createHash("sha256").update(item.productId).digest("hex").slice(0,32);
       const movementId = `ecommerce_${stableKey}_${safeProductId}`;
       operations.push({
         type: "update",
@@ -331,6 +343,7 @@ export async function confirmEcommercePayment({
   try {
     await commitDocuments(operations, { env });
   } catch (error) {
+    if (error?.retryable) throw error;
     if (["firebase-admin-already-exists", "firebase-admin-precondition-failed"].includes(error?.code)) {
       const raced = await getDocument(`orders/${safeOrderId}`, { env });
       if (raced?.data && sameFinalPayment(raced.data, confirmation)) {

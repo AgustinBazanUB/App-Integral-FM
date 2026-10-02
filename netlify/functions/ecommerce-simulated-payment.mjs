@@ -37,9 +37,10 @@ export default async function handler(request) {
       });
     }
 
+    if (body?.mode !== "simulate-approved") return json({ok:false, code:"ecommerce-simulation-mode-invalid", message:"Acción inválida."},400);
     const orderId = String(body?.orderId || "").trim();
     const idempotencyKey = String(body?.idempotencyKey || "").trim();
-    const reference = `simulation:${orderId}:${idempotencyKey}`;
+    const reference = `simulation:${orderId}`;
     paymentResult = await confirmEcommercePayment({
       orderId,
       idempotencyKey,
@@ -58,7 +59,7 @@ export default async function handler(request) {
     const fiscal = await prepareEcommerceInvoiceFiscal({
       orderId,
       idempotencyKey,
-      receiverCuit: body?.receiverCuit || "",
+      receiverCuit: body?.receiverCuit ?? "",
       requestedBy: session.uid,
       requestedByName: session.profile?.name || session.email || null,
       env: process.env,

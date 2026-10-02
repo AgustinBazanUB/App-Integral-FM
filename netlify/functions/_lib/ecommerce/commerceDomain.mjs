@@ -24,8 +24,8 @@ export function ecommercePickupEnabled(env = process.env) {
 }
 
 export function normalizeEcommerceRequestId(value) {
-  const normalized = String(value || "").trim().replace(/[^A-Za-z0-9_-]/g, "");
-  if (normalized.length < 8 || normalized.length > 96) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (!/^([A-Za-z0-9_-]{8,96})$/.test(normalized)) {
     throw commerceError(
       "ecommerce-request-id-invalid",
       "No se pudo identificar de forma segura el intento de compra.",
@@ -45,7 +45,7 @@ export function normalizeCheckoutItems(items) {
     if (!productId || productId.includes("/")) {
       throw commerceError("ecommerce-product-id-invalid", "Uno de los productos no es válido.", 400);
     }
-    const quantity = Number(raw?.quantity ?? raw?.qty);
+    const quantity = numberOrNull(raw?.quantity ?? raw?.qty);
     if (!Number.isInteger(quantity) || quantity <= 0) {
       throw commerceError("ecommerce-quantity-invalid", "Las cantidades deben ser números enteros mayores a cero.", 400);
     }
@@ -64,7 +64,7 @@ export function normalizeCheckoutItems(items) {
 }
 
 function numberOrNull(value) {
-  if (value === "" || value == null) return null;
+  if (!["string", "number"].includes(typeof value) || (typeof value === "string" && !value.trim())) return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -121,7 +121,7 @@ export function authoritativeVatRate(product = {}) {
 }
 
 export function currentStockQuantity(stock = {}) {
-  const value = Number(stock.currentStock);
+  const value = numberOrNull(stock.currentStock);
   if (!Number.isInteger(value) || value < 0) {
     throw commerceError("ecommerce-stock-invalid", "El stock comercial tiene un valor inválido.", 409);
   }

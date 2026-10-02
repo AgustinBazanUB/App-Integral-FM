@@ -2711,6 +2711,7 @@ input::placeholder {
 }
 
 .integration-state p {
+  overflow-wrap: anywhere;
   max-width: 560px;
   color: var(--text-secondary);
 }

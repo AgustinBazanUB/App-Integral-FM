@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import {
   adminCommitDocuments,
   adminGetDocument,
+  adminRunTransaction,
   adminListDocuments,
 } from "../firestoreAdminRest.mjs";
 import {
@@ -14,6 +15,7 @@ import {
   normalizeCustomer,
   normalizeEcommerceRequestId,
   prepareAuthoritativeCheckout,
+  resolveRequestedPaymentStatus,
 } from "./commerceDomain.mjs";
 
 const docsById = (documents = []) => Object.fromEntries(
@@ -104,7 +106,7 @@ export async function loadEcommerceCatalog({
 
   const stocks = await Promise.all(products.map(async (product) => {
     const stockSnapshot = await getDocument(`locationStock/${locationId}/items/${product.id}`, { env });
-    return stockSnapshot ? { id: stockSnapshot.path?.split("/").at(-1) || product.id, ...stockSnapshot.data } : null;
+    return stockSnapshot ? { ...stockSnapshot.data, id: stockSnapshot.path?.split("/").at(-1) || product.id } : null;
   }));
 
   return {
@@ -155,6 +157,10 @@ export async function createEcommerceOrder({
   getDocument = adminGetDocument,
   commitDocuments = adminCommitDocuments,
 } = {}) {
+  resolveRequestedPaymentStatus(body?.paymentMode);
+  if (getDocument === adminGetDocument && commitDocuments === adminCommitDocuments) {
+    return adminRunTransaction((transaction) => createEcommerceOrder({body, env, now, ...transaction}), {env});
+  }
   const requestId = normalizeEcommerceRequestId(body?.requestId);
   const requestFingerprint = checkoutRequestFingerprint(body || {});
   const ids = deterministicIds(requestId);
@@ -170,7 +176,7 @@ export async function createEcommerceOrder({
     return {
       created: false,
       idempotent: true,
-      order: { id: ids.orderId, ...existing.data },
+      order: { ...existing.data, id: ids.orderId },
     };
   }
 
@@ -196,10 +202,10 @@ export async function createEcommerceOrder({
     ]);
     return [
       productId,
-      productSnapshot ? { id: productId, ...productSnapshot.data } : null,
+      productSnapshot ? { ...productSnapshot.data, id: productId } : null,
       stockSnapshot ? {
-        id: productId,
         ...stockSnapshot.data,
+        id: productId,
         __updateTime: stockSnapshot.updateTime || null,
       } : null,
     ];
@@ -360,6 +366,7 @@ export async function createEcommerceOrder({
   try {
     await commitDocuments(operations, { env });
   } catch (error) {
+    if (error?.retryable) throw error;
     if (error?.code === "firebase-admin-already-exists") {
       const existingAfterRace = await getDocument(`orders/${ids.orderId}`, { env });
       if (existingAfterRace) {
@@ -373,7 +380,7 @@ export async function createEcommerceOrder({
         return {
           created: false,
           idempotent: true,
-          order: { id: ids.orderId, ...existingAfterRace.data },
+          order: { ...existingAfterRace.data, id: ids.orderId },
         };
       }
     }
