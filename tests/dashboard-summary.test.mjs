@@ -5,7 +5,7 @@ import { SINGLE_PAYMENT_METHODS, PAYMENT_LABELS } from "../src/modules/locations
 import { summarizeSales, buildPeriodSalesSeries } from "../src/modules/locations/domain/dashboard.js";
 import { argentinaPeriodRange } from "../src/modules/locations/domain/time.js";
 import { applyMetricsFilters, calculateMetrics } from "../src/modules/locations/domain/metrics.js";
-import { alertContextPath, prioritizeAlerts } from "../src/modules/alerts/domain/alerts.js";
+import { alertContextPath, alertPresentation, groupActiveAlerts, prioritizeAlerts } from "../src/modules/alerts/domain/alerts.js";
 
 const sale = (id, total, date, extra = {}) => ({ id, total, createdAt: new Date(date), status: "active", paymentMethod: "cash", locationId: "local", ...extra });
 
@@ -78,6 +78,26 @@ test("alertas críticas antiguas preceden preventivas y avisos; se excluyen cerr
   ];
   assert.deepEqual(prioritizeAlerts(alerts).map((alert) => alert.id), ["red", "yellow", "info"]);
   assert.equal(alerts[0].id, "info");
+});
+
+test("campanita agrupa pendientes en rojo, amarillo y verde sin duplicar ni contar cerradas", () => {
+  const alerts = [
+    { id: "notice", status: "new" },
+    { id: "warning", color: "amarilla" },
+    { id: "critical", severity: "critical" },
+    { id: "closed", status: "resolved", severity: "critical" },
+    { id: "inactive", active: false },
+  ];
+  const groups = groupActiveAlerts(alerts);
+  assert.deepEqual(groups.map((group) => [group.key, group.alerts.map((alert) => alert.id)]), [
+    ["critical", ["critical"]], ["preventive", ["warning"]], ["notice", ["notice"]],
+  ]);
+  assert.equal(groups.reduce((count, group) => count + group.alerts.length, 0), 3);
+  assert.equal(alertPresentation(alerts[0]).tone, "success");
+  assert.equal(alertPresentation(alerts[1]).tone, "warning");
+  assert.equal(alertPresentation(alerts[2]).tone, "error");
+  assert.equal(alerts.length, 5);
+  assert.deepEqual(groupActiveAlerts().map((group) => group.alerts.length), [0, 0, 0]);
 });
 
 test("alertas navegan al stock, ubicación o módulo sin salir de rutas autorizadas", () => {

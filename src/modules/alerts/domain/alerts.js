@@ -15,7 +15,7 @@ export function alertPresentation(alert = {}) {
   const values = [alert.severity, alert.priority, alert.color, alert.status].map((value) => String(value || "").toLowerCase());
   if (values.some((value) => criticalValues.has(value))) return { rank: 0, tone: "error", label: "Crítica" };
   if (values.some((value) => warningValues.has(value))) return { rank: 1, tone: "warning", label: "Preventiva" };
-  return { rank: 2, tone: "info", label: "Aviso" };
+  return { rank: 2, tone: "success", label: "Aviso" };
 }
 
 /** @param {Alert} alert */
@@ -30,6 +30,19 @@ export function prioritizeAlerts(alerts = []) {
   return alerts.filter(isActiveAlert).slice().sort((a, b) =>
     alertPresentation(a).rank - alertPresentation(b).rank || updatedTime(b) - updatedTime(a) || String(a.id).localeCompare(String(b.id)),
   );
+}
+
+/** Agrupa los mismos pendientes sin crear estados de lectura ni notificaciones paralelas.
+ * @param {Alert[]} alerts
+ */
+export function groupActiveAlerts(alerts = []) {
+  const groups = [
+    { rank: 0, key: "critical", label: "Críticas", alerts: [] },
+    { rank: 1, key: "preventive", label: "Preventivas", alerts: [] },
+    { rank: 2, key: "notice", label: "Avisos", alerts: [] },
+  ];
+  for (const alert of prioritizeAlerts(alerts)) groups[alertPresentation(alert).rank].alerts.push(alert);
+  return groups;
 }
 
 // Sólo usamos relaciones conocidas y rutas internas. Sin origen, se abre Alertas.

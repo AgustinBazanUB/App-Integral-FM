@@ -23,7 +23,7 @@ import { Link, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
 import DashboardFilters from "../components/DashboardFilters";
 import DashboardPayments from "../components/DashboardPayments";
-import DashboardAlerts from "../components/DashboardAlerts";
+import DashboardAlerts, { DashboardAlertsBell } from "../components/DashboardAlerts";
 import { dashboardGreeting, summarizeDashboardPayments } from "../dashboardPresentation";
 import { Icon } from "../components/icons";
 import { formatMoney } from "../formatters";
@@ -35,6 +35,7 @@ import {
   listSalesByRange,
 } from "../services/dashboardService";
 import { invalidateSharedLocations, listLocationsShared } from "../services/sharedResources";
+import { listActiveAlerts } from "../services/alertsService";
 
 const SESSION_FORMAT_KEY = "fm-dashboard-period-format";
 const VALID_FORMATS = new Set(["year", "month", "week", "day"]);
@@ -92,6 +93,7 @@ export default function DashboardPage() {
   }, [format]);
 
   const locationsResult = useAsyncData(() => listLocationsShared(profile), [profile]);
+  const alertsResult = useAsyncData(() => listActiveAlerts(profile), [profile]);
   const locations = useMemo(() => locationsResult.data || [], [locationsResult.data]);
   const activeLocations = useMemo(
     () => locations.filter((location) => locationActivity(location).active),
@@ -158,7 +160,7 @@ export default function DashboardPage() {
   const canLoadStock = can(profile, "locations", "loadStock") || can(profile, "locations", "adjustStock");
 
   return (
-    <div className="fm-page-enter">
+    <div className="fm-page-enter fm-dashboard-page">
       <HeroBanner
         eyebrow="Panel general"
         title={dashboardGreeting(profile.name)}
@@ -180,6 +182,7 @@ export default function DashboardPage() {
           </div>
         ) : null}
       >
+        <DashboardAlertsBell profile={profile} allowedLocationIds={allowedLocationIds} result={alertsResult} />
         <div className="fm-hero-banner__quote">
           <span>Flor Mía</span>
           <strong>gestión con raíces</strong>
@@ -223,8 +226,6 @@ export default function DashboardPage() {
         </>
       ) : null}
 
-      <DashboardAlerts profile={profile} allowedLocationIds={allowedLocationIds} />
-
       {metricsReady ? (
         <>
           <section className="fm-two-column-grid">
@@ -250,6 +251,8 @@ export default function DashboardPage() {
           ) : null}
         </>
       ) : null}
+
+      <DashboardAlerts profile={profile} allowedLocationIds={allowedLocationIds} result={alertsResult} />
 
       <Panel title="Tus módulos" description="El menú y estos accesos se generan desde los permisos de tu perfil.">
         <div className="fm-module-grid">

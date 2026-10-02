@@ -28,12 +28,12 @@ No se modificará ARCA, ni se sumarán facturas a ventas, ni se crearán agregad
 
 | Archivo | Cambio |
 | --- | --- |
-| `src/gestion/pages/DashboardPage.jsx` | Saludo por hora de Buenos Aires; eliminación de la actividad y sus consultas; pagos del mismo dataset; alertas antes de los gráficos; módulos disponibles durante loading/error; reintentos controlados; picker de stock con loading/error y revalidación del estado operativo al navegar. |
+| `src/gestion/pages/DashboardPage.jsx` | Saludo por hora de Buenos Aires; eliminación de la actividad y sus consultas; pagos del mismo dataset; campanita en el encabezado y alertas debajo de ritmo/formas de pago; módulos disponibles durante loading/error; reintentos controlados; picker de stock con loading/error y revalidación del estado operativo al navegar. |
 | `src/gestion/dashboardPresentation.js` | Selectores de saludo y distribución de cobros. Reutiliza `summarizeSales`, configuración central y `salePaymentParts`. |
 | `src/gestion/components/DashboardPayments.jsx` | Barras de participación, alternancia porcentaje/monto y consulta del segmento por mouse/teclado; categorías con cero; estados vacíos e información de cobros sin clasificación. |
-| `src/gestion/components/DashboardAlerts.jsx` | Vista resumida independiente de la consulta comercial; seis alertas prioritarias, estados propios y enlaces autorizados. |
+| `src/gestion/components/DashboardAlerts.jsx` | Campanita con contador y desplegable animado; resumen de seis alertas debajo de pagos; grupos rojo/amarillo/verde, estados propios y enlaces autorizados. Ambas vistas reciben el mismo resultado de la única consulta del Panel. |
 | `src/gestion/services/alertsService.js` | Lectura de la colección configurada por el módulo Alertas, sólo `active=true`, caché compartida de 30 segundos y solicitudes simultáneas deduplicadas. Para no administradores se consulta su `responsibleId`, conforme a las reglas existentes. |
-| `src/modules/alerts/domain/alerts.js` | Exclusión de cerradas/eliminadas, prioridad estable y resolución del contexto. Sin severidad se presenta un aviso; no se asigna criticidad por un umbral inventado. |
+| `src/modules/alerts/domain/alerts.js` | Exclusión de cerradas/eliminadas, prioridad estable y resolución del contexto. Agrupación compartida crítica/preventiva/aviso. Sin severidad se presenta un aviso verde; no se asigna criticidad por un umbral inventado. |
 | `src/gestion/services/dashboardService.js` | Invalidación explícita de caché para reintentar; consultas de ventas y servicio de Actividad conservados. |
 | `src/styles/dashboard-filters.css` | Controles y alertas accesibles, tokens existentes, barras con escala y etiquetas espaciadas en pantallas pequeñas. |
 | `tests/dashboard-summary.test.mjs` | Pagos múltiples, facturadas, descuentos, anulaciones, deduplicación, rangos, ausencia de ventas, priorización y navegación por permisos. |
@@ -59,8 +59,8 @@ Las relaciones implementadas de alertas son `locationId` y contexto de stock (`p
 
 ## Validación
 
-- Suite completa `node --test tests/*.test.mjs`: **444 tests pasados**, sin fallos ni skips. Incluye los tests existentes de ARCA, vendedor, ubicaciones, stock, Métricas y Actividad, además de los nuevos tests del Panel.
-- Suite focalizada del Panel (`dashboard-summary`, `dashboard-services`, `dashboard-filters`): **21 tests pasados**.
+- Suite completa `node --test tests/*.test.mjs`: **445 tests pasados**, sin fallos ni skips. Incluye los tests existentes de ARCA, vendedor, ubicaciones, stock, Métricas y Actividad, además de los nuevos tests del Panel.
+- Suite focalizada del Panel (`dashboard-summary`, `dashboard-services`, `dashboard-filters`): **22 tests pasados**.
 - Lint focalizado con ESLint: sin errores de variables, referencias, claves duplicadas, código inalcanzable o condiciones constantes en los archivos cambiados.
 - Typecheck focalizado con TypeScript 5.9.3, `allowJs/checkJs`, sin emisión: **0 errores** en los nuevos selectores y servicio de alertas. La base es JS/JSX y no tiene `tsconfig`, scripts de lint/typecheck ni tipos declarados para todas las props del design system. Una comprobación ampliada de JSX/servicios antiguos detecta errores heredados de inferencia (props opcionales interpretadas como obligatorias y tipos de constraints); no se hizo una migración global fuera del alcance. Los componentes también se verifican por compilación y smoke real de navegador.
 - Builds `npm run build`, `npm run build:gestion` y `npm run build:ecommerce`: correctos. Continúa la advertencia existente de chunks superiores a 500 kB.
@@ -77,3 +77,12 @@ Las relaciones implementadas de alertas son `locationId` y contexto de stock (`p
 5. Las cachés pueden demorar hasta 60 segundos (ventas) y 30 segundos (ubicaciones/alertas) la incorporación de cambios de otro usuario. Los reintentos por error invalidan ventas y ubicaciones; no se agregaron listeners ni agregados nuevos.
 6. Períodos largos o volúmenes altos todavía leen todas las ventas del rango necesario. No se introdujo un resumen persistido de integridad desconocida. Los promedios por horarios, feriados y comparaciones históricas pertenecen a Métricas, no al Panel.
 7. El smoke usa datos sintéticos y valida el Panel y su navegación; no sustituye una prueba con la sesión administrativa real y el despliegue efectivo de índices/permisos en Firestore. No se ejecutó E2E pesado ni se escribieron ventas/stock/alertas reales.
+
+## Ajuste visual solicitado — campanita de alertas
+
+- Se agregó una campanita en la esquina superior derecha del encabezado, también visible en móvil. Su contador representa todas las alertas activas autorizadas, no un estado de «no leídas». El color del contador responde a la prioridad más alta disponible; cero pendientes no muestra una insignia y un error se indica con `!`, sin fingir ausencia de alertas.
+- El desplegable muestra críticas/rojas, preventivas/amarillas y avisos/verdes. Los grupos vacíos se omiten. Abre con una transición breve y un movimiento de la campana; respeta `prefers-reduced-motion`. Reutiliza `AnchoredPopover`, con posicionamiento portal, cierre al tocar afuera o Escape y devolución del foco. La lista tiene scroll interno para volúmenes altos.
+- El bloque de Alertas activas quedó debajo de la fila de Ritmo de ventas/Formas de pago y antes de Tus módulos. Comparte agrupación, contenido y errores con la campanita; el resumen conserva las seis de mayor prioridad y el desplegable permite consultar todos los pendientes cargados.
+- `useAsyncData(listActiveAlerts)` se elevó a `DashboardPage`; abrir/cerrar la campanita y cambiar día/mes no ejecuta otra consulta. Se conserva la caché central de 30 segundos. No se introdujeron listeners, marcas de lectura, bajas automáticas ni un sistema paralelo de notificaciones. La actualización de alertas conserva el comportamiento de carga/reintento del Panel y no promete recepción en tiempo real.
+- Los enlaces mantienen los permisos y relaciones de origen ya implementados. No se tocó el módulo ARCA, ventas, stock, servicios de pagos ni las reglas de Firestore.
+- Verificación de esta revisión: 445 tests pasados, 22 focalizados, lint y typecheck focalizados sin errores; build de Gestión correcto con la advertencia heredada de chunks. Navegador integrado: contador, tres grupos, cero pendientes, error de consulta, cierre por Escape/exterior, navegación al stock y contador estable con día/mes; desplegable revisado a 320/390/1366 px y restauración del tamaño normal. En 320 px con barras de scroll de escritorio, el `body` global heredado conserva `min-width:320px`; el desplegable cabe dentro del ancho útil y en 390 px no desborda. El smoke visual usa datos sintéticos y destinos de prueba, sin escribir datos reales. Diff fiscal respecto a la base ARCA: vacío.

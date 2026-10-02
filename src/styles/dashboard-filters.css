@@ -112,3 +112,45 @@
   .fm-dashboard-period-trigger,
   .fm-dashboard-calendar button { transition: none; }
 }
+
+/* Campanita y resumen: una sola fuente de alertas activas. */
+.fm-dashboard-page .fm-hero-banner__aside { display: grid; justify-items: end; align-self: flex-start; gap: 8px; }
+.fm-dashboard-alert-bell { position: relative; display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid rgb(255 253 248 / 35%); border-radius: 50%; background: rgb(255 253 248 / 10%); color: #fffdf8; cursor: pointer; transition: background 160ms ease, box-shadow 160ms ease; }
+.fm-dashboard-alert-bell:hover, .fm-dashboard-alert-bell[aria-expanded="true"] { background: rgb(255 253 248 / 22%); box-shadow: 0 0 0 4px rgb(255 253 248 / 7%); }
+.fm-dashboard-alert-bell > svg { width: 23px; height: 23px; transform-origin: 50% 15%; }
+.fm-dashboard-alert-bell[aria-expanded="true"] > svg { animation: fm-alert-bell-ring 420ms ease; }
+.fm-dashboard-alert-bell__count { position: absolute; top: -4px; right: -5px; display: grid; place-items: center; min-width: 23px; height: 23px; padding: 0 5px; border: 2px solid #493222; border-radius: 20px; background: #b93a35; color: #fff; font-size: 11px; font-weight: 700; }
+.fm-dashboard-alert-bell--preventive .fm-dashboard-alert-bell__count { background: #f0c65a; color: #49370d; }
+.fm-dashboard-alert-bell--notice .fm-dashboard-alert-bell__count { background: #287348; }
+.fm-dashboard-alert-bell:focus-visible, .fm-dashboard-alert-dropdown button:focus-visible { outline: 3px solid var(--fm-gold-primary); outline-offset: 3px; }
+.fm-anchored-popover.fm-dashboard-alert-popover { width: min(420px, calc(100vw - 32px)); max-width: calc(100% - 16px); }
+.fm-dashboard-alert-dropdown { display: flex; flex-direction: column; max-height: min(640px, calc(100dvh - 16px)); animation: fm-alert-dropdown-enter 180ms ease-out; }
+.fm-dashboard-alert-dropdown header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; border-bottom: 1px solid var(--fm-border-subtle); }
+.fm-dashboard-alert-dropdown header strong { font-size: 17px; }
+.fm-dashboard-alert-dropdown header small { display: block; margin-top: 4px; font-size: 12px; color: var(--fm-text-muted); }
+.fm-dashboard-alert-dropdown header .fm-icon-button { min-width: 44px; min-height: 44px; }
+.fm-dashboard-alert-dropdown__body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; }
+.fm-dashboard-alert-dropdown footer { padding: 12px 16px; border-top: 1px solid var(--fm-border-subtle); }
+.fm-dashboard-alert-dropdown footer a { width: 100%; justify-content: center; }
+.fm-dashboard-alert-groups { display: grid; gap: 20px; }
+.fm-dashboard-alert-group { --alert-color: #287348; }
+.fm-dashboard-alert-group--critical { --alert-color: #b93a35; }
+.fm-dashboard-alert-group--preventive { --alert-color: #aa790c; }
+.fm-dashboard-alert-group h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; color: var(--alert-color); }
+.fm-dashboard-alert-group h3 > span:last-child { margin-left: auto; font-size: 12px; }
+.fm-dashboard-alert-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--alert-color); }
+.fm-dashboard-alert-group .fm-dashboard-alerts a { border-left: 3px solid var(--alert-color); }
+.fm-dashboard-alert-dropdown .fm-dashboard-alerts a { align-items: flex-start; gap: 8px; }
+.fm-dashboard-alert-dropdown .fm-dashboard-alerts strong { font-size: 13px; }
+.fm-dashboard-alert-dropdown .fm-dashboard-alerts small { font-size: 12px; }
+@keyframes fm-alert-bell-ring { 20% { transform: rotate(16deg); } 45% { transform: rotate(-14deg); } 70% { transform: rotate(8deg); } 100% { transform: rotate(0); } }
+@keyframes fm-alert-dropdown-enter { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 768px) {
+  .fm-dashboard-page .fm-hero-banner__aside { display: grid; position: absolute; top: 18px; right: 20px; }
+  .fm-dashboard-page .fm-hero-banner__quote { display: none; }
+  .fm-dashboard-page .fm-hero-banner__content { padding-top: 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fm-dashboard-alert-bell { transition: none; }
+  .fm-dashboard-alert-bell[aria-expanded="true"] > svg, .fm-dashboard-alert-dropdown { animation: none; }
+}
