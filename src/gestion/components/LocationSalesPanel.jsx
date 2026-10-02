@@ -29,6 +29,7 @@ import {
 } from "../services/arcaService";
 import { listLocationSalesPage } from "../services/locationSalesService";
 import { Icon } from "./icons";
+import { fiscalPresentation } from "../../shared/fiscalRecovery.mjs";
 
 const paymentLabels = {
   cash: "Efectivo",
@@ -229,7 +230,7 @@ export default function LocationSalesPanel({ profile, location, products = [] })
     }
   };
 
-  const canCancel = (sale) => sale?.status === "active" && can(profile, "quick-sales", "cancelOwn") && (canAccessAdministration(profile) || sale.sellerId === profile.id);
+  const canCancel = (sale) => sale?.status === "active" && !sale.fiscalInvoiceId && !sale.fiscalInvoice && !fiscalState.invoice && can(profile, "quick-sales", "cancelOwn") && (canAccessAdministration(profile) || sale.sellerId === profile.id);
   const detailDiscounts = saleDiscountList(detail);
   const detailDiscountTotals = storedDiscountTotals(detail || {});
   const detailPayments = salePaymentParts(detail || {});
@@ -406,7 +407,7 @@ export default function LocationSalesPanel({ profile, location, products = [] })
                         : "Solicitud fiscal"}
                     </span>
                     <Badge tone={detailInvoice.status === "authorized" ? "success" : detailInvoice.status === "rejected" || detailInvoice.status === "error" ? "error" : "warning"}>
-                      {detailInvoice.status || "pendiente"}
+                      {fiscalPresentation(detailInvoice).label}
                     </Badge>
                   </div>
                   <dl className="fm-location-sale-detail__audit">
@@ -415,6 +416,7 @@ export default function LocationSalesPanel({ profile, location, products = [] })
                     <div><dt>Verificación ARCA</dt><dd>{detailInvoice.verification?.matched === true ? "FECompConsultar coincide" : detailInvoice.verification?.matched === false ? "Requiere revisión" : "Pendiente"}</dd></div>
                     <div><dt>Entorno fiscal</dt><dd>{detailInvoice.fiscalEnvironment || "Sin dato"}</dd></div>
                   </dl>
+                  {detailInvoice.status !== "authorized" ? <p>La venta y el pago permanecen registrados. {fiscalPresentation(detailInvoice).message} {canAccessAdministration(profile) ? <a href="/gestion/settings">Revisar en atención fiscal</a> : "Solicitá la revisión fiscal a administración."}</p> : null}
                   {detailInvoice.status === "authorized" ? (
                     <>
                       {!detailInvoice.pdf?.issuerDataReady ? (

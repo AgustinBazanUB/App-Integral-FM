@@ -30,7 +30,7 @@ function parseErrors(xml) {
   const blocks = xmlTags(xml, "Err");
   return blocks.map((block) => ({
     code: Number(xmlTag(block, "Code") || 0),
-    message: xmlTag(block, "Msg") || "Error ARCA",
+    message: `ARCA informó el código ${Number(xmlTag(block, "Code") || 0)}.`,
   }));
 }
 
@@ -38,7 +38,7 @@ function parseEvents(xml) {
   const blocks = xmlTags(xml, "Evt");
   return blocks.map((block) => ({
     code: Number(xmlTag(block, "Code") || 0),
-    message: xmlTag(block, "Msg") || "Evento ARCA",
+    message: `ARCA informó el evento ${Number(xmlTag(block, "Code") || 0)}.`,
   }));
 }
 
@@ -99,7 +99,7 @@ export async function getLastAuthorized({ voucherType, pointOfSale, ...options }
   return {
     pointOfSale: Number(xmlTag(result.xml, "PtoVta") || pointOfSale || result.config.pointOfSale),
     voucherType: Number(xmlTag(result.xml, "CbteTipo") || voucherType),
-    number: Number(xmlTag(result.xml, "CbteNro") || 0),
+    number: xmlTag(result.xml, "CbteNro") == null ? null : Number(xmlTag(result.xml, "CbteNro")),
     errors: result.errors,
     events: result.events,
   };
@@ -182,6 +182,13 @@ export function buildCaeDetail(detail) {
 }
 
 export async function requestCae({ voucherType, pointOfSale, details, ...options }) {
+  const env = options.env || process.env;
+  const config = loadArcaPublicConfig(env);
+  const gate = config.environment === "production" ? "ARCA_ALLOW_PRODUCTION_CAE" : "ARCA_ALLOW_CAE_HOMOLOGATION";
+  if (String(env[gate] || "").trim().toLowerCase() !== "true") {
+    const error = new Error("La solicitud de CAE está deshabilitada.");
+    error.code = "arca-cae-disabled"; error.status = 409; throw error;
+  }
   if (!Array.isArray(details) || !details.length) throw new Error("Falta el detalle a autorizar.");
   const result = await wsfeCall("FECAESolicitar", (config) => {
     const ptoVta = requiredInteger(pointOfSale || config.pointOfSale, "Punto de venta", { min: 1 });
@@ -199,15 +206,16 @@ export async function requestCae({ voucherType, pointOfSale, details, ...options
       "</ar:FeCAEReq>",
     ].join("");
   }, options);
+  const detail = xmlTag(result.xml, "FECAEDetResponse") || "";
   return {
-    result: xmlTag(result.xml, "Resultado") || null,
-    cae: xmlTag(result.xml, "CAE") || null,
-    caeExpiration: xmlTag(result.xml, "CAEFchVto") || null,
-    voucherFrom: Number(xmlTag(result.xml, "CbteDesde") || 0),
-    voucherTo: Number(xmlTag(result.xml, "CbteHasta") || 0),
+    result: xmlTag(detail, "Resultado") || null,
+    cae: xmlTag(detail, "CAE") || null,
+    caeExpiration: xmlTag(detail, "CAEFchVto") || null,
+    voucherFrom: Number(xmlTag(detail, "CbteDesde") || 0),
+    voucherTo: Number(xmlTag(detail, "CbteHasta") || 0),
     observations: xmlTags(result.xml, "Obs").map((block) => ({
       code: Number(xmlTag(block, "Code") || 0),
-      message: xmlTag(block, "Msg") || "Observación ARCA",
+      message: `ARCA informó la observación ${Number(xmlTag(block, "Code") || 0)}.`,
     })),
     errors: result.errors,
     events: result.events,
@@ -223,14 +231,22 @@ export async function consultVoucher({ voucherType, pointOfSale, voucherNumber, 
     `<ar:PtoVta>${requiredInteger(pointOfSale || config.pointOfSale, "Punto de venta", { min: 1 })}</ar:PtoVta>`,
     "</ar:FeCompConsReq>",
   ].join(""), options);
+  return parseConsultedVoucher(result.xml, result);
+}
+
+export function parseConsultedVoucher(xml, { errors = parseErrors(xml), events = parseEvents(xml) } = {}) {
+  const detail = xmlTag(xml, "ResultGet") || "";
+  const number = (tag) => xmlTag(detail, tag) == null ? null : Number(xmlTag(detail, tag));
   return {
-    result: xmlTag(result.xml, "Resultado") || null,
-    cae: xmlTag(result.xml, "CodAutorizacion") || xmlTag(result.xml, "CAE") || null,
-    caeExpiration: xmlTag(result.xml, "FchVto") || xmlTag(result.xml, "CAEFchVto") || null,
-    voucherNumber: Number(xmlTag(result.xml, "CbteDesde") || voucherNumber),
-    errors: result.errors,
-    events: result.events,
-    rawXml: result.xml,
+    result: xmlTag(detail, "Resultado") || null,
+    cae: xmlTag(detail, "CodAutorizacion") || null,
+    caeExpiration: xmlTag(detail, "FchVto") || null,
+    voucherNumber: number("CbteDesde"), voucherTo: number("CbteHasta"),
+    pointOfSale: number("PtoVta"), voucherType: number("CbteTipo"),
+    docType: number("DocTipo"), docNumber: xmlTag(detail, "DocNro"), voucherDate: xmlTag(detail, "CbteFch"),
+    total: number("ImpTotal"), net: number("ImpNeto"), vat: number("ImpIVA"), nonTaxed: number("ImpTotConc"), exempt: number("ImpOpEx"), tributes: number("ImpTrib"),
+    currencyId: xmlTag(detail, "MonId"), currencyQuote: number("MonCotiz"),
+    errors, events,
   };
 }
 

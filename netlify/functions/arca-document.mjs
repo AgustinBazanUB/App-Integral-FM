@@ -1,3 +1,4 @@
+import { safeFiscalError } from "../../src/shared/fiscalRecovery.mjs";
 import { requireFirebaseActiveProfile } from "./_lib/firebaseAuth.mjs";
 import { adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
 import { invoiceIdForEnvironment } from "./_lib/arca/billing.mjs";
@@ -15,11 +16,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 function safeError(error) {
-  return {
-    code: error?.code || "arca-document-error",
-    message: String(error?.message || "No se pudo obtener el comprobante fiscal.").slice(0, 400),
-    ...(Array.isArray(error?.missing) ? { missing: error.missing } : {}),
-  };
+  return { ...safeFiscalError(error), ...(Array.isArray(error?.missing) ? { missing: error.missing } : {}) };
 }
 
 function isAdmin(session) {

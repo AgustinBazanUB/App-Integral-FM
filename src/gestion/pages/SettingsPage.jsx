@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { fiscalPresentation } from "../../shared/fiscalRecovery.mjs";
 import { Badge, Button, EmptyState, PageHeader, Panel, Skeleton, Toast } from "../../design-system";
 import { useAuth } from "../AuthContext";
 import { can, canAccessAdministration } from "../permissions";
@@ -9,6 +10,7 @@ import {
   getArcaWsaaCacheStatus,
   listRecentArcaInvoices,
   reconcileArcaInvoice,
+  reviewArcaInvoice,
   recoverPreCaeArcaInvoice,
   runArcaDiagnostics,
   runArcaProductionReadonlyPreflight,
@@ -164,6 +166,7 @@ function stageMessage(stage, fallback = "") {
 }
 
 export default function SettingsPage() {
+  const fiscalActionRef = useRef(false);
   const { profile } = useAuth();
   const isAdmin = canAccessAdministration(profile);
   const [arcaState, setArcaState] = useState({
@@ -171,6 +174,7 @@ export default function SettingsPage() {
     result: null,
     error: "",
   });
+  const [receiverDrafts, setReceiverDrafts] = useState({});
   const [invoiceState, setInvoiceState] = useState({
     busy: false,
     items: [],
@@ -208,7 +212,7 @@ export default function SettingsPage() {
   const loadInvoices = async () => {
     setInvoiceState((current) => ({ ...current, busy: true, error: "", message: "" }));
     try {
-      const items = await listRecentArcaInvoices({ pageSize: 10 });
+      const items = await listRecentArcaInvoices({ pageSize: 25 });
       setInvoiceState((current) => ({ ...current, busy: false, items, error: "" }));
     } catch (error) {
       setInvoiceState((current) => ({ ...current, busy: false, error: error.message }));
@@ -276,6 +280,8 @@ export default function SettingsPage() {
   }, [isAdmin]);
 
   const runInvoiceAction = async (invoice, mode) => {
+    if (fiscalActionRef.current) return;
+    fiscalActionRef.current = true;
     setInvoiceState((current) => ({
       ...current,
       actionId: invoice.id,
@@ -283,19 +289,32 @@ export default function SettingsPage() {
       message: "",
     }));
     try {
+      const draft = receiverDrafts[invoice.id];
+      const condition = Number(draft?.condition || 0);
+      const digits = String(draft?.document || "").replace(/\D/g, "");
+      const receiver = !invoice.receiverSnapshot?.vatConditionId && !invoice.authorization?.voucherNumber && condition ? {
+        vatConditionId: condition, documentType: condition === 5 ? (digits ? 96 : 99) : 80,
+        documentNumber: digits || "0", anonymousConsumerFinal: condition === 5 && !digits, concept: 1,
+      } : null;
+      if (mode === "review") {
+        const result = await reviewArcaInvoice({ invoiceId: invoice.id, receiver });
+        await loadInvoices();
+        setInvoiceState((current) => ({ ...current, actionId: "", message: `Revisión fiscal: ${fiscalPresentation(result.invoice || { status: result.status, recovery: { classification: result.classification } }).label}. No se solicitó CAE.` }));
+        return;
+      }
       if (mode === "dry-run") {
-        const result = await dryRunArcaInvoice({ invoiceId: invoice.id });
+        const result = await dryRunArcaInvoice({ invoiceId: invoice.id, receiver });
         setInvoiceState((current) => ({
           ...current,
           actionId: "",
           dryRuns: { ...current.dryRuns, [invoice.id]: result },
-          message: `Dry-run fiscal completado para ${invoice.saleSnapshot?.saleCode || invoice.id}.`,
+          message: result.blocked ? "La validación fiscal requiere corregir datos; no se solicitó CAE." : `Dry-run fiscal completado para ${invoice.saleSnapshot?.saleCode || invoice.id}.`,
         }));
         return;
       }
 
       if (mode === "authorize") {
-        const result = await authorizeArcaInvoice({ invoiceId: invoice.id });
+        const result = await authorizeArcaInvoice({ invoiceId: invoice.id, receiver });
         await loadInvoices();
         setInvoiceState((current) => ({
           ...current,
@@ -352,6 +371,8 @@ export default function SettingsPage() {
         actionId: "",
         error: error.message,
       }));
+    } finally {
+      fiscalActionRef.current = false;
     }
   };
 
@@ -653,11 +674,12 @@ export default function SettingsPage() {
           {registrySmokeState.error ? <Toast tone="error">{registrySmokeState.error}</Toast> : null}
           {productionPreflightState.error ? <Toast tone="error">{productionPreflightState.error}</Toast> : null}
           {invoiceState.error ? <Toast tone="error">{invoiceState.error}</Toast> : null}
-          {invoiceState.message ? <Toast tone="success">{invoiceState.message}</Toast> : null}
+          {invoiceState.message ? <Toast tone="info">{invoiceState.message}</Toast> : null}
 
           {invoiceState.items.length ? (
-            <div className="fm-settings-list">
+            <div className="fm-settings-list fm-fiscal-attention-list">
               {invoiceState.items.map((invoice) => {
+                const recovery = fiscalPresentation(invoice);
                 const dryRun = invoiceState.dryRuns[invoice.id];
                 const plan = dryRun?.plan;
                 return (
@@ -665,9 +687,24 @@ export default function SettingsPage() {
                     <div>
                       <strong>{invoice.saleSnapshot?.saleCode || invoice.id}</strong>
                       <span>
-                        {invoice.status} · {invoice.sourceType}
+                        {recovery.label} · {invoice.sourceType}
                         {invoice.saleSnapshot?.total != null ? ` · ${Number(invoice.saleSnapshot.total).toLocaleString("es-AR", { style: "currency", currency: "ARS" })}` : ""}
                       </span>
+                      {invoice.status === "pending" && !invoice.receiverSnapshot?.vatConditionId && !invoice.authorization?.voucherNumber ? (
+                        <fieldset className="fm-fiscal-receiver">
+                          <legend>Completar receptor fiscal</legend>
+                          <label>Condición IVA
+                            <select aria-label={`Condición IVA de ${invoice.saleSnapshot?.saleCode || invoice.id}`} value={receiverDrafts[invoice.id]?.condition || ""} onChange={(event) => setReceiverDrafts((current) => ({ ...current, [invoice.id]: { ...current[invoice.id], condition: event.target.value } }))}>
+                              <option value="">Elegí la condición</option>
+                              <option value="5">Consumidor Final</option><option value="1">Responsable Inscripto</option><option value="6">Monotributo</option><option value="4">Exento</option>
+                            </select>
+                          </label>
+                          <label>{receiverDrafts[invoice.id]?.condition === "5" ? "DNI (opcional)" : "CUIT"}
+                            <input aria-label={`Documento fiscal de ${invoice.saleSnapshot?.saleCode || invoice.id}`} inputMode="numeric" value={receiverDrafts[invoice.id]?.document || ""} onChange={(event) => setReceiverDrafts((current) => ({ ...current, [invoice.id]: { ...current[invoice.id], document: event.target.value } }))} />
+                          </label>
+                          <small>Revisá el receptor antes de autorizar. Si el importe exige identificación, deberás completar su documento.</small>
+                        </fieldset>
+                      ) : null}
                       {plan ? (
                         <span>
                           Dry-run: Factura {plan.voucherClass} · Neto {Number(plan.fiscal.net).toLocaleString("es-AR", { style: "currency", currency: "ARS" })} · IVA {Number(plan.fiscal.vat).toLocaleString("es-AR", { style: "currency", currency: "ARS" })} · Total {Number(plan.fiscal.total).toLocaleString("es-AR", { style: "currency", currency: "ARS" })}
@@ -681,6 +718,8 @@ export default function SettingsPage() {
                         </span>
                       ) : null}
                       {invoice.error?.message ? <span>Error fiscal: {invoice.error.message}</span> : null}
+                      {recovery.nextRetryAt ? <span>Próximo intento seguro desde {new Date(recovery.nextRetryAt).toLocaleString("es-AR")} · intento {invoice.recovery?.attemptCount || 0}/3</span> : null}
+                      {recovery.classification === "UNCERTAIN" ? <span>La venta y el pago permanecen. Consultar ARCA antes de cualquier reenvío.</span> : null}
                       {Array.isArray(invoice.authorization?.observations) && invoice.authorization.observations.length ? (
                         <span>
                           Observaciones ARCA: {invoice.authorization.observations.map((item) => `${item.code}: ${item.message}`).join(" · ")}
@@ -693,6 +732,7 @@ export default function SettingsPage() {
                       ) : null}
                     </div>
                     <div>
+                      {invoice.status !== "authorized" ? <Button variant="secondary" disabled={Boolean(invoiceState.actionId)} loading={invoiceState.actionId === invoice.id} onClick={() => runInvoiceAction(invoice, "review")}>Revisar recuperación</Button> : null}
                       <Button
                         variant="secondary"
                         loading={invoiceState.actionId === invoice.id}
@@ -702,7 +742,7 @@ export default function SettingsPage() {
                       </Button>
                       {invoice.status === "pending" ? (
                         <Button
-                          disabled={!caeEnabled || invoiceState.actionId === invoice.id}
+                          disabled={!caeEnabled || Boolean(invoiceState.actionId) || (invoice.recovery?.classification === "TEMPORARY" && (!recovery.retryable || Date.parse(recovery.nextRetryAt || "") > Date.now()))}
                           loading={invoiceState.actionId === invoice.id}
                           onClick={() => runInvoiceAction(invoice, "authorize")}
                         >
@@ -1036,7 +1076,7 @@ export default function SettingsPage() {
             )}
           </div>
           {invoiceState.error ? <Toast tone="error">{invoiceState.error}</Toast> : null}
-          {invoiceState.message ? <Toast tone="success">{invoiceState.message}</Toast> : null}
+          {invoiceState.message ? <Toast tone="info">{invoiceState.message}</Toast> : null}
         </Panel>
       ) : null}
       {profile ? <DriveSettings profile={profile} /> : null}

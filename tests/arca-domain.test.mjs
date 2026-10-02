@@ -157,7 +157,8 @@ test("parser de padrón distingue CUIT inexistente", () => {
   </personaReturn></getPersona_v2Response></soap:Body></soap:Envelope>`;
   const person = parseTaxpayerResponse(xml, "20-12345678-6");
   assert.equal(person.found, false);
-  assert.equal(person.errorConstancia.message, "No existe persona con ese Id");
+  assert.equal(person.errorConstancia.message, "El padrón no pudo confirmar esta sección de la constancia.");
+  assert.equal(JSON.stringify(person).includes("No existe persona con ese Id"), false);
   assert.equal(person.errorConstancia.personId, "20123456786");
   assert.equal(person.taxes.length, 0);
 });

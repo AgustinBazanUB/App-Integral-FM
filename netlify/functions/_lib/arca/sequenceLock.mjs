@@ -94,6 +94,18 @@ export async function acquireSequenceLock({
   }
 
   const data = current.data || {};
+  // A lease may expire while a worker waits for ARCA. The reservation is
+  // durable and is cleared only after a definitive fiscal result.
+  if (data.reservation?.invoiceId) {
+    const invoice = await getDocument(`invoices/${data.reservation.invoiceId}`, { env });
+    if (!["authorized", "rejected"].includes(invoice?.data?.status)
+      || invoice.data.authorization?.attemptId !== data.reservation.attemptId
+      || invoice.data.authorization?.voucherNumber !== data.reservation.voucherNumber) {
+      return { acquired: false, path, reason: "unresolved-voucher", invoiceId: data.reservation.invoiceId };
+    }
+    // Repair an interrupted release only after reading a definitive result.
+    data.holder = null;
+  }
   if (data.holder && data.holder !== cleanHolder && !expired(data, now)) {
     return {
       acquired: false,
@@ -110,6 +122,7 @@ export async function acquireSequenceLock({
       holder: cleanHolder,
       leaseExpiresAt,
       updatedAt: iso(now),
+      reservation: null,
     }, {
       env,
       currentUpdateTime: current.updateTime,
@@ -140,6 +153,7 @@ export async function releaseSequenceLock({
   voucherType,
   holder,
   expectedUpdateTime,
+  resolvedInvoiceId,
   env = process.env,
   now = new Date(),
   getDocument = adminGetDocument,
@@ -158,10 +172,23 @@ export async function releaseSequenceLock({
     };
   }
 
+  if (current.data?.reservation?.invoiceId && current.data.reservation.invoiceId !== resolvedInvoiceId) {
+    return { released: false, reason: "unresolved-voucher" };
+  }
+  if (current.data?.reservation?.invoiceId) {
+    const invoice = await getDocument(`invoices/${resolvedInvoiceId}`, { env });
+    if (!["authorized", "rejected"].includes(invoice?.data?.status)
+      || invoice.data.authorization?.attemptId !== current.data.reservation.attemptId
+      || invoice.data.authorization?.voucherNumber !== current.data.reservation.voucherNumber) {
+      return { released: false, reason: "fiscal-result-not-terminal" };
+    }
+  }
+
   try {
     const updated = await patchDocument(path, {
       holder: null,
       leaseExpiresAt: null,
+      reservation: null,
       updatedAt: iso(now),
     }, {
       env,

@@ -2,6 +2,8 @@ import { requireFirebaseAdmin } from "./_lib/firebaseAuth.mjs";
 import { authorizeInvoice, reconcileInvoice, recoverPreCaeInvoice, verifyAuthorizedInvoice } from "./_lib/arca/authorizer.mjs";
 import { arcaEnvironment } from "./_lib/arca/config.mjs";
 import { syncInvoiceToSale } from "./_lib/arca/invoicePersistence.mjs";
+import { reviewFiscalInvoice } from "./_lib/arca/recoveryService.mjs";
+import { safeFiscalError } from "../../src/shared/fiscalRecovery.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -13,10 +15,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 function safeError(error) {
-  return {
-    code: error?.code || "arca-authorize-error",
-    message: String(error?.message || "No se pudo completar la operación fiscal.").slice(0, 300),
-  };
+  return safeFiscalError(error);
 }
 
 export default async function handler(request) {
@@ -32,6 +31,10 @@ export default async function handler(request) {
 
     if (!invoiceId) {
       return json({ ok: false, code: "missing-invoice-id", message: "Falta identificar la solicitud fiscal." }, 400);
+    }
+
+    if (mode === "review") {
+      return json({ ok: true, mode, result: await reviewFiscalInvoice({ invoiceId, receiver: body?.receiver && typeof body.receiver === "object" ? body.receiver : null, env: process.env }) });
     }
 
     if (mode === "reconcile") {

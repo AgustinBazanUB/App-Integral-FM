@@ -1,3 +1,4 @@
+import { safeFiscalError } from "../../src/shared/fiscalRecovery.mjs";
 import { requireFirebaseActiveProfile } from "./_lib/firebaseAuth.mjs";
 import { adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
 import { arcaEnvironment, productionAutoAuthorizeSources } from "./_lib/arca/config.mjs";
@@ -18,10 +19,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 function safeError(error) {
-  return {
-    code: error?.code || "arca-invoice-error",
-    message: String(error?.message || "No se pudo preparar la facturación.").slice(0, 240),
-  };
+  return { ...safeFiscalError(error) };
 }
 
 export default async function handler(request) {

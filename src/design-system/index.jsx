@@ -26,9 +26,9 @@ export const Button = forwardRef(function Button(
       ref={ref}
       type="button"
       className={`fm-button fm-button--${variant} ${className}`.trim()}
+      {...props}
       aria-busy={loading || undefined}
       disabled={loading || props.disabled}
-      {...props}
     >
       {loading ? <Icon name="LoaderCircle" className="fm-spinner" /> : null}
       {!loading && icon && iconPosition === "start" ? <Icon name={icon} /> : null}
@@ -232,6 +232,15 @@ export const DatePicker = forwardRef(function DatePicker(props, ref) {
   return <input ref={ref} type="date" {...props} />;
 });
 
+const overlayStack = [];
+let overlaySequence = 0;
+function refreshOverlayAccessibility() {
+  const top = overlayStack.at(-1);
+  overlayStack.forEach((ref) => {
+    if (ref.current?.parentElement) ref.current.parentElement.inert = ref !== top;
+    ref.current?.setAttribute("aria-modal", ref === top ? "true" : "false");
+  });
+}
 function useOverlay(open, onClose, initialFocusRef) {
   const containerRef = useRef(null);
   const returnFocusRef = useRef(null);
@@ -240,6 +249,9 @@ function useOverlay(open, onClose, initialFocusRef) {
 
   useEffect(() => {
     if (!open) return undefined;
+    overlayStack.push(containerRef);
+    if (containerRef.current?.parentElement) containerRef.current.parentElement.style.zIndex = String(1000 + ++overlaySequence);
+    refreshOverlayAccessibility();
     returnFocusRef.current = document.activeElement;
     const frame = window.requestAnimationFrame(() => {
       (initialFocusRef?.current ||
@@ -248,6 +260,7 @@ function useOverlay(open, onClose, initialFocusRef) {
         ))?.focus();
     });
     const onKeyDown = (event) => {
+      if (overlayStack.at(-1) !== containerRef) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onCloseRef.current?.();
@@ -273,10 +286,14 @@ function useOverlay(open, onClose, initialFocusRef) {
     document.addEventListener("keydown", onKeyDown);
     document.body.classList.add("fm-overlay-open");
     return () => {
+      const wasTop = overlayStack.at(-1) === containerRef;
+      const index = overlayStack.indexOf(containerRef);
+      if (index >= 0) overlayStack.splice(index, 1);
+      refreshOverlayAccessibility();
       window.cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKeyDown);
-      document.body.classList.remove("fm-overlay-open");
-      window.requestAnimationFrame(() => returnFocusRef.current?.focus?.());
+      if (!overlayStack.length) document.body.classList.remove("fm-overlay-open");
+      if (wasTop) window.requestAnimationFrame(() => { if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus?.(); });
     };
   }, [initialFocusRef, open]);
   return containerRef;
@@ -284,13 +301,14 @@ function useOverlay(open, onClose, initialFocusRef) {
 
 export function Modal({ open, onClose, title, description, children, footer }) {
   const ref = useOverlay(open, onClose);
+  const titleId = useId();
   if (!open) return null;
   return (
     <div className="fm-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose?.()}>
-      <section ref={ref} className="fm-modal" role="dialog" aria-modal="true" aria-labelledby="fm-modal-title">
+      <section ref={ref} className="fm-modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <header>
           <div>
-            <h2 id="fm-modal-title">{title}</h2>
+            <h2 id={titleId}>{title}</h2>
             {description ? <p>{description}</p> : null}
           </div>
           <IconButton label="Cerrar" icon="X" onClick={onClose} />

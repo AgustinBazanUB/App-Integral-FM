@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Button,
@@ -50,6 +50,7 @@ export default function QuickSalesPage() {
   const [receiverDocument, setReceiverDocument] = useState("");
   const [deliveryMethod, setDeliveryMethod] = useState("pickup");
   const [discountIds, setDiscountIds] = useState([]);
+  const submitRef = useRef(false);
   const [submitState, setSubmitState] = useState({ busy: false, error: "", success: "" });
 
   const locations = locationsResult.data || [];
@@ -99,6 +100,8 @@ export default function QuickSalesPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (submitRef.current) return;
+    submitRef.current = true;
     setSubmitState({ busy: true, error: "", success: "" });
     try {
       const location = selectedLocation;
@@ -172,6 +175,8 @@ export default function QuickSalesPage() {
       });
     } catch (error) {
       setSubmitState({ busy: false, error: error.message, success: "" });
+    } finally {
+      submitRef.current = false;
     }
   };
 

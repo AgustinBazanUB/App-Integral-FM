@@ -2,7 +2,10 @@ import {
   adminCreateDocument,
   adminGetDocument,
   adminPatchDocument,
+  adminRunTransaction,
 } from "../firestoreAdminRest.mjs";
+import { randomUUID } from "node:crypto";
+import { fiscalRecovery, safeFiscalError } from "../../../../src/shared/fiscalRecovery.mjs";
 import {
   BILLING_SOURCE_TYPES,
   invoiceIdFor,
@@ -131,7 +134,7 @@ function assertDeclaredSaleSource(sourceType, sale) {
   }
 }
 
-function validateSaleForInvoice(sourceType, sourceId, sale) {
+function validateSaleForInvoice(sourceType, sourceId, sale, { existingInvoice = false } = {}) {
   assertDeclaredSaleSource(sourceType, sale);
   if (!BILLING_SOURCE_TYPES.includes(sourceType)) {
     const error = new Error("Origen de facturación inválido.");
@@ -164,7 +167,7 @@ function validateSaleForInvoice(sourceType, sourceId, sale) {
       throw error;
     }
   }
-  if (!requestedBySource(sourceType, sale)) {
+  if (!existingInvoice && !requestedBySource(sourceType, sale)) {
     const error = new Error("La venta no tiene una solicitud de facturación pendiente.");
     error.code = "arca-invoice-not-requested";
     error.status = 409;
@@ -209,7 +212,17 @@ export async function ensurePendingInvoice({
   now = new Date(),
   getDocument = adminGetDocument,
   createDocument = adminCreateDocument,
+  runTransaction = adminRunTransaction,
 } = {}) {
+  if (getDocument === adminGetDocument && createDocument === adminCreateDocument) {
+    return runTransaction(async (transaction) => ensurePendingInvoice({ sourceType, sourceId, requestedBy, requestedByName, receiver, env, now,
+      getDocument: transaction.getDocument,
+      createDocument: async (collection, id, data) => {
+        await transaction.commitDocuments([{ type: "create", path: `${collection}/${id}`, data }]);
+        return adminGetDocument(`${collection}/${id}`, { env });
+      },
+    }), { env });
+  }
   const scope = fiscalScope(env);
   const invoiceId = invoiceIdForEnvironment(scope.environment, sourceType, sourceId);
   const sourceSale = await getDocument(salePathFor(sourceId), { env });
@@ -217,7 +230,7 @@ export async function ensurePendingInvoice({
   const assertInvoiceAssociation = async (candidateId, candidate) => {
     const currentSale = await getDocument(salePathFor(sourceId), { env });
     assertDeclaredSaleSource(sourceType, currentSale?.data);
-    if (sourceType === "ecommerce") validateSaleForInvoice(sourceType, sourceId, currentSale?.data || null);
+    if (sourceType === "ecommerce") validateSaleForInvoice(sourceType, sourceId, currentSale?.data || null, { existingInvoice: Boolean(candidate) });
     const sale = currentSale?.data || {};
     const links = [{id:sale.fiscalInvoiceId, environment:sale.fiscalEnvironment}, {id:sale.fiscalInvoice?.id, environment:sale.fiscalInvoice?.environment}];
     if (links.some((link) => link.id && link.id !== candidateId && (!link.environment || link.environment === scope.environment)) || (candidate && (candidate.sourceType !== sourceType || candidate.sourceId !== sourceId || (candidate.fiscalEnvironment && candidate.fiscalEnvironment !== scope.environment)))) {
@@ -371,7 +384,7 @@ export async function claimPendingInvoice({
   }
 
   const timestamp = nowIso(now);
-  const attemptId = `attempt_${timestamp.replace(/[^0-9]/g, "").slice(0, 17)}_${String(claimedBy || "system").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40)}`;
+  const attemptId = `attempt_${randomUUID()}`;
 
   try {
     const updated = await patchDocument(invoicePathFor(invoiceId), {
@@ -384,6 +397,7 @@ export async function claimPendingInvoice({
         claimedBy: claimedBy || null,
       },
       error: null,
+      recovery: { ...(current.data.recovery || {}), attemptCount: Number(current.data.recovery?.attemptCount || 0) + 1, retryable: false, nextRetryAt: null },
     }, {
       env,
       currentUpdateTime: current.updateTime,
@@ -424,8 +438,7 @@ export async function releaseInvoiceClaim({
     status: "error",
     updatedAt: timestamp,
     error: {
-      code: String(errorCode || "arca-authorization-error").slice(0, 120),
-      message: String(errorMessage || "Falló la autorización fiscal.").slice(0, 500),
+      ...safeFiscalError({ code: errorCode }),
       at: timestamp,
     },
   }, {
@@ -446,12 +459,17 @@ export async function persistAuthorizationPlan({
   receiverDocument,
   fiscal,
   attemptId,
+  sequenceLock,
+  requestSnapshot,
+  receiverSnapshot,
   env = process.env,
   now = new Date(),
   patchDocument = adminPatchDocument,
+  runTransaction = adminRunTransaction,
+  getDocument = adminGetDocument,
 } = {}) {
   const timestamp = nowIso(now);
-  return patchDocument(invoicePathFor(invoiceId), {
+  const payload = {
     status: "authorizing",
     updatedAt: timestamp,
     authorization: {
@@ -465,16 +483,40 @@ export async function persistAuthorizationPlan({
       attemptId: attemptId || null,
       plannedAt: timestamp,
       lastAttemptAt: timestamp,
+      attemptStartedAt: timestamp,
+      requestSnapshot: requestSnapshot || null,
       cae: null,
       caeExpiration: null,
       result: null,
       authorizedAt: null,
     },
     error: null,
-  }, {
-    env,
-    currentUpdateTime: expectedUpdateTime,
-  });
+  };
+  if (!sequenceLock?.path || !sequenceLock.updateTime) {
+    const error = new Error("Falta el lock fiscal para reservar el comprobante.");
+    error.code = "arca-sequence-lock-invalid";
+    throw error;
+  }
+  await runTransaction(async (transaction) => {
+    const current = await transaction.getDocument(invoicePathFor(invoiceId));
+    const lock = await transaction.getDocument(sequenceLock.path);
+    payload.authorization.attemptCount = Number(current?.data?.recovery?.attemptCount || 0);
+    if (receiverSnapshot) payload.receiverSnapshot = { ...(current?.data?.receiverSnapshot || {}), ...receiverSnapshot };
+    if (current?.updateTime !== expectedUpdateTime || lock?.updateTime !== sequenceLock.updateTime
+      || current?.data?.status !== "authorizing" || current.data.authorization?.attemptId !== attemptId
+      || lock?.data?.holder !== attemptId || lock.data.reservation?.invoiceId
+      || !Number.isFinite(Date.parse(lock.data.leaseExpiresAt || "")) || Date.parse(lock.data.leaseExpiresAt) <= Date.now()) {
+      const error = new Error("El intento fiscal perdió su exclusión antes del envío.");
+      error.code = "firebase-admin-precondition-failed";
+      throw error;
+    }
+    await transaction.commitDocuments([
+      { type: "update", path: invoicePathFor(invoiceId), data: payload, currentUpdateTime: expectedUpdateTime },
+      { type: "update", path: sequenceLock.path, currentUpdateTime: sequenceLock.updateTime,
+        data: { reservation: { invoiceId, attemptId, voucherNumber: Number(voucherNumber), plannedAt: timestamp }, updatedAt: timestamp } },
+    ]);
+  }, { env });
+  return getDocument(invoicePathFor(invoiceId), { env });
 }
 
 export async function markInvoiceAuthorized({
@@ -503,6 +545,7 @@ export async function markInvoiceAuthorized({
       lastAttemptAt: timestamp,
     },
     error: null,
+    recovery: fiscalRecovery({ classification: "AUTHORIZED", attemptCount: Number(baseAuthorization.attemptCount || 0), now }),
   }, {
     env,
     currentUpdateTime: expectedUpdateTime,
@@ -536,6 +579,7 @@ export async function markInvoiceRejected({
       details: Array.isArray(errors) ? errors : [],
       at: timestamp,
     },
+    recovery: fiscalRecovery({ classification: "REJECTED", code: "arca-rejected", attemptCount: Number(baseAuthorization.attemptCount || 0), now }),
   }, {
     env,
     currentUpdateTime: expectedUpdateTime,
@@ -547,6 +591,7 @@ export async function markInvoiceReconciling({
   expectedUpdateTime,
   errorCode,
   errorMessage,
+  attemptCount = 0,
   env = process.env,
   now = new Date(),
   patchDocument = adminPatchDocument,
@@ -556,10 +601,11 @@ export async function markInvoiceReconciling({
     status: "reconciling",
     updatedAt: timestamp,
     error: {
-      code: String(errorCode || "arca-uncertain-response").slice(0, 120),
-      message: String(errorMessage || "La respuesta de ARCA es incierta y debe reconciliarse antes de reintentar.").slice(0, 500),
+      ...safeFiscalError({ code: errorCode }),
+      message: fiscalRecovery({ classification: "UNCERTAIN", code: errorCode, now }).lastError.message,
       at: timestamp,
     },
+    recovery: fiscalRecovery({ classification: "UNCERTAIN", code: errorCode, attemptCount, now }),
   }, {
     env,
     currentUpdateTime: expectedUpdateTime,
@@ -572,6 +618,7 @@ export async function returnInvoiceToPending({
   expectedUpdateTime,
   errorCode = "arca-retry-later",
   errorMessage = "La autorización fiscal debe reintentarse.",
+  attemptCount = 0,
   env = process.env,
   now = new Date(),
   patchDocument = adminPatchDocument,
@@ -581,11 +628,11 @@ export async function returnInvoiceToPending({
     status: "pending",
     updatedAt: timestamp,
     error: {
-      code: String(errorCode).slice(0, 120),
-      message: String(errorMessage).slice(0, 500),
+      ...safeFiscalError({ code: errorCode }),
       at: timestamp,
-      retryable: true,
+      retryable: attemptCount < 3,
     },
+    recovery: fiscalRecovery({ classification: "TEMPORARY", code: errorCode, attemptCount, now }),
   }, {
     env,
     currentUpdateTime: expectedUpdateTime,
@@ -606,11 +653,11 @@ export async function markInvoiceError({
     status: "error",
     updatedAt: timestamp,
     error: {
-      code: String(errorCode).slice(0, 120),
-      message: String(errorMessage).slice(0, 500),
+      ...safeFiscalError({ code: errorCode }),
       at: timestamp,
       retryable: false,
     },
+    recovery: fiscalRecovery({ classification: "VALIDATION", code: errorCode, now }),
   }, {
     env,
     currentUpdateTime: expectedUpdateTime,
@@ -662,7 +709,14 @@ export async function syncInvoiceToSale({
   now = new Date(),
   getDocument = adminGetDocument,
   patchDocument = adminPatchDocument,
+  runTransaction = adminRunTransaction,
 } = {}) {
+  if (getDocument === adminGetDocument && patchDocument === adminPatchDocument) {
+    return runTransaction(async (transaction) => syncInvoiceToSale({ invoiceId, env, now,
+      getDocument: transaction.getDocument,
+      patchDocument: async (path, data, options) => transaction.commitDocuments([{ type: "update", path, data, currentUpdateTime: options.currentUpdateTime }]),
+    }), { env });
+  }
   if (!invoiceId) {
     const error = new Error("Falta identificar la solicitud fiscal.");
     error.code = "arca-invoice-id-missing";
@@ -696,6 +750,12 @@ export async function syncInvoiceToSale({
   }
 
   const authorization = invoice.authorization || {};
+  const existingId = saleDocument.data.fiscalInvoiceId || saleDocument.data.fiscalInvoice?.id;
+  if (existingId && existingId !== invoiceId && saleDocument.data.fiscalEnvironment === invoice.fiscalEnvironment) {
+    const error = new Error("La venta ya está vinculada a otro comprobante fiscal.");
+    error.code = "arca-invoice-association-conflict"; error.status = 409; throw error;
+  }
+  assertDeclaredSaleSource(invoice.sourceType, saleDocument.data);
   const verification = invoice.verification || {};
   const timestamp = nowIso(now);
   const fiscalInvoice = {
@@ -713,6 +773,7 @@ export async function syncInvoiceToSale({
     verificationMatched: verification.checkedAt ? verification.matched === true : null,
     verificationCheckedAt: verification.checkedAt || null,
     updatedAt: timestamp,
+    recovery: invoice.recovery || null,
   };
 
   await patchDocument(salePathFor(sourceId), {
@@ -724,6 +785,7 @@ export async function syncInvoiceToSale({
   }, {
     env,
     requireExists: true,
+    currentUpdateTime: saleDocument.updateTime,
   });
 
   return {

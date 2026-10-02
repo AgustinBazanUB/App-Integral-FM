@@ -74,7 +74,7 @@ export function parseWsaaEncryptionKey(env = process.env, { required = false } =
     key = Buffer.alloc(0);
   }
 
-  if (key.length !== KEY_BYTES || key.toString("base64").replace(/=+$/g, "") !== raw.replace(/=+$/g, "")) {
+  if (key.length !== KEY_BYTES || key.toString("base64") !== raw) {
     const error = new Error("ARCA_TA_ENCRYPTION_KEY debe ser una clave Base64 de 32 bytes.");
     error.code = "arca-wsaa-cache-key-invalid";
     throw error;

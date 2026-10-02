@@ -1,3 +1,4 @@
+import { assertValidCuit } from "./cuit.mjs";
 import { buildFiscalAmounts, assertSaleMatchesFiscalTotal } from "./billing.mjs";
 
 export const ARCA_VOUCHER_TYPES = Object.freeze({
@@ -61,7 +62,7 @@ function resolveReceiverDocument({
   documentNumber,
   anonymousConsumerFinal = false,
   total = 0,
-  consumerFinalIdThreshold = 10000000,
+  consumerFinalIdThreshold = null,
 } = {}) {
   const docType = Number(documentType || 0);
   const docNumber = digits(documentNumber);
@@ -72,6 +73,7 @@ function resolveReceiverDocument({
       error.code = "arca-receiver-cuit-required";
       throw error;
     }
+    assertValidCuit(docNumber, "CUIT del receptor");
     return { documentType: 80, documentNumber: docNumber };
   }
 
@@ -81,10 +83,15 @@ function resolveReceiverDocument({
       error.code = "arca-anonymous-receiver-invalid";
       throw error;
     }
+    if (!Number.isFinite(Number(consumerFinalIdThreshold)) || Number(consumerFinalIdThreshold) <= 0) {
+      const error = new Error("Falta configurar el umbral de identificación de Consumidor Final.");
+      error.code = "arca-consumer-final-threshold-invalid";
+      throw error;
+    }
     return {
       documentType: 99,
       documentNumber: "0",
-      requiresIdentification: Number(total || 0) >= Number(consumerFinalIdThreshold || 10000000),
+      requiresIdentification: Number(total || 0) >= Number(consumerFinalIdThreshold),
     };
   }
 
@@ -94,6 +101,7 @@ function resolveReceiverDocument({
     throw error;
   }
 
+  if (docType === 80) assertValidCuit(docNumber, "CUIT del receptor");
   return { documentType: docType, documentNumber: docNumber };
 }
 
@@ -124,7 +132,7 @@ export function buildAuthorizationPlan({
   anonymousConsumerFinal = false,
   voucherDate = new Date(),
   concept = 1,
-  consumerFinalIdThreshold = 10000000,
+  consumerFinalIdThreshold = null,
 } = {}) {
   if (!invoice || !["pending", "authorizing"].includes(invoice.status)) {
     const error = new Error("La solicitud fiscal no está disponible para preparar autorización.");

@@ -204,3 +204,20 @@
 .fm-mobile-sidebar__close { position: absolute; z-index: 2; top: 13px; right: 13px; }
 @keyframes fm-sidebar-enter { from { opacity: 0; transform: translateX(-12px); } }
 .fm-live-region { position: fixed; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+
+.fm-fiscal-attention-list > div { padding: 14px 0; }
+.fm-fiscal-attention-list > div > div:first-child { min-width: 0; overflow-wrap: anywhere; gap: 4px; }
+.fm-fiscal-attention-list strong { font-size: 14px; }
+.fm-fiscal-attention-list span:not(.fm-badge) { font-size: 12px; line-height: 1.5; }
+.fm-fiscal-attention-list > div > div:last-child { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+@media (max-width: 600px) {
+  .fm-fiscal-attention-list > div { align-items: stretch; flex-direction: column; }
+  .fm-fiscal-attention-list > div > div:last-child { justify-content: flex-start; }
+  .fm-fiscal-attention-list .fm-button { min-height: 44px; flex: 1 1 140px; }
+}
+
+.fm-fiscal-receiver { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; margin: 8px 0; border: 1px solid var(--fm-border-subtle); border-radius: 12px; }
+.fm-fiscal-receiver label { display: grid; gap: 5px; font-size: 12px; }
+.fm-fiscal-receiver small { grid-column: 1 / -1; }
+@media (max-width: 600px) { .fm-fiscal-receiver { grid-template-columns: 1fr; } }

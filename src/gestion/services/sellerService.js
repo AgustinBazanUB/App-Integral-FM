@@ -538,6 +538,7 @@ export async function updateSellerSale({
   const initialSale = await getDoc(saleReference);
   if (!initialSale.exists()) throw new Error("La venta ya no existe.");
   const original = initialSale.data();
+  if (original.fiscalInvoiceId || original.fiscalInvoice) throw new Error("La venta tiene una solicitud fiscal asociada. Requiere revisión administrativa.");
   if (!canAccessAdministration(profile) && original.sellerId !== profile.id) {
     throw new Error("No podés editar una venta ajena.");
   }
@@ -564,6 +565,7 @@ export async function updateSellerSale({
     const saleSnapshot = await transaction.get(saleReference);
     if (!saleSnapshot.exists()) throw new Error("La venta ya no existe.");
     const sale = saleSnapshot.data();
+    if (sale.fiscalInvoiceId || sale.fiscalInvoice) throw new Error("La venta tiene una solicitud fiscal asociada. Requiere revisión administrativa.");
     if (sale.status !== "active") throw new Error("La venta está anulada.");
     if (!canAccessAdministration(profile) && sale.sellerId !== profile.id) {
       throw new Error("No podés editar una venta ajena.");
@@ -674,6 +676,7 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
     const saleSnapshot = await transaction.get(saleReference);
     if (!saleSnapshot.exists()) throw new Error("La venta ya no existe.");
     const sale = saleSnapshot.data();
+    if (sale.fiscalInvoiceId || sale.fiscalInvoice) throw new Error("La venta tiene una solicitud fiscal asociada. Requiere revisión administrativa.");
     if (sale.status !== "active") throw new Error("La venta ya está anulada.");
     if (!canAccessAdministration(profile) && sale.sellerId !== profile.id) {
       throw new Error("No podés anular una venta ajena.");

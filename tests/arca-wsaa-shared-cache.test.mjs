@@ -15,6 +15,11 @@ import {
 } from "../netlify/functions/_lib/arca/wsaaSharedCache.mjs";
 
 const KEY = Buffer.alloc(32, 7).toString("base64");
+test("WSAA key exige Base64 canónico, incluido padding", () => {
+  for (const invalid of [KEY.replace(/=+$/, ""), `${KEY}=`, `${KEY}\nextra`]) {
+    assert.throws(() => parseWsaaEncryptionKey({ ARCA_TA_ENCRYPTION_KEY: invalid }), { code: "arca-wsaa-cache-key-invalid" });
+  }
+});
 const ENV = {
   ARCA_TA_ENCRYPTION_KEY: KEY,
   ARCA_ISSUER_CUIT: "20-12345678-6",

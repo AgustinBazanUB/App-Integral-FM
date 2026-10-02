@@ -1,4 +1,5 @@
 import { adminGetDocument } from "../firestoreAdminRest.mjs";
+import { classifyFiscalFailure, fiscalRecovery, safeFiscalError } from "../../../../src/shared/fiscalRecovery.mjs";
 import { buildAuthorizationPlan } from "./authorizationPlan.mjs";
 import {
   claimPendingInvoice,
@@ -49,21 +50,14 @@ function assertInvoiceEnvironment(invoice, env = process.env) {
   return storedEnvironment;
 }
 
-function isNetworkUncertain(error) {
-  return ["arca-network-error", "arca-timeout"].includes(error?.code);
-}
-
 function compactError(error) {
-  return {
-    code: error?.code || "arca-authorization-error",
-    message: String(error?.message || "Falló la autorización fiscal.").slice(0, 500),
-  };
+  return safeFiscalError(error);
 }
 
 function arcaMessages(list = []) {
   return (Array.isArray(list) ? list : []).map((item) => ({
     code: Number(item?.code || 0),
-    message: String(item?.message || "").slice(0, 500),
+    message: `ARCA informó el código ${Number(item?.code || 0)}.`,
   }));
 }
 
@@ -86,6 +80,7 @@ async function reconcilePlannedVoucher({
       expectedUpdateTime: plannedDocument.updateTime,
       errorCode: "arca-reconciliation-plan-incomplete",
       errorMessage: "No hay datos suficientes para reconciliar el comprobante.",
+      attemptCount: Number(plannedDocument.data?.recovery?.attemptCount || 0),
       env,
     });
   }
@@ -98,7 +93,7 @@ async function reconcilePlannedVoucher({
       env,
     });
 
-    if (consulted?.cae) {
+    if (voucherMatchesAuthorization(consulted, authorization)) {
       return markAuthorizedFn({
         invoiceId,
         expectedUpdateTime: plannedDocument.updateTime,
@@ -116,6 +111,7 @@ async function reconcilePlannedVoucher({
       expectedUpdateTime: plannedDocument.updateTime,
       errorCode: "arca-reconciliation-not-confirmed",
       errorMessage: "ARCA todavía no confirmó el comprobante planificado. No se reenviará automáticamente.",
+      attemptCount: Number(plannedDocument.data?.recovery?.attemptCount || 0),
       env,
     });
   } catch (error) {
@@ -124,9 +120,24 @@ async function reconcilePlannedVoucher({
       expectedUpdateTime: plannedDocument.updateTime,
       errorCode: error?.code || "arca-reconciliation-error",
       errorMessage: error?.message || "No se pudo reconciliar la respuesta incierta de ARCA.",
+      attemptCount: Number(plannedDocument.data?.recovery?.attemptCount || 0),
       env,
     });
   }
+}
+
+export function voucherMatchesAuthorization(consulted = {}, authorization = {}) {
+  const request = authorization.requestSnapshot;
+  // Legacy plans without the submitted identity cannot be auto-associated.
+  return Boolean(request && consulted.result === "A" && /^\d{14}$/.test(String(consulted.cae || ""))
+    && /^\d{8}$/.test(String(consulted.caeExpiration || "")) && !consulted.errors?.length
+    && consulted.pointOfSale === authorization.pointOfSale && consulted.voucherType === authorization.voucherType
+    && consulted.voucherNumber === authorization.voucherNumber && consulted.voucherTo === authorization.voucherNumber
+    && consulted.docType === request.docType && String(consulted.docNumber) === String(request.docNumber)
+    && consulted.voucherDate === request.voucherDate && consulted.currencyId === request.currencyId
+    && Number(consulted.currencyQuote) === Number(request.currencyQuote)
+    && ["total", "net", "vat", "nonTaxed", "exempt", "tributes"].every((key) =>
+      Number.isFinite(consulted[key]) && Math.round(consulted[key] * 100) === Math.round(Number(request[key] || 0) * 100)));
 }
 
 export async function authorizeInvoice({
@@ -176,7 +187,7 @@ export async function authorizeInvoice({
     };
   }
 
-  if (current.data?.status === "reconciling") {
+  if (current.data?.status === "reconciling" || (current.data?.status !== "authorized" && current.data?.status !== "rejected" && current.data?.authorization?.voucherNumber)) {
     return {
       status: "reconciling",
       needsReconciliation: true,
@@ -194,6 +205,10 @@ export async function authorizeInvoice({
   }
 
   const savedReceiver = current.data?.receiverSnapshot || {};
+  if (receiver && Object.keys(savedReceiver).length && ["vatConditionId", "documentType", "documentNumber", "anonymousConsumerFinal", "concept"].some((key) => receiver[key] != null && String(receiver[key]) !== String(savedReceiver[key]))) {
+    const error = new Error("El receptor no coincide con el snapshot fiscal.");
+    error.code = "arca-receiver-conflict"; error.status = 409; throw error;
+  }
   const effectiveReceiver = {
     vatConditionId: receiver?.vatConditionId || savedReceiver.vatConditionId,
     documentType: receiver?.documentType || savedReceiver.documentType,
@@ -202,7 +217,7 @@ export async function authorizeInvoice({
       || (receiver?.anonymousConsumerFinal == null && savedReceiver.anonymousConsumerFinal === true),
     concept: receiver?.concept || savedReceiver.concept || 1,
   };
-  const thresholdRaw = String(env.ARCA_CONSUMER_FINAL_ID_THRESHOLD || "10000000").trim();
+  const thresholdRaw = String(env.ARCA_CONSUMER_FINAL_ID_THRESHOLD || "").trim();
   const threshold = Number(thresholdRaw);
   if (!Number.isFinite(threshold) || threshold <= 0) {
     const error = new Error("ARCA_CONSUMER_FINAL_ID_THRESHOLD debe ser un importe válido.");
@@ -210,7 +225,8 @@ export async function authorizeInvoice({
     throw error;
   }
 
-  const plan = buildAuthorizationPlan({
+  let plan;
+  try { plan = buildAuthorizationPlan({
     invoice: current.data,
     issuerVatCondition,
     receiverVatConditionId: effectiveReceiver.vatConditionId,
@@ -220,7 +236,9 @@ export async function authorizeInvoice({
     voucherDate: now,
     concept: effectiveReceiver.concept,
     consumerFinalIdThreshold: threshold,
-  });
+  }); } catch (error) {
+    return { status: "pending", blocked: true, classification: "VALIDATION", error: compactError(error) };
+  }
 
   if (plan.blockers.length) {
     return {
@@ -228,6 +246,7 @@ export async function authorizeInvoice({
       blocked: true,
       blockers: plan.blockers,
       plan,
+      classification: "VALIDATION",
     };
   }
 
@@ -237,6 +256,11 @@ export async function authorizeInvoice({
       dryRun: true,
       plan,
     };
+  }
+
+  const recovery = current.data.recovery || {};
+  if (recovery.classification === "TEMPORARY" && (!recovery.retryable || Date.parse(recovery.nextRetryAt || "") > now.getTime())) {
+    return { status: "pending", blocked: true, reason: "retry-not-due-or-exhausted", recovery };
   }
 
   const config = loadArcaPublicConfig(env);
@@ -291,6 +315,15 @@ export async function authorizeInvoice({
     error.status = 409;
     throw error;
   }
+  if (config.environment === "homologation" && String(env.ARCA_ALLOW_CAE_HOMOLOGATION || "").toLowerCase() !== "true") {
+    const error = new Error("La emisión de homologación está deshabilitada.");
+    error.code = "arca-cae-disabled"; error.status = 409; throw error;
+  }
+  if ((current.data.issuerCuit && String(current.data.issuerCuit) !== config.issuerCuit)
+    || (current.data.pointOfSaleSnapshot && Number(current.data.pointOfSaleSnapshot) !== config.pointOfSale)) {
+    const error = new Error("El emisor o punto de venta no coincide con el snapshot fiscal.");
+    error.code = "arca-invoice-scope-mismatch"; error.status = 409; throw error;
+  }
 
   const claim = await claimInvoiceFn({
     invoiceId,
@@ -310,6 +343,8 @@ export async function authorizeInvoice({
 
   let lock = null;
   let plannedDocument = null;
+  let resolved = false;
+  const attemptCount = Number(claim.invoice?.recovery?.attemptCount || recovery.attemptCount + 1 || 1);
 
   try {
     lock = await acquireLockFn({
@@ -329,6 +364,7 @@ export async function authorizeInvoice({
         errorMessage: "Otra factura está usando la secuencia fiscal. Reintentá en unos segundos.",
         env,
         now,
+        attemptCount,
       });
       return {
         status: returned.data?.status || "pending",
@@ -347,6 +383,11 @@ export async function authorizeInvoice({
       });
     } catch (error) {
       const compact = compactError(error);
+      const classification = classifyFiscalFailure(error);
+      if (classification !== "TEMPORARY") {
+        const failed = await markErrorFn({ invoiceId, expectedUpdateTime: claim.updateTime, errorCode: compact.code, env, now });
+        return { status: failed.data?.status || "error", classification, error: compact };
+      }
       const returned = await returnPendingFn({
         invoiceId,
         expectedUpdateTime: claim.updateTime,
@@ -354,17 +395,18 @@ export async function authorizeInvoice({
         errorMessage: `No se pudo consultar el último comprobante autorizado antes de pedir CAE: ${compact.message}`,
         env,
         now,
+        attemptCount,
       });
       return {
         status: returned.data?.status || "pending",
-        retryable: true,
+        retryable: attemptCount < 3,
         phase: "last-authorized",
         error: compact,
       };
     }
 
     if (last.errors?.length) {
-      const returned = await returnPendingFn({
+      const returned = await markErrorFn({
         invoiceId,
         expectedUpdateTime: claim.updateTime,
         errorCode: "arca-last-authorized-error",
@@ -376,10 +418,15 @@ export async function authorizeInvoice({
         status: returned.data?.status || "pending",
         reason: "last-authorized-error",
         errors: arcaMessages(last.errors),
+        classification: "VALIDATION",
       };
     }
 
     const voucherNumber = Number(last.number || 0) + 1;
+    if (!Number.isSafeInteger(last.number) || last.number < 0) {
+      const error = new Error("La respuesta de numeración fiscal no es válida.");
+      error.code = "arca-last-authorized-invalid"; error.status = 409; throw error;
+    }
     plannedDocument = await persistPlanFn({
       invoiceId,
       expectedUpdateTime: claim.updateTime,
@@ -389,8 +436,12 @@ export async function authorizeInvoice({
       voucherClass: plan.voucherClass,
       receiverVatConditionId: plan.receiverVatConditionId,
       receiverDocument: plan.receiverDocument,
+      receiverSnapshot: { vatConditionId: plan.receiverVatConditionId, documentType: plan.receiverDocument.documentType,
+        documentNumber: plan.receiverDocument.documentNumber, anonymousConsumerFinal: effectiveReceiver.anonymousConsumerFinal === true, concept: Number(effectiveReceiver.concept || 1) },
       fiscal: plan.fiscal,
       attemptId: claim.attemptId,
+      sequenceLock: lock,
+      requestSnapshot: plan.detailBase,
       env,
       now,
     });
@@ -408,7 +459,7 @@ export async function authorizeInvoice({
         env,
       });
     } catch (error) {
-      if (isNetworkUncertain(error)) {
+      {
         const reconciled = await reconcilePlannedVoucher({
           invoiceId,
           plannedDocument,
@@ -417,6 +468,7 @@ export async function authorizeInvoice({
           markAuthorizedFn,
           markReconcilingFn,
         });
+        resolved = reconciled.data?.status === "authorized";
         return {
           status: reconciled.data?.status || "reconciling",
           uncertain: true,
@@ -424,22 +476,11 @@ export async function authorizeInvoice({
         };
       }
 
-      const compact = compactError(error);
-      const failed = await markErrorFn({
-        invoiceId,
-        expectedUpdateTime: plannedDocument.updateTime,
-        errorCode: compact.code,
-        errorMessage: compact.message,
-        env,
-        now,
-      });
-      return {
-        status: failed.data?.status || "error",
-        error: compact,
-      };
     }
 
-    if (caeResponse?.result === "A" && caeResponse?.cae) {
+    if (caeResponse?.result === "A" && /^\d{14}$/.test(String(caeResponse?.cae || "")) && /^\d{8}$/.test(String(caeResponse?.caeExpiration || "")) && !caeResponse.errors?.length
+      && (caeResponse.voucherFrom == null || caeResponse.voucherFrom === voucherNumber)
+      && (caeResponse.voucherTo == null || caeResponse.voucherTo === voucherNumber)) {
       const authorized = await markAuthorizedFn({
         invoiceId,
         expectedUpdateTime: plannedDocument.updateTime,
@@ -451,10 +492,17 @@ export async function authorizeInvoice({
         env,
         now,
       });
+      resolved = true;
       return {
         status: "authorized",
         invoice: authorized.data,
       };
+    }
+
+    if (caeResponse?.result !== "R" || caeResponse?.cae) {
+      const reconciled = await reconcilePlannedVoucher({ invoiceId, plannedDocument, env, consultVoucherFn, markAuthorizedFn, markReconcilingFn });
+      resolved = reconciled.data?.status === "authorized";
+      return { status: reconciled.data?.status || "reconciling", uncertain: true, reconciled: resolved };
     }
 
     const rejected = await markRejectedFn({
@@ -467,17 +515,39 @@ export async function authorizeInvoice({
       env,
       now,
     });
+    resolved = true;
     return {
       status: rejected.data?.status || "rejected",
       invoice: rejected.data,
     };
+  } catch (error) {
+    // Includes failures persisting an accepted response. Never downgrade an
+    // accepted/uncertain operation into a fresh pending authorization.
+    const latest = await getDocument(invoicePath(invoiceId), { env });
+    if (latest?.data?.status === "authorized" || latest?.data?.status === "rejected") {
+      resolved = true;
+      return { status: latest.data.status, invoice: latest.data };
+    }
+    if (latest?.data?.authorization?.attemptId !== claim.attemptId || latest?.data?.status === "pending") {
+      return { status: latest?.data?.status || "unknown", blocked: true, reason: "attempt-superseded", invoice: latest?.data || null };
+    }
+    if (latest?.data?.authorization?.voucherNumber) {
+      const reconciled = await reconcilePlannedVoucher({ invoiceId, plannedDocument: latest, env, consultVoucherFn, markAuthorizedFn, markReconcilingFn });
+      resolved = reconciled.data?.status === "authorized";
+      return { status: reconciled.data?.status || "reconciling", uncertain: true };
+    }
+    const classification = classifyFiscalFailure(error);
+    const persisted = classification === "TEMPORARY"
+      ? await returnPendingFn({ invoiceId, expectedUpdateTime: latest.updateTime, errorCode: error.code, attemptCount, env, now })
+      : await markErrorFn({ invoiceId, expectedUpdateTime: latest.updateTime, errorCode: error.code, env, now });
+    return { status: persisted.data?.status || "error", classification, error: compactError(error) };
   } finally {
     if (lock?.acquired) {
       await releaseLockFn({
         pointOfSale: config.pointOfSale,
         voucherType: plan.voucherType,
         holder: claim.attemptId,
-        expectedUpdateTime: lock.updateTime,
+        resolvedInvoiceId: resolved ? invoiceId : null,
         env,
         now: new Date(),
       }).catch(() => {});
@@ -492,6 +562,7 @@ export async function reconcileInvoice({
   consultVoucherFn = consultVoucher,
   markAuthorizedFn = markInvoiceAuthorized,
   markReconcilingFn = markInvoiceReconciling,
+  releaseLockFn = releaseSequenceLock,
 } = {}) {
   const current = await getDocument(invoicePath(invoiceId), { env });
   if (!current) {
@@ -504,7 +575,10 @@ export async function reconcileInvoice({
   if (current.data?.status === "authorized") {
     return { status: "authorized", alreadyAuthorized: true, invoice: current.data };
   }
-  if (current.data?.status !== "reconciling") {
+  if (current.data?.status === "rejected") {
+    return { status: "rejected", blocked: true, reason: "invoice-rejected", invoice: current.data };
+  }
+  if (current.data?.status !== "reconciling" && !current.data?.authorization?.voucherNumber) {
     return {
       status: current.data?.status || "unknown",
       blocked: true,
@@ -520,6 +594,12 @@ export async function reconcileInvoice({
     markAuthorizedFn,
     markReconcilingFn,
   });
+
+  if (result.data?.status === "authorized") {
+    const authorization = result.data.authorization || {};
+    await releaseLockFn({ pointOfSale: authorization.pointOfSale, voucherType: authorization.voucherType,
+      holder: authorization.attemptId, resolvedInvoiceId: invoiceId, env }).catch(() => {});
+  }
 
   return {
     status: result.data?.status || "reconciling",
@@ -571,6 +651,10 @@ export async function recoverPreCaeInvoice({
     };
   }
 
+  if (Date.parse(authorization.attemptStartedAt || "") + 120000 > now.getTime()) {
+    return { status: "authorizing", recovered: false, reason: "attempt-still-active", invoice: current.data };
+  }
+
   const returned = await returnPendingFn({
     invoiceId,
     expectedUpdateTime: current.updateTime,
@@ -578,6 +662,7 @@ export async function recoverPreCaeInvoice({
     errorMessage: "Se recuperó un intento interrumpido antes de reservar número y antes de solicitar CAE. Puede reintentarse cuando ARCA esté disponible.",
     env,
     now,
+    attemptCount: Number(current.data.recovery?.attemptCount || 0),
   });
 
   return {
@@ -655,7 +740,8 @@ export async function verifyAuthorizedInvoice({
     && consulted?.result === "A"
     && consultedCae === expectedCae
     && consultedNumber === voucherNumber
-    && (!expectedExpiration || !consultedExpiration || consultedExpiration === expectedExpiration)
+    && (!expectedExpiration || consultedExpiration === expectedExpiration)
+    && (!authorization.requestSnapshot || voucherMatchesAuthorization(consulted, authorization))
   );
 
   const persisted = await markVerifiedFn({

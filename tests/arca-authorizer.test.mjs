@@ -28,6 +28,7 @@ test("dry run prepara factura A sin llamar a ARCA", async () => {
   let requested = false;
   const result = await authorizeInvoice({
     invoiceId: "invoice-1",
+    env: { ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000" },
     issuerVatCondition: "responsable_inscripto",
     receiver: {
       vatConditionId: 1,
@@ -63,8 +64,8 @@ test("autorización exitosa serializa secuencia y persiste CAE", async () => {
       requestedBy: "admin-1",
     },
     allowCaeRequest: true,
-    env: {
-      ARCA_ENVIRONMENT: "homologation",
+    env: { ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
+      ARCA_ENVIRONMENT: "homologation", ARCA_ALLOW_CAE_HOMOLOGATION: "true",
       ARCA_ISSUER_CUIT: "20123456786",
       ARCA_POINT_OF_SALE: "3",
       ARCA_CERTIFICATE_PEM: "cert",
@@ -152,8 +153,8 @@ test("timeout no reenvía CAE y entra en reconciliación", async () => {
       documentNumber: "30123456",
     },
     allowCaeRequest: true,
-    env: {
-      ARCA_ENVIRONMENT: "homologation",
+    env: { ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
+      ARCA_ENVIRONMENT: "homologation", ARCA_ALLOW_CAE_HOMOLOGATION: "true",
       ARCA_ISSUER_CUIT: "20123456786",
       ARCA_POINT_OF_SALE: "3",
       ARCA_CERTIFICATE_PEM: "cert",
@@ -219,8 +220,8 @@ test("timeout reconciliado con CAE se marca autorizado sin reenvío", async () =
       documentNumber: "30123456",
     },
     allowCaeRequest: true,
-    env: {
-      ARCA_ENVIRONMENT: "homologation",
+    env: { ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
+      ARCA_ENVIRONMENT: "homologation", ARCA_ALLOW_CAE_HOMOLOGATION: "true",
       ARCA_ISSUER_CUIT: "20123456786",
       ARCA_POINT_OF_SALE: "3",
       ARCA_CERTIFICATE_PEM: "cert",
@@ -248,6 +249,7 @@ test("timeout reconciliado con CAE se marca autorizado sin reenvío", async () =
           pointOfSale: 3,
           voucherType: 6,
           voucherNumber: input.voucherNumber,
+          requestSnapshot: input.requestSnapshot,
         },
       },
     }),
@@ -263,6 +265,9 @@ test("timeout reconciliado con CAE se marca autorizado sin reenvío", async () =
         result: "A",
         cae: "99887766554433",
         caeExpiration: "20261008",
+        pointOfSale: 3, voucherType: 6, voucherNumber: 21, voucherTo: 21,
+        docType: 96, docNumber: "30123456", voucherDate: new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).replaceAll("-", ""),
+        currencyId: "PES", currencyQuote: 1, total: 1210, net: 1000, vat: 210, nonTaxed: 0, exempt: 0, tributes: 0, errors: [],
       };
     },
     markAuthorizedFn: async (input) => ({
@@ -295,7 +300,7 @@ test("502 al consultar último autorizado vuelve a pending sin reservar número 
     },
     allowCaeRequest: true,
     env: {
-      ARCA_ENVIRONMENT: "homologation",
+      ARCA_ENVIRONMENT: "homologation", ARCA_ALLOW_CAE_HOMOLOGATION: "true",
       ARCA_ISSUER_CUIT: "20123456786",
       ARCA_POINT_OF_SALE: "3",
       ARCA_CERTIFICATE_PEM: "cert",
@@ -557,7 +562,7 @@ test("factura de homologación no puede operarse desde runtime productivo", asyn
         anonymousConsumerFinal: true,
       },
       allowCaeRequest: false,
-      env: {
+      env: { ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
         ARCA_ENVIRONMENT: "production",
         ARCA_POINT_OF_SALE: "8",
       },

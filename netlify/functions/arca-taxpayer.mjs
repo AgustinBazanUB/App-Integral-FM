@@ -1,3 +1,4 @@
+import { safeFiscalError } from "../../src/shared/fiscalRecovery.mjs";
 import { requireFirebaseAdmin } from "./_lib/firebaseAuth.mjs";
 import { getTaxpayer } from "./_lib/arca/registry.mjs";
 import { inferReceiverVatCondition } from "./_lib/arca/receiver.mjs";
@@ -25,12 +26,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 function safeError(error) {
-  return {
-    code: error?.code || "arca-taxpayer-error",
-    status: Number(error?.status || 0) || null,
-    causeCode: error?.causeCode || null,
-    message: String(error?.message || "No se pudo completar la operación.").slice(0, 240),
-  };
+  return { ...safeFiscalError(error) };
 }
 
 async function preflightStage(name, operation) {

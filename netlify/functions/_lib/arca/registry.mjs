@@ -96,7 +96,7 @@ function parseRegistryError(personXml, tagName) {
   const block = xmlTag(personXml, tagName);
   if (!block) return null;
   return {
-    message: xmlTag(block, "error") || String(block).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || null,
+    message: "El padrón no pudo confirmar esta sección de la constancia.",
     personId: xmlTag(block, "idPersona") || null,
   };
 }
