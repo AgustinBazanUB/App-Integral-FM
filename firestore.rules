@@ -943,10 +943,10 @@ service cloud.firestore {
         && (!("invoiceStatus" in data) || data.invoiceStatus in ["pending", "not_requested"]);
     }
     match /sales/{saleId} {
-      allow get: if isAdmin()
+      allow get: if isAdmin() || canModule("finance", "view")
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
-      allow list: if isAdmin()
+      allow list: if isAdmin() || canModule("finance", "view")
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
       // Las ventas Ecommerce se crean exclusivamente desde backend después de

@@ -1,3 +1,4 @@
+import { createAdministrativeSale } from "./sellerService";
 import { deleteApp, initializeApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
@@ -14,16 +15,10 @@ import {
   limit,
   orderBy,
   query,
-  runTransaction,
   serverTimestamp,
   setDoc,
   where,
 } from "firebase/firestore";
-import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
-import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
-import { isLocationActiveNow } from "../../modules/locations/domain/locations";
-import { normalizePayment } from "../../modules/locations/domain/payments";
-import { calculateStockAfterSale } from "../../modules/locations/domain/sales";
 import { moduleById } from "../modules";
 import { can, normalizedRole } from "../permissions";
 import { auth, db, firebaseConfig } from "./firebase";
@@ -187,7 +182,7 @@ export async function listLocations(profile, { includeDeleted = false } = {}) {
   const snapshots = await Promise.all(ids.map((id) => getDoc(doc(db, "locations", id))));
   return snapshots
     .filter((snapshot) => snapshot.exists())
-    .map((snapshot) => ({ id: snapshot.id, ...snapshot.data() }))
+    .map((snapshot) => /** @type {any} */ ({ id: snapshot.id, ...snapshot.data() }))
     .filter((item) => item.deleted !== true)
     .sort((a, b) => String(a.name).localeCompare(String(b.name), "es"));
 }
@@ -235,174 +230,7 @@ export async function listRecentSales({ profile, locationId, pageSize = 25 }) {
   );
 }
 
-function localDateKey(date = new Date()) {
-  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function wholeQuantity(value, label) {
-  const number = Number(value);
-  if (!Number.isInteger(number) || number < 0) {
-    throw new Error(`${label} debe ser un número entero mayor o igual a cero.`);
-  }
-  return number;
-}
-
-function cleanSaleItems(items) {
-  return items.reduce((result, item) => {
-    const qty = wholeQuantity(
-      item.qty,
-      `La cantidad de ${item.name || item.productName || "un producto"}`,
-    );
-    if (!qty) return result;
-    const unitPrice = wholeQuantity(
-      item.unitPrice ?? item.price ?? 0,
-      `El precio de ${item.name || item.productName || "un producto"}`,
-    );
-    result.push({
-      productId: item.productId || item.id,
-      name: item.name || item.productName,
-      abbreviation: item.abbreviation || "",
-      unitPrice,
-      qty,
-      subtotal: unitPrice * qty,
-    });
-    return result;
-  }, []);
-}
-
-export async function createQuickSale({
-  location,
-  seller,
-  items,
-  discounts = [],
-  paymentMethod,
-  paymentMethodLabel,
-  payments = [],
-  channel = "manual",
-  customerDni = "",
-  invoiceRequested = false,
-  deliveryMethod = "pickup",
-}) {
-  if (!location?.id) throw new Error("Elegí una ubicación.");
-  if (!isLocationActiveNow(location)) {
-    throw new Error("La ubicación no está activa en este momento.");
-  }
-  const saleItems = cleanSaleItems(items);
-  if (!saleItems.length) throw new Error("La venta está vacía.");
-  const requestedDiscountIds = [...new Set(discounts.map((discount) => discount.discountId || discount.id).filter(Boolean))];
-  const discountSnapshots = await Promise.all(requestedDiscountIds.map((id) => getDoc(doc(db, "discounts", id))));
-  const verifiedDiscounts = discountSnapshots.map((snapshot) => {
-    if (!snapshot.exists()) throw new Error("Uno de los descuentos ya no existe.");
-    return { id: snapshot.id, ...snapshot.data() };
-  });
-  if (verifiedDiscounts.some((discount) => !isDiscountAvailable(discount, location, new Date(), { profile: seller, items: saleItems }))) {
-    throw new Error("Uno de los descuentos no está vigente o no aplica a esta venta.");
-  }
-  const subtotal = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountSummary = calculateDiscountSummary(verifiedDiscounts, subtotal);
-  const total = discountSummary.total;
-  const payment = normalizePayment(
-    paymentMethod,
-    paymentMethodLabel,
-    payments,
-    total,
-  );
-  const dateKey = localDateKey();
-  const prefix = String(location.codePrefix || "LOC")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 8);
-  const counterRef = doc(db, "counters", `${prefix}_${dateKey}`);
-  const saleRef = doc(collection(db, "sales"));
-  const stockRefs = saleItems.map((item) =>
-    doc(db, "locationStock", location.id, "items", item.productId),
-  );
-  const movementRefs = saleItems.map(() => doc(collection(db, "stockMovements")));
-  const auditRef = doc(collection(db, "auditLogs"));
-
-  return runTransaction(db, async (transaction) => {
-    const counterSnapshot = await transaction.get(counterRef);
-    const stockSnapshots = [];
-    for (const stockRef of stockRefs) {
-      stockSnapshots.push(await transaction.get(stockRef));
-    }
-    const next = Number(counterSnapshot.data()?.lastNumber || 0) + 1;
-    const saleCode = `FM-${prefix}-${dateKey}-${String(next).padStart(4, "0")}`;
-    transaction.set(
-      counterRef,
-      { locationId: location.id, date: dateKey, lastNumber: next },
-      { merge: true },
-    );
-    stockSnapshots.forEach((snapshot, index) => {
-      const item = saleItems[index];
-      if (
-        !snapshot.exists() ||
-        snapshot.data().active === false ||
-        snapshot.data().deleted === true
-      ) {
-        throw new Error(`${item.name} no está habilitado en esta ubicación.`);
-      }
-      const previousStock = Number(snapshot.data().currentStock || 0);
-      const newStock = calculateStockAfterSale(previousStock, item.qty, item.name);
-      transaction.update(stockRefs[index], {
-        currentStock: newStock,
-        lastSaleId: saleRef.id,
-        updatedAt: serverTimestamp(),
-      });
-      transaction.set(movementRefs[index], {
-        locationId: location.id,
-        productId: item.productId,
-        type: "sale",
-        qty: -item.qty,
-        previousStock,
-        newStock,
-        reason: `Venta ${saleCode}`,
-        userId: seller.id,
-        userName: seller.name,
-        saleId: saleRef.id,
-        createdAt: serverTimestamp(),
-      });
-    });
-    transaction.set(saleRef, {
-      saleCode,
-      locationId: location.id,
-      locationName: location.name,
-      locationPrefix: prefix,
-      sellerId: seller.id,
-      sellerName: seller.name,
-      items: saleItems,
-      discounts: discountSummary.discounts,
-      discount: null,
-      discountTotal: discountSummary.discountTotal,
-      totalBeforeDiscounts: discountSummary.totalBeforeDiscounts,
-      ...payment,
-      subtotal,
-      totalItems: saleItems.reduce((sum, item) => sum + item.qty, 0),
-      total,
-      status: "active",
-      sourceChannel: channel,
-      customerDni: customerDni.trim() || null,
-      invoiceStatus: invoiceRequested ? "pending" : "not_requested",
-      deliveryMethod,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      deletedAt: null,
-    });
-    transaction.set(auditRef, {
-      action: "sale.created",
-      title: "Venta registrada",
-      description: `${saleCode} · ${location.name}`,
-      moduleId: "quick-sales",
-      entityType: "sale",
-      entityId: saleRef.id,
-      locationId: location.id,
-      locationName: location.name,
-      userId: seller.id,
-      userName: seller.name || seller.email || "Vendedor",
-      status: "completed",
-      amount: total,
-      createdAt: serverTimestamp(),
-    });
-    return { id: saleRef.id, saleCode, total, ...payment, createdAt: new Date() };
-  });
+// Adapter retained for existing callers; all stock/customer/payment writes use the POS service.
+export async function createQuickSale({ seller, channel, location, stockOrigin, ...sale }) {
+  return createAdministrativeSale({ ...sale, profile: seller, channel, stockOrigin: stockOrigin || { type: "location", id: location?.id } });
 }

@@ -23,7 +23,7 @@ const chunk = (items, size = 10) => Array.from(
 
 const hasAllLocations = (profile) =>
   ["admin", "general_admin"].includes(normalizedRole(profile)) ||
-  can(profile, "locations", "viewAllLocations");
+  can(profile, "locations", "viewAllLocations") || can(profile, "finance", "view");
 
 function allowedIds(profile, requestedIds) {
   const requested = requestedIds ? [...new Set(requestedIds)] : null;
@@ -49,6 +49,7 @@ export async function listSalesByRange({ profile, locationIds, start, end, useCa
 
   const groups = scopedIds ? chunk(scopedIds) : [null];
   const snapshots = await Promise.all(groups.map((ids) => {
+    /** @type {import("firebase/firestore").QueryConstraint[]} */
     const constraints = [
       where("status", "==", "active"),
       where("createdAt", ">=", Timestamp.fromDate(start)),
@@ -149,6 +150,7 @@ function matchesActivityFilters(activity, filters = {}) {
   return true;
 }
 
+/** @param {*} options */
 export async function listActivityPage({
   profile,
   locationIds,

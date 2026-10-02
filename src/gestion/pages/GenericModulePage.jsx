@@ -1,3 +1,4 @@
+import SalesIncomePanel from "../components/SalesIncomePanel";
 import { useMemo, useState } from "react";
 import {
   Badge,
@@ -130,6 +131,7 @@ export default function GenericModulePage({ moduleId }) {
           <Link className="fm-button fm-button--secondary" to="/productos">Abrir catálogo público</Link>
         </Panel>
       ) : null}
+      {moduleId === "finance" ? <SalesIncomePanel /> : null}
       <Panel
         title="Registros recientes"
         description="Consulta paginada de los registros autorizados en Firestore."

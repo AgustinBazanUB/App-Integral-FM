@@ -347,3 +347,18 @@ test("homologación reutiliza factura legacy, producción no la adopta", async (
   assert.equal(prod.invoiceId, "invoice_production_seller_sale_sale-legacy");
   assert.equal(prod.created, true);
 });
+
+
+test("Venta Rápida desde depósito conserva entrada fiscal existente sin ubicación ficticia ni ingreso adicional", async () => {
+  const warehouseSale = { ...sale, sourceType: "admin_quick_sale", sourceChannel: "whatsapp", invoiceStatus: "pending", locationId: null, locationName: null, stockOriginType: "warehouse", stockOriginId: "central", stockOriginName: "Depósito central", warehouseId: "central" };
+  const store = memoryStore({ "sales/warehouse-sale": warehouseSale, "products/product-1": { name: "Producto", arcaVatRate: 21, active: true } });
+  const args = { sourceType: "admin_quick_sale", sourceId: "warehouse-sale", requestedBy: "admin", getDocument: store.getDocument, createDocument: store.createDocument };
+  const first = await ensurePendingInvoice(args);
+  const retry = await ensurePendingInvoice(args);
+  assert.equal(first.invoiceId, retry.invoiceId);
+  assert.equal(first.invoice.saleSnapshot.locationId, null);
+  assert.equal(first.invoice.saleSnapshot.total, warehouseSale.total);
+  assert.equal(store.documents.get("sales/warehouse-sale").data.total, warehouseSale.total);
+  assert.equal([...store.documents.keys()].filter(key => key.startsWith("financialEntries/")).length, 0);
+  assert.equal([...store.documents.keys()].filter(key => key.startsWith("invoices/")).length, 1);
+});

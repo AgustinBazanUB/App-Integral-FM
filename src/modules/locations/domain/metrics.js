@@ -1,3 +1,4 @@
+import { saleChannelLabel } from "./channels.js";
 import { saleDiscountList, storedDiscountTotal } from "./discounts.js";
 import { salePaymentParts } from "./payments.js";
 import {
@@ -103,6 +104,7 @@ export function applyMetricsFilters(sales, filters = {}, range) {
     const date = saleDate(sale);
     if (!date || date < range.start || date >= range.end) return false;
     if (!includesAny(filters.locationIds, [sale.locationId, sale.locationName].filter(Boolean))) return false;
+    if (!includesAny(filters.channelIds, [sale.sourceChannel || "__unknown"])) return false;
     if (!includesAny(filters.sellerIds, [sale.sellerId, sale.sellerName].filter(Boolean))) return false;
     if (effectiveProducts.length && !(sale.items || []).some((item) => effectiveProducts.includes(item.productId))) return false;
     if (filters.productId && !(sale.items || []).some((item) => itemMatches(item, filters.productId, filters.productName))) return false;
@@ -200,6 +202,8 @@ export function calculateMetrics(sales, range, filters = {}) {
   const cancelled = sales.filter((sale) => !isActiveSale(sale));
   const total = active.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
   const totalItems = active.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.qty || 0), 0), 0);
+  const byChannel = new Map();
+  const byStockOrigin = new Map();
   const byLocation = new Map();
   const bySeller = new Map();
   const byProduct = new Map();
@@ -214,8 +218,15 @@ export function calculateMetrics(sales, range, filters = {}) {
     const saleTotal = Number(sale.total || 0);
     const items = sale.items || [];
     const itemCount = items.reduce((sum, item) => sum + Number(item.qty || 0), 0);
-    const location = row(byLocation, sale.locationId || sale.locationName || "unknown", sale.locationName || "Ubicación desconocida");
-    location.total += saleTotal; location.sales += 1; location.items += itemCount;
+    const channel = row(byChannel, sale.sourceChannel || "__unknown", saleChannelLabel(sale.sourceChannel));
+    channel.total += saleTotal; channel.sales += 1; channel.items += itemCount;
+    const originType = sale.stockOriginType || (sale.warehouseId ? "warehouse" : "location");
+    const origin = row(byStockOrigin, `${originType}:${sale.stockOriginId || sale.locationId || sale.warehouseId || "unknown"}`, sale.stockOriginName || sale.locationName || sale.warehouseName || "Origen no informado");
+    origin.total += saleTotal; origin.sales += 1; origin.items += itemCount; origin.type = originType;
+    if (originType !== "warehouse") {
+      const location = row(byLocation, sale.locationId || sale.locationName || "unknown", sale.locationName || "Ubicación desconocida");
+      location.total += saleTotal; location.sales += 1; location.items += itemCount;
+    }
     const seller = row(bySeller, sale.sellerId || sale.sellerName || "unknown", sale.sellerName || "Vendedor desconocido");
     seller.total += saleTotal; seller.sales += 1; seller.items += itemCount;
 
@@ -274,6 +285,8 @@ export function calculateMetrics(sales, range, filters = {}) {
     selectedProductUnits,
     timeline: timeline.points,
     timelineMode: timeline.mode,
+    byChannel: withAverage(sorted(byChannel)),
+    byStockOrigin: withAverage(sorted(byStockOrigin)),
     byLocation: withAverage(sorted(byLocation)),
     bySeller: withAverage(sorted(bySeller)),
     byProduct: sorted(byProduct, "items"),

@@ -29,7 +29,7 @@ import { Icon } from "../components/icons";
 import { formatMoney } from "../formatters";
 import { useAsyncData } from "../hooks";
 import { getManagementPath } from "../modules";
-import { can, visibleBusinessModules } from "../permissions";
+import { canAccessAdministration, can, visibleBusinessModules } from "../permissions";
 import {
   invalidateDashboardSales,
   listSalesByRange,
@@ -119,16 +119,17 @@ export default function DashboardPage() {
   const range = useMemo(() => argentinaPeriodRange(format, referenceKey), [format, referenceKey]);
   const periodLabel = useMemo(() => argentinaPeriodLabel(format, referenceKey), [format, referenceKey]);
 
-  const salesQueryKey = `${profile.id}|${selectedLocationIdsKey}|${range.start.toISOString()}|${range.end.toISOString()}`;
+  const allStockOrigins = canAccessAdministration(profile) && selectedLocationIds == null;
+  const salesQueryKey = `${profile.id}|${allStockOrigins ? "all-origins" : selectedLocationIdsKey}|${range.start.toISOString()}|${range.end.toISOString()}`;
   const salesResult = useAsyncData(async () => {
-    const sales = locationsResult.data && effectiveLocationIds.length ? await listSalesByRange({
+    const sales = locationsResult.data && (allStockOrigins || effectiveLocationIds.length) ? await listSalesByRange({
       profile,
-      locationIds: effectiveLocationIds,
+      locationIds: allStockOrigins ? undefined : effectiveLocationIds,
       start: range.start,
       end: range.end,
     }) : [];
     return { queryKey: salesQueryKey, sales };
-  }, [profile, locationsResult.data, selectedLocationIdsKey, range, salesQueryKey]);
+  }, [profile, locationsResult.data, selectedLocationIdsKey, range, salesQueryKey, allStockOrigins]);
 
   const modules = visibleBusinessModules(profile);
   const periodSales = useMemo(() => salesResult.data?.queryKey === salesQueryKey ? salesResult.data.sales : [], [salesResult.data, salesQueryKey]);
@@ -161,6 +162,7 @@ export default function DashboardPage() {
 
   return (
     <div className="fm-page-enter fm-dashboard-page">
+      {allStockOrigins ? <p className="fm-safe-note">Resumen de todos los canales, incluidas ventas con salida de depósitos.</p> : null}
       <HeroBanner
         eyebrow="Panel general"
         title={dashboardGreeting(profile.name)}

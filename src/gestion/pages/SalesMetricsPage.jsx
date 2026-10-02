@@ -1,7 +1,10 @@
+import { saleChannelLabel } from "../../modules/locations/domain/channels";
 import { useMemo, useState } from "react";
 import {
   DataTable,
   EmptyState,
+  FormField,
+  Select,
   PageHeader,
   Panel,
   Skeleton,
@@ -48,6 +51,7 @@ const initialFilterState = () => {
     productIds: [],
     discountIds: [],
     paymentMethods: [],
+    channelIds: [],
   };
 };
 
@@ -116,6 +120,7 @@ export default function SalesMetricsPage() {
   const filteredSales = useMemo(() => {
     if (!rangeState.range) return [];
     return applyMetricsFilters(salesResult.data || [], {
+      channelIds: filters.channelIds,
       locationIds: filters.locationIds,
       sellerIds: filters.sellerIds,
       productIds: filters.productIds,
@@ -123,7 +128,7 @@ export default function SalesMetricsPage() {
       discountIds: filters.discountIds,
       paymentMethods: filters.paymentMethods,
     }, rangeState.range);
-  }, [salesResult.data, rangeState.range, filters.locationIds, filters.sellerIds, filters.productIds, categoryProductIds, filters.discountIds, filters.paymentMethods]);
+  }, [salesResult.data, rangeState.range, filters.locationIds, filters.sellerIds, filters.productIds, categoryProductIds, filters.discountIds, filters.paymentMethods, filters.channelIds]);
 
   const metrics = useMemo(
     () => rangeState.range ? calculateMetrics(filteredSales, rangeState.range) : null,
@@ -144,6 +149,7 @@ export default function SalesMetricsPage() {
       />
 
       <Panel title="Filtros" description="Combiná período, ubicaciones, vendedores, productos, descuentos y formas de pago.">
+        <FormField label="Canal comercial"><Select value={filters.channelIds[0] || ""} onChange={event => setFilters(current => ({ ...current, channelIds: event.target.value ? [event.target.value] : [] }))}><option value="">Todos los canales</option>{[...new Set((salesResult.data || []).map(sale => sale.sourceChannel || "__unknown"))].map(channel => <option key={channel} value={channel}>{saleChannelLabel(channel === "__unknown" ? "" : channel)}</option>)}</Select></FormField>
         <MetricsFiltersPanel
           state={filters}
           onChange={setFilters}
@@ -169,6 +175,10 @@ export default function SalesMetricsPage() {
             <StatCard label="Total descuentos" value={formatMoney(metrics.discountTotal)} hint={`${metrics.discountedSales} ventas con descuento`} icon="Percent" tone="gold" />
           </section>
 
+          <section className="fm-analysis-grid fm-metrics-analysis-grid">
+            <Panel title="Canales comerciales" description="Origen de la operación; Venta Rápida es la herramienta de registro."><DataTable rows={metrics.byChannel} columns={[{ key: "name", label: "Canal" }, { key: "sales", label: "Ventas" }, { key: "total", label: "Monto", render: row => formatMoney(row.total) }]} empty={<EmptyState title="Sin ventas por canal" />} /></Panel>
+            <Panel title="Origen físico del stock" description="Ubicaciones y depósitos desde los cuales salió la mercadería."><DataTable rows={metrics.byStockOrigin} columns={[{ key: "name", label: "Origen" }, { key: "type", label: "Tipo", render: row => row.type === "warehouse" ? "Depósito" : "Ubicación" }, { key: "total", label: "Monto asociado", render: row => formatMoney(row.total) }]} empty={<EmptyState title="Sin salidas por ventas" />} /></Panel>
+          </section>
           <Panel title="Evolución de ventas" description={`Granularidad automática: ${metrics.timelineMode === "hour" ? "hora" : metrics.timelineMode === "day" ? "día" : metrics.timelineMode === "week" ? "semana" : "mes"}.`}>
             {metrics.timeline.length ? <SalesLineChart points={metrics.timeline} label="Evolución de ventas según los filtros seleccionados" /> : <EmptyState icon="ChartNoAxesCombined" title="Sin puntos para graficar" />}
           </Panel>

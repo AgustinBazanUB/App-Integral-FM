@@ -34,6 +34,14 @@ const operationId = (value = "") => {
   return id;
 };
 
+// POS already loads the master catalog once; avoid hydrating each stock row with another product read.
+export async function listQuickSaleStock({ type, id }, profile) {
+  if (!["location", "warehouse"].includes(type) || !id) return [];
+  if (!can(profile, "quick-sales", "create")) throw new Error("No tenés permiso para registrar ventas.");
+  return docsToArray(await getDocs(query(collection(db, type === "warehouse" ? "warehouseStock" : "locationStock", id, "items"), orderBy("productName"))))
+    .filter(item => item.deleted !== true);
+}
+
 function assertPermission(profile, moduleId, action, message) {
   if (!can(profile, moduleId, action)) throw new Error(message);
 }

@@ -71,7 +71,7 @@ export default function DiscountDialog({
           <div className="fm-discount-dialog__heading">
             <div>
               <span className="fm-overline">Descuentos disponibles</span>
-              <p>Configurados por el administrador para esta ubicación.</p>
+              <p>Configurados por el administrador para esta venta.</p>
             </div>
             <Icon name="Percent" />
           </div>

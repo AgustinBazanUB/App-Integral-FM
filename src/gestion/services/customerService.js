@@ -84,6 +84,7 @@ function rememberedActiveZones() {
   }
 }
 
+/** @returns {Promise<any>} */
 export async function findCustomerByPhone(phone) {
   const phoneNormalized = normalizeCustomerPhone(phone);
   if (!phoneNormalized) return null;

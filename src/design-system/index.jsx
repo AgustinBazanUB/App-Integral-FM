@@ -58,6 +58,7 @@ export const IconButton = forwardRef(function IconButton(
   );
 });
 
+/** @param {{eyebrow?: *, title?: *, description?: *, actions?: *}} props */
 export function PageHeader({ eyebrow, title, description, actions }) {
   return (
     <header className="fm-page-header">
@@ -101,6 +102,7 @@ export function StatCard({ label, value, hint, icon, tone = "gold" }) {
   );
 }
 
+/** @param {{title?: *, description?: *, action?: *, className?: string, children?: *}} props */
 export function Panel({ title, description, action, className = "", children }) {
   return (
     <section className={`fm-panel ${className}`.trim()}>
@@ -127,6 +129,7 @@ export function Badge({ children, tone = "neutral", icon }) {
   );
 }
 
+/** @param {{icon?: string, title?: *, description?: *, action?: *}} props */
 export function EmptyState({ icon = "Box", title, description, action }) {
   return (
     <div className="fm-empty-state">
@@ -171,6 +174,7 @@ export function FilterBar({ children, search, actions }) {
   );
 }
 
+/** @param {{label?: *, hint?: *, error?: *, required?: boolean, children?: *, className?: string}} props */
 export function FormField({
   label,
   hint,

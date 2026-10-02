@@ -103,6 +103,7 @@ export function customerZoneLabel(customer = {}) {
   return cleanZoneName(customer.zoneName || customer.customZone || customer.zone);
 }
 
+/** @param {{phone?: string, name?: string, zoneId?: string, zoneName?: string, customZone?: string}} [input] */
 export function buildCustomerDraft({ phone, name = "", zoneId = "", zoneName = "", customZone = "" } = {}) {
   const phoneNormalized = normalizeCustomerPhone(phone);
   if (!isValidCustomerPhone(phoneNormalized)) throw new Error("Ingresá un teléfono válido.");
