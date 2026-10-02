@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   adminCommitDocuments,
   adminGetDocument,
@@ -10,6 +11,7 @@ import {
   ecommerceLocationId,
   ecommercePickupEnabled,
   normalizeCheckoutItems,
+  normalizeCustomer,
   normalizeEcommerceRequestId,
   prepareAuthoritativeCheckout,
 } from "./commerceDomain.mjs";
@@ -122,6 +124,18 @@ export async function loadEcommerceCatalog({
   };
 }
 
+function checkoutRequestFingerprint(body = {}) {
+  const items = normalizeCheckoutItems(body.items)
+    .sort((a, b) => a.productId.localeCompare(b.productId));
+  const customer = normalizeCustomer(body.customer || {});
+  const shippingMethod = String(body.deliveryMethod || body.shipping?.method || "pickup")
+    .trim().toLowerCase();
+  const notes = String(body.notes || body.shipping?.notes || "").trim().slice(0, 500);
+  return createHash("sha256")
+    .update(JSON.stringify({ items, customer, shippingMethod, notes }))
+    .digest("hex");
+}
+
 function deterministicIds(requestId) {
   return {
     orderId: `ecommerce_order_${requestId}`,
@@ -142,9 +156,17 @@ export async function createEcommerceOrder({
   commitDocuments = adminCommitDocuments,
 } = {}) {
   const requestId = normalizeEcommerceRequestId(body?.requestId);
+  const requestFingerprint = checkoutRequestFingerprint(body || {});
   const ids = deterministicIds(requestId);
   const existing = await getDocument(`orders/${ids.orderId}`, { env });
   if (existing) {
+    if (existing.data?.requestFingerprint && existing.data.requestFingerprint !== requestFingerprint) {
+      throw commerceError(
+        "ecommerce-idempotency-conflict",
+        "La misma clave de idempotencia ya fue utilizada para otro contenido de checkout.",
+        409,
+      );
+    }
     return {
       created: false,
       idempotent: true,
@@ -204,13 +226,15 @@ export async function createEcommerceOrder({
 
   const timestamp = now instanceof Date ? now : new Date(now);
   const orderStatus = prepared.stockCommitRequired ? "confirmed" : "pending_payment";
-  const paymentProvider = prepared.paymentStatus === "simulated_approved" ? "local_simulation" : "payway_pending";
+  const paymentProvider = null;
   const saleId = prepared.stockCommitRequired ? ids.saleId : null;
 
   const order = {
     schemaVersion: 1,
     sourceType: "ecommerce",
     requestId,
+    idempotencyKey: requestId,
+    requestFingerprint,
     status: orderStatus,
     locationId,
     locationName: locationSnapshot.data?.name || "Ecommerce",
@@ -234,6 +258,7 @@ export async function createEcommerceOrder({
     schemaVersion: 1,
     sourceType: "ecommerce",
     orderId: ids.orderId,
+    idempotencyKey: requestId,
     saleId,
     provider: paymentProvider,
     status: prepared.paymentStatus,
@@ -338,6 +363,13 @@ export async function createEcommerceOrder({
     if (error?.code === "firebase-admin-already-exists") {
       const existingAfterRace = await getDocument(`orders/${ids.orderId}`, { env });
       if (existingAfterRace) {
+        if (existingAfterRace.data?.requestFingerprint && existingAfterRace.data.requestFingerprint !== requestFingerprint) {
+          throw commerceError(
+            "ecommerce-idempotency-conflict",
+            "La clave de idempotencia entró en conflicto con otro checkout.",
+            409,
+          );
+        }
         return {
           created: false,
           idempotent: true,

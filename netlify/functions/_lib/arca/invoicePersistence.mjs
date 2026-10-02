@@ -102,6 +102,17 @@ function requestedBySource(sourceType, sale = {}) {
   if (sourceType === "admin_quick_sale") {
     return String(sale.invoiceStatus || "").toLowerCase() === "pending";
   }
+  if (sourceType === "ecommerce") {
+    const status = String(sale.paymentStatus || "").toLowerCase();
+    const provider = String(sale.paymentProvider || "").toLowerCase();
+    const trustedPayment = (
+      (status === "simulated_approved" && provider === "simulation")
+      || (status === "approved" && provider === "payway")
+    );
+    return sale.sourceType === "ecommerce"
+      && trustedPayment
+      && String(sale.invoiceStatus || "").toLowerCase() === "pending";
+  }
   return false;
 }
 
@@ -122,6 +133,20 @@ function validateSaleForInvoice(sourceType, sourceId, sale) {
     error.code = "arca-sale-not-active";
     error.status = 409;
     throw error;
+  }
+  if (sourceType === "ecommerce") {
+    const status = String(sale.paymentStatus || "").toLowerCase();
+    const provider = String(sale.paymentProvider || "").toLowerCase();
+    const validPayment = (
+      (status === "simulated_approved" && provider === "simulation")
+      || (status === "approved" && provider === "payway")
+    );
+    if (sale.sourceType !== "ecommerce" || !validPayment) {
+      const error = new Error("La venta Ecommerce no tiene un pago aprobado válido para facturar.");
+      error.code = "ecommerce-payment-not-approved";
+      error.status = 409;
+      throw error;
+    }
   }
   if (!requestedBySource(sourceType, sale)) {
     const error = new Error("La venta no tiene una solicitud de facturación pendiente.");
@@ -171,6 +196,10 @@ export async function ensurePendingInvoice({
   const scope = fiscalScope(env);
   const invoiceId = invoiceIdForEnvironment(scope.environment, sourceType, sourceId);
   const existing = await getDocument(invoicePathFor(invoiceId), { env });
+  if (existing && sourceType === "ecommerce") {
+    const currentSale = await getDocument(salePathFor(sourceId), { env });
+    validateSaleForInvoice(sourceType, sourceId, currentSale?.data || null);
+  }
   if (existing) {
     return {
       created: false,

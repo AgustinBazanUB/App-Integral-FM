@@ -52,8 +52,24 @@ test("configuración Ecommerce no inventa ubicación ni activa pagos simulados",
   const env = await read("../.env.example");
   assert.match(env, /^ECOMMERCE_LOCATION_ID=$/m);
   assert.match(env, /^ECOMMERCE_PICKUP_ENABLED=false$/m);
-  assert.match(env, /^ECOMMERCE_LOCAL_TEST_MODE=false$/m);
-  assert.match(env, /^ECOMMERCE_ALLOW_SIMULATED_PAYMENTS=false$/m);
+  assert.match(env, /^ECOMMERCE_SIMULATED_PAYMENT_ENABLED=false$/m);
+  assert.doesNotMatch(env, /^VITE_.*SIMULATED_PAYMENT/m);
   assert.match(env, /^ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=admin_quick_sale$/m);
   assert.doesNotMatch(env, /^ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=.*ecommerce/m);
+});
+
+
+test("simulación Etapa 6 exige capability backend, admin y advertencia fiscal explícita", async () => {
+  const [checkout, service, endpoint] = await Promise.all([
+    read("../src/pages/CheckoutPage.jsx"),
+    read("../src/services/ecommerceService.js"),
+    read("../netlify/functions/ecommerce-simulated-payment.mjs"),
+  ]);
+  assert.match(checkout, /Este checkout no procesa un pago real/);
+  assert.match(checkout, /La acción simulará un pago aprobado/);
+  assert.match(checkout, /La factura fiscal puede ser real si la emisión productiva está habilitada/);
+  assert.match(service, /ecommerce-simulated-payment/);
+  assert.match(endpoint, /requireFirebaseAdmin/);
+  assert.match(endpoint, /provider: "simulation"/);
+  assert.doesNotMatch(checkout + service, /VITE_.*SIMULATED_PAYMENT/);
 });

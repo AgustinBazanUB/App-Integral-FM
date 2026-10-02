@@ -23,13 +23,6 @@ export function ecommercePickupEnabled(env = process.env) {
   return String(env.ECOMMERCE_PICKUP_ENABLED || "").trim().toLowerCase() === "true";
 }
 
-export function ecommerceSimulatedPaymentEnabled(env = process.env) {
-  return (
-    String(env.ECOMMERCE_LOCAL_TEST_MODE || "").trim().toLowerCase() === "true"
-    && String(env.ECOMMERCE_ALLOW_SIMULATED_PAYMENTS || "").trim().toLowerCase() === "true"
-  );
-}
-
 export function normalizeEcommerceRequestId(value) {
   const normalized = String(value || "").trim().replace(/[^A-Za-z0-9_-]/g, "");
   if (normalized.length < 8 || normalized.length > 96) {
@@ -184,20 +177,14 @@ export function resolveShipping(raw = {}, env = process.env) {
   throw commerceError("ecommerce-shipping-method-invalid", "La forma de entrega no es válida.", 400);
 }
 
-export function resolveRequestedPaymentStatus(rawMode, env = process.env) {
+export function resolveRequestedPaymentStatus(rawMode) {
   const mode = String(rawMode || "pending").trim().toLowerCase();
   if (mode === "pending") return "pending";
-  if (mode === "simulate_approved" && ecommerceSimulatedPaymentEnabled(env)) {
-    return "simulated_approved";
-  }
-  if (mode === "simulate_approved") {
-    throw commerceError(
-      "ecommerce-simulated-payment-disabled",
-      "La simulación de pago sólo está disponible en el entorno local de pruebas.",
-      409,
-    );
-  }
-  throw commerceError("ecommerce-payment-mode-invalid", "El modo de pago solicitado no es válido.", 400);
+  throw commerceError(
+    "ecommerce-checkout-payment-authority-denied",
+    "El checkout público sólo puede crear pagos pendientes.",
+    403,
+  );
 }
 
 export function prepareAuthoritativeCheckout({
@@ -212,7 +199,7 @@ export function prepareAuthoritativeCheckout({
   const items = normalizeCheckoutItems(requestedItems);
   const normalizedCustomer = normalizeCustomer(customer);
   const normalizedShipping = resolveShipping(shipping, env);
-  const paymentStatus = resolveRequestedPaymentStatus(paymentMode, env);
+  const paymentStatus = resolveRequestedPaymentStatus(paymentMode);
 
   const preparedItems = items.map(({ productId, quantity }) => {
     const product = productsById?.[productId];

@@ -15,8 +15,8 @@ import {
 const baseEnv = {
   ECOMMERCE_LOCATION_ID: "loc-web",
   ECOMMERCE_PICKUP_ENABLED: "true",
-  ECOMMERCE_LOCAL_TEST_MODE: "false",
-  ECOMMERCE_ALLOW_SIMULATED_PAYMENTS: "false",
+  ECOMMERCE_SIMULATED_PAYMENT_ENABLED: "false",
+  NODE_ENV: "test",
 };
 
 const product = {
@@ -269,7 +269,7 @@ test("pedido pending persiste Order + Payment sin Sale, stock ni Invoice", async
   assert.equal([...adapter.documents.keys()].some((path) => path.startsWith("invoices/")), false);
 });
 
-test("simulated_approved sólo en modo local crea Sale y descuenta stock atómicamente", async () => {
+test("checkout público no puede autoaprobar un pago aunque el flag local exista", async () => {
   const adapter = memoryAdapter({
     "products/product-1": product,
     "locations/loc-web": { name: "Web", active: true, deleted: false },
@@ -277,33 +277,28 @@ test("simulated_approved sólo en modo local crea Sale y descuenta stock atómic
   });
   const env = {
     ...baseEnv,
-    ECOMMERCE_LOCAL_TEST_MODE: "true",
-    ECOMMERCE_ALLOW_SIMULATED_PAYMENTS: "true",
+    ECOMMERCE_SIMULATED_PAYMENT_ENABLED: "true",
   };
 
-  const result = await createEcommerceOrder({
-    body: {
-      requestId: "request_approved_001",
-      items: [{ productId: "product-1", quantity: 2 }],
-      customer,
-      deliveryMethod: "pickup",
-      paymentMode: "simulate_approved",
-    },
-    env,
-    now: new Date("2026-10-01T12:00:00.000Z"),
-    getDocument: adapter.getDocument,
-    commitDocuments: adapter.commitDocuments,
-  });
-
-  assert.equal(result.order.paymentStatus, "simulated_approved");
-  assert.equal(result.order.saleId, "ecommerce_sale_request_approved_001");
-  assert.equal(adapter.documents.has("sales/ecommerce_sale_request_approved_001"), true);
-  assert.equal(adapter.documents.get("locationStock/loc-web/items/product-1").data.currentStock, 3);
-  assert.equal(
-    adapter.documents.get("sales/ecommerce_sale_request_approved_001").data.invoiceStatus,
-    "not_requested",
+  await assert.rejects(
+    () => createEcommerceOrder({
+      body: {
+        requestId: "request_approved_001",
+        items: [{ productId: "product-1", quantity: 2 }],
+        customer,
+        deliveryMethod: "pickup",
+        paymentMode: "simulate_approved",
+      },
+      env,
+      now: new Date("2026-10-01T12:00:00.000Z"),
+      getDocument: adapter.getDocument,
+      commitDocuments: adapter.commitDocuments,
+    }),
+    (error) => error?.code === "ecommerce-checkout-payment-authority-denied",
   );
-  assert.equal([...adapter.documents.keys()].some((path) => path.startsWith("invoices/")), false);
+
+  assert.equal(adapter.documents.has("sales/ecommerce_sale_request_approved_001"), false);
+  assert.equal(adapter.documents.get("locationStock/loc-web/items/product-1").data.currentStock, 5);
 });
 
 test("requestId vuelve idempotente un retry de checkout", async () => {

@@ -5,7 +5,11 @@ import PageMeta from "../components/PageMeta";
 import { useCart } from "../context/CartContext";
 import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import { categoryById } from "../data/categories";
-import { createEcommerceOrder } from "../services/ecommerceService";
+import {
+  createEcommerceOrder,
+  observeEcommerceSimulationCapability,
+  simulateApprovedEcommercePayment,
+} from "../services/ecommerceService";
 import { trackEvent } from "../utils/analytics";
 
 const DRAFT_KEY = "flor-mia-checkout-draft-v2";
@@ -28,6 +32,7 @@ function initialDraft() {
     postalCode: "",
     notes: "",
     marketingConsent: false,
+    fiscalCuit: "",
   };
 }
 
@@ -68,6 +73,11 @@ export default function CheckoutPage() {
   const [storageMessage, setStorageMessage] = useState("");
   const [submitState, setSubmitState] = useState({ busy: false, error: "" });
   const [orderResult, setOrderResult] = useState(null);
+  const [simulationCapability, setSimulationCapability] = useState({
+    enabled: false,
+    localRuntime: false,
+    adminRequired: true,
+  });
 
   useEffect(() => {
     try {
@@ -83,6 +93,11 @@ export default function CheckoutPage() {
   useEffect(() => {
     trackEvent("begin_checkout", { quantity: unitCount, value: knownSubtotal });
   }, [knownSubtotal, unitCount]);
+
+  useEffect(
+    () => observeEcommerceSimulationCapability(setSimulationCapability),
+    [],
+  );
 
   const summary = useMemo(
     () =>
@@ -138,7 +153,7 @@ export default function CheckoutPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const submitOrder = async () => {
+  const submitOrder = async ({ simulatePayment = false } = {}) => {
     setSubmitState({ busy: true, error: "" });
     try {
       const latestCatalog = await refreshCatalog();
@@ -168,7 +183,23 @@ export default function CheckoutPage() {
         clientTotal: knownSubtotal,
       });
 
-      setOrderResult(result.order);
+      let finalOrder = result.order;
+      let simulation = null;
+      if (simulatePayment) {
+        simulation = await simulateApprovedEcommercePayment({
+          orderId: result.order.id,
+          idempotencyKey: draft.requestId,
+          receiverCuit: draft.fiscalCuit,
+        });
+        finalOrder = {
+          ...result.order,
+          ...simulation.order,
+          invoiceId: simulation.invoice?.id || null,
+          invoiceStatus: simulation.invoice?.status || result.order.invoiceStatus,
+        };
+      }
+
+      setOrderResult({ ...finalOrder, simulation });
       setStep(3);
       clearCart();
       window.localStorage.removeItem(DRAFT_KEY);
@@ -235,11 +266,23 @@ export default function CheckoutPage() {
                 <p>Total recalculado por el backend: <strong>{formatMoney(orderResult.total)}</strong></p>
                 <p>Pago: <strong>{orderResult.paymentStatus}</strong></p>
                 <p>Factura: <strong>{orderResult.invoiceStatus}</strong></p>
-                <p>
-                  Esta etapa no procesó tarjeta ni emitió ARCA. Cuando Payway se
-                  integre, la aprobación del pago podrá confirmar la venta y
-                  descontar stock dentro de una operación server-side.
-                </p>
+                {orderResult.simulation ? (
+                  <>
+                    <p>Venta Ecommerce: <strong>{orderResult.saleId}</strong></p>
+                    <p>Invoice: <strong>{orderResult.simulation.invoice?.id}</strong> · {orderResult.simulation.invoice?.status}</p>
+                    <p>
+                      Resultado fiscal: <strong>{orderResult.simulation.fiscal?.mode}</strong>
+                      {orderResult.simulation.fiscal?.voucherClass ? ` · Factura ${orderResult.simulation.fiscal.voucherClass}` : ""}
+                    </p>
+                    <p>No se procesó un pago real y no se solicitó CAE en este flujo local.</p>
+                  </>
+                ) : (
+                  <p>
+                    Esta etapa no procesó tarjeta ni emitió ARCA. Cuando Payway se
+                    integre, la aprobación del pago podrá confirmar la venta y
+                    descontar stock dentro de una operación server-side.
+                  </p>
+                )}
                 <Link className="button button--gold" to="/productos">Seguir comprando</Link>
               </div>
             ) : items.length ? (
@@ -328,6 +371,26 @@ export default function CheckoutPage() {
                         aprobación de pago confiable.
                       </p>
                     </div>
+                    {simulationCapability.enabled ? (
+                      <div className="pending-panel">
+                        <strong>Modo local de prueba para administrador</strong>
+                        <p>
+                          Este checkout no procesa un pago real.
+                          La acción simulará un pago aprobado.
+                          La factura fiscal puede ser real si la emisión productiva está habilitada.
+                        </p>
+                        <label className="field-label">
+                          CUIT para facturación (opcional)
+                          <input
+                            name="fiscalCuit"
+                            inputMode="numeric"
+                            value={draft.fiscalCuit}
+                            onChange={updateField}
+                            placeholder="Sin CUIT: Consumidor Final"
+                          />
+                        </label>
+                      </div>
+                    ) : null}
                     <div className="integration-state">
                       <ShieldCheck size={28} aria-hidden="true" />
                       <h3>Precio y stock no vienen del navegador.</h3>
@@ -377,10 +440,20 @@ export default function CheckoutPage() {
                       type="button"
                       className="button button--gold"
                       disabled={checkoutBlocked || submitState.busy}
-                      onClick={submitOrder}
+                      onClick={() => submitOrder()}
                     >
                       {submitState.busy ? "Registrando…" : "Crear pedido"}
                     </button>
+                    {simulationCapability.enabled ? (
+                      <button
+                        type="button"
+                        className="button button--secondary"
+                        disabled={checkoutBlocked || submitState.busy}
+                        onClick={() => submitOrder({ simulatePayment: true })}
+                      >
+                        {submitState.busy ? "Procesando…" : "Simular pago aprobado + factura"}
+                      </button>
+                    ) : null}
                   )}
                 </div>
               </>
