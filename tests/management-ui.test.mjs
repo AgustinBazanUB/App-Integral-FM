@@ -11,7 +11,7 @@ test("el panel usa Venta Rápida y enlaza el flujo existente", async () => {
   assert.doesNotMatch(source, />Nueva venta</);
 });
 
-test("el panel incluye selector temporal único, análisis y actividad ampliable", async () => {
+test("el panel incluye selector temporal único, ritmo, pagos y alertas", async () => {
   const source = await read("../src/gestion/pages/DashboardPage.jsx");
   const filters = await read("../src/gestion/components/DashboardFilters.jsx");
   assert.match(source, /<DashboardFilters/);
@@ -24,7 +24,9 @@ test("el panel incluye selector temporal único, análisis y actividad ampliable
   assert.match(filters, /Día/);
   assert.match(filters, /Ubicaciones/);
   assert.match(source, /\/gestion\/metrics\/sales/);
-  assert.match(source, /\/gestion\/actividad/);
+  assert.match(source, /DashboardPayments/);
+  assert.match(source, /DashboardAlerts/);
+  assert.doesNotMatch(source, /listActivityPage/);
 });
 
 test("las tarjetas de módulos renderizan iconos semánticos y no números", async () => {

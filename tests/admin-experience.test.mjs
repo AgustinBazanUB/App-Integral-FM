@@ -32,11 +32,11 @@ test("conexión es global, compacta, accesible y permite reconectar", () => {
   assert.match(connection, /Conexión restablecida\./);
 });
 
-test("actividad comparte presentación y mantiene paginación", () => {
+test("actividad mantiene su presentación y paginación fuera del resumen del Panel", () => {
   assert.match(activity, /getActivityPresentation/);
   assert.match(activity, /Filtrar por tipo de actividad/);
-  assert.match(dashboard, /getActivityPresentation/);
-  assert.match(dashboard, /activityType/);
+  assert.doesNotMatch(dashboard, /getActivityPresentation|activityType|listActivityPage/);
+  assert.match(dashboard, /DashboardPayments/);
   assert.match(activity, /Cargar más actividad/);
 });
 
