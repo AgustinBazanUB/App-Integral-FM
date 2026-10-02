@@ -94,7 +94,7 @@ function activityFromDocument(source, item) {
     locationName: data.locationName || "",
     userId: data.userId || data.sellerId || data.createdBy || "",
     userName: data.userName || data.sellerName || data.createdByName || "Sistema",
-    moduleId: data.moduleId || (source === "sales" ? "quick-sales" : source === "stockMovements" ? "locations" : "system"),
+    moduleId: data.moduleId || (source === "sales" ? "quick-sales" : source === "stockMovements" ? (data.inventoryType === "warehouse" ? "warehouse" : "locations") : "system"),
     entityId: data.entityId || data.saleId || item.id,
     raw: data,
   };

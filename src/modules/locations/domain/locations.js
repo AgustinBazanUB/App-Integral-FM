@@ -73,3 +73,19 @@ export function addDays(date, days) {
   result.setDate(result.getDate() + Number(days || 0));
   return result;
 }
+
+export const LOCATION_TYPES = Object.freeze({ store: "Local", fair: "Feria", event: "Evento" });
+export const OPERATING_DAYS = Object.freeze(["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]);
+
+export function normalizeOperatingCalendar(calendar = {}) {
+  const weekdays = [...new Set(calendar.weekdays || [])].sort((a, b) => a - b);
+  if (weekdays.some((day) => !Number.isInteger(day) || day < 1 || day > 7)) throw new Error("Los días de atención deben estar entre lunes y domingo.");
+  const openingTime = String(calendar.openingTime || "");
+  const closingTime = String(calendar.closingTime || "");
+  const clock = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  if ((openingTime && !clock.test(openingTime)) || (closingTime && !clock.test(closingTime)) || Boolean(openingTime) !== Boolean(closingTime)) throw new Error("Completá horarios válidos de apertura y cierre.");
+  if (openingTime && openingTime === closingTime) throw new Error("Apertura y cierre deben ser distintos; para una jornada nocturna usá un cierre menor que la apertura.");
+  const dates = [...new Set((calendar.dates || []).map((date) => String(date).trim()).filter(Boolean))].sort();
+  if (dates.length > 120 || dates.some((date) => !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date)) throw new Error("Usá hasta 120 fechas reales con formato AAAA-MM-DD.");
+  return { timeZone: "America/Argentina/Buenos_Aires", weekdays, openingTime, closingTime, overnight: Boolean(openingTime && closingTime < openingTime), dates };
+}

@@ -8,11 +8,13 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   writeBatch,
   where,
 } from "firebase/firestore";
-import { localDateTimeToDate } from "../../modules/locations/domain/locations";
+import { localDateTimeToDate, locationActivity, LOCATION_TYPES, normalizeOperatingCalendar } from "../../modules/locations/domain/locations";
+import { assertUniqueInventoryProducts, effectiveLocationPrice } from "../../modules/inventory/domain/inventory";
+import { invalidateRuntimeCache } from "./runtimeCache";
+import { addProductToLocation, saveLocationProductSettings } from "./inventoryService";
 import { can, normalizedRole } from "../permissions";
 import { db } from "./firebase";
 
@@ -84,41 +86,60 @@ export async function listAssignableSellers() {
 
 export async function saveManagedLocation(data, profile, locationId = null) {
   assertPermission(profile, locationId ? "edit" : "create", "No tenés permiso para guardar ubicaciones.");
-  const locationRef = locationId ? doc(db, "locations", locationId) : doc(collection(db, "locations"));
+  const locationRef = locationId ? doc(db, "locations", locationId) : data.requestId ? doc(db, "locations", data.requestId) : doc(collection(db, "locations"));
   const auditRef = doc(collection(db, "auditLogs"));
-  const batch = writeBatch(db);
   const scheduleStartAt = localDateTimeToDate(data.scheduleStartAt || data.startDateTime || data.startDate);
   const scheduleEndAt = localDateTimeToDate(data.scheduleEndAt || data.endDateTime || data.endDate);
-  batch.set(locationRef, {
-    name: data.name.trim(),
-    type: data.type,
-    codePrefix: data.codePrefix.trim().toUpperCase(),
-    dniMode: data.dniMode,
-    active: data.active !== false,
-    deleted: false,
-    scheduleStartAt: scheduleStartAt || null,
-    scheduleEndAt: scheduleEndAt || null,
-    startDateTime: data.scheduleStartAt || "",
-    endDateTime: data.scheduleEndAt || "",
-    updatedBy: profile.id,
-    updatedByName: userName(profile),
-    updatedAt: serverTimestamp(),
-    ...(locationId ? {} : { createdAt: serverTimestamp(), assignedSellerIds: [], enabledDiscountIds: [] }),
-  }, { merge: true });
-  batch.set(auditRef, auditFields(profile, {
-    action: locationId ? "location.updated" : "location.created",
-    title: locationId ? "Ubicación actualizada" : "Ubicación creada",
-    description: data.name.trim(),
-    moduleId: "locations",
-    entityType: "location",
-    entityId: locationRef.id,
-    entityName: data.name.trim(),
-    locationId: locationRef.id,
-    locationName: data.name.trim(),
-    status: "completed",
-  }));
-  await batch.commit();
-  return locationRef.id;
+  const name = String(data.name || "").trim();
+  const prefix = String(data.codePrefix || "").trim().toUpperCase();
+  if (!name || !/^[A-Z0-9]{1,8}$/.test(prefix)) throw new Error("Completá un nombre y un prefijo de hasta 8 letras o números.");
+  if (scheduleStartAt && scheduleEndAt && scheduleStartAt >= scheduleEndAt) throw new Error("La fecha final debe ser posterior a la inicial.");
+  const result = await runTransaction(db, async (transaction) => {
+    const previous = await transaction.get(locationRef);
+    if (locationId && (!previous.exists() || previous.data().deleted === true)) throw new Error("La ubicación no está disponible.");
+    if (!locationId && previous.exists()) {
+      if (previous.data().createdBy !== profile.id) throw new Error("La ubicación ya existe.");
+      return locationRef.id;
+    }
+    if (!Object.hasOwn(LOCATION_TYPES, data.type) && (!previous.exists() || previous.data().type !== data.type)) throw new Error("Elegí Local, Feria o Evento. Los depósitos se crean en su propio módulo.");
+    const operatingCalendar = normalizeOperatingCalendar(data.operatingCalendar ?? (previous.exists() ? previous.data().operatingCalendar : undefined));
+    transaction.set(locationRef, {
+      name,
+      type: data.type,
+      codePrefix: prefix,
+      operatingCalendar,
+      dniMode: data.dniMode,
+      active: data.active !== false,
+      ...(!locationId ? { deleted: false } : {}),
+      scheduleStartAt: scheduleStartAt || null,
+      scheduleEndAt: scheduleEndAt || null,
+      startDateTime: data.scheduleStartAt || "",
+      endDateTime: data.scheduleEndAt || "",
+      updatedBy: profile.id,
+      updatedByName: userName(profile),
+      updatedAt: serverTimestamp(),
+      ...(locationId ? {} : { createdAt: serverTimestamp(), createdBy: profile.id, assignedSellerIds: [], enabledDiscountIds: [] }),
+    }, { merge: true });
+    transaction.set(auditRef, auditFields(profile, {
+      action: locationId ? "location.updated" : "location.created",
+      title: locationId ? "Ubicación actualizada" : "Ubicación creada",
+      description: data.name.trim(),
+      moduleId: "locations",
+      entityType: "location",
+      entityId: locationRef.id,
+      entityName: data.name.trim(),
+      locationId: locationRef.id,
+      locationName: data.name.trim(),
+      previousCalendar: previous.exists() ? previous.data().operatingCalendar || null : null,
+      operatingCalendar,
+      previousSchedule: previous.exists() ? { startAt: previous.data().scheduleStartAt || null, endAt: previous.data().scheduleEndAt || null } : null,
+      schedule: { startAt: scheduleStartAt || null, endAt: scheduleEndAt || null },
+      status: "completed",
+    }));
+    return locationRef.id;
+  });
+  invalidateRuntimeCache("locations:");
+  return result;
 }
 
 export async function setLocationLifecycle(location, action, profile) {
@@ -135,8 +156,7 @@ export async function setLocationLifecycle(location, action, profile) {
     delete: ["location.deleted", "Ubicación dada de baja"],
     restore: ["location.restored", "Ubicación restaurada"],
   };
-  if (action === "pause") Object.assign(updates, { active: false, manualInactiveUntil: null });
-  else if (action === "activate") Object.assign(updates, { active: true, manualInactiveUntil: null });
+  if (action === "pause" || action === "activate") Object.assign(updates, { active: action === "activate", manualInactiveUntil: null, manualInactiveDays: null, ...(location.manualInactiveUntilDateTime ? { manualInactiveUntilDateTime: null } : {}) });
   else if (action === "delete") Object.assign(updates, { active: false, deleted: true, deletedAt: serverTimestamp(), deletedBy: profile.id });
   else if (action === "restore") Object.assign(updates, { active: true, deleted: false, deletedAt: null, restoredAt: serverTimestamp(), restoredBy: profile.id });
   else throw new Error("La acción solicitada no es válida.");
@@ -155,6 +175,7 @@ export async function setLocationLifecycle(location, action, profile) {
     status: action === "delete" ? "archived" : "completed",
   }));
   await batch.commit();
+  invalidateRuntimeCache("locations:");
 }
 
 function quantity(value, label, { allowZero = true } = {}) {
@@ -168,14 +189,16 @@ function quantity(value, label, { allowZero = true } = {}) {
 export async function loadLocationStock({ location, entries, mode, reason, profile, operationId }) {
   const action = mode === "adjust" ? "adjustStock" : "loadStock";
   assertPermission(profile, action, "No tenés permiso para cargar este stock.");
-  if (!location?.id || location.deleted === true || location.active === false) {
+  if (!location?.id || !locationActivity(location).active) {
     throw new Error("La ubicación no está habilitada para cargar stock.");
   }
   if (!["initial", "add", "adjust"].includes(mode)) throw new Error("Elegí un modo de carga válido.");
   const cleaned = (entries || []).filter((entry) => String(entry.quantity ?? "").trim() !== "");
   if (!cleaned.length) throw new Error("Ingresá al menos una cantidad.");
+  assertUniqueInventoryProducts(cleaned);
   if (cleaned.length > 40) throw new Error("Podés actualizar hasta 40 productos por operación.");
-  const safeOperationId = String(operationId || crypto.randomUUID()).replace(/[^a-zA-Z0-9_-]/g, "");
+  const safeOperationId = String(operationId || crypto.randomUUID());
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(safeOperationId)) throw new Error("El identificador de operación no es válido.");
   const operationRef = doc(db, "stockOperations", safeOperationId);
   const locationRef = doc(db, "locations", location.id);
 
@@ -183,7 +206,7 @@ export async function loadLocationStock({ location, entries, mode, reason, profi
     const operationSnapshot = await transaction.get(operationRef);
     if (operationSnapshot.exists()) return operationSnapshot.data();
     const locationSnapshot = await transaction.get(locationRef);
-    if (!locationSnapshot.exists() || locationSnapshot.data().deleted === true || locationSnapshot.data().active === false) {
+    if (!locationSnapshot.exists() || !locationActivity(locationSnapshot.data()).active) {
       throw new Error("La ubicación dejó de estar disponible.");
     }
     const prepared = [];
@@ -199,6 +222,7 @@ export async function loadLocationStock({ location, entries, mode, reason, profi
       const existing = stockSnapshot.exists() && stockSnapshot.data().deleted !== true ? stockSnapshot.data() : {};
       const previousStock = Number(existing.currentStock || 0);
       const previousInitial = Number(existing.initialStock || 0);
+      if (mode === "initial" && stockSnapshot.exists() && requested !== previousInitial) assertPermission(profile, "adjustStock", "La modificación del stock inicial existente requiere permiso de ajuste.");
       const currentStock = mode === "add" ? previousStock + requested : mode === "adjust" ? requested : previousStock + requested - previousInitial;
       if (currentStock < 0) throw new Error(`El ajuste de ${entry.product.name} dejaría stock negativo.`);
       prepared.push({ entry, existing, stockRef, requested, previousStock, previousInitial, currentStock });
@@ -217,7 +241,8 @@ export async function loadLocationStock({ location, entries, mode, reason, profi
         categoryName: product.categoryName || "",
         imageUrl: product.imageUrl || "",
         thumbUrl: product.thumbUrl || "",
-        price: quantity(entry.price ?? existing.price ?? product.defaultPrice ?? 0, `El precio de ${product.name}`),
+        price: effectiveLocationPrice(product, existing),
+        ...(!Object.keys(existing).length ? { priceMode: "default", priceOverride: null } : {}),
         initialStock: mode === "initial" ? requested : previousInitial,
         currentStock,
         yellowAlertQty,
@@ -226,11 +251,13 @@ export async function loadLocationStock({ location, entries, mode, reason, profi
         deleted: false,
         deletedAt: null,
         productDeleted: false,
+        lastMovementId: `${safeOperationId}_${product.id}`,
         updatedAt: serverTimestamp(),
         updatedBy: profile.id,
       }, { merge: true });
       transaction.set(doc(db, "stockMovements", `${safeOperationId}_${product.id}`), {
         operationId: safeOperationId,
+        inventoryType: "location", inventoryId: location.id,
         locationId: location.id,
         locationName: location.name,
         productId: product.id,
@@ -278,41 +305,16 @@ export async function loadLocationStock({ location, entries, mode, reason, profi
 }
 
 export async function saveLocationProductConfiguration({ location, product, values, profile }) {
-  assertPermission(profile, "configureLocationProducts", "No tenés permiso para configurar productos en esta ubicación.");
-  const yellowAlertQty = quantity(values.yellowAlertQty || 0, "La alerta amarilla");
-  const redAlertQty = quantity(values.redAlertQty || 0, "La alerta roja");
-  if (yellowAlertQty < redAlertQty) throw new Error("La alerta amarilla debe ser mayor o igual a la roja.");
-  const stockRef = doc(db, "locationStock", location.id, "items", product.id);
-  const batch = writeBatch(db);
-  batch.set(stockRef, {
-    productId: product.id,
-    productName: product.name,
-    abbreviation: product.abbreviation || "",
-    categoryId: product.categoryId || "",
-    categoryName: product.categoryName || "",
-    imageUrl: product.imageUrl || "",
-    thumbUrl: product.thumbUrl || "",
-    price: quantity(values.price || 0, "El precio"),
-    yellowAlertQty,
-    redAlertQty,
-    ...(!product.hasLocalRecord ? { currentStock: 0, initialStock: 0 } : {}),
-    active: values.active !== false,
-    deleted: false,
-    updatedAt: serverTimestamp(),
-    updatedBy: profile.id,
-  }, { merge: true });
-  batch.set(doc(collection(db, "auditLogs")), auditFields(profile, {
-    action: "locationProduct.configured",
-    title: "Producto configurado",
-    description: `${product.name} · ${location.name}`,
-    moduleId: "locations",
-    entityType: "locationProduct",
-    entityId: product.id,
-    locationId: location.id,
-    locationName: location.name,
-    status: "completed",
-  }));
-  await batch.commit();
+  // Adaptador legacy: la configuración no puede resetear stock por una UI obsoleta.
+  assertPermission(profile, "configureLocationProducts", "No tenés permiso para configurar este producto.");
+  const yellow = quantity(values.yellowAlertQty ?? 0, "La alerta amarilla");
+  const red = quantity(values.redAlertQty ?? 0, "La alerta roja");
+  if (yellow < red) throw new Error("La alerta amarilla debe ser mayor o igual a la roja.");
+  const snapshot = await getDoc(doc(db, "locationStock", location.id, "items", product.id));
+  if (!snapshot.exists() || snapshot.data().deleted === true) {
+    await addProductToLocation({ location, product, initialStock: 0, useDefaultPrice: false, priceOverride: values.price ?? product.defaultPrice ?? 0, profile });
+  }
+  return saveLocationProductSettings({ location, productId: product.id, values: { ...values, useDefaultPrice: values.useDefaultPrice ?? false, priceOverride: values.priceOverride ?? values.price ?? product.defaultPrice ?? 0 }, profile });
 }
 
 export async function saveLocationSellers(location, sellerIds, profile) {

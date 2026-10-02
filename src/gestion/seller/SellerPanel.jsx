@@ -1,3 +1,4 @@
+import { effectiveLocationPrice } from "../../modules/inventory/domain/inventory";
 import { getArcaInvoiceForSale, arcaSourceTypeForSale } from "../services/arcaService";
 import { fiscalPresentation } from "../../shared/fiscalRecovery.mjs";
 import ArcaInvoicePrintAction from "../components/ArcaInvoicePrintAction";
@@ -289,14 +290,16 @@ export default function SellerPanel() {
     () => pendingReservedQuantities(pendingData, locationId),
     [pendingData, locationId],
   );
+  const masterById = useMemo(() => new Map((resourcesResult.data?.products || []).map((product) => [product.id, product])), [resourcesResult.data?.products]);
   const products = useMemo(() => stockData.map((item) => ({
     ...item,
+    price: effectiveLocationPrice(masterById.get(item.productId || item.id) || { defaultPrice: item.masterDefaultPrice ?? item.price ?? 0 }, item),
     availableStock: Math.max(
       0,
       Number(item.currentStock || 0) - Number(reserved[item.id] || 0) +
       Number(editSale?.items?.find((old) => old.productId === item.id)?.qty || 0),
     ),
-  })), [stockData, reserved, editSale]);
+  })), [stockData, reserved, editSale, masterById]);
   const productGroups = useMemo(
     () => groupSellerProducts(products, categories),
     [products, categories],

@@ -16,7 +16,7 @@ export function wholeInventoryQuantity(value, label = "La cantidad", { allowZero
   return number;
 }
 
-export function normalizeLegacyLocationPrice(stockItem = {}, product = {}) {
+export function normalizeLegacyLocationPrice(stockItem = {}, _product = {}) {
   const hasExplicitMode = stockItem.priceMode === PRICE_MODES.DEFAULT || stockItem.priceMode === PRICE_MODES.CUSTOM;
   if (hasExplicitMode) {
     const override = stockItem.priceMode === PRICE_MODES.CUSTOM
@@ -135,6 +135,22 @@ export function summarizeTransfer(lines = []) {
     productCount: selected.length,
     totalQuantity: selected.reduce((sum, line) => sum + Number(line.quantity || 0), 0),
   };
+}
+
+// La cantidad prevista sale del stock digital: incluye faltantes de preparación.
+// Sólo lo físicamente recibido se acredita al destino; pérdidas no se suman otra vez.
+export function reconcileTransferLine(line = {}, availableStock = 0) {
+  if ([line.preparedQuantity, line.receivedQuantity].some((value) => typeof value === "string" && !value.trim())) throw new Error("Completá las cantidades preparadas y recibidas; usá cero si no hubo unidades.");
+  const quantity = validateTransferLine(line, availableStock);
+  const preparedQuantity = wholeInventoryQuantity(line.preparedQuantity ?? quantity, "La cantidad preparada");
+  const receivedQuantity = wholeInventoryQuantity(line.receivedQuantity ?? preparedQuantity, "La cantidad recibida");
+  if (preparedQuantity > quantity || receivedQuantity > preparedQuantity) throw new Error("La cantidad recibida no puede superar la preparada ni ésta la prevista.");
+  return { quantity, preparedQuantity, receivedQuantity, missingQuantity: quantity - preparedQuantity, lostQuantity: preparedQuantity - receivedQuantity };
+}
+
+export function assertUniqueInventoryProducts(lines = []) {
+  const ids = lines.map((line) => line.productId || line.product?.id || line.id);
+  if (ids.some((id) => !id) || new Set(ids).size !== ids.length) throw new Error("Cada producto debe aparecer una sola vez en la operación.");
 }
 
 export function movementLabel(movement = {}) {

@@ -21,7 +21,7 @@ test("las ubicaciones fijadas son personales y tienen límite de cuatro", () => 
 test("cargar stock abre directamente la sección correcta y bloquea ingresos en ubicaciones inactivas", () => {
   assert.match(locationsPage, /\/stock`/);
   assert.match(detailPage, /disabled=\{!state\.active\}/);
-  assert.match(detailPage, /no ingresar mercadería hasta reactivarla/);
+  assert.match(detailPage, /La carga directa requiere reactivarla/);
 });
 
 test("la ubicación selecciona productos ya existentes del catálogo maestro", () => {

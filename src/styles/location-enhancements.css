@@ -127,3 +127,11 @@
   .fm-location-pin-action,
   .fm-image-picker-grid label { transition: none !important; }
 }
+
+.fm-operating-calendar { border: 1px solid var(--fm-border); border-radius: 12px; padding: 16px; min-width: 0; }
+.fm-operating-calendar legend { font-weight: 700; }
+.fm-operating-calendar p { color: var(--fm-text-muted); font-size: 12px; }
+.fm-calendar-days { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 16px; }
+.fm-calendar-days label { display: flex; gap: 8px; align-items: center; min-height: 44px; }
+.fm-transfer-counts { grid-column: 1 / -1; }
+.fm-transfer-form .fm-transfer-lines { max-height: none; overflow: visible; }

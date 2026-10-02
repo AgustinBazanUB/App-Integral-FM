@@ -805,6 +805,9 @@ service cloud.firestore {
         && data.newStock >= 0
         && data.qty is int
         && data.saleId is string
+        && (!(data.type in ["adjustment", "initial_adjustment"])
+          || (data.inventoryType == "location" && canModule("locations", "adjustStock"))
+          || (data.inventoryType == "warehouse" && canModule("warehouse", "adjustStock")))
         && (
           (data.locationId is string
             && data.type in ["sale", "sale_edit", "sale_cancel"]
@@ -817,6 +820,7 @@ service cloud.firestore {
                 && data.locationId is string
                 && allowedLocation(data.locationId)
                 && (canModule("locations", "loadStock")
+                  || canModule("locations", "adjustStock")
                   || canModule("locations", "configureLocationProducts")
                   || canModule("warehouse", "transferStock"))))
         );
@@ -843,8 +847,8 @@ service cloud.firestore {
           && allowedLocation(locationId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "name", "type", "codePrefix", "dniMode", "active",
-            "scheduleStartAt", "scheduleEndAt", "startDateTime", "endDateTime",
-            "manualInactiveUntil", "manualInactiveDays", "updatedBy", "updatedByName",
+            "scheduleStartAt", "scheduleEndAt", "startDateTime", "endDateTime", "operatingCalendar",
+            "manualInactiveUntil", "manualInactiveUntilDateTime", "manualInactiveDays", "updatedBy", "updatedByName",
             "updatedAt"
           ]))
         || (canModule("locations", "archive")
@@ -1002,9 +1006,12 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if activeUser()
         && request.resource.data.userId == request.auth.uid
+        && (!("operationType" in request.resource.data) || request.resource.data.operationType != "adjust_stock"
+          || (request.resource.data.inventoryType == "location" && canModule("locations", "adjustStock"))
+          || (request.resource.data.inventoryType == "warehouse" && canModule("warehouse", "adjustStock")))
         && ((request.resource.data.inventoryType == "location"
             && allowedLocation(request.resource.data.inventoryId)
-            && (canModule("locations", "loadStock") || canModule("locations", "configureLocationProducts")))
+            && (canModule("locations", "loadStock") || canModule("locations", "adjustStock") || canModule("locations", "configureLocationProducts")))
           || (request.resource.data.inventoryType == "warehouse"
             && canModule("warehouse", "edit")));
       allow update, delete: if false;

@@ -7,6 +7,7 @@ import {
   argentinaParts,
   lastSevenArgentinaDays,
 } from "./time.js";
+import { effectiveLocationPrice } from "../../inventory/domain/inventory.js";
 
 const CANCELLED_STATUSES = new Set([
   "cancelled",
@@ -141,7 +142,7 @@ export function joinMasterProducts(products = [], stock = []) {
         hasLocalRecord: Boolean(local),
         configured: Boolean(local && local.deleted !== true),
         currentStock: Number(local?.currentStock || 0),
-        price: Number(local?.price ?? product.defaultPrice ?? 0),
+        price: effectiveLocationPrice(product, local || {}),
         active: local ? local.active !== false && local.deleted !== true : product.active !== false,
       };
     })
