@@ -26,6 +26,7 @@ import {
 import { listLocationInventory } from "../services/inventoryService";
 import { listDiscounts } from "../services/locationManagementService";
 import { dryRunArcaInvoice, requestPendingArcaInvoice } from "../services/arcaService";
+import ArcaInvoicePrintAction from "../components/ArcaInvoicePrintAction";
 
 const friendlyPayments = {
   credit: "Crédito",
@@ -52,6 +53,7 @@ export default function QuickSalesPage() {
   const [discountIds, setDiscountIds] = useState([]);
   const submitRef = useRef(false);
   const [submitState, setSubmitState] = useState({ busy: false, error: "", success: "" });
+  const [registeredInvoice, setRegisteredInvoice] = useState(null);
 
   const locations = locationsResult.data || [];
   useEffect(() => {
@@ -102,6 +104,7 @@ export default function QuickSalesPage() {
     event.preventDefault();
     if (submitRef.current) return;
     submitRef.current = true;
+    setRegisteredInvoice(null);
     setSubmitState({ busy: true, error: "", success: "" });
     try {
       const location = selectedLocation;
@@ -130,6 +133,7 @@ export default function QuickSalesPage() {
         deliveryMethod,
       });
       let invoiceNotice = "";
+      let invoiceId = null;
       if (invoiceRequested) {
         try {
           const invoice = await requestPendingArcaInvoice({
@@ -137,6 +141,7 @@ export default function QuickSalesPage() {
             sourceId: result.id,
             receiver,
           });
+          invoiceId = invoice?.id || null;
           if (invoice?.fiscalReadiness?.ready === false) {
             invoiceNotice = " Solicitud fiscal creada; faltan datos fiscales de uno o más productos antes de autorizarla.";
           } else if (invoice?.autoAuthorization?.status === "authorized") {
@@ -159,6 +164,9 @@ export default function QuickSalesPage() {
         } catch (invoiceError) {
           invoiceNotice = ` La venta quedó registrada, pero no se pudo preparar/validar la solicitud fiscal: ${invoiceError.message}`;
         }
+      }
+      if (invoiceId) {
+        setRegisteredInvoice({ saleId: result.id, sourceType: "admin_quick_sale", invoiceId });
       }
       setQuantities({});
       setCustomerDni("");
@@ -263,6 +271,7 @@ export default function QuickSalesPage() {
             ) : null}
             {submitState.error ? <Toast tone="error">{submitState.error}</Toast> : null}
             {submitState.success ? <Toast tone="success">{submitState.success}</Toast> : null}
+            {registeredInvoice ? <ArcaInvoicePrintAction {...registeredInvoice} /> : null}
             <Button type="submit" icon="Check" loading={submitState.busy} disabled={!cart.length || !paymentMethod} className="fm-sale-submit">Confirmar venta</Button>
             <p className="fm-safe-note"><Badge tone="success" icon="ShieldCheck">Operación atómica</Badge> Si falta stock o se corta la conexión, la venta completa se revierte.</p>
           </Panel>

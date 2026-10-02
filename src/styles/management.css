@@ -170,6 +170,11 @@
 .fm-check-row input { width: 18px; height: 18px; accent-color: var(--fm-gold-primary); }
 .fm-sale-submit { width: 100%; }
 .fm-safe-note { display: flex; align-items: center; gap: 7px; margin: 12px 0 0; color: var(--fm-text-muted); font-size: 10px; }
+.fm-arca-print-action { display: grid; justify-items: start; gap: 6px; margin: 12px 0; }
+.fm-arca-print-action small,
+.fm-arca-print-note,
+.fm-arca-print-error { margin: 0; color: var(--fm-text-muted); font-size: 12px; line-height: 1.45; }
+.fm-arca-print-error { color: var(--fm-danger, #9b2c2c); }
 
 .fm-settings-list { display: grid; }
 .fm-settings-list > div { display: flex; min-height: 62px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--fm-border-subtle); }

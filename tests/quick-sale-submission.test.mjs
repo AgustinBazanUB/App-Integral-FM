@@ -6,7 +6,7 @@ const handlerSource = source.slice(source.indexOf('  const handleSubmit ='), sou
 function harness(overrides = {}) {
   const states = []; const noop = () => {};
   const context = { submitRef: { current: false }, selectedLocation: { id: 'local' }, profile: { id: 'admin' }, cart: [{ id: 'p1', qty: 1 }], appliedDiscounts: [], paymentMethod: 'cash', PAYMENT_LABELS: { cash: 'Efectivo' }, channel: 'manual', customerDni: '', invoiceRequested: false, receiverVatConditionId: '5', receiverDocument: '', deliveryMethod: 'pickup', locationId: 'local', formatMoney: String,
-    setSubmitState: (s) => states.push(s), setQuantities: noop, setCustomerDni: noop, setPaymentMethod: noop, setInvoiceRequested: noop, setReceiverVatConditionId: noop, setReceiverDocument: noop, setDiscountIds: noop, setStock: noop,
+    setSubmitState: (s) => states.push(s), setRegisteredInvoice: noop, setQuantities: noop, setCustomerDni: noop, setPaymentMethod: noop, setInvoiceRequested: noop, setReceiverVatConditionId: noop, setReceiverDocument: noop, setDiscountIds: noop, setStock: noop,
     createQuickSale: async () => ({ id: 's1', saleCode: 'QA-1', total: 1210 }), listLocationInventory: async () => [], requestPendingArcaInvoice: async () => ({ id: 'invoice-s1' }), dryRunArcaInvoice: async () => ({ blocked: false }), ...overrides };
   const submit = Function(...Object.keys(context), `${handlerSource}; return handleSubmit;`)(...Object.values(context));
   return { submit: () => submit({ preventDefault() {} }), states, context };
