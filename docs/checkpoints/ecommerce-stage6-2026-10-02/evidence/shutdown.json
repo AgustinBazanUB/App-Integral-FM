@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-10-02T01:36:01.5964034-03:00",
+  "stoppedProcesses": [
+    {
+      "ProcessId": 49632,
+      "Name": "node.exe"
+    },
+    {
+      "ProcessId": 45468,
+      "Name": "java.exe"
+    },
+    {
+      "ProcessId": 32844,
+      "Name": "node.exe"
+    },
+    {
+      "ProcessId": 10656,
+      "Name": "node.exe"
+    }
+  ],
+  "ports": [
+    8886,
+    5186,
+    8186,
+    9186
+  ],
+  "listeningPortsAfter": [],
+  "localSimulationFlag": "false",
+  "ignoredGuardEnablesSimulation": false,
+  "productionCAE": 0,
+  "deploys": 0,
+  "previews": 0,
+  "pushes": 0,
+  "processStop": "Cierre voluntario luego de las pruebas; no representa exit code de una suite"
+}

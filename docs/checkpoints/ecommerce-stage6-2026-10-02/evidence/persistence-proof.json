@@ -1,0 +1,185 @@
+{
+  "verifiedAt": "2026-10-02T04:14:40.026Z",
+  "operations": [
+    {
+      "orderId": "ecommerce_order_00fcb2f9-c01c-41da-859e-26c38142d44d",
+      "paymentId": "ecommerce_payment_00fcb2f9-c01c-41da-859e-26c38142d44d",
+      "paymentProvider": "simulation",
+      "paymentStatus": "simulated_approved",
+      "saleId": "ecommerce_sale_00fcb2f9-c01c-41da-859e-26c38142d44d",
+      "invoiceId": "invoice_homologation_ecommerce_ecommerce_sale_00fcb2f9-c01c-41da-859e-26c38142d44d",
+      "invoiceStatus": "pending",
+      "total": 22000,
+      "cae": null,
+      "voucherNumber": null,
+      "receiver": {
+        "vatConditionId": 5,
+        "documentType": 99,
+        "documentNumber": "0",
+        "anonymousConsumerFinal": true,
+        "concept": 1
+      },
+      "movements": [
+        {
+          "id": "ecommerce_00fcb2f9-c01c-41da-859e-26c38142d44d_79d563b9b64a2fbff8b22eb02522ffb5",
+          "previousStock": 1,
+          "newStock": 0,
+          "qty": -1
+        }
+      ]
+    },
+    {
+      "orderId": "ecommerce_order_448cd46b-6e86-4037-8745-e2c6bc477065",
+      "paymentId": "ecommerce_payment_448cd46b-6e86-4037-8745-e2c6bc477065",
+      "paymentProvider": "simulation",
+      "paymentStatus": "simulated_approved",
+      "saleId": "ecommerce_sale_448cd46b-6e86-4037-8745-e2c6bc477065",
+      "invoiceId": "invoice_homologation_ecommerce_ecommerce_sale_448cd46b-6e86-4037-8745-e2c6bc477065",
+      "invoiceStatus": "pending",
+      "total": 22000,
+      "cae": null,
+      "voucherNumber": null,
+      "receiver": {
+        "vatConditionId": 5,
+        "documentType": 99,
+        "documentNumber": "0",
+        "anonymousConsumerFinal": true,
+        "concept": 1
+      },
+      "movements": [
+        {
+          "id": "ecommerce_448cd46b-6e86-4037-8745-e2c6bc477065_79d563b9b64a2fbff8b22eb02522ffb5",
+          "previousStock": 48,
+          "newStock": 47,
+          "qty": -1
+        }
+      ]
+    },
+    {
+      "orderId": "ecommerce_order_9de862ac-b475-4145-b669-70d4f594d24e",
+      "paymentId": "ecommerce_payment_9de862ac-b475-4145-b669-70d4f594d24e",
+      "paymentProvider": "simulation",
+      "paymentStatus": "simulated_approved",
+      "saleId": "ecommerce_sale_9de862ac-b475-4145-b669-70d4f594d24e",
+      "invoiceId": "invoice_homologation_ecommerce_ecommerce_sale_9de862ac-b475-4145-b669-70d4f594d24e",
+      "invoiceStatus": "pending",
+      "total": 22000,
+      "cae": null,
+      "voucherNumber": null,
+      "receiver": {
+        "vatConditionId": 5,
+        "documentType": 99,
+        "documentNumber": "0",
+        "anonymousConsumerFinal": true,
+        "concept": 1
+      },
+      "movements": [
+        {
+          "id": "ecommerce_9de862ac-b475-4145-b669-70d4f594d24e_79d563b9b64a2fbff8b22eb02522ffb5",
+          "previousStock": 17,
+          "newStock": 16,
+          "qty": -1
+        }
+      ]
+    },
+    {
+      "orderId": "ecommerce_order_qa_http_stage6_0001",
+      "paymentId": "ecommerce_payment_qa_http_stage6_0001",
+      "paymentProvider": "simulation",
+      "paymentStatus": "simulated_approved",
+      "saleId": "ecommerce_sale_qa_http_stage6_0001",
+      "invoiceId": "invoice_homologation_ecommerce_ecommerce_sale_qa_http_stage6_0001",
+      "invoiceStatus": "pending",
+      "total": 44000,
+      "cae": null,
+      "voucherNumber": null,
+      "receiver": {
+        "vatConditionId": 5,
+        "documentType": 99,
+        "documentNumber": "0",
+        "anonymousConsumerFinal": true,
+        "concept": 1
+      },
+      "movements": [
+        {
+          "id": "ecommerce_qa_http_stage6_0001_79d563b9b64a2fbff8b22eb02522ffb5",
+          "previousStock": 50,
+          "newStock": 48,
+          "qty": -2
+        }
+      ]
+    },
+    {
+      "orderId": "ecommerce_order_qa_http_stage6_verified",
+      "paymentId": "ecommerce_payment_qa_http_stage6_verified",
+      "paymentProvider": "simulation",
+      "paymentStatus": "simulated_approved",
+      "saleId": "ecommerce_sale_qa_http_stage6_verified",
+      "invoiceId": "invoice_homologation_ecommerce_ecommerce_sale_qa_http_stage6_verified",
+      "invoiceStatus": "pending",
+      "total": 44000,
+      "cae": null,
+      "voucherNumber": null,
+      "receiver": {
+        "vatConditionId": 5,
+        "documentType": 99,
+        "documentNumber": "0",
+        "anonymousConsumerFinal": true,
+        "concept": 1
+      },
+      "movements": [
+        {
+          "id": "ecommerce_qa_http_stage6_verified_79d563b9b64a2fbff8b22eb02522ffb5",
+          "previousStock": 20,
+          "newStock": 18,
+          "qty": -2
+        }
+      ]
+    },
+    {
+      "orderId": "ecommerce_order_qa_http_stage6_verified_fiscal_error",
+      "paymentId": "ecommerce_payment_qa_http_stage6_verified_fiscal_error",
+      "paymentProvider": "simulation",
+      "paymentStatus": "simulated_approved",
+      "saleId": "ecommerce_sale_qa_http_stage6_verified_fiscal_error",
+      "invoiceId": "invoice_homologation_ecommerce_ecommerce_sale_qa_http_stage6_verified_fiscal_error",
+      "invoiceStatus": "pending",
+      "total": 22000,
+      "cae": null,
+      "voucherNumber": null,
+      "receiver": {
+        "vatConditionId": 5,
+        "documentType": 99,
+        "documentNumber": "0",
+        "anonymousConsumerFinal": true,
+        "concept": 1
+      },
+      "movements": [
+        {
+          "id": "ecommerce_qa_http_stage6_verified_fiscal_error_79d563b9b64a2fbff8b22eb02522ffb5",
+          "previousStock": 18,
+          "newStock": 17,
+          "qty": -1
+        }
+      ]
+    }
+  ],
+  "caeProductivos": 0,
+  "deploys": 0,
+  "previews": 0,
+  "arcaTransportRequests": 0,
+  "externalBlocked": [
+    {
+      "host": "edge.netlify.com",
+      "method": "GET"
+    },
+    {
+      "host": "edge.netlify.com",
+      "method": "GET"
+    },
+    {
+      "host": "edge.netlify.com",
+      "method": "GET"
+    }
+  ]
+}

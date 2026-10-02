@@ -1,0 +1,211 @@
+TAP version 13
+# Subtest: runtime: checkout recalcula total; Order/Payment pending sin Sale ni stock descontado
+ok 1 - runtime: checkout recalcula total; Order/Payment pending sin Sale ni stock descontado
+  ---
+  duration_ms: 12.605
+  type: 'test'
+  ...
+# Subtest: runtime: misma request/key devuelve misma Order; distinto contenido conflict
+ok 2 - runtime: misma request/key devuelve misma Order; distinto contenido conflict
+  ---
+  duration_ms: 2.6166
+  type: 'test'
+  ...
+# Subtest: runtime: checkout público rechaza simulate_approved también en replay
+not ok 3 - runtime: checkout público rechaza simulate_approved también en replay
+  ---
+  duration_ms: 3.1735
+  type: 'test'
+  location: 'C:\\Users\\agsba\\OneDrive\\Documentos\\ChatGPT\\FM-Ecommerce-Etapa6-Audit\\tests\\ecommerce-stage6-runtime.test.mjs:33:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected rejection.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/agsba/OneDrive/Documentos/ChatGPT/FM-Ecommerce-Etapa6-Audit/tests/ecommerce-stage6-runtime.test.mjs:33:110)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: runtime: flag off bloquea sin escrituras
+ok 4 - runtime: flag off bloquea sin escrituras
+  ---
+  duration_ms: 3.2397
+  type: 'test'
+  ...
+# Subtest: runtime: production bloquea sin escrituras
+ok 5 - runtime: production bloquea sin escrituras
+  ---
+  duration_ms: 1.4414
+  type: 'test'
+  ...
+# Subtest: runtime: deploy-preview bloquea sin escrituras
+ok 6 - runtime: deploy-preview bloquea sin escrituras
+  ---
+  duration_ms: 1.2834
+  type: 'test'
+  ...
+# Subtest: runtime: branch-deploy bloquea sin escrituras
+ok 7 - runtime: branch-deploy bloquea sin escrituras
+  ---
+  duration_ms: 2.3429
+  type: 'test'
+  ...
+# Subtest: runtime: no admin bloqueado
+ok 8 - runtime: no admin bloqueado
+  ---
+  duration_ms: 2.1417
+  type: 'test'
+  ...
+# Subtest: runtime: Payway rejected no crea Sale/Invoice ni descuenta stock
+ok 9 - runtime: Payway rejected no crea Sale/Invoice ni descuenta stock
+  ---
+  duration_ms: 2.8144
+  type: 'test'
+  ...
+# Subtest: runtime: dos approvals concurrentes y retry crean una Sale, un descuento y una Invoice
+ok 10 - runtime: dos approvals concurrentes y retry crean una Sale, un descuento y una Invoice
+  ---
+  duration_ms: 21.2951
+  type: 'test'
+  ...
+# Subtest: runtime: aprobación rechaza producto inexistente
+ok 11 - runtime: aprobación rechaza producto inexistente
+  ---
+  duration_ms: 1.3653
+  type: 'test'
+  ...
+# Subtest: runtime: aprobación rechaza producto inactivo
+ok 12 - runtime: aprobación rechaza producto inactivo
+  ---
+  duration_ms: 0.9732
+  type: 'test'
+  ...
+# Subtest: runtime: aprobación rechaza precio inválido
+ok 13 - runtime: aprobación rechaza precio inválido
+  ---
+  duration_ms: 0.933
+  type: 'test'
+  ...
+# Subtest: runtime: aprobación rechaza cambio de precio
+ok 14 - runtime: aprobación rechaza cambio de precio
+  ---
+  duration_ms: 0.73
+  type: 'test'
+  ...
+# Subtest: runtime: aprobación rechaza stock insuficiente
+ok 15 - runtime: aprobación rechaza stock insuficiente
+  ---
+  duration_ms: 0.7093
+  type: 'test'
+  ...
+# Subtest: runtime: payment amount inconsistente y key incorrecta bloqueadas
+ok 16 - runtime: payment amount inconsistente y key incorrecta bloqueadas
+  ---
+  duration_ms: 1.0298
+  type: 'test'
+  ...
+# Subtest: runtime: Payment final incompatible no permite nueva aprobación
+not ok 17 - runtime: Payment final incompatible no permite nueva aprobación
+  ---
+  duration_ms: 1.2856
+  type: 'test'
+  location: 'C:\\Users\\agsba\\OneDrive\\Documentos\\ChatGPT\\FM-Ecommerce-Etapa6-Audit\\tests\\ecommerce-stage6-runtime.test.mjs:40:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected rejection.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/agsba/OneDrive/Documentos/ChatGPT/FM-Ecommerce-Etapa6-Audit/tests/ecommerce-stage6-runtime.test.mjs:40:212)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: runtime: error fiscal tras Sale y retry conservan Sale/stock/Invoice
+ok 18 - runtime: error fiscal tras Sale y retry conservan Sale/stock/Invoice
+  ---
+  duration_ms: 4.9151
+  type: 'test'
+  ...
+# Subtest: runtime: CUIT mock produce plan A sin autorización ni CAE
+ok 19 - runtime: CUIT mock produce plan A sin autorización ni CAE
+  ---
+  duration_ms: 2.2552
+  type: 'test'
+  ...
+# Subtest: runtime: CUIT inválido no se convierte silenciosamente a Consumidor Final
+not ok 20 - runtime: CUIT inválido no se convierte silenciosamente a Consumidor Final
+  ---
+  duration_ms: 0.3796
+  type: 'test'
+  location: 'C:\\Users\\agsba\\OneDrive\\Documentos\\ChatGPT\\FM-Ecommerce-Etapa6-Audit\\tests\\ecommerce-stage6-runtime.test.mjs:43:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected rejection.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/agsba/OneDrive/Documentos/ChatGPT/FM-Ecommerce-Etapa6-Audit/tests/ecommerce-stage6-runtime.test.mjs:43:132)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: runtime: umbral CF genera blocker de identificación
+ok 21 - runtime: umbral CF genera blocker de identificación
+  ---
+  duration_ms: 1.4533
+  type: 'test'
+  ...
+# Subtest: runtime: mockAuthorize sólo en test; ningún CAE inventado se persiste
+ok 22 - runtime: mockAuthorize sólo en test; ningún CAE inventado se persiste
+  ---
+  duration_ms: 2.3562
+  type: 'test'
+  ...
+# Subtest: runtime: replay fiscal no puede cambiar receptor de Invoice existente
+not ok 23 - runtime: replay fiscal no puede cambiar receptor de Invoice existente
+  ---
+  duration_ms: 3.1361
+  type: 'test'
+  location: 'C:\\Users\\agsba\\OneDrive\\Documentos\\ChatGPT\\FM-Ecommerce-Etapa6-Audit\\tests\\ecommerce-stage6-runtime.test.mjs:46:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected rejection.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/agsba/OneDrive/Documentos/ChatGPT/FM-Ecommerce-Etapa6-Audit/tests/ecommerce-stage6-runtime.test.mjs:46:143)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: runtime: identidades de documentos no se toman del campo id
+not ok 24 - runtime: identidades de documentos no se toman del campo id
+  ---
+  duration_ms: 1.3575
+  type: 'test'
+  location: 'C:\\Users\\agsba\\OneDrive\\Documentos\\ChatGPT\\FM-Ecommerce-Etapa6-Audit\\tests\\ecommerce-stage6-runtime.test.mjs:47:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+
+    + 'forged-order'
+    - 'ecommerce_order_qa_request_0001'
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ecommerce_order_qa_request_0001'
+  actual: 'forged-order'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/agsba/OneDrive/Documentos/ChatGPT/FM-Ecommerce-Etapa6-Audit/tests/ecommerce-stage6-runtime.test.mjs:47:196)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 19
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 281.0626

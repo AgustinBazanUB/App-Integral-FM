@@ -1,0 +1,18 @@
+{
+  "eventsByKind": {
+    "oauth-mock": 51,
+    "firestore-emulator": 389,
+    "external-blocked": 3,
+    "auth-emulator": 39,
+    "emulator-error": 3,
+    "transaction-shape": 92
+  },
+  "arcaTransportRequests": 0,
+  "notes": [
+    "Las conexiones ARCA/WSAA/WSFE se bloquearon y no se solicitaron.",
+    "OAuth administrativo usa clave RSA sintética en memoria y token owner del Emulator.",
+    "Firebase Auth admin/seller se validó en Auth Emulator; el token del usuario se conservó para lectura de perfil.",
+    "Los intentos bloqueados a edge.netlify.com pertenecen al runner local, no a ARCA.",
+    "No se exportan tokens ni credenciales."
+  ]
+}

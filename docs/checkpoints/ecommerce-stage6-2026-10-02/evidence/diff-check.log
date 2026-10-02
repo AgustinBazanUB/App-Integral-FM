@@ -1,0 +1,14 @@
+warning: in the working copy of 'netlify/functions/_lib/ecommerce/commerceDomain.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'netlify/functions/_lib/ecommerce/commerceService.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'netlify/functions/_lib/ecommerce/fiscalService.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'netlify/functions/_lib/ecommerce/paymentService.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'netlify/functions/_lib/firestoreAdminRest.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'netlify/functions/ecommerce-simulated-payment.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/data/products.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/CheckoutPage.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/firestore.meta-ads-creative.rules.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/firestore.meta-ads-planner.rules.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/firestore.meta-ads-theory.rules.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/firestore.meta-ads.rules.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/firestore.rules.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/firestore.whatsapp-release.rules.mjs', LF will be replaced by CRLF the next time Git touches it

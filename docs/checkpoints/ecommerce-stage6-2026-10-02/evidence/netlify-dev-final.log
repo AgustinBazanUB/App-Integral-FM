@@ -1,0 +1,181 @@
+⬥ Ignored netlify.toml file env var: VITE_FIREBASE_API_KEY (defined in .env.local file)
+⬥ Ignored netlify.toml file env var: VITE_FIREBASE_AUTH_DOMAIN (defined in .env.local file)
+⬥ Ignored netlify.toml file env var: VITE_FIREBASE_PROJECT_ID (defined in .env.local file)
+⬥ Ignored general context env var: LANG (defined in process)
+⬥ Ignored general context env var: LC_ALL (defined in process)
+⬥ Ignored .env.local file env var: ECOMMERCE_SIMULATED_PAYMENT_ENABLED (defined in process)
+⬥ Injected netlify.toml file env vars: NODE_VERSION, VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID
+⬥ Injected .env.local file env vars: VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID
+⬥ Setting up local dev server
+
+⬥ Starting #custom dev server
+⠋ Waiting for #custom dev server to be ready on port 5186
+
+  VITE v6.4.3   ecommerce   ready in 700 ms
+
+[1G⠙ Waiting for #custom dev server to be ready on port 5186
+[1G(node:10656) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+⠹ Waiting for #custom dev server to be ready on port 5186
+  ➜  Local:   http://127.0.0.1:5186/
+[1G⠸ Waiting for #custom dev server to be ready on port 5186
+√ #custom dev server ready on port 5186
+
+   ╭─────────────────────── ⬥  ────────────────────────╮
+   │                                                   │
+   │   Local dev server ready: http://localhost:8886   │
+   │                                                   │
+   ╰───────────────────────────────────────────────────╯
+
+⬥ Loaded function ecommerce-checkout
+⬥ Loaded function campaign-planner
+⬥ Loaded function google-drive
+⬥ Loaded function google-drive-callback
+⬥ Loaded function theory-compiler
+⬥ Loaded function ecommerce-catalog
+⬥ Loaded function arca-taxpayer
+⬥ Loaded function arca-document
+⬥ Loaded function ecommerce-simulated-payment
+⬥ Loaded function arca-invoice
+⬥ Loaded function arca-authorize
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 401 in 2527 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 403 in 1041 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 965 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-checkout
+Response with status 403 in 1928 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-checkout
+Response with status 200 in 1426 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 1561 ms.
+Response with status 200 in 1883 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 1465 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 1818 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 1216 ms.
+12:54:10 AM [vite] .netlify/stage6-qa/vite.config.mjs changed, restarting server...
+12:54:10 AM [vite] (client) page reload .netlify/stage6-qa/login.js
+12:54:10 AM [vite] (client) Re-optimizing dependencies because vite config has changed
+12:54:10 AM [vite] server restarted.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 1841 ms.
+Response with status 200 in 1891 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 584 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 799 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-checkout
+Response with status 200 in 875 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 1074 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 403 in 1266 ms.
+Response with status 200 in 1333 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 971 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 653 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 815 ms.
+Response with status 200 in 761 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 1114 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-checkout
+Response with status 200 in 778 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 400 in 718 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 1093 ms.
+Response with status 200 in 1193 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 778 ms.
+⬥ Reloading function ecommerce-checkout...
+⬥ Reloading function ecommerce-catalog...
+⬥ Reloading function ecommerce-simulated-payment...
+12:59:42 AM [vite] (client) hmr update /src/pages/CheckoutPage.jsx
+⬥ Reloaded function ecommerce-checkout
+⬥ Reloaded function ecommerce-simulated-payment
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+⬥ Reloaded function ecommerce-catalog
+Response with status 200 in 1634 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 400 in 847 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 881 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 982 ms.
+Response with status 200 in 771 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 733 ms.
+1:00:45 AM [vite] (client) hmr update /src/styles.css
+1:00:45 AM [vite] (client) hmr update /src/styles.css
+⬥ Reloading function arca-document...
+⬥ Reloading function ecommerce-simulated-payment...
+⬥ Reloading function arca-invoice...
+⬥ Reloading function arca-authorize...
+⬥ Reloaded function ecommerce-simulated-payment
+⬥ Reloaded function arca-document
+⬥ Reloaded function arca-authorize
+⬥ Reloaded function arca-invoice
+⬥ Reloading function ecommerce-checkout...
+⬥ Reloading function ecommerce-catalog...
+⬥ Reloaded function ecommerce-catalog
+⬥ Reloaded function ecommerce-checkout
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 401 in 957 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 403 in 352 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 291 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-checkout
+Response with status 403 in 561 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-checkout
+Response with status 200 in 454 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 460 ms.
+Response with status 200 in 504 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 518 ms.
+Request from ::1: POST /.netlify/functions/arca-invoice
+Response with status 403 in 574 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-checkout
+Response with status 200 in 346 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 400 in 525 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 834 ms.
+1:07:46 AM [vite] (client) page reload dist/index.html
+1:07:47 AM [vite] (client) page reload dist/index.html
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 1718 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 728 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 773 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 862 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-checkout
+Response with status 200 in 784 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 400 in 774 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 766 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 1542 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Response with status 200 in 1703 ms.
+Response with status 200 in 764 ms.
+1:14:38 AM [vite] (client) page reload .netlify/stage6-qa/base7ce/index.html
+1:14:48 AM [vite] (client) page reload .netlify/stage6-qa/base7ce/dist/index.html
