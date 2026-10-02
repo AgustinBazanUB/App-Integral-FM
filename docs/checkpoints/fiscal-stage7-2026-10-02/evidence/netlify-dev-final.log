@@ -1,0 +1,91 @@
+⬥ Ignored netlify.toml file env var: VITE_FIREBASE_API_KEY (defined in .env.local file)
+⬥ Ignored netlify.toml file env var: VITE_FIREBASE_PROJECT_ID (defined in .env.local file)
+⬥ Ignored general context env var: LANG (defined in process)
+⬥ Ignored general context env var: LC_ALL (defined in process)
+⬥ Ignored .env.local file env var: ECOMMERCE_SIMULATED_PAYMENT_ENABLED (defined in process)
+⬥ Injected netlify.toml file env vars: NODE_VERSION, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID
+⬥ Injected .env.local file env vars: VITE_FIREBASE_API_KEY, VITE_FIREBASE_PROJECT_ID
+⬥ Setting up local dev server
+
+⬥ Starting #custom dev server
+⠋ Waiting for #custom dev server to be ready on port 5187
+
+  VITE v6.4.3  ready in 762 ms
+
+[1G⠙ Waiting for #custom dev server to be ready on port 5187
+[1G(node:44364) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+⠹ Waiting for #custom dev server to be ready on port 5187
+  ➜  Local:   http://127.0.0.1:5187/
+[1G⠸ Waiting for #custom dev server to be ready on port 5187
+√ #custom dev server ready on port 5187
+
+   ╭─────────────────────── ⬥  ────────────────────────╮
+   │                                                   │
+   │   Local dev server ready: http://localhost:8887   │
+   │                                                   │
+   ╰───────────────────────────────────────────────────╯
+
+⬥ Loaded function ecommerce-catalog
+⬥ Loaded function campaign-planner
+⬥ Loaded function theory-compiler
+⬥ Loaded function google-drive-callback
+⬥ Loaded function google-drive
+⬥ Loaded function arca-document
+⬥ Loaded function ecommerce-checkout
+⬥ Loaded function arca-taxpayer
+⬥ Loaded function arca-invoice
+⬥ Loaded function ecommerce-simulated-payment
+⬥ Loaded function arca-authorize
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/google-drive
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/google-drive?health=1
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/arca-taxpayer
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/arca-taxpayer
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/google-drive
+Response with status 200 in 888 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/arca-taxpayer
+Response with status 200 in 571 ms.
+Request from ::ffff:127.0.0.1: POST /.netlify/functions/arca-taxpayer
+Response with status 200 in 601 ms.
+Response with status 200 in 613 ms.
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/ecommerce-catalog
+Request from ::ffff:127.0.0.1: GET /.netlify/functions/google-drive?health=1
+Response with status 200 in 608 ms.
+Response with status 200 in 629 ms.
+Response with status 200 in 757 ms.
+Response with status 200 in 338 ms.
+Response with status 200 in 438 ms.
+Response with status 200 in 474 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 401 in 1013 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 403 in 317 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 354 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-checkout
+Response with status 403 in 461 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-checkout
+Response with status 200 in 309 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 2558 ms.
+Response with status 200 in 2598 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 429 ms.
+Request from ::1: POST /.netlify/functions/arca-invoice
+Response with status 403 in 557 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-checkout
+Response with status 200 in 325 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 400 in 382 ms.
+Request from ::1: POST /.netlify/functions/ecommerce-simulated-payment
+Response with status 200 in 366 ms.
+Request from ::1: POST /.netlify/functions/arca-authorize
+Response with status 200 in 1035 ms.
+Request from ::1: POST /.netlify/functions/arca-authorize
+Response with status 200 in 328 ms.
+Request from ::1: POST /.netlify/functions/arca-authorize
+Response with status 200 in 343 ms.
+Request from ::1: POST /.netlify/functions/arca-authorize
+Response with status 409 in 317 ms.

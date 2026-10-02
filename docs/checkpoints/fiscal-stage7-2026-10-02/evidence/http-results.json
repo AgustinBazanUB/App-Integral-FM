@@ -1,0 +1,59 @@
+[
+  {
+    "case": "sin sesión",
+    "status": 401
+  },
+  {
+    "case": "seller",
+    "status": 403
+  },
+  {
+    "case": "capability admin",
+    "status": 200
+  },
+  {
+    "case": "pending autoritativo",
+    "orderId": "ecommerce_order_qa_http_stage7_dependencies",
+    "total": 44000,
+    "status": 200
+  },
+  {
+    "case": "concurrencia",
+    "orderId": "ecommerce_order_qa_http_stage7_dependencies",
+    "saleId": "ecommerce_sale_qa_http_stage7_dependencies",
+    "invoiceId": "invoice_homologation_ecommerce_ecommerce_sale_qa_http_stage7_dependencies",
+    "stockBefore": 33,
+    "stockAfter": 31,
+    "fiscal": {
+      "mode": "dry-run-no-cae",
+      "transport": "blocked",
+      "caeRequested": false,
+      "voucherType": 6,
+      "voucherClass": "B",
+      "blockers": [],
+      "total": 44000,
+      "net": 36363.64,
+      "vat": 7636.36,
+      "mockAuthorization": null
+    }
+  },
+  {
+    "case": "retry",
+    "status": 200,
+    "idempotent": true
+  },
+  {
+    "case": "source alias bloqueado",
+    "status": 403
+  },
+  {
+    "case": "error fiscal y retry",
+    "orderId": "ecommerce_order_qa_http_stage7_dependencies_fiscal_error",
+    "saleId": "ecommerce_sale_qa_http_stage7_dependencies_fiscal_error",
+    "invoiceId": "invoice_homologation_ecommerce_ecommerce_sale_qa_http_stage7_dependencies_fiscal_error",
+    "errorStatus": 400,
+    "retryStatus": 200,
+    "stockBefore": 31,
+    "stockAfter": 30
+  }
+]

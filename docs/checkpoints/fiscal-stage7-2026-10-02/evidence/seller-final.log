@@ -1,0 +1,118 @@
+TAP version 13
+# Subtest: un vendedor puro accede al Panel Vendedor y no al administrativo
+ok 1 - un vendedor puro accede al Panel Vendedor y no al administrativo
+  ---
+  duration_ms: 1.0103
+  type: 'test'
+  ...
+# Subtest: el administrador conserva ambos paneles
+ok 2 - el administrador conserva ambos paneles
+  ---
+  duration_ms: 0.8395
+  type: 'test'
+  ...
+# Subtest: las ubicaciones efectivas respetan permisos, actividad y baja lógica
+ok 3 - las ubicaciones efectivas respetan permisos, actividad y baja lógica
+  ---
+  duration_ms: 9.7319
+  type: 'test'
+  ...
+# Subtest: productos visibles y categorías reutilizan los datos locales de la ubicación
+ok 4 - productos visibles y categorías reutilizan los datos locales de la ubicación
+  ---
+  duration_ms: 0.529
+  type: 'test'
+  ...
+# Subtest: el carrito calcula cantidades y subtotal
+ok 5 - el carrito calcula cantidades y subtotal
+  ---
+  duration_ms: 0.1896
+  type: 'test'
+  ...
+# Subtest: los descuentos fijos se aplican antes que todos los porcentajes
+ok 6 - los descuentos fijos se aplican antes que todos los porcentajes
+  ---
+  duration_ms: 0.2847
+  type: 'test'
+  ...
+# Subtest: varios porcentajes mantienen la aplicación sucesiva sobre el saldo
+ok 7 - varios porcentajes mantienen la aplicación sucesiva sobre el saldo
+  ---
+  duration_ms: 0.1848
+  type: 'test'
+  ...
+# Subtest: los descuentos nunca reducen el total por debajo de cero
+ok 8 - los descuentos nunca reducen el total por debajo de cero
+  ---
+  duration_ms: 0.1197
+  type: 'test'
+  ...
+# Subtest: las ventas pendientes reservan stock local sin afirmarse confirmadas
+ok 9 - las ventas pendientes reservan stock local sin afirmarse confirmadas
+  ---
+  duration_ms: 0.3961
+  type: 'test'
+  ...
+# Subtest: la botonera distingue tecla, código y ubicación física
+ok 10 - la botonera distingue tecla, código y ubicación física
+  ---
+  duration_ms: 0.4732
+  type: 'test'
+  ...
+# Subtest: +2 pagos exige montos no negativos y suma exacta
+ok 11 - +2 pagos exige montos no negativos y suma exacta
+  ---
+  duration_ms: 0.6897
+  type: 'test'
+  ...
+# Subtest: la ruta y el cambio entre paneles conservan la misma sesión
+ok 12 - la ruta y el cambio entre paneles conservan la misma sesión
+  ---
+  duration_ms: 8.7573
+  type: 'test'
+  ...
+# Subtest: la interfaz compacta descuentos y prepara ticket sin simular ARCA
+ok 13 - la interfaz compacta descuentos y prepara ticket sin simular ARCA
+  ---
+  duration_ms: 3.7688
+  type: 'test'
+  ...
+# Subtest: la venta guarda creador, fecha local, descuentos desglosados y ticket
+ok 14 - la venta guarda creador, fecha local, descuentos desglosados y ticket
+  ---
+  duration_ms: 0.8686
+  type: 'test'
+  ...
+# Subtest: la cola offline conserva descuentos, ticket e idempotencia
+ok 15 - la cola offline conserva descuentos, ticket e idempotencia
+  ---
+  duration_ms: 2.0856
+  type: 'test'
+  ...
+# Subtest: Ubicaciones incorpora Ventas y consulta una sola colección paginada
+ok 16 - Ubicaciones incorpora Ventas y consulta una sola colección paginada
+  ---
+  duration_ms: 5.2181
+  type: 'test'
+  ...
+# Subtest: stock, navegación y venta actual tienen reglas responsive compactas
+ok 17 - stock, navegación y venta actual tienen reglas responsive compactas
+  ---
+  duration_ms: 2.8819
+  type: 'test'
+  ...
+# Subtest: las reglas vinculan stock con venta y movimiento de la misma transacción
+ok 18 - las reglas vinculan stock con venta y movimiento de la misma transacción
+  ---
+  duration_ms: 0.7745
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 116.7781

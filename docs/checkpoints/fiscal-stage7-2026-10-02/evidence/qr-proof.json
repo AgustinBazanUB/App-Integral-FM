@@ -1,0 +1,128 @@
+[
+  {
+    "file": "pdf-mock-admin_quick_sale-A.pdf",
+    "decoder": "zxing-cpp",
+    "decoded": true,
+    "fixture": "MOCK LOCAL - SIN EMISION",
+    "payload": {
+      "ver": 1,
+      "fecha": "2026-09-29",
+      "cuit": 20123456786,
+      "ptoVta": 8,
+      "tipoCmp": 1,
+      "nroCmp": 320,
+      "importe": 1000,
+      "moneda": "PES",
+      "ctz": 1,
+      "tipoDocRec": 80,
+      "nroDocRec": 20164755100,
+      "tipoCodAut": "E",
+      "codAut": 12345678901234
+    }
+  },
+  {
+    "file": "pdf-mock-admin_quick_sale-B.pdf",
+    "decoder": "zxing-cpp",
+    "decoded": true,
+    "fixture": "MOCK LOCAL - SIN EMISION",
+    "payload": {
+      "ver": 1,
+      "fecha": "2026-09-29",
+      "cuit": 20123456786,
+      "ptoVta": 8,
+      "tipoCmp": 6,
+      "nroCmp": 320,
+      "importe": 1000,
+      "moneda": "PES",
+      "ctz": 1,
+      "tipoDocRec": 99,
+      "nroDocRec": 0,
+      "tipoCodAut": "E",
+      "codAut": 12345678901234
+    }
+  },
+  {
+    "file": "pdf-mock-ecommerce-A.pdf",
+    "decoder": "zxing-cpp",
+    "decoded": true,
+    "fixture": "MOCK LOCAL - SIN EMISION",
+    "payload": {
+      "ver": 1,
+      "fecha": "2026-09-29",
+      "cuit": 20123456786,
+      "ptoVta": 8,
+      "tipoCmp": 1,
+      "nroCmp": 320,
+      "importe": 1000,
+      "moneda": "PES",
+      "ctz": 1,
+      "tipoDocRec": 80,
+      "nroDocRec": 20164755100,
+      "tipoCodAut": "E",
+      "codAut": 12345678901234
+    }
+  },
+  {
+    "file": "pdf-mock-ecommerce-B.pdf",
+    "decoder": "zxing-cpp",
+    "decoded": true,
+    "fixture": "MOCK LOCAL - SIN EMISION",
+    "payload": {
+      "ver": 1,
+      "fecha": "2026-09-29",
+      "cuit": 20123456786,
+      "ptoVta": 8,
+      "tipoCmp": 6,
+      "nroCmp": 320,
+      "importe": 1000,
+      "moneda": "PES",
+      "ctz": 1,
+      "tipoDocRec": 99,
+      "nroDocRec": 0,
+      "tipoCodAut": "E",
+      "codAut": 12345678901234
+    }
+  },
+  {
+    "file": "pdf-mock-seller_sale-A.pdf",
+    "decoder": "zxing-cpp",
+    "decoded": true,
+    "fixture": "MOCK LOCAL - SIN EMISION",
+    "payload": {
+      "ver": 1,
+      "fecha": "2026-09-29",
+      "cuit": 20123456786,
+      "ptoVta": 8,
+      "tipoCmp": 1,
+      "nroCmp": 320,
+      "importe": 1000,
+      "moneda": "PES",
+      "ctz": 1,
+      "tipoDocRec": 80,
+      "nroDocRec": 20164755100,
+      "tipoCodAut": "E",
+      "codAut": 12345678901234
+    }
+  },
+  {
+    "file": "pdf-mock-seller_sale-B.pdf",
+    "decoder": "zxing-cpp",
+    "decoded": true,
+    "fixture": "MOCK LOCAL - SIN EMISION",
+    "payload": {
+      "ver": 1,
+      "fecha": "2026-09-29",
+      "cuit": 20123456786,
+      "ptoVta": 8,
+      "tipoCmp": 6,
+      "nroCmp": 320,
+      "importe": 1000,
+      "moneda": "PES",
+      "ctz": 1,
+      "tipoDocRec": 99,
+      "nroDocRec": 0,
+      "tipoCodAut": "E",
+      "codAut": 12345678901234
+    }
+  }
+]

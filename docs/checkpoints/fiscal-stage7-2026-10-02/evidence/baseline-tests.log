@@ -1,0 +1,2294 @@
+
+> app-integral-fm@1.0.0 test
+> node --test tests/*.test.mjs
+
+TAP version 13
+# Subtest: las actividades reales reciben iconos semánticos consistentes
+ok 1 - las actividades reales reciben iconos semánticos consistentes
+  ---
+  duration_ms: 1.1245
+  type: 'test'
+  ...
+# Subtest: un tipo desconocido conserva un fallback legible
+ok 2 - un tipo desconocido conserva un fallback legible
+  ---
+  duration_ms: 0.2429
+  type: 'test'
+  ...
+# Subtest: el selector agrupa tipos por módulo semántico
+ok 3 - el selector agrupa tipos por módulo semántico
+  ---
+  duration_ms: 10.8831
+  type: 'test'
+  ...
+# Subtest: header usa un solo chevron de perfil y popovers portales
+ok 4 - header usa un solo chevron de perfil y popovers portales
+  ---
+  duration_ms: 1.1163
+  type: 'test'
+  ...
+# Subtest: conexión es global, compacta, accesible y permite reconectar
+ok 5 - conexión es global, compacta, accesible y permite reconectar
+  ---
+  duration_ms: 0.2154
+  type: 'test'
+  ...
+# Subtest: actividad comparte presentación y mantiene paginación
+ok 6 - actividad comparte presentación y mantiene paginación
+  ---
+  duration_ms: 0.1555
+  type: 'test'
+  ...
+# Subtest: clientes abren detalle, editan transaccionalmente y WhatsApp no usa el formato visual
+ok 7 - clientes abren detalle, editan transaccionalmente y WhatsApp no usa el formato visual
+  ---
+  duration_ms: 0.2207
+  type: 'test'
+  ...
+# Subtest: reglas permiten migración de ID al editar y auditoría de clientes
+ok 8 - reglas permiten migración de ID al editar y auditoría de clientes
+  ---
+  duration_ms: 0.6752
+  type: 'test'
+  ...
+# Subtest: emisor RI genera factura A para RI y monotributo
+ok 9 - emisor RI genera factura A para RI y monotributo
+  ---
+  duration_ms: 2.0237
+  type: 'test'
+  ...
+# Subtest: emisor RI genera factura B para consumidor final y exento
+ok 10 - emisor RI genera factura B para consumidor final y exento
+  ---
+  duration_ms: 0.2126
+  type: 'test'
+  ...
+# Subtest: plan A exige CUIT y conserva cierre fiscal
+ok 11 - plan A exige CUIT y conserva cierre fiscal
+  ---
+  duration_ms: 4.8561
+  type: 'test'
+  ...
+# Subtest: consumidor final anónimo debajo del umbral vigente no queda bloqueado
+ok 12 - consumidor final anónimo debajo del umbral vigente no queda bloqueado
+  ---
+  duration_ms: 0.353
+  type: 'test'
+  ...
+# Subtest: consumidor final anónimo en o sobre el umbral exige identificación
+ok 13 - consumidor final anónimo en o sobre el umbral exige identificación
+  ---
+  duration_ms: 0.3739
+  type: 'test'
+  ...
+# Subtest: lock de secuencia impide dos autorizaciones simultáneas
+ok 14 - lock de secuencia impide dos autorizaciones simultáneas
+  ---
+  duration_ms: 1.736
+  type: 'test'
+  ...
+# Subtest: lock vencido puede ser tomado por otro intento
+ok 15 - lock vencido puede ser tomado por otro intento
+  ---
+  duration_ms: 0.4099
+  type: 'test'
+  ...
+# Subtest: locks de homologación y producción quedan separados aunque coincidan PV y tipo
+ok 16 - locks de homologación y producción quedan separados aunque coincidan PV y tipo
+  ---
+  duration_ms: 0.331
+  type: 'test'
+  ...
+# Subtest: dry run prepara factura A sin llamar a ARCA
+ok 17 - dry run prepara factura A sin llamar a ARCA
+  ---
+  duration_ms: 3.3261
+  type: 'test'
+  ...
+# Subtest: autorización exitosa serializa secuencia y persiste CAE
+ok 18 - autorización exitosa serializa secuencia y persiste CAE
+  ---
+  duration_ms: 2.1137
+  type: 'test'
+  ...
+# Subtest: timeout no reenvía CAE y entra en reconciliación
+ok 19 - timeout no reenvía CAE y entra en reconciliación
+  ---
+  duration_ms: 1.0798
+  type: 'test'
+  ...
+# Subtest: timeout reconciliado con CAE se marca autorizado sin reenvío
+ok 20 - timeout reconciliado con CAE se marca autorizado sin reenvío
+  ---
+  duration_ms: 0.7626
+  type: 'test'
+  ...
+# Subtest: 502 al consultar último autorizado vuelve a pending sin reservar número ni pedir CAE
+ok 21 - 502 al consultar último autorizado vuelve a pending sin reservar número ni pedir CAE
+  ---
+  duration_ms: 1.7033
+  type: 'test'
+  ...
+# Subtest: recupera authorizing pre-CAE sólo si no hay número planificado
+ok 22 - recupera authorizing pre-CAE sólo si no hay número planificado
+  ---
+  duration_ms: 0.6169
+  type: 'test'
+  ...
+# Subtest: FECompConsultar confirma un comprobante autorizado y coincidente
+ok 23 - FECompConsultar confirma un comprobante autorizado y coincidente
+  ---
+  duration_ms: 0.6696
+  type: 'test'
+  ...
+# Subtest: FECompConsultar detecta CAE distinto sin desautorizar el registro local
+ok 24 - FECompConsultar detecta CAE distinto sin desautorizar el registro local
+  ---
+  duration_ms: 0.298
+  type: 'test'
+  ...
+# Subtest: producción nunca solicita CAE aunque el gate read-only esté habilitado
+ok 25 - producción nunca solicita CAE aunque el gate read-only esté habilitado
+  ---
+  duration_ms: 1.1783
+  type: 'test'
+  ...
+# Subtest: factura de homologación no puede operarse desde runtime productivo
+ok 26 - factura de homologación no puede operarse desde runtime productivo
+  ---
+  duration_ms: 0.7424
+  type: 'test'
+  ...
+# Subtest: dry-run productivo arma el plan sin llamar a ARCA
+ok 27 - dry-run productivo arma el plan sin llamar a ARCA
+  ---
+  duration_ms: 0.5134
+  type: 'test'
+  ...
+# Subtest: producción bloquea CAE si la venta objetivo no coincide
+ok 28 - producción bloquea CAE si la venta objetivo no coincide
+  ---
+  duration_ms: 0.3701
+  type: 'test'
+  ...
+# Subtest: el modo automático no abre la autorización manual productiva sin venta objetivo
+ok 29 - el modo automático no abre la autorización manual productiva sin venta objetivo
+  ---
+  duration_ms: 0.7134
+  type: 'test'
+  ...
+# Subtest: autorización automática productiva permite Venta Rápida cuando los gates están habilitados
+ok 30 - autorización automática productiva permite Venta Rápida cuando los gates están habilitados
+  ---
+  duration_ms: 0.8479
+  type: 'test'
+  ...
+# Subtest: autorización automática productiva bloquea fuentes no incluidas en el allowlist
+ok 31 - autorización automática productiva bloquea fuentes no incluidas en el allowlist
+  ---
+  duration_ms: 0.4975
+  type: 'test'
+  ...
+# Subtest: producción permite una única venta objetivo cuando el gate exacto está armado
+ok 32 - producción permite una única venta objetivo cuando el gate exacto está armado
+  ---
+  duration_ms: 1.8086
+  type: 'test'
+  ...
+# Subtest: CUIT del emisor informado es válido
+ok 33 - CUIT del emisor informado es válido
+  ---
+  duration_ms: 1.4609
+  type: 'test'
+  ...
+# Subtest: configuración ARCA arranca en homologación y exige punto de venta cuando corresponde
+ok 34 - configuración ARCA arranca en homologación y exige punto de venta cuando corresponde
+  ---
+  duration_ms: 0.9096
+  type: 'test'
+  ...
+# Subtest: TRA WSAA es corto, temporal y específico por servicio
+ok 35 - TRA WSAA es corto, temporal y específico por servicio
+  ---
+  duration_ms: 1.4927
+  type: 'test'
+  ...
+# Subtest: envelope LoginCms escapa CMS y parser recupera token/sign
+ok 36 - envelope LoginCms escapa CMS y parser recupera token/sign
+  ---
+  duration_ms: 1.9982
+  type: 'test'
+  ...
+# Subtest: helpers XML soportan namespace y múltiples bloques
+ok 37 - helpers XML soportan namespace y múltiples bloques
+  ---
+  duration_ms: 1.0367
+  type: 'test'
+  ...
+# Subtest: detalle CAE incluye condición IVA del receptor y totales
+ok 38 - detalle CAE incluye condición IVA del receptor y totales
+  ---
+  duration_ms: 0.5767
+  type: 'test'
+  ...
+# Subtest: dominio fiscal genera ID determinístico por origen
+ok 39 - dominio fiscal genera ID determinístico por origen
+  ---
+  duration_ms: 0.7867
+  type: 'test'
+  ...
+# Subtest: descuento se distribuye sin alterar el total
+ok 40 - descuento se distribuye sin alterar el total
+  ---
+  duration_ms: 0.4419
+  type: 'test'
+  ...
+# Subtest: descompone precios finales con IVA explícito por producto
+ok 41 - descompone precios finales con IVA explícito por producto
+  ---
+  duration_ms: 1.5907
+  type: 'test'
+  ...
+# Subtest: no inventa alícuota IVA si el producto no está configurado
+ok 42 - no inventa alícuota IVA si el producto no está configurado
+  ---
+  duration_ms: 0.6638
+  type: 'test'
+  ...
+# Subtest: parser de padrón recupera identidad, domicilio e inscripción IVA
+ok 43 - parser de padrón recupera identidad, domicilio e inscripción IVA
+  ---
+  duration_ms: 5.2809
+  type: 'test'
+  ...
+# Subtest: configuración usa dominio vigente y fallback oficial del Padrón ARCA
+ok 44 - configuración usa dominio vigente y fallback oficial del Padrón ARCA
+  ---
+  duration_ms: 0.1814
+  type: 'test'
+  ...
+# Subtest: parser de padrón distingue CUIT inexistente
+ok 45 - parser de padrón distingue CUIT inexistente
+  ---
+  duration_ms: 3.1523
+  type: 'test'
+  ...
+# Subtest: parser de padrón marca encontrada una persona con datos generales
+ok 46 - parser de padrón marca encontrada una persona con datos generales
+  ---
+  duration_ms: 0.2863
+  type: 'test'
+  ...
+# Subtest: padrón activo en IVA resuelve Responsable Inscripto
+ok 47 - padrón activo en IVA resuelve Responsable Inscripto
+  ---
+  duration_ms: 0.3866
+  type: 'test'
+  ...
+# Subtest: monotributo activo resuelve condición general y variantes conocidas
+ok 48 - monotributo activo resuelve condición general y variantes conocidas
+  ---
+  duration_ms: 0.3101
+  type: 'test'
+  ...
+# Subtest: no inventa condición IVA si el padrón no alcanza
+ok 49 - no inventa condición IVA si el padrón no alcanza
+  ---
+  duration_ms: 0.1067
+  type: 'test'
+  ...
+# Subtest: consumidor final y tabla de condiciones se validan explícitamente
+ok 50 - consumidor final y tabla de condiciones se validan explícitamente
+  ---
+  duration_ms: 0.2151
+  type: 'test'
+  ...
+# Subtest: fault SOAP de WSAA conserva coe.alreadyAuthenticated y no se disfraza de error de red
+ok 51 - fault SOAP de WSAA conserva coe.alreadyAuthenticated y no se disfraza de error de red
+  ---
+  duration_ms: 35.4083
+  type: 'test'
+  ...
+# Subtest: producción queda bloqueada por defecto y acepta gates explícitos separados
+ok 52 - producción queda bloqueada por defecto y acepta gates explícitos separados
+  ---
+  duration_ms: 0.2857
+  type: 'test'
+  ...
+# Subtest: credenciales ARCA seguras reportan faltantes e inválidos sin exponer secretos
+ok 53 - credenciales ARCA seguras reportan faltantes e inválidos sin exponer secretos
+  ---
+  duration_ms: 0.4585
+  type: 'test'
+  ...
+# Subtest: fallback IVA 21 configurable completa snapshot y conserva receptor
+ok 54 - fallback IVA 21 configurable completa snapshot y conserva receptor
+  ---
+  duration_ms: 5.5482
+  type: 'test'
+  ...
+# Subtest: QR fiscal genera payload y matriz
+ok 55 - QR fiscal genera payload y matriz
+  ---
+  duration_ms: 5.1527
+  type: 'test'
+  ...
+# Subtest: PDF fiscal exige datos del emisor y factura verificada
+ok 56 - PDF fiscal exige datos del emisor y factura verificada
+  ---
+  duration_ms: 66.9942
+  type: 'test'
+  ...
+# Subtest: PDF detalla el producto, su IVA y el descuento de la venta autorizada
+ok 57 - PDF detalla el producto, su IVA y el descuento de la venta autorizada
+  ---
+  duration_ms: 6.5249
+  type: 'test'
+  ...
+# Subtest: syncInvoiceToSale persiste el vínculo fiscal en la venta
+ok 58 - syncInvoiceToSale persiste el vínculo fiscal en la venta
+  ---
+  duration_ms: 1.9775
+  type: 'test'
+  ...
+# Subtest: crea una sola solicitud pending y reutiliza el ID determinístico
+ok 59 - crea una sola solicitud pending y reutiliza el ID determinístico
+  ---
+  duration_ms: 5.0695
+  type: 'test'
+  ...
+# Subtest: snapshot fiscal queda marcado incompleto sin alícuota configurada
+ok 60 - snapshot fiscal queda marcado incompleto sin alícuota configurada
+  ---
+  duration_ms: 1.4785
+  type: 'test'
+  ...
+# Subtest: no crea solicitud para una venta que no pidió factura
+ok 61 - no crea solicitud para una venta que no pidió factura
+  ---
+  duration_ms: 0.9297
+  type: 'test'
+  ...
+# Subtest: una venta rápida administrativa usa invoiceStatus pending como solicitud
+ok 62 - una venta rápida administrativa usa invoiceStatus pending como solicitud
+  ---
+  duration_ms: 0.6302
+  type: 'test'
+  ...
+# Subtest: vendedor sólo puede pedir factura de su propia venta; administración puede hacerlo
+ok 63 - vendedor sólo puede pedir factura de su propia venta; administración puede hacerlo
+  ---
+  duration_ms: 0.2742
+  type: 'test'
+  ...
+# Subtest: claim exclusivo cambia pending a authorizing una sola vez
+ok 64 - claim exclusivo cambia pending a authorizing una sola vez
+  ---
+  duration_ms: 0.8107
+  type: 'test'
+  ...
+# Subtest: claim pierde limpiamente ante una precondición concurrente
+ok 65 - claim pierde limpiamente ante una precondición concurrente
+  ---
+  duration_ms: 0.5694
+  type: 'test'
+  ...
+# Subtest: misma venta puede tener solicitudes separadas por entorno fiscal
+ok 66 - misma venta puede tener solicitudes separadas por entorno fiscal
+  ---
+  duration_ms: 0.6292
+  type: 'test'
+  ...
+# Subtest: homologación reutiliza factura legacy, producción no la adopta
+ok 67 - homologación reutiliza factura legacy, producción no la adopta
+  ---
+  duration_ms: 0.8338
+  type: 'test'
+  ...
+# Subtest: clave WSAA compartida exige exactamente 32 bytes Base64
+ok 68 - clave WSAA compartida exige exactamente 32 bytes Base64
+  ---
+  duration_ms: 2.9952
+  type: 'test'
+  ...
+# Subtest: TA se cifra AES-256-GCM y Token/Sign no quedan en claro
+ok 69 - TA se cifra AES-256-GCM y Token/Sign no quedan en claro
+  ---
+  duration_ms: 3.7105
+  type: 'test'
+  ...
+# Subtest: AAD impide usar un TA cifrado para otro servicio
+ok 70 - AAD impide usar un TA cifrado para otro servicio
+  ---
+  duration_ms: 0.6607
+  type: 'test'
+  ...
+# Subtest: lease exclusivo evita dos renovaciones y el TA publicado se reutiliza
+ok 71 - lease exclusivo evita dos renovaciones y el TA publicado se reutiliza
+  ---
+  duration_ms: 3.1366
+  type: 'test'
+  ...
+# Subtest: producción exige un gate de red explícito y luego caché compartida cifrada
+ok 72 - producción exige un gate de red explícito y luego caché compartida cifrada
+  ---
+  duration_ms: 0.9929
+  type: 'test'
+  ...
+# Subtest: requestAccessTicket reutiliza TA compartido tras perder la caché en memoria
+ok 73 - requestAccessTicket reutiliza TA compartido tras perder la caché en memoria
+  ---
+  duration_ms: 1.0488
+  type: 'test'
+  ...
+# Subtest: inspección segura reporta metadata sin Token/Sign
+ok 74 - inspección segura reporta metadata sin Token/Sign
+  ---
+  duration_ms: 1.2431
+  type: 'test'
+  ...
+# Subtest: AAD también aísla por CUIT emisor
+ok 75 - AAD también aísla por CUIT emisor
+  ---
+  duration_ms: 0.568
+  type: 'test'
+  ...
+# Subtest: caché v1 real se sigue descifrando tras agregar aislamiento por CUIT
+ok 76 - caché v1 real se sigue descifrando tras agregar aislamiento por CUIT
+  ---
+  duration_ms: 1.2779
+  type: 'test'
+  ...
+# Subtest: la raíz abre la gestión y la tienda queda en /tienda
+ok 77 - la raíz abre la gestión y la tienda queda en /tienda
+  ---
+  duration_ms: 2.043
+  type: 'test'
+  ...
+# Subtest: la vista de tienda requiere un administrador
+ok 78 - la vista de tienda requiere un administrador
+  ---
+  duration_ms: 0.2194
+  type: 'test'
+  ...
+# Subtest: el login permite ver la contraseña y espera la persistencia local
+ok 79 - el login permite ver la contraseña y espera la persistencia local
+  ---
+  duration_ms: 0.2107
+  type: 'test'
+  ...
+# Subtest: el modal de anulación conserva el foco y el motivo es opcional
+ok 80 - el modal de anulación conserva el foco y el motivo es opcional
+  ---
+  duration_ms: 1.3462
+  type: 'test'
+  ...
+# Subtest: el servicio normaliza el motivo vacío sin impedir la anulación
+ok 81 - el servicio normaliza el motivo vacío sin impedir la anulación
+  ---
+  duration_ms: 0.3222
+  type: 'test'
+  ...
+# Subtest: anular continúa restituyendo stock y registrando movimiento y auditoría
+ok 82 - anular continúa restituyendo stock y registrando movimiento y auditoría
+  ---
+  duration_ms: 0.2936
+  type: 'test'
+  ...
+# Subtest: Métricas Generales usa una sola ruta y un solo componente
+ok 83 - Métricas Generales usa una sola ruta y un solo componente
+  ---
+  duration_ms: 0.3054
+  type: 'test'
+  ...
+# Subtest: los multiselect de métricas aplican en bloque y sólo abren uno
+ok 84 - los multiselect de métricas aplican en bloque y sólo abren uno
+  ---
+  duration_ms: 0.235
+  type: 'test'
+  ...
+# Subtest: el panel de filtros deja de recortar overlays y mantiene scroll interno responsive
+ok 85 - el panel de filtros deja de recortar overlays y mantiene scroll interno responsive
+  ---
+  duration_ms: 0.2792
+  type: 'test'
+  ...
+# Subtest: formatos equivalentes del mismo teléfono argentino producen la misma normalización
+ok 86 - formatos equivalentes del mismo teléfono argentino producen la misma normalización
+  ---
+  duration_ms: 2.8721
+  type: 'test'
+  ...
+# Subtest: el formato móvil internacional +54 9 se normaliza al número nacional
+ok 87 - el formato móvil internacional +54 9 se normaliza al número nacional
+  ---
+  duration_ms: 0.3106
+  type: 'test'
+  ...
+# Subtest: el contrato WhatsApp canoniza formatos argentinos equivalentes a 549 + 10 dígitos
+ok 88 - el contrato WhatsApp canoniza formatos argentinos equivalentes a 549 + 10 dígitos
+  ---
+  duration_ms: 0.6352
+  type: 'test'
+  ...
+# Subtest: el contrato WhatsApp no adivina país ni acepta números argentinos ambiguos
+ok 89 - el contrato WhatsApp no adivina país ni acepta números argentinos ambiguos
+  ---
+  duration_ms: 0.1713
+  type: 'test'
+  ...
+# Subtest: el nombre es opcional pero la zona y el teléfono son obligatorios
+ok 90 - el nombre es opcional pero la zona y el teléfono son obligatorios
+  ---
+  duration_ms: 1.1452
+  type: 'test'
+  ...
+# Subtest: la zona libre no crea una referencia a una zona global
+ok 91 - la zona libre no crea una referencia a una zona global
+  ---
+  duration_ms: 0.3502
+  type: 'test'
+  ...
+# Subtest: el id de cliente es determinístico y no expone el teléfono
+ok 92 - el id de cliente es determinístico y no expone el teléfono
+  ---
+  duration_ms: 10.8097
+  type: 'test'
+  ...
+# Subtest: la búsqueda administrativa encuentra teléfono, nombre y zona
+ok 93 - la búsqueda administrativa encuentra teléfono, nombre y zona
+  ---
+  duration_ms: 1.1288
+  type: 'test'
+  ...
+# Subtest: el teléfono CABA se muestra legible sin alterar la normalización
+ok 94 - el teléfono CABA se muestra legible sin alterar la normalización
+  ---
+  duration_ms: 0.5546
+  type: 'test'
+  ...
+# Subtest: otros teléfonos conservan todos sus dígitos en el formato visible
+ok 95 - otros teléfonos conservan todos sus dígitos en el formato visible
+  ---
+  duration_ms: 0.7367
+  type: 'test'
+  ...
+# Subtest: WhatsApp usa numeración internacional canónica sin guiones ni datos adicionales
+ok 96 - WhatsApp usa numeración internacional canónica sin guiones ni datos adicionales
+  ---
+  duration_ms: 0.7159
+  type: 'test'
+  ...
+# Subtest: Flor Mía WhatsApp Sender import deduplicates phones and preserves zone evidence
+ok 97 - Flor Mía WhatsApp Sender import deduplicates phones and preserves zone evidence
+  ---
+  duration_ms: 1.8165
+  type: 'test'
+  ...
+# Subtest: Clientes page exposes bulk import next to manual creation with contextual help
+ok 98 - Clientes page exposes bulk import next to manual creation with contextual help
+  ---
+  duration_ms: 7.2028
+  type: 'test'
+  ...
+# Subtest: los rangos usan límites inclusivos y finales exclusivos de Buenos Aires
+ok 99 - los rangos usan límites inclusivos y finales exclusivos de Buenos Aires
+  ---
+  duration_ms: 2.5548
+  type: 'test'
+  ...
+# Subtest: la semana comienza el lunes y cruza meses o años sin corrimiento
+ok 100 - la semana comienza el lunes y cruza meses o años sin corrimiento
+  ---
+  duration_ms: 2.6451
+  type: 'test'
+  ...
+# Subtest: las flechas avanzan exactamente una unidad y bloquean períodos futuros
+ok 101 - las flechas avanzan exactamente una unidad y bloquean períodos futuros
+  ---
+  duration_ms: 1.0093
+  type: 'test'
+  ...
+# Subtest: el ritmo de ventas se adapta al año, mes, semana y día
+ok 102 - el ritmo de ventas se adapta al año, mes, semana y día
+  ---
+  duration_ms: 9.1517
+  type: 'test'
+  ...
+# Subtest: el Panel General conserva un único selector principal y elimina la evaluación
+ok 103 - el Panel General conserva un único selector principal y elimina la evaluación
+  ---
+  duration_ms: 0.3615
+  type: 'test'
+  ...
+# Subtest: el selector ofrece formatos exactos y calendarios adaptativos
+ok 104 - el selector ofrece formatos exactos y calendarios adaptativos
+  ---
+  duration_ms: 0.331
+  type: 'test'
+  ...
+# Subtest: el filtro separa ubicaciones activas e inactivas y permite aplicar múltiples
+ok 105 - el filtro separa ubicaciones activas e inactivas y permite aplicar múltiples
+  ---
+  duration_ms: 0.2044
+  type: 'test'
+  ...
+# Subtest: las consultas permanecen acotadas, autorizadas, agrupadas y sin duplicados
+ok 106 - las consultas permanecen acotadas, autorizadas, agrupadas y sin duplicados
+  ---
+  duration_ms: 0.1683
+  type: 'test'
+  ...
+# Subtest: las respuestas antiguas se ignoran y el diseño es responsive y accesible
+ok 107 - las respuestas antiguas se ignoran y el diseño es responsive y accesible
+  ---
+  duration_ms: 0.4501
+  type: 'test'
+  ...
+# Subtest: los identificadores y slugs del catálogo son únicos
+ok 108 - los identificadores y slugs del catálogo son únicos
+  ---
+  duration_ms: 1.2646
+  type: 'test'
+  ...
+# Subtest: cada producto pertenece a una categoría existente
+ok 109 - cada producto pertenece a una categoría existente
+  ---
+  duration_ms: 0.3472
+  type: 'test'
+  ...
+# Subtest: los datos comerciales desconocidos permanecen explícitamente pendientes
+ok 110 - los datos comerciales desconocidos permanecen explícitamente pendientes
+  ---
+  duration_ms: 0.1958
+  type: 'test'
+  ...
+# Subtest: todos los productos y varietales usan una imagen local existente
+ok 111 - todos los productos y varietales usan una imagen local existente
+  ---
+  duration_ms: 4.5996
+  type: 'test'
+  ...
+# Subtest: el manifiesto usa el logo, el local y los seis destacados reales
+ok 112 - el manifiesto usa el logo, el local y los seis destacados reales
+  ---
+  duration_ms: 2.0473
+  type: 'test'
+  ...
+# Subtest: la barra informativa conserva los tres mensajes aprobados
+ok 113 - la barra informativa conserva los tres mensajes aprobados
+  ---
+  duration_ms: 0.9305
+  type: 'test'
+  ...
+# Subtest: la navegación de escritorio conserva sus accesos actuales
+ok 114 - la navegación de escritorio conserva sus accesos actuales
+  ---
+  duration_ms: 0.384
+  type: 'test'
+  ...
+# Subtest: el menú mobile tiene el orden y destinos solicitados
+ok 115 - el menú mobile tiene el orden y destinos solicitados
+  ---
+  duration_ms: 0.2198
+  type: 'test'
+  ...
+# Subtest: la colección regional agrupa categorías existentes sin duplicar productos
+ok 116 - la colección regional agrupa categorías existentes sin duplicar productos
+  ---
+  duration_ms: 0.4749
+  type: 'test'
+  ...
+# Subtest: vinos conserva un estado vacío honesto
+ok 117 - vinos conserva un estado vacío honesto
+  ---
+  duration_ms: 0.5066
+  type: 'test'
+  ...
+# Subtest: los CTAs y el título AOVE usan los textos aprobados
+ok 118 - los CTAs y el título AOVE usan los textos aprobados
+  ---
+  duration_ms: 0.9999
+  type: 'test'
+  ...
+# Subtest: la home solo publica las dos promociones aprobadas
+ok 119 - la home solo publica las dos promociones aprobadas
+  ---
+  duration_ms: 0.2058
+  type: 'test'
+  ...
+# Subtest: los seis varietales tienen intensidad y producto de 500 cc
+ok 120 - los seis varietales tienen intensidad y producto de 500 cc
+  ---
+  duration_ms: 0.3375
+  type: 'test'
+  ...
+# Subtest: los cuatro beneficios comerciales tienen contenido desplegable
+ok 121 - los cuatro beneficios comerciales tienen contenido desplegable
+  ---
+  duration_ms: 0.1513
+  type: 'test'
+  ...
+# Subtest: gestión y e-commerce tienen builds independientes sin romper el build unificado
+ok 122 - gestión y e-commerce tienen builds independientes sin romper el build unificado
+  ---
+  duration_ms: 25.0209
+  type: 'test'
+  ...
+# Subtest: cada modo fija una única superficie y sólo el e-commerce es público
+ok 123 - cada modo fija una única superficie y sólo el e-commerce es público
+  ---
+  duration_ms: 26.9337
+  type: 'test'
+  ...
+# Subtest: catálogo sin ubicación Ecommerce no inventa precio ni stock
+ok 124 - catálogo sin ubicación Ecommerce no inventa precio ni stock
+  ---
+  duration_ms: 2.7697
+  type: 'test'
+  ...
+# Subtest: catálogo usa products como maestro y locationStock para precio/stock efectivo
+ok 125 - catálogo usa products como maestro y locationStock para precio/stock efectivo
+  ---
+  duration_ms: 1.8944
+  type: 'test'
+  ...
+# Subtest: precio legacy local se conserva como autoritativo y no se reemplaza silenciosamente
+ok 126 - precio legacy local se conserva como autoritativo y no se reemplaza silenciosamente
+  ---
+  duration_ms: 0.221
+  type: 'test'
+  ...
+# Subtest: cantidades negativas, decimales y excesivas son rechazadas
+ok 127 - cantidades negativas, decimales y excesivas son rechazadas
+  ---
+  duration_ms: 0.9809
+  type: 'test'
+  ...
+# Subtest: total se recalcula desde fuente autoritativa e ignora precio/total del cliente
+ok 128 - total se recalcula desde fuente autoritativa e ignora precio/total del cliente
+  ---
+  duration_ms: 0.9805
+  type: 'test'
+  ...
+# Subtest: producto inexistente, inactivo, eliminado o sin stock falla
+ok 129 - producto inexistente, inactivo, eliminado o sin stock falla
+  ---
+  duration_ms: 0.9507
+  type: 'test'
+  ...
+# Subtest: pedido pending persiste Order + Payment sin Sale, stock ni Invoice
+ok 130 - pedido pending persiste Order + Payment sin Sale, stock ni Invoice
+  ---
+  duration_ms: 3.3659
+  type: 'test'
+  ...
+# Subtest: checkout público no puede autoaprobar un pago aunque el flag local exista
+ok 131 - checkout público no puede autoaprobar un pago aunque el flag local exista
+  ---
+  duration_ms: 0.6373
+  type: 'test'
+  ...
+# Subtest: requestId vuelve idempotente un retry de checkout
+ok 132 - requestId vuelve idempotente un retry de checkout
+  ---
+  duration_ms: 1.0053
+  type: 'test'
+  ...
+# Subtest: Ecommerce Etapa 5 no importa ni llama emisión ARCA
+ok 133 - Ecommerce Etapa 5 no importa ni llama emisión ARCA
+  ---
+  duration_ms: 11.5394
+  type: 'test'
+  ...
+# Subtest: runtime: checkout recalcula total; Order/Payment pending sin Sale ni stock descontado
+ok 134 - runtime: checkout recalcula total; Order/Payment pending sin Sale ni stock descontado
+  ---
+  duration_ms: 4.8022
+  type: 'test'
+  ...
+# Subtest: runtime: misma request/key devuelve misma Order; distinto contenido conflict
+ok 135 - runtime: misma request/key devuelve misma Order; distinto contenido conflict
+  ---
+  duration_ms: 1.446
+  type: 'test'
+  ...
+# Subtest: runtime: checkout público rechaza simulate_approved también en replay
+ok 136 - runtime: checkout público rechaza simulate_approved también en replay
+  ---
+  duration_ms: 0.6007
+  type: 'test'
+  ...
+# Subtest: runtime: flag off bloquea sin escrituras
+ok 137 - runtime: flag off bloquea sin escrituras
+  ---
+  duration_ms: 1.3994
+  type: 'test'
+  ...
+# Subtest: runtime: production bloquea sin escrituras
+ok 138 - runtime: production bloquea sin escrituras
+  ---
+  duration_ms: 0.6116
+  type: 'test'
+  ...
+# Subtest: runtime: deploy-preview bloquea sin escrituras
+ok 139 - runtime: deploy-preview bloquea sin escrituras
+  ---
+  duration_ms: 0.6831
+  type: 'test'
+  ...
+# Subtest: runtime: branch-deploy bloquea sin escrituras
+ok 140 - runtime: branch-deploy bloquea sin escrituras
+  ---
+  duration_ms: 0.5777
+  type: 'test'
+  ...
+# Subtest: runtime: default off y una variable VITE no habilitan la simulación
+ok 141 - runtime: default off y una variable VITE no habilitan la simulación
+  ---
+  duration_ms: 0.5495
+  type: 'test'
+  ...
+# Subtest: runtime: no admin bloqueado
+ok 142 - runtime: no admin bloqueado
+  ---
+  duration_ms: 0.9844
+  type: 'test'
+  ...
+# Subtest: runtime: Payway rejected no crea Sale/Invoice ni descuenta stock
+ok 143 - runtime: Payway rejected no crea Sale/Invoice ni descuenta stock
+  ---
+  duration_ms: 1.8582
+  type: 'test'
+  ...
+# Subtest: runtime: dos approvals concurrentes y retry crean una Sale, un descuento y una Invoice
+ok 144 - runtime: dos approvals concurrentes y retry crean una Sale, un descuento y una Invoice
+  ---
+  duration_ms: 9.3927
+  type: 'test'
+  ...
+# Subtest: runtime: aprobación rechaza producto inexistente
+ok 145 - runtime: aprobación rechaza producto inexistente
+  ---
+  duration_ms: 0.9192
+  type: 'test'
+  ...
+# Subtest: runtime: aprobación rechaza producto inactivo
+ok 146 - runtime: aprobación rechaza producto inactivo
+  ---
+  duration_ms: 0.6953
+  type: 'test'
+  ...
+# Subtest: runtime: aprobación rechaza precio inválido
+ok 147 - runtime: aprobación rechaza precio inválido
+  ---
+  duration_ms: 0.5496
+  type: 'test'
+  ...
+# Subtest: runtime: aprobación rechaza cambio de precio
+ok 148 - runtime: aprobación rechaza cambio de precio
+  ---
+  duration_ms: 0.4803
+  type: 'test'
+  ...
+# Subtest: runtime: aprobación rechaza stock insuficiente
+ok 149 - runtime: aprobación rechaza stock insuficiente
+  ---
+  duration_ms: 0.5605
+  type: 'test'
+  ...
+# Subtest: runtime: payment amount inconsistente y key incorrecta bloqueadas
+ok 150 - runtime: payment amount inconsistente y key incorrecta bloqueadas
+  ---
+  duration_ms: 1.4358
+  type: 'test'
+  ...
+# Subtest: runtime: Payment final incompatible no permite nueva aprobación
+ok 151 - runtime: Payment final incompatible no permite nueva aprobación
+  ---
+  duration_ms: 0.545
+  type: 'test'
+  ...
+# Subtest: runtime: error fiscal tras Sale y retry conservan Sale/stock/Invoice
+ok 152 - runtime: error fiscal tras Sale y retry conservan Sale/stock/Invoice
+  ---
+  duration_ms: 2.3289
+  type: 'test'
+  ...
+# Subtest: runtime: CUIT mock produce plan A sin autorización ni CAE
+ok 153 - runtime: CUIT mock produce plan A sin autorización ni CAE
+  ---
+  duration_ms: 2.1519
+  type: 'test'
+  ...
+# Subtest: runtime: CUIT inválido no se convierte silenciosamente a Consumidor Final
+ok 154 - runtime: CUIT inválido no se convierte silenciosamente a Consumidor Final
+  ---
+  duration_ms: 0.3957
+  type: 'test'
+  ...
+# Subtest: runtime: umbral CF genera blocker de identificación
+ok 155 - runtime: umbral CF genera blocker de identificación
+  ---
+  duration_ms: 1.5756
+  type: 'test'
+  ...
+# Subtest: runtime: mockAuthorize sólo en test; ningún CAE inventado se persiste
+ok 156 - runtime: mockAuthorize sólo en test; ningún CAE inventado se persiste
+  ---
+  duration_ms: 2.4211
+  type: 'test'
+  ...
+# Subtest: runtime: replay fiscal no puede cambiar receptor de Invoice existente
+ok 157 - runtime: replay fiscal no puede cambiar receptor de Invoice existente
+  ---
+  duration_ms: 4.5621
+  type: 'test'
+  ...
+# Subtest: runtime: identidades de documentos no se toman del campo id
+ok 158 - runtime: identidades de documentos no se toman del campo id
+  ---
+  duration_ms: 0.9226
+  type: 'test'
+  ...
+# Subtest: runtime: dos checkouts concurrentes con igual key y distinto contenido dan conflict
+ok 159 - runtime: dos checkouts concurrentes con igual key y distinto contenido dan conflict
+  ---
+  duration_ms: 1.1939
+  type: 'test'
+  ...
+# Subtest: runtime: dos Orders concurrentes no venden más stock del disponible
+ok 160 - runtime: dos Orders concurrentes no venden más stock del disponible
+  ---
+  duration_ms: 1.7113
+  type: 'test'
+  ...
+# Subtest: runtime: booleans/arrays no representan precios, cantidades ni stock válidos
+ok 161 - runtime: booleans/arrays no representan precios, cantidades ni stock válidos
+  ---
+  duration_ms: 3.2861
+  type: 'test'
+  ...
+# Subtest: runtime: key malformada no se normaliza a una identidad existente
+ok 162 - runtime: key malformada no se normaliza a una identidad existente
+  ---
+  duration_ms: 0.5274
+  type: 'test'
+  ...
+# Subtest: runtime: stock movements para IDs a.b y a_b no colisionan
+ok 163 - runtime: stock movements para IDs a.b y a_b no colisionan
+  ---
+  duration_ms: 11.9802
+  type: 'test'
+  ...
+# Subtest: runtime: reintento fiscal conserva IVA confirmado aunque cambie el master
+ok 164 - runtime: reintento fiscal conserva IVA confirmado aunque cambie el master
+  ---
+  duration_ms: 1.6639
+  type: 'test'
+  ...
+# Subtest: runtime: invoice determinística no enmascara otra asociación fiscal
+ok 165 - runtime: invoice determinística no enmascara otra asociación fiscal
+  ---
+  duration_ms: 2.0349
+  type: 'test'
+  ...
+# Subtest: runtime: proveedor o moneda inconsistentes bloquean preparación fiscal
+ok 166 - runtime: proveedor o moneda inconsistentes bloquean preparación fiscal
+  ---
+  duration_ms: 0.9151
+  type: 'test'
+  ...
+# Subtest: runtime: Ecommerce no se enmascara como admin_quick_sale para entrar en allowlist productiva
+ok 167 - runtime: Ecommerce no se enmascara como admin_quick_sale para entrar en allowlist productiva
+  ---
+  duration_ms: 0.6841
+  type: 'test'
+  ...
+# Subtest: Etapa 6: flag off bloquea simulation
+ok 168 - Etapa 6: flag off bloquea simulation
+  ---
+  duration_ms: 1.8235
+  type: 'test'
+  ...
+# Subtest: Etapa 6: simulation sólo habilita runtime local
+ok 169 - Etapa 6: simulation sólo habilita runtime local
+  ---
+  duration_ms: 0.2526
+  type: 'test'
+  ...
+# Subtest: Etapa 6: payment contract no mezcla simulation con Payway
+ok 170 - Etapa 6: payment contract no mezcla simulation con Payway
+  ---
+  duration_ms: 0.2069
+  type: 'test'
+  ...
+# Subtest: Etapa 6: simulation no admite pending ni rejected
+ok 171 - Etapa 6: simulation no admite pending ni rejected
+  ---
+  duration_ms: 0.2503
+  type: 'test'
+  ...
+# Subtest: Etapa 6: endpoint local exige admin y usa contrato simulation
+ok 172 - Etapa 6: endpoint local exige admin y usa contrato simulation
+  ---
+  duration_ms: 6.5313
+  type: 'test'
+  ...
+# Subtest: Etapa 6: flujo fiscal Ecommerce no contiene transporte FECAESolicitar
+ok 173 - Etapa 6: flujo fiscal Ecommerce no contiene transporte FECAESolicitar
+  ---
+  duration_ms: 2.1558
+  type: 'test'
+  ...
+# Subtest: Etapa 6: invoicePersistence sólo acepta Ecommerce con pago confiable
+ok 174 - Etapa 6: invoicePersistence sólo acepta Ecommerce con pago confiable
+  ---
+  duration_ms: 1.3648
+  type: 'test'
+  ...
+# Subtest: Etapa 6: Firestore mantiene payment/fiscal authority fuera del navegador
+ok 175 - Etapa 6: Firestore mantiene payment/fiscal authority fuera del navegador
+  ---
+  duration_ms: 1.2386
+  type: 'test'
+  ...
+# Subtest: Etapa 6: UI advierte pago simulado y no usa VITE para habilitar backend
+ok 176 - Etapa 6: UI advierte pago simulado y no usa VITE para habilitar backend
+  ---
+  duration_ms: 3.249
+  type: 'test'
+  ...
+# Subtest: Etapa 6: allowlist productiva por default sigue limitada a admin_quick_sale
+ok 177 - Etapa 6: allowlist productiva por default sigue limitada a admin_quick_sale
+  ---
+  duration_ms: 2.1904
+  type: 'test'
+  ...
+# Subtest: carrito persistido conserva sólo productId y quantity
+ok 178 - carrito persistido conserva sólo productId y quantity
+  ---
+  duration_ms: 6.2012
+  type: 'test'
+  ...
+# Subtest: catálogo y producto consumen CommerceCatalogContext
+ok 179 - catálogo y producto consumen CommerceCatalogContext
+  ---
+  duration_ms: 2.2191
+  type: 'test'
+  ...
+# Subtest: checkout manda IDs/cantidades y no usa precios cliente como autoridad
+ok 180 - checkout manda IDs/cantidades y no usa precios cliente como autoridad
+  ---
+  duration_ms: 2.1419
+  type: 'test'
+  ...
+# Subtest: checkout no contiene integración ARCA ni CAE
+ok 181 - checkout no contiene integración ARCA ni CAE
+  ---
+  duration_ms: 1.7868
+  type: 'test'
+  ...
+# Subtest: fuente editorial declara explícitamente que no es comercial
+ok 182 - fuente editorial declara explícitamente que no es comercial
+  ---
+  duration_ms: 2.4675
+  type: 'test'
+  ...
+# Subtest: configuración Ecommerce no inventa ubicación ni activa pagos simulados
+ok 183 - configuración Ecommerce no inventa ubicación ni activa pagos simulados
+  ---
+  duration_ms: 2.2514
+  type: 'test'
+  ...
+# Subtest: simulación Etapa 6 exige capability backend, admin y advertencia fiscal explícita
+ok 184 - simulación Etapa 6 exige capability backend, admin y advertencia fiscal explícita
+  ---
+  duration_ms: 2.5924
+  type: 'test'
+  ...
+# Subtest: useOverlay conserva el foco aunque onClose cambie en cada render
+ok 185 - useOverlay conserva el foco aunque onClose cambie en cada render
+  ---
+  duration_ms: 1.1837
+  type: 'test'
+  ...
+# Subtest: el focus trap tolera re-renders sin perder el elemento activo
+ok 186 - el focus trap tolera re-renders sin perder el elemento activo
+  ---
+  duration_ms: 0.2541
+  type: 'test'
+  ...
+# Subtest: los formularios con cierres inline quedan cubiertos por el fix global
+ok 187 - los formularios con cierres inline quedan cubiertos por el fix global
+  ---
+  duration_ms: 0.2343
+  type: 'test'
+  ...
+# Subtest: los campos controlados siguen actualizando sólo su estado y no el overlay
+ok 188 - los campos controlados siguen actualizando sólo su estado y no el overlay
+  ---
+  duration_ms: 0.2964
+  type: 'test'
+  ...
+# Subtest: el precio predeterminado se resuelve siempre desde el producto maestro
+ok 189 - el precio predeterminado se resuelve siempre desde el producto maestro
+  ---
+  duration_ms: 0.9711
+  type: 'test'
+  ...
+# Subtest: el precio especial de una ubicación no cambia cuando cambia el maestro
+ok 190 - el precio especial de una ubicación no cambia cuando cambia el maestro
+  ---
+  duration_ms: 0.1805
+  type: 'test'
+  ...
+# Subtest: un precio legacy se conserva como precio local para evitar cambios silenciosos
+ok 191 - un precio legacy se conserva como precio local para evitar cambios silenciosos
+  ---
+  duration_ms: 0.2123
+  type: 'test'
+  ...
+# Subtest: un depósito nunca expone campos de precio aunque un registro legacy los tenga
+ok 192 - un depósito nunca expone campos de precio aunque un registro legacy los tenga
+  ---
+  duration_ms: 0.2509
+  type: 'test'
+  ...
+# Subtest: agregar stock suma unidades y rechaza valores inválidos
+ok 193 - agregar stock suma unidades y rechaza valores inválidos
+  ---
+  duration_ms: 0.6091
+  type: 'test'
+  ...
+# Subtest: una transferencia valida disponibilidad y nunca acepta cantidades negativas o superiores al stock
+ok 194 - una transferencia valida disponibilidad y nunca acepta cantidades negativas o superiores al stock
+  ---
+  duration_ms: 0.2326
+  type: 'test'
+  ...
+# Subtest: el resumen de transferencia admite varios productos en una sola operación
+ok 195 - el resumen de transferencia admite varios productos en una sola operación
+  ---
+  duration_ms: 0.805
+  type: 'test'
+  ...
+# Subtest: las ubicaciones fijadas son personales y tienen límite de cuatro
+ok 196 - las ubicaciones fijadas son personales y tienen límite de cuatro
+  ---
+  duration_ms: 1.0042
+  type: 'test'
+  ...
+# Subtest: cargar stock abre directamente la sección correcta y bloquea ingresos en ubicaciones inactivas
+ok 197 - cargar stock abre directamente la sección correcta y bloquea ingresos en ubicaciones inactivas
+  ---
+  duration_ms: 0.302
+  type: 'test'
+  ...
+# Subtest: la ubicación selecciona productos ya existentes del catálogo maestro
+ok 198 - la ubicación selecciona productos ya existentes del catálogo maestro
+  ---
+  duration_ms: 0.4306
+  type: 'test'
+  ...
+# Subtest: el stock de una ubicación permite búsqueda y filtro por categoría
+ok 199 - el stock de una ubicación permite búsqueda y filtro por categoría
+  ---
+  duration_ms: 0.2216
+  type: 'test'
+  ...
+# Subtest: el catálogo maestro usa imágenes locales del proyecto
+ok 200 - el catálogo maestro usa imágenes locales del proyecto
+  ---
+  duration_ms: 0.3413
+  type: 'test'
+  ...
+# Subtest: vendedores asignados y disponibles se muestran por separado
+ok 201 - vendedores asignados y disponibles se muestran por separado
+  ---
+  duration_ms: 0.2501
+  type: 'test'
+  ...
+# Subtest: los descuentos globales se validan antes de habilitarse
+ok 202 - los descuentos globales se validan antes de habilitarse
+  ---
+  duration_ms: 0.3203
+  type: 'test'
+  ...
+# Subtest: los valores de stock usan texto oscuro y controles táctiles
+ok 203 - los valores de stock usan texto oscuro y controles táctiles
+  ---
+  duration_ms: 0.2401
+  type: 'test'
+  ...
+# Subtest: la venta no puede dejar stock negativo
+ok 204 - la venta no puede dejar stock negativo
+  ---
+  duration_ms: 1.4187
+  type: 'test'
+  ...
+# Subtest: los descuentos múltiples aplican primero los fijos y después los porcentuales
+ok 205 - los descuentos múltiples aplican primero los fijos y después los porcentuales
+  ---
+  duration_ms: 0.4583
+  type: 'test'
+  ...
+# Subtest: el pago simple conserva las etiquetas compatibles con las reglas existentes
+ok 206 - el pago simple conserva las etiquetas compatibles con las reglas existentes
+  ---
+  duration_ms: 1.0687
+  type: 'test'
+  ...
+# Subtest: una ubicación pausada no se considera activa
+ok 207 - una ubicación pausada no se considera activa
+  ---
+  duration_ms: 0.4498
+  type: 'test'
+  ...
+# Subtest: un vendedor sólo ve módulos operativos autorizados
+ok 208 - un vendedor sólo ve módulos operativos autorizados
+  ---
+  duration_ms: 0.7486
+  type: 'test'
+  ...
+# Subtest: las denegaciones individuales prevalecen sobre la plantilla de rol
+ok 209 - las denegaciones individuales prevalecen sobre la plantilla de rol
+  ---
+  duration_ms: 0.2033
+  type: 'test'
+  ...
+# Subtest: Campaign Planner permite admin y marketing manager pero no seller
+ok 210 - Campaign Planner permite admin y marketing manager pero no seller
+  ---
+  duration_ms: 0.3144
+  type: 'test'
+  ...
+# Subtest: los meses se delimitan a medianoche de Argentina sin corrimiento UTC
+ok 211 - los meses se delimitan a medianoche de Argentina sin corrimiento UTC
+  ---
+  duration_ms: 0.7318
+  type: 'test'
+  ...
+# Subtest: el resumen mensual excluye anuladas, bajas y ventas duplicadas
+ok 212 - el resumen mensual excluye anuladas, bajas y ventas duplicadas
+  ---
+  duration_ms: 0.6621
+  type: 'test'
+  ...
+# Subtest: el ritmo de ventas siempre contiene siete días y completa ceros
+ok 213 - el ritmo de ventas siempre contiene siete días y completa ceros
+  ---
+  duration_ms: 3.0437
+  type: 'test'
+  ...
+# Subtest: el catálogo maestro aparece en una ubicación nueva sin duplicar productos
+ok 214 - el catálogo maestro aparece en una ubicación nueva sin duplicar productos
+  ---
+  duration_ms: 1.3706
+  type: 'test'
+  ...
+# Subtest: el vendedor puede consultar stock pero no cargarlo ni administrar descuentos
+ok 215 - el vendedor puede consultar stock pero no cargarlo ni administrar descuentos
+  ---
+  duration_ms: 0.1949
+  type: 'test'
+  ...
+# Subtest: el administrador general conserva acceso a la administración
+ok 216 - el administrador general conserva acceso a la administración
+  ---
+  duration_ms: 0.1268
+  type: 'test'
+  ...
+# Subtest: el panel usa Venta Rápida y enlaza el flujo existente
+ok 217 - el panel usa Venta Rápida y enlaza el flujo existente
+  ---
+  duration_ms: 5.2805
+  type: 'test'
+  ...
+# Subtest: el panel incluye selector temporal único, análisis y actividad ampliable
+ok 218 - el panel incluye selector temporal único, análisis y actividad ampliable
+  ---
+  duration_ms: 2.5367
+  type: 'test'
+  ...
+# Subtest: las tarjetas de módulos renderizan iconos semánticos y no números
+ok 219 - las tarjetas de módulos renderizan iconos semánticos y no números
+  ---
+  duration_ms: 1.8932
+  type: 'test'
+  ...
+# Subtest: la ubicación separa el catálogo global y conserva el orden operativo
+ok 220 - la ubicación separa el catálogo global y conserva el orden operativo
+  ---
+  duration_ms: 1.3103
+  type: 'test'
+  ...
+# Subtest: las consultas de ventas usan rango y la actividad usa cursor
+ok 221 - las consultas de ventas usan rango y la actividad usa cursor
+  ---
+  duration_ms: 1.0382
+  type: 'test'
+  ...
+# Subtest: Ubicaciones comienza con ubicaciones y eventos, sin tarjetas de métricas
+ok 222 - Ubicaciones comienza con ubicaciones y eventos, sin tarjetas de métricas
+  ---
+  duration_ms: 1.0673
+  type: 'test'
+  ...
+# Subtest: CampaignProject fija schemaVersion inicial
+ok 223 - CampaignProject fija schemaVersion inicial
+  ---
+  duration_ms: 0.6378
+  type: 'test'
+  ...
+# Subtest: normaliza nombre y producto opcional
+ok 224 - normaliza nombre y producto opcional
+  ---
+  duration_ms: 0.7548
+  type: 'test'
+  ...
+# Subtest: rechaza campos obligatorios e identidad de producto incompleta
+ok 225 - rechaza campos obligatorios e identidad de producto incompleta
+  ---
+  duration_ms: 0.6173
+  type: 'test'
+  ...
+# Subtest: estados y transiciones viven en dominio
+ok 226 - estados y transiciones viven en dominio
+  ---
+  duration_ms: 0.209
+  type: 'test'
+  ...
+# Subtest: Planner backend es server-side, verifica Firebase y usa Structured Outputs
+ok 227 - Planner backend es server-side, verifica Firebase y usa Structured Outputs
+  ---
+  duration_ms: 6.1645
+  type: 'test'
+  ...
+# Subtest: Planner distingue billing y no activa fixtures en producción
+ok 228 - Planner distingue billing y no activa fixtures en producción
+  ---
+  duration_ms: 2.201
+  type: 'test'
+  ...
+# Subtest: Workspace muestra contexto, preguntas, estrategia y creatividades sin JSON crudo
+ok 229 - Workspace muestra contexto, preguntas, estrategia y creatividades sin JSON crudo
+  ---
+  duration_ms: 3.9839
+  type: 'test'
+  ...
+# Subtest: Servicio fija TheoryVersion, persiste respuestas y conserva revisiones
+ok 230 - Servicio fija TheoryVersion, persiste respuestas y conserva revisiones
+  ---
+  duration_ms: 1.4725
+  type: 'test'
+  ...
+# Subtest: Preguntas booleanas y numéricas empiezan sin respuesta inventada
+ok 231 - Preguntas booleanas y numéricas empiezan sin respuesta inventada
+  ---
+  duration_ms: 1.3028
+  type: 'test'
+  ...
+# Subtest: Fixtures existen sólo para tests
+ok 232 - Fixtures existen sólo para tests
+  ---
+  duration_ms: 4.0151
+  type: 'test'
+  ...
+# Subtest: doble request queda protegido por idempotencia temporal y exclusión concurrente
+ok 233 - doble request queda protegido por idempotencia temporal y exclusión concurrente
+  ---
+  duration_ms: 2.7845
+  type: 'test'
+  ...
+# Subtest: edición manual vuelve a cargar la revisión guardada
+ok 234 - edición manual vuelve a cargar la revisión guardada
+  ---
+  duration_ms: 1.0928
+  type: 'test'
+  ...
+# Subtest: historial permite abrir revisiones anteriores sin sobrescribirlas
+ok 235 - historial permite abrir revisiones anteriores sin sobrescribirlas
+  ---
+  duration_ms: 1.9568
+  type: 'test'
+  ...
+# Subtest: Campaign Context reutiliza negocio/producto/teoría sin PII
+ok 236 - Campaign Context reutiliza negocio/producto/teoría sin PII
+  ---
+  duration_ms: 2.092
+  type: 'test'
+  ...
+# Subtest: Missing Information no pregunta lo ya conocido y admite cero preguntas
+ok 237 - Missing Information no pregunta lo ya conocido y admite cero preguntas
+  ---
+  duration_ms: 1.1203
+  type: 'test'
+  ...
+# Subtest: Question schema valida tipos, límites y allowed keys
+ok 238 - Question schema valida tipos, límites y allowed keys
+  ---
+  duration_ms: 0.8984
+  type: 'test'
+  ...
+# Subtest: Answers rechaza vacíos, tipo incorrecto y opción no permitida
+ok 239 - Answers rechaza vacíos, tipo incorrecto y opción no permitida
+  ---
+  duration_ms: 0.4006
+  type: 'test'
+  ...
+# Subtest: CampaignPlan deriva 3 y 6 piezas de TheoryConfig sin cantidades hardcodeadas
+ok 240 - CampaignPlan deriva 3 y 6 piezas de TheoryConfig sin cantidades hardcodeadas
+  ---
+  duration_ms: 0.8056
+  type: 'test'
+  ...
+# Subtest: CampaignPlan acepta categoría dinámica testimonial sin componente específico
+ok 241 - CampaignPlan acepta categoría dinámica testimonial sin componente específico
+  ---
+  duration_ms: 0.3164
+  type: 'test'
+  ...
+# Subtest: CampaignPlan acepta categoría dinámica product_demo sin componente específico
+ok 242 - CampaignPlan acepta categoría dinámica product_demo sin componente específico
+  ---
+  duration_ms: 0.3789
+  type: 'test'
+  ...
+# Subtest: CampaignPlan rechaza requirement desconocido o cantidad distinta a teoría
+ok 243 - CampaignPlan rechaza requirement desconocido o cantidad distinta a teoría
+  ---
+  duration_ms: 0.9368
+  type: 'test'
+  ...
+# Subtest: Aprobación humana cambia piezas propuestas a aprobadas sin mutar original
+ok 244 - Aprobación humana cambia piezas propuestas a aprobadas sin mutar original
+  ---
+  duration_ms: 0.4258
+  type: 'test'
+  ...
+# Subtest: Billing se distingue de rate limit y auth
+ok 245 - Billing se distingue de rate limit y auth
+  ---
+  duration_ms: 0.7511
+  type: 'test'
+  ...
+# Subtest: RecordingTaskGenerator crea una tarea por CreativePiece
+ok 246 - RecordingTaskGenerator crea una tarea por CreativePiece
+  ---
+  duration_ms: 3.4938
+  type: 'test'
+  ...
+# Subtest: generación repetida es determinista y una revisión nueva conserva IDs históricos
+ok 247 - generación repetida es determinista y una revisión nueva conserva IDs históricos
+  ---
+  duration_ms: 0.8374
+  type: 'test'
+  ...
+# Subtest: la cantidad y el orden por categoría salen de CreativePieces
+ok 248 - la cantidad y el orden por categoría salen de CreativePieces
+  ---
+  duration_ms: 0.2585
+  type: 'test'
+  ...
+# Subtest: una CreativePiece no puede apuntar a una categoría ajena a TheoryConfig
+ok 249 - una CreativePiece no puede apuntar a una categoría ajena a TheoryConfig
+  ---
+  duration_ms: 0.3836
+  type: 'test'
+  ...
+# Subtest: una categoría dinámica genera tarea sin cambiar componentes
+ok 250 - una categoría dinámica genera tarea sin cambiar componentes
+  ---
+  duration_ms: 0.2328
+  type: 'test'
+  ...
+# Subtest: folder mapping mantiene nombres amigables y fallback dinámico
+ok 251 - folder mapping mantiene nombres amigables y fallback dinámico
+  ---
+  duration_ms: 0.7777
+  type: 'test'
+  ...
+# Subtest: file naming es estable, ordenado y no usa el nombre original como path
+ok 252 - file naming es estable, ordenado y no usa el nombre original como path
+  ---
+  duration_ms: 0.5684
+  type: 'test'
+  ...
+# Subtest: metadata local rechaza tipo y tamaño inválidos
+ok 253 - metadata local rechaza tipo y tamaño inválidos
+  ---
+  duration_ms: 0.383
+  type: 'test'
+  ...
+# Subtest: CreativeAsset válido no admite credenciales o sesiones
+ok 254 - CreativeAsset válido no admite credenciales o sesiones
+  ---
+  duration_ms: 1.4175
+  type: 'test'
+  ...
+# Subtest: OAuth usa scope drive.file, offline access y state
+ok 255 - OAuth usa scope drive.file, offline access y state
+  ---
+  duration_ms: 3.01
+  type: 'test'
+  ...
+# Subtest: refresh token se cifra con AES-GCM y no queda plaintext
+ok 256 - refresh token se cifra con AES-GCM y no queda plaintext
+  ---
+  duration_ms: 1.3308
+  type: 'test'
+  ...
+# Subtest: backend inicia Google Drive resumable upload y no recibe binario
+ok 257 - backend inicia Google Drive resumable upload y no recibe binario
+  ---
+  duration_ms: 3.3224
+  type: 'test'
+  ...
+# Subtest: browser sube chunks a sessionUrl y Netlify sólo recibe metadata
+ok 258 - browser sube chunks a sessionUrl y Netlify sólo recibe metadata
+  ---
+  duration_ms: 0.9955
+  type: 'test'
+  ...
+# Subtest: sesiones resumibles no se persisten con URL y secrets quedan backend-only
+ok 259 - sesiones resumibles no se persisten con URL y secrets quedan backend-only
+  ---
+  duration_ms: 1.9202
+  type: 'test'
+  ...
+# Subtest: cliente no puede escribir RecordingTasks ni CreativeAssets
+ok 260 - cliente no puede escribir RecordingTasks ni CreativeAssets
+  ---
+  duration_ms: 0.717
+  type: 'test'
+  ...
+# Subtest: marketing_manager puede usar workspace pero no administrar OAuth por defecto
+ok 261 - marketing_manager puede usar workspace pero no administrar OAuth por defecto
+  ---
+  duration_ms: 1.6714
+  type: 'test'
+  ...
+# Subtest: una toma adicional fallida conserva una tarea que ya tenía toma preferida
+ok 262 - una toma adicional fallida conserva una tarea que ya tenía toma preferida
+  ---
+  duration_ms: 1.702
+  type: 'test'
+  ...
+# Subtest: health reconoce ambos nombres server-side de la cuenta Firebase
+ok 263 - health reconoce ambos nombres server-side de la cuenta Firebase
+  ---
+  duration_ms: 1.6488
+  type: 'test'
+  ...
+# Subtest: OAuth callback valida que el state pertenezca a Google Drive
+ok 264 - OAuth callback valida que el state pertenezca a Google Drive
+  ---
+  duration_ms: 1.9402
+  type: 'test'
+  ...
+# Subtest: OAuth state rechaza registros ausentes, inválidos y vencidos
+ok 265 - OAuth state rechaza registros ausentes, inválidos y vencidos
+  ---
+  duration_ms: 0.3172
+  type: 'test'
+  ...
+# Subtest: OAuth state es one-time y callback sin code falla de forma segura
+ok 266 - OAuth state es one-time y callback sin code falla de forma segura
+  ---
+  duration_ms: 1.1965
+  type: 'test'
+  ...
+# Subtest: Marketing conserva WhatsApp y agrega acceso separado a Meta Ads
+ok 267 - Marketing conserva WhatsApp y agrega acceso separado a Meta Ads
+  ---
+  duration_ms: 4.6073
+  type: 'test'
+  ...
+# Subtest: routing lazy incluye Meta Ads sin reemplazar WhatsApp
+ok 268 - routing lazy incluye Meta Ads sin reemplazar WhatsApp
+  ---
+  duration_ms: 1.9586
+  type: 'test'
+  ...
+# Subtest: página Meta Ads expone flujo real de CampaignProject sin integración Meta ficticia
+ok 269 - página Meta Ads expone flujo real de CampaignProject sin integración Meta ficticia
+  ---
+  duration_ms: 1.9051
+  type: 'test'
+  ...
+# Subtest: BusinessContext normaliza listas sin inventar datos
+ok 270 - BusinessContext normaliza listas sin inventar datos
+  ---
+  duration_ms: 3.1779
+  type: 'test'
+  ...
+# Subtest: BusinessContext rechaza claves inesperadas
+ok 271 - BusinessContext rechaza claves inesperadas
+  ---
+  duration_ms: 0.2808
+  type: 'test'
+  ...
+# Subtest: metadata de producto conserva productId y no duplica catálogo
+ok 272 - metadata de producto conserva productId y no duplica catálogo
+  ---
+  duration_ms: 0.6072
+  type: 'test'
+  ...
+# Subtest: producto inexistente o perfil cruzado no se acepta como contexto
+ok 273 - producto inexistente o perfil cruzado no se acepta como contexto
+  ---
+  duration_ms: 0.5488
+  type: 'test'
+  ...
+# Subtest: sanitización bloquea script en conocimiento
+ok 274 - sanitización bloquea script en conocimiento
+  ---
+  duration_ms: 0.235
+  type: 'test'
+  ...
+# Subtest: TheoryConfig válido conserva schemaVersion y categorías dinámicas
+ok 275 - TheoryConfig válido conserva schemaVersion y categorías dinámicas
+  ---
+  duration_ms: 2.1247
+  type: 'test'
+  ...
+# Subtest: TheoryConfig rechaza cantidad negativa y min mayor que max
+ok 276 - TheoryConfig rechaza cantidad negativa y min mayor que max
+  ---
+  duration_ms: 0.3482
+  type: 'test'
+  ...
+# Subtest: TheoryConfig rechaza duración inválida y claves desconocidas
+ok 277 - TheoryConfig rechaza duración inválida y claves desconocidas
+  ---
+  duration_ms: 0.3557
+  type: 'test'
+  ...
+# Subtest: TheoryConfig rechaza schemaVersion incorrecto y contenido peligroso
+ok 278 - TheoryConfig rechaza schemaVersion incorrecto y contenido peligroso
+  ---
+  duration_ms: 0.4597
+  type: 'test'
+  ...
+# Subtest: la teoría admite cambiar recommendedCount 3 a 6 sin cambiar código
+ok 279 - la teoría admite cambiar recommendedCount 3 a 6 sin cambiar código
+  ---
+  duration_ms: 0.3231
+  type: 'test'
+  ...
+# Subtest: normalización de fuente limita tipos y tamaño
+ok 280 - normalización de fuente limita tipos y tamaño
+  ---
+  duration_ms: 0.3156
+  type: 'test'
+  ...
+# Subtest: transiciones e inmutabilidad de versión son explícitas
+ok 281 - transiciones e inmutabilidad de versión son explícitas
+  ---
+  duration_ms: 0.2566
+  type: 'test'
+  ...
+# Subtest: versiones tienen numeración determinística
+ok 282 - versiones tienen numeración determinística
+  ---
+  duration_ms: 0.1545
+  type: 'test'
+  ...
+# Subtest: hub Meta Ads conserva Campañas y agrega Conocimiento y Metodologías
+ok 283 - hub Meta Ads conserva Campañas y agrega Conocimiento y Metodologías
+  ---
+  duration_ms: 4.3957
+  type: 'test'
+  ...
+# Subtest: Theory UI exige procesamiento explícito, revisión, aprobación y activación
+ok 284 - Theory UI exige procesamiento explícito, revisión, aprobación y activación
+  ---
+  duration_ms: 1.4523
+  type: 'test'
+  ...
+# Subtest: Theory UI vuelve a leer la misma versión después de procesar o guardar
+ok 285 - Theory UI vuelve a leer la misma versión después de procesar o guardar
+  ---
+  duration_ms: 1.9169
+  type: 'test'
+  ...
+# Subtest: PDF se extrae lazy en navegador y no se persiste como binario
+ok 286 - PDF se extrae lazy en navegador y no se persiste como binario
+  ---
+  duration_ms: 1.4502
+  type: 'test'
+  ...
+# Subtest: backend OpenAI usa Responses API, structured outputs y auth Firebase
+ok 287 - backend OpenAI usa Responses API, structured outputs y auth Firebase
+  ---
+  duration_ms: 2.0022
+  type: 'test'
+  ...
+# Subtest: Knowledge UI reutiliza products y declara minimización de PII
+ok 288 - Knowledge UI reutiliza products y declara minimización de PII
+  ---
+  duration_ms: 1.4813
+  type: 'test'
+  ...
+# Subtest: métricas soporta día, mes, año y rango con límites exclusivos
+ok 289 - métricas soporta día, mes, año y rango con límites exclusivos
+  ---
+  duration_ms: 1.6293
+  type: 'test'
+  ...
+# Subtest: los filtros de métricas se combinan sobre un único dataset
+ok 290 - los filtros de métricas se combinan sobre un único dataset
+  ---
+  duration_ms: 0.7977
+  type: 'test'
+  ...
+# Subtest: Sin descuento combina correctamente con descuentos configurados
+ok 291 - Sin descuento combina correctamente con descuentos configurados
+  ---
+  duration_ms: 0.2831
+  type: 'test'
+  ...
+# Subtest: +2 pagos se distribuye por monto y no duplica el total
+ok 292 - +2 pagos se distribuye por monto y no duplica el total
+  ---
+  duration_ms: 3.3705
+  type: 'test'
+  ...
+# Subtest: la granularidad del gráfico se adapta al período
+ok 293 - la granularidad del gráfico se adapta al período
+  ---
+  duration_ms: 7.8898
+  type: 'test'
+  ...
+# Subtest: la aplicación separa bundles, mantiene vendedor disponible y conserva offline pendiente
+ok 294 - la aplicación separa bundles, mantiene vendedor disponible y conserva offline pendiente
+  ---
+  duration_ms: 3.2589
+  type: 'test'
+  ...
+# Subtest: Dashboard ofrece Cargar Stock y acceso directo a métricas sin nueva selección
+ok 295 - Dashboard ofrece Cargar Stock y acceso directo a métricas sin nueva selección
+  ---
+  duration_ms: 1.0905
+  type: 'test'
+  ...
+# Subtest: el estado de conexión es compartido y Reconectar consulta un documento
+ok 296 - el estado de conexión es compartido y Reconectar consulta un documento
+  ---
+  duration_ms: 1.2336
+  type: 'test'
+  ...
+# Subtest: las escrituras del vendedor toleran temporalmente reglas Firestore anteriores
+ok 297 - las escrituras del vendedor toleran temporalmente reglas Firestore anteriores
+  ---
+  duration_ms: 1.5959
+  type: 'test'
+  ...
+# Subtest: normaliza acentos y mayúsculas
+ok 298 - normaliza acentos y mayúsculas
+  ---
+  duration_ms: 1.5444
+  type: 'test'
+  ...
+# Subtest: encuentra productos por categoría, uso y ocasión
+ok 299 - encuentra productos por categoría, uso y ocasión
+  ---
+  duration_ms: 8.7911
+  type: 'test'
+  ...
+# Subtest: tolera errores de escritura razonables
+ok 300 - tolera errores de escritura razonables
+  ---
+  duration_ms: 0.263
+  type: 'test'
+  ...
+# Subtest: no devuelve coincidencias irrelevantes
+ok 301 - no devuelve coincidencias irrelevantes
+  ---
+  duration_ms: 0.2095
+  type: 'test'
+  ...
+# Subtest: un vendedor puro accede al Panel Vendedor y no al administrativo
+ok 302 - un vendedor puro accede al Panel Vendedor y no al administrativo
+  ---
+  duration_ms: 2.1709
+  type: 'test'
+  ...
+# Subtest: el administrador conserva ambos paneles
+ok 303 - el administrador conserva ambos paneles
+  ---
+  duration_ms: 0.508
+  type: 'test'
+  ...
+# Subtest: las ubicaciones efectivas respetan permisos, actividad y baja lógica
+ok 304 - las ubicaciones efectivas respetan permisos, actividad y baja lógica
+  ---
+  duration_ms: 13.5294
+  type: 'test'
+  ...
+# Subtest: productos visibles y categorías reutilizan los datos locales de la ubicación
+ok 305 - productos visibles y categorías reutilizan los datos locales de la ubicación
+  ---
+  duration_ms: 0.6215
+  type: 'test'
+  ...
+# Subtest: el carrito calcula cantidades y subtotal
+ok 306 - el carrito calcula cantidades y subtotal
+  ---
+  duration_ms: 0.2815
+  type: 'test'
+  ...
+# Subtest: los descuentos fijos se aplican antes que todos los porcentajes
+ok 307 - los descuentos fijos se aplican antes que todos los porcentajes
+  ---
+  duration_ms: 0.4301
+  type: 'test'
+  ...
+# Subtest: varios porcentajes mantienen la aplicación sucesiva sobre el saldo
+ok 308 - varios porcentajes mantienen la aplicación sucesiva sobre el saldo
+  ---
+  duration_ms: 0.2057
+  type: 'test'
+  ...
+# Subtest: los descuentos nunca reducen el total por debajo de cero
+ok 309 - los descuentos nunca reducen el total por debajo de cero
+  ---
+  duration_ms: 0.1362
+  type: 'test'
+  ...
+# Subtest: las ventas pendientes reservan stock local sin afirmarse confirmadas
+ok 310 - las ventas pendientes reservan stock local sin afirmarse confirmadas
+  ---
+  duration_ms: 0.387
+  type: 'test'
+  ...
+# Subtest: la botonera distingue tecla, código y ubicación física
+ok 311 - la botonera distingue tecla, código y ubicación física
+  ---
+  duration_ms: 0.465
+  type: 'test'
+  ...
+# Subtest: +2 pagos exige montos no negativos y suma exacta
+ok 312 - +2 pagos exige montos no negativos y suma exacta
+  ---
+  duration_ms: 0.7565
+  type: 'test'
+  ...
+# Subtest: la ruta y el cambio entre paneles conservan la misma sesión
+ok 313 - la ruta y el cambio entre paneles conservan la misma sesión
+  ---
+  duration_ms: 10.7627
+  type: 'test'
+  ...
+# Subtest: la interfaz compacta descuentos y prepara ticket sin simular ARCA
+ok 314 - la interfaz compacta descuentos y prepara ticket sin simular ARCA
+  ---
+  duration_ms: 2.9619
+  type: 'test'
+  ...
+# Subtest: la venta guarda creador, fecha local, descuentos desglosados y ticket
+ok 315 - la venta guarda creador, fecha local, descuentos desglosados y ticket
+  ---
+  duration_ms: 1.2656
+  type: 'test'
+  ...
+# Subtest: la cola offline conserva descuentos, ticket e idempotencia
+ok 316 - la cola offline conserva descuentos, ticket e idempotencia
+  ---
+  duration_ms: 1.9854
+  type: 'test'
+  ...
+# Subtest: Ubicaciones incorpora Ventas y consulta una sola colección paginada
+ok 317 - Ubicaciones incorpora Ventas y consulta una sola colección paginada
+  ---
+  duration_ms: 2.9493
+  type: 'test'
+  ...
+# Subtest: stock, navegación y venta actual tienen reglas responsive compactas
+ok 318 - stock, navegación y venta actual tienen reglas responsive compactas
+  ---
+  duration_ms: 2.2188
+  type: 'test'
+  ...
+# Subtest: las reglas vinculan stock con venta y movimiento de la misma transacción
+ok 319 - las reglas vinculan stock con venta y movimiento de la misma transacción
+  ---
+  duration_ms: 2.7081
+  type: 'test'
+  ...
+# Subtest: deduplica Flor Mía + Excel por teléfono WhatsApp canónico y prioriza datos maestros
+ok 320 - deduplica Flor Mía + Excel por teléfono WhatsApp canónico y prioriza datos maestros
+  ---
+  duration_ms: 2.7289
+  type: 'test'
+  ...
+# Subtest: formatos 0/15 y +54 9 del mismo móvil no generan destinatarios duplicados
+ok 321 - formatos 0/15 y +54 9 del mismo móvil no generan destinatarios duplicados
+  ---
+  duration_ms: 0.4242
+  type: 'test'
+  ...
+# Subtest: contabiliza sin teléfono e inválidos sin mezclarlos con válidos
+ok 322 - contabiliza sin teléfono e inválidos sin mezclarlos con válidos
+  ---
+  duration_ms: 0.2413
+  type: 'test'
+  ...
+# Subtest: un teléfono ambiguo no se completa silenciosamente para la extensión
+ok 323 - un teléfono ambiguo no se completa silenciosamente para la extensión
+  ---
+  duration_ms: 0.4668
+  type: 'test'
+  ...
+# Subtest: respeta bloqueos explícitos pero no inventa consentimiento cuando el campo no existe
+ok 324 - respeta bloqueos explícitos pero no inventa consentimiento cuando el campo no existe
+  ---
+  duration_ms: 0.3532
+  type: 'test'
+  ...
+# Subtest: combina zona, categoría, nombre y teléfono
+ok 325 - combina zona, categoría, nombre y teléfono
+  ---
+  duration_ms: 0.5335
+  type: 'test'
+  ...
+# Subtest: mapping Excel detecta teléfono y deja nombre opcional
+ok 326 - mapping Excel detecta teléfono y deja nombre opcional
+  ---
+  duration_ms: 0.7665
+  type: 'test'
+  ...
+# Subtest: validación final exige extensión operativa, destinatario canónico y contenido
+ok 327 - validación final exige extensión operativa, destinatario canónico y contenido
+  ---
+  duration_ms: 0.5092
+  type: 'test'
+  ...
+# Subtest: estado de conexión usa vocabulario simple
+ok 328 - estado de conexión usa vocabulario simple
+  ---
+  duration_ms: 1.3841
+  type: 'test'
+  ...
+# Subtest: la detención conserva un estado distinto de la cancelación previa
+ok 329 - la detención conserva un estado distinto de la cancelación previa
+  ---
+  duration_ms: 0.5877
+  type: 'test'
+  ...
+# Subtest: CONTACT_CONTEXT_UNVERIFIED se presenta en lenguaje de seguridad para el usuario
+ok 330 - CONTACT_CONTEXT_UNVERIFIED se presenta en lenguaje de seguridad para el usuario
+  ---
+  duration_ms: 0.2672
+  type: 'test'
+  ...
+# Subtest: INTERFACE_LOADING explica una espera general de WhatsApp sin exponer internals
+ok 331 - INTERFACE_LOADING explica una espera general de WhatsApp sin exponer internals
+  ---
+  duration_ms: 0.147
+  type: 'test'
+  ...
+# Subtest: progreso deriva porcentaje sin superar 100
+ok 332 - progreso deriva porcentaje sin superar 100
+  ---
+  duration_ms: 0.2052
+  type: 'test'
+  ...
+# Subtest: 97 enviados + 3 fallidos terminales equivale a 100 procesados sin mentir sobre enviados
+ok 333 - 97 enviados + 3 fallidos terminales equivale a 100 procesados sin mentir sobre enviados
+  ---
+  duration_ms: 0.2665
+  type: 'test'
+  ...
+# Subtest: contadores separan envíos confirmados de enviados sin confirmación
+ok 334 - contadores separan envíos confirmados de enviados sin confirmación
+  ---
+  duration_ms: 0.2722
+  type: 'test'
+  ...
+# Subtest: progreso de la extensión usa sent y failed separados
+ok 335 - progreso de la extensión usa sent y failed separados
+  ---
+  duration_ms: 0.1729
+  type: 'test'
+  ...
+# Subtest: Reintentar aparece sólo para una pausa recuperable y nunca ante envío ambiguo
+ok 336 - Reintentar aparece sólo para una pausa recuperable y nunca ante envío ambiguo
+  ---
+  duration_ms: 0.3018
+  type: 'test'
+  ...
+# Subtest: Reintentar fallidos sólo aparece al completar con fallidos seguros y Quitar del emisor sólo tras Stop
+ok 337 - Reintentar fallidos sólo aparece al completar con fallidos seguros y Quitar del emisor sólo tras Stop
+  ---
+  duration_ms: 0.1745
+  type: 'test'
+  ...
+# Subtest: un envío SENT_UNVERIFIED no entra en Reintentar fallidos
+ok 338 - un envío SENT_UNVERIFIED no entra en Reintentar fallidos
+  ---
+  duration_ms: 0.1448
+  type: 'test'
+  ...
+# Subtest: permissionDeny específico bloquea envío aunque el rol pueda editar Marketing
+ok 339 - permissionDeny específico bloquea envío aunque el rol pueda editar Marketing
+  ---
+  duration_ms: 0.371
+  type: 'test'
+  ...
+# Subtest: serializes extension events for the same campaign
+ok 340 - serializes extension events for the same campaign
+  ---
+  duration_ms: 63.1271
+  type: 'test'
+  ...
+# Subtest: continues the campaign queue after one event fails
+ok 341 - continues the campaign queue after one event fails
+  ---
+  duration_ms: 0.7329
+  type: 'test'
+  ...
+# Subtest: una liberación confirmada se archiva con los campos de cancelación ya permitidos por Firestore
+ok 342 - una liberación confirmada se archiva con los campos de cancelación ya permitidos por Firestore
+  ---
+  duration_ms: 7.1419
+  type: 'test'
+  ...
+# Subtest: STOP libera automáticamente el slot antes de archivar la campaña
+ok 343 - STOP libera automáticamente el slot antes de archivar la campaña
+  ---
+  duration_ms: 1.2984
+  type: 'test'
+  ...
+# Subtest: un snapshot stopped también se libera para no revivir una campaña vieja
+ok 344 - un snapshot stopped también se libera para no revivir una campaña vieja
+  ---
+  duration_ms: 1.4691
+  type: 'test'
+  ...
+# Subtest: el sync global usa la reconciliación para eventos live y snapshots
+ok 345 - el sync global usa la reconciliación para eventos live y snapshots
+  ---
+  duration_ms: 2.2787
+  type: 'test'
+  ...
+# Subtest: los timeouts de la integración cubren operaciones reales de WhatsApp sin ping agresivo
+ok 346 - los timeouts de la integración cubren operaciones reales de WhatsApp sin ping agresivo
+  ---
+  duration_ms: 1.4009
+  type: 'test'
+  ...
+# Subtest: PREPARE serializa imágenes como dataBase64 compatible con la extensión
+ok 347 - PREPARE serializa imágenes como dataBase64 compatible con la extensión
+  ---
+  duration_ms: 4.4026
+  type: 'test'
+  ...
+# Subtest: PREPARE entrega exactamente el mensaje escrito por el usuario, incluido Unicode y saltos
+ok 348 - PREPARE entrega exactamente el mensaje escrito por el usuario, incluido Unicode y saltos
+  ---
+  duration_ms: 0.258
+  type: 'test'
+  ...
+# Subtest: START se envía separado de PREPARE con campaignId y expectedSequence
+ok 349 - START se envía separado de PREPARE con campaignId y expectedSequence
+  ---
+  duration_ms: 0.2942
+  type: 'test'
+  ...
+# Subtest: Retry y Retry Failed usan controles explícitos con campaignId
+ok 350 - Retry y Retry Failed usan controles explícitos con campaignId
+  ---
+  duration_ms: 0.3705
+  type: 'test'
+  ...
+# Subtest: STATUS_REQUEST consulta la campaña realmente activa de la extensión
+ok 351 - STATUS_REQUEST consulta la campaña realmente activa de la extensión
+  ---
+  duration_ms: 0.3641
+  type: 'test'
+  ...
+# Subtest: STOP sobre una campaña pausada consulta estado y luego detiene con la sequence real
+ok 352 - STOP sobre una campaña pausada consulta estado y luego detiene con la sequence real
+  ---
+  duration_ms: 0.4069
+  type: 'test'
+  ...
+# Subtest: STOP no libera accidentalmente una campaña que ya está stopped
+ok 353 - STOP no libera accidentalmente una campaña que ya está stopped
+  ---
+  duration_ms: 0.4839
+  type: 'test'
+  ...
+# Subtest: DELETE libera stopped y, si el emisor ya estaba libre, lo reconcilia como released
+ok 354 - DELETE libera stopped y, si el emisor ya estaba libre, lo reconcilia como released
+  ---
+  duration_ms: 0.7223
+  type: 'test'
+  ...
+# Subtest: Comprobar solicita un preflight nuevo en vez de leer solamente el estado anterior
+ok 355 - Comprobar solicita un preflight nuevo en vez de leer solamente el estado anterior
+  ---
+  duration_ms: 0.4506
+  type: 'test'
+  ...
+# Subtest: PING concurrente se deduplica y conserva una sola comprobación lightweight
+ok 356 - PING concurrente se deduplica y conserva una sola comprobación lightweight
+  ---
+  duration_ms: 0.3402
+  type: 'test'
+  ...
+# Subtest: PING conserva el snapshot de campaña para resincronizar después de perder eventos live
+ok 357 - PING conserva el snapshot de campaña para resincronizar después de perder eventos live
+  ---
+  duration_ms: 0.1692
+  type: 'test'
+  ...
+# Subtest: EXTENSION_CONTEXT_INVALIDATED pide reload controlado en vez de reintentos infinitos
+ok 358 - EXTENSION_CONTEXT_INVALIDATED pide reload controlado en vez de reintentos infinitos
+  ---
+  duration_ms: 0.0727
+  type: 'test'
+  ...
+# Subtest: CANCEL paused consulta source of truth, envía Cancel real y exige la sequence activa
+ok 359 - CANCEL paused consulta source of truth, envía Cancel real y exige la sequence activa
+  ---
+  duration_ms: 0.3263
+  type: 'test'
+  ...
+# Subtest: CANCEL stale en Web App no manda control si la extensión ya está idle y reconcilia cancelled localmente
+ok 360 - CANCEL stale en Web App no manda control si la extensión ya está idle y reconcilia cancelled localmente
+  ---
+  duration_ms: 0.2009
+  type: 'test'
+  ...
+# Subtest: CANCEL archiva una campaña stale sin mandar un comando a otra campaña activa
+ok 361 - CANCEL archiva una campaña stale sin mandar un comando a otra campaña activa
+  ---
+  duration_ms: 0.158
+  type: 'test'
+  ...
+# Subtest: reporte bajo demanda usa el canal dedicado y devuelve texto + JSON
+ok 362 - reporte bajo demanda usa el canal dedicado y devuelve texto + JSON
+  ---
+  duration_ms: 0.2083
+  type: 'test'
+  ...
+# Subtest: una respuesta válida del bridge mantiene conexión aunque WhatsApp no esté operativo
+ok 363 - una respuesta válida del bridge mantiene conexión aunque WhatsApp no esté operativo
+  ---
+  duration_ms: 0.9507
+  type: 'test'
+  ...
+# Subtest: sin respuesta o runtime inválido continúa figurando desconectado
+ok 364 - sin respuesta o runtime inválido continúa figurando desconectado
+  ---
+  duration_ms: 0.1852
+  type: 'test'
+  ...
+# Subtest: un contexto invalidado sigue pidiendo recarga controlada
+ok 365 - un contexto invalidado sigue pidiendo recarga controlada
+  ---
+  duration_ms: 0.1295
+  type: 'test'
+  ...
+# Subtest: Marketing enlaza la ruta canónica de WhatsApp y no automatiza WhatsApp Web
+ok 366 - Marketing enlaza la ruta canónica de WhatsApp y no automatiza WhatsApp Web
+  ---
+  duration_ms: 4.9527
+  type: 'test'
+  ...
+# Subtest: contrato es versionado, valida origen y no usa wildcard
+ok 367 - contrato es versionado, valida origen y no usa wildcard
+  ---
+  duration_ms: 1.0495
+  type: 'test'
+  ...
+# Subtest: imágenes se serializan como dataBase64 para la extensión y no se persisten
+ok 368 - imágenes se serializan como dataBase64 para la extensión y no se persisten
+  ---
+  duration_ms: 1.1856
+  type: 'test'
+  ...
+# Subtest: recipients vive en subcolección y usa batches acotados
+ok 369 - recipients vive en subcolección y usa batches acotados
+  ---
+  duration_ms: 0.8677
+  type: 'test'
+  ...
+# Subtest: Excel se procesa localmente y sólo acepta xlsx
+ok 370 - Excel se procesa localmente y sólo acepta xlsx
+  ---
+  duration_ms: 1.467
+  type: 'test'
+  ...
+# Subtest: permisos WhatsApp están integrados al módulo marketing
+ok 371 - permisos WhatsApp están integrados al módulo marketing
+  ---
+  duration_ms: 0.7852
+  type: 'test'
+  ...
+# Subtest: WhatsApp no hereda permisos genéricos de create/edit y el Excel tiene vista previa
+ok 372 - WhatsApp no hereda permisos genéricos de create/edit y el Excel tiene vista previa
+  ---
+  duration_ms: 1.6344
+  type: 'test'
+  ...
+# Subtest: progreso repetido no crea auditoría en cada tick y existe evento started explícito
+ok 373 - progreso repetido no crea auditoría en cada tick y existe evento started explícito
+  ---
+  duration_ms: 0.9556
+  type: 'test'
+  ...
+# Subtest: Retry, Retry Failed y Delete están cableados a controles explícitos y UX no técnica
+ok 374 - Retry, Retry Failed y Delete están cableados a controles explícitos y UX no técnica
+  ---
+  duration_ms: 1.5399
+  type: 'test'
+  ...
+# Subtest: snapshot de PING se aplica por la misma cola y la secuencia evita retrocesos
+ok 375 - snapshot de PING se aplica por la misma cola y la secuencia evita retrocesos
+  ---
+  duration_ms: 1.4192
+  type: 'test'
+  ...
+# Subtest: la pantalla no mantiene despierta la extensión con polling continuo
+ok 376 - la pantalla no mantiene despierta la extensión con polling continuo
+  ---
+  duration_ms: 0.9893
+  type: 'test'
+  ...
+# Subtest: 0.9.4.3 persiste y muestra confirmados vs enviados sin confirmación
+ok 377 - 0.9.4.3 persiste y muestra confirmados vs enviados sin confirmación
+  ---
+  duration_ms: 1.1037
+  type: 'test'
+  ...
+# Subtest: 0.9.4.4 usa App Integral FM como control plane para Cancel y reporte bajo demanda
+ok 378 - 0.9.4.4 usa App Integral FM como control plane para Cancel y reporte bajo demanda
+  ---
+  duration_ms: 1.6323
+  type: 'test'
+  ...
+# Subtest: cancelar una campaña stale la saca de activas sin tocar otra campaña real de la extensión
+ok 379 - cancelar una campaña stale la saca de activas sin tocar otra campaña real de la extensión
+  ---
+  duration_ms: 2.7846
+  type: 'test'
+  ...
+# Subtest: cancelar una campaña stopped usa release como fallback para una extensión 0.9.4.4 vieja
+ok 380 - cancelar una campaña stopped usa release como fallback para una extensión 0.9.4.4 vieja
+  ---
+  duration_ms: 0.9807
+  type: 'test'
+  ...
+1..380
+# tests 380
+# suites 0
+# pass 380
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 747.7603

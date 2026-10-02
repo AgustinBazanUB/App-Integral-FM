@@ -1,0 +1,29 @@
+{
+  "workers": [
+    {
+      "pid": 66504,
+      "status": "authorized",
+      "alreadyAuthorized": true,
+      "realCAERequests": 0
+    },
+    {
+      "pid": 67892,
+      "status": "authorized",
+      "alreadyAuthorized": false,
+      "realCAERequests": 0
+    }
+  ],
+  "requests": [
+    {
+      "pid": 67892,
+      "invoiceId": "invoice_homologation_seller_sale_qa_workers_stage7_final",
+      "mode": "MOCK_ONLY",
+      "realCAERequests": 0
+    }
+  ],
+  "saleId": "qa_workers_stage7_final",
+  "invoiceId": "invoice_homologation_seller_sale_qa_workers_stage7_final",
+  "status": "authorized",
+  "realCAERequests": 0,
+  "fixture": "MOCK_ONLY"
+}

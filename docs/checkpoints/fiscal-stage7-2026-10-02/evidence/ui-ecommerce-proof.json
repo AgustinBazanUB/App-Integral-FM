@@ -1,0 +1,26 @@
+[
+  {
+    "case": "mobile-double-tap",
+    "orderId": "ecommerce_order_59fd7829-8260-4817-bfe3-23f9ba7f2184",
+    "saleId": "ecommerce_sale_59fd7829-8260-4817-bfe3-23f9ba7f2184",
+    "invoiceId": "invoice_homologation_ecommerce_ecommerce_sale_59fd7829-8260-4817-bfe3-23f9ba7f2184",
+    "total": 22000,
+    "paymentStatus": "simulated_approved",
+    "invoiceStatus": "pending",
+    "cae": null,
+    "stockWrites": 1,
+    "stockQuantity": -1
+  },
+  {
+    "case": "desktop-fiscal-error-retry",
+    "orderId": "ecommerce_order_7a0e0169-1617-4ace-a164-8d265d942424",
+    "saleId": "ecommerce_sale_7a0e0169-1617-4ace-a164-8d265d942424",
+    "invoiceId": "invoice_homologation_ecommerce_ecommerce_sale_7a0e0169-1617-4ace-a164-8d265d942424",
+    "total": 22000,
+    "paymentStatus": "simulated_approved",
+    "invoiceStatus": "pending",
+    "cae": null,
+    "stockWrites": 1,
+    "stockQuantity": -1
+  }
+]
