@@ -3,7 +3,7 @@ const criticalValues = new Set(["critical", "red", "error", "high", "roja", "cri
 const warningValues = new Set(["warning", "yellow", "preventive", "medium", "amarilla", "preventiva"]);
 
 /** @typedef {Date | string | number | {toDate: () => Date}} AlertDate */
-/** @typedef {{id?: string, active?: boolean, deleted?: boolean, status?: string, severity?: string, priority?: string, color?: string, updatedAt?: AlertDate, createdAt?: AlertDate, locationId?: string, productId?: string, type?: string, entityType?: string}} Alert */
+/** @typedef {{id?: string, active?: boolean, deleted?: boolean, status?: string, severity?: string, priority?: string, color?: string, updatedAt?: AlertDate, createdAt?: AlertDate, locationId?: string, productId?: string, type?: string, entityType?: string, moduleId?: string}} Alert */
 
 /** @param {Alert} alert */
 export function isActiveAlert(alert = {}) {
@@ -47,7 +47,8 @@ export function groupActiveAlerts(alerts = []) {
 
 // Sólo usamos relaciones conocidas y rutas internas. Sin origen, se abre Alertas.
 /** @param {Alert} alert @param {string[]} allowedLocationIds */
-export function alertContextPath(alert, allowedLocationIds = [], canViewLocations = false, canViewStock = true) {
+export function alertContextPath(alert, allowedLocationIds = [], canViewLocations = false, canViewStock = true, canViewFinance = false) {
+  if (canViewFinance && alert.moduleId === "finance") return "/gestion/finance";
   if (canViewLocations && alert.locationId && allowedLocationIds.includes(alert.locationId)) {
     const stockContext = alert.productId || [alert.type, alert.entityType].some((value) => String(value || "").toLowerCase().includes("stock"));
     if (stockContext && !canViewStock) return "/gestion/alerts";

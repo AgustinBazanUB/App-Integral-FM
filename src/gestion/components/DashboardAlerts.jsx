@@ -15,7 +15,7 @@ function AlertGroups({ alerts, profile, allowedLocationIds, onNavigate }) {
           {group.alerts.map((alert) => {
             const presentation = alertPresentation(alert);
             return <li key={alert.id}>
-              <Link onClick={onNavigate} to={alertContextPath(alert, allowedLocationIds, can(profile, "locations", "view"), can(profile, "locations", "viewStock"))}>
+              <Link onClick={onNavigate} to={alertContextPath(alert, allowedLocationIds, can(profile, "locations", "view"), can(profile, "locations", "viewStock"), can(profile, "finance", "view"))}>
                 <Badge tone={presentation.tone}>{presentation.label}</Badge>
                 <span><strong>{alert.name || alert.title || "Alerta del negocio"}</strong><small>{alert.notes || alert.description || alert.locationName || "Revisá el registro en Alertas."}</small></span>
                 <span className="sr-only">Abrir contexto de la alerta</span>
@@ -28,7 +28,7 @@ function AlertGroups({ alerts, profile, allowedLocationIds, onNavigate }) {
   </div>;
 }
 
-function AlertContent({ result, profile, allowedLocationIds, limit, onNavigate }) {
+function AlertContent({ result, profile, allowedLocationIds, limit = null, onNavigate = undefined }) {
   const alerts = result.data || [];
   return <>
     {result.status === "loading" ? <div role="status"><span className="sr-only">Cargando alertas</span><Skeleton lines={3} /></div> : null}

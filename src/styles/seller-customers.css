@@ -716,3 +716,13 @@
   .fm-customer-detail dl > div { grid-template-columns: 1fr; gap: 3px; padding: 9px 0; }
   .fm-customer-detail dd a { min-height: 44px; }
 }
+
+.fm-crm-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 14px; align-items: end; margin-bottom: 16px; }
+.fm-finance-page textarea { width: 100%; min-height: 90px; }
+.fm-finance-page .fm-tabs { overflow-x: auto; }
+.fm-customer-detail .fm-panel { margin-top: 20px; }
+@media (max-width: 600px) { .fm-crm-filters { grid-template-columns: 1fr; } .fm-finance-page .fm-tabs button { white-space: nowrap; } }
+
+.fm-crm-segments { margin-bottom: 16px; border: 1px solid var(--fm-border, #e5ddcf); padding: 12px; border-radius: 12px; }
+.fm-crm-segments summary { cursor: pointer; font-weight: 600; }
+.fm-crm-segments[open] summary { margin-bottom: 16px; }

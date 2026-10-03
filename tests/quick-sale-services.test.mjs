@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import { build } from "esbuild";
 import { buildMetricsDateRange, calculateMetrics, applyMetricsFilters } from "../src/modules/locations/domain/metrics.js";
 import { customerDocumentId } from "../src/gestion/customers/customerDomain.js";
+import { customerPurchaseIndex } from "../src/gestion/customers/customerPurchases.js";
+import { financeSummary } from "../src/gestion/finance/financeDomain.js";
 
 // Adaptador transaccional local: lecturas antes de escrituras, commit atómico y cola
 // para verificar reintentos/concurrencia sin escribir Firebase real.
 const mock = { data: new Map(), writes: [], queries: [], sequence: 0, queue: Promise.resolve() };
 globalThis.__quickSaleTest = mock;
-const bundle = await build({stdin:{contents:'export { createQuickSale } from "./src/gestion/services/managementService.js"; export { createSellerSale } from "./src/gestion/services/sellerService.js";',resolveDir:process.cwd()},bundle:true,write:false,platform:"node",format:"esm",plugins:[{name:"operations-transaction-adapter",setup(builder){
+const bundle = await build({stdin:{contents:'export { createQuickSale } from "./src/gestion/services/managementService.js"; export { createSellerSale, cancelSellerSale } from "./src/gestion/services/sellerService.js";',resolveDir:process.cwd()},bundle:true,write:false,platform:"node",format:"esm",plugins:[{name:"operations-transaction-adapter",setup(builder){
   builder.onResolve({filter:/^firebase\/firestore$/},()=>({path:"firestore",namespace:"qa"}));
   builder.onResolve({filter:/^\.\/firebase$/},()=>({path:"firebase",namespace:"qa"}));
   builder.onResolve({filter:/arcaService$/},()=>({path:"fiscal",namespace:"qa"}));
@@ -70,3 +72,25 @@ test("reintento concurrente/reload y acuse perdido actualizan stock, contador y 
 test("Instagram y WhatsApp se filtran por canal sin convertir el depósito en canal",async()=>{seed();await service.createQuickSale(args("warehouse"));await service.createQuickSale(args("location",{requestId:"attempt-2",channel:"instagram"}));const selected=applyMetricsFilters(sales(),{channelIds:["instagram"]},range);assert.equal(selected.length,1);assert.equal(calculateMetrics(selected,range).total,5000);assert.equal(calculateMetrics([],range).total,0);});
 
 test("Panel Vendedor conserva ubicación y canal presencial; retry offline no duplica",async()=>{seed();const input={profile:admin,location:{id:"origin"},items:args().items,paymentMethod:"cash",offlineSale:{localId:"local_qa",createdLocallyAt:"2026-10-02T15:00:00Z"}};await service.createSellerSale(input);await service.createSellerSale(input);assert.equal(sales().length,1);assert.equal(sales()[0].sourceChannel,"in_person");assert.equal(sales()[0].createdOffline,true);assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock,18);});
+
+test("Venta Rápida asociada con pago combinado integra CRM, Métricas y Finanzas; anulación conserva venta y actividad", async () => {
+  seed(); const customer = { phone: "11 1234-5678" };
+  const created = await service.createQuickSale(args("location", { customer, paymentMethod: "multiple", paymentMethodLabel: "+2 pagos", payments: [{ method: "cash", amount: 2000 }, { method: "debit", amount: 3000 }] }));
+  const id = await customerDocumentId(customer.phone), customers = [{ id, ...mock.data.get(`customers/${id}`) }];
+  assert.equal(customerPurchaseIndex(customers, sales(), [], {}, new Date("2026-10-03T15:00:00Z")).get(id).count, 1);
+  assert.equal(calculateMetrics(sales(), range).salesCount, 1); assert.equal(calculateMetrics(sales(), range).byPayment.reduce((sum, part) => sum + part.total, 0), 5000);
+  assert.equal(financeSummary(sales(), [], {}, range).saleIncome, 5000);
+  mock.data.get(`sales/${created.id}`).fiscalInvoiceId = "qa-linked-invoice";
+  mock.data.set("invoices/qa-linked-invoice", { saleId: created.id, total: 5000, status: "authorized" });
+  assert.equal(customerPurchaseIndex(customers, sales(), [], {}, new Date("2026-10-03T15:00:00Z")).get(id).count, 1);
+  assert.equal(calculateMetrics(sales(), range).total, 5000); assert.equal(financeSummary(sales(), [], {}, range).saleIncome, 5000);
+  await assert.rejects(service.cancelSellerSale({ profile: admin, saleId: created.id, reason: "QA" }), /revisión administrativa/);
+  // Otra venta sin comprobante usa la anulación comercial existente.
+  seed(); const cancellable = await service.createQuickSale(args("location", { customer }));
+  await service.cancelSellerSale({ profile: admin, saleId: cancellable.id, reason: "Corrección de prueba" });
+  assert.equal(sales().length, 1); assert.equal(sales()[0].status, "cancelled");
+  assert.equal(customerPurchaseIndex(customers, sales(), [], {}, new Date("2026-10-03T15:00:00Z")).get(id).count, 0);
+  assert.equal(calculateMetrics(sales(), range).total, 0); assert.equal(financeSummary(sales(), [], {}, range).saleIncome, 0);
+  assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, 20);
+  assert.ok([...mock.data.values()].some(row => row.action === "sale.cancelled" && row.description.includes("Corrección de prueba")));
+});

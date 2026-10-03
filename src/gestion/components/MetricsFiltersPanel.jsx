@@ -3,12 +3,8 @@ import { locationActivity } from "../../modules/locations/domain/locations";
 import { argentinaDateKey, argentinaMonthKey, argentinaParts } from "../../modules/locations/domain/time";
 import { Icon } from "./icons";
 
-const paymentOptions = [
-  ["cash", "Efectivo"],
-  ["debit", "Débito"],
-  ["credit", "Crédito"],
-  ["alias", "Alias / transferencia"],
-];
+import { PAYMENT_OPTIONS } from "../../modules/locations/domain/payments";
+const paymentOptions = PAYMENT_OPTIONS.filter(option => option.value !== "multiple").map(option => [option.value, option.label]);
 
 const filterKeys = {
   locations: ["locationIds"],
@@ -22,7 +18,7 @@ const toggle = (values, value) => values.includes(value)
   ? values.filter((item) => item !== value)
   : [...values, value];
 
-function Choice({ checked, label, onChange, count }) {
+function Choice({ checked, label, onChange, count = null }) {
   return (
     <label className="fm-metrics-choice">
       <input type="checkbox" checked={checked} onChange={onChange} />
@@ -98,7 +94,10 @@ export default function MetricsFiltersPanel({
   products,
   discounts,
   busy,
+  actualPayments = [],
 }) {
+  const availablePayments = new Map(paymentOptions.map(([id, label]) => [id, label]));
+  actualPayments.forEach(part => availablePayments.set(part.key || part.id || part.method, part.name || part.label));
   const today = argentinaDateKey();
   const currentMonth = argentinaMonthKey();
   const currentYear = argentinaParts().year;
@@ -107,6 +106,7 @@ export default function MetricsFiltersPanel({
   const [openFilter, setOpenFilter] = useState(null);
   const [draft, setDraft] = useState(state);
   const rootRef = useRef(null);
+  /** @type {import("react").MutableRefObject<Record<string, any>>} */
   const triggerRefs = useRef({});
 
   const restoreTriggerFocus = useCallback((filterId) => {
@@ -301,7 +301,7 @@ export default function MetricsFiltersPanel({
           onCancel={cancelFilter}
         >
           <Choice checked={!draft.paymentMethods.length} label="Todas las formas de pago" onChange={() => setDraftField("paymentMethods", [])} />
-          {paymentOptions.map(([id, label]) => <Choice key={id} checked={draft.paymentMethods.includes(id)} label={label} onChange={() => setDraftField("paymentMethods", toggle(draft.paymentMethods, id))} />)}
+          {[...availablePayments.entries()].map(([id, label]) => <Choice key={id} checked={draft.paymentMethods.includes(id)} label={label} onChange={() => setDraftField("paymentMethods", toggle(draft.paymentMethods, id))} />)}
         </MultiSection>
       </div>
     </div>

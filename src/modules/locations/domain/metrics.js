@@ -1,3 +1,5 @@
+import { isActiveSale, saleDate, summarizeSales } from "./saleFacts.js";
+export { isActiveSale, saleDate } from "./saleFacts.js";
 import { saleChannelLabel } from "./channels.js";
 import { saleDiscountList, storedDiscountTotal } from "./discounts.js";
 import { salePaymentParts } from "./payments.js";
@@ -10,7 +12,6 @@ import {
   argentinaParts,
 } from "./time.js";
 
-const CANCELLED_STATUSES = new Set(["cancelled", "canceled", "deleted", "anulada", "anulado", "cancelada", "cancelado"]);
 const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const DAY_MS = 86_400_000;
 const pad = (value) => String(value).padStart(2, "0");
@@ -54,18 +55,6 @@ export function buildMetricsCustomRange(from, to) {
   return { period: "custom", value: `${from}:${to}`, start, end };
 }
 
-export function saleDate(sale) {
-  for (const value of [sale?.createdAt, sale?.date, sale?.createdLocallyAt, sale?.updatedAt]) {
-    const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
-    if (date && !Number.isNaN(date.valueOf())) return date;
-  }
-  return null;
-}
-
-export function isActiveSale(sale) {
-  return !CANCELLED_STATUSES.has(String(sale?.status || "active").toLowerCase());
-}
-
 const itemMatches = (item, id, name) => !id || item?.productId === id || (!item?.productId && name && item?.name === name);
 const discountIdentity = (discount, index = 0) => discount.discountId || discount.id || discount.name || `legacy-${index}`;
 const saleDiscountIds = (sale) => saleDiscountList(sale).map(discountIdentity);
@@ -96,6 +85,7 @@ export function applyMetricsFilters(sales, filters = {}, range) {
   const productIds = Array.isArray(filters.productIds) ? filters.productIds : [];
   const categoryProductIds = Array.isArray(filters.categoryProductIds) ? filters.categoryProductIds : [];
   const effectiveProducts = [...new Set([...productIds, ...categoryProductIds])];
+  const selectedCategories = new Set(filters.categoryIds || []);
   const discountIds = Array.isArray(filters.discountIds) ? filters.discountIds : [];
   const wantsNoDiscount = discountIds.includes("__none");
   const selectedDiscountIds = discountIds.filter((id) => id !== "__none");
@@ -106,7 +96,7 @@ export function applyMetricsFilters(sales, filters = {}, range) {
     if (!includesAny(filters.locationIds, [sale.locationId, sale.locationName].filter(Boolean))) return false;
     if (!includesAny(filters.channelIds, [sale.sourceChannel || "__unknown"])) return false;
     if (!includesAny(filters.sellerIds, [sale.sellerId, sale.sellerName].filter(Boolean))) return false;
-    if (effectiveProducts.length && !(sale.items || []).some((item) => effectiveProducts.includes(item.productId))) return false;
+    if ((effectiveProducts.length || selectedCategories.size) && !(sale.items || []).some(item => effectiveProducts.includes(item.productId) || selectedCategories.has(item.categoryId))) return false;
     if (filters.productId && !(sale.items || []).some((item) => itemMatches(item, filters.productId, filters.productName))) return false;
 
     if (discountIds.length) {
@@ -198,7 +188,8 @@ function buildTimeline(active, range) {
 }
 
 export function calculateMetrics(sales, range, filters = {}) {
-  const active = sales.filter(isActiveSale);
+  const facts = summarizeSales(sales);
+  const active = facts.sales;
   const cancelled = sales.filter((sale) => !isActiveSale(sale));
   const total = active.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
   const totalItems = active.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.qty || 0), 0), 0);
@@ -276,7 +267,7 @@ export function calculateMetrics(sales, range, filters = {}) {
     cancelled,
     total,
     salesCount: active.length,
-    ticket: active.length ? total / active.length : 0,
+    ticket: facts.average,
     totalItems,
     discountTotal,
     discountedSales,

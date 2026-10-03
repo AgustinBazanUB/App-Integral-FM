@@ -15,17 +15,16 @@ import {
 } from "firebase/firestore";
 import { can } from "../../permissions.js";
 import { db } from "../../services/firebase.js";
+import { customerAnalysis, getLoyaltyPolicy } from "../../customers/crmService.js";
 import { listCustomerZones } from "../../services/customerService.js";
 import {
   CAMPAIGN_STATUS_LABELS,
   campaignRecipientDisplayPhone,
-  customerCategory,
   customerCommunicationAllowed,
   customerMatchesCampaignFilters,
   extensionCampaignCounters,
   progressPercentage,
   recipientDocumentId,
-  recipientFromCustomer,
 } from "./campaignDomain.js";
 import { EXTENSION_MESSAGE_TYPES } from "./extensionBridge.js";
 
@@ -70,12 +69,16 @@ function campaignAudit(profile, action, campaignId, title, description) {
 
 export async function listCampaignCustomerPage(profile, { pageSize = 100, cursor = null } = {}) {
   if (!can(profile, "loyal-customers", "view")) throw new Error("No tenés permiso para consultar Clientes Fidelizados.");
+  /** @type {import("firebase/firestore").QueryConstraint[]} */
   const constraints = [orderBy("updatedAt", "desc")];
   if (cursor) constraints.push(startAfter(cursor));
   constraints.push(limit(Math.max(1, Math.min(150, pageSize))));
   const snapshot = await getDocs(query(collection(db, "customers"), ...constraints));
+  const customers = docsToArray(snapshot).filter(customerCommunicationAllowed);
+  const policy = await getLoyaltyPolicy(profile);
+  const analysis = await customerAnalysis(profile, customers, policy);
   return {
-    items: docsToArray(snapshot).filter(customerCommunicationAllowed),
+    items: customers.map(customer => ({ ...customer, purchaseStats: analysis.stats.get(customer.id), segment: analysis.stats.get(customer.id)?.loyal == null ? "Sin regla de fidelización" : analysis.stats.get(customer.id).loyal ? "Fidelizado" : "No fidelizado", segmentWindowDays: analysis.days })),
     cursor: snapshot.docs.at(-1) || null,
     hasMore: snapshot.docs.length === Math.max(1, Math.min(150, pageSize)),
   };
@@ -83,22 +86,8 @@ export async function listCampaignCustomerPage(profile, { pageSize = 100, cursor
 
 export async function listCampaignCustomerFilterOptions(profile) {
   if (!can(profile, "loyal-customers", "view")) throw new Error("No tenés permiso para consultar clientes.");
-  const [zones, segmentSnapshot, categorySnapshot] = await Promise.all([
-    listCustomerZones(profile),
-    getDocs(query(collection(db, "customers"), orderBy("segment"), limit(250))).catch(() => null),
-    getDocs(query(collection(db, "customers"), orderBy("category"), limit(250))).catch(() => null),
-  ]);
-  const categories = new Set();
-  for (const snapshot of [segmentSnapshot, categorySnapshot]) {
-    for (const item of snapshot?.docs || []) {
-      const category = customerCategory(item.data());
-      if (category) categories.add(category);
-    }
-  }
-  return {
-    zones: zones.filter((zone) => zone.active !== false),
-    categories: [...categories].sort((a, b) => a.localeCompare(b, "es")),
-  };
+  const [zones, policy] = await Promise.all([listCustomerZones(profile), getLoyaltyPolicy(profile)]);
+  return { zones: zones.filter(zone => zone.active !== false), categories: policy.enabled ? ["Fidelizado", "No fidelizado"] : ["Sin regla de fidelización"] };
 }
 
 export async function listAllCampaignCustomers(profile, filters = {}) {
@@ -117,6 +106,7 @@ export async function listAllCampaignCustomers(profile, filters = {}) {
 
 export async function listWhatsAppCampaignsPage(profile, { pageSize = 20, cursor = null } = {}) {
   if (!canView(profile)) throw new Error("No tenés permiso para ver campañas de WhatsApp.");
+  /** @type {import("firebase/firestore").QueryConstraint[]} */
   const constraints = [orderBy("createdAt", "desc")];
   if (cursor) constraints.push(startAfter(cursor));
   constraints.push(limit(Math.max(1, Math.min(50, pageSize))));
@@ -140,6 +130,7 @@ export async function listCampaignRecipients(profile, campaignId) {
   const result = [];
   let cursor = null;
   while (result.length < MAX_SELECT_ALL) {
+    /** @type {import("firebase/firestore").QueryConstraint[]} */
     const constraints = [orderBy("createdAt", "asc")];
     if (cursor) constraints.push(startAfter(cursor));
     constraints.push(limit(400));

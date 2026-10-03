@@ -12,6 +12,9 @@ import {
   Tabs,
   Toast,
 } from "../../design-system";
+import { CustomerHistory, CustomerSegments, LoyaltyConfiguration } from "../customers/CustomerInsights";
+import { listCustomerPage } from "../customers/crmService";
+import { normalizedRole } from "../permissions";
 import CustomerImportModal from "../customers/CustomerImportModal";
 import {
   customerDisplayName,
@@ -27,9 +30,9 @@ import { formatDateTime } from "../formatters";
 import { useAsyncData } from "../hooks";
 import { can } from "../permissions";
 import {
-  listCustomers,
   listCustomerZones,
-  saveCustomerFromAdmin,
+  mergeCustomerFromAdmin,
+  findCustomerByPhone,
   saveCustomerZone,
   setCustomerZoneActive,
   updateCustomerFromAdmin,
@@ -46,14 +49,14 @@ function customerToForm(customer = {}, zones = []) {
   const configured = zones.some((zone) => zone.id && zone.id === customer.zoneId);
   const usesCustom = Boolean(customer.customZone) || (!configured && !customer.zoneId && customer.zoneName);
   return {
-    phone: customer.phoneNormalized || customer.phone || "",
+    phone: customer.phone || customer.phoneNormalized || "",
     name: customer.name || "",
     zoneId: usesCustom ? "__custom" : (customer.zoneId || ""),
     customZone: usesCustom ? (customer.customZone || customer.zoneName || "") : "",
   };
 }
 
-function CustomersList({ customers, onOpen }) {
+function CustomersList({ customers, onOpen, stats }) {
   if (!customers.length) {
     return <EmptyState icon="UsersRound" title="No hay clientes para mostrar" description="Los clientes identificados desde una venta aparecerán aquí automáticamente." />;
   }
@@ -82,9 +85,9 @@ function CustomersList({ customers, onOpen }) {
                 {customerZoneLabel(customer) ? <span><Icon name="MapPin" />{customerZoneLabel(customer)}</span> : null}
               </div>
             </div>
-            <Badge tone={customer.active === false ? "neutral" : "success"}>
+            <div>{stats?.get(customer.id) ? <small>{stats.get(customer.id).count} compras en período · {stats.get(customer.id).loyal === null ? "Fidelización sin configurar" : stats.get(customer.id).loyal ? "Fidelizado" : "No fidelizado"}</small> : null}<Badge tone={customer.active === false ? "neutral" : "success"}>
               {customer.active === false ? "Inactivo" : "Activo"}
-            </Badge>
+            </Badge></div>
           </article>
         );
       })}
@@ -97,13 +100,19 @@ export default function LoyalCustomersPage() {
   const canEditCustomers = can(profile, "loyal-customers", "edit");
   const canCreateCustomers = can(profile, "loyal-customers", "create") || canEditCustomers;
   const canManageZones = canEditCustomers || can(profile, "loyal-customers", "admin");
-  const customersResult = useAsyncData(() => listCustomers(profile, 250), [profile.id]);
+  const customersResult = useAsyncData(() => listCustomerPage(profile), [profile.id]);
+  const [extraCustomers, setExtraCustomers] = useState([]);
+  const [nextCustomers, setNextCustomers] = useState(null);
+  const [moreBusy, setMoreBusy] = useState(false);
+  const refreshCustomers = async () => { setExtraCustomers([]); setNextCustomers(null); return customersResult.refresh(); };
+  const loadMore = async () => { setMoreBusy(true); try { const page = await listCustomerPage(profile, (nextCustomers || customersResult.data).cursor); setExtraCustomers(current => [...current, ...page.items]); setNextCustomers(page); } catch (error) { setMessage(error.message); } finally { setMoreBusy(false); } };
   const zonesResult = useAsyncData(() => listCustomerZones(profile), [profile.id]);
   const [tab, setTab] = useState("customers");
   const [search, setSearch] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [customerForm, setCustomerForm] = useState(blankCustomer);
+  const [customerLookup, setCustomerLookup] = useState("");
   const [customerBusy, setCustomerBusy] = useState(false);
   const [customerError, setCustomerError] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -118,7 +127,7 @@ export default function LoyalCustomersPage() {
   const [zoneError, setZoneError] = useState("");
   const [message, setMessage] = useState("");
 
-  const customers = customersResult.data || [];
+  const customers = [...new Map([...(customersResult.data?.items || []), ...extraCustomers].map(customer => [customer.id, customer])).values()];
   const zones = zonesResult.data || [];
   const activeZones = zones.filter((zone) => zone.active !== false);
   const filteredCustomers = useMemo(
@@ -129,12 +138,13 @@ export default function LoyalCustomersPage() {
   const openNewCustomer = () => {
     setCustomerForm(blankCustomer);
     setCustomerError("");
+    setCustomerLookup("");
     setCustomerOpen(true);
   };
 
-  const handleImportedCustomers = async ({ created, skipped, invalid }) => {
-    await customersResult.refresh();
-    setMessage(`Importación finalizada: ${created} creado(s), ${skipped} omitido(s) y ${invalid} inválido(s).`);
+  const handleImportedCustomers = async ({ created, updated = 0, skipped, conflicts = 0, invalid }) => {
+    await refreshCustomers();
+    setMessage(`Importación finalizada: ${created} creado(s), ${updated} completado(s), ${skipped} omitido(s), ${conflicts} conflicto(s) y ${invalid} inválido(s).`);
   };
 
   const saveCustomer = async () => {
@@ -142,7 +152,7 @@ export default function LoyalCustomersPage() {
     setCustomerError("");
     try {
       const selectedZone = activeZones.find((zone) => zone.id === customerForm.zoneId);
-      await saveCustomerFromAdmin(profile, {
+      const result = await mergeCustomerFromAdmin(profile, {
         phone: customerForm.phone,
         name: customerForm.name,
         zoneId: selectedZone?.id || "",
@@ -151,8 +161,8 @@ export default function LoyalCustomersPage() {
       });
       setCustomerOpen(false);
       setCustomerForm(blankCustomer);
-      await customersResult.refresh();
-      setMessage("Cliente guardado correctamente.");
+      await refreshCustomers();
+      setMessage(result.created ? "Cliente creado correctamente." : `Cliente existente: ${result.updated ? "se completaron campos vacíos" : "se conservó su información"}${result.conflicts.length ? "; hay diferencias sin reemplazar, revisalas desde Editar" : ""}.`);
     } catch (error) {
       setCustomerError(error.message);
     } finally {
@@ -193,8 +203,8 @@ export default function LoyalCustomersPage() {
         zoneName: selectedZone?.name || "",
         customZone: detailForm.zoneId === "__custom" ? detailForm.customZone : "",
       });
-      const refreshed = await customersResult.refresh();
-      const updated = (refreshed || []).find((customer) => customer.id === result.id);
+      const refreshed = await refreshCustomers();
+      const updated = (refreshed?.items || []).find((customer) => customer.id === result.id);
       setSelectedCustomer(updated || { ...selectedCustomer, id: result.id, phone: detailForm.phone, phoneNormalized: normalizeCustomerPhone(detailForm.phone), name: detailForm.name, zoneId: selectedZone?.id || "", zoneName: selectedZone?.name || detailForm.customZone, customZone: detailForm.zoneId === "__custom" ? detailForm.customZone : "" });
       setEditingCustomer(false);
       setMessage("Cliente actualizado.");
@@ -282,6 +292,7 @@ export default function LoyalCustomersPage() {
         tabs={[
           { id: "customers", label: "Clientes" },
           ...(canManageZones ? [{ id: "zones", label: "Configuración de zonas" }] : []),
+          ...(["admin", "general_admin"].includes(normalizedRole(profile)) ? [{ id: "loyalty", label: "Fidelización" }] : []),
         ]}
         active={tab}
         onChange={setTab}
@@ -292,7 +303,7 @@ export default function LoyalCustomersPage() {
       {tab === "customers" ? (
         <Panel
           title="Registro de clientes"
-          description="La vista carga un bloque acotado de registros; la venta nunca descarga la colección completa para identificar un teléfono."
+          description="Clientes comerciales. Buscá por teléfono para encontrar registros en toda la base."
           action={<Badge tone="neutral">{filteredCustomers.length} visibles</Badge>}
         >
           <div className="fm-customers-toolbar">
@@ -306,9 +317,9 @@ export default function LoyalCustomersPage() {
           </div>
           {customersResult.status === "loading" ? <Skeleton lines={6} /> : null}
           {customersResult.status === "error" ? <Toast tone="error">{customersResult.error.message}</Toast> : null}
-          {customersResult.status === "ready" ? <CustomersList customers={filteredCustomers} onOpen={openCustomer} /> : null}
+          {customersResult.status === "ready" ? <><CustomerSegments key={tab} profile={profile} customers={filteredCustomers} zones={zones} renderCustomers={(visible, stats) => <CustomersList customers={visible} stats={stats} onOpen={openCustomer} />} />{(nextCustomers || customersResult.data)?.hasMore ? <Button variant="secondary" loading={moreBusy} onClick={loadMore}>Cargar más clientes</Button> : null}<Button variant="secondary" disabled={!normalizeCustomerPhone(search)} onClick={async () => { try { const customer = await findCustomerByPhone(search); if (customer) openCustomer(customer); else setMessage("No existe un cliente con ese teléfono."); } catch (error) { setMessage(error.message); } }}>Buscar teléfono en toda la base</Button></> : null}
         </Panel>
-      ) : (
+      ) : tab === "loyalty" ? <LoyaltyConfiguration profile={profile} /> : (
         <Panel
           title="Zonas"
           description="Las zonas inactivas dejan de ofrecerse en ventas nuevas, pero siguen visibles en clientes y ventas históricas."
@@ -354,7 +365,7 @@ export default function LoyalCustomersPage() {
           <div className="fm-customer-form fm-customer-detail-form">
             <FormField label="Nombre (opcional)"><input autoComplete="name" value={detailForm.name} onChange={(event) => setDetailForm((current) => ({ ...current, name: event.target.value }))} /></FormField>
             <FormField label="Teléfono" required hint="Se valida contra la base antes de guardar para evitar duplicados."><input type="tel" inputMode="tel" autoComplete="tel" value={detailForm.phone} onChange={(event) => setDetailForm((current) => ({ ...current, phone: event.target.value }))} /></FormField>
-            <FormField label="Zona" required><select value={detailForm.zoneId} onChange={(event) => setDetailForm((current) => ({ ...current, zoneId: event.target.value }))}><option value="">Elegir zona</option>{activeZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}{historicalZone ? <option value={historicalZone.id}>{historicalZone.name} (inactiva · actual)</option> : null}<option value="__custom">Otra zona</option></select></FormField>
+            <FormField label="Zona (opcional)"><select value={detailForm.zoneId} onChange={(event) => setDetailForm((current) => ({ ...current, zoneId: event.target.value }))}><option value="">Elegir zona</option>{activeZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}{historicalZone ? <option value={historicalZone.id}>{historicalZone.name} (inactiva · actual)</option> : null}<option value="__custom">Otra zona</option></select></FormField>
             {detailForm.zoneId === "__custom" ? <FormField label="Otra zona" required><input value={detailForm.customZone} onChange={(event) => setDetailForm((current) => ({ ...current, customZone: event.target.value }))} /></FormField> : null}
             {detailError ? <Toast tone="error">{detailError}</Toast> : null}
           </div>
@@ -365,9 +376,9 @@ export default function LoyalCustomersPage() {
               <div><dt>Teléfono</dt><dd>{detailWhatsapp ? <a href={detailWhatsapp} target="_blank" rel="noopener noreferrer" aria-label={`Abrir WhatsApp con ${detailPhone}`}><Icon name="MessagesSquare" />{detailPhone}</a> : detailPhone}</dd></div>
               <div><dt>Zona</dt><dd>{customerZoneLabel(selectedCustomer) || "Sin zona"}</dd></div>
               {selectedCustomer.createdAt ? <div><dt>Alta</dt><dd>{formatDateTime(selectedCustomer.createdAt)}</dd></div> : null}
-              {selectedCustomer.lastPurchaseAt ? <div><dt>Última compra</dt><dd>{formatDateTime(selectedCustomer.lastPurchaseAt)}</dd></div> : null}
               {selectedCustomer.updatedAt ? <div><dt>Última actualización</dt><dd>{formatDateTime(selectedCustomer.updatedAt)}</dd></div> : null}
             </dl>
+            <CustomerHistory key={selectedCustomer.id} profile={profile} customer={selectedCustomer} />
           </div>
         ) : null}
       </Modal>
@@ -376,14 +387,15 @@ export default function LoyalCustomersPage() {
         open={customerOpen}
         onClose={() => !customerBusy && setCustomerOpen(false)}
         title="Nuevo cliente"
-        description="Teléfono y zona son suficientes; el nombre es opcional."
+        description="Sólo el teléfono es obligatorio; nombre y zona son opcionales."
         footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={() => setCustomerOpen(false)}>Cancelar</Button><Button icon="Save" loading={customerBusy} onClick={saveCustomer}>Guardar</Button></div>}
       >
         <div className="fm-customer-form">
-          <FormField label="Teléfono" required hint="Se usa para evitar clientes duplicados aunque cambie el formato escrito."><input type="tel" inputMode="tel" autoComplete="tel" value={customerForm.phone} onChange={(event) => setCustomerForm((current) => ({ ...current, phone: event.target.value }))} /></FormField>
-          <FormField label="Zona" required><select value={customerForm.zoneId} onChange={(event) => setCustomerForm((current) => ({ ...current, zoneId: event.target.value }))}><option value="">Elegir zona</option>{activeZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}<option value="__custom">Otra zona</option></select></FormField>
-          {customerForm.zoneId === "__custom" ? <FormField label="Nueva zona" required><input value={customerForm.customZone} onChange={(event) => setCustomerForm((current) => ({ ...current, customZone: event.target.value }))} /></FormField> : null}
+          <FormField label="Teléfono" required hint="Se usa para evitar clientes duplicados aunque cambie el formato escrito."><input type="tel" inputMode="tel" autoComplete="tel" value={customerForm.phone} onBlur={async () => { try { const existing = customerForm.phone ? await findCustomerByPhone(customerForm.phone) : null; setCustomerLookup(existing ? "Cliente existente: se reutiliza su identidad; sólo se completan campos vacíos." : "Teléfono nuevo. Nombre y zona son opcionales."); } catch (error) { setCustomerError(error.message); } }} onChange={(event) => setCustomerForm((current) => ({ ...current, phone: event.target.value }))} /></FormField>
+          <FormField label="Zona (opcional)"><select value={customerForm.zoneId} onChange={(event) => setCustomerForm((current) => ({ ...current, zoneId: event.target.value }))}><option value="">Elegir zona</option>{activeZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}<option value="__custom">Otra zona</option></select></FormField>
+          {customerForm.zoneId === "__custom" ? <FormField label="Nueva zona (opcional)"><input value={customerForm.customZone} onChange={(event) => setCustomerForm((current) => ({ ...current, customZone: event.target.value }))} /></FormField> : null}
           <FormField label="Nombre (opcional)"><input autoComplete="name" value={customerForm.name} onChange={(event) => setCustomerForm((current) => ({ ...current, name: event.target.value }))} /></FormField>
+          {customerLookup ? <p role="status">{customerLookup}</p> : null}
           {customerError ? <Toast tone="error">{customerError}</Toast> : null}
         </div>
       </Modal>
@@ -397,7 +409,7 @@ export default function LoyalCustomersPage() {
       >
         <div className="fm-customer-form">
           <FormField label="Nombre de la zona" required><input value={zoneForm.name} onChange={(event) => setZoneForm((current) => ({ ...current, name: event.target.value }))} /></FormField>
-          <FormField label="Orden"><input type="number" min="0" step="1" inputMode="numeric" value={zoneForm.order} onChange={(event) => setZoneForm((current) => ({ ...current, order: event.target.value }))} /></FormField>
+          <FormField label="Orden"><input type="number" min="0" step="1" inputMode="numeric" value={zoneForm.order} onChange={(event) => setZoneForm((current) => ({ ...current, order: Number(event.target.value) }))} /></FormField>
           <label className="fm-zone-active-toggle"><input type="checkbox" checked={zoneForm.active !== false} onChange={(event) => setZoneForm((current) => ({ ...current, active: event.target.checked }))} /><span>Zona activa</span></label>
           {zoneError ? <Toast tone="error">{zoneError}</Toast> : null}
         </div>

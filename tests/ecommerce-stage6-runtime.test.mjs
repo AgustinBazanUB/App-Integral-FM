@@ -4,6 +4,7 @@ import { createEcommerceOrder } from '../netlify/functions/_lib/ecommerce/commer
 import { confirmEcommercePayment } from '../netlify/functions/_lib/ecommerce/paymentService.mjs';
 import { prepareEcommerceInvoiceFiscal, resolveEcommerceReceiver } from '../netlify/functions/_lib/ecommerce/fiscalService.mjs';
 import { canRequestInvoiceForSale, ensurePendingInvoice, syncInvoiceToSale } from '../netlify/functions/_lib/arca/invoicePersistence.mjs';
+import { customerDocumentId } from '../src/gestion/customers/customerDomain.js';
 
 export const qaEnv = { NODE_ENV:'test', CONTEXT:'dev', ECOMMERCE_SIMULATED_PAYMENT_ENABLED:'true', ECOMMERCE_LOCATION_ID:'qa-local', ECOMMERCE_PICKUP_ENABLED:'true', ARCA_ENVIRONMENT:'homologation', ARCA_ISSUER_CUIT:'20123456786', ARCA_ISSUER_VAT_CONDITION:'responsable_inscripto', ARCA_POINT_OF_SALE:'3', ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES:'admin_quick_sale', ARCA_ALLOW_PRODUCTION_CAE:'false' };
 function store() {
@@ -27,6 +28,20 @@ const approve=(s,extra={})=>confirmEcommercePayment({orderId:s.order.id,idempote
 const fiscal=(s,extra={})=>prepareEcommerceInvoiceFiscal({orderId:s.order.id,idempotencyKey:s.body.requestId,requestedBy:'qa-admin',env:qaEnv,...s.db,ensureInvoiceFn:args=>ensurePendingInvoice({...args,createDocument:s.db.createDocument}),syncInvoiceFn:syncInvoiceToSale,...extra});
 const count=(s,prefix)=>[...s.db.records.keys()].filter(p=>p.startsWith(prefix+'/')).length;
 const rejectsCode=(fn,code)=>assert.rejects(fn,e=>e.code===code);
+
+test('runtime CRM: pedido pendiente no crea cliente; aprobación concurrente asocia un maestro sin duplicar',async()=>{
+  const s=await setup();assert.equal(count(s,'customers'),0);
+  const [a,b]=await Promise.all([approve(s),approve(s)]);assert.equal(a.saleId,b.saleId);
+  const id=await customerDocumentId(s.body.customer.phone), sale=(await s.db.getDocument(`sales/${a.saleId}`)).data;
+  assert.equal(sale.customerId,id);assert.equal(sale.customerPhoneNormalized,'1112345678');assert.equal(count(s,'customers'),1);
+  assert.equal((await s.db.getDocument(`customers/${id}`)).data.name,'Cliente QA');await approve(s);assert.equal(count(s,'customers'),1);
+});
+test('runtime CRM: ecommerce conserva nombre/zona existentes y completa sólo vacíos',async()=>{
+  const s=await setup(),id=await customerDocumentId(s.body.customer.phone);
+  s.db.put(`customers/${id}`,{phone:'+54 9 11 1234-5678',phoneNormalized:'1112345678',name:'Nombre del maestro',zoneName:'Zona del maestro',active:true});
+  await approve(s);const customer=(await s.db.getDocument(`customers/${id}`)).data;
+  assert.equal(customer.name,'Nombre del maestro');assert.equal(customer.zoneName,'Zona del maestro');assert.equal(customer.phone,'+54 9 11 1234-5678');assert.equal(count(s,'customers'),1);
+});
 
 test('runtime: checkout recalcula total; Order/Payment pending sin Sale ni stock descontado',async()=>{const s=await setup();assert.equal(s.order.total,44000);assert.equal(s.order.paymentStatus,'pending');assert.equal((await s.db.getDocument(`payments/${s.order.paymentId}`)).data.status,'pending');assert.equal(count(s,'sales'),0);assert.equal((await s.db.getDocument('locationStock/qa-local/items/qa-product')).data.currentStock,5);});
 test('runtime: misma request/key devuelve misma Order; distinto contenido conflict',async()=>{const s=await setup();const repeated=await createEcommerceOrder({body:s.body,env:qaEnv,...s.db});assert.equal(repeated.order.id,s.order.id);assert.equal(repeated.idempotent,true);await rejectsCode(()=>createEcommerceOrder({body:{...s.body,items:[{productId:'qa-product',quantity:1}]},env:qaEnv,...s.db}),'ecommerce-idempotency-conflict');assert.equal(count(s,'orders'),1);});
@@ -52,6 +67,6 @@ test('runtime: booleans/arrays no representan precios, cantidades ni stock váli
 test('runtime: key malformada no se normaliza a una identidad existente',async()=>{const s=await setup();await rejectsCode(()=>approve(s,{idempotencyKey:'qa_request_0001!'}),'ecommerce-request-id-invalid');});
 test('runtime: stock movements para IDs a.b y a_b no colisionan',async()=>{const db=store();for(const id of ['a.b','a_b']){db.put(`products/${id}`,{name:id,active:true,defaultPrice:22000,arcaVatRate:21});db.put(`locationStock/qa-local/items/${id}`,{productId:id,currentStock:2,priceMode:'default'});}const body={...request('qa_product_collision'),items:[{productId:'a.b',quantity:1},{productId:'a_b',quantity:1}]};const {order}=await createEcommerceOrder({body,env:qaEnv,...db});await approve({db,body,order});assert.equal([...db.records.keys()].filter(p=>p.startsWith('stockMovements/')).length,2);});
 test('runtime: reintento fiscal conserva IVA confirmado aunque cambie el master',async()=>{const s=await setup();await approve(s);s.db.put('products/qa-product',{name:'master changed',defaultPrice:99999,arcaVatRate:27});const r=await fiscal(s);const i=await s.db.getDocument(`invoices/${r.invoiceId}`);assert.equal(i.data.productFiscalSnapshot[0].arcaVatRate,21);assert.equal(r.fiscal.total,44000);});
-test('runtime: invoice determinística no enmascara otra asociación fiscal',async()=>{const s=await setup();await approve(s);const r=await fiscal(s);const salePath=`sales/ecommerce_sale_${s.body.requestId}`;s.db.put(salePath,{...(await s.db.getDocument(salePath)).data,fiscalInvoiceId:'different-invoice'});await rejectsCode(()=>fiscal(s),'arca-sale-invoice-conflict');assert.equal(count(s,'invoices'),1);});
+test('runtime: invoice determinística no enmascara otra asociación fiscal',async()=>{const s=await setup();await approve(s);await fiscal(s);const salePath=`sales/ecommerce_sale_${s.body.requestId}`;s.db.put(salePath,{...(await s.db.getDocument(salePath)).data,fiscalInvoiceId:'different-invoice'});await rejectsCode(()=>fiscal(s),'arca-sale-invoice-conflict');assert.equal(count(s,'invoices'),1);});
 test('runtime: proveedor o moneda inconsistentes bloquean preparación fiscal',async()=>{for(const patch of [{provider:'payway'},{currency:'USD'}]){const s=await setup();await approve(s);const p=`payments/${s.order.paymentId}`;s.db.put(p,{...(await s.db.getDocument(p)).data,...patch});await rejectsCode(()=>fiscal(s),'ecommerce-payment-not-approved');assert.equal(count(s,'invoices'),0);}});
 test('runtime: Ecommerce no se enmascara como admin_quick_sale para entrar en allowlist productiva',async()=>{const s=await setup();await approve(s);const sourceId=`ecommerce_sale_${s.body.requestId}`;const sale=(await s.db.getDocument(`sales/${sourceId}`)).data;assert.equal(canRequestInvoiceForSale({sourceType:'admin_quick_sale',sale,session:{profile:{role:'admin'}}}),false);await rejectsCode(()=>ensurePendingInvoice({sourceType:'admin_quick_sale',sourceId,env:qaEnv,...s.db}),'arca-sale-source-mismatch');assert.equal(count(s,'invoices'),0);});

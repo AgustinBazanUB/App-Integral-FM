@@ -23,7 +23,7 @@ const chunk = (items, size = 10) => Array.from(
 
 const hasAllLocations = (profile) =>
   ["admin", "general_admin"].includes(normalizedRole(profile)) ||
-  can(profile, "locations", "viewAllLocations") || can(profile, "finance", "view");
+  can(profile, "locations", "viewAllLocations") || can(profile, "finance", "view") || can(profile, "loyal-customers", "view") || (normalizedRole(profile) === "analyst" && can(profile, "metrics", "view"));
 
 function allowedIds(profile, requestedIds) {
   const requested = requestedIds ? [...new Set(requestedIds)] : null;
@@ -34,7 +34,7 @@ function allowedIds(profile, requestedIds) {
 
 const snapshotDate = (snapshot) => snapshot.data().createdAt?.toDate?.() || new Date(0);
 
-export async function listSalesByRange({ profile, locationIds, start, end, useCache = true }) {
+export async function listSalesByRange({ profile, locationIds, start, end, useCache = true, includeCancelled = false }) {
   if (!hasAllLocations(profile) && !can(profile, "quick-sales", "view") && !can(profile, "metrics", "view")) return [];
   const scopedIds = allowedIds(profile, locationIds);
   if (Array.isArray(scopedIds) && !scopedIds.length) return [];
@@ -43,6 +43,7 @@ export async function listSalesByRange({ profile, locationIds, start, end, useCa
     scopedIds?.slice().sort().join(",") || "all",
     start.toISOString(),
     end.toISOString(),
+    includeCancelled ? "history" : "active",
   ].join("|");
   const cached = salesCache.get(key);
   if (useCache && cached && Date.now() - cached.savedAt < SALES_CACHE_TTL) return cached.data;
@@ -51,7 +52,7 @@ export async function listSalesByRange({ profile, locationIds, start, end, useCa
   const snapshots = await Promise.all(groups.map((ids) => {
     /** @type {import("firebase/firestore").QueryConstraint[]} */
     const constraints = [
-      where("status", "==", "active"),
+      ...(!includeCancelled ? [where("status", "==", "active")] : []),
       where("createdAt", ">=", Timestamp.fromDate(start)),
       where("createdAt", "<", Timestamp.fromDate(end)),
     ];
@@ -62,7 +63,7 @@ export async function listSalesByRange({ profile, locationIds, start, end, useCa
   const unique = new Map();
   snapshots.forEach((result) => result.docs.forEach((item) => {
     const data = item.data();
-    if (data.deleted !== true) unique.set(item.id, { id: item.id, ...data });
+    if (includeCancelled || data.deleted !== true) unique.set(item.id, { id: item.id, ...data });
   }));
   const data = [...unique.values()].sort((a, b) => {
     const left = a.createdAt?.toMillis?.() || 0;

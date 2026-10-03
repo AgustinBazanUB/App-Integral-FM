@@ -1,3 +1,4 @@
+import { prepareCommerceCustomer } from "./customerLink.mjs";
 import {
   adminCommitDocuments,
   adminGetDocument,
@@ -215,6 +216,8 @@ export async function confirmEcommercePayment({
     assertCommercialSnapshotMatches(order, prepared);
 
     saleId = `ecommerce_sale_${stableKey}`;
+    const crm = await prepareCommerceCustomer({ customer: prepared.customer, saleId, timestamp, getDocument, env });
+    operations.push(...crm.operations);
     const sale = {
       schemaVersion: 2,
       sourceType: "ecommerce",
@@ -225,7 +228,9 @@ export async function confirmEcommercePayment({
       locationName: order.locationName || locationSnapshot.data?.name || "Ecommerce",
       sellerId: null,
       sellerName: "Ecommerce",
-      customerId: null,
+      customerId: crm.customerId,
+      customerPhoneNormalized: crm.customerPhoneNormalized,
+      crmLinkStatus: crm.crmLinkStatus,
       customerNameSnapshot: prepared.customer.fullName,
       customerPhoneSnapshot: prepared.customer.phone,
       customerEmailSnapshot: prepared.customer.email,

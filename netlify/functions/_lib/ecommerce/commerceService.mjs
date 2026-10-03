@@ -1,3 +1,4 @@
+import { prepareCommerceCustomer } from "./customerLink.mjs";
 import { createHash } from "node:crypto";
 import {
   adminCommitDocuments,
@@ -17,10 +18,6 @@ import {
   prepareAuthoritativeCheckout,
   resolveRequestedPaymentStatus,
 } from "./commerceDomain.mjs";
-
-const docsById = (documents = []) => Object.fromEntries(
-  documents.map((document) => [document.id, document]),
-);
 
 function slugFrom(value, fallback) {
   const normalized = String(value || "").trim().toLowerCase()
@@ -281,6 +278,8 @@ export async function createEcommerceOrder({
   ];
 
   if (prepared.stockCommitRequired) {
+    const crm = await prepareCommerceCustomer({ customer: prepared.customer, saleId: ids.saleId, timestamp, getDocument, env });
+    operations.push(...crm.operations);
     const sale = {
       schemaVersion: 1,
       sourceType: "ecommerce",
@@ -290,7 +289,9 @@ export async function createEcommerceOrder({
       locationName: locationSnapshot.data?.name || "Ecommerce",
       sellerId: null,
       sellerName: "Ecommerce",
-      customerId: null,
+      customerId: crm.customerId,
+      customerPhoneNormalized: crm.customerPhoneNormalized,
+      crmLinkStatus: crm.crmLinkStatus,
       customerNameSnapshot: prepared.customer.fullName,
       customerPhoneSnapshot: prepared.customer.phone,
       customerEmailSnapshot: prepared.customer.email,

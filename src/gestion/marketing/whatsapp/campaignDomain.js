@@ -1,3 +1,4 @@
+import { matchesCustomerSegment } from "../../customers/customerPurchases.js";
 
 import {
   canonicalWhatsAppPhone,
@@ -62,7 +63,7 @@ export function customerCommunicationAllowed(customer = {}) {
 }
 
 export function customerCategory(customer = {}) {
-  return String(customer.category || customer.segment || "").trim();
+  return String(customer.segment || customer.category || "").trim();
 }
 
 export function customerZone(customer = {}) {
@@ -71,6 +72,7 @@ export function customerZone(customer = {}) {
 
 export function customerMatchesCampaignFilters(customer, filters = {}) {
   if (!customerCommunicationAllowed(customer)) return false;
+  if (!matchesCustomerSegment(customer, customer.purchaseStats, filters)) return false;
   if (filters.zoneId || filters.zoneName) {
     const zoneMatches =
       (filters.zoneId && customer.zoneId === filters.zoneId) ||
@@ -209,7 +211,7 @@ export async function recipientDocumentId(phone) {
   return `recipient_${hex.slice(0, 40)}`;
 }
 
-export function userFacingWhatsAppProblem({ code, message } = {}) {
+export function userFacingWhatsAppProblem({ code = "", message = "" } = {}) {
   if (code === "CONTACT_CONTEXT_UNVERIFIED") {
     return "No pudimos confirmar que WhatsApp abrió el contacto correcto. La campaña se protegió para evitar enviar el mensaje a otra persona.";
   }
@@ -248,7 +250,7 @@ export function extensionPrimaryStatus(status = {}) {
   };
 }
 
-export function campaignValidation({ name, recipients = [], message = "", images = [], extensionStatus, persistedImageMetadata = [] } = {}) {
+export function campaignValidation({ name = "", recipients = [], message = "", images = [], extensionStatus = null, persistedImageMetadata = [] } = {}) {
   const errors = [];
   if (!String(name || "").trim()) errors.push("Ingresá un nombre para la campaña.");
   if (!recipients.length) errors.push("Seleccioná al menos un destinatario válido.");

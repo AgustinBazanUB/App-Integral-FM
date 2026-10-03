@@ -9,7 +9,7 @@ import {
 } from "react";
 import { Icon } from "../gestion/components/icons";
 
-export const Button = forwardRef(function Button(
+export const Button = forwardRef(/** @param {any} props @param {any} ref */ function Button(
   {
     children,
     variant = "primary",
@@ -40,7 +40,7 @@ export const Button = forwardRef(function Button(
 
 export const LoadingButton = Button;
 
-export const IconButton = forwardRef(function IconButton(
+export const IconButton = forwardRef(/** @param {any} props @param {any} ref */ function IconButton(
   { label, icon, variant = "secondary", className = "", ...props },
   ref,
 ) {
@@ -89,7 +89,7 @@ export function HeroBanner({ eyebrow, title, description, action, children }) {
   );
 }
 
-export function StatCard({ label, value, hint, icon, tone = "gold" }) {
+export function StatCard({ label, value, hint = "", icon, tone = "gold" }) {
   return (
     <article className={`fm-stat-card fm-stat-card--${tone}`}>
       <div className="fm-stat-card__icon"><Icon name={icon} /></div>
@@ -120,7 +120,7 @@ export function Panel({ title, description, action, className = "", children }) 
   );
 }
 
-export function Badge({ children, tone = "neutral", icon }) {
+export function Badge({ children, tone = "neutral", icon = null }) {
   return (
     <span className={`fm-badge fm-badge--${tone}`}>
       {icon ? <Icon name={icon} /> : null}
@@ -151,7 +151,7 @@ export function Skeleton({ lines = 3 }) {
   );
 }
 
-export const SearchInput = forwardRef(function SearchInput(
+export const SearchInput = forwardRef(/** @param {any} props @param {any} ref */ function SearchInput(
   { label = "Buscar", ...props },
   ref,
 ) {
@@ -211,7 +211,7 @@ export function FormField({
   );
 }
 
-export const Select = forwardRef(function Select(props, ref) {
+export const Select = forwardRef(/** @param {any} props @param {any} ref */ function Select(props, ref) {
   return <select ref={ref} {...props} />;
 });
 
@@ -303,7 +303,7 @@ function useOverlay(open, onClose, initialFocusRef) {
   return containerRef;
 }
 
-export function Modal({ open, onClose, title, description, children, footer }) {
+export function Modal({ open, onClose, title, description, children = null, footer }) {
   const ref = useOverlay(open, onClose);
   const titleId = useId();
   if (!open) return null;
@@ -354,7 +354,7 @@ export function ConfirmationDialog({ open, title = "Confirmar", description, onC
   );
 }
 
-export function DataTable({ columns, rows, rowKey = "id", empty }) {
+export function DataTable({ columns, rows, rowKey = "id", empty = null }) {
   if (!rows?.length) return empty || null;
   return (
     <div className="fm-data-table-wrap">
@@ -402,7 +402,7 @@ export function Accordion({ title, open, onToggle, children }) {
 
 export function ProgressBar({ value = 0, label }) {
   const safe = Math.max(0, Math.min(100, Number(value) || 0));
-  return <div className="fm-progress"><div className="fm-progress__meta"><span>{label}</span><span>{safe}%</span></div><div className="fm-progress__track" role="progressbar" aria-label={label} aria-valuemin="0" aria-valuemax="100" aria-valuenow={safe}><span style={{ width: `${safe}%` }} /></div></div>;
+  return <div className="fm-progress"><div className="fm-progress__meta"><span>{label}</span><span>{safe}%</span></div><div className="fm-progress__track" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={safe}><span style={{ width: `${safe}%` }} /></div></div>;
 }
 
 export function Pagination({ page, totalPages, onChange }) {

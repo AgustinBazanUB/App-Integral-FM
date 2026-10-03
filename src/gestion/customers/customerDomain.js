@@ -110,7 +110,6 @@ export function buildCustomerDraft({ phone, name = "", zoneId = "", zoneName = "
   const cleanCustomZone = cleanZoneName(customZone);
   const cleanConfiguredZone = cleanZoneName(zoneName);
   const resolvedZoneName = cleanCustomZone || cleanConfiguredZone;
-  if (!resolvedZoneName) throw new Error("Elegí una zona o ingresá una nueva zona.");
   return {
     phone: String(phone || "").trim(),
     phoneNormalized,
@@ -119,6 +118,21 @@ export function buildCustomerDraft({ phone, name = "", zoneId = "", zoneName = "
     zoneName: resolvedZoneName,
     customZone: cleanCustomZone,
   };
+}
+
+// Imports and fast captures enrich empty fields only. Explicit administrative
+// edits use their own confirmation flow; conflicting evidence is never discarded.
+export function customerEnrichment(existing = {}, incoming = {}) {
+  const patch = {};
+  const conflicts = [];
+  const name = cleanCustomerName(incoming.name);
+  const zone = customerZoneLabel(incoming);
+  if (name && !cleanCustomerName(existing.name)) patch.name = name;
+  else if (name && normalizedSearchText(name) !== normalizedSearchText(existing.name)) conflicts.push({ field: "name", existing: existing.name, incoming: name });
+  const previousZone = customerZoneLabel(existing);
+  if (zone && !previousZone) Object.assign(patch, { zoneId: incoming.zoneId || null, zoneName: zone, customZone: incoming.customZone || null });
+  else if (zone && normalizedSearchText(zone) !== normalizedSearchText(previousZone)) conflicts.push({ field: "zone", existing: previousZone, incoming: zone });
+  return { patch, conflicts };
 }
 
 export function matchesCustomerSearch(customer, search) {

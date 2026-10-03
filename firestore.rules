@@ -84,7 +84,7 @@ service cloud.firestore {
           && action in ["create", "edit", "export", "approve", "transferStock"])
         || (role == "financial_manager"
           && moduleId == "finance"
-          && action in ["create", "edit", "export", "approve"])
+          && action in ["create", "edit", "export", "approve", "admin"])
         || (role == "analyst" && moduleId == "metrics" && action == "export")
         || (role == "operational_admin"
           && moduleId != "finance"
@@ -892,8 +892,9 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /settings/{settingId} {
-      allow get: if activeUser();
-      allow list, create, update: if isAdmin();
+      allow get: if activeUser() && (settingId != "financeConfig" || canModule("finance", "view"));
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() || (settingId == "financeConfig" && canModule("finance", "admin"));
       allow delete: if false;
     }
     match /locationStock/{locationId} {
@@ -943,10 +944,12 @@ service cloud.firestore {
         && (!("invoiceStatus" in data) || data.invoiceStatus in ["pending", "not_requested"]);
     }
     match /sales/{saleId} {
-      allow get: if isAdmin() || canModule("finance", "view")
+      allow get: if isAdmin() || canModule("finance", "view") || canModule("loyal-customers", "view")
+        || (canModule("metrics", "view") && profile().role == "analyst")
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
-      allow list: if isAdmin() || canModule("finance", "view")
+      allow list: if isAdmin() || canModule("finance", "view") || canModule("loyal-customers", "view")
+        || (canModule("metrics", "view") && profile().role == "analyst")
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
       // Las ventas Ecommerce se crean exclusivamente desde backend después de
@@ -1058,7 +1061,8 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /orders/{orderId} {
-      allow read: if canModule("ecommerce", "view");
+      allow get: if canModule("ecommerce", "view") || canModule("finance", "view");
+      allow list: if canModule("ecommerce", "view");
       // Checkout público usa backend server-side. Precio, total, paymentStatus,
       // saleId e invoiceStatus nunca son autoridad del navegador.
       allow create, update, delete: if false;
@@ -1069,7 +1073,8 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
     match /shipments/{shipmentId} {
-      allow read: if canModule("shipping", "view");
+      allow get: if canModule("shipping", "view") || canModule("finance", "view");
+      allow list: if canModule("shipping", "view");
       allow create: if canModule("shipping", "create") && ownsNewRecord();
       allow update: if canModule("shipping", "edit") && logicalMutation();
       allow delete: if false;
@@ -1101,7 +1106,8 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /suppliers/{supplierId} {
-      allow read: if canModule("suppliers", "view");
+      allow get: if canModule("suppliers", "view") || canModule("finance", "view");
+      allow list: if canModule("suppliers", "view");
       allow create: if canModule("suppliers", "create") && ownsNewRecord();
       allow update: if canModule("suppliers", "edit") && logicalMutation();
       allow delete: if false;
@@ -1212,10 +1218,12 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /alerts/{alertId} {
-      allow read: if canModule("alerts", "view")
+      allow get: if canModule("finance", "view") && alertId.matches("finance_.*")
+        && (!exists(/databases/$(database)/documents/alerts/$(alertId)) || resource.data.moduleId == "finance");
+      allow read: if (canModule("finance", "view") && ("moduleId" in resource.data) && resource.data.moduleId == "finance") || canModule("alerts", "view")
         && (!("responsibleId" in resource.data) || resource.data.responsibleId == request.auth.uid || isAdmin());
-      allow create: if canModule("alerts", "create") && ownsNewRecord();
-      allow update: if canModule("alerts", "edit") && logicalMutation();
+      allow create: if (canModule("alerts", "create") || (canModule("finance", "edit") && request.resource.data.moduleId == "finance" && alertId.matches("finance_.*"))) && ownsNewRecord();
+      allow update: if (canModule("alerts", "edit") || (canModule("finance", "edit") && resource.data.moduleId == "finance" && request.resource.data.moduleId == "finance" && alertId.matches("finance_.*"))) && logicalMutation();
       allow delete: if false;
     }
     match /dailySummaries/{summaryId} {
@@ -1224,7 +1232,7 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /auditLogs/{logId} {
-      allow read: if isAdmin()
+      allow read: if (canModule("finance", "view") && ("moduleId" in resource.data) && resource.data.moduleId == "finance") || isAdmin()
         || (canModule("locations", "view")
           && ("locationId" in resource.data)
           && allowedLocation(resource.data.locationId))
@@ -1232,6 +1240,9 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && (isAdmin()
+          || (("moduleId" in request.resource.data)
+            && request.resource.data.moduleId == "finance"
+            && (canModule("finance", "create") || canModule("finance", "edit") || canModule("finance", "admin")))
           || (("moduleId" in request.resource.data)
             && request.resource.data.moduleId == "products"
             && (canModule("products", "create") || canModule("products", "edit")))
