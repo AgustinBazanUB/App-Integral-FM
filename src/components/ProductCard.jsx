@@ -4,6 +4,7 @@ import { Link } from "../router";
 import { categoryById } from "../data/categories";
 import { getProductAsset } from "../data/assetsManifest";
 import { useCart } from "../context/CartContext";
+import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 
 function formatPrice(price) {
   if (typeof price !== "number") return null;
@@ -16,12 +17,15 @@ function formatPrice(price) {
 
 export default function ProductCard({ product, compact = false }) {
   const { addItem } = useCart();
-  const [format, setFormat] = useState(product.formats?.[0] ?? "");
+  const { resolveProduct } = useCommerceCatalog();
   const [added, setAdded] = useState(false);
-  const category = categoryById[product.categoryId];
-  const imageAsset = getProductAsset(product.id);
-  const price = formatPrice(product.price);
-  const unavailable = product.stock === "out" || product.active === false;
+  const commercial = resolveProduct(product);
+  const display = commercial || product;
+  const category = categoryById[display.categoryId];
+  const imageAsset = getProductAsset(display.editorialId || display.id);
+  const price = formatPrice(commercial?.price);
+  const unavailable = !commercial || commercial.commercialReady !== true || commercial.active === false;
+  const format = display.formats?.[0] ?? "";
 
   useEffect(() => {
     if (!added) return undefined;
@@ -31,33 +35,28 @@ export default function ProductCard({ product, compact = false }) {
 
   const onAdd = () => {
     if (unavailable) return;
-    addItem(product, {
-      format,
-      variant:
-        product.attributes?.variety ?? product.attributes?.flavor ?? "",
-    });
-    setAdded(true);
+    if (addItem(commercial)) setAdded(true);
   };
 
   return (
     <article className={`product-card${compact ? " product-card--compact" : ""}`}>
       <Link
-        to={`/producto/${product.slug}`}
+        to={`/producto/${commercial?.slug || display.slug}`}
         className="product-card__image-link"
-        aria-label={`Ver ${product.name}`}
+        aria-label={`Ver ${display.name}`}
       >
-        {product.image ? (
+        {display.image ? (
           <img
             className="product-card__image"
-            src={product.image}
-            width={product.imageWidth ?? imageAsset?.width ?? 900}
-            height={product.imageHeight ?? imageAsset?.height ?? 900}
-            alt={product.imageAlt ?? product.name}
+            src={display.image}
+            width={display.imageWidth ?? imageAsset?.width ?? 900}
+            height={display.imageHeight ?? imageAsset?.height ?? 900}
+            alt={display.imageAlt ?? display.name}
             loading="lazy"
             decoding="async"
           />
         ) : (
-          <span className="product-card__image-missing" role="img" aria-label={`Sin fotografía disponible para ${product.name}`}>
+          <span className="product-card__image-missing" role="img" aria-label={`Sin fotografía disponible para ${display.name}`}>
             Imagen pendiente
           </span>
         )}
@@ -65,34 +64,17 @@ export default function ProductCard({ product, compact = false }) {
 
       <div className="product-card__content">
         <span className="product-card__category">
-          {category?.name ?? product.subcategory}
+          {category?.name ?? display.categoryName ?? display.subcategory}
         </span>
         <h3>
-          <Link to={`/producto/${product.slug}`}>{product.name}</Link>
+          <Link to={`/producto/${commercial?.slug || display.slug}`}>{display.name}</Link>
         </h3>
-        <p className="product-card__description">{product.description}</p>
+        <p className="product-card__description">{display.description}</p>
 
-        {!compact && product.formats?.length > 1 ? (
-          <label className="field-label product-card__format">
-            Presentación
-            <select
-              value={format}
-              onChange={(event) => setFormat(event.target.value)}
-              aria-label={`Presentación de ${product.name}`}
-            >
-              {product.formats.map((option) => (
-                <option value={option} key={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : format ? (
-          <span className="product-card__format-text">{format}</span>
-        ) : null}
+        {format ? <span className="product-card__format-text">{format}</span> : null}
 
         <div className="product-card__purchase">
-          {price ? <strong>{price}</strong> : <span aria-hidden="true" />}
+          {price ? <strong>{price}</strong> : <span>Precio no disponible</span>}
           <button
             className={`product-card__add${added ? " is-added" : ""}`}
             type="button"
@@ -100,12 +82,12 @@ export default function ProductCard({ product, compact = false }) {
             disabled={unavailable}
             aria-label={
               unavailable
-                ? `${product.name} no está disponible`
-                : `Agregar ${product.name} al carrito`
+                ? `${display.name} no está disponible`
+                : `Agregar ${display.name} al carrito`
             }
           >
             {added ? <Check size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}
-            {unavailable ? "SIN STOCK" : added ? "AGREGADO" : "AGREGAR"}
+            {unavailable ? "NO DISPONIBLE" : added ? "AGREGADO" : "AGREGAR"}
           </button>
         </div>
       </div>

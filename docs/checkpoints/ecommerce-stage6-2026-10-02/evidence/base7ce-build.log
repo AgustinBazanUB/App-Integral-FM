@@ -1,0 +1,61 @@
+
+> app-integral-fm@1.0.0 build
+> vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 1792 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                                   2.01 kB │ gzip:   0.77 kB
+dist/assets/manrope-latin-500-normal-BYYD-dBL.woff2              14.04 kB
+dist/assets/manrope-latin-400-normal-PaqtzbVb.woff2              14.11 kB
+dist/assets/manrope-latin-600-normal-4f0koTD-.woff2              14.17 kB
+dist/assets/manrope-latin-700-normal-BZp_XxE4.woff2              14.21 kB
+dist/assets/manrope-latin-500-normal-DMZssgOp.woff               18.24 kB
+dist/assets/manrope-latin-400-normal-8tf8FM3T.woff               18.29 kB
+dist/assets/manrope-latin-600-normal-BqgrALkZ.woff               18.38 kB
+dist/assets/manrope-latin-700-normal-DGRFkw-m.woff               18.41 kB
+dist/assets/cormorant-garamond-latin-500-normal-BsRWmXhO.woff2   23.31 kB
+dist/assets/cormorant-garamond-latin-600-normal-Co1r35X9.woff2   23.40 kB
+dist/assets/inter-latin-400-normal-C38fXH4l.woff2                23.66 kB
+dist/assets/inter-latin-500-normal-Cerq10X2.woff2                24.27 kB
+dist/assets/inter-latin-700-normal-Yt3aPRUw.woff2                24.36 kB
+dist/assets/inter-latin-600-normal-LgqL8muc.woff2                24.45 kB
+dist/assets/inter-latin-400-normal-CyCys3Eg.woff                 30.70 kB
+dist/assets/inter-latin-600-normal-CiBQ2DWP.woff                 31.26 kB
+dist/assets/inter-latin-500-normal-BL9OpVg8.woff                 31.28 kB
+dist/assets/cormorant-garamond-latin-600-normal-2CBVLo0M.woff    31.30 kB
+dist/assets/inter-latin-700-normal-BLAVimhd.woff                 31.32 kB
+dist/assets/cormorant-garamond-latin-500-normal-zIXX3Q-H.woff    31.37 kB
+dist/assets/meta-ads-creative-DemJfbID.css                        3.75 kB │ gzip:   0.96 kB
+dist/assets/MetaAdsHubPage-5GyLLft4.css                           5.28 kB │ gzip:   1.31 kB
+dist/assets/index-Dqo4Mn5p.css                                  224.18 kB │ gzip:  38.48 kB
+dist/assets/AuditPage-CS-ViMSB.js                                 1.43 kB │ gzip:   0.81 kB
+dist/assets/HelpTooltip-CmL7lqJ-.js                               1.65 kB │ gzip:   0.90 kB
+dist/assets/pdfTextExtractor-BPaIR2H8.js                          3.76 kB │ gzip:   1.77 kB
+dist/assets/AdministrationPage-BmIJwngm.js                        4.61 kB │ gzip:   1.93 kB
+dist/assets/ActivityPage-B_JILi5E.js                              4.92 kB │ gzip:   1.99 kB
+dist/assets/GenericModulePage-CAaeiPsD.js                         4.95 kB │ gzip:   2.18 kB
+dist/assets/meta-ads-creative-BaQLSD_I.js                         7.68 kB │ gzip:   3.25 kB
+dist/assets/QuickSalesPage-Ii8EZXMU.js                            9.24 kB │ gzip:   3.64 kB
+dist/assets/ProductsPage-Cdk5CUBf.js                             12.26 kB │ gzip:   4.04 kB
+dist/assets/LocationsPage-D-TqlUOW.js                            13.54 kB │ gzip:   5.04 kB
+dist/assets/LoyalCustomersPage-D_H4MyIj.js                       18.64 kB │ gzip:   6.14 kB
+dist/assets/WarehousePage-BiRmYsOF.js                            22.52 kB │ gzip:   6.45 kB
+dist/assets/SalesMetricsPage-E4Xt9paS.js                         24.03 kB │ gzip:   8.26 kB
+dist/assets/SettingsPage-Fc2e29NX.js                             27.75 kB │ gzip:   7.18 kB
+dist/assets/WhatsAppCampaignsPage-DfKJn0hv.js                    30.63 kB │ gzip:   9.84 kB
+dist/assets/LocationDetailPage-DBZ6tgQh.js                       39.29 kB │ gzip:  10.85 kB
+dist/assets/index-D9qr7lu9.js                                    51.29 kB │ gzip:  15.68 kB
+dist/assets/Storefront-LTbiVtb0.js                               70.13 kB │ gzip:  20.14 kB
+dist/assets/MetaAdsHubPage-C1Xhxg2R.js                          107.25 kB │ gzip:  29.06 kB
+dist/assets/index-D8505SxZ.js                                   158.82 kB │ gzip:  50.86 kB
+dist/assets/ManagementApp-rgZGY3um.js                           179.99 kB │ gzip:  52.19 kB
+dist/assets/LoginPage-z4J0OeJ2.js                               771.27 kB │ gzip: 192.24 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.92s

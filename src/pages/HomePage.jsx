@@ -20,7 +20,8 @@ import { assetsManifest, getCategoryAsset } from "../data/assetsManifest";
 import { brand } from "../data/brand";
 import { categories } from "../data/categories";
 import { oliveProfileById } from "../data/oliveProfiles";
-import { productById, products } from "../data/products";
+import { products } from "../data/products";
+import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import { promotions } from "../data/promotions";
 import { useCart } from "../context/CartContext";
 import PageMeta from "../components/PageMeta";
@@ -146,10 +147,11 @@ function CategoryArtwork({ category }) {
 
 function OilProfileCard({ profile }) {
   const { addItem } = useCart();
+  const { resolveProduct } = useCommerceCatalog();
   const [feedbackVersion, setFeedbackVersion] = useState(0);
-  const product = productById[profile.productId];
+  const product = resolveProduct(profile.productId);
   const added = feedbackVersion > 0;
-  const unavailable = !product || product.stock === "out" || product.active === false;
+  const unavailable = !product || product.commercialReady !== true || product.active === false;
 
   useEffect(() => {
     if (!feedbackVersion) return undefined;
@@ -159,11 +161,9 @@ function OilProfileCard({ profile }) {
 
   const handleAdd = () => {
     if (unavailable) return;
-    addItem(product, {
-      format: "500 cc",
-      variant: product.attributes?.variety ?? profile.name,
-    });
-    setFeedbackVersion((current) => current + 1);
+    if (addItem(product)) {
+      setFeedbackVersion((current) => current + 1);
+    }
   };
 
   return (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pin, PinOff } from "lucide-react";
 import {
   Badge,
@@ -16,6 +16,8 @@ import {
   Toast,
 } from "../../design-system";
 import {
+  LOCATION_TYPES,
+  OPERATING_DAYS,
   locationActivity,
   locationSchedule,
   toLocalDateTimeInput,
@@ -42,6 +44,7 @@ const emptyLocation = {
   active: true,
   scheduleStartAt: "",
   scheduleEndAt: "",
+  operatingCalendar: { weekdays: [], openingTime: "", closingTime: "", dates: [] },
 };
 
 const MAX_PINNED_LOCATIONS = 4;
@@ -58,7 +61,7 @@ export const locationTypeLabels = {
   store: "Local",
   fair: "Feria",
   event: "Evento",
-  warehouse_store: "Depósito",
+  warehouse_store: "Depósito (tipo heredado)",
   temporary: "Punto temporal",
   other: "Otro",
 };
@@ -160,6 +163,7 @@ function LocationCard({
 
 export default function LocationsPage() {
   const { profile } = useAuth();
+  const submitRef = useRef(false);
   const canRecover = ["admin", "general_admin"].includes(normalizedRole(profile));
   const locationsResult = useAsyncData(() => listLocations(profile, { includeDeleted: canRecover }), [profile.id, canRecover]);
   const locations = locationsResult.data || [];
@@ -232,7 +236,7 @@ export default function LocationsPage() {
 
   const openCreate = (type = "store") => {
     setEditingId("");
-    setForm({ ...emptyLocation, type });
+    setForm({ ...emptyLocation, type, requestId: crypto.randomUUID() });
     setSaveState({ busy: false, error: "", success: "" });
     setModalOpen(true);
   };
@@ -244,6 +248,7 @@ export default function LocationsPage() {
       codePrefix: location.codePrefix || "",
       dniMode: location.dniMode || "optional",
       active: location.active !== false,
+      operatingCalendar: { ...emptyLocation.operatingCalendar, ...location.operatingCalendar, weekdays: location.operatingCalendar?.weekdays || [], dates: location.operatingCalendar?.dates || [] },
       scheduleStartAt: toLocalDateTimeInput(location.scheduleStartAt || location.startDateTime || location.startDate),
       scheduleEndAt: toLocalDateTimeInput(location.scheduleEndAt || location.endDateTime || location.endDate, "end"),
     });
@@ -252,6 +257,7 @@ export default function LocationsPage() {
   };
   const handleSave = async (event) => {
     event.preventDefault();
+    if (submitRef.current) return;
     if (!form.name.trim() || !form.codePrefix.trim()) {
       setSaveState({ busy: false, error: "Completá el nombre y el prefijo de venta.", success: "" });
       return;
@@ -260,12 +266,15 @@ export default function LocationsPage() {
       setSaveState({ busy: false, error: "La fecha final debe ser posterior a la inicial.", success: "" });
       return;
     }
+    submitRef.current = true;
     setSaveState({ busy: true, error: "", success: "" });
     try {
       await saveManagedLocation(form, profile, editingId || null);
       await locationsResult.refresh();
       setModalOpen(false);
+      submitRef.current = false;
     } catch (error) {
+      submitRef.current = false;
       setSaveState({ busy: false, error: error.message, success: "" });
     }
   };
@@ -306,13 +315,14 @@ export default function LocationsPage() {
       <Modal open={modalOpen} onClose={() => !saveState.busy && setModalOpen(false)} title={editingId ? "Editar ubicación" : form.type === "event" ? "Nuevo evento" : "Nueva ubicación"} description="Los datos se guardan sin alterar ventas ni movimientos históricos.">
         <form className="fm-form-grid" onSubmit={handleSave}>
           <FormField label="Nombre" required><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></FormField>
-          <FormField label="Tipo" required><Select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>{Object.entries(locationTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></FormField>
+          <FormField label="Tipo" required><Select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>{Object.entries({ ...LOCATION_TYPES, ...(editingId && !(form.type in LOCATION_TYPES) ? { [form.type]: locationTypeLabels[form.type] || "Tipo heredado" } : {}) }).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></FormField>
           <FormField label="Prefijo de venta" hint="Hasta 8 letras o números." required><input maxLength="8" value={form.codePrefix} onChange={(event) => setForm({ ...form, codePrefix: event.target.value.replace(/[^a-zA-Z0-9]/g, "") })} /></FormField>
           <FormField label="Solicitud de DNI" required><Select value={form.dniMode} onChange={(event) => setForm({ ...form, dniMode: event.target.value })}><option value="disabled">Desactivado</option><option value="optional">Opcional</option><option value="recommended">Recomendado</option><option value="required">Obligatorio</option></Select></FormField>
           <FormField label="Inicio" hint="Opcional para locales permanentes."><input type="datetime-local" value={form.scheduleStartAt} onChange={(event) => setForm({ ...form, scheduleStartAt: event.target.value })} /></FormField>
           <FormField label="Finalización" hint="Opcional para locales permanentes."><input type="datetime-local" value={form.scheduleEndAt} onChange={(event) => setForm({ ...form, scheduleEndAt: event.target.value })} /></FormField>
+          <fieldset className="fm-form-grid__full fm-operating-calendar"><legend>Calendario de atención (hora de Argentina)</legend><p>Definí los días y horarios de atención. Las jornadas nocturnas cierran al día siguiente.</p><div className="fm-calendar-days">{OPERATING_DAYS.map((label, index) => <label key={label}><input type="checkbox" checked={form.operatingCalendar.weekdays.includes(index + 1)} onChange={(event) => setForm((current) => ({ ...current, operatingCalendar: { ...current.operatingCalendar, weekdays: event.target.checked ? [...current.operatingCalendar.weekdays, index + 1] : current.operatingCalendar.weekdays.filter((day) => day !== index + 1) } }))} />{label}</label>)}</div><div className="fm-form-grid"><FormField label="Apertura"><input type="time" value={form.operatingCalendar.openingTime} onChange={(event) => setForm({ ...form, operatingCalendar: { ...form.operatingCalendar, openingTime: event.target.value } })} /></FormField><FormField label="Cierre"><input type="time" value={form.operatingCalendar.closingTime} onChange={(event) => setForm({ ...form, operatingCalendar: { ...form.operatingCalendar, closingTime: event.target.value } })} /></FormField></div><FormField label="Fechas específicas" hint="Para ferias/eventos: AAAA-MM-DD separadas por coma; opcional."><input value={form.operatingCalendar.dates.join(", ")} onChange={(event) => setForm({ ...form, operatingCalendar: { ...form.operatingCalendar, dates: event.target.value.split(",") } })} /></FormField></fieldset>
           {saveState.error ? <p className="fm-form-error fm-form-grid__full" role="alert">{saveState.error}</p> : null}
-          <div className="fm-dialog-actions fm-form-grid__full"><Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button><Button type="submit" loading={saveState.busy}>Guardar</Button></div>
+          <div className="fm-dialog-actions fm-form-grid__full"><Button disabled={saveState.busy} variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button><Button type="submit" loading={saveState.busy}>Guardar</Button></div>
         </form>
       </Modal>
 

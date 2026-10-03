@@ -18,6 +18,10 @@ import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
 import { locationActivity, locationSchedule } from "../../modules/locations/domain/locations";
 import { Link, useLocation, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
+import InventoryAdjustmentModal from "../components/InventoryAdjustmentModal";
+import InventoryTransferModal from "../components/InventoryTransferModal";
+import { listWarehouses } from "../services/inventoryService";
+import { listLocations } from "../services/managementService";
 import HelpTooltip from "../components/HelpTooltip";
 import LocationSalesPanel from "../components/LocationSalesPanel";
 import { formatDate, formatMoney } from "../formatters";
@@ -33,7 +37,6 @@ import {
   saveLocationProductSettings,
 } from "../services/inventoryService";
 import {
-  loadActiveLocationStock,
   saveValidatedLocationDiscounts,
 } from "../services/locationEnhancementsService";
 import {
@@ -80,6 +83,7 @@ function movementDate(value) {
 }
 
 function AddLocationProductModal({ open, location, inventory, categories, profile, onClose, onSaved }) {
+  const canLoadInitial = can(profile, "locations", "loadStock") && locationActivity(location).active;
   const [state, setState] = useState({ busy: false, loading: false, error: "" });
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
@@ -181,8 +185,8 @@ function AddLocationProductModal({ open, location, inventory, categories, profil
 
         {selected ? (
           <section className="fm-inventory-selection-config">
-            <FormField label="Stock inicial" hint="Cuántas unidades hay físicamente ahora en esta ubicación." required>
-              <input type="number" min="0" step="1" inputMode="numeric" value={initialStock} onChange={(event) => setInitialStock(event.target.value)} />
+            <FormField label="Stock inicial" hint={canLoadInitial ? "Cuántas unidades hay físicamente ahora en esta ubicación." : "Se habilita sin cantidades. La carga requiere permiso y una ubicación activa; también puede recibir transferencias."} required>
+              <input disabled={!canLoadInitial || state.busy} type="number" min="0" step="1" inputMode="numeric" value={initialStock} onChange={(event) => setInitialStock(event.target.value)} />
             </FormField>
             <div className="fm-price-choice">
               <p><strong>Precio predeterminado del producto:</strong> {formatMoney(selected.defaultPrice || 0)}</p>
@@ -366,6 +370,13 @@ export default function LocationDetailPage({ locationId }) {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [stockProduct, setStockProduct] = useState(null);
+  const [adjustProduct, setAdjustProduct] = useState(null);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const transferResources = useAsyncData(async () => {
+    if (!transferOpen) return { warehouses: [], locations: [] };
+    const [warehouses, locations] = await Promise.all([listWarehouses(profile), listLocations(profile)]);
+    return { warehouses, locations };
+  }, [transferOpen, profile]);
   const [settingsProduct, setSettingsProduct] = useState(null);
   const [movementProduct, setMovementProduct] = useState(null);
   const [sellerIds, setSellerIds] = useState([]);
@@ -462,9 +473,9 @@ export default function LocationDetailPage({ locationId }) {
         <Panel
           title={`Stock de ${location.name}`}
           description="Acá ves solamente los productos disponibles en esta ubicación. Para sumar uno nuevo, elegilo desde el catálogo general."
-          action={canConfigure ? <HelpTooltip label="Agrega a esta ubicación un producto que ya existe en el catálogo."><Button icon="Plus" onClick={() => setAddProductOpen(true)}>Agregar producto</Button></HelpTooltip> : null}
+          action={<div className="fm-header-action-row">{can(profile, "warehouse", "transferStock") ? <Button variant="secondary" icon="Truck" onClick={() => setTransferOpen(true)}>Transferir stock</Button> : null}{canConfigure ? <HelpTooltip label="Agrega a esta ubicación un producto que ya existe en el catálogo."><Button icon="Plus" onClick={() => setAddProductOpen(true)}>Agregar producto</Button></HelpTooltip> : null}</div>}
         >
-          {!state.active ? <Toast tone="error">Esta ubicación no está activa. Podés consultar el stock, pero no ingresar mercadería hasta reactivarla.</Toast> : null}
+          {!state.active ? <Toast tone="warning">Esta ubicación está inactiva. La carga directa requiere reactivarla; podés preparar mercadería mediante transferencias y consultar su historial.</Toast> : null}
           {inventory.length ? (
             <>
               <div className="fm-inventory-picker-filters">
@@ -479,7 +490,7 @@ export default function LocationDetailPage({ locationId }) {
                     <div><dt>Precio efectivo</dt><dd>{formatMoney(product.effectivePrice || 0)}</dd></div>
                   </dl>
                   <p className="fm-price-source">{product.usesDefaultPrice ? "Usa el precio de Productos" : product.legacyPrice ? "Precio local anterior (se conserva sin cambios)" : "Usa un precio especial en esta ubicación"}</p>
-                  <footer className="fm-inventory-card__actions">
+                  <footer className="fm-inventory-card__actions">{can(profile, "locations", "adjustStock") ? <Button variant="secondary" onClick={() => setAdjustProduct(product)}>Ajustar inventario</Button> : null}
                     {canLoad ? <HelpTooltip label="Suma nuevas unidades al stock actual de este producto."><Button onClick={() => setStockProduct(product)} disabled={!state.active}>Agregar stock</Button></HelpTooltip> : null}
                     <HelpTooltip label="Muestra los ingresos, transferencias y cambios de stock de este producto."><Button variant="secondary" onClick={() => setMovementProduct(product)}>Movimientos</Button></HelpTooltip>
                     {canConfigure ? <HelpTooltip label="Cambia el precio que usa esta ubicación, las alertas o si el producto está habilitado."><Button variant="ghost" onClick={() => setSettingsProduct(product)}>Configuración</Button></HelpTooltip> : null}
@@ -522,6 +533,10 @@ export default function LocationDetailPage({ locationId }) {
 
       {activeTab === "sales" ? <Panel title="Ventas" description="Registro operativo de las ventas asociadas a esta ubicación."><LocationSalesPanel profile={profile} location={location} products={inventory} /></Panel> : null}
 
+      <InventoryAdjustmentModal open={Boolean(adjustProduct)} type={INVENTORY_TYPES.LOCATION} inventory={location} product={adjustProduct} profile={profile} onClose={() => setAdjustProduct(null)} onSaved={result.refresh} />
+      {transferOpen && transferResources.status === "loading" ? <Modal open onClose={() => setTransferOpen(false)} title="Transferir stock"><Skeleton lines={4} /></Modal> : null}
+      {transferOpen && transferResources.status === "error" ? <Modal open onClose={() => setTransferOpen(false)} title="Transferir stock"><Toast tone="error">{transferResources.error.message}</Toast><Button onClick={() => transferResources.refresh().catch(() => {})}>Reintentar</Button></Modal> : null}
+      <InventoryTransferModal open={transferOpen && transferResources.status === "ready"} warehouses={transferResources.data?.warehouses || []} locations={transferResources.data?.locations || []} initialOriginId={locationId} initialOriginType={INVENTORY_TYPES.LOCATION} profile={profile} onClose={() => setTransferOpen(false)} onSaved={result.refresh} />
       <AddLocationProductModal open={addProductOpen} location={location} inventory={inventory} categories={result.data.categories} profile={profile} onClose={() => setAddProductOpen(false)} onSaved={result.refresh} />
       <AddStockModal open={Boolean(stockProduct)} location={location} product={stockProduct} profile={profile} onClose={() => setStockProduct(null)} onSaved={result.refresh} />
       <ProductSettingsModal open={Boolean(settingsProduct)} location={location} product={settingsProduct} profile={profile} onClose={() => setSettingsProduct(null)} onSaved={result.refresh} />

@@ -1,0 +1,18 @@
+{
+  "counts": {
+    "oauth-mock": 122,
+    "firestore-emulator": 2364,
+    "external-blocked": 2,
+    "auth-emulator": 123,
+    "transaction-shape": 935,
+    "emulator-error": 24
+  },
+  "externalBlockedHosts": [
+    "edge.netlify.com"
+  ],
+  "fiscalTransport": "MOCK / DRY RUN",
+  "realFECAESolicitarCalls": 0,
+  "realWSAACalls": 0,
+  "productionCAE": 0,
+  "note": "Guard rechaza fetch externo; muestra conteos sin tokens, headers ni cuerpos. La inspección criptográfica separada no hace red."
+}

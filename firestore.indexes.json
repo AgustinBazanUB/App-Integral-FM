@@ -17,7 +17,13 @@
     {"collectionGroup":"stockTransfers","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
     {"collectionGroup":"purchases","queryScope":"COLLECTION","fields":[{"fieldPath":"supplierId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"campaigns","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"startAt","order":"DESCENDING"}]},
-    {"collectionGroup":"financialEntries","queryScope":"COLLECTION","fields":[{"fieldPath":"type","order":"ASCENDING"},{"fieldPath":"occurredAt","order":"DESCENDING"}]}
+    {"collectionGroup":"financialEntries","queryScope":"COLLECTION","fields":[{"fieldPath":"type","order":"ASCENDING"},{"fieldPath":"occurredAt","order":"DESCENDING"}]},
+    {"collectionGroup":"stockMovements","queryScope":"COLLECTION","fields":[{"fieldPath":"locationId","order":"ASCENDING"},{"fieldPath":"productId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"stockMovements","queryScope":"COLLECTION","fields":[{"fieldPath":"warehouseId","order":"ASCENDING"},{"fieldPath":"productId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"sales","queryScope":"COLLECTION","fields":[{"fieldPath":"customerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"sales","queryScope":"COLLECTION","fields":[{"fieldPath":"customerPhoneSnapshot","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
+    {"collectionGroup":"financialEntries","queryScope":"COLLECTION","fields":[{"fieldPath":"type","order":"ASCENDING"},{"fieldPath":"month","order":"ASCENDING"}]},
+    {"collectionGroup":"financialEntries","queryScope":"COLLECTION","fields":[{"fieldPath":"type","order":"ASCENDING"},{"fieldPath":"saleId","order":"ASCENDING"}]}
   ],
   "fieldOverrides": []
 }

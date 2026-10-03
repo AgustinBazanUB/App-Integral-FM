@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-10-02T12:05:01.6670562-03:00",
+  "stoppedProcesses": [
+    {
+      "ProcessId": 10608,
+      "ParentProcessId": 64588,
+      "Name": "node.exe"
+    },
+    {
+      "ProcessId": 63776,
+      "ParentProcessId": 10608,
+      "Name": "java.exe"
+    },
+    {
+      "ProcessId": 58716,
+      "ParentProcessId": 65232,
+      "Name": "node.exe"
+    },
+    {
+      "ProcessId": 44364,
+      "ParentProcessId": 58716,
+      "Name": "node.exe"
+    },
+    {
+      "ProcessId": 50496,
+      "ParentProcessId": 44364,
+      "Name": "esbuild.exe"
+    },
+    {
+      "ProcessId": 64452,
+      "ParentProcessId": 58716,
+      "Name": "esbuild.exe"
+    }
+  ],
+  "remainingQAListeners": [],
+  "localSimulationEnabled": false,
+  "remoteRefsUnchanged": true,
+  "originalHead": "e8734ce748249b3830926e0ef8338fb9cb5ef644",
+  "originalStatus": [
+    "?? tmp/"
+  ],
+  "productionCAE": 0,
+  "netlifyDeploys": 0,
+  "netlifyPreviews": 0,
+  "pushes": 0,
+  "note": "Sólo procesos de QA identificados, configuración ignorada restaurada; no se modificaron gates productivos."
+}

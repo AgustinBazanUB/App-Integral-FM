@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-10-02T13:58:22.609Z",
+  "sales": [
+    {
+      "id": "OYh8zwJd8u1SY4LHaoac",
+      "code": "FM-LOC-20261002-0004",
+      "invoiceId": "invoice_homologation_seller_sale_OYh8zwJd8u1SY4LHaoac",
+      "total": 22000
+    },
+    {
+      "id": "Z7d1qUy1SwVEB0HSXrBH",
+      "code": "FM-LOC-20261002-0002",
+      "invoiceId": "invoice_homologation_admin_quick_sale_Z7d1qUy1SwVEB0HSXrBH",
+      "total": 22000
+    },
+    {
+      "id": "iz9QMu8hF4OxpwcZgEye",
+      "code": "FM-LOC-20261002-0005",
+      "invoiceId": null,
+      "total": 22000
+    },
+    {
+      "id": "p1tCKkrtF9pC7ydDgihU",
+      "code": "FM-LOC-20261002-0001",
+      "invoiceId": "invoice_homologation_admin_quick_sale_p1tCKkrtF9pC7ydDgihU",
+      "total": 22000
+    },
+    {
+      "id": "xGJJN34j3k8RQx70rhc0",
+      "code": "FM-LOC-20261002-0003",
+      "invoiceId": "invoice_homologation_admin_quick_sale_xGJJN34j3k8RQx70rhc0",
+      "total": 22000
+    }
+  ],
+  "stock": 42
+}

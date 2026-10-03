@@ -1,3 +1,6 @@
+import { effectiveLocationPrice } from "../../modules/inventory/domain/inventory";
+import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
+import { invalidateDashboardSales } from "./dashboardService";
 import {
   collection,
   doc,
@@ -33,6 +36,7 @@ import {
   effectiveSellerLocations,
 } from "../permissions";
 import { db } from "./firebase";
+import { requestPendingArcaInvoice } from "./arcaService";
 import {
   listLocationsShared,
   loadSellerResourcesShared,
@@ -40,12 +44,13 @@ import {
 
 const docsToArray = (snapshot) =>
   snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+const saleValidationError = message => Object.assign(new Error(message), { code: "sale/validation" });
 const userName = (profile) => profile.name || profile.email || "Usuario";
 
 const wholeNumber = (value, label, minimum = 0) => {
   const number = Number(value);
   if (!Number.isInteger(number) || number < minimum) {
-    throw new Error(`${label} debe ser un número entero mayor o igual a ${minimum}.`);
+    throw saleValidationError(`${label} debe ser un número entero mayor o igual a ${minimum}.`);
   }
   return number;
 };
@@ -100,20 +105,25 @@ function cleanSaleItems(items = []) {
         productId: item.productId || item.id,
         name: item.name || item.productName,
         abbreviation: item.abbreviation || "",
+        categoryId: item.categoryId || null,
         unitPrice,
         qty,
         subtotal: unitPrice * qty,
       };
     })
     .filter(Boolean);
-  if (!cleaned.length) throw new Error("La venta está vacía.");
+  if (!cleaned.length) throw saleValidationError("La venta está vacía.");
+  const ids = cleaned.map(item => item.productId);
+  if (ids.some(id => !id || String(id).includes("/")) || new Set(ids).size !== ids.length) {
+    throw saleValidationError("Cada producto debe aparecer una sola vez con su cantidad total.");
+  }
   return cleaned;
 }
 
 function insufficientStockError(item, available) {
-  const error = new Error(
+  const error = /** @type {Error & {code?: string, productId?: string, availableStock?: number}} */ (new Error(
     `${item.name}: el stock disponible es ${available}. Corregí el carrito antes de continuar.`,
-  );
+  ));
   error.code = "seller/insufficient-stock";
   error.productId = item.productId;
   error.availableStock = available;
@@ -122,11 +132,11 @@ function insufficientStockError(item, available) {
 
 function normalizeManualDiscount(discount) {
   if (!["fixed", "percent"].includes(discount.type)) {
-    throw new Error("El tipo de descuento manual no es válido.");
+    throw saleValidationError("El tipo de descuento manual no es válido.");
   }
   const value = wholeNumber(discount.value, "El descuento manual", 1);
   if (discount.type === "percent" && value > 100) {
-    throw new Error("El porcentaje manual no puede superar 100.");
+    throw saleValidationError("El porcentaje manual no puede superar 100.");
   }
   return {
     discountId: "manual",
@@ -174,23 +184,25 @@ function resolvedCustomerFromSnapshot(snapshot, prepared) {
   if (!snapshot?.exists()) return prepared;
   const stored = snapshot.data();
   if (stored.deleted === true || stored.active === false) {
-    throw new Error("Este teléfono fue reemplazado en Clientes Fidelizados. Usá el número actualizado.");
+    throw saleValidationError("Este teléfono fue reemplazado en Clientes Fidelizados. Usá el número actualizado.");
   }
   return {
     id: snapshot.id,
     phone: stored.phone || prepared.phone,
     phoneNormalized: stored.phoneNormalized || prepared.phoneNormalized,
-    name: stored.name || "",
-    zoneId: stored.zoneId || "",
+    name: stored.name || prepared.name || "",
+    zoneId: stored.zoneId || prepared.zoneId || "",
     zoneName: stored.zoneName || stored.customZone || prepared.zoneName,
-    customZone: stored.customZone || "",
+    customZone: stored.customZone || prepared.customZone || "",
   };
 }
 
-function writeCustomerForSale(transaction, customerRef, customerSnapshot, customer, profile, saleId) {
+function writeCustomerForSale(transaction, customerRef, customerSnapshot, customer, profile, saleId, source = "seller_sale") {
   if (!customerRef || !customer) return;
   if (customerSnapshot.exists()) {
     transaction.update(customerRef, {
+      ...(!customerSnapshot.data().name && customer.name ? { name: customer.name } : {}),
+      ...(!customerSnapshot.data().zoneName && customer.zoneName ? { zoneId: customer.zoneId || null, zoneName: customer.zoneName, customZone: customer.customZone || null } : {}),
       lastSaleId: saleId,
       lastPurchaseAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -207,7 +219,7 @@ function writeCustomerForSale(transaction, customerRef, customerSnapshot, custom
     customZone: customer.customZone || null,
     active: true,
     deleted: false,
-    source: "seller_sale",
+    source,
     createdBy: profile.id,
     createdByName: userName(profile),
     createdAt: serverTimestamp(),
@@ -222,15 +234,16 @@ export async function listSellerLocations(profile) {
   return effectiveSellerLocations(profile, locations);
 }
 
+/** @returns {Promise<any>} */
 export async function assertSellerLocation(profile, locationId) {
   if (!can(profile, "quick-sales", "view")) {
-    throw new Error("No tenés permiso para abrir el Panel Vendedor.");
+    throw saleValidationError("No tenés permiso para abrir el Panel Vendedor.");
   }
   const snapshot = await getDoc(doc(db, "locations", locationId));
-  if (!snapshot.exists()) throw new Error("La ubicación ya no existe.");
+  if (!snapshot.exists()) throw saleValidationError("La ubicación ya no existe.");
   const location = { id: snapshot.id, ...snapshot.data() };
   if (!effectiveSellerLocations(profile, [location]).length) {
-    throw new Error("No tenés permiso para vender desde esta ubicación activa.");
+    throw saleValidationError("No tenés permiso para vender desde esta ubicación activa.");
   }
   return location;
 }
@@ -270,14 +283,14 @@ async function verifiedDiscounts({ profile, location, discounts, items }) {
   const requested = Array.isArray(discounts) ? discounts.filter(Boolean) : [];
   if (!requested.length) return [];
   if (!can(profile, "quick-sales", "useDiscounts")) {
-    throw new Error("No tenés permiso para aplicar descuentos.");
+    throw saleValidationError("No tenés permiso para aplicar descuentos.");
   }
 
   const manual = requested.filter((discount) =>
     discount.source === "manual" || discount.discountId === "manual",
   );
   if (manual.length && !can(profile, "quick-sales", "useManualDiscounts")) {
-    throw new Error("No tenés permiso para aplicar descuentos manuales.");
+    throw saleValidationError("No tenés permiso para aplicar descuentos manuales.");
   }
   const normalizedManual = manual.map(normalizeManualDiscount);
 
@@ -287,10 +300,10 @@ async function verifiedDiscounts({ profile, location, discounts, items }) {
   const ids = [...new Set(saved.map((discount) => discount.discountId || discount.id).filter(Boolean))];
   const snapshots = await Promise.all(ids.map((id) => getDoc(doc(db, "discounts", id))));
   const normalizedSaved = snapshots.map((snapshot) => {
-    if (!snapshot.exists()) throw new Error("Uno de los descuentos ya no existe.");
-    const discount = { id: snapshot.id, ...snapshot.data() };
+    if (!snapshot.exists()) throw saleValidationError("Uno de los descuentos ya no existe.");
+    const discount = /** @type {any} */ ({ id: snapshot.id, ...snapshot.data() });
     if (!isDiscountAvailable(discount, location, new Date(), { profile, items })) {
-      throw new Error(`${discount.name || "El descuento"} ya no está disponible para esta venta.`);
+      throw saleValidationError(`${discount.name || "El descuento"} ya no está disponible para esta venta.`);
     }
     return {
       discountId: discount.id,
@@ -303,7 +316,7 @@ async function verifiedDiscounts({ profile, location, discounts, items }) {
   return [...normalizedSaved, ...normalizedManual];
 }
 
-function saleRefs({ location, saleItems, seller, offlineSale }) {
+function saleRefs({ location, saleItems, seller, offlineSale, stockType = "location", requestId = null }) {
   const dateKey = argentinaDateKey().replaceAll("-", "");
   const prefix = String(location.codePrefix || "LOC")
     .toUpperCase()
@@ -311,23 +324,47 @@ function saleRefs({ location, saleItems, seller, offlineSale }) {
     .slice(0, 8);
   const localId = String(offlineSale?.localId || "").trim();
   if (localId && !/^local_[A-Za-z0-9_-]+$/.test(localId)) {
-    throw new Error("El identificador de la venta pendiente no es válido.");
+    throw saleValidationError("El identificador de la venta pendiente no es válido.");
   }
   return {
     dateKey,
     prefix,
     localId,
+    requestId,
     counterRef: doc(db, "counters", `${prefix}_${dateKey}`),
     saleRef: localId
       ? doc(db, "sales", `offline_${seller.id}_${localId}`.replaceAll("/", "_"))
-      : doc(collection(db, "sales")),
-    stockRefs: saleItems.map((item) => doc(db, "locationStock", location.id, "items", item.productId)),
+      : requestId ? doc(db, "sales", `quick_${seller.id}_${requestId}`) : doc(collection(db, "sales")),
+    stockRefs: saleItems.map((item) => doc(db, stockType === "warehouse" ? "warehouseStock" : "locationStock", location.id, "items", item.productId)),
     movementRefs: saleItems.map(() => doc(collection(db, "stockMovements"))),
     auditRef: doc(collection(db, "auditLogs")),
   };
 }
 
-export async function createSellerSale({
+export const createSellerSale = (sale) => createSale({ ...sale, administrative: false, requestId: null, requestFingerprint: null });
+
+export async function createAdministrativeSale(sale) {
+  if (!canAccessAdministration(sale.profile) || !sale.profile?.active) {
+    throw saleValidationError("Venta Rápida administrativa requiere un Administrador.");
+  }
+  const requestId = sale.requestId || crypto.randomUUID();
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(requestId)) throw saleValidationError("Identificador de venta inválido.");
+  if (!SALES_CHANNELS.some(option => option.value === sale.channel)) throw saleValidationError("Elegí el canal comercial real.");
+  const fingerprint = administrativeFingerprint(sale);
+  const existing = await getDoc(doc(db, "sales", `quick_${sale.profile.id}_${requestId}`));
+  if (existing.exists()) {
+    if (existing.data().sellerId !== sale.profile.id || existing.data().requestFingerprint !== fingerprint) throw Object.assign(new Error("Este intento ya corresponde a otra venta. Recuperá la confirmación original."), { code: "sale/request-conflict" });
+    invalidateDashboardSales();
+    return { id: existing.id, ...existing.data(), alreadySynced: true };
+  }
+  return createSale({ ...sale, administrative: true, requestId, requestFingerprint: fingerprint });
+}
+
+function administrativeFingerprint(sale) {
+  return JSON.stringify({ origin: sale.stockOrigin, channel: sale.channel, items: sale.items, discounts: sale.discounts || [], paymentMethod: sale.paymentMethod, payments: sale.payments || [], customer: sale.customer || null, customerDni: sale.customerDni || "", invoiceRequested: sale.invoiceRequested === true, deliveryMethod: sale.deliveryMethod || "pickup" });
+}
+
+async function createSale({
   profile,
   location,
   items,
@@ -338,34 +375,57 @@ export async function createSellerSale({
   ticketRequested = false,
   customer = null,
   offlineSale = null,
+  administrative = false,
+  stockOrigin = null,
+  channel = "in_person",
+  requestId = null,
+  requestFingerprint = null,
+  customerDni = "",
+  invoiceRequested = false,
+  deliveryMethod = "pickup",
 }) {
   if (!can(profile, "quick-sales", "create")) {
-    throw new Error("No tenés permiso para registrar ventas.");
+    throw saleValidationError("No tenés permiso para registrar ventas.");
   }
   if (ticketRequested && !can(profile, "quick-sales", "requestTicket")) {
-    throw new Error("No tenés permiso para solicitar ticket.");
+    throw saleValidationError("No tenés permiso para solicitar ticket.");
   }
-  const permittedLocation = await assertSellerLocation(profile, location?.id);
+  const stockType = administrative ? stockOrigin?.type : "location";
+  if (!["location", "warehouse"].includes(stockType)) throw saleValidationError("Elegí el origen físico del stock.");
+  const originId = administrative ? stockOrigin?.id : location?.id;
+  if (!originId || String(originId).includes("/")) throw saleValidationError("Elegí el origen físico del stock.");
+  /** @type {any} */
+  let permittedLocation;
+  if (stockType === "warehouse") {
+    if (!can(profile, "warehouse", "edit")) throw saleValidationError("No tenés permiso para descontar stock del depósito.");
+    const snapshot = await getDoc(doc(db, "warehouses", originId));
+    if (!snapshot.exists() || snapshot.data().active === false || snapshot.data().deleted === true) throw saleValidationError("El depósito no está activo.");
+    permittedLocation = { id: snapshot.id, ...snapshot.data(), codePrefix: "VR" };
+  } else {
+    permittedLocation = await assertSellerLocation(profile, originId);
+  }
   const saleItems = cleanSaleItems(items);
-  const safeDiscounts = await verifiedDiscounts({ profile, location: permittedLocation, discounts, items: saleItems });
+  const safeDiscounts = await verifiedDiscounts({ profile, location: stockType === "warehouse" ? {} : permittedLocation, discounts, items: saleItems });
   const subtotal = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
   const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal);
   const payment = normalizePayment(paymentMethod, paymentMethodLabel, payments, discountSummary.total);
+  if (paymentMethod === "multiple" && !can(profile, "quick-sales", "useMultiplePayments")) throw saleValidationError("No tenés permiso para combinar pagos.");
   const preparedCustomer = await prepareSaleCustomer(customer);
-  const refs = saleRefs({ location: permittedLocation, saleItems, seller: profile, offlineSale });
+  const refs = saleRefs({ location: permittedLocation, saleItems, seller: profile, offlineSale, stockType, requestId });
+  const fingerprint = requestFingerprint;
   const customerRef = preparedCustomer ? doc(db, "customers", preparedCustomer.id) : null;
   const createdLocallyAt = refs.localId ? new Date(offlineSale.createdLocallyAt) : null;
   if (createdLocallyAt && Number.isNaN(createdLocallyAt.valueOf())) {
-    throw new Error("La fecha local de la venta pendiente no es válida.");
+    throw saleValidationError("La fecha local de la venta pendiente no es válida.");
   }
 
-  return runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
-    if (refs.localId) {
+  const result = await runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
+    if (refs.localId || refs.requestId) {
       const existing = await transaction.get(refs.saleRef);
       if (existing.exists()) {
         const data = existing.data();
-        if (data.offlineLocalId !== refs.localId || data.sellerId !== profile.id) {
-          throw new Error("El identificador pendiente ya está en uso.");
+        if (data.sellerId !== profile.id || (refs.localId && data.offlineLocalId !== refs.localId) || (refs.requestId && data.requestFingerprint !== fingerprint)) {
+          throw saleValidationError("El identificador pendiente ya está en uso.");
         }
         return {
           id: refs.saleRef.id,
@@ -383,24 +443,34 @@ export async function createSellerSale({
       }
     }
 
-    const locationSnapshot = await transaction.get(doc(db, "locations", permittedLocation.id));
-    if (!locationSnapshot.exists() || !isLocationActiveNow({ id: locationSnapshot.id, ...locationSnapshot.data() })) {
-      throw new Error("La ubicación dejó de estar activa.");
+    const locationSnapshot = await transaction.get(doc(db, stockType === "warehouse" ? "warehouses" : "locations", permittedLocation.id));
+    if (!locationSnapshot.exists() || locationSnapshot.data().deleted === true || (stockType === "warehouse" ? locationSnapshot.data().active === false : !isLocationActiveNow({ id: locationSnapshot.id, ...locationSnapshot.data() }))) {
+      throw saleValidationError("La ubicación dejó de estar activa.");
     }
     const customerSnapshot = customerRef ? await transaction.get(customerRef) : null;
     const counterSnapshot = await transaction.get(refs.counterRef);
     const stockSnapshots = [];
     for (const stockRef of refs.stockRefs) stockSnapshots.push(await transaction.get(stockRef));
 
+    const priceOverrides = [];
+    if (administrative) {
+      for (const [index, item] of saleItems.entries()) {
+        const product = await transaction.get(doc(db, "products", item.productId));
+        if (!product.exists() || product.data().active === false || product.data().deleted === true) throw saleValidationError(`${item.name} ya no está activo en el catálogo global.`);
+        const suggestedPrice = stockType === "warehouse" ? Number(product.data().defaultPrice || 0) : effectiveLocationPrice(product.data(), stockSnapshots[index].data() || {});
+        item.categoryId = product.data().categoryId || null;
+        if (item.unitPrice !== suggestedPrice) priceOverrides.push({ productId: item.productId, suggestedPrice, unitPrice: item.unitPrice });
+      }
+    }
     const resolvedCustomer = resolvedCustomerFromSnapshot(customerSnapshot, preparedCustomer);
     const next = Number(counterSnapshot.data()?.lastNumber || 0) + 1;
     const saleCode = `FM-${refs.prefix}-${refs.dateKey}-${String(next).padStart(4, "0")}`;
-    transaction.set(refs.counterRef, { locationId: permittedLocation.id, date: refs.dateKey, lastNumber: next }, { merge: true });
+    transaction.set(refs.counterRef, { locationId: stockType === "location" ? permittedLocation.id : null, stockOriginType: stockType, stockOriginId: permittedLocation.id, date: refs.dateKey, lastNumber: next }, { merge: true });
 
     stockSnapshots.forEach((snapshot, index) => {
       const item = saleItems[index];
       if (!snapshot.exists() || snapshot.data().active === false || snapshot.data().deleted === true || snapshot.data().productDeleted === true) {
-        throw new Error(`${item.name} ya no está habilitado en esta ubicación.`);
+        throw saleValidationError(`${item.name} ya no está habilitado en esta ubicación.`);
       }
       const previousStock = Number(snapshot.data().currentStock || 0);
       if (previousStock < item.qty) throw insufficientStockError(item, previousStock);
@@ -412,8 +482,8 @@ export async function createSellerSale({
         legacy: legacyStockMutation,
       }));
       transaction.set(refs.movementRefs[index], {
-        locationId: permittedLocation.id,
-        locationName: permittedLocation.name,
+        inventoryType: stockType,
+        ...(stockType === "warehouse" ? { warehouseId: permittedLocation.id, warehouseName: permittedLocation.name } : { locationId: permittedLocation.id, locationName: permittedLocation.name }),
         productId: item.productId,
         productName: item.name,
         type: "sale",
@@ -428,14 +498,19 @@ export async function createSellerSale({
       });
     });
 
-    writeCustomerForSale(transaction, customerRef, customerSnapshot, resolvedCustomer, profile, refs.saleRef.id);
+    writeCustomerForSale(transaction, customerRef, customerSnapshot, resolvedCustomer, profile, refs.saleRef.id, administrative ? "admin_quick_sale" : "seller_sale");
 
     const localFields = saleLocalFields();
     const ticketStatus = ticketRequested ? "pending" : "not_requested";
     transaction.set(refs.saleRef, {
       saleCode,
-      locationId: permittedLocation.id,
-      locationName: permittedLocation.name,
+      locationId: stockType === "location" ? permittedLocation.id : null,
+      locationName: stockType === "location" ? permittedLocation.name : null,
+      stockOriginType: stockType,
+      stockOriginId: permittedLocation.id,
+      stockOriginName: permittedLocation.name,
+      ...(stockType === "warehouse" ? { warehouseId: permittedLocation.id, warehouseName: permittedLocation.name } : {}),
+      ...(administrative ? { sourceType: "admin_quick_sale", requestId, requestFingerprint: fingerprint, priceOverrides, customerDni: String(customerDni).trim() || null, invoiceStatus: invoiceRequested ? "pending" : "not_requested", deliveryMethod } : {}),
       locationPrefix: refs.prefix,
       sellerId: profile.id,
       sellerName: userName(profile),
@@ -454,7 +529,7 @@ export async function createSellerSale({
       totalItems: saleItems.reduce((sum, item) => sum + item.qty, 0),
       total: discountSummary.total,
       status: "active",
-      sourceChannel: "in_person",
+      sourceChannel: administrative ? channel : "in_person",
       ticketRequested: Boolean(ticketRequested),
       ticketStatus,
       ...localFields,
@@ -475,12 +550,16 @@ export async function createSellerSale({
       moduleId: "quick-sales",
       entityType: "sale",
       entityId: refs.saleRef.id,
-      locationId: permittedLocation.id,
-      locationName: permittedLocation.name,
+      locationId: stockType === "location" ? permittedLocation.id : null,
+      locationName: stockType === "location" ? permittedLocation.name : null,
+      stockOriginType: stockType,
+      stockOriginId: permittedLocation.id,
+      sourceChannel: administrative ? channel : "in_person",
       userId: profile.id,
       userName: userName(profile),
       status: "completed",
       amount: discountSummary.total,
+      ...(priceOverrides.length ? { priceOverrides } : {}),
       ticketRequested: Boolean(ticketRequested),
       ...(resolvedCustomer ? { customerId: resolvedCustomer.id } : {}),
       createdAt: serverTimestamp(),
@@ -496,6 +575,28 @@ export async function createSellerSale({
       createdAt: new Date(),
     };
   }));
+
+  invalidateDashboardSales();
+  if (!ticketRequested || administrative) return result;
+
+  try {
+    const invoice = await requestPendingArcaInvoice({
+      sourceType: "seller_sale",
+      sourceId: result.id,
+    });
+    return {
+      ...result,
+      fiscalPreparationStatus: "prepared",
+      fiscalInvoiceId: invoice?.id || null,
+      fiscalReadiness: invoice?.fiscalReadiness || null,
+    };
+  } catch (error) {
+    return {
+      ...result,
+      fiscalPreparationStatus: "error",
+      fiscalPreparationError: String(error?.message || "No se pudo preparar la solicitud fiscal."),
+    };
+  }
 }
 
 export async function updateSellerSale({
@@ -516,6 +617,7 @@ export async function updateSellerSale({
   const initialSale = await getDoc(saleReference);
   if (!initialSale.exists()) throw new Error("La venta ya no existe.");
   const original = initialSale.data();
+  if (original.fiscalInvoiceId || original.fiscalInvoice) throw new Error("La venta tiene una solicitud fiscal asociada. Requiere revisión administrativa.");
   if (!canAccessAdministration(profile) && original.sellerId !== profile.id) {
     throw new Error("No podés editar una venta ajena.");
   }
@@ -542,6 +644,7 @@ export async function updateSellerSale({
     const saleSnapshot = await transaction.get(saleReference);
     if (!saleSnapshot.exists()) throw new Error("La venta ya no existe.");
     const sale = saleSnapshot.data();
+    if (sale.fiscalInvoiceId || sale.fiscalInvoice) throw new Error("La venta tiene una solicitud fiscal asociada. Requiere revisión administrativa.");
     if (sale.status !== "active") throw new Error("La venta está anulada.");
     if (!canAccessAdministration(profile) && sale.sellerId !== profile.id) {
       throw new Error("No podés editar una venta ajena.");
@@ -652,6 +755,7 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
     const saleSnapshot = await transaction.get(saleReference);
     if (!saleSnapshot.exists()) throw new Error("La venta ya no existe.");
     const sale = saleSnapshot.data();
+    if (sale.fiscalInvoiceId || sale.fiscalInvoice) throw new Error("La venta tiene una solicitud fiscal asociada. Requiere revisión administrativa.");
     if (sale.status !== "active") throw new Error("La venta ya está anulada.");
     if (!canAccessAdministration(profile) && sale.sellerId !== profile.id) {
       throw new Error("No podés anular una venta ajena.");

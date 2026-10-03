@@ -15,26 +15,24 @@ import {
 import {
   INVENTORY_TYPES,
   movementLabel,
-  summarizeTransfer,
 } from "../../modules/inventory/domain/inventory";
 import { Link, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
 import HelpTooltip from "../components/HelpTooltip";
-import { formatMoney } from "../formatters";
+import InventoryAdjustmentModal from "../components/InventoryAdjustmentModal";
+import InventoryTransferModal from "../components/InventoryTransferModal";
 import { useAsyncData } from "../hooks";
 import { can } from "../permissions";
 import {
   addProductToWarehouse,
   addStockToInventory,
   createWarehouse,
-  getTransferDestinationInventory,
   getWarehouse,
   listInventoryMovements,
   listMasterProductsForInventory,
   listProductCategoriesForInventory,
   listWarehouseInventory,
   listWarehouses,
-  transferStock,
 } from "../services/inventoryService";
 import { listLocations } from "../services/managementService";
 
@@ -201,132 +199,6 @@ function WarehouseMovementsModal({ open, warehouse, product, onClose }) {
   );
 }
 
-function TransferModal({ open, warehouses, locations, initialOriginId = "", initialProductId = "", profile, onClose, onSaved }) {
-  const [originId, setOriginId] = useState("");
-  const [destinationType, setDestinationType] = useState(INVENTORY_TYPES.LOCATION);
-  const [destinationId, setDestinationId] = useState("");
-  const [originInventory, setOriginInventory] = useState([]);
-  const [destinationInventory, setDestinationInventory] = useState([]);
-  const [quantities, setQuantities] = useState({});
-  const [pricing, setPricing] = useState({});
-  const [note, setNote] = useState("");
-  const [confirming, setConfirming] = useState(false);
-  const [transferId, setTransferId] = useState("");
-  const [state, setState] = useState({ busy: false, loadingOrigin: false, loadingDestination: false, error: "" });
-
-  useEffect(() => {
-    if (!open) return;
-    const nextOrigin = initialOriginId || warehouses[0]?.id || "";
-    setOriginId(nextOrigin);
-    setDestinationType(INVENTORY_TYPES.LOCATION);
-    setDestinationId("");
-    setOriginInventory([]);
-    setDestinationInventory([]);
-    setQuantities(initialProductId ? { [initialProductId]: 1 } : {});
-    setPricing({});
-    setNote("");
-    setConfirming(false);
-    setTransferId(crypto.randomUUID());
-    setState({ busy: false, loadingOrigin: false, loadingDestination: false, error: "" });
-  }, [open, initialOriginId, initialProductId, warehouses]);
-
-  useEffect(() => {
-    if (!open || !originId) return;
-    let active = true;
-    setState((current) => ({ ...current, loadingOrigin: true, error: "" }));
-    listWarehouseInventory(originId)
-      .then((data) => { if (active) { setOriginInventory(data); setState((current) => ({ ...current, loadingOrigin: false })); } })
-      .catch((error) => { if (active) setState((current) => ({ ...current, loadingOrigin: false, error: error.message })); });
-    return () => { active = false; };
-  }, [open, originId]);
-
-  useEffect(() => {
-    if (!open || !destinationId) { setDestinationInventory([]); return undefined; }
-    let active = true;
-    setState((current) => ({ ...current, loadingDestination: true, error: "" }));
-    getTransferDestinationInventory({ type: destinationType, id: destinationId })
-      .then((data) => { if (active) { setDestinationInventory(data); setState((current) => ({ ...current, loadingDestination: false })); } })
-      .catch((error) => { if (active) setState((current) => ({ ...current, loadingDestination: false, error: error.message })); });
-    return () => { active = false; };
-  }, [open, destinationId, destinationType]);
-
-  const origin = warehouses.find((item) => item.id === originId);
-  const destinationList = destinationType === INVENTORY_TYPES.LOCATION ? locations : warehouses.filter((item) => item.id !== originId);
-  const destinationRecord = destinationList.find((item) => item.id === destinationId);
-  const destinationIds = useMemo(() => new Set(destinationInventory.map((item) => item.productId || item.id)), [destinationInventory]);
-  const lines = useMemo(() => originInventory.map((item) => ({
-    ...item,
-    quantity: Number(quantities[item.productId] || 0),
-    destinationUseDefaultPrice: pricing[item.productId]?.useDefaultPrice !== false,
-    destinationPriceOverride: pricing[item.productId]?.priceOverride ?? item.defaultPrice ?? 0,
-  })).filter((item) => item.quantity > 0), [originInventory, pricing, quantities]);
-  const summary = summarizeTransfer(lines);
-
-  const changeDestinationType = (value) => {
-    setDestinationType(value);
-    setDestinationId("");
-    setDestinationInventory([]);
-    setConfirming(false);
-  };
-  const changeQty = (product, value) => {
-    const max = Number(product.currentStock || 0);
-    const next = Math.min(max, Math.max(0, Number(value || 0)));
-    setQuantities((current) => ({ ...current, [product.productId]: next }));
-    setConfirming(false);
-  };
-
-  const execute = async () => {
-    setState((current) => ({ ...current, busy: true, error: "" }));
-    try {
-      const result = await transferStock({
-        originWarehouse: origin,
-        destination: { type: destinationType, id: destinationId, note },
-        lines,
-        profile,
-        transferId,
-      });
-      await onSaved?.(result);
-      onClose?.();
-    } catch (error) {
-      setConfirming(false);
-      setState((current) => ({ ...current, busy: false, error: error.message }));
-    }
-  };
-
-  return (
-    <Modal open={open} onClose={() => !state.busy && onClose?.()} title="Transferir stock" description="Elegí qué productos salen del depósito y a qué lugar querés enviarlos. El sistema actualiza ambos stocks automáticamente.">
-      <div className="fm-inventory-modal fm-transfer-form">
-        <div className="fm-form-grid">
-          <FormField label="Origen" required><Select value={originId} onChange={(event) => { setOriginId(event.target.value); setQuantities({}); setConfirming(false); }}><option value="">Elegir depósito</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</Select></FormField>
-          <FormField label="Tipo de destino" required><Select value={destinationType} onChange={(event) => changeDestinationType(event.target.value)}><option value={INVENTORY_TYPES.LOCATION}>Ubicación de venta</option><option value={INVENTORY_TYPES.WAREHOUSE}>Otro depósito</option></Select></FormField>
-          <FormField label="Destino" required><Select value={destinationId} onChange={(event) => { setDestinationId(event.target.value); setConfirming(false); }}><option value="">Elegir destino</option>{destinationList.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></FormField>
-          <FormField label="Observación" hint="Opcional."><input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Reposición feria" /></FormField>
-        </div>
-        {state.loadingOrigin ? <Skeleton lines={4} /> : null}
-        {originId && !state.loadingOrigin && !originInventory.length ? <EmptyState icon="Boxes" title="El depósito de origen no tiene productos" description="Primero agregá productos y stock al depósito." /> : null}
-        {originInventory.length ? <div className="fm-transfer-lines">{originInventory.map((product) => {
-          const missingAtDestination = Boolean(destinationId) && !destinationIds.has(product.productId);
-          const value = quantities[product.productId] || 0;
-          const priceSettings = pricing[product.productId] || { useDefaultPrice: true, priceOverride: product.defaultPrice || 0 };
-          return <article key={product.productId} className={value ? "is-selected" : ""}>
-            <ProductImage product={product} />
-            <div className="fm-transfer-line__identity"><strong>{product.productName}</strong><small>Disponible: {product.currentStock}</small>{missingAtDestination ? <Badge tone="warning">Todavía no está en el destino</Badge> : <Badge tone="success">Ya está en el destino</Badge>}</div>
-            <FormField label="Transferir"><input type="number" min="0" max={product.currentStock} step="1" inputMode="numeric" value={value} onChange={(event) => changeQty(product, event.target.value)} /></FormField>
-            {missingAtDestination && destinationType === INVENTORY_TYPES.LOCATION && Number(value) > 0 ? <div className="fm-transfer-line__pricing"><label className="fm-check-row"><input type="checkbox" checked={priceSettings.useDefaultPrice !== false} onChange={(event) => setPricing((current) => ({ ...current, [product.productId]: { ...priceSettings, useDefaultPrice: event.target.checked } }))} /><span>Usar precio predeterminado ({formatMoney(product.defaultPrice || 0)})</span></label>{priceSettings.useDefaultPrice === false ? <FormField label="Precio especial"><input type="number" min="0" step="1" inputMode="numeric" value={priceSettings.priceOverride} onChange={(event) => setPricing((current) => ({ ...current, [product.productId]: { ...priceSettings, priceOverride: event.target.value } }))} /></FormField> : null}</div> : null}
-          </article>;
-        })}</div> : null}
-
-        {confirming ? <section className="fm-transfer-summary" aria-live="polite"><h3>Revisá antes de confirmar</h3><dl><div><dt>Desde</dt><dd>{origin?.name || "—"}</dd></div><div><dt>Hacia</dt><dd>{destinationRecord?.name || "—"}</dd></div><div><dt>Productos</dt><dd>{summary.productCount}</dd></div><div><dt>Total de unidades</dt><dd>{summary.totalQuantity}</dd></div></dl><ul>{lines.map((line) => <li key={line.productId}><span>{line.productName}</span><strong>{line.quantity}</strong></li>)}</ul><p>La transferencia se aplica como una sola operación: si una parte falla, no se modifica ningún stock.</p></section> : null}
-        {state.error ? <Toast tone="error">{state.error}</Toast> : null}
-        <div className="fm-dialog-actions">
-          <HelpTooltip label="Cierra esta ventana sin mover mercadería."><Button variant="secondary" onClick={onClose}>Cancelar</Button></HelpTooltip>
-          {!confirming ? <HelpTooltip label="Muestra un resumen final antes de mover el stock."><Button disabled={!originId || !destinationId || !summary.productCount || state.loadingDestination} onClick={() => setConfirming(true)}>Revisar transferencia</Button></HelpTooltip> : <HelpTooltip label="Mueve todos los productos seleccionados en una sola operación y actualiza origen y destino juntos."><Button loading={state.busy} onClick={execute}>Confirmar transferencia</Button></HelpTooltip>}
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 function WarehouseDetail({ warehouseId, profile, warehouses, locations, onWarehousesRefresh }) {
   const navigate = useNavigate();
   const result = useAsyncData(async () => {
@@ -343,6 +215,7 @@ function WarehouseDetail({ warehouseId, profile, warehouses, locations, onWareho
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [stockProduct, setStockProduct] = useState(null);
   const [movementProduct, setMovementProduct] = useState(null);
+  const [adjustProduct, setAdjustProduct] = useState(null);
   const [transferProduct, setTransferProduct] = useState(null);
 
   if (result.status === "loading") return <Skeleton lines={8} />;
@@ -360,12 +233,13 @@ function WarehouseDetail({ warehouseId, profile, warehouses, locations, onWareho
       <Link className="fm-back-link" to="/gestion/warehouse">← Volver a Depósitos</Link>
       <PageHeader eyebrow="Depósito" title={warehouse.name} description="Los depósitos guardan mercadería, pero no tienen precios de venta." actions={<Badge tone={warehouse.active === false ? "warning" : "success"}>{warehouse.active === false ? "Inactivo" : "Activo"}</Badge>} />
       <Panel title="Stock del depósito" description="Acá ves solamente los productos que realmente forman parte de este depósito." action={canEdit ? <HelpTooltip label="Agrega a este depósito un producto que ya existe en el catálogo."><Button icon="Plus" onClick={() => setAddProductOpen(true)}>Agregar producto</Button></HelpTooltip> : null}>
-        {inventory.length ? <><div className="fm-inventory-picker-filters"><SearchInput label="Buscar en este depósito" value={search} onChange={(event) => setSearch(event.target.value)} /><Select aria-label="Filtrar por categoría" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">Todas las categorías</option>{result.data.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></div>{visible.length ? <div className="fm-inventory-card-grid">{visible.map((product) => <article className="fm-inventory-card" key={product.productId}><header className="fm-inventory-card__identity"><ProductImage product={product} /><div><h3>{product.productName}</h3><p>{product.categoryName || "Sin categoría"}</p></div><Badge tone={product.active ? "success" : "neutral"}>{product.active ? "Activo" : "Inactivo"}</Badge></header><dl className="fm-inventory-card__stats"><div><dt>Stock actual</dt><dd>{product.currentStock}</dd></div></dl><footer className="fm-inventory-card__actions">{canEdit ? <HelpTooltip label="Suma nuevas unidades al stock actual de este producto."><Button onClick={() => setStockProduct(product)}>Agregar stock</Button></HelpTooltip> : null}{canTransfer ? <HelpTooltip label="Inicia una transferencia de este producto hacia una ubicación u otro depósito."><Button variant="secondary" onClick={() => setTransferProduct(product)}>Transferir</Button></HelpTooltip> : null}<HelpTooltip label="Muestra los ingresos y transferencias de este producto."><Button variant="ghost" onClick={() => setMovementProduct(product)}>Movimientos</Button></HelpTooltip></footer></article>)}</div> : <EmptyState icon="Search" title="No hay productos con estos filtros" />}</> : <EmptyState icon="Boxes" title="Este depósito todavía no tiene productos" description="Elegí un producto del catálogo y cargá cuántas unidades hay actualmente." action={canEdit ? <HelpTooltip label="Agrega el primer producto a este depósito desde el catálogo general."><Button onClick={() => setAddProductOpen(true)}>Agregar primer producto</Button></HelpTooltip> : null} />}
+        {inventory.length ? <><div className="fm-inventory-picker-filters"><SearchInput label="Buscar en este depósito" value={search} onChange={(event) => setSearch(event.target.value)} /><Select aria-label="Filtrar por categoría" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">Todas las categorías</option>{result.data.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></div>{visible.length ? <div className="fm-inventory-card-grid">{visible.map((product) => <article className="fm-inventory-card" key={product.productId}><header className="fm-inventory-card__identity"><ProductImage product={product} /><div><h3>{product.productName}</h3><p>{product.categoryName || "Sin categoría"}</p></div><Badge tone={product.active ? "success" : "neutral"}>{product.active ? "Activo" : "Inactivo"}</Badge></header><dl className="fm-inventory-card__stats"><div><dt>Stock actual</dt><dd>{product.currentStock}</dd></div></dl><footer className="fm-inventory-card__actions">{canEdit ? <HelpTooltip label="Suma nuevas unidades al stock actual de este producto."><Button onClick={() => setStockProduct(product)}>Agregar stock</Button></HelpTooltip> : null}{canEdit && can(profile, "warehouse", "adjustStock") ? <Button variant="secondary" onClick={() => setAdjustProduct(product)}>Ajustar inventario</Button> : null}{canTransfer ? <HelpTooltip label="Inicia una transferencia de este producto hacia una ubicación u otro depósito."><Button variant="secondary" onClick={() => setTransferProduct(product)}>Transferir</Button></HelpTooltip> : null}<HelpTooltip label="Muestra los ingresos y transferencias de este producto."><Button variant="ghost" onClick={() => setMovementProduct(product)}>Movimientos</Button></HelpTooltip></footer></article>)}</div> : <EmptyState icon="Search" title="No hay productos con estos filtros" />}</> : <EmptyState icon="Boxes" title="Este depósito todavía no tiene productos" description="Elegí un producto del catálogo y cargá cuántas unidades hay actualmente." action={canEdit ? <HelpTooltip label="Agrega el primer producto a este depósito desde el catálogo general."><Button onClick={() => setAddProductOpen(true)}>Agregar primer producto</Button></HelpTooltip> : null} />}
       </Panel>
       <AddWarehouseProductModal open={addProductOpen} warehouse={warehouse} inventory={inventory} categories={result.data.categories} profile={profile} onClose={() => setAddProductOpen(false)} onSaved={result.refresh} />
       <AddWarehouseStockModal open={Boolean(stockProduct)} warehouse={warehouse} product={stockProduct} profile={profile} onClose={() => setStockProduct(null)} onSaved={result.refresh} />
       <WarehouseMovementsModal open={Boolean(movementProduct)} warehouse={warehouse} product={movementProduct} onClose={() => setMovementProduct(null)} />
-      <TransferModal open={Boolean(transferProduct)} warehouses={warehouses} locations={locations} initialOriginId={warehouse.id} initialProductId={transferProduct?.productId || ""} profile={profile} onClose={() => setTransferProduct(null)} onSaved={async () => { await result.refresh(); await onWarehousesRefresh?.(); }} />
+      <InventoryAdjustmentModal open={Boolean(adjustProduct)} type={INVENTORY_TYPES.WAREHOUSE} inventory={warehouse} product={adjustProduct} profile={profile} onClose={() => setAdjustProduct(null)} onSaved={result.refresh} />
+      <InventoryTransferModal open={Boolean(transferProduct)} warehouses={warehouses} locations={locations} initialOriginId={warehouse.id} initialProductId={transferProduct?.productId || ""} profile={profile} onClose={() => setTransferProduct(null)} onSaved={async () => { await result.refresh(); await onWarehousesRefresh?.(); }} />
     </div>
   );
 }
@@ -407,7 +281,7 @@ export default function WarehousePage({ warehouseId = null }) {
         {warehouses.length ? <div className="fm-warehouse-grid">{warehouses.map((warehouse) => <article key={warehouse.id} className="fm-warehouse-card"><div className="fm-warehouse-card__icon" aria-hidden="true">FM</div><div><h3>{warehouse.name}</h3><p>{warehouse.description || warehouse.address || "Sin descripción"}</p></div><Badge tone={warehouse.active === false ? "warning" : "success"}>{warehouse.active === false ? "Inactivo" : "Activo"}</Badge><footer><HelpTooltip label="Abre este depósito para ver productos, stock y movimientos."><Button variant="secondary" onClick={() => navigate(`/gestion/warehouse/${encodeURIComponent(warehouse.id)}`)}>Abrir depósito</Button></HelpTooltip></footer></article>)}</div> : <EmptyState icon="Warehouse" title="Todavía no hay depósitos" description="Creá el primer depósito. Va a comenzar vacío y después vas a poder agregar productos." action={canCreate ? <HelpTooltip label="Crea el primer depósito de Flor Mía."><Button onClick={() => setNewOpen(true)}>Nuevo depósito</Button></HelpTooltip> : null} />}
       </Panel>
       <NewWarehouseModal open={newOpen} profile={profile} onClose={() => setNewOpen(false)} onSaved={async (id) => { await result.refresh(); setMessage("Depósito creado. Empieza vacío, listo para agregar productos."); navigate(`/gestion/warehouse/${encodeURIComponent(id)}`); }} />
-      <TransferModal open={transferOpen} warehouses={warehouses} locations={result.data.locations} profile={profile} onClose={() => setTransferOpen(false)} onSaved={async (transfer) => { await result.refresh(); setMessage(`Transferencia confirmada: ${transfer.itemCount} producto${transfer.itemCount === 1 ? "" : "s"}, ${transfer.totalQuantity} unidades.`); }} />
+      <InventoryTransferModal open={transferOpen} warehouses={warehouses} locations={result.data.locations} profile={profile} onClose={() => setTransferOpen(false)} onSaved={async (transfer) => { await result.refresh(); setMessage(`Transferencia confirmada: ${transfer.itemCount} producto${transfer.itemCount === 1 ? "" : "s"}, ${transfer.receivedQuantity ?? transfer.totalQuantity} unidades recibidas.`); }} />
     </div>
   );
 }

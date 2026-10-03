@@ -244,8 +244,8 @@ test("Ubicaciones incorpora Ventas y consulta una sola colección paginada", asy
 test("stock, navegación y venta actual tienen reglas responsive compactas", async () => {
   const page = await read("../src/gestion/pages/LocationDetailPage.jsx");
   const css = await read("../src/styles/seller-stage2.css");
-  assert.match(page, /fm-stock-mode-row/);
-  assert.match(page, /fm-stock-reason-input/);
+  assert.match(page, /className="fm-inventory-modal"/);
+  assert.match(page, /className="fm-stock-calculation"/);
   assert.match(css, /grid-template-columns: minmax\(220px/);
   assert.match(css, /#f7f1e8/i);
   assert.match(css, /#2f2924/i);

@@ -1,0 +1,37 @@
+name: ARCA homologación
+
+on:
+  push:
+    branches:
+      - feature/arca-integration
+  pull_request:
+    paths:
+      - "netlify/functions/_lib/arca/**"
+      - "netlify/functions/arca-*.mjs"
+      - "src/gestion/services/arcaService.js"
+      - "src/gestion/pages/SettingsPage.jsx"
+      - "src/gestion/pages/QuickSalesPage.jsx"
+      - "src/gestion/services/sellerService.js"
+      - "tests/arca*.test.mjs"
+      - "tests/firestore.rules.mjs"
+      - "firestore.rules"
+      - ".env.example"
+      - ".github/workflows/arca-ci.yml"
+
+jobs:
+  arca-test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Tests ARCA
+        run: node --test tests/arca*.test.mjs
+      - name: Reglas Firestore fiscales
+        run: npx firebase-tools@14.12.0 emulators:exec --only firestore --project demo-flor-mia-integral "node --test --test-name-pattern='facturas fiscales|caché WSAA' tests/firestore.rules.mjs"
+      - name: Build
+        run: npm run build

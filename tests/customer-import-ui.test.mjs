@@ -17,7 +17,8 @@ test("Flor Mía WhatsApp Sender import deduplicates phones and preserves zone ev
   assert.equal(parsed.summary.duplicates, 1);
   assert.equal(parsed.summary.invalid, 1);
   assert.equal(parsed.rows[0].name, "Ana Pérez");
-  assert.equal(parsed.rows[0].zone, "Tribunales | Microcentro");
+  assert.equal(parsed.rows[0].zone, "Tribunales");
+  assert.equal(parsed.rows[0].importConflicts[0].incoming, "Microcentro");
   assert.equal(parsed.rows[1].zoneId, "tribunales");
 });
 
@@ -34,4 +35,14 @@ test("Clientes page exposes bulk import next to manual creation with contextual 
   assert.match(page, /Contactos → elegí la etiqueta → Analizar → Exportar Excel/);
   assert.match(modules, /label: "Clientes"/);
   assert.match(modal, /Telefono, Nombre y Apellido y Zona/);
+});
+
+test("Importación admite sólo teléfono, campos opcionales y conserva el número de fila real", () => {
+  const parsed = parseFlorMiaContactImport([["Telefono"], ["1112345678"], [], ["inválido"]]);
+  assert.equal(parsed.rows[0].zoneName, "");
+  assert.equal(parsed.rows[0].name, "");
+  assert.equal(parsed.invalidRows[0].row, 4);
+  const reordered = parseFlorMiaContactImport([["Zona", "Telefono"], ["CABA", "1112345678"]]);
+  assert.equal(reordered.rows[0].zoneName, "CABA");
+  assert.throws(() => parseFlorMiaContactImport([["Zona"], ["CABA"]]), /Telefono/);
 });

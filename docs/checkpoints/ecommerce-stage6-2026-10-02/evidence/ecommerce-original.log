@@ -1,0 +1,177 @@
+
+> app-integral-fm@1.0.0 test:ecommerce
+> node --test tests/ecommerce*.test.mjs
+
+TAP version 13
+# Subtest: catálogo sin ubicación Ecommerce no inventa precio ni stock
+ok 1 - catálogo sin ubicación Ecommerce no inventa precio ni stock
+  ---
+  duration_ms: 3.3076
+  type: 'test'
+  ...
+# Subtest: catálogo usa products como maestro y locationStock para precio/stock efectivo
+ok 2 - catálogo usa products como maestro y locationStock para precio/stock efectivo
+  ---
+  duration_ms: 1.4712
+  type: 'test'
+  ...
+# Subtest: precio legacy local se conserva como autoritativo y no se reemplaza silenciosamente
+ok 3 - precio legacy local se conserva como autoritativo y no se reemplaza silenciosamente
+  ---
+  duration_ms: 0.1562
+  type: 'test'
+  ...
+# Subtest: cantidades negativas, decimales y excesivas son rechazadas
+ok 4 - cantidades negativas, decimales y excesivas son rechazadas
+  ---
+  duration_ms: 0.8634
+  type: 'test'
+  ...
+# Subtest: total se recalcula desde fuente autoritativa e ignora precio/total del cliente
+ok 5 - total se recalcula desde fuente autoritativa e ignora precio/total del cliente
+  ---
+  duration_ms: 0.9274
+  type: 'test'
+  ...
+# Subtest: producto inexistente, inactivo, eliminado o sin stock falla
+ok 6 - producto inexistente, inactivo, eliminado o sin stock falla
+  ---
+  duration_ms: 0.6345
+  type: 'test'
+  ...
+# Subtest: pedido pending persiste Order + Payment sin Sale, stock ni Invoice
+ok 7 - pedido pending persiste Order + Payment sin Sale, stock ni Invoice
+  ---
+  duration_ms: 3.7122
+  type: 'test'
+  ...
+# Subtest: checkout público no puede autoaprobar un pago aunque el flag local exista
+ok 8 - checkout público no puede autoaprobar un pago aunque el flag local exista
+  ---
+  duration_ms: 0.7569
+  type: 'test'
+  ...
+# Subtest: requestId vuelve idempotente un retry de checkout
+ok 9 - requestId vuelve idempotente un retry de checkout
+  ---
+  duration_ms: 0.8032
+  type: 'test'
+  ...
+# Subtest: Ecommerce Etapa 5 no importa ni llama emisión ARCA
+ok 10 - Ecommerce Etapa 5 no importa ni llama emisión ARCA
+  ---
+  duration_ms: 8.8869
+  type: 'test'
+  ...
+# Subtest: Etapa 6: flag off bloquea simulation
+ok 11 - Etapa 6: flag off bloquea simulation
+  ---
+  duration_ms: 1.7878
+  type: 'test'
+  ...
+# Subtest: Etapa 6: simulation sólo habilita runtime local
+ok 12 - Etapa 6: simulation sólo habilita runtime local
+  ---
+  duration_ms: 0.2228
+  type: 'test'
+  ...
+# Subtest: Etapa 6: payment contract no mezcla simulation con Payway
+ok 13 - Etapa 6: payment contract no mezcla simulation con Payway
+  ---
+  duration_ms: 0.1712
+  type: 'test'
+  ...
+# Subtest: Etapa 6: simulation no admite pending ni rejected
+ok 14 - Etapa 6: simulation no admite pending ni rejected
+  ---
+  duration_ms: 0.2131
+  type: 'test'
+  ...
+# Subtest: Etapa 6: endpoint local exige admin y usa contrato simulation
+ok 15 - Etapa 6: endpoint local exige admin y usa contrato simulation
+  ---
+  duration_ms: 6.6187
+  type: 'test'
+  ...
+# Subtest: Etapa 6: flujo fiscal Ecommerce no contiene transporte FECAESolicitar
+ok 16 - Etapa 6: flujo fiscal Ecommerce no contiene transporte FECAESolicitar
+  ---
+  duration_ms: 2.062
+  type: 'test'
+  ...
+# Subtest: Etapa 6: invoicePersistence sólo acepta Ecommerce con pago confiable
+ok 17 - Etapa 6: invoicePersistence sólo acepta Ecommerce con pago confiable
+  ---
+  duration_ms: 1.5054
+  type: 'test'
+  ...
+# Subtest: Etapa 6: Firestore mantiene payment/fiscal authority fuera del navegador
+ok 18 - Etapa 6: Firestore mantiene payment/fiscal authority fuera del navegador
+  ---
+  duration_ms: 3.282
+  type: 'test'
+  ...
+# Subtest: Etapa 6: UI advierte pago simulado y no usa VITE para habilitar backend
+ok 19 - Etapa 6: UI advierte pago simulado y no usa VITE para habilitar backend
+  ---
+  duration_ms: 3.3244
+  type: 'test'
+  ...
+# Subtest: Etapa 6: allowlist productiva por default sigue limitada a admin_quick_sale
+ok 20 - Etapa 6: allowlist productiva por default sigue limitada a admin_quick_sale
+  ---
+  duration_ms: 3.1505
+  type: 'test'
+  ...
+# Subtest: carrito persistido conserva sólo productId y quantity
+ok 21 - carrito persistido conserva sólo productId y quantity
+  ---
+  duration_ms: 6.9129
+  type: 'test'
+  ...
+# Subtest: catálogo y producto consumen CommerceCatalogContext
+ok 22 - catálogo y producto consumen CommerceCatalogContext
+  ---
+  duration_ms: 2.7724
+  type: 'test'
+  ...
+# Subtest: checkout manda IDs/cantidades y no usa precios cliente como autoridad
+ok 23 - checkout manda IDs/cantidades y no usa precios cliente como autoridad
+  ---
+  duration_ms: 2.5703
+  type: 'test'
+  ...
+# Subtest: checkout no contiene integración ARCA ni CAE
+ok 24 - checkout no contiene integración ARCA ni CAE
+  ---
+  duration_ms: 2.6198
+  type: 'test'
+  ...
+# Subtest: fuente editorial declara explícitamente que no es comercial
+ok 25 - fuente editorial declara explícitamente que no es comercial
+  ---
+  duration_ms: 21.6324
+  type: 'test'
+  ...
+# Subtest: configuración Ecommerce no inventa ubicación ni activa pagos simulados
+ok 26 - configuración Ecommerce no inventa ubicación ni activa pagos simulados
+  ---
+  duration_ms: 2.3125
+  type: 'test'
+  ...
+# Subtest: simulación Etapa 6 exige capability backend, admin y advertencia fiscal explícita
+ok 27 - simulación Etapa 6 exige capability backend, admin y advertencia fiscal explícita
+  ---
+  duration_ms: 1.4616
+  type: 'test'
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 27
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 177.8205
+exit code: 0

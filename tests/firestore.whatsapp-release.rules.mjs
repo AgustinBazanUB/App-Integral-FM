@@ -40,6 +40,7 @@ before(async () => {
     },
   });
 
+  await environment.clearFirestore();
   await environment.withSecurityRulesDisabled(async (context) => {
     const database = context.firestore();
     await Promise.all([

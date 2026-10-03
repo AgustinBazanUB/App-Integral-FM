@@ -1,11 +1,11 @@
 # Flor Mía · Plataforma integral
 
-Aplicación web única para la tienda, el Panel Administrador y el Panel Vendedor de Flor Mía. Integra el diseño y contenido aprobado de `flor-mia-web-fiel-v3` con la lógica comprobada de `FM-stock-y-ventas`, sin modificar esos sistemas productivos anteriores.
+Repositorio único para la tienda y la gestión integral de Flor Mía, con builds independientes para publicar cada superficie en un sitio distinto. Integra el diseño y contenido aprobado de `flor-mia-web-fiel-v3` con la lógica comprobada de `FM-stock-y-ventas`, sin modificar esos sistemas productivos anteriores.
 
-- Acceso inicial: <https://app-integral-fm.netlify.app/>
-- Gestión: <https://app-integral-fm.netlify.app/gestion>
-- Panel Vendedor: <https://app-integral-fm.netlify.app/vendedor>
-- Vista de tienda para administradores: <https://app-integral-fm.netlify.app/tienda>
+- Acceso inicial: <https://appintegralflormia.netlify.app/>
+- Gestión: <https://appintegralflormia.netlify.app/gestion>
+- Panel Vendedor: <https://appintegralflormia.netlify.app/vendedor>
+- Vista de tienda para administradores: <https://appintegralflormia.netlify.app/tienda>
 - Repositorio: <https://github.com/AgustinBazanUB/App-Integral-FM>
 
 ## Qué incluye
@@ -43,6 +43,15 @@ npm install
 npm run dev
 ```
 
+Builds separados:
+
+```bash
+npm run dev:gestion
+npm run dev:ecommerce
+npm run build:gestion
+npm run build:ecommerce
+```
+
 El acceso inicial se abre en `http://localhost:5173/`, la gestión en `http://localhost:5173/gestion`, el Panel Vendedor en `http://localhost:5173/vendedor` y la vista de tienda para administradores en `http://localhost:5173/tienda`.
 
 ## Verificar
@@ -68,12 +77,15 @@ La plataforma usa el proyecto Firebase separado `app-integral-fm`. El sistema an
 
 ## Netlify
 
-`netlify.toml` configura el build Vite, navegación SPA, caché y cabeceras de seguridad. Cada push a la rama principal del repositorio integral puede publicar producción; los Pull Requests generan Deploy Previews para validar los cambios antes del merge.
+`netlify.toml` conserva el despliegue unificado durante la transición. El [preview separado de E-commerce](https://flor-mia-ecommerce-preview.netlify.app/) usa el build público; su configuración, verificación y límites están en [Superficies y despliegues](docs/DEPLOYMENT-SURFACES.md). Gestión sigue en el sitio existente hasta completar su migración. Durante el desarrollo local de ARCA, los builds automáticos de Netlify deben permanecer detenidos; las pruebas se hacen con Netlify Dev en la PC.
 
 ## Documentación
 
 - [Auditoría de los proyectos](docs/AUDITORIA.md)
 - [Arquitectura, rutas y permisos](docs/ARQUITECTURA.md)
+- [Superficies, despliegues y contrato e-commerce](docs/DEPLOYMENT-SURFACES.md)
+- [Desarrollo local y traslado de ARCA a otra PC](docs/DESARROLLO-LOCAL-Y-TRASLADO-ARCA.md)
+- [Integración ARCA](docs/arca-integration.md)
 - [Modelo de datos Firestore](docs/FIRESTORE-MODEL.md)
 - [Separación y estrategia de migración](docs/MIGRACION.md)
 - [Manual de administrador](docs/MANUAL-ADMINISTRADOR.md)
@@ -91,4 +103,4 @@ La plataforma usa el proyecto Firebase separado `app-integral-fm`. El sistema an
 
 ## Estado honesto de integraciones
 
-La app no procesa pagos online, no emite comprobantes ARCA, no envía mensajes ni automatiza redes. El recibo del Panel Vendedor es interno y no reemplaza un comprobante fiscal. Esas integraciones se activarán únicamente al recibir proveedores, credenciales y reglas comerciales reales.
+El E-commerce público aún no procesa pagos ni crea pedidos. Gestión incorpora la integración ARCA server-side para preparar, autorizar y verificar comprobantes fiscales cuando las credenciales y los gates del entorno están configurados. Las pruebas locales ya incluyeron comprobantes reales; un deploy cloud requiere configurar sus propios secretos y mantener los gates de emisión deshabilitados hasta validarlo. El recibo del Panel Vendedor es interno y no reemplaza un comprobante fiscal.

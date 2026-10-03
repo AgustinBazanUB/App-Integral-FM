@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: Firestore REST real: admin_quick_sale, dos workers, sync, terminal
+ok 1 - Firestore REST real: admin_quick_sale, dos workers, sync, terminal
+  ---
+  duration_ms: 406.9887
+  type: 'test'
+  ...
+# Subtest: Firestore REST real: seller_sale, dos workers, sync, terminal
+ok 2 - Firestore REST real: seller_sale, dos workers, sync, terminal
+  ---
+  duration_ms: 149.3509
+  type: 'test'
+  ...
+# Subtest: Firestore REST real: ecommerce, dos workers, sync, terminal
+ok 3 - Firestore REST real: ecommerce, dos workers, sync, terminal
+  ---
+  duration_ms: 166.7992
+  type: 'test'
+  ...
+# Subtest: Firestore REST real: timeout bloquea otra invoice y reconciliación exacta libera
+ok 4 - Firestore REST real: timeout bloquea otra invoice y reconciliación exacta libera
+  ---
+  duration_ms: 174.7786
+  type: 'test'
+  ...
+# Subtest: Netlify Dev: review, capability y gates reales cerrados
+ok 5 - Netlify Dev: review, capability y gates reales cerrados
+  ---
+  duration_ms: 2270.3654
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3638.0828

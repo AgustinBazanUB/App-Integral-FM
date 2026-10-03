@@ -57,9 +57,10 @@ export function normalizePayment(paymentMethod, paymentMethodLabel, payments, to
 
 export function salePaymentParts(sale) {
   if (sale?.paymentMethod === "multiple" && Array.isArray(sale.payments)) {
-    return sale.payments.filter(entry=>SINGLE_PAYMENT_METHODS.includes(entry?.method)&&Number(entry?.amount)>0).map(entry=>({method:entry.method,label:PAYMENT_LABELS[entry.method],amount:Number(entry.amount)}));
+    return sale.payments.filter(entry=>entry?.method && Number.isFinite(Number(entry.amount)) && Number(entry.amount)>0).map(entry=>({method:entry.method,label:PAYMENT_LABELS[entry.method] || entry.label || entry.method,amount:Number(entry.amount)}));
   }
   if (SINGLE_PAYMENT_METHODS.includes(sale?.paymentMethod)) return [{method:sale.paymentMethod,label:PAYMENT_LABELS[sale.paymentMethod],amount:Number(sale.total||0)}];
+  if (sale?.paymentMethod && sale.paymentMethod !== "multiple") return [{ method: sale.paymentMethod, label: sale.paymentMethodLabel || sale.paymentMethod, amount: Number(sale.total || 0) }];
   return [];
 }
 

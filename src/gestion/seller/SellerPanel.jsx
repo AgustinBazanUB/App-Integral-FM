@@ -1,3 +1,7 @@
+import { effectiveLocationPrice } from "../../modules/inventory/domain/inventory";
+import { getArcaInvoiceForSale, arcaSourceTypeForSale } from "../services/arcaService";
+import { fiscalPresentation } from "../../shared/fiscalRecovery.mjs";
+import ArcaInvoicePrintAction from "../components/ArcaInvoicePrintAction";
 import {
   useCallback,
   useEffect,
@@ -122,7 +126,7 @@ function SellerHeader({
       </header>
       <nav className="fm-seller-nav" aria-label="Secciones del Panel Vendedor">
         {SELLER_VIEWS.map((item) => (
-          <button key={item.id} type="button" className={view === item.id ? "is-active" : ""} aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}>
+          <button key={item.id} type="button" aria-label={item.label} className={view === item.id ? "is-active" : ""} aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}>
             <Icon name={item.icon} /><span>{item.label}</span>
             {item.id === "pending" && pendingCount ? <b>{pendingCount}</b> : null}
           </button>
@@ -206,10 +210,21 @@ export default function SellerPanel() {
   const [customerOpen, setCustomerOpen] = useState(false);
   const [lastProductId, setLastProductId] = useState("");
   const [editSale, setEditSale] = useState(null);
+  const submitRef = useRef(false);
   const [submitState, setSubmitState] = useState({ busy: false, message: "", tone: "info" });
   const [multipleOpen, setMultipleOpen] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [detailSale, setDetailSale] = useState(null);
+  const [fiscalDetail, setFiscalDetail] = useState({ ready: false, invoice: null, error: "" });
+  useEffect(() => {
+    if (!detailSale?.id) return;
+    let active = true;
+    setFiscalDetail({ ready: false, invoice: null, error: "" });
+    getArcaInvoiceForSale({ saleId: detailSale.id, sourceType: arcaSourceTypeForSale(detailSale) })
+      .then((invoice) => { if (active) setFiscalDetail({ ready: true, invoice, error: "" }); })
+      .catch((error) => { if (active) setFiscalDetail({ ready: error.code === "arca-invoice-not-found", invoice: null, error: error.code === "arca-invoice-not-found" ? "" : "No se pudo revisar el vínculo fiscal. Solicitá revisión administrativa." }); });
+    return () => { active = false; };
+  }, [detailSale?.id]);
   const [locationToApply, setLocationToApply] = useState("");
   const [clearRequested, setClearRequested] = useState(false);
   const [editRequested, setEditRequested] = useState(null);
@@ -275,14 +290,16 @@ export default function SellerPanel() {
     () => pendingReservedQuantities(pendingData, locationId),
     [pendingData, locationId],
   );
+  const masterById = useMemo(() => new Map((resourcesResult.data?.products || []).map((product) => [product.id, product])), [resourcesResult.data?.products]);
   const products = useMemo(() => stockData.map((item) => ({
     ...item,
+    price: effectiveLocationPrice(masterById.get(item.productId || item.id) || { defaultPrice: item.masterDefaultPrice ?? item.price ?? 0 }, item),
     availableStock: Math.max(
       0,
       Number(item.currentStock || 0) - Number(reserved[item.id] || 0) +
       Number(editSale?.items?.find((old) => old.productId === item.id)?.qty || 0),
     ),
-  })), [stockData, reserved, editSale]);
+  })), [stockData, reserved, editSale, masterById]);
   const productGroups = useMemo(
     () => groupSellerProducts(products, categories),
     [products, categories],
@@ -431,7 +448,7 @@ export default function SellerPanel() {
   }, [selectedLocation, profile, currentItems, appliedDiscounts, summary.total, paymentMethod, payments, selectedCustomer, ticketRequested, pendingSales, resetSale]);
 
   const submitSale = useCallback(async () => {
-    if (submitState.busy) return;
+    if (submitRef.current || submitState.busy) return;
     if (!selectedLocation) {
       setSubmitState({ busy: false, tone: "error", message: "Elegí una ubicación activa." });
       return;
@@ -463,6 +480,7 @@ export default function SellerPanel() {
       setSubmitState({ busy: false, tone: "error", message: "Necesitás conexión para editar una venta confirmada." });
       return;
     }
+    submitRef.current = true;
     setSubmitState({ busy: true, tone: "info", message: online ? "Registrando venta…" : "Guardando pendiente…" });
     try {
       if (!online) {
@@ -488,6 +506,8 @@ export default function SellerPanel() {
       setSubmitState({ busy: false, tone: "success", message: `${result.saleCode} registrada correctamente.` });
     } catch (error) {
       setSubmitState({ busy: false, tone: "error", message: error.message });
+    } finally {
+      submitRef.current = false;
     }
   }, [submitState.busy, selectedLocation, currentItems, hasStockConflict, paymentMethod, payments, summary.total, selectedCustomer, ticketRequested, ticketAllowed, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales]);
 
@@ -763,7 +783,7 @@ export default function SellerPanel() {
           <label className={`fm-seller-ticket-option ${ticketRequested ? "is-selected" : ""}`}>
             <input type="checkbox" checked={ticketRequested} disabled={!ticketAllowed} onChange={(event) => setTicketRequested(event.target.checked)} />
             <Icon name="ReceiptText" />
-            <span><strong>Agregar ticket</strong><small>{ticketRequested ? "Solicitud pendiente al registrar" : "Preparado para futura integración ARCA"}</small></span>
+            <span><strong>Agregar ticket</strong><small>{ticketRequested ? "Solicitud pendiente al registrar" : "Preparar solicitud fiscal ARCA después de guardar la venta"}</small></span>
           </label>
 
           {submitState.message ? <Toast tone={submitState.tone}>{submitState.message}</Toast> : null}
@@ -831,8 +851,71 @@ export default function SellerPanel() {
     <small className="fm-field__hint">Si es posible, indicá brevemente por qué se anula la venta.</small>
   </label>
 </Modal>
-      <Modal open={Boolean(detailSale)} onClose={() => setDetailSale(null)} title={detailSale?.saleCode || "Detalle de venta"} description={detailSale ? `${formatDateTime(detailSale.createdAt)} · ${detailSale.locationName}` : ""}>{detailSale ? <div className="fm-seller-detail"><div className="fm-seller-detail__summary"><Badge tone={statusTone(detailSale.status)}>{detailSale.status === "cancelled" ? "Anulada" : "Activa"}</Badge><strong>{formatMoney(detailSale.total)}</strong></div><div>{asArray(detailSale.items).map((item) => <p key={item.productId}><span>{item.qty} × {item.name}</span><strong>{formatMoney(item.subtotal)}</strong></p>)}</div>{detailSale.customerPhoneSnapshot ? <div className="fm-seller-detail__customer"><small>Cliente</small><strong>{detailSale.customerPhoneSnapshot}</strong>{detailSale.customerZoneSnapshot ? <span>{detailSale.customerZoneSnapshot}</span> : null}{detailSale.customerNameSnapshot ? <span>{detailSale.customerNameSnapshot}</span> : null}</div> : null}<div className="fm-seller-detail__actions">{detailSale.status !== "cancelled" ? <><Button variant="secondary" icon="Pencil" onClick={() => setEditRequested(detailSale)}>Editar</Button><Button variant="danger" icon="Ban" onClick={() => setCancelTarget(detailSale)}>Anular</Button></> : null}</div></div> : null}</Modal>
-      <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Venta registrada" description={receipt?.saleCode || ""}>{receipt ? <div className="fm-seller-receipt"><Icon name="CircleCheck" /><strong>{formatMoney(receipt.total)}</strong><span>{receipt.saleCode}</span>{receipt.customerPhoneSnapshot ? <small>Cliente: {receipt.customerPhoneSnapshot}</small> : null}{receipt.ticketRequested ? <small>Ticket solicitado · pendiente de integración</small> : null}<Button onClick={() => setReceipt(null)}>Nueva venta</Button></div> : null}</Modal>
+      <Modal open={Boolean(detailSale)} onClose={() => setDetailSale(null)} title={detailSale?.saleCode || "Detalle de venta"} description={detailSale ? `${formatDateTime(detailSale.createdAt)} · ${detailSale.locationName}` : ""}>
+        {detailSale ? (
+          <div className="fm-seller-detail">
+            <div className="fm-seller-detail__summary">
+              <Badge tone={statusTone(detailSale.status)}>{detailSale.status === "cancelled" ? "Anulada" : "Activa"}</Badge>
+              <strong>{formatMoney(detailSale.total)}</strong>
+            </div>
+            <div>{asArray(detailSale.items).map((item) => <p key={item.productId}><span>{item.qty} × {item.name}</span><strong>{formatMoney(item.subtotal)}</strong></p>)}</div>
+            {detailSale.customerPhoneSnapshot ? (
+              <div className="fm-seller-detail__customer">
+                <small>Cliente</small>
+                <strong>{detailSale.customerPhoneSnapshot}</strong>
+                {detailSale.customerZoneSnapshot ? <span>{detailSale.customerZoneSnapshot}</span> : null}
+                {detailSale.customerNameSnapshot ? <span>{detailSale.customerNameSnapshot}</span> : null}
+              </div>
+            ) : null}
+            {fiscalDetail.invoice ? (
+              <div className="fm-seller-detail__fiscal">
+                <p><strong>{fiscalPresentation(fiscalDetail.invoice).label}</strong><br />{fiscalPresentation(fiscalDetail.invoice).message}</p>
+                {detailSale.status !== "cancelled" ? (
+                  <ArcaInvoicePrintAction
+                    saleId={detailSale.id}
+                    sourceType={arcaSourceTypeForSale(detailSale)}
+                    invoiceId={fiscalDetail.invoice.id}
+                    invoice={fiscalDetail.invoice}
+                  />
+                ) : null}
+                {fiscalDetail.invoice.pdf?.ready !== true ? <small>Para revisar o recuperar la factura, contactá administración.</small> : null}
+              </div>
+            ) : null}
+            {fiscalDetail.error ? <p role="alert">{fiscalDetail.error}</p> : null}
+            <div className="fm-seller-detail__actions">
+              {detailSale.status !== "cancelled" && fiscalDetail.ready && !fiscalDetail.invoice && !detailSale.fiscalInvoiceId && !detailSale.fiscalInvoice ? <>
+                <Button variant="secondary" icon="Pencil" onClick={() => setEditRequested(detailSale)}>Editar</Button>
+                <Button variant="danger" icon="Ban" onClick={() => setCancelTarget(detailSale)}>Anular</Button>
+              </> : null}
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+      <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Venta registrada" description={receipt?.saleCode || ""}>
+        {receipt ? (
+          <div className="fm-seller-receipt">
+            <Icon name="CircleCheck" />
+            <strong>{formatMoney(receipt.total)}</strong>
+            <span>{receipt.saleCode}</span>
+            {receipt.customerPhoneSnapshot ? <small>Cliente: {receipt.customerPhoneSnapshot}</small> : null}
+            {receipt.ticketRequested ? (
+              <>
+                <small>{receipt.fiscalPreparationStatus === "error"
+                  ? "La venta quedó registrada. La solicitud fiscal requiere revisión de administración."
+                  : "La solicitud fiscal quedó registrada; la impresión estará disponible cuando la factura esté autorizada y verificada."}</small>
+                {receipt.fiscalInvoiceId ? (
+                  <ArcaInvoicePrintAction
+                    saleId={receipt.id}
+                    sourceType="seller_sale"
+                    invoiceId={receipt.fiscalInvoiceId}
+                  />
+                ) : null}
+              </>
+            ) : null}
+            <Button onClick={() => setReceipt(null)}>Nueva venta</Button>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

@@ -1,0 +1,38 @@
+{
+  "proof": [
+    {
+      "sourceType": "admin_quick_sale",
+      "invoiceId": "invoice_homologation_admin_quick_sale_qa_fiscal_stage7_dependencies_admin_quick_sale",
+      "saleId": "qa_fiscal_stage7_dependencies_admin_quick_sale",
+      "sentMock": 1,
+      "realCAERequests": 0,
+      "status": "authorized"
+    },
+    {
+      "sourceType": "seller_sale",
+      "invoiceId": "invoice_homologation_seller_sale_qa_fiscal_stage7_dependencies_seller_sale",
+      "saleId": "qa_fiscal_stage7_dependencies_seller_sale",
+      "sentMock": 1,
+      "realCAERequests": 0,
+      "status": "authorized"
+    },
+    {
+      "sourceType": "ecommerce",
+      "invoiceId": "invoice_homologation_ecommerce_qa_fiscal_stage7_dependencies_ecommerce",
+      "saleId": "qa_fiscal_stage7_dependencies_ecommerce",
+      "sentMock": 1,
+      "realCAERequests": 0,
+      "status": "authorized"
+    },
+    {
+      "case": "uncertain",
+      "invoiceId": "invoice_homologation_admin_quick_sale_qa_fiscal_stage7_dependencies_admin_quick_sale_uncertain",
+      "otherInvoiceId": "invoice_homologation_seller_sale_qa_fiscal_stage7_dependencies_seller_sale_after_uncertain",
+      "status": "authorized",
+      "otherBlocked": true,
+      "realCAERequests": 0
+    }
+  ],
+  "realCAERequests": 0,
+  "fixture": "MOCK_ONLY"
+}

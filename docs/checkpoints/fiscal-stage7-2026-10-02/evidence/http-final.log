@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: HTTP real: backend requiere Firebase Auth
+ok 1 - HTTP real: backend requiere Firebase Auth
+  ---
+  duration_ms: 1230.8291
+  type: 'test'
+  ...
+# Subtest: HTTP real: Firebase Auth seller no admin
+ok 2 - HTTP real: Firebase Auth seller no admin
+  ---
+  duration_ms: 323.5621
+  type: 'test'
+  ...
+# Subtest: HTTP real: admin y capability local
+ok 3 - HTTP real: admin y capability local
+  ---
+  duration_ms: 360.3597
+  type: 'test'
+  ...
+# Subtest: HTTP real: público no controla pago, total recalculado y Payment pending
+ok 4 - HTTP real: público no controla pago, total recalculado y Payment pending
+  ---
+  duration_ms: 801.1919
+  type: 'test'
+  ...
+# Subtest: HTTP real: dos approvals simultáneos, una Sale, un descuento, una Invoice
+ok 5 - HTTP real: dos approvals simultáneos, una Sale, un descuento, una Invoice
+  ---
+  duration_ms: 2663.4069
+  type: 'test'
+  ...
+# Subtest: HTTP real: refresh/retry no descuenta stock ni duplica Invoice
+ok 6 - HTTP real: refresh/retry no descuenta stock ni duplica Invoice
+  ---
+  duration_ms: 442.9579
+  type: 'test'
+  ...
+# Subtest: HTTP real: origen Ecommerce no puede presentarse como admin_quick_sale
+ok 7 - HTTP real: origen Ecommerce no puede presentarse como admin_quick_sale
+  ---
+  duration_ms: 563.6057
+  type: 'test'
+  ...
+# Subtest: HTTP real: error fiscal posterior a Sale y retry crean una sola Invoice y descuento
+ok 8 - HTTP real: error fiscal posterior a Sale y retry crean una sola Invoice y descuento
+  ---
+  duration_ms: 1127.0205
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7772.43

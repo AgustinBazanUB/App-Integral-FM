@@ -109,6 +109,8 @@
 .fm-seller-payment-difference { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; border-radius: 9px; background: var(--fm-error-bg); padding: 10px; color: var(--fm-error); font-size: 11px; }
 .fm-seller-payment-difference.is-valid { background: var(--fm-success-bg); color: var(--fm-success); }
 .fm-seller-receipt { display: grid; justify-items: center; gap: 9px; text-align: center; }
+.fm-seller-receipt .fm-arca-print-action { justify-items: center; width: 100%; }
+.fm-seller-detail__fiscal { display: grid; gap: 8px; }
 .fm-seller-receipt img { width: 130px; }
 .fm-seller-receipt > strong { font-size: 14px; }
 .fm-seller-receipt > span { font-family: var(--fm-font-display); font-size: 38px; color: var(--fm-text-accent); }

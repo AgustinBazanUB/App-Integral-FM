@@ -1,0 +1,670 @@
+TAP version 13
+# Subtest: emisor RI genera factura A para RI y monotributo
+ok 1 - emisor RI genera factura A para RI y monotributo
+  ---
+  duration_ms: 5.4847
+  type: 'test'
+  ...
+# Subtest: emisor RI genera factura B para consumidor final y exento
+ok 2 - emisor RI genera factura B para consumidor final y exento
+  ---
+  duration_ms: 0.2178
+  type: 'test'
+  ...
+# Subtest: plan A exige CUIT y conserva cierre fiscal
+ok 3 - plan A exige CUIT y conserva cierre fiscal
+  ---
+  duration_ms: 14.8341
+  type: 'test'
+  ...
+# Subtest: consumidor final anónimo debajo del umbral vigente no queda bloqueado
+ok 4 - consumidor final anónimo debajo del umbral vigente no queda bloqueado
+  ---
+  duration_ms: 0.3941
+  type: 'test'
+  ...
+# Subtest: consumidor final anónimo en o sobre el umbral exige identificación
+ok 5 - consumidor final anónimo en o sobre el umbral exige identificación
+  ---
+  duration_ms: 0.3922
+  type: 'test'
+  ...
+# Subtest: lock de secuencia impide dos autorizaciones simultáneas
+ok 6 - lock de secuencia impide dos autorizaciones simultáneas
+  ---
+  duration_ms: 8.1745
+  type: 'test'
+  ...
+# Subtest: lock vencido puede ser tomado por otro intento
+ok 7 - lock vencido puede ser tomado por otro intento
+  ---
+  duration_ms: 0.516
+  type: 'test'
+  ...
+# Subtest: locks de homologación y producción quedan separados aunque coincidan PV y tipo
+ok 8 - locks de homologación y producción quedan separados aunque coincidan PV y tipo
+  ---
+  duration_ms: 0.4828
+  type: 'test'
+  ...
+# Subtest: dry run prepara factura A sin llamar a ARCA
+ok 9 - dry run prepara factura A sin llamar a ARCA
+  ---
+  duration_ms: 4.7503
+  type: 'test'
+  ...
+# Subtest: autorización exitosa serializa secuencia y persiste CAE
+ok 10 - autorización exitosa serializa secuencia y persiste CAE
+  ---
+  duration_ms: 1.4562
+  type: 'test'
+  ...
+# Subtest: timeout no reenvía CAE y entra en reconciliación
+ok 11 - timeout no reenvía CAE y entra en reconciliación
+  ---
+  duration_ms: 2.0431
+  type: 'test'
+  ...
+# Subtest: timeout reconciliado con CAE se marca autorizado sin reenvío
+ok 12 - timeout reconciliado con CAE se marca autorizado sin reenvío
+  ---
+  duration_ms: 59.817
+  type: 'test'
+  ...
+# Subtest: 502 al consultar último autorizado vuelve a pending sin reservar número ni pedir CAE
+ok 13 - 502 al consultar último autorizado vuelve a pending sin reservar número ni pedir CAE
+  ---
+  duration_ms: 0.9621
+  type: 'test'
+  ...
+# Subtest: recupera authorizing pre-CAE sólo si no hay número planificado
+ok 14 - recupera authorizing pre-CAE sólo si no hay número planificado
+  ---
+  duration_ms: 0.3745
+  type: 'test'
+  ...
+# Subtest: FECompConsultar confirma un comprobante autorizado y coincidente
+ok 15 - FECompConsultar confirma un comprobante autorizado y coincidente
+  ---
+  duration_ms: 0.4879
+  type: 'test'
+  ...
+# Subtest: FECompConsultar detecta CAE distinto sin desautorizar el registro local
+ok 16 - FECompConsultar detecta CAE distinto sin desautorizar el registro local
+  ---
+  duration_ms: 0.2502
+  type: 'test'
+  ...
+# Subtest: producción nunca solicita CAE aunque el gate read-only esté habilitado
+ok 17 - producción nunca solicita CAE aunque el gate read-only esté habilitado
+  ---
+  duration_ms: 1.1621
+  type: 'test'
+  ...
+# Subtest: factura de homologación no puede operarse desde runtime productivo
+ok 18 - factura de homologación no puede operarse desde runtime productivo
+  ---
+  duration_ms: 0.5186
+  type: 'test'
+  ...
+# Subtest: dry-run productivo arma el plan sin llamar a ARCA
+ok 19 - dry-run productivo arma el plan sin llamar a ARCA
+  ---
+  duration_ms: 0.3496
+  type: 'test'
+  ...
+# Subtest: producción bloquea CAE si la venta objetivo no coincide
+ok 20 - producción bloquea CAE si la venta objetivo no coincide
+  ---
+  duration_ms: 0.2922
+  type: 'test'
+  ...
+# Subtest: el modo automático no abre la autorización manual productiva sin venta objetivo
+ok 21 - el modo automático no abre la autorización manual productiva sin venta objetivo
+  ---
+  duration_ms: 0.5927
+  type: 'test'
+  ...
+# Subtest: autorización automática productiva permite Venta Rápida cuando los gates están habilitados
+ok 22 - autorización automática productiva permite Venta Rápida cuando los gates están habilitados
+  ---
+  duration_ms: 0.5442
+  type: 'test'
+  ...
+# Subtest: autorización automática productiva bloquea fuentes no incluidas en el allowlist
+ok 23 - autorización automática productiva bloquea fuentes no incluidas en el allowlist
+  ---
+  duration_ms: 0.3981
+  type: 'test'
+  ...
+# Subtest: producción permite una única venta objetivo cuando el gate exacto está armado
+ok 24 - producción permite una única venta objetivo cuando el gate exacto está armado
+  ---
+  duration_ms: 0.6626
+  type: 'test'
+  ...
+# Subtest: CUIT del emisor informado es válido
+ok 25 - CUIT del emisor informado es válido
+  ---
+  duration_ms: 1.2292
+  type: 'test'
+  ...
+# Subtest: configuración ARCA arranca en homologación y exige punto de venta cuando corresponde
+ok 26 - configuración ARCA arranca en homologación y exige punto de venta cuando corresponde
+  ---
+  duration_ms: 0.7998
+  type: 'test'
+  ...
+# Subtest: TRA WSAA es corto, temporal y específico por servicio
+ok 27 - TRA WSAA es corto, temporal y específico por servicio
+  ---
+  duration_ms: 1.5814
+  type: 'test'
+  ...
+# Subtest: envelope LoginCms escapa CMS y parser recupera token/sign
+ok 28 - envelope LoginCms escapa CMS y parser recupera token/sign
+  ---
+  duration_ms: 5.2295
+  type: 'test'
+  ...
+# Subtest: helpers XML soportan namespace y múltiples bloques
+ok 29 - helpers XML soportan namespace y múltiples bloques
+  ---
+  duration_ms: 1.0667
+  type: 'test'
+  ...
+# Subtest: detalle CAE incluye condición IVA del receptor y totales
+ok 30 - detalle CAE incluye condición IVA del receptor y totales
+  ---
+  duration_ms: 0.701
+  type: 'test'
+  ...
+# Subtest: dominio fiscal genera ID determinístico por origen
+ok 31 - dominio fiscal genera ID determinístico por origen
+  ---
+  duration_ms: 0.9542
+  type: 'test'
+  ...
+# Subtest: descuento se distribuye sin alterar el total
+ok 32 - descuento se distribuye sin alterar el total
+  ---
+  duration_ms: 0.5709
+  type: 'test'
+  ...
+# Subtest: descompone precios finales con IVA explícito por producto
+ok 33 - descompone precios finales con IVA explícito por producto
+  ---
+  duration_ms: 1.184
+  type: 'test'
+  ...
+# Subtest: no inventa alícuota IVA si el producto no está configurado
+ok 34 - no inventa alícuota IVA si el producto no está configurado
+  ---
+  duration_ms: 0.4836
+  type: 'test'
+  ...
+# Subtest: parser de padrón recupera identidad, domicilio e inscripción IVA
+ok 35 - parser de padrón recupera identidad, domicilio e inscripción IVA
+  ---
+  duration_ms: 3.7333
+  type: 'test'
+  ...
+# Subtest: configuración usa dominio vigente y fallback oficial del Padrón ARCA
+ok 36 - configuración usa dominio vigente y fallback oficial del Padrón ARCA
+  ---
+  duration_ms: 0.7147
+  type: 'test'
+  ...
+# Subtest: parser de padrón distingue CUIT inexistente
+ok 37 - parser de padrón distingue CUIT inexistente
+  ---
+  duration_ms: 1.9408
+  type: 'test'
+  ...
+# Subtest: parser de padrón marca encontrada una persona con datos generales
+ok 38 - parser de padrón marca encontrada una persona con datos generales
+  ---
+  duration_ms: 0.1814
+  type: 'test'
+  ...
+# Subtest: padrón activo en IVA resuelve Responsable Inscripto
+ok 39 - padrón activo en IVA resuelve Responsable Inscripto
+  ---
+  duration_ms: 0.2614
+  type: 'test'
+  ...
+# Subtest: monotributo activo resuelve condición general y variantes conocidas
+ok 40 - monotributo activo resuelve condición general y variantes conocidas
+  ---
+  duration_ms: 0.1816
+  type: 'test'
+  ...
+# Subtest: no inventa condición IVA si el padrón no alcanza
+ok 41 - no inventa condición IVA si el padrón no alcanza
+  ---
+  duration_ms: 0.0673
+  type: 'test'
+  ...
+# Subtest: consumidor final y tabla de condiciones se validan explícitamente
+ok 42 - consumidor final y tabla de condiciones se validan explícitamente
+  ---
+  duration_ms: 0.181
+  type: 'test'
+  ...
+# Subtest: fault SOAP de WSAA conserva coe.alreadyAuthenticated y no se disfraza de error de red
+ok 43 - fault SOAP de WSAA conserva coe.alreadyAuthenticated y no se disfraza de error de red
+  ---
+  duration_ms: 46.7278
+  type: 'test'
+  ...
+# Subtest: producción queda bloqueada por defecto y acepta gates explícitos separados
+ok 44 - producción queda bloqueada por defecto y acepta gates explícitos separados
+  ---
+  duration_ms: 0.2159
+  type: 'test'
+  ...
+# Subtest: credenciales ARCA seguras reportan faltantes e inválidos sin exponer secretos
+ok 45 - credenciales ARCA seguras reportan faltantes e inválidos sin exponer secretos
+  ---
+  duration_ms: 0.59
+  type: 'test'
+  ...
+# Subtest: fallback IVA 21 configurable completa snapshot y conserva receptor
+ok 46 - fallback IVA 21 configurable completa snapshot y conserva receptor
+  ---
+  duration_ms: 4.6607
+  type: 'test'
+  ...
+# Subtest: QR fiscal genera payload y matriz
+ok 47 - QR fiscal genera payload y matriz
+  ---
+  duration_ms: 5.9773
+  type: 'test'
+  ...
+# Subtest: PDF fiscal exige datos del emisor y factura verificada
+ok 48 - PDF fiscal exige datos del emisor y factura verificada
+  ---
+  duration_ms: 48.1165
+  type: 'test'
+  ...
+# Subtest: PDF detalla el producto, su IVA y el descuento de la venta autorizada
+ok 49 - PDF detalla el producto, su IVA y el descuento de la venta autorizada
+  ---
+  duration_ms: 4.0022
+  type: 'test'
+  ...
+# Subtest: syncInvoiceToSale persiste el vínculo fiscal en la venta
+ok 50 - syncInvoiceToSale persiste el vínculo fiscal en la venta
+  ---
+  duration_ms: 1.8105
+  type: 'test'
+  ...
+# Subtest: crea una sola solicitud pending y reutiliza el ID determinístico
+ok 51 - crea una sola solicitud pending y reutiliza el ID determinístico
+  ---
+  duration_ms: 3.4825
+  type: 'test'
+  ...
+# Subtest: snapshot fiscal queda marcado incompleto sin alícuota configurada
+ok 52 - snapshot fiscal queda marcado incompleto sin alícuota configurada
+  ---
+  duration_ms: 1.0458
+  type: 'test'
+  ...
+# Subtest: no crea solicitud para una venta que no pidió factura
+ok 53 - no crea solicitud para una venta que no pidió factura
+  ---
+  duration_ms: 0.589
+  type: 'test'
+  ...
+# Subtest: una venta rápida administrativa usa invoiceStatus pending como solicitud
+ok 54 - una venta rápida administrativa usa invoiceStatus pending como solicitud
+  ---
+  duration_ms: 0.4674
+  type: 'test'
+  ...
+# Subtest: vendedor sólo puede pedir factura de su propia venta; administración puede hacerlo
+ok 55 - vendedor sólo puede pedir factura de su propia venta; administración puede hacerlo
+  ---
+  duration_ms: 0.2102
+  type: 'test'
+  ...
+# Subtest: claim exclusivo cambia pending a authorizing una sola vez
+ok 56 - claim exclusivo cambia pending a authorizing una sola vez
+  ---
+  duration_ms: 0.9169
+  type: 'test'
+  ...
+# Subtest: claim pierde limpiamente ante una precondición concurrente
+ok 57 - claim pierde limpiamente ante una precondición concurrente
+  ---
+  duration_ms: 0.3346
+  type: 'test'
+  ...
+# Subtest: misma venta puede tener solicitudes separadas por entorno fiscal
+ok 58 - misma venta puede tener solicitudes separadas por entorno fiscal
+  ---
+  duration_ms: 0.4375
+  type: 'test'
+  ...
+# Subtest: homologación reutiliza factura legacy, producción no la adopta
+ok 59 - homologación reutiliza factura legacy, producción no la adopta
+  ---
+  duration_ms: 0.6045
+  type: 'test'
+  ...
+# Subtest: rejected no reconcilia un número que otra invoice puede reutilizar
+ok 60 - rejected no reconcilia un número que otra invoice puede reutilizar
+  ---
+  duration_ms: 7.7585
+  type: 'test'
+  ...
+# Subtest: admin_quick_sale: misma invoice, mismo motor, autorizado terminal y mirror
+ok 61 - admin_quick_sale: misma invoice, mismo motor, autorizado terminal y mirror
+  ---
+  duration_ms: 2.1285
+  type: 'test'
+  ...
+# Subtest: seller_sale: misma invoice, mismo motor, autorizado terminal y mirror
+ok 62 - seller_sale: misma invoice, mismo motor, autorizado terminal y mirror
+  ---
+  duration_ms: 1.4678
+  type: 'test'
+  ...
+# Subtest: ecommerce: misma invoice, mismo motor, autorizado terminal y mirror
+ok 63 - ecommerce: misma invoice, mismo motor, autorizado terminal y mirror
+  ---
+  duration_ms: 1.3439
+  type: 'test'
+  ...
+# Subtest: timeout antes de envío: TEMPORARY, backoff y límite de tres intentos
+ok 64 - timeout antes de envío: TEMPORARY, backoff y límite de tres intentos
+  ---
+  duration_ms: 3.318
+  type: 'test'
+  ...
+# Subtest: timeout después de envío: durable reservation aun al vencer lease
+ok 65 - timeout después de envío: durable reservation aun al vencer lease
+  ---
+  duration_ms: 1.6845
+  type: 'test'
+  ...
+# Subtest: FECompConsultar coincide: reconcilia, libera reserva, no reenvía
+ok 66 - FECompConsultar coincide: reconcilia, libera reserva, no reenvía
+  ---
+  duration_ms: 1.542
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en total: no asocia CAE
+ok 67 - FECompConsultar difiere en total: no asocia CAE
+  ---
+  duration_ms: 1.2765
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en net: no asocia CAE
+ok 68 - FECompConsultar difiere en net: no asocia CAE
+  ---
+  duration_ms: 2.1981
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en vat: no asocia CAE
+ok 69 - FECompConsultar difiere en vat: no asocia CAE
+  ---
+  duration_ms: 1.8356
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en docNumber: no asocia CAE
+ok 70 - FECompConsultar difiere en docNumber: no asocia CAE
+  ---
+  duration_ms: 1.24
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en docType: no asocia CAE
+ok 71 - FECompConsultar difiere en docType: no asocia CAE
+  ---
+  duration_ms: 1.0751
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en voucherDate: no asocia CAE
+ok 72 - FECompConsultar difiere en voucherDate: no asocia CAE
+  ---
+  duration_ms: 1.3369
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en pointOfSale: no asocia CAE
+ok 73 - FECompConsultar difiere en pointOfSale: no asocia CAE
+  ---
+  duration_ms: 2.781
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en voucherType: no asocia CAE
+ok 74 - FECompConsultar difiere en voucherType: no asocia CAE
+  ---
+  duration_ms: 2.2969
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en voucherNumber: no asocia CAE
+ok 75 - FECompConsultar difiere en voucherNumber: no asocia CAE
+  ---
+  duration_ms: 1.0207
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en voucherTo: no asocia CAE
+ok 76 - FECompConsultar difiere en voucherTo: no asocia CAE
+  ---
+  duration_ms: 0.8746
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en currencyId: no asocia CAE
+ok 77 - FECompConsultar difiere en currencyId: no asocia CAE
+  ---
+  duration_ms: 0.768
+  type: 'test'
+  ...
+# Subtest: FECompConsultar difiere en currencyQuote: no asocia CAE
+ok 78 - FECompConsultar difiere en currencyQuote: no asocia CAE
+  ---
+  duration_ms: 1.0426
+  type: 'test'
+  ...
+# Subtest: respuesta vacía y error SOAP después de envío siempre consultan
+ok 79 - respuesta vacía y error SOAP después de envío siempre consultan
+  ---
+  duration_ms: 2.6602
+  type: 'test'
+  ...
+# Subtest: rechazo explícito terminal: libera lock, no vuelve a enviar
+ok 80 - rechazo explícito terminal: libera lock, no vuelve a enviar
+  ---
+  duration_ms: 1.4919
+  type: 'test'
+  ...
+# Subtest: validación: sin claim, reserva ni envío
+ok 81 - validación: sin claim, reserva ni envío
+  ---
+  duration_ms: 0.5694
+  type: 'test'
+  ...
+# Subtest: doble click / dos workers misma invoice: un único envío
+ok 82 - doble click / dos workers misma invoice: un único envío
+  ---
+  duration_ms: 1.3092
+  type: 'test'
+  ...
+# Subtest: worker con lease vencido no persiste plan ni solicita CAE
+ok 83 - worker con lease vencido no persiste plan ni solicita CAE
+  ---
+  duration_ms: 1.3362
+  type: 'test'
+  ...
+# Subtest: caída al persistir respuesta aceptada: consulta, no devuelve pending
+ok 84 - caída al persistir respuesta aceptada: consulta, no devuelve pending
+  ---
+  duration_ms: 0.9614
+  type: 'test'
+  ...
+# Subtest: revisión común nunca emite; intento activo no se resetea
+ok 85 - revisión común nunca emite; intento activo no se resetea
+  ---
+  duration_ms: 0.7357
+  type: 'test'
+  ...
+# Subtest: mirror de venta no sobrescribe otro vínculo fiscal
+ok 86 - mirror de venta no sobrescribe otro vínculo fiscal
+  ---
+  duration_ms: 0.3148
+  type: 'test'
+  ...
+# Subtest: clasificación y UI honestas, sin raw errors
+ok 87 - clasificación y UI honestas, sin raw errors
+  ---
+  duration_ms: 0.2561
+  type: 'test'
+  ...
+# Subtest: parser consulta no inventa número de comprobante ausente
+ok 88 - parser consulta no inventa número de comprobante ausente
+  ---
+  duration_ms: 2.8308
+  type: 'test'
+  ...
+# Subtest: terminal persistido con release interrumpido: siguiente worker repara reserva
+ok 89 - terminal persistido con release interrumpido: siguiente worker repara reserva
+  ---
+  duration_ms: 1.0268
+  type: 'test'
+  ...
+# Subtest: homologación flag off no invoca transporte ni reserva
+ok 90 - homologación flag off no invoca transporte ni reserva
+  ---
+  duration_ms: 0.3753
+  type: 'test'
+  ...
+# Subtest: scope emisor/POS distinto del snapshot: no reserva ni envía
+ok 91 - scope emisor/POS distinto del snapshot: no reserva ni envía
+  ---
+  duration_ms: 0.571
+  type: 'test'
+  ...
+# Subtest: respuesta A con número diferente permanece incierta y consulta
+ok 92 - respuesta A con número diferente permanece incierta y consulta
+  ---
+  duration_ms: 0.6818
+  type: 'test'
+  ...
+# Subtest: verificación posterior compara identidad completa, importes y vencimiento
+ok 93 - verificación posterior compara identidad completa, importes y vencimiento
+  ---
+  duration_ms: 1.1048
+  type: 'test'
+  ...
+# Subtest: umbral CF ausente no usa un importe fiscal inventado
+ok 94 - umbral CF ausente no usa un importe fiscal inventado
+  ---
+  duration_ms: 0.2893
+  type: 'test'
+  ...
+# Subtest: consulta con importes cero ausentes no inventa la coincidencia
+ok 95 - consulta con importes cero ausentes no inventa la coincidencia
+  ---
+  duration_ms: 0.7101
+  type: 'test'
+  ...
+# Subtest: worker demorado no modifica el intento que lo reemplazó después de recuperación segura
+ok 96 - worker demorado no modifica el intento que lo reemplazó después de recuperación segura
+  ---
+  duration_ms: 13.8577
+  type: 'test'
+  ...
+# Subtest: revisión común admite receptor explícito para plan sin solicitar CAE
+ok 97 - revisión común admite receptor explícito para plan sin solicitar CAE
+  ---
+  duration_ms: 0.5292
+  type: 'test'
+  ...
+# Subtest: receptor faltante se valida y queda fijado atómicamente antes de enviar
+ok 98 - receptor faltante se valida y queda fijado atómicamente antes de enviar
+  ---
+  duration_ms: 1.2946
+  type: 'test'
+  ...
+# Subtest: CUIT con dígito verificador inválido es VALIDATION antes de claim/envío
+ok 99 - CUIT con dígito verificador inválido es VALIDATION antes de claim/envío
+  ---
+  duration_ms: 0.4039
+  type: 'test'
+  ...
+# Subtest: TEMPORARY previo al envío: retry después del backoff autoriza una sola vez la misma Invoice
+ok 100 - TEMPORARY previo al envío: retry después del backoff autoriza una sola vez la misma Invoice
+  ---
+  duration_ms: 1.2084
+  type: 'test'
+  ...
+# Subtest: WSAA key exige Base64 canónico, incluido padding
+ok 101 - WSAA key exige Base64 canónico, incluido padding
+  ---
+  duration_ms: 3.1604
+  type: 'test'
+  ...
+# Subtest: clave WSAA compartida exige exactamente 32 bytes Base64
+ok 102 - clave WSAA compartida exige exactamente 32 bytes Base64
+  ---
+  duration_ms: 0.4374
+  type: 'test'
+  ...
+# Subtest: TA se cifra AES-256-GCM y Token/Sign no quedan en claro
+ok 103 - TA se cifra AES-256-GCM y Token/Sign no quedan en claro
+  ---
+  duration_ms: 4.6632
+  type: 'test'
+  ...
+# Subtest: AAD impide usar un TA cifrado para otro servicio
+ok 104 - AAD impide usar un TA cifrado para otro servicio
+  ---
+  duration_ms: 1.0631
+  type: 'test'
+  ...
+# Subtest: lease exclusivo evita dos renovaciones y el TA publicado se reutiliza
+ok 105 - lease exclusivo evita dos renovaciones y el TA publicado se reutiliza
+  ---
+  duration_ms: 1.6332
+  type: 'test'
+  ...
+# Subtest: producción exige un gate de red explícito y luego caché compartida cifrada
+ok 106 - producción exige un gate de red explícito y luego caché compartida cifrada
+  ---
+  duration_ms: 0.5689
+  type: 'test'
+  ...
+# Subtest: requestAccessTicket reutiliza TA compartido tras perder la caché en memoria
+ok 107 - requestAccessTicket reutiliza TA compartido tras perder la caché en memoria
+  ---
+  duration_ms: 0.541
+  type: 'test'
+  ...
+# Subtest: inspección segura reporta metadata sin Token/Sign
+ok 108 - inspección segura reporta metadata sin Token/Sign
+  ---
+  duration_ms: 0.6355
+  type: 'test'
+  ...
+# Subtest: AAD también aísla por CUIT emisor
+ok 109 - AAD también aísla por CUIT emisor
+  ---
+  duration_ms: 0.5404
+  type: 'test'
+  ...
+# Subtest: caché v1 real se sigue descifrando tras agregar aislamiento por CUIT
+ok 110 - caché v1 real se sigue descifrando tras agregar aislamiento por CUIT
+  ---
+  duration_ms: 0.7388
+  type: 'test'
+  ...
+1..110
+# tests 110
+# suites 0
+# pass 110
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 256.8648

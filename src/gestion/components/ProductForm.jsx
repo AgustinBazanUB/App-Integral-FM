@@ -17,6 +17,7 @@ const emptyForm = {
   categoryId: "",
   description: "",
   defaultPrice: 0,
+  arcaVatRate: "",
   yellowAlertQty: 0,
   redAlertQty: 0,
   active: true,
@@ -37,6 +38,7 @@ function initialForm(product) {
     categoryId: product.categoryId || "",
     description: product.description || "",
     defaultPrice: Number(product.defaultPrice || 0),
+    arcaVatRate: product.arcaVatRate == null ? "" : String(product.arcaVatRate),
     yellowAlertQty: Number(product.yellowAlertQty || 0),
     redAlertQty: Number(product.redAlertQty || 0),
     active: product.active !== false,
@@ -142,6 +144,15 @@ export default function ProductForm({ open, product, categories, profile, onClos
         </FormField>
         <FormField label="Precio predeterminado" hint="Las ubicaciones que usen este precio se actualizarán automáticamente." required>
           <input type="number" min="0" step="1" inputMode="numeric" value={form.defaultPrice} onChange={(event) => setForm({ ...form, defaultPrice: event.target.value })} />
+        </FormField>
+        <FormField label="Alícuota IVA ARCA" hint="Obligatoria para emitir comprobantes automáticos. No se adivina por categoría.">
+          <Select value={form.arcaVatRate} onChange={(event) => setForm({ ...form, arcaVatRate: event.target.value })}>
+            <option value="">Sin configurar</option>
+            <option value="21">21%</option>
+            <option value="10.5">10,5%</option>
+            <option value="27">27%</option>
+            <option value="0">0%</option>
+          </Select>
         </FormField>
         <FormField label="Descripción" className="fm-form-grid__full">
           <textarea rows="3" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />

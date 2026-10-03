@@ -8,7 +8,6 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -16,18 +15,32 @@ import {
   INVENTORY_TYPES,
   PRICE_MODES,
   effectiveLocationPrice,
+  assertUniqueInventoryProducts,
   mergeLocationInventoryItem,
   mergeWarehouseInventoryItem,
-  validateTransferLine,
+  reconcileTransferLine,
   wholeInventoryQuantity,
 } from "../../modules/inventory/domain/inventory";
 import { can, normalizedRole } from "../permissions";
+import { locationActivity } from "../../modules/locations/domain/locations";
 import { db } from "./firebase";
 
 const docsToArray = (snapshot) => snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
 const userName = (profile) => profile.name || profile.email || "Usuario";
 const normalizedText = (value) => String(value || "").trim().toLocaleLowerCase("es");
-const operationId = (value = "") => String(value || crypto.randomUUID()).replace(/[^a-zA-Z0-9_-]/g, "");
+const operationId = (value = "") => {
+  const id = String(value || crypto.randomUUID());
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw new Error("El identificador de operación no es válido.");
+  return id;
+};
+
+// POS already loads the master catalog once; avoid hydrating each stock row with another product read.
+export async function listQuickSaleStock({ type, id }, profile) {
+  if (!["location", "warehouse"].includes(type) || !id) return [];
+  if (!can(profile, "quick-sales", "create")) throw new Error("No tenés permiso para registrar ventas.");
+  return docsToArray(await getDocs(query(collection(db, type === "warehouse" ? "warehouseStock" : "locationStock", id, "items"), orderBy("productName"))))
+    .filter(item => item.deleted !== true);
+}
 
 function assertPermission(profile, moduleId, action, message) {
   if (!can(profile, moduleId, action)) throw new Error(message);
@@ -66,6 +79,7 @@ async function hydrateInventory(items, type) {
     .sort((a, b) => String(a.productName || "").localeCompare(String(b.productName || ""), "es"));
 }
 
+/** @param {*} profile @param {{ includeInactive?: boolean }} [options] */
 export async function listMasterProductsForInventory(profile, { includeInactive } = {}) {
   const showInactive = includeInactive ?? ["admin", "general_admin"].includes(normalizedRole(profile));
   const target = showInactive
@@ -91,6 +105,8 @@ function productPayload(values, categoryName, profile, editing) {
   const defaultPrice = wholeInventoryQuantity(values.defaultPrice || 0, "El precio predeterminado");
   const yellowAlertQty = wholeInventoryQuantity(values.yellowAlertQty || 0, "La alerta amarilla");
   const redAlertQty = wholeInventoryQuantity(values.redAlertQty || 0, "La alerta roja");
+  const arcaVatRate = values.arcaVatRate === "" || values.arcaVatRate == null ? null : Number(values.arcaVatRate);
+  if (arcaVatRate != null && ![0, 10.5, 21, 27].includes(arcaVatRate)) throw new Error("La alícuota IVA ARCA no es válida.");
   if (!name) throw new Error("Ingresá el nombre del producto.");
   if (!abbreviation) throw new Error("Ingresá una abreviación.");
   if (abbreviation.length > 8) throw new Error("La abreviación admite hasta 8 caracteres.");
@@ -102,6 +118,7 @@ function productPayload(values, categoryName, profile, editing) {
     abbreviationKey: normalizedText(abbreviation),
     description: String(values.description || "").trim(),
     defaultPrice,
+    arcaVatRate,
     yellowAlertQty,
     redAlertQty,
     categoryId: String(values.categoryId || "").trim(),
@@ -194,11 +211,12 @@ export async function addProductToLocation({
   useDefaultPrice = true,
   priceOverride = null,
   profile,
-  requestId,
+  requestId = "",
 }) {
   assertPermission(profile, "locations", "configureLocationProducts", "No tenés permiso para agregar productos a esta ubicación.");
   if (!location?.id) throw new Error("La ubicación no está disponible.");
   const initial = wholeInventoryQuantity(initialStock || 0, "El stock inicial");
+  if (initial > 0) assertPermission(profile, "locations", "loadStock", "No tenés permiso para cargar cantidades en esta ubicación.");
   const customPrice = useDefaultPrice
     ? null
     : wholeInventoryQuantity(priceOverride, "El precio especial");
@@ -217,6 +235,7 @@ export async function addProductToLocation({
     const productSnapshot = await transaction.get(productRef);
     const stockSnapshot = await transaction.get(stockRef);
     if (!locationSnapshot.exists() || locationSnapshot.data().deleted === true) throw new Error("La ubicación ya no está disponible.");
+    if (initial > 0 && !locationActivity(locationSnapshot.data()).active) throw new Error("Activá la ubicación para ingresar stock; podés habilitar el producto con cantidad cero.");
     if (!productSnapshot.exists() || productSnapshot.data().deleted === true || productSnapshot.data().active === false) {
       throw new Error("El producto seleccionado ya no está disponible.");
     }
@@ -239,8 +258,8 @@ export async function addProductToLocation({
       masterDefaultPrice: Number(master.defaultPrice || 0),
       initialStock: initial,
       currentStock: initial,
-      yellowAlertQty: Number(master.yellowAlertQty || 0),
-      redAlertQty: Number(master.redAlertQty || 0),
+      yellowAlertQty: 0,
+      redAlertQty: 0,
       active: true,
       deleted: false,
       deletedAt: null,
@@ -324,6 +343,15 @@ export async function saveLocationProductSettings({ location, productId, values,
       active: values.active !== false,
       updatedAt: serverTimestamp(),
       updatedBy: profile.id,
+    });
+    transaction.set(doc(collection(db, "auditLogs")), {
+      action: "locationProduct.configured", title: "Producto configurado",
+      description: `${productSnapshot.data().name} · ${location.name}`,
+      moduleId: "locations", entityType: "locationProduct", entityId: productId,
+      locationId: location.id, locationName: location.name,
+      previousSettings: { priceMode: stockSnapshot.data().priceMode || "legacy", price: stockSnapshot.data().price ?? null, priceOverride: stockSnapshot.data().priceOverride ?? null, yellowAlertQty: stockSnapshot.data().yellowAlertQty ?? 0, redAlertQty: stockSnapshot.data().redAlertQty ?? 0, active: stockSnapshot.data().active !== false },
+      newSettings: { useDefaultPrice, priceOverride: customPrice, yellowAlertQty, redAlertQty, active: values.active !== false },
+      userId: profile.id, userName: userName(profile), status: "completed", createdAt: serverTimestamp(),
     });
     return {
       effectivePrice: useDefaultPrice ? Number(productSnapshot.data().defaultPrice || 0) : customPrice,
@@ -498,6 +526,7 @@ function ownerReference(type, inventoryId) {
 }
 
 export async function addStockToInventory({ type, inventory, product, quantity, reason, profile, requestId }) {
+  if (!Object.values(INVENTORY_TYPES).includes(type)) throw new Error("El tipo de inventario no es válido.");
   if (type === INVENTORY_TYPES.LOCATION) {
     assertPermission(profile, "locations", "loadStock", "No tenés permiso para agregar stock en esta ubicación.");
   } else {
@@ -515,6 +544,7 @@ export async function addStockToInventory({ type, inventory, product, quantity, 
     const operationSnapshot = await transaction.get(operationRef);
     if (operationSnapshot.exists()) return operationSnapshot.data();
     const ownerSnapshot = await transaction.get(ownerRef);
+    const masterSnapshot = await transaction.get(doc(db, "products", product.productId || product.id));
     const stockSnapshot = await transaction.get(stockRef);
     if (!ownerSnapshot.exists() || ownerSnapshot.data().deleted === true || ownerSnapshot.data().active === false) {
       throw new Error(type === INVENTORY_TYPES.LOCATION ? "La ubicación ya no está disponible." : "El depósito ya no está disponible.");
@@ -522,6 +552,8 @@ export async function addStockToInventory({ type, inventory, product, quantity, 
     if (!stockSnapshot.exists() || stockSnapshot.data().deleted === true || stockSnapshot.data().active === false) {
       throw new Error(`${product.productName || product.name} todavía no forma parte del stock de este lugar.`);
     }
+    if (type === INVENTORY_TYPES.LOCATION && !locationActivity(ownerSnapshot.data()).active) throw new Error("Activá la ubicación para ingresar mercadería.");
+    if (!masterSnapshot.exists() || masterSnapshot.data().active === false || masterSnapshot.data().deleted === true) throw new Error("El producto ya no está disponible.");
     const previousStock = wholeInventoryQuantity(stockSnapshot.data().currentStock || 0, "El stock actual");
     const newStock = previousStock + requested;
     transaction.update(stockRef, {
@@ -592,12 +624,14 @@ export async function listInventoryMovements({ type, inventoryId, productId, pag
         collection(db, "stockMovements"),
         where("productId", "==", productId),
         where("locationId", "==", inventoryId),
+        orderBy("createdAt", "desc"),
         limit(max),
       )
     : query(
         collection(db, "stockMovements"),
         where("productId", "==", productId),
         where("warehouseId", "==", inventoryId),
+        orderBy("createdAt", "desc"),
         limit(max),
       );
   return docsToArray(await getDocs(target))
@@ -608,21 +642,52 @@ export async function listInventoryMovements({ type, inventoryId, productId, pag
     });
 }
 
-export async function transferStock({ originWarehouse, destination, lines, profile, transferId: requestedTransferId }) {
+export async function adjustInventoryStock({ type, inventory, product, quantity, reason, profile, requestId }) {
+  if (!Object.values(INVENTORY_TYPES).includes(type)) throw new Error("El tipo de inventario no es válido.");
+  const moduleId = type === INVENTORY_TYPES.LOCATION ? "locations" : "warehouse";
+  assertPermission(profile, moduleId, "adjustStock", "No tenés permiso para ajustar inventario.");
+  if (type === INVENTORY_TYPES.WAREHOUSE) assertPermission(profile, "warehouse", "edit", "El ajuste también requiere permiso para editar el depósito.");
+  const requested = wholeInventoryQuantity(quantity, "La cantidad física real");
+  const safeId = operationId(requestId);
+  const productId = product.productId || product.id;
+  const operationRef = doc(db, "inventoryOperations", safeId);
+  const stockRef = stockReference(type, inventory.id, productId);
+  const movementRef = doc(db, "stockMovements", `${safeId}_${productId}`);
+  return runTransaction(db, async (transaction) => {
+    const previousOperation = await transaction.get(operationRef);
+    if (previousOperation.exists()) return previousOperation.data();
+    const ownerSnapshot = await transaction.get(ownerReference(type, inventory.id));
+    const stockSnapshot = await transaction.get(stockRef);
+    if (!ownerSnapshot.exists() || ownerSnapshot.data().deleted === true || !stockSnapshot.exists() || stockSnapshot.data().deleted === true) throw new Error("El inventario ya no está disponible.");
+    const previousStock = wholeInventoryQuantity(stockSnapshot.data().currentStock || 0, "El stock anterior");
+    const note = String(reason || "Ajuste por conteo físico").trim() || "Ajuste por conteo físico";
+    const context = type === INVENTORY_TYPES.LOCATION ? { locationId: inventory.id, locationName: ownerSnapshot.data().name } : { warehouseId: inventory.id, warehouseName: ownerSnapshot.data().name };
+    const result = { operationId: safeId, operationType: "adjust_stock", inventoryType: type, inventoryId: inventory.id, productId, previousStock, newStock: requested, quantity: requested - previousStock, reason: note, userId: profile.id, status: "completed", createdAt: serverTimestamp() };
+    transaction.update(stockRef, { currentStock: requested, lastMovementId: movementRef.id, updatedAt: serverTimestamp(), updatedBy: profile.id });
+    transaction.set(movementRef, { ...result, ...context, type: "adjustment", qty: requested - previousStock, requestedQty: requested, productName: stockSnapshot.data().productName || product.productName || product.name, userName: userName(profile), saleId: "", transferId: "" });
+    transaction.set(operationRef, result);
+    transaction.set(doc(db, "auditLogs", safeId), { ...context, action: "stock.adjust", title: "Inventario ajustado", description: `${product.productName || product.name} · ${previousStock} → ${requested} · ${note}`, moduleId, entityType: "inventoryOperation", entityId: safeId, previousStock, newStock: requested, userId: profile.id, userName: userName(profile), status: "completed", createdAt: serverTimestamp() });
+    return result;
+  });
+}
+
+export async function transferStock({ origin: requestedOrigin, originWarehouse, destination, lines, profile, carrierName = "", transferId: requestedTransferId }) {
+  const origin = requestedOrigin || { ...originWarehouse, type: INVENTORY_TYPES.WAREHOUSE };
   assertPermission(profile, "warehouse", "transferStock", "No tenés permiso para transferir stock.");
-  if (!originWarehouse?.id) throw new Error("Elegí un depósito de origen.");
+  if (!origin?.id || !Object.values(INVENTORY_TYPES).includes(origin.type)) throw new Error("Elegí un origen válido.");
   if (!destination?.id || ![INVENTORY_TYPES.LOCATION, INVENTORY_TYPES.WAREHOUSE].includes(destination.type)) {
     throw new Error("Elegí un destino válido.");
   }
-  if (destination.type === INVENTORY_TYPES.WAREHOUSE && destination.id === originWarehouse.id) {
+  if (destination.type === origin.type && destination.id === origin.id) {
     throw new Error("El origen y el destino deben ser distintos.");
   }
-  const selected = (lines || []).filter((line) => Number(line.quantity || 0) > 0);
+  const selected = (lines || []).filter((line) => Number(line.quantity || 0) !== 0);
   if (!selected.length) throw new Error("Elegí al menos un producto para transferir.");
+  assertUniqueInventoryProducts(selected);
   if (selected.length > 40) throw new Error("Podés transferir hasta 40 productos por operación.");
   const safeId = operationId(requestedTransferId);
   const transferRef = doc(db, "stockTransfers", safeId);
-  const originRef = doc(db, "warehouses", originWarehouse.id);
+  const originRef = ownerReference(origin.type, origin.id);
   const destinationRef = ownerReference(destination.type, destination.id);
   const auditRef = doc(db, "auditLogs", safeId);
 
@@ -631,10 +696,10 @@ export async function transferStock({ originWarehouse, destination, lines, profi
     if (transferSnapshot.exists()) return { id: transferRef.id, ...transferSnapshot.data() };
     const originSnapshot = await transaction.get(originRef);
     const destinationSnapshot = await transaction.get(destinationRef);
-    if (!originSnapshot.exists() || originSnapshot.data().deleted === true || originSnapshot.data().active === false) {
-      throw new Error("El depósito de origen ya no está disponible.");
+    if (!originSnapshot.exists() || originSnapshot.data().deleted === true || (origin.type === INVENTORY_TYPES.WAREHOUSE && originSnapshot.data().active === false)) {
+      throw new Error("El origen ya no está disponible.");
     }
-    if (!destinationSnapshot.exists() || destinationSnapshot.data().deleted === true || destinationSnapshot.data().active === false) {
+    if (!destinationSnapshot.exists() || destinationSnapshot.data().deleted === true || (destination.type === INVENTORY_TYPES.WAREHOUSE && destinationSnapshot.data().active === false)) {
       throw new Error("El destino ya no está disponible.");
     }
 
@@ -642,7 +707,7 @@ export async function transferStock({ originWarehouse, destination, lines, profi
     for (const line of selected) {
       const productId = line.productId || line.id;
       const productRef = doc(db, "products", productId);
-      const originStockRef = doc(db, "warehouseStock", originWarehouse.id, "items", productId);
+      const originStockRef = stockReference(origin.type, origin.id, productId);
       const destinationStockRef = stockReference(destination.type, destination.id, productId);
       const productSnapshot = await transaction.get(productRef);
       const originStockSnapshot = await transaction.get(originStockRef);
@@ -651,15 +716,15 @@ export async function transferStock({ originWarehouse, destination, lines, profi
         throw new Error(`${line.productName || "Un producto"} ya no existe en Productos.`);
       }
       if (!originStockSnapshot.exists() || originStockSnapshot.data().deleted === true || originStockSnapshot.data().active === false) {
-        throw new Error(`${productSnapshot.data().name} ya no forma parte del depósito de origen.`);
+        throw new Error(`${productSnapshot.data().name} ya no forma parte del inventario de origen.`);
       }
       const available = Number(originStockSnapshot.data().currentStock || 0);
-      const quantity = validateTransferLine({ ...line, productName: productSnapshot.data().name }, available);
+      const reconciled = reconcileTransferLine({ ...line, productName: productSnapshot.data().name }, available);
       prepared.push({
         line,
         productId,
         product: productSnapshot.data(),
-        quantity,
+        ...reconciled,
         originStockRef,
         originStock: originStockSnapshot.data(),
         destinationStockRef,
@@ -675,7 +740,7 @@ export async function transferStock({ originWarehouse, destination, lines, profi
       const originPrevious = Number(item.originStock.currentStock || 0);
       const originNew = originPrevious - item.quantity;
       const destinationPrevious = Number(item.destinationStock?.currentStock || 0);
-      const destinationNew = destinationPrevious + item.quantity;
+      const destinationNew = destinationPrevious + item.receivedQuantity;
       const outMovementRef = doc(db, "stockMovements", `${safeId}_${item.productId}_out`);
       const inMovementRef = doc(db, "stockMovements", `${safeId}_${item.productId}_in`);
 
@@ -712,10 +777,10 @@ export async function transferStock({ originWarehouse, destination, lines, profi
           priceOverride,
           price: wantsCustomPrice ? priceOverride : Number(item.product.defaultPrice || 0),
           masterDefaultPrice: Number(item.product.defaultPrice || 0),
-          initialStock: item.quantity,
-          currentStock: item.quantity,
-          yellowAlertQty: Number(item.product.yellowAlertQty || 0),
-          redAlertQty: Number(item.product.redAlertQty || 0),
+          initialStock: item.receivedQuantity,
+          currentStock: item.receivedQuantity,
+          yellowAlertQty: 0,
+          redAlertQty: 0,
           active: true,
           deleted: false,
           productDeleted: false,
@@ -734,8 +799,8 @@ export async function transferStock({ originWarehouse, destination, lines, profi
           categoryName: item.product.categoryName || "Sin categoría",
           imageUrl: item.product.imageUrl || "",
           thumbUrl: item.product.thumbUrl || "",
-          initialStock: item.quantity,
-          currentStock: item.quantity,
+          initialStock: item.receivedQuantity,
+          currentStock: item.receivedQuantity,
           active: true,
           deleted: false,
           productDeleted: false,
@@ -750,20 +815,21 @@ export async function transferStock({ originWarehouse, destination, lines, profi
       transaction.set(outMovementRef, {
         operationId: safeId,
         transferId: safeId,
-        inventoryType: INVENTORY_TYPES.WAREHOUSE,
-        inventoryId: originWarehouse.id,
-        warehouseId: originWarehouse.id,
-        warehouseName: originName,
+        inventoryType: origin.type,
+        inventoryId: origin.id,
+        ...(origin.type === INVENTORY_TYPES.LOCATION ? { locationId: origin.id, locationName: originName } : { warehouseId: origin.id, warehouseName: originName }),
         productId: item.productId,
         productName: item.product.name,
         type: "transfer_out",
         qty: -item.quantity,
         requestedQty: item.quantity,
+        preparedQty: item.preparedQuantity, receivedQty: item.receivedQuantity,
+        missingQty: item.missingQuantity, lostQty: item.lostQuantity,
         previousStock: originPrevious,
         newStock: originNew,
-        reason: `Transferencia a ${destinationName}`,
-        originType: INVENTORY_TYPES.WAREHOUSE,
-        originId: originWarehouse.id,
+        reason: `Transferencia a ${destinationName}: previstas ${item.quantity}, preparadas ${item.preparedQuantity}, recibidas ${item.receivedQuantity}${destination.note ? ` · ${destination.note}` : ""}`,
+        originType: origin.type,
+        originId: origin.id,
         originName,
         destinationType: destination.type,
         destinationId: destination.id,
@@ -784,13 +850,15 @@ export async function transferStock({ originWarehouse, destination, lines, profi
         productId: item.productId,
         productName: item.product.name,
         type: "transfer_in",
-        qty: item.quantity,
+        qty: item.receivedQuantity,
         requestedQty: item.quantity,
+        preparedQty: item.preparedQuantity, receivedQty: item.receivedQuantity,
+        missingQty: item.missingQuantity, lostQty: item.lostQuantity,
         previousStock: destinationPrevious,
         newStock: destinationNew,
-        reason: `Transferencia desde ${originName}`,
-        originType: INVENTORY_TYPES.WAREHOUSE,
-        originId: originWarehouse.id,
+        reason: `Transferencia desde ${originName}: recibidas ${item.receivedQuantity} de ${item.quantity}${destination.note ? ` · ${destination.note}` : ""}`,
+        originType: origin.type,
+        originId: origin.id,
         originName,
         destinationType: destination.type,
         destinationId: destination.id,
@@ -809,18 +877,25 @@ export async function transferStock({ originWarehouse, destination, lines, profi
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       status: "completed",
-      sourceType: INVENTORY_TYPES.WAREHOUSE,
-      sourceId: originWarehouse.id,
+      sourceType: origin.type,
+      sourceId: origin.id,
       sourceName: originName,
       destinationType: destination.type,
       destinationId: destination.id,
       destinationName,
       itemCount: prepared.length,
       totalQuantity,
+      preparedQuantity: prepared.reduce((sum, item) => sum + item.preparedQuantity, 0),
+      receivedQuantity: prepared.reduce((sum, item) => sum + item.receivedQuantity, 0),
+      missingQuantity: prepared.reduce((sum, item) => sum + item.missingQuantity, 0),
+      lostQuantity: prepared.reduce((sum, item) => sum + item.lostQuantity, 0),
+      preparedBy: profile.id, preparedByName: userName(profile),
+      receivedBy: profile.id, receivedByName: userName(profile), receivedAt: serverTimestamp(),
+      carrierName: String(carrierName || userName(profile)).trim(),
       items: prepared.map((item) => ({
         productId: item.productId,
         productName: item.product.name,
-        quantity: item.quantity,
+        quantity: item.quantity, preparedQuantity: item.preparedQuantity, receivedQuantity: item.receivedQuantity, missingQuantity: item.missingQuantity, lostQuantity: item.lostQuantity,
       })),
       note: String(destination.note || "").trim(),
     };
@@ -832,7 +907,9 @@ export async function transferStock({ originWarehouse, destination, lines, profi
       moduleId: "warehouse",
       entityType: "stockTransfer",
       entityId: safeId,
-      sourceWarehouseId: originWarehouse.id,
+      sourceType: origin.type, sourceId: origin.id,
+      ...(origin.type === INVENTORY_TYPES.LOCATION ? { locationId: origin.id, locationName: originName } : { warehouseId: origin.id, warehouseName: originName, sourceWarehouseId: origin.id }),
+      receivedQuantity: payload.receivedQuantity, missingQuantity: payload.missingQuantity, lostQuantity: payload.lostQuantity, carrierName: payload.carrierName,
       destinationType: destination.type,
       destinationId: destination.id,
       userId: profile.id,

@@ -61,7 +61,7 @@ export function useNavigate() {
   return context.navigate;
 }
 
-export function Link({ to, onClick, target, children, ...props }) {
+export function Link({ to, onClick = undefined, target = undefined, children, ...props }) {
   const navigate = useNavigate();
 
   const handleClick = (event) => {
@@ -120,6 +120,7 @@ function matchRoute(pathPattern, pathname) {
 
 export function Routes({ children }) {
   const { pathname } = useLocation();
+  /** @type {any[]} */
   const routes = Children.toArray(children).filter(isValidElement);
   let fallback = null;
 

@@ -1,3 +1,5 @@
+// Catálogo editorial de la tienda. NO es fuente autoritativa de precio, stock, IVA ni ID comercial.
+// La identidad comercial real proviene de Firestore products y locationStock mediante el backend Ecommerce.
 const productImage = (fileName) => `/images/flor-mia/products/${fileName}`;
 const pendingFormat = "Presentación por confirmar";
 const pendingProfile = "Perfil por validar";

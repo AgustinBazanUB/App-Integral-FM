@@ -8,7 +8,7 @@ import {
 } from "./customerImport";
 import {
   findCustomerByPhone,
-  saveCustomerFromAdmin,
+  mergeCustomerFromAdmin,
 } from "../services/customerService";
 
 const emptyImport = {
@@ -55,41 +55,34 @@ export default function CustomerImportModal({ open, onClose, profile, zones, onI
   };
 
   const confirmImport = async () => {
-    const pending = parsed.rows.filter((row) => !row.existingCustomer);
+    const pending = parsed.rows;
     if (!pending.length) return;
-    setBusy(true);
-    setError("");
-    setProgress({ completed: 0, total: pending.length, created: 0, skipped: 0 });
-    let created = 0;
-    let skipped = 0;
+    setBusy(true); setError("");
+    let created = 0; let updated = 0; let skipped = 0;
+    const conflicts = pending.flatMap(row => (row.importConflicts || []).map(conflict => ({ ...conflict, phone: row.phone })));
+    const failures = [];
     try {
       for (let index = 0; index < pending.length; index += 1) {
         const row = pending[index];
-        const existing = await findCustomerByPhone(row.phone);
-        if (existing) {
-          skipped += 1;
-        } else {
-          await saveCustomerFromAdmin(profile, {
-            phone: row.phone,
-            name: row.name,
-            zoneId: row.zoneId,
-            zoneName: row.zoneName,
-            customZone: row.customZone,
-          });
-          created += 1;
-        }
-        setProgress({ completed: index + 1, total: pending.length, created, skipped });
+        try {
+          const result = await mergeCustomerFromAdmin(profile, row);
+          if (result.created) created++;
+          else if (result.updated) updated++;
+          else skipped++;
+          conflicts.push(...result.conflicts.map(conflict => ({ ...conflict, phone: row.phone })));
+        } catch (cause) { failures.push(`Fila ${row.sourceRows.join(", ")}: ${cause.message}`); }
+        setProgress({ completed: index + 1, total: pending.length, created, updated, skipped, conflicts: conflicts.length });
       }
-      await onImported?.({ created, skipped, invalid: parsed.summary?.invalid || 0 });
-      reset();
-      onClose?.();
-    } catch (cause) {
-      setError(cause?.message || "La importación se interrumpió.");
-    } finally {
-      setBusy(false);
-    }
+      await onImported?.({ created, updated, skipped, conflicts: conflicts.length, invalid: parsed.summary?.invalid || 0 });
+      if (failures.length) setError(`Importación parcial. ${failures.join(" · ")}`);
+      else {
+        setParsed(current => ({ ...current, summary: { ...current.summary, readyToImport: 0, conflicts: conflicts.length }, resultConflicts: conflicts }));
+      }
+    } catch (cause) { setError(cause?.message || "No se pudo actualizar el resumen de importación."); }
+    finally { setBusy(false); }
   };
 
+  const visibleConflicts = parsed.resultConflicts || (parsed.rows || []).flatMap(row => [...(row.importConflicts || []), ...(row.enrichment?.conflicts || [])].map(conflict => ({ ...conflict, phone: row.phone })));
   const footer = (
     <div className="fm-dialog-actions">
       <Button variant="secondary" disabled={busy} onClick={close}>Cerrar</Button>
@@ -98,7 +91,7 @@ export default function CustomerImportModal({ open, onClose, profile, zones, onI
         disabled={!parsed.summary || parsed.summary.readyToImport === 0 || busy}
         onClick={confirmImport}
       >
-        Importar {parsed.summary?.readyToImport || 0} cliente(s)
+        Procesar {parsed.summary?.readyToImport || 0} cliente(s)
       </Button>
     </div>
   );
@@ -108,7 +101,7 @@ export default function CustomerImportModal({ open, onClose, profile, zones, onI
       open={open}
       onClose={close}
       title="Agregar Clientes"
-      description="Cargá el Excel generado por Flor Mía WhatsApp Sender con las columnas Telefono, Nombre y Apellido y Zona."
+      description="Cargá el Excel generado por Flor Mía WhatsApp Sender con las columnas Telefono, Nombre y Apellido y Zona. Sólo Telefono es obligatoria."
       footer={footer}
     >
       <div className="fm-customer-import">
@@ -139,6 +132,7 @@ export default function CustomerImportModal({ open, onClose, profile, zones, onI
               <span><b>{parsed.summary.duplicates}</b>Duplicados en archivo</span>
               <span><b>{parsed.summary.existing}</b>Ya existentes</span>
               <span><b>{parsed.summary.invalid}</b>Inválidos</span>
+              <span><b>{parsed.summary.conflicts || 0}</b>Conflictos para revisar</span>
               <span><b>{parsed.summary.readyToImport}</b>Listos para importar</span>
             </div>
 
@@ -151,12 +145,12 @@ export default function CustomerImportModal({ open, onClose, profile, zones, onI
                       <td>{row.phone.startsWith("+") ? row.phone : formatPhoneForDisplay(row.phone)}</td>
                       <td>{row.name || "—"}</td>
                       <td>{row.zone}</td>
-                      <td>{row.existingCustomer ? "Ya existe · no se importará" : "Listo"}</td>
+                      <td>{row.existingCustomer ? Object.keys(row.enrichment?.patch || {}).length ? "Completar campos vacíos" : "Ya existe · conservar datos" : "Nuevo"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <small>Vista previa de hasta 20 clientes válidos. Los existentes se omiten; nunca se duplican ni se pisan desde esta importación.</small>
+              <small>Vista previa de hasta 20 clientes válidos. Sólo se completan campos vacíos. Los valores distintos se informan y conservan para una edición explícita.</small>
             </div>
 
             {parsed.invalidRows.length ? (
@@ -168,9 +162,10 @@ export default function CustomerImportModal({ open, onClose, profile, zones, onI
           </>
         ) : null}
 
+        {visibleConflicts.length ? <div className="fm-customer-import__errors"><strong>Conflictos de datos (sin reemplazo automático)</strong><ul>{visibleConflicts.slice(0, 30).map((conflict, index) => <li key={index}>{formatPhoneForDisplay(conflict.phone)} · {conflict.field}: «{conflict.existing}» / archivo «{conflict.incoming}»</li>)}</ul></div> : null}
         {progress ? (
           <p aria-live="polite">
-            Importando {progress.completed} / {progress.total} · creados {progress.created} · omitidos {progress.skipped}
+            Importando {progress.completed} / {progress.total} · creados {progress.created} · completados {progress.updated || 0} · omitidos {progress.skipped} · conflictos {progress.conflicts || 0}
           </p>
         ) : null}
       </div>

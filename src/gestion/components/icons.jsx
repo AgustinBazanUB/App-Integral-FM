@@ -68,6 +68,7 @@ import {
   Zap,
   Pause,
   Play,
+  Printer,
   Trash2,
 } from "lucide-react";
 
@@ -141,6 +142,7 @@ export const icons = {
   Zap,
   Pause,
   Play,
+  Printer,
   Trash2,
 };
 

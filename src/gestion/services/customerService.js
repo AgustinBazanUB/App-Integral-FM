@@ -11,10 +11,10 @@ import {
   serverTimestamp,
   setDoc,
   where,
-  writeBatch,
 } from "firebase/firestore";
 import {
   buildCustomerDraft,
+  customerEnrichment,
   cleanZoneName,
   customerDocumentId,
   normalizeCustomerPhone,
@@ -42,7 +42,7 @@ function customerAudit(profile, { action, customerId, changedFields = [] }) {
   return {
     action,
     title: action === "customer.created" ? "Cliente creado" : "Cliente actualizado",
-    description: action === "customer.created" ? "Nuevo cliente fidelizado" : "Datos principales actualizados",
+    description: action === "customer.created" ? "Nuevo cliente comercial" : "Datos principales actualizados",
     moduleId: "loyal-customers",
     entityType: "customer",
     entityId: customerId,
@@ -84,6 +84,7 @@ function rememberedActiveZones() {
   }
 }
 
+/** @returns {Promise<any>} */
 export async function findCustomerByPhone(phone) {
   const phoneNormalized = normalizeCustomerPhone(phone);
   if (!phoneNormalized) return null;
@@ -111,45 +112,32 @@ export async function listCustomers(profile, pageSize = 200) {
   }
 }
 
-export async function saveCustomerFromAdmin(profile, input) {
-  if (!can(profile, "loyal-customers", "create") && !can(profile, "loyal-customers", "edit")) {
-    throw new Error("No tenés permiso para guardar clientes.");
-  }
+export async function mergeCustomerFromAdmin(profile, input) {
+  if (!can(profile, "loyal-customers", "create") && !can(profile, "loyal-customers", "edit")) throw new Error("No tenés permiso para guardar clientes.");
   const draft = buildCustomerDraft(input);
   const customerId = await customerDocumentId(draft.phoneNormalized);
   const reference = doc(db, "customers", customerId);
-  const existing = await getDoc(reference);
-  if (existing.exists() && !can(profile, "loyal-customers", "edit")) {
-    throw new Error("Ese cliente ya existe y no tenés permiso para editarlo.");
-  }
-  const batch = writeBatch(db);
-  batch.set(reference, {
-    customerKey: customerId,
-    phone: draft.phone,
-    phoneNormalized: draft.phoneNormalized,
-    name: draft.name || null,
-    zoneId: draft.zoneId || null,
-    zoneName: draft.zoneName,
-    customZone: draft.customZone || null,
-    active: true,
-    deleted: false,
-    source: existing.exists() ? (existing.data().source || "admin") : "admin",
-    updatedBy: profile.id,
-    updatedByName: userName(profile),
-    updatedAt: serverTimestamp(),
-    ...(existing.exists() ? {} : {
-      createdBy: profile.id,
-      createdByName: userName(profile),
-      createdAt: serverTimestamp(),
-    }),
-  }, { merge: true });
-  batch.set(doc(collection(db, "auditLogs")), customerAudit(profile, {
-    action: existing.exists() ? "customer.updated" : "customer.created",
-    customerId,
-    changedFields: existing.exists() ? ["name", "phone", "zone"] : [],
-  }));
-  await batch.commit();
-  return customerId;
+  const auditRef = doc(collection(db, "auditLogs"));
+  return runTransaction(db, async transaction => {
+    const snapshot = await transaction.get(reference);
+    if (snapshot.exists() && (snapshot.data().deleted === true || snapshot.data().active === false)) throw new Error("El teléfono corresponde a un cliente inactivo o reemplazado. Revisá su identidad antes de reutilizarlo.");
+    const { patch, conflicts } = customerEnrichment(snapshot.exists() ? snapshot.data() : {}, draft);
+    if (snapshot.exists() && Object.keys(patch).length && !can(profile, "loyal-customers", "edit")) throw new Error("No tenés permiso para completar este cliente.");
+    const created = !snapshot.exists();
+    const updated = !created && Object.keys(patch).length > 0;
+    if (created || updated) {
+      transaction.set(reference, {
+        ...(created ? { ...draft, customerKey: customerId, active: true, deleted: false, source: "admin", createdBy: profile.id, createdByName: userName(profile), createdAt: serverTimestamp() } : patch),
+        updatedBy: profile.id, updatedByName: userName(profile), updatedAt: serverTimestamp(),
+      }, { merge: true });
+      transaction.set(auditRef, customerAudit(profile, { action: created ? "customer.created" : "customer.updated", customerId, changedFields: Object.keys(patch) }));
+    }
+    return { id: customerId, created, updated, conflicts };
+  });
+}
+
+export async function saveCustomerFromAdmin(profile, input) {
+  return (await mergeCustomerFromAdmin(profile, input)).id;
 }
 
 export async function updateCustomerFromAdmin(profile, currentCustomer, input) {
@@ -210,6 +198,7 @@ export async function updateCustomerFromAdmin(profile, currentCustomer, input) {
         lastSaleId: stored.lastSaleId || null,
         lastPurchaseAt: stored.lastPurchaseAt || null,
         migratedFromCustomerId: currentCustomer.id,
+        previousCustomerIds: [...new Set([...(stored.previousCustomerIds || []), stored.migratedFromCustomerId, currentCustomer.id].filter(Boolean))],
       }, { merge: true });
       transaction.set(currentRef, {
         active: false,

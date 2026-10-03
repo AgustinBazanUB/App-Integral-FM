@@ -9,6 +9,7 @@ export const managementPageLoaders = {
   products: () => import("./pages/ProductsPage"),
   warehouse: () => import("./pages/WarehousePage"),
   "quick-sales": () => import("./pages/QuickSalesPage"),
+  finance: () => import("./pages/FinancePage"),
   metrics: () => import("./pages/SalesMetricsPage"),
   marketingWhatsapp: () => import("./pages/WhatsAppCampaignsPage"),
   marketingMetaAds: () => import("./pages/MetaAdsHubPage"),

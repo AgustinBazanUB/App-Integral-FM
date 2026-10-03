@@ -7,44 +7,10 @@ import {
   argentinaParts,
   lastSevenArgentinaDays,
 } from "./time.js";
+import { effectiveLocationPrice } from "../../inventory/domain/inventory.js";
 
-const CANCELLED_STATUSES = new Set([
-  "cancelled",
-  "canceled",
-  "deleted",
-  "anulada",
-  "anulado",
-  "cancelada",
-  "cancelado",
-]);
-
-export function isActiveDashboardSale(sale = {}) {
-  return sale.deleted !== true && !CANCELLED_STATUSES.has(String(sale.status || "active").toLowerCase());
-}
-
-export function uniqueSales(sales = []) {
-  const unique = new Map();
-  sales.forEach((sale, index) => unique.set(sale.id || `legacy-${index}`, sale));
-  return [...unique.values()];
-}
-
-export function summarizeSales(sales = []) {
-  const active = uniqueSales(sales).filter(isActiveDashboardSale);
-  const total = active.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
-  return {
-    sales: active,
-    count: active.length,
-    total,
-    average: active.length ? total / active.length : 0,
-  };
-}
-
-function saleDate(sale) {
-  const value = sale.createdAt?.toDate?.() || sale.createdAt || sale.date;
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.valueOf()) ? null : date;
-}
+import { isActiveSale as isActiveDashboardSale, saleDate, uniqueSales } from "./saleFacts.js";
+export { isActiveSale as isActiveDashboardSale, uniqueSales, summarizeSales } from "./saleFacts.js";
 
 export function buildSevenDaySalesSeries(sales = [], now = new Date()) {
   const { start } = lastSevenArgentinaDays(now);
@@ -141,7 +107,7 @@ export function joinMasterProducts(products = [], stock = []) {
         hasLocalRecord: Boolean(local),
         configured: Boolean(local && local.deleted !== true),
         currentStock: Number(local?.currentStock || 0),
-        price: Number(local?.price ?? product.defaultPrice ?? 0),
+        price: effectiveLocationPrice(product, local || {}),
         active: local ? local.active !== false && local.deleted !== true : product.active !== false,
       };
     })

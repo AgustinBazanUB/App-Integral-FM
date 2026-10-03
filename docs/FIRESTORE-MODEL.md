@@ -38,3 +38,14 @@ Las bajas son lógicas (`active`, `deleted`, `deletedAt`, `deletedBy`). Ventas, 
 ## Datos sensibles
 
 DNI, teléfono, dirección, preferencias y consentimiento sólo pueden leerse desde módulos/acciones autorizadas. Finanzas y facturación tienen reglas separadas. Las credenciales de pagos, ARCA y cuentas de servicio no pertenecen a Firestore cliente.
+
+
+## Ecommerce comercial Etapa 5
+
+La tienda pública reutiliza `products` como catálogo maestro y `locationStock/{ECOMMERCE_LOCATION_ID}/items/{productId}` como stock/precio de la ubicación Ecommerce. `src/data/products.js` es contenido editorial, no autoridad comercial.
+
+`orders`, `payments` y las `sales` Ecommerce se escriben sólo desde backend. El cliente público nunca escribe directamente esos documentos.
+
+Un Order puede existir con Payment `pending` y sin Sale. La Sale aparece recién cuando el pago se considera aprobado por una fuente confiable. Invoice permanece separada y no existe durante Etapa 5.
+
+La ubicación de stock Ecommerce y las reglas de delivery no tienen defaults de negocio y deben configurarse explícitamente.
