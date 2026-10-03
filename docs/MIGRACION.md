@@ -1,5 +1,7 @@
 # Separación y estrategia de migración
 
+La actualización aplicada el 3 de octubre de 2026, junto con la baja autorizada de las 13 ventas propias, está documentada en [Migración incremental](MIGRACION_INCREMENTAL_2026_10_03.md). El procedimiento inicial descrito abajo conserva su alcance de copia sobre una base vacía.
+
 ## Entornos independientes
 
 | Uso | Proyecto Firebase | Región | Estado |

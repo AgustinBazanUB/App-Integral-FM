@@ -9,6 +9,13 @@ import { alertContextPath, alertPresentation, groupActiveAlerts, prioritizeAlert
 
 const sale = (id, total, date, extra = {}) => ({ id, total, createdAt: new Date(date), status: "active", paymentMethod: "cash", locationId: "local", ...extra });
 
+test("ventas archivadas no se contabilizan como ventas ni como anulaciones", () => {
+  const date = "2026-10-02T13:00:00Z";
+  const metrics = calculateMetrics([sale("vigente", 100, date), sale("archivada", 500, date, { deleted: true }), sale("anulada", 200, date, { status: "cancelled" }), sale("anulada-archivada", 800, date, { status: "cancelled", deleted: true })], argentinaPeriodRange("day", "2026-10-02"));
+  assert.equal(metrics.total, 100); assert.equal(metrics.salesCount, 1);
+  assert.equal(metrics.cancelled.length, 1); assert.equal(metrics.cancelledTotal, 200);
+});
+
 test("saludo contextual con hora de Argentina, nombre y fallback", () => {
   assert.equal(dashboardGreeting("  Ana Pérez", new Date("2026-10-02T11:00:00Z")), "Buen día, Ana.");
   assert.equal(dashboardGreeting("Ana", new Date("2026-10-02T18:00:00Z")), "Buenas tardes, Ana.");

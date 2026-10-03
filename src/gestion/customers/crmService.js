@@ -69,7 +69,7 @@ export async function customerHistoryPage(profile, customer, cursor = {}, active
   const pages = await Promise.all(groups.map(async group => {
     const constraints = [where(group.field, "in", group.values), orderBy("createdAt", "desc"), ...(cursor[group.key] ? [startAfter(cursor[group.key])] : []), limit(21)];
     const snapshot = await getDocs(query(collection(db, "sales"), ...constraints));
-    return snapshot.docs.map(document => ({ group: group.key, document, sale: { id: document.id, ...document.data() } }));
+    return snapshot.docs.map(document => ({ group: group.key, document, sale: /** @type {any} */ ({ id: document.id, ...document.data() }) }));
   }));
   const raw = pages.flat().sort((a, b) => (saleDate(b.sale)?.getTime() || 0) - (saleDate(a.sale)?.getTime() || 0) || b.sale.id.localeCompare(a.sale.id));
   const items = [], seen = new Set(), next = { ...cursor };
@@ -79,7 +79,7 @@ export async function customerHistoryPage(profile, customer, cursor = {}, active
     // La misma venta puede coincidir por customerId y por teléfono histórico.
     if (items.length === 20 && !seen.has(entry.sale.id)) break;
     next[entry.group] = entry.document; consumed++;
-    if (seen.has(entry.sale.id) || (activeOnly && !isActiveSale(entry.sale))) continue;
+    if (seen.has(entry.sale.id) || entry.sale.deleted === true || (activeOnly && !isActiveSale(entry.sale))) continue;
     seen.add(entry.sale.id); items.push(entry.sale);
   }
   return { items, cursor: next, hasMore: consumed < raw.length || pages.some(page => page.length === 21) };

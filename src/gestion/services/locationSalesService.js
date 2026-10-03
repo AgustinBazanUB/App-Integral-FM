@@ -24,6 +24,7 @@ export async function listLocationSalesPage({
   }
   if (!locationId) return { items: [], cursor: null, hasMore: false };
   const safePageSize = Math.min(100, Math.max(10, Number(pageSize) || 50));
+  /** @type {import("firebase/firestore").QueryConstraint[]} */
   const constraints = [
     where("locationId", "==", locationId),
     orderBy("createdAt", "desc"),
@@ -32,7 +33,7 @@ export async function listLocationSalesPage({
   constraints.push(limit(safePageSize));
   const snapshot = await getDocs(query(collection(db, "sales"), ...constraints));
   return {
-    items: docsToArray(snapshot),
+    items: docsToArray(snapshot).filter((sale) => sale.deleted !== true),
     cursor: snapshot.docs.at(-1) || null,
     hasMore: snapshot.size === safePageSize,
   };

@@ -276,7 +276,7 @@ export async function listSellerDailySales(profile, locationId) {
     where("createdAt", "<", Timestamp.fromDate(end)),
     orderBy("createdAt", "desc"),
     limit(150),
-  )));
+  ))).filter((sale) => sale.deleted !== true);
 }
 
 async function verifiedDiscounts({ profile, location, discounts, items }) {

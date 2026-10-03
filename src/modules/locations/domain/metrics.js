@@ -190,7 +190,7 @@ function buildTimeline(active, range) {
 export function calculateMetrics(sales, range, filters = {}) {
   const facts = summarizeSales(sales);
   const active = facts.sales;
-  const cancelled = sales.filter((sale) => !isActiveSale(sale));
+  const cancelled = sales.filter((sale) => sale.deleted !== true && !isActiveSale(sale));
   const total = active.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
   const totalItems = active.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.qty || 0), 0), 0);
   const byChannel = new Map();
