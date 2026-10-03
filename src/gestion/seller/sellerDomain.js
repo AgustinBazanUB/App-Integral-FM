@@ -117,6 +117,7 @@ export function sellerStockStatus(item = {}) {
   const stock = Number(item.currentStock || 0);
   const red = Number(item.redAlertQty || 0);
   const yellow = Number(item.yellowAlertQty || 0);
+  if (stock < 0) return { label: "Stock negativo · Revisar inventario", tone: "error" };
   if (stock <= red) return { label: "Alerta roja", tone: "error" };
   if (stock <= yellow) return { label: "Alerta amarilla", tone: "warning" };
   return { label: "Stock normal", tone: "success" };

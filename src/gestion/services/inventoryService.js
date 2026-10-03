@@ -554,7 +554,7 @@ export async function addStockToInventory({ type, inventory, product, quantity, 
     }
     if (type === INVENTORY_TYPES.LOCATION && !locationActivity(ownerSnapshot.data()).active) throw new Error("Activá la ubicación para ingresar mercadería.");
     if (!masterSnapshot.exists() || masterSnapshot.data().active === false || masterSnapshot.data().deleted === true) throw new Error("El producto ya no está disponible.");
-    const previousStock = wholeInventoryQuantity(stockSnapshot.data().currentStock || 0, "El stock actual");
+    const previousStock = wholeInventoryQuantity(stockSnapshot.data().currentStock || 0, "El stock actual", { allowNegative: type === INVENTORY_TYPES.LOCATION });
     const newStock = previousStock + requested;
     transaction.update(stockRef, {
       currentStock: newStock,
@@ -659,7 +659,7 @@ export async function adjustInventoryStock({ type, inventory, product, quantity,
     const ownerSnapshot = await transaction.get(ownerReference(type, inventory.id));
     const stockSnapshot = await transaction.get(stockRef);
     if (!ownerSnapshot.exists() || ownerSnapshot.data().deleted === true || !stockSnapshot.exists() || stockSnapshot.data().deleted === true) throw new Error("El inventario ya no está disponible.");
-    const previousStock = wholeInventoryQuantity(stockSnapshot.data().currentStock || 0, "El stock anterior");
+    const previousStock = wholeInventoryQuantity(stockSnapshot.data().currentStock || 0, "El stock anterior", { allowNegative: type === INVENTORY_TYPES.LOCATION });
     const note = String(reason || "Ajuste por conteo físico").trim() || "Ajuste por conteo físico";
     const context = type === INVENTORY_TYPES.LOCATION ? { locationId: inventory.id, locationName: ownerSnapshot.data().name } : { warehouseId: inventory.id, warehouseName: ownerSnapshot.data().name };
     const result = { operationId: safeId, operationType: "adjust_stock", inventoryType: type, inventoryId: inventory.id, productId, previousStock, newStock: requested, quantity: requested - previousStock, reason: note, userId: profile.id, status: "completed", createdAt: serverTimestamp() };

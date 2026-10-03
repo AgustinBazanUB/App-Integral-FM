@@ -281,9 +281,10 @@ service cloud.firestore {
       let sale = getAfter(/databases/$(database)/documents/sales/$(request.resource.data.lastSaleId)).data;
       let movementPath = /databases/$(database)/documents/stockMovements/$(request.resource.data.lastMovementId);
       let movement = getAfter(movementPath).data;
-      return !exists(movementPath)
-        && existsAfter(movementPath)
-        && sale.sellerId == request.auth.uid
+      return ((resource.data.currentStock < 0 || request.resource.data.currentStock < 0)
+          ? movement.createdAt == request.time
+          : (!exists(movementPath) && existsAfter(movementPath)))
+        && (sale.sellerId == request.auth.uid || isAdmin())
         && sale.locationId == locationId
         && sale.status in ["active", "cancelled"]
         && movement.userId == request.auth.uid
@@ -291,7 +292,8 @@ service cloud.firestore {
         && movement.productId == productId
         && movement.saleId == request.resource.data.lastSaleId
         && movement.previousStock == resource.data.currentStock
-        && movement.newStock == request.resource.data.currentStock;
+        && movement.newStock == request.resource.data.currentStock
+        && movement.newStock == movement.previousStock + movement.qty;
     }
     function validSellerStockMutation(locationId, productId) {
       return quickSalesPermission("edit")
@@ -300,10 +302,62 @@ service cloud.firestore {
           "currentStock", "lastSaleId", "lastMovementId", "updatedAt"
         ])
         && request.resource.data.currentStock is int
-        && request.resource.data.currentStock >= 0
+        && (request.resource.data.currentStock >= 0 || (
+          resource.data.get("active", true) == true
+          && resource.data.get("deleted", false) != true
+          && resource.data.get("productDeleted", false) != true))
         && request.resource.data.lastSaleId is string
         && request.resource.data.lastMovementId is string
         && linkedSellerStockMutation(locationId, productId);
+    }
+    // Sólo ventas atómicas pueden originar un saldo negativo. Los índices
+    // enlazan la cantidad del movimiento con los ítems antes/después de la venta.
+    function validNegativeSaleEffect(data) {
+      let salePath = /databases/$(database)/documents/sales/$(data.saleId);
+      let sale = getAfter(salePath).data;
+      let original = exists(salePath) ? get(salePath).data : {"items": [], "status": ""};
+      let beforeIndex = data.get("previousSaleItemIndex", -2);
+      let afterIndex = data.get("saleItemIndex", -2);
+      let before = beforeIndex >= 0 && beforeIndex < original.items.size() ? original.items[beforeIndex] : {"productId": data.productId, "qty": 0};
+      let after = afterIndex >= 0 && afterIndex < sale.items.size() ? sale.items[afterIndex] : {"productId": data.productId, "qty": 0};
+      return sale.locationId == data.locationId
+        && (sale.sellerId == request.auth.uid || isAdmin())
+        && sale.updatedAt == request.time
+        && sale.get("deleted", false) != true
+        && original.get("deleted", false) != true
+        && beforeIndex is int && beforeIndex >= -1 && beforeIndex < original.items.size()
+        && afterIndex is int && afterIndex >= -1 && afterIndex < sale.items.size()
+        && before.productId == data.productId && after.productId == data.productId
+        && before.qty is int && before.qty >= 0 && after.qty is int && after.qty >= 0
+        && data.qty != 0 && data.qty == before.qty - after.qty
+        && ((data.type == "sale" && !exists(salePath) && sale.status == "active" && beforeIndex == -1 && afterIndex >= 0)
+          || (data.type == "sale_edit" && original.status == "active" && sale.status == "active" && (beforeIndex >= 0 || afterIndex >= 0))
+          || (data.type == "sale_cancel" && original.status == "active" && sale.status == "cancelled" && beforeIndex >= 0 && afterIndex == -1));
+    }
+    function linkedNegativeLocationMovement(data, movementId) {
+      let stock = getAfter(/databases/$(database)/documents/locationStock/$(data.locationId)/items/$(data.productId)).data;
+      return stock.lastMovementId == movementId
+        && stock.currentStock == data.newStock
+        && data.newStock == data.previousStock + data.qty
+        && data.createdAt == request.time
+        && ((data.type in ["sale", "sale_edit", "sale_cancel"]
+            && stock.lastSaleId == data.saleId && validNegativeSaleEffect(data))
+          || (data.type == "add" && data.previousStock < 0 && data.qty > 0));
+    }
+    function validNegativeStockRecovery(locationId, productId) {
+      let movement = getAfter(/databases/$(database)/documents/stockMovements/$(request.resource.data.lastMovementId)).data;
+      return canModule("locations", "loadStock") && allowedLocation(locationId)
+        && resource.data.currentStock < 0
+        && request.resource.data.currentStock is int
+        && request.resource.data.currentStock > resource.data.currentStock
+        && request.resource.data.productId == productId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["currentStock", "lastMovementId", "updatedAt", "updatedBy"])
+        && movement.userId == request.auth.uid && movement.locationId == locationId && movement.productId == productId
+        && movement.type == "add" && movement.qty > 0
+        && movement.previousStock == resource.data.currentStock
+        && movement.newStock == request.resource.data.currentStock
+        && movement.newStock == movement.previousStock + movement.qty
+        && movement.createdAt == request.time;
     }
     function ownsNewRecord() {
       return request.resource.data.createdBy == request.auth.uid;
@@ -796,13 +850,16 @@ service cloud.firestore {
           "price", "effectivePrice", "priceMode", "priceOverride", "masterDefaultPrice"
         ]);
     }
-    function validInventoryMovement(data) {
+    function validInventoryMovement(data, movementId) {
       return data.userId == request.auth.uid
         && data.productId is string
         && data.previousStock is int
-        && data.previousStock >= 0
+        && (data.previousStock >= 0 || (data.get("locationId", null) is string && data.type in ["sale", "sale_edit", "sale_cancel", "add", "adjustment"]))
         && data.newStock is int
-        && data.newStock >= 0
+        && ((data.previousStock >= 0 && data.newStock >= 0)
+          || (data.get("locationId", null) is string && (
+            (data.type == "adjustment" && data.newStock >= 0)
+            || linkedNegativeLocationMovement(data, movementId))))
         && data.qty is int
         && data.saleId is string
         && (!(data.type in ["adjustment", "initial_adjustment"])
@@ -903,7 +960,8 @@ service cloud.firestore {
         allow read: if activeUser() && allowedLocation(locationId);
         allow create: if validOperationalLocationStockCreate(locationId, productId);
         allow update: if validOperationalLocationStockMutation(locationId, productId)
-          || validSellerStockMutation(locationId, productId);
+          || validSellerStockMutation(locationId, productId)
+          || validNegativeStockRecovery(locationId, productId);
         allow delete: if false;
       }
     }
@@ -982,7 +1040,7 @@ service cloud.firestore {
         || (canModule("locations", "view")
           && ("locationId" in resource.data)
           && allowedLocation(resource.data.locationId));
-      allow create: if signedIn() && validInventoryMovement(request.resource.data);
+      allow create: if signedIn() && validInventoryMovement(request.resource.data, movementId);
       allow update, delete: if false;
     }
     match /stockOperations/{operationId} {

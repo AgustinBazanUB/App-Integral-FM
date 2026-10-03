@@ -59,6 +59,17 @@ const seed=(originType="warehouse",destinationType="location")=>{
 };
 const transfer=(originType="warehouse",destinationType="location",extra={})=>({origin:{type:originType,id:"origin"},destination:{type:destinationType,id:"destination",note:"Una faltó en preparación y otra se rompió"},lines:[{productId:"oil",quantity:20,preparedQuantity:19,receivedQuantity:18}],profile:admin,transferId:"transfer-qa",carrierName:"Transportista QA",...extra});
 
+test("carga y conteo físico corrigen saldos negativos de ubicación con auditoría e idempotencia", async () => {
+  seed("location", "warehouse"); mock.data.get(stockPath("location", "origin")).currentStock = -3;
+  const input = { type: "location", inventory: { id: "origin" }, product: { id: "oil", productName: "Aceite" }, quantity: 1, profile: admin, requestId: "negative-add" };
+  await service.addStockToInventory(input); await service.addStockToInventory(input);
+  assert.equal(mock.data.get(stockPath("location", "origin")).currentStock, -2);
+  const result = await service.adjustInventoryStock({ ...input, quantity: 4, requestId: "negative-adjust", reason: "Conteo físico" });
+  assert.equal(result.previousStock, -2); assert.equal(result.newStock, 4);
+  assert.equal(mock.data.get(stockPath("location", "origin")).currentStock, 4);
+  assert.ok([...mock.data.values()].some(data => data.action === "stock.adjust" && data.previousStock === -2));
+});
+
 for(const originType of ["warehouse","location"])for(const destinationType of ["warehouse","location"]){
   test(`transferencia ${originType} → ${destinationType}: faltantes/pérdidas no ingresan al destino y reintentos no duplican`,async()=>{
     seed(originType,destinationType);

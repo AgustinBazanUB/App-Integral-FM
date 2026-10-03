@@ -42,7 +42,7 @@
 .fm-seller-cart .fm-panel { margin: 0; box-shadow: var(--fm-shadow-sm); }
 .fm-seller-cart-lines { display: grid; max-height: 310px; overflow-y: auto; }
 .fm-seller-cart-lines article { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 9px; border-bottom: 1px solid var(--fm-border-subtle); padding: 9px 0; }
-.fm-seller-cart-lines article.has-error { background: var(--fm-error-bg); }
+.fm-seller-cart-lines article.has-stock-warning { background: var(--fm-warning-bg); }
 .fm-seller-cart-lines img { width: 42px; height: 42px; border-radius: 8px; object-fit: contain; }
 .fm-seller-cart-lines article > div:nth-child(2) { display: grid; min-width: 0; }
 .fm-seller-cart-lines strong { font-size: 11px; }

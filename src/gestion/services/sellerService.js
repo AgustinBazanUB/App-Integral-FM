@@ -1,5 +1,6 @@
 import { effectiveLocationPrice } from "../../modules/inventory/domain/inventory";
 import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
+import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
 import { invalidateDashboardSales } from "./dashboardService";
 import {
   collection,
@@ -343,6 +344,8 @@ function saleRefs({ location, saleItems, seller, offlineSale, stockType = "locat
 
 export const createSellerSale = (sale) => createSale({ ...sale, administrative: false, requestId: null, requestFingerprint: null });
 
+const pendingAdministrativeSales = new Map();
+
 export async function createAdministrativeSale(sale) {
   if (!canAccessAdministration(sale.profile) || !sale.profile?.active) {
     throw saleValidationError("Venta Rápida administrativa requiere un Administrador.");
@@ -351,6 +354,22 @@ export async function createAdministrativeSale(sale) {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(requestId)) throw saleValidationError("Identificador de venta inválido.");
   if (!SALES_CHANNELS.some(option => option.value === sale.channel)) throw saleValidationError("Elegí el canal comercial real.");
   const fingerprint = administrativeFingerprint(sale);
+  const key = `${sale.profile.id}:${requestId}`;
+  const pending = pendingAdministrativeSales.get(key);
+  if (pending) {
+    if (pending.fingerprint !== fingerprint) throw Object.assign(new Error("Este intento ya corresponde a otra venta. Recuperá la confirmación original."), { code: "sale/request-conflict" });
+    return pending.promise;
+  }
+  const promise = resumeAdministrativeSale(sale, requestId, fingerprint);
+  pendingAdministrativeSales.set(key, { fingerprint, promise });
+  try {
+    return await promise;
+  } finally {
+    pendingAdministrativeSales.delete(key);
+  }
+}
+
+async function resumeAdministrativeSale(sale, requestId, fingerprint) {
   const existing = await getDoc(doc(db, "sales", `quick_${sale.profile.id}_${requestId}`));
   if (existing.exists()) {
     if (existing.data().sellerId !== sale.profile.id || existing.data().requestFingerprint !== fingerprint) throw Object.assign(new Error("Este intento ya corresponde a otra venta. Recuperá la confirmación original."), { code: "sale/request-conflict" });
@@ -437,6 +456,7 @@ async function createSale({
           ticketRequested: data.ticketRequested === true,
           ticketStatus: data.ticketStatus || "not_requested",
           customerId: data.customerId || null,
+          stockDiscrepancies: data.stockDiscrepancies || [],
           createdAt: data.createdAt,
           alreadySynced: true,
         };
@@ -463,6 +483,10 @@ async function createSale({
       }
     }
     const resolvedCustomer = resolvedCustomerFromSnapshot(customerSnapshot, preparedCustomer);
+    const stockDiscrepancies = stockType === "location" ? saleStockDiscrepancies(saleItems, item => {
+      const index = saleItems.indexOf(item);
+      return Number(stockSnapshots[index].data()?.currentStock || 0);
+    }) : [];
     const next = Number(counterSnapshot.data()?.lastNumber || 0) + 1;
     const saleCode = `FM-${refs.prefix}-${refs.dateKey}-${String(next).padStart(4, "0")}`;
     transaction.set(refs.counterRef, { locationId: stockType === "location" ? permittedLocation.id : null, stockOriginType: stockType, stockOriginId: permittedLocation.id, date: refs.dateKey, lastNumber: next }, { merge: true });
@@ -473,7 +497,8 @@ async function createSale({
         throw saleValidationError(`${item.name} ya no está habilitado en esta ubicación.`);
       }
       const previousStock = Number(snapshot.data().currentStock || 0);
-      if (previousStock < item.qty) throw insufficientStockError(item, previousStock);
+      if (!Number.isInteger(previousStock)) throw saleValidationError(`El stock registrado de ${item.name} no es válido.`);
+      if (stockType === "warehouse" && previousStock < item.qty) throw insufficientStockError(item, previousStock);
       const newStock = previousStock - item.qty;
       transaction.update(refs.stockRefs[index], stockMutationFields({
         currentStock: newStock,
@@ -494,6 +519,8 @@ async function createSale({
         userId: profile.id,
         userName: userName(profile),
         saleId: refs.saleRef.id,
+        saleItemIndex: index,
+        previousSaleItemIndex: -1,
         createdAt: serverTimestamp(),
       });
     });
@@ -517,6 +544,7 @@ async function createSale({
       createdBy: profile.id,
       createdByName: userName(profile),
       items: saleItems,
+      ...(stockDiscrepancies.length ? { stockDiscrepancies } : {}),
       discounts: discountSummary.discounts,
       discount: null,
       fixedDiscountTotal: discountSummary.fixedDiscountTotal,
@@ -560,6 +588,7 @@ async function createSale({
       status: "completed",
       amount: discountSummary.total,
       ...(priceOverrides.length ? { priceOverrides } : {}),
+      ...(stockDiscrepancies.length ? { stockDiscrepancies } : {}),
       ticketRequested: Boolean(ticketRequested),
       ...(resolvedCustomer ? { customerId: resolvedCustomer.id } : {}),
       createdAt: serverTimestamp(),
@@ -569,6 +598,7 @@ async function createSale({
       saleCode,
       total: discountSummary.total,
       ...payment,
+      stockDiscrepancies,
       customerId: resolvedCustomer?.id || null,
       ticketRequested: Boolean(ticketRequested),
       ticketStatus,
@@ -659,15 +689,23 @@ export async function updateSellerSale({
     const stockSnapshots = [];
     for (const stockRef of stockRefs) stockSnapshots.push(await transaction.get(stockRef));
 
+    const stockDiscrepancies = saleStockDiscrepancies(newItems, item => {
+      const index = productIds.indexOf(item.productId);
+      return Number(stockSnapshots[index].data()?.currentStock || 0) + (oldQty.get(item.productId) || 0);
+    });
+
     productIds.forEach((productId, index) => {
       const difference = (oldQty.get(productId) || 0) - (newQty.get(productId) || 0);
       if (!difference) return;
       const snapshot = stockSnapshots[index];
       const item = newItems.find((entry) => entry.productId === productId) || sale.items.find((entry) => entry.productId === productId);
       if (!snapshot.exists()) throw new Error(`Falta el stock de ${item.name}.`);
+      if (difference < 0 && (snapshot.data().active === false || snapshot.data().deleted === true || snapshot.data().productDeleted === true)) {
+        throw saleValidationError(`${item.name} no está habilitado en esta ubicación.`);
+      }
       const previousStock = Number(snapshot.data().currentStock || 0);
       const newStock = previousStock + difference;
-      if (newStock < 0) throw insufficientStockError(item, previousStock + (oldQty.get(productId) || 0));
+      if (!Number.isInteger(previousStock)) throw saleValidationError(`El stock registrado de ${item.name} no es válido.`);
       transaction.update(stockRefs[index], stockMutationFields({
         currentStock: newStock,
         lastSaleId: saleId,
@@ -687,6 +725,8 @@ export async function updateSellerSale({
         userId: profile.id,
         userName: userName(profile),
         saleId,
+        saleItemIndex: newItems.findIndex(entry => entry.productId === productId),
+        previousSaleItemIndex: sale.items.findIndex(entry => entry.productId === productId),
         createdAt: serverTimestamp(),
       });
     });
@@ -698,6 +738,7 @@ export async function updateSellerSale({
       : "not_requested";
     transaction.update(saleReference, {
       items: newItems,
+      stockDiscrepancies,
       discounts: discountSummary.discounts,
       discount: null,
       fixedDiscountTotal: discountSummary.fixedDiscountTotal,
@@ -729,6 +770,7 @@ export async function updateSellerSale({
       userName: userName(profile),
       status: "completed",
       amount: discountSummary.total,
+      ...(stockDiscrepancies.length ? { stockDiscrepancies } : {}),
       ...(resolvedCustomer ? { customerId: resolvedCustomer.id } : {}),
       createdAt: serverTimestamp(),
     });
@@ -737,6 +779,7 @@ export async function updateSellerSale({
       saleCode: sale.saleCode,
       total: discountSummary.total,
       ...payment,
+      stockDiscrepancies,
       customerId: resolvedCustomer?.id || null,
       ticketRequested: nextTicketRequested,
       ticketStatus,
@@ -791,6 +834,8 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
         userId: profile.id,
         userName: userName(profile),
         saleId,
+        saleItemIndex: -1,
+        previousSaleItemIndex: index,
         createdAt: serverTimestamp(),
       });
     });

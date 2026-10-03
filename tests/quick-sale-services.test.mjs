@@ -10,7 +10,7 @@ import { financeSummary } from "../src/gestion/finance/financeDomain.js";
 // para verificar reintentos/concurrencia sin escribir Firebase real.
 const mock = { data: new Map(), writes: [], queries: [], sequence: 0, queue: Promise.resolve() };
 globalThis.__quickSaleTest = mock;
-const bundle = await build({stdin:{contents:'export { createQuickSale } from "./src/gestion/services/managementService.js"; export { createSellerSale, cancelSellerSale } from "./src/gestion/services/sellerService.js";',resolveDir:process.cwd()},bundle:true,write:false,platform:"node",format:"esm",plugins:[{name:"operations-transaction-adapter",setup(builder){
+const bundle = await build({stdin:{contents:'export { createQuickSale } from "./src/gestion/services/managementService.js"; export { createSellerSale, updateSellerSale, cancelSellerSale } from "./src/gestion/services/sellerService.js";',resolveDir:process.cwd()},bundle:true,write:false,platform:"node",format:"esm",plugins:[{name:"operations-transaction-adapter",setup(builder){
   builder.onResolve({filter:/^firebase\/firestore$/},()=>({path:"firestore",namespace:"qa"}));
   builder.onResolve({filter:/^\.\/firebase$/},()=>({path:"firebase",namespace:"qa"}));
   builder.onResolve({filter:/arcaService$/},()=>({path:"fiscal",namespace:"qa"}));
@@ -63,7 +63,48 @@ for(const type of ["location","warehouse"]) test(`venta simple desde ${type}: st
 
 test("pagos combinados exactos y descuento manual con precio administrativo editable",async()=>{seed();const result=await service.createQuickSale(args("warehouse",{items:[{id:"oil",name:"Aceite",qty:2,unitPrice:3000}],discounts:[{discountId:"manual",source:"manual",type:"percent",value:10}],paymentMethod:"multiple",paymentMethodLabel:"+2 pagos",payments:[{method:"cash",amount:2000},{method:"alias",amount:3400}]}));assert.equal(result.total,5400);const sale=sales()[0];assert.equal(sale.items[0].unitPrice,3000);assert.equal(sale.discountTotal,600);assert.deepEqual(sale.priceOverrides,[{productId:"oil",suggestedPrice:2500,unitPrice:3000}]);assert.ok([...mock.data.values()].some(v=>v.action==="sale.created"&&v.priceOverrides?.length===1));assert.equal(sale.payments.reduce((n,p)=>n+p.amount,0),5400);});
 
-test("pagos con diferencia, canal manual, duplicados, catálogo inactivo y stock insuficiente no escriben nada",async()=>{for(const extra of [{paymentMethod:"multiple",paymentMethodLabel:"+2 pagos",payments:[{method:"cash",amount:1000},{method:"alias",amount:2000}]},{channel:"manual"},{items:[{id:"oil",qty:2,unitPrice:2500},{id:"oil",qty:2,unitPrice:2500}]},{items:[{id:"oil",qty:21,unitPrice:2500}]}]){seed();await assert.rejects(service.createQuickSale(args("location",extra)));assert.equal(mock.writes.length,0);}seed();mock.data.get("products/oil").active=false;await assert.rejects(service.createQuickSale(args()));assert.equal(mock.writes.length,0);});
+test("pagos con diferencia, canal manual, duplicados y catálogo inactivo no escriben nada",async()=>{for(const extra of [{paymentMethod:"multiple",paymentMethodLabel:"+2 pagos",payments:[{method:"cash",amount:1000},{method:"alias",amount:2000}]},{channel:"manual"},{items:[{id:"oil",qty:2,unitPrice:2500},{id:"oil",qty:2,unitPrice:2500}]}]){seed();await assert.rejects(service.createQuickSale(args("location",extra)));assert.equal(mock.writes.length,0);}seed();mock.data.get("products/oil").active=false;await assert.rejects(service.createQuickSale(args()));assert.equal(mock.writes.length,0);});
+
+test("ubicación permite stock cero, insuficiente y negativo; registra saldo, aviso y actividad sin duplicar", async () => {
+  for (const stock of [0, 1, -2]) {
+    seed(); mock.data.get("locationStock/origin/items/oil").currentStock = stock;
+    const input = args("location", { items: [{ id: "oil", name: "Aceite", qty: 2, unitPrice: 2500 }] });
+    const [first, retry] = await Promise.all([service.createQuickSale(input), service.createQuickSale(input)]);
+    assert.equal(first.id, retry.id); assert.equal(sales().length, 1);
+    assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, stock - 2);
+    assert.deepEqual(first.stockDiscrepancies, [{ productId: "oil", name: "Aceite", previousStock: stock, quantity: 2, newStock: stock - 2, missingQuantity: 2 - stock }]);
+    assert.deepEqual(sales()[0].stockDiscrepancies, first.stockDiscrepancies);
+    const movement = [...mock.data.values()].find(data => data.type === "sale");
+    assert.equal(movement.saleItemIndex, 0); assert.equal(movement.previousSaleItemIndex, -1); assert.equal(movement.qty, -2);
+    assert.ok([...mock.data.values()].some(data => data.action === "sale.created" && data.stockDiscrepancies?.length === 1));
+    assert.equal(calculateMetrics(sales(), range).total, 5000); assert.equal(financeSummary(sales(), [], {}, range).saleIncome, 5000);
+    assert.equal([...mock.data.keys()].filter(key => key.startsWith("financialEntries/")).length, 0);
+  }
+});
+
+test("vendedor registra 0 → -1 → -2; edición y anulación restituyen sólo sus unidades", async () => {
+  seed(); mock.data.get("locationStock/origin/items/oil").currentStock = 0;
+  const seller = { id: "seller", name: "Vendedor QA", role: "seller", active: true, allowedLocationIds: ["origin"] };
+  const input = { profile: seller, location: { id: "origin" }, items: [{ id: "oil", name: "Aceite", qty: 1, unitPrice: 2500 }], paymentMethod: "cash", paymentMethodLabel: "Efectivo" };
+  const first = await service.createSellerSale(input);
+  assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, -1);
+  const second = await service.createSellerSale(input);
+  assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, -2);
+  await service.updateSellerSale({ ...input, saleId: first.id, items: [{ id: "oil", name: "Aceite", qty: 2, unitPrice: 2500 }] });
+  assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, -3);
+  await service.cancelSellerSale({ profile: seller, saleId: second.id });
+  assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, -2);
+  await assert.rejects(service.cancelSellerSale({ profile: seller, saleId: second.id }), /anulada/);
+  await service.cancelSellerSale({ profile: seller, saleId: first.id });
+  assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, 0);
+});
+
+test("faltante de depósito, producto ausente o deshabilitado y ubicación inactiva siguen rechazados", async () => {
+  seed(); await assert.rejects(service.createQuickSale(args("warehouse", { items: [{ id: "oil", qty: 21, unitPrice: 2500 }] })), /stock/); assert.equal(mock.writes.length, 0);
+  for (const change of [() => mock.data.delete("locationStock/origin/items/oil"), () => { mock.data.get("locationStock/origin/items/oil").active = false; }, () => { mock.data.get("locations/origin").active = false; }]) {
+    seed(); change(); await assert.rejects(service.createQuickSale(args())); assert.equal(mock.writes.length, 0);
+  }
+});
 
 test("nuevo cliente y teléfono argentino equivalente reutilizan el mismo registro e historial",async()=>{seed();const customer={phone:"+54 9 11 1234-5678",name:"Ana",zoneName:"CABA"};await service.createQuickSale(args("location",{customer}));const id=await customerDocumentId("1112345678");assert.equal(sales()[0].customerId,id);assert.equal(mock.data.get(`customers/${id}`).source,"admin_quick_sale");await service.createQuickSale(args("warehouse",{channel:"instagram",requestId:"attempt-2",customer:{phone:"11 1234-5678",name:"Nombre distinto",zoneName:"Otra zona"}}));assert.equal([...mock.data.keys()].filter(k=>k.startsWith("customers/")).length,1);assert.equal(sales()[1].customerNameSnapshot,"Ana");assert.equal(sales()[1].customerZoneSnapshot,"CABA");assert.equal(mock.data.get(`customers/${id}`).lastSaleId,sales()[1].id);});
 

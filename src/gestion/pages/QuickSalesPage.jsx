@@ -20,6 +20,8 @@ import {
 } from "../../modules/locations/domain/payments";
 import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
 import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
+import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
+import SaleStockWarning from "../components/SaleStockWarning";
 import { can, effectiveSellerLocations } from "../permissions";
 import { joinMasterProducts } from "../../modules/locations/domain/dashboard";
 import { findCustomerByPhone, listActiveCustomerZones } from "../services/customerService";
@@ -60,7 +62,7 @@ export default function QuickSalesPage() {
   const discountsResult = useAsyncData(() => listDiscountsShared(profile), [profile.id]);
   const [stockType, setStockType] = useState(restored?.stockOrigin?.type || "location");
   const [locationId, setLocationId] = useState(restored?.stockOrigin?.id || "");
-  const [stock, setStock] = useState({ status: "idle", data: [] });
+  const [stock, setStock] = useState(/** @type {{status: string, data: any[], error?: Error}} */ ({ status: "idle", data: [] }));
   const [quantities, setQuantities] = useState(() => Object.fromEntries((restored?.items || []).map(item => [item.id, item.qty])));
   const [prices, setPrices] = useState(() => Object.fromEntries((restored?.items || []).map(item => [item.id, item.unitPrice])));
   const [paymentMethod, setPaymentMethod] = useState(restored?.paymentMethod || "");
@@ -129,13 +131,12 @@ export default function QuickSalesPage() {
   const saleSummary = useMemo(() => calculateDiscountSummary(appliedDiscounts, subtotal), [appliedDiscounts, subtotal]);
 
   const allocation = paymentAllocationSummary(payments, saleSummary.total);
+  const stockDiscrepancies = stockType === "location" && !pendingIntent ? saleStockDiscrepancies(cart) : [];
 
   const changeQty = (item, amount) => {
     setQuantities((current) => {
-      const next = Math.max(
-        0,
-        Math.min(Number(item.currentStock || 0), Number(current[item.id] || 0) + amount),
-      );
+      const requested = Math.max(0, Number(current[item.id] || 0) + amount);
+      const next = stockType === "warehouse" ? Math.min(Math.max(0, Number(item.currentStock || 0)), requested) : requested;
       return { ...current, [item.id]: next };
     });
   };
@@ -244,7 +245,7 @@ export default function QuickSalesPage() {
       setReceiverDocument("");
       setDiscountIds([]);
       setDialog("");
-      setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.${invoiceNotice}` });
+      setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.${result.stockDiscrepancies?.length ? " Stock negativo pendiente de revisión." : ""}${invoiceNotice}` });
       // Refresh failure must never turn a committed sale into a retryable commercial failure.
       await refreshStock().catch(error => setStock({ status: "error", data: [], error }));
     } catch (error) {
@@ -279,9 +280,9 @@ export default function QuickSalesPage() {
               <summary>{group.name}<span>{group.items.length}</span></summary>
               <div className="fm-quick-pos__carousel">{group.items.map(item => {
                 const qty = Number(quantities[item.id] || 0);
-                return <button key={item.id} type="button" className={`fm-quick-pos__tile ${qty ? "is-selected" : ""}`} aria-label={`Agregar ${item.productName}`} disabled={locked || !item.hasLocalRecord || item.active === false || qty >= Number(item.currentStock || 0)} onClick={() => changeQty(item, 1)}>
+                return <button key={item.id} type="button" className={`fm-quick-pos__tile ${qty ? "is-selected" : ""}`} aria-label={`Agregar ${item.productName}`} disabled={locked || !item.hasLocalRecord || item.active === false || (stockType === "warehouse" && qty >= Number(item.currentStock || 0))} onClick={() => changeQty(item, 1)}>
                   <span className="fm-quick-pos__product-mark" aria-hidden="true">{item.productName.slice(0, 2).toUpperCase()}{item.thumbUrl || item.imageUrl ? <img src={item.thumbUrl || item.imageUrl} alt="" loading="lazy" decoding="async" onError={event => { event.currentTarget.style.display = "none"; }} /> : null}</span>
-                  <strong>{item.productName}</strong><span>{formatMoney(item.price)}</span><small>{item.currentStock > 0 ? `${item.currentStock} disponibles` : "Sin stock"}</small>
+                  <strong>{item.productName}</strong><span>{formatMoney(item.price)}</span><small>{item.currentStock > 0 ? `${item.currentStock} disponibles` : `Stock registrado: ${item.currentStock}`}</small>
                   {qty > 0 ? <b className="fm-quick-pos__count">{qty}</b> : null}
                 </button>;
               })}</div>
@@ -293,10 +294,11 @@ export default function QuickSalesPage() {
           <div className="fm-quick-pos__cart">
             {!cart.length ? <p className="fm-quick-pos__empty">Tocá un producto para agregarlo a la venta.</p> : cart.map(item => <article key={item.id} className="fm-quick-pos__line">
               <div><strong>{item.productName}</strong><button type="button" className="fm-quick-pos__price" disabled={locked} aria-label={`Editar precio de ${item.productName}`} onClick={() => { setPriceItem(item); setPriceDraft(String(item.price)); setDialog("price"); }}>{formatMoney(item.price)} / unidad · Editar</button></div>
-              <div className="fm-quantity-control"><button type="button" aria-label={`Quitar ${item.productName}`} disabled={locked} onClick={() => changeQty(item, -1)}>−</button><output aria-live="polite">{item.qty}</output><button type="button" aria-label={`Sumar ${item.productName}`} disabled={locked || item.qty >= Number(item.currentStock || 0)} onClick={() => changeQty(item, 1)}>+</button></div>
+              <div className="fm-quantity-control"><button type="button" aria-label={`Quitar ${item.productName}`} disabled={locked} onClick={() => changeQty(item, -1)}>−</button><output aria-live="polite">{item.qty}</output><button type="button" aria-label={`Sumar ${item.productName}`} disabled={locked || (stockType === "warehouse" && item.qty >= Number(item.currentStock || 0))} onClick={() => changeQty(item, 1)}>+</button></div>
               <strong>{formatMoney(item.qty * Number(item.price))}</strong>
             </article>)}
           </div>
+          <SaleStockWarning discrepancies={stockDiscrepancies} />
           <div className="fm-quick-pos__extras">
             <Button variant="secondary" disabled={locked || discountsResult.status === "loading"} onClick={() => setDialog("discount")}>Agregar descuento</Button>
             <Button variant="secondary" disabled={locked} onClick={() => setDialog("customer")}>{customer.phone ? customer.name || customer.phone : "Agregar cliente"}</Button>
