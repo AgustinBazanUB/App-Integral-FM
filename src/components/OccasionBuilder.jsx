@@ -19,7 +19,7 @@ const defaultOccasions = [
   {
     id: "gift",
     label: "Para regalar",
-    description: "Una selección individual; no es un pack comercial.",
+    description: "Productos pensados para regalar.",
     productIds: productsByOccasion.gift,
   },
   {
@@ -32,7 +32,7 @@ const defaultOccasions = [
 
 export default function OccasionBuilder({
   occasions = defaultOccasions,
-  note = "Agregá cada producto por separado. Precios, stock y formatos siguen pendientes de confirmación.",
+  note = "Agregá cada producto por separado; el armado del regalo se coordina al comprar.",
 }) {
   const [occasionId, setOccasionId] = useState(occasions[0]?.id);
   const selectedOccasion =

@@ -122,7 +122,7 @@ export default function SearchExperience({
                           <strong>{product.name}</strong>
                           <small>
                             {product.formats?.[0]} ·{" "}
-                            {product.uses?.[0] ?? "Uso pendiente"}
+                            {product.uses?.[0] ?? product.subcategory}
                           </small>
                         </span>
                         <ArrowRight size={18} aria-hidden="true" />

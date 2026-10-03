@@ -113,7 +113,7 @@ export default function ProductPage() {
     <main id="main-content" className="page-shell product-page">
       <PageMeta
         title={`${product.name} | Flor Mía`}
-        description={`${product.description} Datos comerciales pendientes de confirmación.`}
+        description={product.description}
       />
       <script type="application/ld+json">
         {JSON.stringify(structuredData)}
@@ -165,10 +165,10 @@ export default function ProductPage() {
             </div>
           ) : (
             <div className="pending-panel">
-              <strong>Ficha comercial pendiente</strong>
+              <strong>Consultá precio y disponibilidad</strong>
               <p>
-                Precio, stock y datos técnicos deben ser confirmados por Flor
-                Mía antes de vender.
+                Escribinos por WhatsApp y te pasamos precio y stock al
+                momento.
               </p>
             </div>
           )}
@@ -195,7 +195,7 @@ export default function ProductPage() {
               <dd>
                 {product.stock && product.stock !== "unknown"
                   ? product.stock
-                  : "A confirmar"}
+                  : "Consultanos"}
               </dd>
             </div>
           </dl>
@@ -228,7 +228,7 @@ export default function ProductPage() {
             </li>
             <li>
               <Check size={16} aria-hidden="true" />
-              No se procesa ningún pago todavía
+              Coordinamos pago y entrega al confirmar tu pedido
             </li>
           </ul>
         </div>
@@ -240,7 +240,7 @@ export default function ProductPage() {
             <p className="eyebrow">PARA COMBINAR</p>
             <h2>Otros sabores para tu mesa.</h2>
             <p className="section-heading__body">
-              Sugerencias configurables. Nada se agrega automáticamente.
+              Combinaciones que van bien con este producto.
             </p>
           </div>
           <div className="catalog-grid catalog-grid--three">

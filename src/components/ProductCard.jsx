@@ -101,7 +101,7 @@ export default function ProductCard({ product, compact = false }) {
             ) : price ? (
               <strong>{price}</strong>
             ) : (
-              <span className="product-card__price-pending">A confirmar</span>
+              <span className="product-card__price-pending">A consultar</span>
             )}
           </div>
           <button

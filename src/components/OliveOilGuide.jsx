@@ -103,7 +103,7 @@ function OilProfileCard({ profile }) {
         {product ? (
           <span className="fm-variety-card__price">
             {formatPrice(product.promoPrice ?? product.price) ??
-              "Precio a confirmar"}
+              "A consultar"}
           </span>
         ) : null}
         <button
@@ -239,7 +239,7 @@ export default function OliveOilGuide({
               <PackageCheck size={19} aria-hidden="true" /> Productos reales
             </li>
             <li>
-              <BadgeCheck size={19} aria-hidden="true" /> Perfiles editables
+              <BadgeCheck size={19} aria-hidden="true" /> Perfiles sensoriales
             </li>
             <li>
               <MapPin size={19} aria-hidden="true" /> Selección mendocina

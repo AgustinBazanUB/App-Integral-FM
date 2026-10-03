@@ -2448,32 +2448,6 @@ input::placeholder {
   grid-template-columns: repeat(3, 1fr);
 }
 
-.catalog-note {
-  display: grid;
-  max-width: 900px;
-  margin: 90px auto 0;
-  padding: 34px;
-  border: 1px dashed var(--border-gold);
-  border-radius: var(--radius-card);
-  background: var(--olive-deep);
-  text-align: center;
-}
-
-.catalog-note h2 {
-  font-size: 40px;
-}
-
-.catalog-note p {
-  color: var(--text-secondary);
-}
-
-.catalog-note a {
-  color: var(--gold-soft);
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-
 .empty-state {
   display: grid;
   max-width: 760px;

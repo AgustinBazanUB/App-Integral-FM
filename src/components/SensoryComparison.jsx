@@ -68,8 +68,8 @@ export default function SensoryComparison() {
       </div>
 
       <p className="comparison-note">
-        Los valores describen el perfil típico de cada variedad (escala 0 a 5).
-        Flor Mía aún tiene que confirmar el perfil exacto de sus aceites.
+        Los valores describen el perfil típico de cada variedad, en escala de
+        0 a 5.
       </p>
 
       <div className="comparison-table" role="table" aria-label="Comparador sensorial">

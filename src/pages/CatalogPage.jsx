@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
-import { Link, useSearchParams } from "../router";
+import { useSearchParams } from "../router";
 import OccasionBuilder from "../components/OccasionBuilder";
 import OliveOilGuide from "../components/OliveOilGuide";
 import PageMeta from "../components/PageMeta";
@@ -139,7 +139,7 @@ export default function CatalogPage() {
             ? "Guía de intensidad y varietales de aceite de oliva Flor Mía para elegir según gusto, intensidad o uso."
             : isGiftsView
               ? "Regalos Flor Mía para cada ocasión: selecciones individuales de productos mendocinos."
-              : "Explorá la selección editable de aceites, frutos secos, aceitunas, mermeladas y sales de Flor Mía."
+              : "Explorá la selección de aceites de oliva, frutos secos, aceitunas, mermeladas y sales de Flor Mía."
         }
       />
 
@@ -167,9 +167,8 @@ export default function CatalogPage() {
             <p className="eyebrow">CATÁLOGO FLOR MÍA</p>
             <h1>Sabores mendocinos para elegir a tu manera.</h1>
             <p>
-              Buscá por producto, categoría u ocasión. Las fotografías y
-              presentaciones visibles corresponden al catálogo recibido; los
-              precios y el stock siguen pendientes.
+              Aceites de oliva, frutos secos, aceitunas, mermeladas y sales:
+              lo mejor de nuestra tierra, seleccionado para tu mesa.
             </p>
           </div>
         </section>
@@ -250,7 +249,7 @@ export default function CatalogPage() {
             />
             <OccasionBuilder
               occasions={giftOccasions}
-              note="Selección individual de productos reales; no es un pack comercial. Los formatos y la presentación del regalo se coordinan al comprar."
+              note="Elegí los productos que quieras; el armado y la presentación del regalo se coordinan al momento de la compra."
             />
           </div>
         </Reveal>
@@ -273,8 +272,8 @@ export default function CatalogPage() {
               </h2>
               <p>
                 {isEmptyWineCategory
-                  ? "La categoría está preparada para incorporar vinos cuando se confirmen sus datos comerciales, sin inventar productos, precios ni stock."
-                  : "Probá otra categoría o limpiá la búsqueda. Las categorías vacías no se muestran como si tuvieran stock."}
+                  ? "Muy pronto vamos a sumar vinos a nuestra selección."
+                  : "Probá otra categoría o limpiá la búsqueda."}
               </p>
               <button
                 className="button"
@@ -286,15 +285,6 @@ export default function CatalogPage() {
             </div>
           )}
 
-          <div className="catalog-note">
-            <h2>¿Falta un producto?</h2>
-            <p>
-              El catálogo fue preparado para crecer sin cambiar el diseño.
-              Sabores de mermelada, packs, tamaños, precios y stock se cargarán
-              desde los archivos de datos cuando Flor Mía los confirme.
-            </p>
-            <Link to="/nosotros">Ver cómo se administra el contenido</Link>
-          </div>
         </div>
       </section>
 

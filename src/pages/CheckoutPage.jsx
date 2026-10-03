@@ -5,6 +5,7 @@ import PageMeta from "../components/PageMeta";
 import { useCart } from "../context/CartContext";
 import { categoryById } from "../data/categories";
 import { trackEvent } from "../utils/analytics";
+import { formatPrice } from "../utils/format";
 
 const DRAFT_KEY = "flor-mia-checkout-draft-v1";
 const steps = ["Datos y contacto", "Entrega o retiro", "Pago", "Confirmación"];
@@ -33,7 +34,7 @@ function readDraft() {
 }
 
 export default function CheckoutPage() {
-  const { items, unitCount, hasPendingPrices } = useCart();
+  const { items, unitCount, hasPendingPrices, knownSubtotal } = useCart();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState(readDraft);
   const [errors, setErrors] = useState({});
@@ -106,14 +107,14 @@ export default function CheckoutPage() {
 
   return (
     <main id="main-content" className="page-shell checkout-page">
-      <PageMeta title="Checkout preparado | Flor Mía" />
+      <PageMeta title="Tu pedido | Flor Mía" />
       <section className="checkout-header">
         <div className="container">
           <Link to="/productos">
             <ArrowLeft size={17} aria-hidden="true" />
             Seguir explorando
           </Link>
-          <p className="eyebrow">CHECKOUT PREPARADO</p>
+          <p className="eyebrow">TU PEDIDO</p>
           <h1>Tu selección, paso a paso.</h1>
           <div className="checkout-progress" aria-label={`Paso ${step + 1} de 4`}>
             {steps.map((label, index) => (
@@ -200,10 +201,7 @@ export default function CheckoutPage() {
                           checked={draft.marketingConsent}
                           onChange={updateField}
                         />
-                        <span>
-                          Quiero recibir novedades. Este consentimiento es
-                          opcional e independiente.
-                        </span>
+                        <span>Quiero recibir novedades y ofertas.</span>
                       </label>
                     </div>
                   </form>
@@ -224,7 +222,7 @@ export default function CheckoutPage() {
                         />
                         <span>
                           <strong>Envío</strong>
-                          <small>Zonas, costos y plazos por confirmar.</small>
+                          <small>Coordinamos zona, costo y plazo al confirmar.</small>
                         </span>
                       </label>
                       <label>
@@ -237,7 +235,7 @@ export default function CheckoutPage() {
                         />
                         <span>
                           <strong>Retiro en el local</strong>
-                          <small>Dirección y horarios por confirmar.</small>
+                          <small>Coordinamos punto y horario al confirmar.</small>
                         </span>
                       </label>
                     </div>
@@ -288,10 +286,10 @@ export default function CheckoutPage() {
                       </div>
                     ) : (
                       <div className="pending-panel">
-                        <strong>Datos de retiro pendientes</strong>
+                        <strong>Coordinamos el retiro</strong>
                         <p>
-                          La opción quedará habilitada comercialmente cuando se
-                          carguen dirección, horarios y tiempo de preparación.
+                          Al confirmar tu pedido te pasamos dirección,
+                          horarios y tiempo de preparación.
                         </p>
                       </div>
                     )}
@@ -304,11 +302,11 @@ export default function CheckoutPage() {
                     <h2>Pago</h2>
                     <div className="integration-state">
                       <LockKeyhole size={30} aria-hidden="true" />
-                      <h3>Integración de pago pendiente.</h3>
+                      <h3>El pago se coordina al confirmar.</h3>
                       <p>
-                        Esta versión no solicita tarjetas, no procesa cobros y
-                        no inventa medios de pago. El punto de integración está
-                        preparado para sumar el proveedor real.
+                        Todavía no cobramos por la web: al confirmar tu pedido
+                        te contactamos para coordinar el medio de pago y la
+                        entrega.
                       </p>
                     </div>
                   </div>
@@ -317,14 +315,13 @@ export default function CheckoutPage() {
                 {step === 3 ? (
                   <div>
                     <p className="eyebrow">PASO 4 DE 4</p>
-                    <h2>Confirmación no disponible todavía.</h2>
+                    <h2>Tu pedido quedó listo para coordinar.</h2>
                     <div className="integration-state">
                       <Check size={30} aria-hidden="true" />
-                      <h3>El flujo y tus datos quedaron preparados.</h3>
+                      <h3>No se generó ningún pago.</h3>
                       <p>
-                        No se generó ningún pedido ni pago. Para habilitar la
-                        compra faltan catálogo, precios, stock, logística y un
-                        proveedor de cobro reales.
+                        Al confirmar, te contactamos para cerrar precio,
+                        stock, medio de pago y entrega.
                       </p>
                     </div>
                   </div>
@@ -380,17 +377,21 @@ export default function CheckoutPage() {
                       {item.quantity} × {item.format}
                     </small>
                   </div>
-                  <span>Precio pendiente</span>
+                  <span>{formatPrice(item.price) ?? "A consultar"}</span>
                 </article>
               ))}
             </div>
             <div className="order-summary__total">
               <span>Subtotal</span>
-              <strong>{hasPendingPrices ? "A confirmar" : "$ 0"}</strong>
+              <strong>
+                {hasPendingPrices
+                  ? `${formatPrice(knownSubtotal)} + pendientes`
+                  : formatPrice(knownSubtotal)}
+              </strong>
             </div>
             <p>
-              El resumen permanece visible. Envío y total final se calcularán
-              cuando existan datos comerciales reales.
+              El resumen permanece visible. Envío y total final se coordinan
+              al confirmar tu pedido.
             </p>
           </aside>
         </div>

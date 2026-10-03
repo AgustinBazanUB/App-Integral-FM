@@ -96,7 +96,7 @@ export default function CartDrawer() {
                       {[item.variant, item.format].filter(Boolean).join(" · ")}
                     </p>
                     <strong>
-                      {formatPrice(item.price) ?? "Precio pendiente"}
+                      {formatPrice(item.price) ?? "A consultar"}
                     </strong>
                     <div className="quantity-control">
                       <button
@@ -156,7 +156,7 @@ export default function CartDrawer() {
                         <span>
                           {formatPrice(
                             suggestion.promoPrice ?? suggestion.price,
-                          ) ?? "Precio a confirmar"}
+                          ) ?? "A consultar"}
                         </span>
                       </div>
                       <button
@@ -178,14 +178,16 @@ export default function CartDrawer() {
               <div className="cart-total">
                 <span>Subtotal</span>
                 <strong>
-                  {hasPendingPrices ? "A confirmar" : formatPrice(knownSubtotal)}
+                  {hasPendingPrices
+                    ? `${formatPrice(knownSubtotal)} + pendientes`
+                    : formatPrice(knownSubtotal)}
                 </strong>
               </div>
               <p>
-                Envío, stock y precios se confirmarán antes de habilitar el pago.
+                Coordinamos envío, stock y detalles al confirmar tu pedido.
               </p>
               <Link className="button button--gold button--block" to="/checkout" onClick={closeCart}>
-                Ir al checkout preparado
+                Finalizar pedido
               </Link>
               <button type="button" className="text-button" onClick={closeCart}>
                 Seguir explorando
