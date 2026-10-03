@@ -1,4 +1,5 @@
 import { products } from "./products";
+import { legacyProductImages } from "./legacyProductImages";
 
 const placeholder = {
   id: "product-placeholder",
@@ -25,6 +26,10 @@ for (const product of products) {
     status: product.imageAlt?.includes("pendiente") ? "editorial" : "available",
     originalFileName,
   });
+}
+
+for (const image of legacyProductImages) {
+  if (!catalogByPath.has(image.imageUrl)) catalogByPath.set(image.imageUrl, image);
 }
 
 export const productImages = [placeholder, ...catalogByPath.values()];

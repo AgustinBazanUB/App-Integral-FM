@@ -39,6 +39,17 @@ const reset = () => {
   service.clearRuntimeCache(); service.invalidateDashboardSales();
 };
 
+test("historial para Métricas y Finanzas omite bajas pero conserva anuladas", async () => {
+  reset();
+  mock.documents = [
+    { id: "archivada", data: { total: 100, status: "active", deleted: true } },
+    { id: "anulada", data: { total: 200, status: "cancelled" } },
+    { id: "vigente", data: { total: 300, status: "active" } },
+  ];
+  const sales = await service.listSalesByRange({ profile: admin, ...range, includeCancelled: true });
+  assert.deepEqual(sales.map(sale => sale.id), ["anulada", "vigente"]);
+});
+
 test("ventas consultan sólo el rango y ubicación; nunca leen facturas", async () => {
   reset();
   mock.documents = [{ id: "venta", data: { total: 100, status: "active", invoiceId: "factura" } }];

@@ -63,7 +63,7 @@ export async function listSalesByRange({ profile, locationIds, start, end, useCa
   const unique = new Map();
   snapshots.forEach((result) => result.docs.forEach((item) => {
     const data = item.data();
-    if (includeCancelled || data.deleted !== true) unique.set(item.id, { id: item.id, ...data });
+    if (data.deleted !== true) unique.set(item.id, { id: item.id, ...data });
   }));
   const data = [...unique.values()].sort((a, b) => {
     const left = a.createdAt?.toMillis?.() || 0;
