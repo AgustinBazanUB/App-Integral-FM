@@ -8,9 +8,9 @@ export const PRICE_MODES = Object.freeze({
   CUSTOM: "custom",
 });
 
-export function wholeInventoryQuantity(value, label = "La cantidad", { allowZero = true } = {}) {
+export function wholeInventoryQuantity(value, label = "La cantidad", { allowZero = true, allowNegative = false } = {}) {
   const number = Number(value);
-  if (!Number.isInteger(number) || number < 0 || (!allowZero && number === 0)) {
+  if (!Number.isInteger(number) || (!allowNegative && number < 0) || (!allowZero && number === 0)) {
     throw new Error(`${label} debe ser un número entero ${allowZero ? "mayor o igual a cero" : "mayor a cero"}.`);
   }
   return number;
