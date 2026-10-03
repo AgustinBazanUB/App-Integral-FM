@@ -2436,12 +2436,7 @@ input::placeholder {
   color: var(--gold-soft);
 }
 
-.catalog-results__header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-}
+
 
 .catalog-grid {
   display: grid;
@@ -3661,10 +3656,7 @@ input::placeholder {
     top: auto;
   }
 
-  .catalog-results__header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
+
 
   .catalog-note,
   .empty-state {

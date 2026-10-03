@@ -122,12 +122,6 @@ export default function CatalogPage() {
     setSearchOpen(false);
   };
 
-  const catalogHeading =
-    activeCollection?.name ?? activeCategory?.name ?? "Toda la selección.";
-  const catalogDescription =
-    activeCollection?.description ??
-    activeCategory?.description ??
-    "Productos de distintas categorías preparados para una compra combinada.";
   const isEmptyWineCategory = activeCategory?.id === "wines";
 
   return (
@@ -264,19 +258,6 @@ export default function CatalogPage() {
 
       <section className="section catalog-results">
         <div className="container">
-          <div className="catalog-results__header">
-            <SectionHeading
-              eyebrow={`${filteredProducts.length} RESULTADOS`}
-              title={catalogHeading}
-              body={catalogDescription}
-            />
-            {filteredProducts.some(
-              (product) => product.dataStatus === "pending",
-            ) ? (
-              <span className="badge">DATOS COMERCIALES PENDIENTES</span>
-            ) : null}
-          </div>
-
           {filteredProducts.length ? (
             <Reveal className="catalog-grid" stagger>
               {filteredProducts.map((product) => (
