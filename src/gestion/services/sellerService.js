@@ -392,6 +392,7 @@ async function createSale({
   paymentMethodLabel,
   payments = [],
   ticketRequested = false,
+  invoiceReceiver = null,
   customer = null,
   offlineSale = null,
   administrative = false,
@@ -407,7 +408,7 @@ async function createSale({
     throw saleValidationError("No tenés permiso para registrar ventas.");
   }
   if (ticketRequested && !can(profile, "quick-sales", "requestTicket")) {
-    throw saleValidationError("No tenés permiso para solicitar ticket.");
+    throw saleValidationError("No tenés permiso para generar factura.");
   }
   const stockType = administrative ? stockOrigin?.type : "location";
   if (!["location", "warehouse"].includes(stockType)) throw saleValidationError("Elegí el origen físico del stock.");
@@ -613,6 +614,7 @@ async function createSale({
     const invoice = await requestPendingArcaInvoice({
       sourceType: "seller_sale",
       sourceId: result.id,
+      receiver: invoiceReceiver,
     });
     return {
       ...result,
