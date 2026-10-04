@@ -398,6 +398,52 @@ test("voice duration is capped at three minutes and connection failures release 
   assert.match(failing.errors[0].message, /Provider unavailable/);
 });
 
+test("default voice timers preserve the browser global receiver during setup and cleanup", async () => {
+  const originalSet = globalThis.setTimeout,
+    originalClear = globalThis.clearTimeout;
+  const timers = [];
+  globalThis.setTimeout = function (callback, delay) {
+    assert.equal(
+      this,
+      globalThis,
+      "browser timers require their global receiver",
+    );
+    const timer = { callback, delay, cleared: false };
+    timers.push(timer);
+    return timer;
+  };
+  globalThis.clearTimeout = function (timer) {
+    assert.equal(
+      this,
+      globalThis,
+      "browser timer cleanup requires its global receiver",
+    );
+    if (timer) timer.cleared = true;
+  };
+  try {
+    const fixture = voiceFixture({
+      setTimer: undefined,
+      clearTimer: undefined,
+    });
+    await fixture.connection.connect();
+    assert.equal(fixture.connection.closed, false);
+    assert.equal(fixture.errors.length, 0);
+    assert.deepEqual(
+      timers.map((t) => t.delay),
+      [180000, 20000],
+    );
+    fixture.connection.close();
+    assert.ok(timers.every((timer) => timer.cleared));
+    assert.equal(fixture.track.stopped, 1);
+    assert.equal(fixture.pc.closed, true);
+    assert.equal(fixture.channel.readyState, "closed");
+    assert.deepEqual(fixture.hangups, ["server-session"]);
+  } finally {
+    globalThis.setTimeout = originalSet;
+    globalThis.clearTimeout = originalClear;
+  }
+});
+
 test("closing while microphone permission is pending stops a late stream without opening a session", async () => {
   let release;
   let sessions = 0;

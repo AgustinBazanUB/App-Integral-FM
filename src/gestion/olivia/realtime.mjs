@@ -4,7 +4,9 @@ export class OliviaRealtime {
   constructor({ createSession, stopSession = async () => {}, onRequest, onState = () => {}, onError = () => {}, onCaption = () => {},
     mediaDevices = globalThis.navigator?.mediaDevices, PeerConnection = globalThis.RTCPeerConnection,
     createAudio = () => document.createElement("audio"),
-    setTimer = globalThis.setTimeout, clearTimer = globalThis.clearTimeout }) {
+    // Browser-native timers must keep their Window receiver.
+    setTimer = (callback, delay) => globalThis.setTimeout(callback, delay),
+    clearTimer = (timer) => globalThis.clearTimeout(timer) }) {
     Object.assign(this, { createSession, stopSession, onRequest, onState, onError, onCaption, mediaDevices, PeerConnection, createAudio, setTimer, clearTimer });
     this.closed = false;
     this.seenInputs = new Set();
