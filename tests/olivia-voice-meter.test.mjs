@@ -43,7 +43,7 @@ const transcription = (
   usage,
 });
 
-function fixture({ hangupFails = false } = {}) {
+function fixture({ hangupFails = false, role = "seller" } = {}) {
   let now = new Date(start),
     serial = Promise.resolve(),
     timerId = 0;
@@ -62,7 +62,7 @@ function fixture({ hangupFails = false } = {}) {
     profile: {
       id: "user_a",
       active: true,
-      role: "seller",
+      role,
       allowedLocationIds: ["local_a"],
     },
   };
@@ -620,4 +620,18 @@ test("background endpoint requires Firebase authentication before handling monit
   );
   assert.equal(response.status, 401);
   assert.equal((await response.json()).code, "unauthenticated");
+});
+
+
+test("administrator voice exceeds the seller token allocation and still closes on hangup", async () => {
+  const f = fixture({ role: "general_admin" }), monitoring = f.start(), socket = await open(f);
+  socket.provider(transcription());
+  socket.provider(response("admin_large_response", 30000, 500));
+  await flush();
+  assert.equal(f.hangs.length, 0);
+  socket.emit("close", 1000);
+  const result = await monitoring;
+  assert.equal(result.totalTokens, 30500);
+  assert.equal(f.documents.get("oliviaRealtime/live_a").closeReason, "provider-closed");
+  assert.equal(f.documents.get(f.budgetPath).usedTokens, 30550);
 });

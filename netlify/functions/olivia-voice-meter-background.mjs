@@ -5,6 +5,7 @@ import { createOliviaStore } from "./_lib/olivia/store.mjs";
 import { createOliviaEngine } from "./_lib/olivia/engine.mjs";
 import { hangupCall } from "./_lib/olivia/voice.mjs";
 import { settleUsage } from "./_lib/olivia/usage.mjs";
+import { canAccessAdministration } from "../../src/gestion/permissions.js";
 import { assertOliviaAccess } from "./_lib/olivia/guards.mjs";
 import {
   defaultOliviaConfiguration,
@@ -339,7 +340,7 @@ export async function monitorRealtime({
               void finish("realtime-usage-invalid", true);
               return;
             }
-            if (measured.totalTokens >= live.reservation.reservedTokens)
+            if (!canAccessAdministration(session.profile) && measured.totalTokens >= live.reservation.reservedTokens)
               void finish("quota-limit");
             return;
           }
@@ -395,7 +396,7 @@ export async function monitorRealtime({
             void finish("realtime-provider-error", true);
             return;
           }
-          if (measured.totalTokens >= live.reservation.reservedTokens)
+          if (!canAccessAdministration(session.profile) && measured.totalTokens >= live.reservation.reservedTokens)
             void finish("quota-limit");
         });
         socket.on("close", (code) => {

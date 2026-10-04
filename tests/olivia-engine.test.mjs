@@ -265,10 +265,10 @@ function fixture({
         .filter(
           (item) =>
             !options.after ||
-            new Date(item.createdAt).getTime() <
-              new Date(options.after.createdAt).getTime() ||
-            (new Date(item.createdAt).getTime() ===
-              new Date(options.after.createdAt).getTime() &&
+            new Date(item[orderBy[0]?.[0] || "createdAt"]).getTime() <
+              new Date(options.after.updatedAt ?? options.after.createdAt).getTime() ||
+            (new Date(item[orderBy[0]?.[0] || "createdAt"]).getTime() ===
+              new Date(options.after.updatedAt ?? options.after.createdAt).getTime() &&
               item.id < options.after.id),
         )
         .slice(0, limit);
@@ -352,7 +352,7 @@ test("explicit timezone schedules retain their instant across browser and UTC ba
   );
 });
 
-test("seller tools and public usage exclude administration, historical sales and AI costs", async () => {
+test("seller tools exclude administration and reveal only their own cost in pesos", async () => {
   const f = fixture(),
     state = await start(f);
   assert.equal(
@@ -377,7 +377,8 @@ test("seller tools and public usage exclude administration, historical sales and
     { model: "secret-model", totalTokens: 10, inputTokens: 5, outputTokens: 5 },
     f.config,
   );
-  assert.equal(JSON.stringify(usage).includes("Cost"), false);
+  assert.deepEqual(usage.lastCost, { ars: null, estimated: false });
+  assert.equal(JSON.stringify(usage).includes("Usd"), false);
   assert.equal(JSON.stringify(usage).includes("Tokens"), false);
   assert.equal(JSON.stringify(usage).includes("secret-model"), false);
 });
@@ -391,7 +392,7 @@ test("admin usage reports reserved estimates honestly while seller usage stays p
   assert.equal(admin.measurement, "reserved-estimate");
   assert.equal(admin.actualCostUsd, null);
   const seller = publicUsage({ ...f.session, profile: { ...f.session.profile, role: "seller" } }, { usedTokens: 6000 }, quota, event, f.config);
-  assert.deepEqual(Object.keys(seller).sort(), ["period", "remainingPercent", "renewsAt"]);
+  assert.deepEqual(Object.keys(seller).sort(), ["lastCost", "period", "remainingPercent", "renewsAt"]);
 });
 
 test("malicious seller provider cannot invoke admin tool even when it ignores supplied tools", async () => {
@@ -1194,13 +1195,10 @@ test("all retained messages survive context trimming and supervisor pagination i
     ).length,
     70,
   );
-  await assert.rejects(
-    f.engine.history(f.session, {
-      userId: f.session.uid,
-      conversationId: initial.conversationId,
-    }),
-    { code: "permission-denied" },
-  );
+  const ownHistory = await f.engine.history(f.session, { conversationId: initial.conversationId });
+  assert.equal(ownHistory.selectedConversation.messages.length, 60);
+  assert.deepEqual(ownHistory.usageEvents, []);
+  await assert.rejects(f.engine.history(f.session, { userId: "other" }), { code: "permission-denied" });
   const admin = { ...f.session, profile: { role: "admin", active: true } };
   const page = await f.engine.history(admin, {
     userId: f.session.uid,
@@ -1233,7 +1231,7 @@ test("all retained messages survive context trimming and supervisor pagination i
   );
 });
 
-test("admin receives a priced estimate while seller receives no model or cost estimate", async () => {
+test("admin receives technical estimates while seller receives only their own peso estimate", async () => {
   const f = fixture({ role: "admin" });
   f.config.pricing[f.config.profiles.adminComplex.model] = {
     inputUsdPerMillion: 1,
@@ -1248,7 +1246,7 @@ test("admin receives a priced estimate while seller receives no model or cost es
   assert.equal(state.estimate.reasoningEffort, "high");
   assert.ok(state.estimate.estimatedCostUsd > 0);
   const seller = fixture();
-  assert.equal((await start(seller)).estimate, undefined);
+  assert.deepEqual((await start(seller)).estimate, { estimatedCostArs: null });
 });
 
 test("retention clamps month ends instead of carrying private messages into another month", () => {
@@ -1303,4 +1301,68 @@ test("an exhausted seller can request one extension per period without calling A
     (await f.engine.getConfiguration(admin)).quotaRequests.length,
     0,
   );
+});
+
+
+test("administrators exceed stored quotas while accounting and seller limits remain enforced", async () => {
+  for (const role of ["admin", "general_admin"]) {
+    const f = fixture({ role, quotaTokens: 1000 }), initial = await start(f);
+    const q = quotaFor(f.config, f.session.uid, initialNow, f.session.profile);
+    f.documents.set(`oliviaBudgets/${f.session.uid}_${q.key}`, { usedTokens: 500000, reservedTokens: 0, requests: 0 });
+    const reservation = await reserveUsage({ store: f.store, session: f.session, configuration: f.config, requestId: "unlimited_reserve", operation: "text", reservedTokens: 50000, now: initialNow });
+    await increaseReservation({ store: f.store, reservation, amount: 50000 });
+    assert.equal(reservation.quota.unlimited, true);
+    f.advance(1300);
+    const result = await chat(f, initial.conversationId, { message: "Consultá mi panel" });
+    assert.equal(result.usage.unlimited, true);
+    assert.equal(result.usage.quotaTokens, null);
+    assert.equal(result.usage.remainingPercent, null);
+    assert.ok(result.usage.usedTokens > 500000);
+  }
+  const seller = fixture({ quotaTokens: 1000 });
+  await assert.rejects(reserveUsage({ store: seller.store, session: seller.session, configuration: seller.config, requestId: "seller_too_much", operation: "text", reservedTokens: 50000, now: initialNow }), { code: "quota-exhausted" });
+});
+
+test("reopening after authentication preserves messages and invalidates the old confirmation", async () => {
+  const f = fixture({ role: "admin", provider: () => functionResponse("prepare_stock_load", { locationId: "local_a", productId: "oil", quantity: 1, reason: "Ingreso" }) });
+  const initial = await start(f), proposal = await chat(f, initial.conversationId, { message: "Ingresá una unidad" });
+  assert.ok(proposal.pendingAction);
+  const nextSession = { ...f.session, authTime: f.session.authTime + 10 };
+  const resumed = await f.engine.resumeConversation(nextSession, { conversationId: initial.conversationId });
+  assert.equal(resumed.pendingAction, null);
+  assert.equal(resumed.messages.length, proposal.messages.length);
+  assert.equal(f.documents.get(`oliviaConfirmations/${proposal.pendingAction.id}`).status, "superseded");
+  await assert.rejects(f.engine.resumeConversation({ ...nextSession, uid: "other" }, { conversationId: initial.conversationId }), { code: "conversation-not-found" });
+  assert.equal(f.documents.get("locationStock/local_a/items/oil").currentStock, 4);
+});
+
+test("a saved peso cost survives repricing and draft estimates make no provider calls", async () => {
+  const f = fixture(), initial = await start(f);
+  const config = { ...f.config, officialDollarSellRate: 1000 };
+  f.documents.set("oliviaConfiguration/global", config);
+  const first = await f.engine.estimate(f.session, { conversationId: initial.conversationId, message: "Stock", screenContext: {} });
+  assert.deepEqual(Object.keys(first.estimate), ["estimatedCostArs"]);
+  assert.ok(first.estimate.estimatedCostArs > 0);
+  assert.equal(f.providerCalls(), 0);
+  const result = await chat(f, initial.conversationId, { message: "Ayuda" });
+  assert.ok(result.usage.lastCost.ars > 0);
+  f.documents.set("oliviaConfiguration/global", { ...config, officialDollarSellRate: 2000 });
+  const reloaded = await f.engine.state(f.session, initial.conversationId);
+  assert.equal(reloaded.usage.lastCost.ars, result.usage.lastCost.ars);
+  assert.equal(reloaded.usage.model, undefined);
+  await assert.rejects(f.engine.estimate({ ...f.session, uid: "other" }, { conversationId: initial.conversationId }), { code: "conversation-not-found" });
+});
+
+test("saved chat pagination includes older chats with equal timestamps without other users", async () => {
+  const f = fixture();
+  for (let i = 0; i < 25; i++) { f.advance(1); await start(f); }
+  f.documents.set("oliviaConversations/foreign", { userId: "other", updatedAt: f.clock(), expiresAt: retentionDate(1, f.clock()) });
+  const first = await f.engine.history(f.session, {});
+  const second = await f.engine.history(f.session, { conversationsCursor: first.conversationsCursor });
+  assert.equal(first.conversations.length, 20);
+  assert.equal(second.conversations.length, 5);
+  assert.equal(second.conversationsCursor, null);
+  assert.equal(new Set([...first.conversations, ...second.conversations].map(c => c.id)).size, 25);
+  assert.equal(first.conversations.some(c => c.id === "foreign"), false);
+  await assert.rejects(f.engine.history(f.session, { conversationsCursor: { id: "foreign", updatedAt: "bad" } }), { code: "invalid-input" });
 });

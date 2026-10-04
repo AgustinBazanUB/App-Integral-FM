@@ -118,7 +118,7 @@ Todas las escrituras por Olivia requieren propuesta normalizada y confirmación 
 
 `src/shared/oliviaKnowledge.mjs` guarda fragmentos revisados y breves, con módulo, estado y URL de fuente. La recuperación es lexical, normaliza acentos en español, acota consulta y máximo de resultados, y filtra audiencia antes de rankear. No contiene stocks/precios/clientes/ventas vivos ni intenta autorizar herramientas.
 
-El perfil Vendedor recibe exclusivamente fragmentos de sus operaciones: venta, pagos, clientes dentro de venta, stock/precios de ubicación, observaciones, avisos, cuota porcentual y continuidad manual. No recupera configuración administrativa, finanzas, históricos, costos monetarios ni política de modelos. El rol enviado al recuperador debe proceder del perfil confiable del servidor.
+El perfil Vendedor recibe exclusivamente fragmentos de sus operaciones: venta, pagos, clientes dentro de venta, stock/precios de ubicación, observaciones, avisos, cuota porcentual y continuidad manual. No recupera configuración administrativa, finanzas, históricos de otros usuarios ni política de modelos. El rol enviado al recuperador debe proceder del perfil confiable del servidor.
 
 El texto recuperado es **dato documental no confiable**, nunca instrucción del sistema. “Pendiente” y “futura” se devuelven explícitamente. La app necesita consultar herramientas para información mutable y validar permisos independientemente del conocimiento.
 
@@ -128,9 +128,13 @@ El texto recuperado es **dato documental no confiable**, nunca instrucción del 
 2. Dos flujos completos sobre servicios comunes: carga de stock Administrador y venta Vendedor; preparación→confirmación vinculada→ejecución idempotente→auditoría.
 3. Correcciones de borrador, error seguro, sesión cambiada, doble confirmación, confirmación expirada, stock insuficiente y rechazo de privilegios/ubicaciones ajenas.
 4. Texto, transcripción y voz con mismo conversationId y política; IA caída/offline nunca bloquea operación manual.
-5. Configuración de cupos/renovación/ampliación temporal/retención y consumos diferenciados; costes solo Administrador.
+5. Configuración de cupos/renovación/ampliación temporal/retención y consumos diferenciados; costos propios en pesos para todos, métricas técnicas solo Administrador.
 6. Ampliar módulos únicamente con contratos, permisos, servicios existentes y pruebas. No hacer pasar una recomendación/documentación como una herramienta ejecutada.
 
 ## Validación del índice documental
 
 Comando: `node --test tests/olivia-knowledge.test.mjs`. Resultado: 9 pruebas aprobadas, 0 fallidas. Se verificaron recuperación en español con acentos y conjugaciones, exclusión administrativa para Vendedor incluso con módulo manipulado, restricciones de stock/histórico, rol desconocido, metadatos pendiente/futuro/preliminar, límites de consulta/resultados, referencias, copias independientes e inyección de instrucciones en consulta. Estas pruebas verifican el recuperador; los permisos, transacciones y disponibilidad de OpenAI se prueban por separado en el núcleo operativo.
+
+## Ampliación solicitada por el usuario el 4/10/2026
+
+Estas instrucciones directas actualizan las restricciones de la propuesta documental: administradores sin límite de tokens; cupos solo para vendedores; costos propios estimados y anteriores en pesos en la vista común; modo desarrollador exclusivo de administradores; chats propios guardados, listados, paginados y retomables, con contexto reciente acotado. La retención configurada sigue vigente. No habilitan operaciones comerciales sin confirmación ni consulta de chats de otros vendedores.

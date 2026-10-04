@@ -1,4 +1,5 @@
 import { createOliviaStore } from "./_lib/olivia/store.mjs";
+import { resolveOliviaPricing } from "./_lib/olivia/pricing.mjs";
 import { createOliviaEngine } from "./_lib/olivia/engine.mjs";
 import { createRealtime, stopRealtime } from "./_lib/olivia/voice.mjs";
 import { oliviaSession, json, errorResponse } from "./_lib/olivia/http.mjs";
@@ -26,7 +27,7 @@ export default async function handler(request) {
       throw oliviaError("invalid-json", "Solicitud inválida.");
     }
     const store = createOliviaStore(),
-      engine = createOliviaEngine({ store });
+      engine = createOliviaEngine({ store, pricingResolver: resolveOliviaPricing });
     let result;
     if (body.operation === "state")
       result = await engine.state(
@@ -40,6 +41,10 @@ export default async function handler(request) {
       result = await engine.confirm(session, body);
     else if (body.operation === "cancel")
       result = await engine.cancel(session, body);
+    else if (body.operation === "estimate")
+      result = await engine.estimate(session, body);
+    else if (body.operation === "resume")
+      result = await engine.resumeConversation(session, body);
     else if (body.operation === "history")
       result = await engine.history(session, body);
     else if (body.operation === "requestQuotaExtension")

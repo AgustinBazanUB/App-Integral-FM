@@ -6,7 +6,7 @@ import { canAccessAdministration } from "../permissions";
 import { useOnlineStatus } from "../hooks";
 import { formatDateTime } from "../formatters";
 import { clearRuntimeCache } from "../services/runtimeCache";
-import { conversationForUser, forgetConversation, operationLabel, pendingExpired, rememberConversation, requestId, safeNavigation } from "./client.mjs";
+import { conversationForUser, forgetConversation, operationLabel, pendingExpired, prependHistoryMessages, rememberConversation, requestId, safeNavigation } from "./client.mjs";
 import { useOliviaContext, useOliviaVisibility } from "./ScreenContext";
 import { oliviaClient } from "./service";
 import { OliviaRealtime } from "./realtime.mjs";
@@ -36,6 +36,17 @@ export default function OliviaAssistant() {
   const online = useOnlineStatus();
   const [open, setOpen] = useState(false);
   const [snapshot, setSnapshot] = useState({ messages: [], state: "information", pendingAction: null, usage: null });
+  const [developer, setDeveloper] = useState(false);
+  const [chatsOpen, setChatsOpen] = useState(false);
+  const [chats, setChats] = useState([]);
+  const [chatsCursor, setChatsCursor] = useState(null);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [archived, setArchived] = useState([]);
+  const [messagesCursor, setMessagesCursor] = useState(undefined);
+  const [draftEstimate, setDraftEstimate] = useState(null);
+  const historyRef = useRef(null);
+  const estimateRef = useRef(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -135,6 +146,8 @@ export default function OliviaAssistant() {
     return () => {
       mounted.current = false;
       requestRef.current?.abort();
+      historyRef.current?.abort();
+      estimateRef.current?.abort();
       stopRecording(true);
       stopVoice();
     };
@@ -143,7 +156,7 @@ export default function OliviaAssistant() {
   useEffect(() => {
     if (!open) return undefined;
     textareaRef.current?.focus();
-    if (!requestRef.current) { estimateContextRef.current = estimateContextKey; perform("state").catch(() => {}); }
+    if (!requestRef.current) { estimateContextRef.current = estimateContextKey; perform(conversationRef.current ? "resume" : "state").catch(() => {}); }
     const onKey = (event) => {
       if (event.key === "Escape") { stopRecording(true); stopVoice(); setOpen(false); launcherRef.current?.focus(); }
     };
@@ -152,10 +165,49 @@ export default function OliviaAssistant() {
   }, [open, perform, stopRecording, stopVoice]);
 
   useEffect(() => {
-    if (!admin || !open || busy || requestRef.current || estimateContextRef.current === estimateContextKey) return;
-    estimateContextRef.current = estimateContextKey;
-    perform("state").catch(() => {});
-  }, [admin, open, busy, estimateContextKey, perform]);
+    setDeveloper(false);
+    if (admin) { try { setDeveloper(localStorage.getItem(`flor-mia-olivia-dev:${user.uid}`) === "true"); } catch { /* Optional preference. */ } }
+  }, [admin, user.uid]);
+
+  useEffect(() => {
+    if (!open || busy || !snapshot.conversationId || recording || voiceActive) return undefined;
+    const controller = new AbortController();
+    estimateRef.current = controller;
+    setDraftEstimate(null);
+    const timer = setTimeout(async () => {
+      try {
+        const result = await oliviaClient.request({ operation: "estimate", conversationId: snapshot.conversationId, screenContext: contextRef.current, message: draft }, { signal: controller.signal });
+        if (!controller.signal.aborted && mounted.current) setDraftEstimate(result.estimate);
+      } catch { /* The server snapshot remains a fallback; estimation never blocks a chat. */ }
+    }, 600);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [open, busy, draft, snapshot.conversationId, snapshot.messages, estimateContextKey, recording, voiceActive]);
+
+  const loadHistory = async (kind, more = false) => {
+    if (historyRef.current || busy || recording || voiceActive) return;
+    const controller = new AbortController(); historyRef.current = controller;
+    setHistoryBusy(true); setHistoryError("");
+    try {
+      const result = await oliviaClient.request({ operation: "history", ...(kind === "messages" ? { conversationId: conversationRef.current, messagesCursor: messagesCursor || null } : { conversationsCursor: more ? chatsCursor : null }) }, { signal: controller.signal });
+      if (!mounted.current || controller.signal.aborted) return;
+      if (kind === "messages") {
+        setArchived((current) => prependHistoryMessages(result.selectedConversation.messages, current));
+        setMessagesCursor(result.selectedConversation.nextCursor);
+      } else { setChats((current) => more ? [...current, ...result.conversations] : result.conversations); setChatsCursor(result.conversationsCursor); }
+    } catch (failure) { if (mounted.current && failure.name !== "AbortError") setHistoryError(failure.message); }
+    finally { if (historyRef.current === controller) historyRef.current = null; if (mounted.current) setHistoryBusy(false); }
+  };
+
+  const reopen = async (id) => {
+    if (busy || recording || voiceActive || historyBusy) return;
+    if (snapshot.pendingAction && id !== conversationRef.current) {
+      try { await perform("cancel", { confirmationToken: snapshot.pendingAction.confirmationToken, actionId: snapshot.pendingAction.id }); } catch { return; }
+    }
+    try {
+      await perform("resume", { conversationId: id });
+      setArchived([]); setMessagesCursor(undefined); setDraft(""); setDraftEstimate(null); setChatsOpen(false);
+    } catch { /* Keep the selected chat visible on failure. */ }
+  };
 
   useEffect(() => {
     const onConfiguration = () => { if (open && !requestRef.current) perform("state").catch(() => {}); };
@@ -202,7 +254,7 @@ export default function OliviaAssistant() {
     forgetConversation(user.uid);
     confirmationIds.current.clear();
     setSnapshot({ messages: [], state: "INFORMACION", pendingAction: null, usage: null });
-    setDraft("");
+    setDraft(""); setArchived([]); setMessagesCursor(undefined); setDraftEstimate(null); setChatsOpen(false);
     perform("state").catch(() => {});
   };
 
@@ -296,7 +348,10 @@ export default function OliviaAssistant() {
   const pending = snapshot.pendingAction;
   const label = recording ? "Escuchando dictado" : busy ? pending ? "Procesando solicitud" : "Procesando" : operationLabel(snapshot.state, pending);
   const quota = snapshot.usage;
-  const estimate = snapshot.estimate;
+  const estimate = draftEstimate || snapshot.estimate;
+  const money = (value) => Number.isFinite(value) ? new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(value) : "No disponible";
+  const visibleMessages = prependHistoryMessages(archived, snapshot.messages);
+  const toggleDeveloper = () => { const next = !developer; setDeveloper(next); try { localStorage.setItem(`flor-mia-olivia-dev:${user.uid}`, String(next)); } catch { /* Optional preference. */ } };
 
   return <>
     <button ref={launcherRef} type="button" className="fm-olivia-launcher" aria-label={open ? "Cerrar Olivia" : "Abrir Olivia, asistente de Flor Mía"} aria-expanded={open} aria-controls="fm-olivia-drawer" onClick={() => open ? close() : setOpen(true)}>
@@ -305,13 +360,18 @@ export default function OliviaAssistant() {
     {open ? <aside id="fm-olivia-drawer" className="fm-olivia-drawer" role="dialog" aria-modal="false" aria-labelledby="fm-olivia-title">
       <header className="fm-olivia-header">
         <OliviaFace active={busy || recording || voiceActive}/><div><h2 id="fm-olivia-title">Olivia</h2><span>Asistente de Flor Mía</span></div>
+        <IconButton label="Mis chats" icon="History" disabled={busy || recording || voiceActive || historyBusy} onClick={() => { setChatsOpen(!chatsOpen); if (!chatsOpen) loadHistory("chats"); }}/>
         <IconButton label="Nueva conversación" icon="MessagesSquare" disabled={busy || recording || voiceActive} onClick={newConversation}/>
         <IconButton label="Cerrar Olivia" icon="X" onClick={close}/>
       </header>
       <div className="fm-olivia-status" role="status"><Badge tone={pending ? "warning" : snapshot.state === "completed" ? "success" : "neutral"}>{label}</Badge><span>{context.module === "seller" ? "Panel Vendedor" : "Panel Administrador"}</span></div>
+      {admin ? <div className="fm-olivia-mode"><label><input type="checkbox" checked={developer} onChange={toggleDeveloper}/> Modo desarrollador</label></div> : null}
+      {chatsOpen ? <section className="fm-olivia-chats" aria-label="Mis chats"><h3>Mis chats</h3><p>Retomá una conversación o creá una nueva. El historial se guarda en tu cuenta durante el período de retención.</p>{chats.map((chat) => <button type="button" key={chat.id} disabled={busy || historyBusy} aria-current={chat.id === snapshot.conversationId ? "true" : undefined} onClick={() => reopen(chat.id)}><strong>{chat.title}</strong><small>{formatDateTime(chat.updatedAt)}</small></button>)}{!chats.length && !historyBusy ? <p>Todavía no hay chats guardados.</p> : null}{chatsCursor ? <Button variant="secondary" disabled={historyBusy} onClick={() => loadHistory("chats", true)}>Ver más chats</Button> : null}{historyBusy ? <p role="status">Cargando chats…</p> : null}</section> : null}
+      {historyError ? <p className="fm-olivia-error" role="alert">{historyError}</p> : null}
       <div ref={messagesRef} className="fm-olivia-messages" role="log" aria-live="polite" aria-label="Conversación con Olivia">
+        {snapshot.messages.length && messagesCursor !== null ? <Button variant="secondary" disabled={historyBusy || busy || recording || voiceActive} onClick={() => loadHistory("messages")}>Ver mensajes anteriores</Button> : null}
         {!snapshot.messages.length && !busy ? <div className="fm-olivia-welcome"><h3>Hola, soy Olivia.</h3><p>Te ayudo a consultar Flor Mía y preparar operaciones de tu panel. Los cambios siempre se confirman con Sí o No.</p><p>Podés escribir, dictar un mensaje o conversar por voz.</p></div> : null}
-        {snapshot.messages.filter((message) => ["user", "assistant"].includes(message.role)).map((message, index) => <article key={message.id || `${index}:${message.role}`} className={`fm-olivia-message fm-olivia-message--${message.role}`}><strong>{message.role === "user" ? "Vos" : "Olivia"}</strong><p>{String(message.content || "")}</p></article>)}
+        {visibleMessages.filter((message) => ["user", "assistant"].includes(message.role)).map((message, index) => <article key={message.id || `${index}:${message.role}`} className={`fm-olivia-message fm-olivia-message--${message.role}`}><strong>{message.role === "user" ? "Vos" : "Olivia"}</strong><p>{String(message.content || "")}</p></article>)}
         {busy ? <p className="fm-olivia-working" role="status">Olivia está procesando tu solicitud…</p> : null}
       </div>
       {pending ? <section className="fm-olivia-confirmation" aria-labelledby="fm-olivia-confirm-title"><h3 id="fm-olivia-confirm-title">¿Confirmar esta acción?</h3><p>{typeof pending.summary === "string" ? pending.summary : JSON.stringify(pending.summary, null, 2)}</p>{expired ? <p role="alert">La confirmación venció. Pedile a Olivia que prepare la acción nuevamente.</p> : null}<div><Button onClick={() => answer(true)} disabled={busy || expired || exhausted || unavailable}>Sí</Button><Button variant="secondary" onClick={() => answer(false)} disabled={busy || !online}>No</Button></div><small>La acción se ejecuta únicamente al tocar Sí. Podés corregir los datos escribiendo.</small></section> : null}
@@ -326,8 +386,12 @@ export default function OliviaAssistant() {
         </div>
         <small>{recording ? "Hasta 60 segundos. Al transcribir podés revisar el texto antes de enviarlo." : "El dictado se transcribe y podés revisarlo antes de enviarlo."}</small>
       </form>
-      {quota ? <footer className={`fm-olivia-usage ${quota.remainingPercent <= 10 ? "is-low" : ""}`}><span>Asistente IA disponible: <strong>{Math.max(0, Math.min(100, quota.remainingPercent))}%</strong></span>{quota.renewsAt ? <small>Próxima renovación: {formatDateTime(quota.renewsAt)}</small> : null}{quota.remainingPercent <= 25 ? <small>{exhausted ? "Tu cupo está agotado. Podés continuar en el panel y solicitar una ampliación al Administrador." : "Tu cupo disponible es bajo."}</small> : null}{admin && quota.model ? <small>Modelo: {quota.model}{quota.totalTokens != null || quota.inputTokens != null ? ` · ${Number(quota.totalTokens ?? (Number(quota.inputTokens || 0) + Number(quota.outputTokens || 0)))} tokens${quota.measurement === "reserved-estimate" ? " estimados" : ""}` : ""}{quota.actualCostUsd != null ? ` · USD ${Number(quota.actualCostUsd).toFixed(4)}` : ""}{quota.actualCostArs != null ? ` · ARS ${Number(quota.actualCostArs).toFixed(2)}` : ""}</small> : null}</footer> : null}
-      {admin && estimate ? <div className="fm-olivia-estimate"><span>Próxima consulta: {estimate.model} · {estimate.reasoningEffort}</span><small>{estimate.estimatedTokens != null ? `${Number(estimate.estimatedTokens).toLocaleString("es-AR")} tokens estimados` : ""}{estimate.estimatedCostUsd != null ? ` · USD ${Number(estimate.estimatedCostUsd).toFixed(4)}` : ""}{estimate.estimatedCostArs != null ? ` · ARS ${Number(estimate.estimatedCostArs).toFixed(2)}` : ""}</small></div> : null}
+      <footer className="fm-olivia-usage">
+        {quota?.unlimited ? <span>Administrador · <strong>Uso sin límite de tokens</strong></span> : quota ? <><span>Asistente IA disponible: <strong>{quota.remainingPercent}%</strong></span>{quota.renewsAt ? <small>Próxima renovación: {formatDateTime(quota.renewsAt)}</small> : null}{quota.remainingPercent <= 25 ? <small>{exhausted ? "Tu cupo está agotado. Podés solicitar una ampliación al Administrador." : "Tu cupo disponible es bajo."}</small> : null}</> : null}
+        <div className="fm-olivia-costs"><div><small>Próxima consulta escrita · estimado</small><strong>{money(estimate?.estimatedCostArs)}</strong></div><div><small>Última llamada{quota?.lastCost?.estimated ? " · sin medición completa" : ""}</small><strong>{quota?.lastCost ? money(quota.lastCost.ars) : "Sin llamadas previas"}</strong></div></div>
+        <small>Costo de IA aproximado en pesos argentinos. Incluye 5% sobre la conversión; el consumo final puede variar. La voz requiere medición de audio.</small>
+      </footer>
+      {admin && developer ? <section className="fm-olivia-developer" aria-label="Métricas de desarrollo"><h3>Métricas de desarrollo</h3><dl><dt>Modelo próximo</dt><dd>{estimate?.model || "—"}</dd><dt>Razonamiento</dt><dd>{estimate?.reasoningEffort || "—"}</dd><dt>Tokens próximos estimados</dt><dd>{estimate?.estimatedTokens?.toLocaleString("es-AR") || "—"}</dd><dt>Última llamada: entrada / salida</dt><dd>{quota?.inputTokens ?? "—"} / {quota?.outputTokens ?? "—"}</dd><dt>Última llamada: total</dt><dd>{quota?.totalTokens ?? "—"}{quota?.measurement === "reserved-estimate" ? " (reserva estimada)" : ""}</dd><dt>Consumo / reservas del período</dt><dd>{quota?.usedTokens ?? 0} / {quota?.reservedTokens ?? 0}</dd><dt>Último costo USD</dt><dd>{quota?.actualCostUsd != null ? Number(quota.actualCostUsd).toFixed(6) : "Sin medición disponible"}</dd><dt>Contexto enviado</dt><dd>Hasta 16 mensajes recientes; archivo consultable por separado</dd><dt>Cotización de referencia</dt><dd>{estimate?.reference ? `${money(estimate.reference.rate)} por USD · ${estimate.reference.date || "Manual"}` : "Sin cotización disponible"}</dd></dl>{estimate?.reference?.source?.startsWith("https://") ? <a href={estimate.reference.source} target="_blank" rel="noreferrer">Fuente de cotización</a> : null}</section> : null}
       {!admin && exhausted ? <div className="fm-olivia-quota-request"><Button variant="secondary" disabled={busy || !online || quotaRequested} onClick={() => setQuotaRequestOpen(true)}>{quotaRequested ? "Ampliación solicitada" : "Solicitar ampliación"}</Button>{quotaNotice ? <p role="status">{quotaNotice}</p> : null}</div> : null}
     </aside> : null}
     <Modal open={quotaRequestOpen} title="Solicitar ampliación de Olivia" description="Enviaremos al Administrador una solicitud de ampliación para tu cupo del período actual." onClose={() => { if (!busy) setQuotaRequestOpen(false); }} footer={<div className="fm-dialog-actions"><Button variant="secondary" disabled={busy} onClick={() => setQuotaRequestOpen(false)}>No</Button><Button loading={busy} onClick={requestQuotaExtension}>Sí, solicitar</Button></div>}><p>La solicitud no cambia tu cupo. El Administrador puede conceder una ampliación temporal desde Configuración de IA.</p>{error ? <p className="fm-form-error" role="alert">{error}</p> : null}</Modal>

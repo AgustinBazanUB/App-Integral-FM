@@ -68,3 +68,18 @@
 @media (prefers-reduced-motion: reduce) { .fm-olivia-face, .fm-olivia-eyes { animation: none !important; } }
 
 @media (max-width: 640px) { .fm-olivia-composer-actions > .fm-button { font-size: 11px; padding-inline: 10px; min-width: 0; } }
+
+.fm-olivia-mode { padding: 6px 16px; font-size: 12px; }
+.fm-olivia-mode label { display:flex; gap:8px; align-items:center; }
+.fm-olivia-chats { padding:12px 16px; max-height:240px; overflow:auto; background:#f6f5ef; border-bottom:1px solid #ddd; }
+.fm-olivia-chats h3,.fm-olivia-developer h3 { margin:0 0 8px; font-size:14px; }
+.fm-olivia-chats p { font-size:12px; margin:6px 0; }
+.fm-olivia-chats > button { display:flex; flex-direction:column; text-align:left; gap:3px; width:100%; background:white; border:1px solid #deded4; border-radius:8px; padding:8px; margin-top:6px; cursor:pointer; }
+.fm-olivia-chats > button[aria-current=true] { border-color:#708048; }
+.fm-olivia-chats small { font-size:11px; }
+.fm-olivia-costs { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:8px 0; }
+.fm-olivia-costs > div { display:flex; flex-direction:column; gap:4px; }
+.fm-olivia-costs strong { font-size:15px; }
+.fm-olivia-developer { padding:12px 16px; max-height:200px; overflow:auto; background:#f3f4ee; font-size:12px; border-top:1px solid #deded4; }
+.fm-olivia-developer dl { display:grid; grid-template-columns:1fr 1fr; gap:5px 12px; margin:0; }
+.fm-olivia-developer dd { margin:0; overflow-wrap:anywhere; }

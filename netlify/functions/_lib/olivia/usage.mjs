@@ -5,14 +5,14 @@ import {
   retentionDate,
 } from "../../../../src/shared/oliviaContracts.mjs";
 import { canAccessAdministration } from "../../../../src/gestion/permissions.js";
-export function quotaFor(configuration, uid, now = new Date()) {
+export function quotaFor(configuration, uid, now = new Date(), profile = null) {
   const quota = configuration.userQuotas?.[uid] || configuration.defaultQuota;
   const period = quotaPeriod(quota.frequency, now);
   const extra =
     quota.temporaryPeriod === period.key
       ? Number(quota.temporaryExtraTokens || 0)
       : 0;
-  return { ...period, tokens: quota.tokens + extra };
+  return { ...period, tokens: quota.tokens + extra, ...(canAccessAdministration(profile || {}) ? { unlimited: true } : {}) };
 }
 export function publicUsage(
   session,
@@ -24,18 +24,20 @@ export function publicUsage(
   const used =
     Number(budget?.usedTokens || 0) + Number(budget?.reservedTokens || 0);
   const result = {
-    remainingPercent: Math.max(
+    remainingPercent: quota.unlimited ? null : Math.max(
       0,
       Math.round((100 * (quota.tokens - used)) / quota.tokens),
     ),
-    renewsAt: quota.renewsAt,
+    renewsAt: quota.unlimited ? null : quota.renewsAt,
+    ...(quota.unlimited ? { unlimited: true } : {}),
     period: quota.key,
   };
+  if (event) result.lastCost = { ars: Object.hasOwn(event, "actualCostArs") ? event.actualCostArs : costForUsage(event, configuration || {}).actualCostArs, estimated: event.measurement === "reserved-estimate" };
   if (canAccessAdministration(session.profile))
     Object.assign(result, {
       usedTokens: Number(budget?.usedTokens || 0),
       reservedTokens: Number(budget?.reservedTokens || 0),
-      quotaTokens: quota.tokens,
+      quotaTokens: quota.unlimited ? null : quota.tokens,
       ...(event
         ? {
             model: event.model,
@@ -43,7 +45,7 @@ export function publicUsage(
             outputTokens: event.outputTokens,
             totalTokens: event.totalTokens,
             measurement: event.measurement,
-            ...costForUsage(event, configuration),
+            ...(Object.hasOwn(event, "actualCostArs") ? { actualCostArs: event.actualCostArs, actualCostUsd: event.actualCostUsd ?? null } : costForUsage(event, configuration || {})),
           }
         : {}),
     });
@@ -58,7 +60,7 @@ export async function reserveUsage({
   reservedTokens,
   now = new Date(),
 }) {
-  const quota = quotaFor(configuration, session.uid, now),
+  const quota = quotaFor(configuration, session.uid, now, session.profile),
     budgetPath = `oliviaBudgets/${session.uid}_${quota.key}`,
     requestPath = `oliviaRequests/${session.uid}_${requestId}`;
   return store.transaction(async (tx) => {
@@ -78,7 +80,7 @@ export async function reserveUsage({
       requests: 0,
     };
     if (
-      budget.usedTokens + budget.reservedTokens + reservedTokens >
+      !quota.unlimited && budget.usedTokens + budget.reservedTokens + reservedTokens >
       quota.tokens
     )
       throw oliviaError(
@@ -201,7 +203,7 @@ export async function increaseReservation({ store, reservation, amount }) {
       throw oliviaError("request-expired", "Este intento venció.", 409);
     const budget = snapshot.data;
     if (
-      budget.usedTokens + budget.reservedTokens + amount >
+      !reservation.quota.unlimited && budget.usedTokens + budget.reservedTokens + amount >
       reservation.quota.tokens
     )
       throw oliviaError(

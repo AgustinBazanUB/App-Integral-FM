@@ -92,10 +92,11 @@ export function createOliviaEngine({
   env = process.env,
   provider = openaiRequest,
   clock = () => new Date(),
+  pricingResolver = async (config) => config,
 } = {}) {
-  async function configuration() {
+  async function configuration({ resolveCosts = true } = {}) {
     const raw = await store.get("oliviaConfiguration/global");
-    return raw
+    const config = raw
       ? validateConfiguration(
           Object.fromEntries(
             Object.keys(defaultOliviaConfiguration())
@@ -104,10 +105,15 @@ export function createOliviaEngine({
           ),
         )
       : defaultOliviaConfiguration(env);
+    return resolveCosts ? pricingResolver(config, clock()) : config;
   }
   async function usage(session, config, event = null) {
-    const quota = quotaFor(config, session.uid, clock()),
+    const quota = quotaFor(config, session.uid, clock(), session.profile),
       budget = await store.get(`oliviaBudgets/${session.uid}_${quota.key}`);
+    if (!event) {
+      const events = await store.query("oliviaUsage", [["userId", "EQUAL", session.uid]], 1, [["createdAt", "DESCENDING"]]);
+      event = events[0] || null;
+    }
     return publicUsage(session, budget, quota, event, config);
   }
   async function state(session, id, context = {}) {
@@ -161,41 +167,7 @@ export function createOliviaEngine({
           expiresAt: action.expiresAt,
         };
     }
-    let estimate;
-    if (canAccessAdministration(session.profile)) {
-      const profile = modelProfile(
-          config,
-          {
-            ...session,
-            profile: {
-              ...session.profile,
-              role: normalizedRole(session.profile),
-            },
-          },
-          screenContext(context),
-        ),
-        estimatedInput =
-          Buffer.byteLength(
-            JSON.stringify((conversation.messages || []).slice(-16)),
-            "utf8",
-          ) + 6000,
-        estimatedOutput = 1200,
-        cost = costForUsage(
-          {
-            model: profile.model,
-            inputTokens: estimatedInput,
-            outputTokens: estimatedOutput,
-          },
-          config,
-        );
-      estimate = {
-        model: profile.model,
-        reasoningEffort: profile.reasoningEffort,
-        estimatedTokens: estimatedInput + estimatedOutput,
-        estimatedCostUsd: cost.actualCostUsd,
-        estimatedCostArs: cost.actualCostArs,
-      };
-    }
+    const estimate = estimateFor(session, config, conversation, context);
     return {
       conversationId: conversation.id,
       messages: conversation.messages,
@@ -213,6 +185,22 @@ export function createOliviaEngine({
       ...(estimate ? { estimate } : {}),
     };
   }
+  function estimateFor(session, config, conversation, context, draft = "") {
+    const profile = modelProfile(config, { ...session, profile: { ...session.profile, role: normalizedRole(session.profile) } }, screenContext(context));
+    const input = { instructions: OLIVIA_INSTRUCTIONS, tools: toolDefinitions(session), context: userContext(session), screen: screenContext(context), documentation: retrieveOliviaKnowledge(draft, { role: normalizedRole(session.profile), module: context.module, limit: 4 }), messages: conversation.messages.slice(-16), draft };
+    const inputTokens = Math.ceil(Buffer.byteLength(JSON.stringify(input), "utf8") / 4), outputTokens = 2400;
+    const costs = costForUsage({ model: profile.model, inputTokens, outputTokens }, config);
+    const common = { estimatedCostArs: costs.actualCostArs };
+    return canAccessAdministration(session.profile) ? { ...common, model: profile.model, reasoningEffort: profile.reasoningEffort, estimatedTokens: inputTokens + outputTokens, estimatedCostUsd: costs.actualCostUsd, reference: config.pricingReference || null } : common;
+  }
+  async function estimate(session, body) {
+    assertOliviaAccess(session);
+    const c = await store.get(`oliviaConversations/${safeId(body.conversationId)}`);
+    assertConversationOwner(session, c, clock());
+    const draft = typeof body.message === "string" ? body.message.slice(0, 8000) : "";
+    return { estimate: estimateFor(session, await configuration(), c, body.screenContext || {}, draft) };
+  }
+
   async function claimConversation(
     session,
     id,
@@ -256,6 +244,7 @@ export function createOliviaEngine({
           path: `oliviaConversations/${id}`,
           data: {
             messages,
+            title: conversation.title || userMessage.replace(/\s+/g, " ").slice(0, 80),
             messageCount: (conversation.messageCount || 0) + 1,
             state: "PREPARANDO_ACCION",
             pendingActionId: null,
@@ -698,12 +687,12 @@ export function createOliviaEngine({
           "La conversación cambió. Revisá la propuesta actual.",
           409,
         );
-      const quota = quotaFor(config, session.uid, now),
+      const quota = quotaFor(config, session.uid, now, session.profile),
         budget = await tx.getDocument(
           `oliviaBudgets/${session.uid}_${quota.key}`,
         );
       if (
-        (budget?.data.usedTokens || 0) + (budget?.data.reservedTokens || 0) >=
+        !quota.unlimited && (budget?.data.usedTokens || 0) + (budget?.data.reservedTokens || 0) >=
         quota.tokens
       )
         throw oliviaError(
@@ -817,7 +806,7 @@ export function createOliviaEngine({
     safeId(body.requestId);
     const config = await configuration(),
       now = clock(),
-      quota = quotaFor(config, session.uid, now),
+      quota = quotaFor(config, session.uid, now, session.profile),
       id = `${session.uid}_${quota.key}`;
     const reason =
       typeof body.reason === "string"
@@ -854,7 +843,7 @@ export function createOliviaEngine({
         "La configuración es exclusiva del Administrador.",
         403,
       );
-    const config = await configuration(),
+    const config = await configuration({ resolveCosts: false }),
       now = clock(),
       requests = await store.query(
         "oliviaQuotaRequests",
@@ -892,21 +881,21 @@ export function createOliviaEngine({
     };
   }
   async function history(session, body) {
-    if (!canAccessAdministration(session.profile))
-      throw oliviaError(
-        "permission-denied",
-        "La supervisión es exclusiva del Administrador.",
-        403,
-      );
-    const userId = safeId(body.userId),
+    assertOliviaAccess(session);
+    const userId = body.userId ? safeId(body.userId) : session.uid;
+    if (userId !== session.uid && !canAccessAdministration(session.profile))
+      throw oliviaError("permission-denied", "Solo podés consultar tus propios chats.", 403);
+    const
       config = await configuration(),
       now = clock();
-    const conversations = await store.query(
-      "oliviaConversations",
-      [["userId", "EQUAL", userId]],
-      20,
-      [["updatedAt", "DESCENDING"]],
+    let after = body.conversationsCursor || null;
+    if (after && (!/^[A-Za-z0-9_-]{1,128}$/.test(after.id || "") || typeof after.updatedAt !== "string" || !Number.isFinite(dateMs(after.updatedAt))))
+      throw oliviaError("invalid-input", "Página de chats inválida.");
+    const conversationRows = await store.query(
+      "oliviaConversations", [["userId", "EQUAL", userId]], 21,
+      [["updatedAt", "DESCENDING"], ["__name__", "DESCENDING"]], { after },
     );
+    const conversations = conversationRows.slice(0,20), lastConversation = conversations.at(-1);
     const usageEvents = await store.query(
       "oliviaUsage",
       [["userId", "EQUAL", userId]],
@@ -966,20 +955,23 @@ export function createOliviaEngine({
         expiresAt: c.expiresAt,
       };
     }
-    const quota = quotaFor(config, userId, now),
+    const targetProfile = await store.get(`users/${userId}`);
+    const quota = quotaFor(config, userId, now, targetProfile),
       budget = await store.get(`oliviaBudgets/${userId}_${quota.key}`);
     return {
+      conversationsCursor: conversationRows.length > 20 ? { id: lastConversation.id, updatedAt: new Date(lastConversation.updatedAt).toISOString() } : null,
       conversations: conversations
         .filter((c) => dateMs(c.expiresAt) > now.getTime())
         .map((c) => ({
           id: c.id,
           userId,
           state: c.state,
+          title: c.title || c.messages?.find((m) => m.role === "user")?.content?.slice(0, 80) || "Nuevo chat",
           updatedAt: c.updatedAt,
           expiresAt: c.expiresAt,
           messageCount: c.messageCount ?? c.messages?.length ?? 0,
         })),
-      usageEvents: usageEvents
+      usageEvents: canAccessAdministration(session.profile) ? usageEvents
         .filter(
           (u) =>
             !u.retentionExpiresAt ||
@@ -994,12 +986,31 @@ export function createOliviaEngine({
             __updateTime,
             ...event
           }) => event,
-        ),
+        ) : [],
       usage: publicUsage(session, budget, quota),
       selectedConversation,
       limit: { conversations: 20, usageEvents: 30, messages: 60 },
     };
   }
+  async function resumeConversation(session, body) {
+    assertOliviaAccess(session);
+    const id = safeId(body.conversationId), now = clock();
+    await store.transaction(async (tx) => {
+      const record = await tx.getDocument(`oliviaConversations/${id}`), c = record?.data;
+      if (!c || c.userId !== session.uid || dateMs(c.expiresAt) <= now.getTime())
+        throw oliviaError("conversation-not-found", "No se encontró este chat o venció.", 404);
+      if (c.busyUntil && dateMs(c.busyUntil) > now.getTime())
+        throw oliviaError("conversation-busy", "Este chat todavía está procesando una solicitud.", 409);
+      if (c.sessionBinding === sessionBinding(session)) return;
+      const pending = c.pendingActionId ? await tx.getDocument(`oliviaConfirmations/${c.pendingActionId}`) : null;
+      await tx.commitDocuments([
+        ...(pending?.data.status === "pending" ? [{ type: "update", path: `oliviaConfirmations/${c.pendingActionId}`, data: { status: "superseded", updatedAt: now } }] : []),
+        { type: "update", path: `oliviaConversations/${id}`, data: { sessionBinding: sessionBinding(session), pendingActionId: null, draft: null, state: "INFORMACION", busyRequestId: null, busyUntil: null, updatedAt: now } }
+      ]);
+    });
+    return state(session, id, body.screenContext);
+  }
+
   async function saveConfiguration(session, body) {
     if (!canAccessAdministration(session.profile))
       throw oliviaError(
@@ -1086,6 +1097,8 @@ export function createOliviaEngine({
     getConfiguration,
     saveConfiguration,
     history,
+    resumeConversation,
+    estimate,
     usage,
     requestQuotaExtension,
   };

@@ -137,7 +137,8 @@ export function createOliviaStore({
           : {}),
       };
       if (queryOptions.after) {
-        const { createdAt, id } = queryOptions.after;
+        const { id } = queryOptions.after;
+        const createdAt = queryOptions.after.updatedAt ?? queryOptions.after.createdAt;
         if (
           !/^[A-Za-z0-9_-]{1,128}$/.test(id) ||
           !Number.isFinite(new Date(createdAt).getTime())

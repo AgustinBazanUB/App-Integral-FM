@@ -38,6 +38,7 @@ function fixture() {
       docs.has(path)
         ? { ...structuredClone(docs.get(path)), id: path.split("/").at(-1) }
         : null,
+    query: async () => [],
     commit: async (writes) => apply(writes),
     transaction: async (work) =>
       work({
@@ -113,6 +114,7 @@ for (const providerUsage of [
     assert.equal(usage(f).measurement, "reserved-estimate");
     assert.equal(usage(f).actualCostUsd, null);
     assert.deepEqual(Object.keys(result.usage).sort(), [
+      "lastCost",
       "period",
       "remainingPercent",
       "renewsAt",
