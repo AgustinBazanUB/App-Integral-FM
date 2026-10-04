@@ -1,8 +1,7 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { Link } from "../router";
 import { categoryById } from "../data/categories";
-import { complementaryByCategory, productById } from "../data/products";
 import { useCart } from "../context/CartContext";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { formatPrice } from "../utils/format";
@@ -16,12 +15,10 @@ export default function CartDrawer() {
     closeCart,
     updateQuantity,
     removeItem,
-    addItem,
     hasPendingPrices,
   } = useCart();
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
-  const [addedIds, setAddedIds] = useState(() => new Set());
 
   useFocusTrap({
     active: isCartOpen,
@@ -31,20 +28,6 @@ export default function CartDrawer() {
   });
 
   if (!isCartOpen) return null;
-
-  const cartProductIds = new Set(items.map((item) => item.productId));
-  const cartCategories = [...new Set(items.map((item) => item.categoryId))];
-  const suggestions = cartCategories
-    .flatMap((categoryId) => complementaryByCategory[categoryId] ?? [])
-    .filter((id, index, ids) => ids.indexOf(id) === index)
-    .filter((id) => !cartProductIds.has(id) && productById[id])
-    .map((id) => productById[id])
-    .slice(0, 3);
-
-  const onAddSuggestion = (suggestion) => {
-    addItem(suggestion);
-    setAddedIds((current) => new Set(current).add(suggestion.id));
-  };
 
   return (
     <div
@@ -133,46 +116,6 @@ export default function CartDrawer() {
                 </article>
               ))}
             </div>
-
-            {suggestions.length ? (
-              <div className="cart-suggestions">
-                <p className="cart-suggestions__title">Completá tu pedido</p>
-                {suggestions.map((suggestion) => {
-                  const isAdded = addedIds.has(suggestion.id);
-                  return (
-                    <div className="cart-suggestion" key={suggestion.id}>
-                      {suggestion.image ? (
-                        <img
-                          src={suggestion.image}
-                          alt=""
-                          width="48"
-                          height="60"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : null}
-                      <div className="cart-suggestion__info">
-                        <strong>{suggestion.name}</strong>
-                        <span>
-                          {formatPrice(
-                            suggestion.promoPrice ?? suggestion.price,
-                          ) ?? "A consultar"}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className={isAdded ? "is-added" : undefined}
-                        onClick={() => onAddSuggestion(suggestion)}
-                        aria-label={`Agregar ${suggestion.name} al carrito`}
-                      >
-                        <Plus size={15} aria-hidden="true" />
-                        {isAdded ? "Agregado" : "Agregar"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
 
             <div className="cart-drawer__footer">
               <div className="cart-total">

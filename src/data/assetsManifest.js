@@ -190,7 +190,6 @@ const productAssetById = Object.freeze({
   "nuts-almonds": products.almonds500g,
   "nuts-pistachios-400g": products.pistachios400g,
   "nuts-pistachios": products.pistachios400g,
-  "nuts-pistachios-1kg": products.pistachios1kg,
   "olives-greek": products.greekOlives,
   "olives-selection": products.greekOlives,
   "jam-pear": products.pearJam,

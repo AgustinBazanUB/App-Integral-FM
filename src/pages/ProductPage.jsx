@@ -61,7 +61,12 @@ export default function ProductPage() {
     )
     .slice(0, 3);
 
-  const price = formatPrice(product.price);
+  const formatOption = product.formatOptions?.find(
+    (option) => option.label === format,
+  );
+  const displayImage = formatOption?.image ?? product.image;
+  const unitPrice = formatOption ? formatOption.price : product.price;
+  const price = formatPrice(unitPrice);
   const promoPrice = formatPrice(product.promoPrice);
 
   const addAndOpen = () => {
@@ -138,7 +143,8 @@ export default function ProductPage() {
 
       <section className="container product-detail">
         <PlaceholderImage
-          src={product.image}
+          key={displayImage}
+          src={displayImage}
           alt={product.imageAlt ?? `Fotografía real de ${product.name}`}
           className="product-detail__media"
           aspectRatio="4 / 5"

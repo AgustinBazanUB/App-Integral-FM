@@ -13,7 +13,13 @@ export default function ProductCard({ product, compact = false }) {
   const [added, setAdded] = useState(false);
   const category = categoryById[product.categoryId];
   const imageAsset = getProductAsset(product.id);
-  const price = formatPrice(product.price);
+  const formatOption = product.formatOptions?.find(
+    (option) => option.label === format,
+  );
+  const displayImage = formatOption?.image ?? product.image;
+  const displayImageHover = formatOption?.imageHover ?? product.imageHover;
+  const unitPrice = formatOption ? formatOption.price : product.price;
+  const price = formatPrice(unitPrice);
   const promoPrice = formatPrice(product.promoPrice);
   const unavailable = product.stock === "out" || product.active === false;
 
@@ -42,21 +48,21 @@ export default function ProductCard({ product, compact = false }) {
         className="product-card__image-link"
         aria-label={`Ver ${product.name}`}
       >
-        {product.image ? (
+        {displayImage ? (
           <>
             <img
               className="product-card__image"
-              src={product.image}
+              src={displayImage}
               width={product.imageWidth ?? imageAsset?.width ?? 900}
               height={product.imageHeight ?? imageAsset?.height ?? 900}
               alt={product.imageAlt ?? product.name}
               loading="lazy"
               decoding="async"
             />
-            {product.imageHover ? (
+            {displayImageHover ? (
               <img
                 className="product-card__image product-card__image--hover"
-                src={product.imageHover}
+                src={displayImageHover}
                 alt=""
                 aria-hidden="true"
                 width={product.imageWidth ?? imageAsset?.width ?? 900}

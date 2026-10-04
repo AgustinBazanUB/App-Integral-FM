@@ -64,6 +64,12 @@ export function CartProvider({ children }) {
       product.attributes?.variety ??
       product.attributes?.flavor ??
       "";
+    const formatOption = product.formatOptions?.find(
+      (option) => option.label === format,
+    );
+    const unitPrice =
+      product.promoPrice ??
+      (formatOption ? formatOption.price ?? null : product.price);
     const lineId = makeLineId(product.id, format, variant);
 
     setItems((currentItems) => {
@@ -85,7 +91,7 @@ export function CartProvider({ children }) {
           format,
           variant,
           quantity: 1,
-          price: product.promoPrice ?? product.price,
+          price: unitPrice,
           dataStatus: product.dataStatus,
         },
       ];
@@ -97,7 +103,7 @@ export function CartProvider({ children }) {
       item_name: product.name,
       item_category: product.categoryId,
       item_variant: variant || format,
-      price: product.price,
+      price: unitPrice,
       quantity: 1,
     });
   }, []);
