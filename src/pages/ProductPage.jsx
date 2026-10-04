@@ -24,6 +24,7 @@ export default function ProductPage() {
   const product = products.find((item) => item.slug === slug);
   const { addItem, openCart } = useCart();
   const [format, setFormat] = useState(product?.formats?.[0] ?? "");
+  const [variety, setVariety] = useState(product?.varieties?.[0] ?? "");
 
   useEffect(() => {
     if (!product) return;
@@ -64,7 +65,12 @@ export default function ProductPage() {
   const promoPrice = formatPrice(product.promoPrice);
 
   const addAndOpen = () => {
-    addItem(product, { format });
+    addItem(product, {
+      format,
+      variant: product.varieties?.length
+        ? variety
+        : product.attributes?.variety,
+    });
     openCart();
   };
 
@@ -199,6 +205,23 @@ export default function ProductPage() {
               </dd>
             </div>
           </dl>
+
+          {product.varieties?.length > 1 ? (
+            <label className="field-label product-detail__format">
+              Variedad
+              <select
+                value={variety}
+                onChange={(event) => setVariety(event.target.value)}
+                aria-label={`Variedad de ${product.name}`}
+              >
+                {product.varieties.map((option) => (
+                  <option value={option} key={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           {product.formats.length > 1 ? (
             <label className="field-label product-detail__format">

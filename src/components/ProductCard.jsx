@@ -9,6 +9,7 @@ import { formatPrice } from "../utils/format";
 export default function ProductCard({ product, compact = false }) {
   const { addItem } = useCart();
   const [format, setFormat] = useState(product.formats?.[0] ?? "");
+  const [variety, setVariety] = useState(product.varieties?.[0] ?? "");
   const [added, setAdded] = useState(false);
   const category = categoryById[product.categoryId];
   const imageAsset = getProductAsset(product.id);
@@ -27,7 +28,9 @@ export default function ProductCard({ product, compact = false }) {
     addItem(product, {
       format,
       variant:
-        product.attributes?.variety ?? product.attributes?.flavor ?? "",
+        product.varieties?.length > 0
+          ? variety
+          : (product.attributes?.variety ?? product.attributes?.flavor ?? ""),
     });
     setAdded(true);
   };
@@ -81,6 +84,23 @@ export default function ProductCard({ product, compact = false }) {
         </h3>
         {compact ? (
           <p className="product-card__description">{product.description}</p>
+        ) : null}
+
+        {product.varieties?.length > 1 ? (
+          <label className="field-label product-card__format">
+            Variedad
+            <select
+              value={variety}
+              onChange={(event) => setVariety(event.target.value)}
+              aria-label={`Variedad de ${product.name}`}
+            >
+              {product.varieties.map((option) => (
+                <option value={option} key={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
         ) : null}
 
         {product.formats?.length > 1 ? (

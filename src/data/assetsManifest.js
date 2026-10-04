@@ -84,6 +84,13 @@ const products = Object.freeze({
     alt: "Pistachos con cáscara Flor Mía de 400 gramos",
     sourcePath: "fotosFinalesFlorMia/productosMendocinos/Pistachos400gr.png",
   }),
+  pistachios1kg: imageAsset({
+    path: "products/pistachos-1kg.webp",
+    width: 1122,
+    height: 1402,
+    alt: "Pistachos con cáscara Flor Mía de 1 kilogramo",
+    sourcePath: "fotosFinalesFlorMia/productosMendocinos/Pistachos800gr.png",
+  }),
   greekOlives: imageAsset({
     path: "products/aceitunas-griegas.webp",
     width: 1086,
@@ -172,6 +179,7 @@ const categories = Object.freeze({
   olives: products.greekOlives,
   jams: products.pearJam,
   seasoned_salts: products.malbecSalt,
+  wines: products.bazanWine,
   gifts: products.oliveOilTrio500cc,
 });
 
@@ -182,6 +190,7 @@ const productAssetById = Object.freeze({
   "nuts-almonds": products.almonds500g,
   "nuts-pistachios-400g": products.pistachios400g,
   "nuts-pistachios": products.pistachios400g,
+  "nuts-pistachios-1kg": products.pistachios1kg,
   "olives-greek": products.greekOlives,
   "olives-selection": products.greekOlives,
   "jam-pear": products.pearJam,

@@ -128,7 +128,8 @@ CONVERSIONS = [
     ("productosMendocinos/Almendras1kgSecundario.png", "almendras-1kg.webp", PRIMARY_WIDTH),
     ("productosMendocinos/Almendras200grSecundario.png", "almendras-200g.webp", PRIMARY_WIDTH),
     ("productosMendocinos/Pistachos150gr.png", "pistachos-150g.webp", PRIMARY_WIDTH),
-    ("productosMendocinos/Pistachos800gr.png", "pistachos-800g.webp", PRIMARY_WIDTH),
+    # El archivo fuente dice 800gr pero el formato comercial real es 1 kg
+    ("productosMendocinos/Pistachos800gr.png", "pistachos-1kg.webp", PRIMARY_WIDTH),
     (
         "productosMendocinos/Secundaria/Almendras1kgSecundaria.png",
         "almendras-1kg-secundaria.webp",
@@ -146,7 +147,7 @@ CONVERSIONS = [
     ),
     (
         "productosMendocinos/Secundaria/Pistachos800grSecundaria.png",
-        "pistachos-800g-secundaria.webp",
+        "pistachos-1kg-secundaria.webp",
         SECONDARY_WIDTH,
     ),
     # Vino (asset editorial / futuro producto)

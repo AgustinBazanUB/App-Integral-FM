@@ -1,13 +1,4 @@
-export const virtualCatalogCategories = {
-  wines: {
-    id: "wines",
-    slug: "vinos",
-    name: "Vinos",
-    shortName: "Vinos",
-    description:
-      "Los vinos todavía no tienen productos comerciales cargados. Esta categoría queda preparada para incorporarlos sin inventar precios, stock ni presentaciones.",
-  },
-};
+export const virtualCatalogCategories = {};
 
 export const catalogCollections = {
   regionales: {

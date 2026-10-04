@@ -157,12 +157,11 @@ test("la colección regional agrupa categorías existentes sin duplicar producto
   assert.equal(new Set(regionalProductIds).size, regionalProductIds.length);
 });
 
-test("vinos conserva un estado vacío honesto", () => {
-  assert.equal(virtualCatalogCategories.wines.name, "Vinos");
-  assert.equal(
-    products.some((product) => product.categoryId === "wines"),
-    false,
-  );
+test("vinos tiene el Bazán como producto real con precio", () => {
+  const wine = products.find((product) => product.id === "wine-bazan");
+  assert.equal(wine.categoryId, "wines");
+  assert.equal(wine.price, 29000);
+  assert.equal(wine.formats.includes("750 ml"), true);
 });
 
 test("los CTAs y el título AOVE usan los textos aprobados", () => {
@@ -226,7 +225,7 @@ test("el showcase de promociones referencia productos reales sin inventar precio
 });
 
 test("los seis varietales tienen intensidad y producto de 500 cc", () => {
-  assert.equal(categories.length, 6);
+  assert.equal(categories.length, 7);
   assert.deepEqual(
     oliveProfiles.map((profile) => profile.name),
     ["Arbequina", "Arbosana", "Blend IG", "Coratina", "Picual", "Arauco"],

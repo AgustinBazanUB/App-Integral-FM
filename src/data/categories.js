@@ -76,6 +76,21 @@ export const categories = [
     facets: ["condimento", "intensidad", "uso", "tamaño"],
   },
   {
+    id: "wines",
+    slug: "vinos",
+    name: "Vinos",
+    shortName: "Vinos",
+    subtitle: "Malbec mendocino",
+    description:
+      "Vino Bazán Malbec, la cepa insignia de Mendoza, en botella de 750 ml.",
+    status: "principal",
+    featured: false,
+    composition: false,
+    image: productImage("vino-bazan.webp"),
+    imageLabel: "Vino Bazán Malbec Flor Mía",
+    facets: ["cepa", "bodega", "año", "tamaño"],
+  },
+  {
     id: "gifts",
     slug: "regalos",
     name: "Regalos",
