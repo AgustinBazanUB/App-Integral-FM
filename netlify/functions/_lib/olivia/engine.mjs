@@ -436,10 +436,10 @@ export function createOliviaEngine({
         nextState = "INFORMACION",
         content = "",
         toolCallCount = 0;
-      // Three tool rounds may resolve location, product and stock in sequence.
+      // Five tool rounds allow sequential context, location, product, stock and preparation.
       // Reserve a final response without tools to present the last tool result.
-      for (let turn = 0; turn < 4; turn++) {
-        const finalResponse = turn === 3;
+      for (let turn = 0; turn < 6; turn++) {
+        const finalResponse = turn === 5 || toolCallCount >= 5;
         const bodyRequest = {
           model: profile.model,
           reasoning: { effort: profile.reasoningEffort },

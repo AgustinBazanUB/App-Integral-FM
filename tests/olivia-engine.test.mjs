@@ -940,8 +940,7 @@ test("a location-product-stock chain presents the last tool result instead of as
           locationId: "local_a",
           productId: "oil",
         });
-      assert.deepEqual(body.tools, []);
-      assert.equal(body.tool_choice, "none");
+      assert.ok(body.tools.some((tool) => tool.name === "prepare_sale"));
       const lastResult = JSON.parse(body.input.at(-1).output);
       assert.equal(lastResult.currentStock, 4);
       return textResponse("Aceite tiene 4 unidades en Local A.");
@@ -956,6 +955,80 @@ test("a location-product-stock chain presents the last tool result instead of as
     "Aceite tiene 4 unidades en Local A.",
   );
   assert.equal(newBusinessSales(f).length, 0);
+});
+
+test("a sequential location-product-stock-preparation chain creates a confirmation without changing stock", async () => {
+  const f = fixture({
+    role: "admin",
+    provider: (_path, body, _options, calls) => {
+      if (calls === 1) return functionResponse("list_locations", {});
+      if (calls === 2)
+        return functionResponse("search_products", {
+          query: "Aceite",
+          locationId: "local_a",
+        });
+      if (calls === 3)
+        return functionResponse("get_stock", {
+          locationId: "local_a",
+          productId: "oil",
+        });
+      assert.equal(calls, 4);
+      assert.ok(body.tools.some((tool) => tool.name === "prepare_stock_load"));
+      assert.equal(JSON.parse(body.input.at(-1).output).currentStock, 4);
+      return functionResponse("prepare_stock_load", {
+        locationId: "local_a",
+        productId: "oil",
+        quantity: 1,
+        reason: "Prueba para cancelar",
+      });
+    },
+  });
+  const initial = await start(f),
+    result = await chat(f, initial.conversationId, {
+      message: "Prepará una unidad de Aceite en Local A",
+    });
+  assert.equal(result.state, "ESPERANDO_CONFIRMACION");
+  assert.ok(result.pendingAction);
+  assert.equal(f.providerCalls(), 4);
+  assert.equal(
+    f.documents.get("locationStock/local_a/items/oil").currentStock,
+    4,
+  );
+  assert.equal(
+    f.commits.flat().some((write) => write.path.startsWith("stockOperations/")),
+    false,
+  );
+});
+
+test("five sequential tools are followed by a final response with no tools", async () => {
+  const f = fixture({
+    provider: (_path, body, _options, calls) => {
+      if (calls === 1) return functionResponse("get_current_user_context", {});
+      if (calls === 2) return functionResponse("list_locations", {});
+      if (calls === 3)
+        return functionResponse("search_products", {
+          query: "Aceite",
+          locationId: "local_a",
+        });
+      if (calls === 4)
+        return functionResponse("get_promotions", { locationId: "local_a" });
+      if (calls === 5)
+        return functionResponse("get_stock", {
+          locationId: "local_a",
+          productId: "oil",
+        });
+      assert.equal(calls, 6);
+      assert.deepEqual(body.tools, []);
+      assert.equal(body.tool_choice, "none");
+      assert.equal(JSON.parse(body.input.at(-1).output).currentStock, 4);
+      return textResponse("Aceite tiene cuatro unidades.");
+    },
+  });
+  const initial = await start(f),
+    result = await chat(f, initial.conversationId);
+  assert.equal(f.providerCalls(), 6);
+  assert.equal(result.messages.at(-1).content, "Aceite tiene cuatro unidades.");
+  assert.equal(result.pendingAction, null);
 });
 
 test("identical tool calls within one turn are resolved once and return both call outputs", async () => {
