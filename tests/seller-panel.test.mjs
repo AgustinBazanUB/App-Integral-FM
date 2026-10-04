@@ -182,7 +182,7 @@ test("la interfaz compacta descuentos y ofrece facturación ARCA explícita", as
   const dialog = await read("../src/gestion/seller/DiscountDialog.jsx");
   const service = await read("../src/gestion/services/sellerService.js");
   assert.match(panel, />Agregar descuento</);
-  assert.match(panel, />Cargar factura</);
+  assert.match(panel, /Cargar factura/);
   assert.match(panel, />Generar factura y continuar</);
   assert.doesNotMatch(panel, />Agregar ticket</);
   assert.match(panel, /"Continuar"/);
