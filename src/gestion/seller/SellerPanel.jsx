@@ -469,7 +469,7 @@ export default function SellerPanel() {
   }, [selectedLocation, profile, currentItems, appliedDiscounts, summary.total, paymentMethod, payments, selectedCustomer, ticketRequested, pendingSales, resetSale]);
 
   const submitSale = useCallback(async (options = {}) => {
-    const requestInvoice = options?.requestInvoice == null ? ticketRequested : options.requestInvoice === true;
+    const requestInvoice = options?.requestInvoice === true;
     const invoiceReceiver = options?.invoiceReceiver || null;
     if (submitRef.current || submitState.busy) return;
     if (!selectedLocation) {
@@ -872,7 +872,6 @@ export default function SellerPanel() {
           <Button loading={submitState.busy} disabled={!currentItems.length || !paymentMethod || !selectedLocation} onClick={() => {
             try {
               const invoiceReceiver = buildInvoiceReceiver();
-              setTicketRequested(true);
               setBillingOpen(false);
               submitSale({ requestInvoice: true, invoiceReceiver });
             } catch (error) {
