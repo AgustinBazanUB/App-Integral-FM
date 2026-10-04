@@ -12,6 +12,7 @@ import {
   Toast,
 } from "../../design-system";
 import { useAuth } from "../AuthContext";
+import { useOliviaRefresh, useOliviaScreenContext } from "../olivia/ScreenContext";
 import HelpTooltip from "../components/HelpTooltip";
 import ProductForm from "../components/ProductForm";
 import { formatMoney } from "../formatters";
@@ -44,6 +45,8 @@ export default function ProductsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [message, setMessage] = useState("");
+  useOliviaScreenContext({ entityType: editingProduct?.id && formOpen ? "product" : undefined, entityId: formOpen ? editingProduct?.id : undefined, productId: formOpen ? editingProduct?.id : undefined, filters: { search, categoryId, status } });
+  useOliviaRefresh(result.refresh);
 
   const products = result.data?.products || [];
   const categories = result.data?.categories || [];

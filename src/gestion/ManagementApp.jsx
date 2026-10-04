@@ -2,6 +2,8 @@ import { Component, lazy, Suspense, useEffect } from "react";
 import { Skeleton } from "../design-system";
 import { useLocation, useNavigate } from "../router";
 import { AuthProvider, useAuth } from "./AuthContext";
+import OliviaMount from "./olivia/OliviaMount";
+import { OliviaScreenProvider } from "./olivia/ScreenContext";
 import ManagementShell from "./ManagementShell";
 import { moduleById, SALES_METRICS_PATH } from "./modules";
 import { managementPageLoaders } from "./routePreload";
@@ -202,9 +204,12 @@ function ManagementRouter() {
 export default function ManagementApp() {
   return (
     <AuthProvider>
-      <ManagementErrorBoundary>
-        <ManagementRouter />
-      </ManagementErrorBoundary>
+      <OliviaScreenProvider>
+        <ManagementErrorBoundary>
+          <ManagementRouter />
+        </ManagementErrorBoundary>
+        <OliviaMount />
+      </OliviaScreenProvider>
     </AuthProvider>
   );
 }

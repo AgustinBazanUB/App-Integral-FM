@@ -18,7 +18,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test tests/*.test.mjs",
     "test:rules": "node --test tests/firestore.rules.mjs tests/firestore.whatsapp-release.rules.mjs tests/firestore.meta-ads.rules.mjs tests/firestore.meta-ads-theory.rules.mjs tests/firestore.meta-ads-planner.rules.mjs tests/firestore.meta-ads-creative.rules.mjs tests/firestore.ecommerce-stage6.rules.mjs tests/firestore.fiscal-recovery.rules.mjs tests/firestore.operations.rules.mjs tests/firestore.quick-sales.rules.mjs tests/firestore.crm-finance.rules.mjs",
-    "test:ecommerce": "node --test tests/ecommerce*.test.mjs"
+    "test:ecommerce": "node --test tests/ecommerce*.test.mjs",
+    "test:olivia:rules": "node --test tests/firestore.olivia.rules.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.1.1",
@@ -28,7 +29,8 @@
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "read-excel-file": "9.3.4"
+    "read-excel-file": "9.3.4",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",

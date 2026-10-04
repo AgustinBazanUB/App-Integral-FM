@@ -1330,6 +1330,16 @@ service cloud.firestore {
             && allowedLocation(request.resource.data.locationId)));
       allow update, delete: if false;
     }
+    // Olivia is accessed through authenticated backend endpoints only.
+    match /oliviaConfiguration/{document=**} { allow read, write: if false; }
+    match /oliviaConversations/{document=**} { allow read, write: if false; }
+    match /oliviaConfirmations/{document=**} { allow read, write: if false; }
+    match /oliviaBudgets/{document=**} { allow read, write: if false; }
+    match /oliviaRequests/{document=**} { allow read, write: if false; }
+    match /oliviaUsage/{document=**} { allow read, write: if false; }
+    match /oliviaRealtime/{document=**} { allow read, write: if false; }
+    match /oliviaAnonymousUsage/{document=**} { allow read, write: if false; }
+    match /oliviaQuotaRequests/{document=**} { allow read, write: if false; }
     match /{document=**} {
       allow read, write: if false;
     }

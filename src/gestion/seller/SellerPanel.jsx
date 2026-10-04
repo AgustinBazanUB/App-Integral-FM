@@ -32,8 +32,9 @@ import {
   salePaymentParts,
   SINGLE_PAYMENT_METHODS,
 } from "../../modules/locations/domain/payments";
-import { useNavigate } from "../../router";
+import { useLocation, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
+import { useOliviaRefresh, useOliviaScreenContext, useOliviaVisibility } from "../olivia/ScreenContext";
 import { Icon } from "../components/icons";
 import {
   formatDateTime,
@@ -193,12 +194,23 @@ function sameManualDiscount(a, b) {
 
 export default function SellerPanel() {
   const { profile, logout } = useAuth();
+  const { assistantOpen } = useOliviaVisibility();
   const navigate = useNavigate();
+  const routeLocation = useLocation();
   const online = useOnlineStatus();
   const locationsResult = useSellerLocations(profile);
   const resourcesResult = useSellerResources(profile);
   const [locationId, setLocationId] = useState("");
-  const [view, setView] = useState("sale");
+  const requestedView = new URLSearchParams(routeLocation.search).get("view");
+  const [view, setViewState] = useState(SELLER_VIEWS.some((item) => item.id === requestedView) ? requestedView : "sale");
+  const setView = useCallback((next) => {
+    if (!SELLER_VIEWS.some((item) => item.id === next)) return;
+    setViewState(next);
+    navigate(`/vendedor?view=${encodeURIComponent(next)}`, { replace: true });
+  }, [navigate]);
+  useEffect(() => {
+    setViewState(SELLER_VIEWS.some((item) => item.id === requestedView) ? requestedView : "sale");
+  }, [requestedView]);
   const [cart, setCart] = useState({});
   const [discountIds, setDiscountIds] = useState([]);
   const [manualDiscounts, setManualDiscounts] = useState([]);
@@ -246,6 +258,8 @@ export default function SellerPanel() {
   const stockResult = useSellerLocationStock(profile, locationId);
   const dailySales = useSellerDailySales(profile, locationId);
   const pendingSales = useSellerPendingSales(profile);
+  useOliviaScreenContext({ module: "seller", locationId: locationId || undefined, view, productId: view === "sale" ? lastProductId || undefined : undefined, customerId: view === "sale" ? selectedCustomer?.id : undefined, saleId: detailSale?.id || editSale?.id, entityType: detailSale?.id || editSale?.id ? "sale" : view === "sale" && lastProductId ? "product" : locationId ? "location" : undefined, entityId: detailSale?.id || editSale?.id || (view === "sale" ? lastProductId : "") || locationId || undefined });
+  useOliviaRefresh(dailySales.refresh);
   const resources = resourcesResult.data && typeof resourcesResult.data === "object"
     ? resourcesResult.data
     : {};
@@ -508,7 +522,7 @@ export default function SellerPanel() {
   })), [resources.shortcuts]);
 
   useSellerKeyboard({
-    enabled: keyboardActive && view === "sale",
+    enabled: keyboardActive && view === "sale" && !assistantOpen,
     products,
     discounts: availableDiscounts,
     actionShortcuts,

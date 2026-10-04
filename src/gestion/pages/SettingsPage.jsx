@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { fiscalPresentation } from "../../shared/fiscalRecovery.mjs";
 import { Badge, Button, EmptyState, PageHeader, Panel, Skeleton, Toast } from "../../design-system";
 import { useAuth } from "../AuthContext";
+import OliviaSettings from "../olivia/OliviaSettings";
 import { can, canAccessAdministration } from "../permissions";
 import {
   authorizeArcaInvoice,
@@ -433,6 +434,8 @@ export default function SettingsPage() {
         title="Configuración"
         description="Estado honesto de servicios e integraciones, sin credenciales privadas en el navegador."
       />
+
+      {isAdmin ? <OliviaSettings /> : null}
 
       <Panel
         title="Servicios de la plataforma"
