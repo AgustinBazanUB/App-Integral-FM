@@ -4,10 +4,11 @@ export class OliviaRealtime {
   constructor({ createSession, stopSession = async () => {}, onRequest, onState = () => {}, onError = () => {}, onCaption = () => {},
     mediaDevices = globalThis.navigator?.mediaDevices, PeerConnection = globalThis.RTCPeerConnection,
     createAudio = () => document.createElement("audio"),
+    createStream = (tracks) => new globalThis.MediaStream(tracks),
     // Browser-native timers must keep their Window receiver.
     setTimer = (callback, delay) => globalThis.setTimeout(callback, delay),
     clearTimer = (timer) => globalThis.clearTimeout(timer) }) {
-    Object.assign(this, { createSession, stopSession, onRequest, onState, onError, onCaption, mediaDevices, PeerConnection, createAudio, setTimer, clearTimer });
+    Object.assign(this, { createSession, stopSession, onRequest, onState, onError, onCaption, mediaDevices, PeerConnection, createAudio, createStream, setTimer, clearTimer });
     this.closed = false;
     this.seenInputs = new Set();
     this.seenCalls = new Set();
@@ -22,13 +23,15 @@ export class OliviaRealtime {
       const stream = await this.mediaDevices.getUserMedia({ audio: true });
       if (this.closed) { stream.getTracks().forEach((track) => track.stop()); return; }
       this.stream = stream;
+      // Keep background speech from cancelling the connection greeting.
+      this.setMuted(true);
       this.pc = new this.PeerConnection();
       this.audio = this.createAudio();
       this.audio.autoplay = true;
       this.pc.ontrack = (event) => {
         if (this.closed) return;
-        this.audio.srcObject = event.streams[0];
-        this.audio.play?.()?.catch?.(() => { if (!this.closed) this.onError(new Error("El navegador bloqueó la reproducción. Volvé a iniciar la voz para habilitar el audio.")); });
+        this.audio.srcObject = event.streams?.[0] || this.createStream([event.track]);
+        this.audio.play?.()?.catch?.(() => { if (!this.closed) this.fail(new Error("El navegador bloqueó la reproducción. Volvé a iniciar la voz para habilitar el audio.")); });
       };
       this.pc.onconnectionstatechange = () => {
         if (this.closed) return;
@@ -54,6 +57,7 @@ export class OliviaRealtime {
       if (!this.session.sdp) throw new Error("No se pudo autorizar la sesión de voz.");
       await this.pc.setRemoteDescription({ type: "answer", sdp: this.session.sdp });
       this.greet();
+      if (!this.session.voiceGreeting) this.setMuted(false);
       const seconds = Math.min(180, Math.max(1, Number(this.session.maxDurationSeconds) || 180));
       this.timer = this.setTimer(() => {
         this.close();
@@ -70,6 +74,7 @@ export class OliviaRealtime {
   greet() {
     if (this.closed || this.greeted || this.channel?.readyState !== "open" || !this.session?.voiceGreeting) return;
     this.greeted = true;
+    this.awaitingGreeting = true;
     this.speakResult({ state: "INFORMACION", messages: [{ role: "assistant", content: this.session.voiceGreeting }] });
   }
 
@@ -105,7 +110,10 @@ export class OliviaRealtime {
       });
     }
     if (event.type === "response.output_audio_transcript.delta") { this.onCaption(event.delta || "", true); this.onState("speaking"); }
-    if (event.type === "response.done") this.onState("listening");
+    if (event.type === "response.done") {
+      if (this.awaitingGreeting) { this.awaitingGreeting = false; this.setMuted(false); }
+      this.onState("listening");
+    }
     if (event.type === "error") this.fail(new Error("La sesión de voz informó un error. Podés continuar escribiendo y reconectar."));
   }
 
@@ -121,6 +129,7 @@ export class OliviaRealtime {
 
   setMuted(muted) { this.stream?.getAudioTracks?.().forEach((track) => { track.enabled = !muted; }); }
   interrupt() {
+    if (this.awaitingGreeting) { this.awaitingGreeting = false; this.setMuted(false); }
     this.send({ type: "response.cancel" });
     this.send({ type: "output_audio_buffer.clear" });
     this.onCaption("");

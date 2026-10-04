@@ -346,6 +346,9 @@ test("voice startup reads the server greeting once as audio without creating a c
   const fixture = voiceFixture({ createSession: async () => ({ sdp: "answer", realtimeSessionId: "server-session", voiceGreeting: "Hola, soy Olivia." }) });
   await fixture.connection.connect();
   fixture.channel.onopen();
+  assert.equal(fixture.track.enabled, false);
+  fixture.connection.handleEvent({ type: "response.done" });
+  assert.equal(fixture.track.enabled, true);
   assert.equal(fixture.events.length, 1);
   assert.equal(fixture.events[0].type, "response.create");
   assert.deepEqual(fixture.events[0].response.output_modalities, ["audio"]);
@@ -354,6 +357,21 @@ test("voice startup reads the server greeting once as audio without creating a c
   assert.deepEqual(fixture.requests, []);
   fixture.connection.close();
   assert.equal(fixture.channel.onopen, null);
+});
+
+test("streamless remote audio is played and a playback rejection closes capture and the provider", async () => {
+  const fallback = { remote: true };
+  const fixture = voiceFixture({ createStream: (tracks) => { assert.equal(tracks[0], "remote-track"); return fallback; } });
+  fixture.audio.play = async () => { throw new DOMException("Blocked", "NotAllowedError"); };
+  await fixture.connection.connect();
+  fixture.pc.ontrack({ streams: [], track: "remote-track" });
+  assert.equal(fixture.audio.srcObject, fallback);
+  await tick();
+  assert.equal(fixture.connection.closed, true);
+  assert.equal(fixture.track.stopped, 1);
+  assert.equal(fixture.channel.readyState, "closed");
+  assert.deepEqual(fixture.hangups, ["server-session"]);
+  assert.match(fixture.errors[0].message, /bloqueó la reproducción/);
 });
 
 test("a forged business tool call with no transcript cannot reach the orchestrator", async () => {
