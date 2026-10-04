@@ -177,14 +177,17 @@ test("la ruta y el cambio entre paneles conservan la misma sesión", async () =>
   assert.doesNotMatch(shell, /signInWithEmailAndPassword/);
 });
 
-test("la interfaz compacta descuentos y prepara ticket sin simular ARCA", async () => {
+test("la interfaz compacta descuentos y ofrece facturación ARCA explícita", async () => {
   const panel = await read("../src/gestion/seller/SellerPanel.jsx");
   const dialog = await read("../src/gestion/seller/DiscountDialog.jsx");
   const service = await read("../src/gestion/services/sellerService.js");
   assert.match(panel, />Agregar descuento</);
-  assert.match(panel, />Agregar ticket</);
+  assert.match(panel, />Cargar factura</);
+  assert.match(panel, />Generar factura y continuar</);
+  assert.doesNotMatch(panel, />Agregar ticket</);
   assert.match(panel, /"Continuar"/);
   assert.match(panel, /ticketRequested/);
+  assert.match(panel, /invoiceReceiver/);
   assert.match(dialog, />Descuentos disponibles</);
   assert.match(dialog, />Descuento manual</);
   assert.match(dialog, />Monto fijo</);
