@@ -508,8 +508,8 @@ export default function SellerPanel() {
         paymentMethodLabel: PAYMENT_LABELS[paymentMethod],
         payments,
         customer: selectedCustomer,
-        ticketRequested: requestInvoice,
-        invoiceReceiver,
+        ticketRequested: editSale ? undefined : requestInvoice,
+        invoiceReceiver: editSale ? null : invoiceReceiver,
       };
       const result = editSale
         ? await updateSellerSale({ ...common, saleId: editSale.id })
