@@ -828,6 +828,7 @@ test("autorización automática productiva bloquea fuentes no incluidas en el al
         ARCA_ENVIRONMENT: "production",
         ARCA_ALLOW_PRODUCTION_CAE: "true",
         ARCA_AUTO_AUTHORIZE_PRODUCTION: "true",
+        ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES: "admin_quick_sale",
         ARCA_ISSUER_CUIT: "20123456786",
         ARCA_POINT_OF_SALE: "8",
         ARCA_CONSUMER_FINAL_ID_THRESHOLD: "10000000",
