@@ -153,6 +153,7 @@ export default function QuickSalesPage() {
     (paymentMethod !== "multiple" || (!allocation.invalid && allocation.difference === 0 && allocation.positiveCount >= 2)));
   const switchOrigin = (id, type = stockType) => {
     setStockType(type); setLocationId(id); setQuantities({}); setPrices({}); setDiscountIds([]);
+    setOpenCategoryId("");
     setStock({ status: "idle", data: [] });
   };
   const paymentStatus = allocation.invalid ? "Revisá los montos" : allocation.difference === 0 ? "Pagos completos" : allocation.difference > 0 ? `Falta ${formatMoney(allocation.difference)}` : `Excede ${formatMoney(-allocation.difference)}`;
