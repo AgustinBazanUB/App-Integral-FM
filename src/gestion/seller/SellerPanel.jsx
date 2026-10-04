@@ -867,7 +867,7 @@ export default function SellerPanel() {
         title="Cargar factura"
         description="Confirmá la venta y prepará su comprobante fiscal ARCA."
         onClose={() => !submitState.busy && setBillingOpen(false)}
-        footer={<div className="fm-quick-pos__billing-actions">
+        footer={<div className="fm-seller-billing-actions">
           <Button variant="secondary" disabled={submitState.busy} onClick={() => { setBillingOpen(false); submitSale({ requestInvoice: false }); }}>Solo continuar</Button>
           <Button loading={submitState.busy} disabled={!currentItems.length || !paymentMethod || !selectedLocation} onClick={() => {
             try {
@@ -881,7 +881,7 @@ export default function SellerPanel() {
           }}>Generar factura y continuar</Button>
         </div>}
       >
-        <p className="fm-quick-pos__billing-total">Total {formatMoney(summary.total)}</p>
+        <p className="fm-seller-billing-total">Total {formatMoney(summary.total)}</p>
         <FormField label="Condición IVA receptor" required>
           <Select disabled={submitState.busy} value={receiverVatConditionId} onChange={event => { setReceiverVatConditionId(event.target.value); setReceiverDocument(""); }}>
             <option value="5">Consumidor Final</option>
