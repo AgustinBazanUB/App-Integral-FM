@@ -41,6 +41,8 @@ export function publicUsage(
             model: event.model,
             inputTokens: event.inputTokens,
             outputTokens: event.outputTokens,
+            totalTokens: event.totalTokens,
+            measurement: event.measurement,
             ...costForUsage(event, configuration),
           }
         : {}),

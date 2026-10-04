@@ -382,6 +382,18 @@ test("seller tools and public usage exclude administration, historical sales and
   assert.equal(JSON.stringify(usage).includes("secret-model"), false);
 });
 
+test("admin usage reports reserved estimates honestly while seller usage stays private", () => {
+  const f = fixture({ role: "admin" });
+  const event = { model: "gpt-transcribe", inputTokens: 0, outputTokens: 0, totalTokens: 6000, measurement: "reserved-estimate" };
+  const quota = quotaFor(f.config, f.session.uid, initialNow);
+  const admin = publicUsage(f.session, { usedTokens: 6000 }, quota, event, f.config);
+  assert.equal(admin.totalTokens, 6000);
+  assert.equal(admin.measurement, "reserved-estimate");
+  assert.equal(admin.actualCostUsd, null);
+  const seller = publicUsage({ ...f.session, profile: { ...f.session.profile, role: "seller" } }, { usedTokens: 6000 }, quota, event, f.config);
+  assert.deepEqual(Object.keys(seller).sort(), ["period", "remainingPercent", "renewsAt"]);
+});
+
 test("malicious seller provider cannot invoke admin tool even when it ignores supplied tools", async () => {
   const f = fixture({
     provider: () =>
