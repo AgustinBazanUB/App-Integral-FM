@@ -207,7 +207,6 @@ export default function SellerPanel() {
   const [discountOpen, setDiscountOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [payments, setPayments] = useState([]);
-  const [ticketRequested, setTicketRequested] = useState(false);
   const [billingOpen, setBillingOpen] = useState(false);
   const [receiverVatConditionId, setReceiverVatConditionId] = useState("5");
   const [receiverDocument, setReceiverDocument] = useState("");
@@ -365,7 +364,6 @@ export default function SellerPanel() {
     setDiscountOpen(false);
     setPaymentMethod("");
     setPayments([]);
-    setTicketRequested(false);
     setBillingOpen(false);
     setReceiverVatConditionId("5");
     setReceiverDocument("");
@@ -636,7 +634,6 @@ export default function SellerPanel() {
     setManualDiscounts(saleDiscounts.filter((discount) => discount.source === "manual" || discount.discountId === "manual").map((discount) => ({ ...discount, source: "manual", discountId: "manual" })));
     setPaymentMethod(sale.paymentMethod || "");
     setPayments(salePaymentParts(sale));
-    setTicketRequested(sale.ticketRequested === true);
     setSelectedCustomer(sale.customerId && sale.customerPhoneSnapshot ? {
       id: sale.customerId,
       phone: sale.customerPhoneSnapshot,
