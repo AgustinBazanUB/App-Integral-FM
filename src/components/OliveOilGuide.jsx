@@ -61,18 +61,28 @@ function OilProfileCard({ profile }) {
   };
 
   const productImage = (
-    <img
-      src={profile.image}
-      alt={
-        profile.imageStatus === "verified-product"
-          ? `Botella real de aceite Flor Mía variedad ${profile.name}`
-          : `Fotografía editorial de aceites Flor Mía; imagen específica de ${profile.name} pendiente`
-      }
-      width="900"
-      height="1350"
-      loading="lazy"
-      decoding="async"
-    />
+    <>
+      <img
+        src={profile.image}
+        alt={`Botella de aceite Flor Mía variedad ${profile.name}`}
+        width="900"
+        height="1350"
+        loading="lazy"
+        decoding="async"
+      />
+      {product?.imageHover ? (
+        <img
+          className="fm-variety-card__img--hover"
+          src={product.imageHover}
+          alt=""
+          aria-hidden="true"
+          width="900"
+          height="1350"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : null}
+    </>
   );
 
   return (

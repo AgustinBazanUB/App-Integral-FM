@@ -12,6 +12,8 @@ export const products = [
     description:
       "Aceite de oliva extra virgen mendocino en bidón de 5 L: el formato pensado para la cocina de todos los días, restaurantes y familias que usan mucho oliva. Equilibrado y versátil, del salteado a la terminación del plato.",
     image: productImage("aceite-oliva-5l.webp"),
+    imageHover: productImage("aceite-oliva-5l-secundaria.webp"),
+    imageAlt: "Bidón de 5 litros de aceite de oliva Flor Mía",
     price: null,
     promoPrice: null,
     promoLabel: null,
@@ -35,6 +37,8 @@ export const products = [
     description:
       "Aceite de oliva extra virgen mendocino en botellón de 2 L: el punto medio entre la botella de mesa y el bidón. Misma calidad que nuestros varietales, en formato de despensa para cocinar a diario sin quedarse corto.",
     image: productImage("aceite-oliva-2l.webp"),
+    imageHover: productImage("aceite-oliva-2l-secundaria.webp"),
+    imageAlt: "Botellón de 2 litros de aceite de oliva Flor Mía",
     price: null,
     promoPrice: null,
     promoLabel: null,
@@ -58,6 +62,8 @@ export const products = [
     description:
       "Almendras naturales del oasis mendocino, dulces y crocantes, en formato de 500 g. Ricas en fibra, proteína vegetal y vitamina E: para la merienda, la picada o la repostería.",
     image: productImage("almendras-500g.webp"),
+    imageHover: productImage("almendras-500g-secundaria.webp"),
+    imageAlt: "Almendras naturales Flor Mía de 500 gramos",
     price: null,
     promoPrice: null,
     promoLabel: null,
@@ -81,6 +87,8 @@ export const products = [
     description:
       "Pistachos en su cáscara del norte y este de Mendoza, donde el 'oro verde' es hoy el cultivo emergente de la provincia. Dulces, cremosos y con ese ritual de abrirlos que los vuelve el infaltable de cualquier picada.",
     image: productImage("pistachos-400g.webp"),
+    imageHover: productImage("pistachos-400g-secundaria.webp"),
+    imageAlt: "Pistachos con cáscara Flor Mía de 400 gramos",
     price: null,
     promoPrice: null,
     promoLabel: null,
@@ -104,6 +112,8 @@ export const products = [
     description:
       "Aceitunas negras curadas en salmuera al estilo griego: fruto maduro de pulpa firme y sabor profundo, con el amargor domesticado por la sal. Protagonistas de la picada y aliadas de ensaladas, pizzas y cocina mediterránea.",
     image: productImage("aceitunas-griegas.webp"),
+    imageHover: productImage("aceitunas-griegas-secundaria.webp"),
+    imageAlt: "Aceitunas negras tipo griegas Flor Mía",
     price: null,
     promoPrice: null,
     promoLabel: null,
@@ -127,6 +137,8 @@ export const products = [
     description:
       "Mermelada de pera Tía Clara, elaborada con fruta mendocina de pulpa delicada: dulzor suave y textura untuosa que acompaña sin invadir. Para desayunos, tostadas con queso, tablas de quesos y frutos secos.",
     image: productImage("mermelada-pera.webp"),
+    imageHover: productImage("mermelada-pera-secundaria.webp"),
+    imageAlt: "Frasco de mermelada de pera Tía Clara de 400 gramos",
     price: null,
     promoPrice: null,
     promoLabel: null,
@@ -150,6 +162,8 @@ export const products = [
     description:
       "Monovarietal de Arbequina, el más delicado de la línea: frutado dulce con notas de manzana, banana y almendra fresca, de amargor y picor bajos. Ideal para pescados, ensaladas, repostería y terminaciones suaves.",
     image: productImage("aceite-arbequina-500cc.webp"),
+    imageHover: productImage("aceite-arbequina-500cc-secundaria.webp"),
+    imageAlt: "Botella de aceite de oliva Arbequina Flor Mía de 500 cc",
     price: 22000,
     promoPrice: null,
     promoLabel: null,
@@ -172,8 +186,9 @@ export const products = [
     subcategory: "Aceite de oliva 500 cc",
     description:
       "Monovarietal de Arbosana, suave con carácter: notas de piel de manzana, banana y almendra cremosa sobre un fondo de hierbas frescas. Versátil en la cocina diaria, un paso más de intensidad que la Arbequina.",
-    image: productImage("aceite-trio-500cc.webp"),
-    imageAlt: "Fotografía editorial de aceites Flor Mía; imagen específica de Arbosana pendiente",
+    image: productImage("aceite-arbosana-500cc.webp"),
+    imageHover: productImage("aceite-arbosana-500cc-secundaria.webp"),
+    imageAlt: "Botella de aceite de oliva Arbosana Flor Mía de 500 cc",
     price: 22000,
     promoPrice: null,
     promoLabel: null,
@@ -197,6 +212,8 @@ export const products = [
     description:
       "Monovarietal de Coratina, el más intenso de la línea: notas de hoja, alcaucil y almendra verde, con amargor y picor marcados propios de su alto contenido de polifenoles. Para carnes a la parrilla, vegetales grillados y finales con carácter.",
     image: productImage("aceite-coratina-500cc.webp"),
+    imageHover: productImage("aceite-coratina-500cc-secundaria.webp"),
+    imageAlt: "Botella de aceite de oliva Coratina Flor Mía de 500 cc",
     price: 22000,
     promoPrice: null,
     promoLabel: null,
@@ -220,6 +237,8 @@ export const products = [
     description:
       "Blend con Indicación Geográfica Mendoza: 50% Arbequina aporta la base suave y frutada, 30% Arauco el carácter criollo y 20% Coratina el amargor y picor que definen su intensidad media. El equilibrio de la casa: va con todo.",
     image: productImage("aceite-blend-500cc.webp"),
+    imageHover: productImage("aceite-blend-500cc-secundaria.webp"),
+    imageAlt: "Botella de aceite de oliva Blend IG Flor Mía de 500 cc",
     price: 22000,
     promoPrice: null,
     promoLabel: null,
@@ -242,8 +261,9 @@ export const products = [
     subcategory: "Aceite de oliva 500 cc",
     description:
       "Monovarietal de Picual, de frutado pronunciado con notas de higuera y hoja de tomate, y un amargor y picor medios que se sostienen en cocción. Muy estable al calor: el caballo de batalla para cocinar, que también brilla en crudo.",
-    image: productImage("aceite-trio-500cc.webp"),
-    imageAlt: "Fotografía editorial de aceites Flor Mía; imagen específica de Picual pendiente",
+    image: productImage("aceite-picual-500cc.webp"),
+    imageHover: productImage("aceite-picual-500cc-secundaria.webp"),
+    imageAlt: "Botella de aceite de oliva Picual Flor Mía de 500 cc",
     price: 36000,
     promoPrice: null,
     promoLabel: null,
@@ -266,8 +286,9 @@ export const products = [
     subcategory: "Aceite de oliva 500 cc",
     description:
       "Monovarietal de Arauco, la variedad criolla emblemática argentina: frutado intenso con notas de tomate, hierbas y manzana verde, amargor medio-alto y picor protagonista. Carácter mendocino puro para platos que lo piden.",
-    image: productImage("aceite-trio-500cc.webp"),
-    imageAlt: "Fotografía editorial de aceites Flor Mía; imagen específica de Arauco pendiente",
+    image: productImage("aceite-arauco-500cc.webp"),
+    imageHover: productImage("aceite-arauco-500cc-secundaria.webp"),
+    imageAlt: "Botella de aceite de oliva Arauco Flor Mía de 500 cc",
     price: 36000,
     promoPrice: null,
     promoLabel: null,
@@ -291,6 +312,8 @@ export const products = [
     description:
       "Sal entrefina hidratada en vino Malbec mendocino: granos teñidos de violeta con un dejo frutal que realza sin tapar. Sal de terminación para carnes, vegetales grillados, quesos — y hasta trufas de chocolate.",
     image: productImage("sal-malbec.webp"),
+    imageHover: productImage("sal-malbec-secundaria.webp"),
+    imageAlt: "Frasco de sal de Malbec Flor Mía",
     price: null,
     promoPrice: null,
     promoLabel: null,

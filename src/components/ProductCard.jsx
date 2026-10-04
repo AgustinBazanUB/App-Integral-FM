@@ -40,15 +40,29 @@ export default function ProductCard({ product, compact = false }) {
         aria-label={`Ver ${product.name}`}
       >
         {product.image ? (
-          <img
-            className="product-card__image"
-            src={product.image}
-            width={product.imageWidth ?? imageAsset?.width ?? 900}
-            height={product.imageHeight ?? imageAsset?.height ?? 900}
-            alt={product.imageAlt ?? product.name}
-            loading="lazy"
-            decoding="async"
-          />
+          <>
+            <img
+              className="product-card__image"
+              src={product.image}
+              width={product.imageWidth ?? imageAsset?.width ?? 900}
+              height={product.imageHeight ?? imageAsset?.height ?? 900}
+              alt={product.imageAlt ?? product.name}
+              loading="lazy"
+              decoding="async"
+            />
+            {product.imageHover ? (
+              <img
+                className="product-card__image product-card__image--hover"
+                src={product.imageHover}
+                alt=""
+                aria-hidden="true"
+                width={product.imageWidth ?? imageAsset?.width ?? 900}
+                height={product.imageHeight ?? imageAsset?.height ?? 900}
+                loading="lazy"
+                decoding="async"
+              />
+            ) : null}
+          </>
         ) : (
           <span className="product-card__image-missing" role="img" aria-label={`Sin fotografía disponible para ${product.name}`}>
             Imagen pendiente
