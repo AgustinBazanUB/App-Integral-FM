@@ -209,6 +209,8 @@ test("realtime sends answer only after trusted sideband connects and retains all
   );
   const session = JSON.parse(f.calls[0].init.body.get("session"));
   assert.equal(session.audio.input.turn_detection.create_response, false);
+  assert.deepEqual(session.output_modalities, ["audio"]);
+  assert.match(result.voiceGreeting, /Olivia/);
   await assert.rejects(
     stopRealtime({
       ...f,

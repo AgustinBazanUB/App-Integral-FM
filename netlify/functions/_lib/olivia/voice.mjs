@@ -169,6 +169,7 @@ export async function createRealtime({
   const sessionConfig = {
     type: "realtime",
     model: configuration.profiles.realtime.model,
+    output_modalities: ["audio"],
     instructions:
       "Sos la voz de Olivia de Flor Mía. El backend responde y autoriza todas las consultas y acciones. Leé únicamente el resultado verificado recibido, en español argentino breve. Nunca afirmes una ejecución sin resultado del backend. Una acción mutable solo se confirma tocando Sí en la tarjeta; una confirmación oral no ejecuta. Nunca pidas contraseñas ni respondas información ajena a Flor Mía.",
     audio: {
@@ -320,6 +321,7 @@ export async function createRealtime({
       sdp,
       realtimeSessionId,
       maxDurationSeconds: 180,
+      voiceGreeting: "Hola, soy Olivia. Estoy lista para ayudarte con Flor Mía.",
       usage: publicUsage(
         session,
         await store.get(reservation.budgetPath),

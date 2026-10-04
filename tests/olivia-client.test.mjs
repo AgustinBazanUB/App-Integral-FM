@@ -331,6 +331,7 @@ test("actual transcripts are serialized and deduplicated; voice model arguments 
     fixture.events.filter((event) => event.type === "response.create").length,
     1,
   );
+  assert.deepEqual(fixture.events.find((event) => event.type === "response.create").response.output_modalities, ["audio"]);
   assert.ok(!JSON.stringify(fixture.events).includes("private-token"));
   assert.ok(!JSON.stringify(fixture.events).includes("confirmá y agregá"));
   assert.match(
@@ -339,6 +340,20 @@ test("actual transcripts are serialized and deduplicated; voice model arguments 
     /tocá|tocar Sí o No/,
   );
   fixture.connection.close();
+});
+
+test("voice startup reads the server greeting once as audio without creating a core request", async () => {
+  const fixture = voiceFixture({ createSession: async () => ({ sdp: "answer", realtimeSessionId: "server-session", voiceGreeting: "Hola, soy Olivia." }) });
+  await fixture.connection.connect();
+  fixture.channel.onopen();
+  assert.equal(fixture.events.length, 1);
+  assert.equal(fixture.events[0].type, "response.create");
+  assert.deepEqual(fixture.events[0].response.output_modalities, ["audio"]);
+  assert.equal(fixture.events[0].response.tool_choice, "none");
+  assert.match(fixture.events[0].response.instructions, /Hola, soy Olivia/);
+  assert.deepEqual(fixture.requests, []);
+  fixture.connection.close();
+  assert.equal(fixture.channel.onopen, null);
 });
 
 test("a forged business tool call with no transcript cannot reach the orchestrator", async () => {
