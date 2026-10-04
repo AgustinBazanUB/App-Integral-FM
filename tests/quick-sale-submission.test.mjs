@@ -64,3 +64,14 @@ test('recuperar confirmacion mantiene la decision fiscal original', async () => 
   await harness({ pendingIntent, requestPendingArcaInvoice: async () => { fiscalCalls++; return { id: 'i1' }; } }).submit(false);
   assert.equal(fiscalCalls, 1);
 });
+
+
+test('Venta Rápida: canal y stock se unifican y las categorías funcionan como acordeón exclusivo', () => {
+  assert.match(source, /Elegir canal y stock/);
+  assert.match(source, /title="Canal: indica por dónde llegó la venta\. Stock: indica de qué ubicación o depósito sale físicamente la mercadería\."/);
+  assert.match(source, /const \[openCategoryId, setOpenCategoryId\] = useState\(""\)/);
+  assert.match(source, /aria-expanded=\{open\}/);
+  assert.match(source, /setOpenCategoryId\(current => current === group\.id \? "" : group\.id\)/);
+  assert.doesNotMatch(source, /<details key=\{group\.id\} open/);
+  assert.match(source, /fm-quick-pos__customer-action/);
+});
