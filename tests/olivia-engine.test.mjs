@@ -884,6 +884,38 @@ test("quota renewal follows Argentina dates and temporary tokens apply to one pe
   );
 });
 
+test("a location-product-stock chain presents the last tool result instead of asking for missing data", async () => {
+  const f = fixture({
+    provider: (_path, body, _options, calls) => {
+      if (calls === 1) return functionResponse("list_locations", {});
+      if (calls === 2)
+        return functionResponse("search_products", {
+          query: "Aceite",
+          locationId: "local_a",
+        });
+      if (calls === 3)
+        return functionResponse("get_stock", {
+          locationId: "local_a",
+          productId: "oil",
+        });
+      assert.deepEqual(body.tools, []);
+      assert.equal(body.tool_choice, "none");
+      const lastResult = JSON.parse(body.input.at(-1).output);
+      assert.equal(lastResult.currentStock, 4);
+      return textResponse("Aceite tiene 4 unidades en Local A.");
+    },
+  });
+  const initial = await start(f),
+    result = await chat(f, initial.conversationId);
+  assert.equal(result.state, "INFORMACION");
+  assert.equal(f.providerCalls(), 4);
+  assert.equal(
+    result.messages.at(-1).content,
+    "Aceite tiene 4 unidades en Local A.",
+  );
+  assert.equal(newBusinessSales(f).length, 0);
+});
+
 test("identical tool calls within one turn are resolved once and return both call outputs", async () => {
   const f = fixture({
     provider: (_path, _body, _options, calls) => {

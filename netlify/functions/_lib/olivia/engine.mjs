@@ -433,15 +433,20 @@ export function createOliviaEngine({
         draft = null,
         navigation = null,
         nextState = "INFORMACION",
-        content = "";
-      for (let turn = 0; turn < 3; turn++) {
+        content = "",
+        toolCallCount = 0;
+      // Three tool rounds may resolve location, product and stock in sequence.
+      // Reserve a final response without tools to present the last tool result.
+      for (let turn = 0; turn < 4; turn++) {
+        const finalResponse = turn === 3;
         const bodyRequest = {
           model: profile.model,
           reasoning: { effort: profile.reasoningEffort },
           store: false,
           instructions: OLIVIA_INSTRUCTIONS,
           input,
-          tools: toolDefinitions(session),
+          tools: finalResponse ? [] : toolDefinitions(session),
+          ...(finalResponse ? { tool_choice: "none" } : {}),
           parallel_tool_calls: false,
           max_output_tokens: 2400,
         };
@@ -494,7 +499,8 @@ export function createOliviaEngine({
         );
         content = responseText(payload) || content;
         if (!calls.length) break;
-        if (calls.length > 5)
+        toolCallCount += calls.length;
+        if (finalResponse || toolCallCount > 5)
           throw oliviaError(
             "tool-limit",
             "La consulta necesita dividirse en pasos más pequeños.",
@@ -529,6 +535,10 @@ export function createOliviaEngine({
                 ? result.state
                 : "RECHAZADA";
               draft = args;
+              content =
+                result.data?.summary ||
+                result.data?.message ||
+                "La operación necesita revisión.";
             }
             if (result.navigation) navigation = result.navigation;
           } catch (e) {
@@ -542,6 +552,7 @@ export function createOliviaEngine({
               },
             };
             nextState = e.status === 403 ? "RECHAZADA" : "ERROR";
+            content = result.data.message;
           }
           input.push({
             type: "function_call_output",
@@ -554,6 +565,8 @@ export function createOliviaEngine({
           content = prepared.summary;
           break;
         }
+        if (["DATOS_INCOMPLETOS", "RECHAZADA", "ERROR"].includes(nextState))
+          break;
       }
       const result = await saveTurn(
         session,
