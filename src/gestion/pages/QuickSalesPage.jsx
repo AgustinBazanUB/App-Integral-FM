@@ -38,6 +38,7 @@ import {
 import { listQuickSaleStock, listWarehouses } from "../services/inventoryService";
 import { dryRunArcaInvoice, requestPendingArcaInvoice } from "../services/arcaService";
 import ArcaInvoicePrintAction from "../components/ArcaInvoicePrintAction";
+import { Icon } from "../components/icons";
 
 import CustomerDialog from "../seller/CustomerDialog";
 import DiscountDialog from "../seller/DiscountDialog";
@@ -74,6 +75,7 @@ export default function QuickSalesPage() {
   const [priceDraft, setPriceDraft] = useState("");
   const zonesResult = useAsyncData(() => listActiveCustomerZones(), [profile.id]);
   const [search, setSearch] = useState("");
+  const [openCategoryId, setOpenCategoryId] = useState("");
   const [manualDiscount, setManualDiscount] = useState(restored?.discounts?.find(d => d.source === "manual") || { type: "percent", value: "" });
   const [channel, setChannel] = useState(restored?.channel || "");
   const [customerDni, setCustomerDni] = useState(restored?.customerDni || "");
@@ -264,8 +266,20 @@ export default function QuickSalesPage() {
     <div className="fm-page-enter fm-quick-pos">
       <PageHeader eyebrow="Administración" title="Venta rápida" description="Elegí productos, completá el pago y continuá." />
       <div className="fm-quick-pos__context">
-        <Button variant="secondary" disabled={locked} onClick={() => setDialog("origin")}>Canal: {SALES_CHANNELS.find(option => option.value === channel)?.label || "Elegir"}</Button>
-        <Button variant="secondary" disabled={locked} onClick={() => setDialog("origin")}>Stock: {selectedLocation?.name || "Elegir origen"}</Button>
+        <Button
+          variant="secondary"
+          disabled={locked}
+          onClick={() => setDialog("origin")}
+          title="Canal: indica por dónde llegó la venta. Stock: define la ubicación o depósito del que se descuenta la mercadería."
+          aria-label="Elegir canal y stock. El canal indica por dónde llegó la venta y el stock define de dónde se descuenta la mercadería."
+        >
+          Elegir canal y stock
+        </Button>
+        {(channel || selectedLocation) ? (
+          <span className="fm-quick-pos__context-summary" aria-live="polite">
+            {SALES_CHANNELS.find(option => option.value === channel)?.label || "Canal pendiente"} · {selectedLocation?.name || "Stock pendiente"}
+          </span>
+        ) : null}
       </div>
       <div className="fm-quick-pos__layout">
         <section className="fm-quick-pos__catalog" aria-label="Catálogo de productos">
@@ -276,17 +290,36 @@ export default function QuickSalesPage() {
           {!locationId ? <EmptyState icon="Box" title="Elegí de dónde sale la mercadería" description="Seleccioná una ubicación o un depósito activo." /> : null}
           {stock.status === "ready" && !visibleProducts.length ? <EmptyState icon="Box" title="No hay productos disponibles" description="Revisá la búsqueda y los productos activos." /> : null}
           <div className="fm-quick-pos__categories">
-            {stock.status === "ready" && groups.map(group => <details key={group.id} open className="fm-quick-pos__category">
-              <summary>{group.name}<span>{group.items.length}</span></summary>
-              <div className="fm-quick-pos__carousel">{group.items.map(item => {
-                const qty = Number(quantities[item.id] || 0);
-                return <button key={item.id} type="button" className={`fm-quick-pos__tile ${qty ? "is-selected" : ""}`} aria-label={`Agregar ${item.productName}`} disabled={locked || !item.hasLocalRecord || item.active === false || (stockType === "warehouse" && qty >= Number(item.currentStock || 0))} onClick={() => changeQty(item, 1)}>
-                  <span className="fm-quick-pos__product-mark" aria-hidden="true">{item.productName.slice(0, 2).toUpperCase()}{item.thumbUrl || item.imageUrl ? <img src={item.thumbUrl || item.imageUrl} alt="" loading="lazy" decoding="async" onError={event => { event.currentTarget.style.display = "none"; }} /> : null}</span>
-                  <strong>{item.productName}</strong><span>{formatMoney(item.price)}</span><small>{item.currentStock > 0 ? `${item.currentStock} disponibles` : `Stock registrado: ${item.currentStock}`}</small>
-                  {qty > 0 ? <b className="fm-quick-pos__count">{qty}</b> : null}
-                </button>;
-              })}</div>
-            </details>)}
+            {stock.status === "ready" && groups.map(group => {
+              const open = openCategoryId === group.id;
+              const controlId = `quick-category-${String(group.id).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+              return (
+                <section key={group.id} className={`fm-quick-pos__category ${open ? "is-open" : ""}`}>
+                  <h2>
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      aria-controls={controlId}
+                      onClick={() => setOpenCategoryId(current => current === group.id ? "" : group.id)}
+                    >
+                      <span>{group.name}</span>
+                      <small>{group.items.length} producto{group.items.length === 1 ? "" : "s"}</small>
+                      <Icon name="ChevronDown" />
+                    </button>
+                  </h2>
+                  {open ? (
+                    <div className="fm-quick-pos__carousel" id={controlId}>{group.items.map(item => {
+                      const qty = Number(quantities[item.id] || 0);
+                      return <button key={item.id} type="button" className={`fm-quick-pos__tile ${qty ? "is-selected" : ""}`} aria-label={`Agregar ${item.productName}`} disabled={locked || !item.hasLocalRecord || item.active === false || (stockType === "warehouse" && qty >= Number(item.currentStock || 0))} onClick={() => changeQty(item, 1)}>
+                        <span className="fm-quick-pos__product-mark" aria-hidden="true">{item.productName.slice(0, 2).toUpperCase()}{item.thumbUrl || item.imageUrl ? <img src={item.thumbUrl || item.imageUrl} alt="" loading="lazy" decoding="async" onError={event => { event.currentTarget.style.display = "none"; }} /> : null}</span>
+                        <strong>{item.productName}</strong><span>{formatMoney(item.price)}</span><small>{item.currentStock > 0 ? `${item.currentStock} disponibles` : `Stock registrado: ${item.currentStock}`}</small>
+                        {qty > 0 ? <b className="fm-quick-pos__count">{qty}</b> : null}
+                      </button>;
+                    })}</div>
+                  ) : null}
+                </section>
+              );
+            })}
           </div>
         </section>
         <section className="fm-quick-pos__sale" aria-label="Venta actual">
@@ -299,11 +332,32 @@ export default function QuickSalesPage() {
             </article>)}
           </div>
           <SaleStockWarning discrepancies={stockDiscrepancies} />
+          <div className="fm-quick-pos__customer-section">
+            {customer.phone ? (
+              <div className="fm-seller-customer-selected">
+                <div className="fm-seller-customer-selected__icon"><Icon name="UserRoundCheck" /></div>
+                <div>
+                  <small>Cliente</small>
+                  <strong>{customer.phone}</strong>
+                  {customer.zoneName ? <span>{customer.zoneName}</span> : null}
+                  {customer.name ? <span>{customer.name}</span> : null}
+                </div>
+                <div className="fm-seller-customer-selected__actions">
+                  <button type="button" disabled={locked} onClick={() => setDialog("customer")}>Cambiar</button>
+                  <button type="button" disabled={locked} onClick={() => setCustomer({ phone: "", name: "", zoneName: "" })}>Quitar</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="fm-seller-add-customer" disabled={locked} onClick={() => setDialog("customer")}>
+                <Icon name="UserPlus" />
+                <span><strong>Agregar cliente</strong><small>Teléfono · zona · nombre opcional</small></span>
+                <Icon name="ChevronRight" />
+              </button>
+            )}
+          </div>
           <div className="fm-quick-pos__extras">
             <Button variant="secondary" disabled={locked || discountsResult.status === "loading"} onClick={() => setDialog("discount")}>Agregar descuento</Button>
-            <Button variant="secondary" disabled={locked} onClick={() => setDialog("customer")}>{customer.phone ? customer.name || customer.phone : "Agregar cliente"}</Button>
             <Button variant="secondary" disabled={locked} aria-pressed={deliveryMethod === "shipping"} onClick={() => setDeliveryMethod(deliveryMethod === "shipping" ? "pickup" : "shipping")}>{deliveryMethod === "shipping" ? "Con envío" : "Retiro"}</Button>
-            {customer.phone ? <Button variant="ghost" disabled={locked} onClick={() => setCustomer({ phone: "", name: "", zoneName: "" })}>Quitar cliente</Button> : null}
           </div>
           {appliedDiscounts.length ? <div className="fm-quick-pos__discounts">{appliedDiscounts.map(discount => <button type="button" disabled={locked} key={discount.id || discount.discountId} aria-label={`Quitar ${discount.name}`} onClick={() => discount.source === "manual" ? setManualDiscount({ type: "percent", value: "" }) : setDiscountIds(ids => ids.filter(id => id !== discount.id))}>{discount.name} ×</button>)}</div> : null}
           <div className="fm-quick-pos__totals"><span>{cart.reduce((count, item) => count + item.qty, 0)} productos · Subtotal</span><strong>{formatMoney(subtotal)}</strong>{saleSummary.discountTotal > 0 ? <><span>Descuentos</span><strong>− {formatMoney(saleSummary.discountTotal)}</strong></> : null}<span>Total</span><strong className="fm-quick-pos__total">{formatMoney(saleSummary.total)}</strong></div>
