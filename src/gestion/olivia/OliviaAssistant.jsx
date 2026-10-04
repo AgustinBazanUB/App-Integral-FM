@@ -360,8 +360,8 @@ export default function OliviaAssistant() {
     {open ? <aside id="fm-olivia-drawer" className="fm-olivia-drawer" role="dialog" aria-modal="false" aria-labelledby="fm-olivia-title">
       <header className="fm-olivia-header">
         <OliviaFace active={busy || recording || voiceActive}/><div><h2 id="fm-olivia-title">Olivia</h2><span>Asistente de Flor Mía</span></div>
-        <IconButton label="Mis chats" icon="History" disabled={busy || recording || voiceActive || historyBusy} onClick={() => { setChatsOpen(!chatsOpen); if (!chatsOpen) loadHistory("chats"); }}/>
-        <IconButton label="Nueva conversación" icon="MessagesSquare" disabled={busy || recording || voiceActive} onClick={newConversation}/>
+        <IconButton label="Mis chats" icon="ScrollText" disabled={busy || recording || voiceActive || historyBusy} onClick={() => { setChatsOpen(!chatsOpen); if (!chatsOpen) loadHistory("chats"); }}/>
+        <IconButton label="Nueva conversación" icon="Plus" disabled={busy || recording || voiceActive} onClick={newConversation}/>
         <IconButton label="Cerrar Olivia" icon="X" onClick={close}/>
       </header>
       <div className="fm-olivia-status" role="status"><Badge tone={pending ? "warning" : snapshot.state === "completed" ? "success" : "neutral"}>{label}</Badge><span>{context.module === "seller" ? "Panel Vendedor" : "Panel Administrador"}</span></div>
