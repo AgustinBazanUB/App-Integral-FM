@@ -259,3 +259,12 @@ test("failed remote hangup keeps expired session active for cleanup retry", asyn
   assert.equal(live.status, "active");
   assert.ok(live.closeRequestedAt);
 });
+
+
+test("starting voice preserves the previous cost while updating its reservation", async () => {
+  const f = await realtimeFixture(), originalState = f.engine.state;
+  f.engine.state = async (...args) => { const result = await originalState(...args); return { ...result, usage: { ...result.usage, lastCost: { ars: 12.50, estimated: false } } }; };
+  const result = await createRealtime(f);
+  assert.deepEqual(result.usage.lastCost, { ars: 12.50, estimated: false });
+  assert.ok(result.usage.remainingPercent < 100);
+});

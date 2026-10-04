@@ -322,11 +322,11 @@ export async function createRealtime({
       realtimeSessionId,
       maxDurationSeconds: 180,
       voiceGreeting: "Hola, soy Olivia. Estoy lista para ayudarte con Flor Mía.",
-      usage: publicUsage(
+      usage: { ...state.usage, ...publicUsage(
         session,
         await store.get(reservation.budgetPath),
         reservation.quota,
-      ),
+      ) },
     };
   } catch (error) {
     if (callId) {
