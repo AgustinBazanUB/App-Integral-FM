@@ -33,6 +33,7 @@ import { executeOperation } from "./operations.mjs";
 import {
   quotaFor,
   publicUsage,
+  releaseMeasuredReservation,
   reserveUsage,
   increaseReservation,
   settleUsage,
@@ -488,6 +489,15 @@ export function createOliviaEngine({
             reservation.reservedTokens,
           );
         }
+        if (
+          measured.measurement === "provider" &&
+          event.measurement !== "reserved-estimate"
+        )
+          await releaseMeasuredReservation({
+            store,
+            reservation,
+            measuredTokens: event.totalTokens,
+          });
         if (payload.status === "incomplete")
           throw oliviaError(
             "openai-incomplete",

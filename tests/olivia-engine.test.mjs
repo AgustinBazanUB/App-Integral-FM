@@ -4,6 +4,7 @@ import { createOliviaEngine } from "../netlify/functions/_lib/olivia/engine.mjs"
 import {
   reserveUsage,
   increaseReservation,
+  releaseMeasuredReservation,
   settleUsage,
   quotaFor,
   publicUsage,
@@ -720,6 +721,46 @@ test("quota reservations account for concurrent requests and release only their 
   assert.equal(result.reservedTokens, 0);
 });
 
+test("measured progress releases only the completed request's excess reservation", async () => {
+  const f = fixture({ quotaTokens: 1000 });
+  const a = await reserveUsage({
+    store: f.store,
+    session: f.session,
+    configuration: f.config,
+    requestId: "progress_a",
+    operation: "chat",
+    reservedTokens: 700,
+    now: initialNow,
+  });
+  const b = await reserveUsage({
+    store: f.store,
+    session: f.session,
+    configuration: f.config,
+    requestId: "progress_b",
+    operation: "chat",
+    reservedTokens: 200,
+    now: new Date(initialNow.getTime() + 1300),
+  });
+  await releaseMeasuredReservation({
+    store: f.store,
+    reservation: a,
+    measuredTokens: 120,
+  });
+  await releaseMeasuredReservation({
+    store: f.store,
+    reservation: a,
+    measuredTokens: 120,
+  });
+  assert.equal(a.reservedTokens, 120);
+  assert.equal(f.documents.get(a.budgetPath).reservedTokens, 320);
+  assert.equal(f.documents.get(b.requestPath).reservedTokens, 200);
+  await increaseReservation({ store: f.store, reservation: b, amount: 600 });
+  await assert.rejects(
+    increaseReservation({ store: f.store, reservation: b, amount: 81 }),
+    { code: "quota-exhausted" },
+  );
+});
+
 test("OpenAI transport maps errors without exposing provider credentials or bodies", async () => {
   for (const status of [401, 429, 500]) {
     await assert.rejects(
@@ -886,6 +927,7 @@ test("quota renewal follows Argentina dates and temporary tokens apply to one pe
 
 test("a location-product-stock chain presents the last tool result instead of asking for missing data", async () => {
   const f = fixture({
+    quotaTokens: 40000,
     provider: (_path, body, _options, calls) => {
       if (calls === 1) return functionResponse("list_locations", {});
       if (calls === 2)

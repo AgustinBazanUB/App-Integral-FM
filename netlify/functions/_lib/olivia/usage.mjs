@@ -222,3 +222,36 @@ export async function increaseReservation({ store, reservation, amount }) {
   });
   reservation.reservedTokens += amount;
 }
+
+export async function releaseMeasuredReservation({
+  store,
+  reservation,
+  measuredTokens,
+}) {
+  if (!Number.isSafeInteger(measuredTokens) || measuredTokens < 0)
+    throw oliviaError("invalid-usage", "Medición de consumo inválida.");
+  const retained = await store.transaction(async (tx) => {
+    const request = await tx.getDocument(reservation.requestPath),
+      snapshot = await tx.getDocument(reservation.budgetPath);
+    if (!request || request.data.status !== "running" || !snapshot)
+      throw oliviaError("request-expired", "Este intento venció.", 409);
+    const current = request.data.reservedTokens,
+      target = Math.min(current, measuredTokens),
+      released = current - target;
+    if (released > 0)
+      await tx.commitDocuments([
+        {
+          type: "update",
+          path: reservation.budgetPath,
+          data: { reservedTokens: snapshot.data.reservedTokens - released },
+        },
+        {
+          type: "update",
+          path: reservation.requestPath,
+          data: { reservedTokens: target },
+        },
+      ]);
+    return target;
+  });
+  reservation.reservedTokens = retained;
+}
