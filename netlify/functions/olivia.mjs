@@ -4,7 +4,7 @@ import { createOliviaEngine } from "./_lib/olivia/engine.mjs";
 import { createRealtime, stopRealtime } from "./_lib/olivia/voice.mjs";
 import { oliviaSession, json, errorResponse } from "./_lib/olivia/http.mjs";
 import { oliviaError } from "../../src/shared/oliviaContracts.mjs";
-import { streamFrame } from "../../src/shared/oliviaStream.mjs";
+import { chatStream } from "./_lib/olivia/stream.mjs";
 import { createLive, interruptLive } from "./_lib/olivia/live.mjs";
 export default async function handler(request) {
   if (request.method !== "POST")
@@ -31,18 +31,7 @@ export default async function handler(request) {
     const store = createOliviaStore(),
       engine = createOliviaEngine({ store, pricingResolver: resolveOliviaPricing });
     if (body.operation === "chat" && body.stream === true) {
-      const abort = new AbortController();
-      const stream = new ReadableStream({
-        start(controller) {
-          const emit = (event) => { if (!abort.signal.aborted) controller.enqueue(streamFrame(event)); };
-          emit({ type: "phase", label: "Olivia está pensando la respuesta…" });
-          engine.chat(session, body, { onEvent: emit, signal: abort.signal })
-            .then((result) => emit({ type: "completed", result }))
-            .catch((error) => emit({ type: "failed", code: error.code || "assistant-error", message: error.status && error.status < 500 ? error.message : "La respuesta se interrumpió. El chat se conserva y podés recuperarlo." }))
-            .finally(() => { if (!abort.signal.aborted) controller.close(); });
-        },
-        cancel() { abort.abort(); },
-      });
+      const stream = chatStream((options) => engine.chat(session, body, options));
       return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
     }
     let result;

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { zipSync, strToU8 } from "fflate";
 import { readEventStream, streamFrame } from "../src/shared/oliviaStream.mjs";
+import { chatStream } from "../netlify/functions/_lib/olivia/stream.mjs";
 import { openaiRequest } from "../netlify/functions/_lib/olivia/provider.mjs";
 import { createOliviaTransport } from "../src/gestion/olivia/client.mjs";
 import { audioBars, DictationCapture } from "../src/gestion/olivia/dictation.mjs";
@@ -45,6 +46,26 @@ test("client consumes final state once and surfaces missing completion", async (
   assert.equal(events.length, 2); assert.equal(result.messages.length, 1);
   const broken = createOliviaTransport({ getToken: async () => "fixture", fetchImpl: async () => new Response(stream(streamFrame({ type: "delta", delta: "Parcial" })), { headers: { "content-type": "text/event-stream" } }) });
   await assert.rejects(broken.request({ operation: "chat" }, { onEvent() {} }), { code: "stream-incomplete" });
+});
+test("server stream emits heartbeats during silence and one final result, then clears the timer", async () => {
+  let tick, finish, cleared = false;
+  const output = chatStream(() => new Promise((resolve) => { finish = resolve; }), { setIntervalImpl: (callback) => { tick = callback; return 1; }, clearIntervalImpl: () => { cleared = true; } });
+  const events = [], reading = readEventStream(output, (event) => events.push(event));
+  await Promise.resolve();
+  tick(); tick(); finish({ messages: [] });
+  await reading;
+  assert.deepEqual(events.map((event) => event.type), ["phase", "heartbeat", "heartbeat", "completed"]);
+  assert.equal(cleared, true);
+});
+test("cancelled server stream aborts the backend and discards a late result", async () => {
+  let signal, finish, cleared = false;
+  const output = chatStream((options) => { signal = options.signal; return new Promise((resolve) => { finish = resolve; }); }, { setIntervalImpl: () => 1, clearIntervalImpl: () => { cleared = true; } });
+  const reader = output.getReader();
+  await reader.read(); await reader.cancel();
+  assert.equal(signal.aborted, true); assert.equal(cleared, true);
+  finish({ messages: [{ content: "late" }] });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal((await reader.read()).done, true);
 });
 test("engine emits accepted input before deltas and persists exactly one user/assistant", async () => {
   const events = [], f = fixture({ provider: async (_, body, options) => { assert.equal(body.stream, true); assert.equal(events[0].type, "accepted"); options.onEvent({ type: "delta", delta: "Hola" }); return textResponse("Hola"); } });
