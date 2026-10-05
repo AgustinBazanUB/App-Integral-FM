@@ -10,7 +10,11 @@ Validación final del anexo: 732 pruebas Node, 19 pruebas de reglas en emulador 
 
 [Matriz del anexo: 52 secciones](OLIVIA-ANNEX-REQUIREMENTS.md). [Política, tareas, diagramas y fuentes oficiales](OLIVIA-MODEL-ROUTER.md).
 
-La sección siguiente conserva la entrega inicial de la evolución; la política y voz actuales se describen arriba.
+[PR 34 de revisión](https://github.com/AgustinBazanUB/App-Integral-FM/pull/34), draft con base `codex/olivia-integration`. [Preview actual del anexo](https://olivia-evolution-pr31--appintegralflormia.netlify.app/gestion): deploy Netlify `6ac3b6ddbeda80976b6f48a6`, implementación `d53b0d1ea0c5995d5c7abd9d25cfb5b3b96ce2da`. La pantalla privada exige iniciar sesión con Firebase. El despliegue compila el build unificado y empaqueta las Functions; no publica rules ni índices.
+
+## Entrega inicial conservada como evidencia histórica
+
+La política y voz actuales se describen arriba; las cifras, versiones y el deploy de esta sección corresponden a la entrega anterior al anexo.
 
 
 La evolución está implementada en `codex/olivia-evolution`, derivada de PR 31. Se conserva el núcleo operativo previo y se amplía la capa conversacional. No se modificó producción ni se crearon operaciones empresariales de prueba.
@@ -58,7 +62,7 @@ Commits de implementación:
 
 Archivos principales: `OliviaAssistant`, `OliviaComposer`, `dictation`, `realtime`, `OliviaVoiceControls`, `OliviaUsage`, `OliviaKnowledgeManager`, `OliviaDeveloperPanel`; backend `engine`, `conversations`, `extendedTools`, `extendedOperations`, `knowledge`, `skills`, `attachments`, `analytics`; shared `oliviaCapabilities`, `oliviaAnalytics`, `oliviaStream` y planes de dominio; nuevos endpoints, rules/indexes y tres suites de evolución.
 
-[PR 34 de revisión](https://github.com/AgustinBazanUB/App-Integral-FM/pull/34), draft con base `codex/olivia-integration`. [Preview final de revisión](https://olivia-evolution-pr31--appintegralflormia.netlify.app/gestion), draft Netlify `6ac346a6baa0d78cbf5e70ab`, código de implementación `94f36d1`. La autenticación Firebase está preservada: los endpoints `olivia`, `olivia-attachment` y `olivia-knowledge` rechazaron solicitudes anónimas con 401. La preview usa el proyecto Firebase configurado; no es una base comercial aislada.
+La preview inicial tuvo deploy Netlify `6ac346a6baa0d78cbf5e70ab`, código de implementación `94f36d1`; el alias hoy sirve el anexo indicado arriba. En esa entrega los endpoints `olivia`, `olivia-attachment` y `olivia-knowledge` rechazaron solicitudes anónimas con 401. La preview usa el proyecto Firebase configurado; no es una base comercial aislada.
 
 Límites externos observados: no se recibió login humano para recorrer datos privados; no se probaron micrófono/altavoz físicos en Android/iPhone ni llamadas reales al proveedor; no se desplegaron rules/índices al Firebase empresarial para cumplir la orden de no tocar producción. El índice versionado de movimientos por depósito acompaña una futura promoción de infraestructura. Estos puntos no se presentan como pruebas completadas en preview.
 
