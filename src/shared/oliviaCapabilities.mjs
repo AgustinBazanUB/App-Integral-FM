@@ -18,6 +18,8 @@ for (const [name, description] of [
   ["get_product_sales_history", "Historial acotado de unidades y facturación por producto."],
   ["get_seller_performance", "Rendimiento por vendedor del período."],
 ]) add(name, "metrics", description, history);
+add("get_all_time_sales_metrics", "metrics", "Ventas, ticket promedio y productos de TODO el historial registrado hasta hoy. Usar solamente si el usuario eligió todo el historial; declara fechas y lectura parcial. No compara con un período anterior ficticio.", closedSchema({ locationId: id, productId: id, sellerId: id }));
+add("research_web_metric", "metrics", "Investigar en internet una métrica, fórmula, metodología o referencia externa para el administrador. topic debe ser un concepto genérico público, sin nombres de clientes, IDs, cifras privadas, ventas ni credenciales. Devuelve fuentes; combinar luego con herramientas internas y explicitar datos faltantes. No usar para consultar ventas propias ya disponibles.", closedSchema({ topic: str(500) }));
 add("get_inventory_summary", "warehouse", "Inventario actual de depósito o ubicación; requiere tipo e ID reales.", closedSchema({ inventoryType: { type: "string", enum: ["warehouse", "location"] }, inventoryId: id }));
 add("get_stock_movements", "warehouse", "Movimientos de stock trazables de un inventario y producto.", closedSchema({ inventoryType: { type: "string", enum: ["warehouse", "location"] }, inventoryId: id, productId: id }));
 add("get_transfer_history", "warehouse", "Transferencias recientes y cantidades preparadas, recibidas y perdidas.", closedSchema({}));
@@ -77,6 +79,7 @@ export function capabilityAllowed(session, name) {
   const definition = definitions[name];
   if (!definition || !session?.profile?.active) return false;
   if (["search_tools", "discover_skills", "load_skill", "search_knowledge"].includes(name)) return true;
+  if (name === "research_web_metric" && !["admin", "general_admin"].includes(normalizedRole(session.profile))) return false;
   const special = ["audit", "administration", "settings"].includes(definition.module);
   return normalizedRole(session.profile) !== "seller" && canAccessAdministration(session.profile) && (special ? !(session.profile.permissionDeny?.[definition.module] || []).some((action) => [definition.action, "admin"].includes(action)) : can(session.profile, definition.module, definition.action));
 }
@@ -86,7 +89,7 @@ export function assertExtendedCapability(session, name) {
 export const normalizeIntent = (text) => String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const intents = {
   locations: /ubicacion|local|feria|evento|pilar/, products: /producto|catalogo|variedad/,
-  metrics: /vend|venta|factur|ticket|compar|creci|cayo|pronostic|feria|llevo|mercaderia|rind|estadistic/,
+  metrics: /vend|venta|factur|ticket|promedio|metric|compar|creci|cayo|pronostic|feria|llevo|mercaderia|rind|estadistic|internet|investig|web|formula|rotacion|retencion|recompra/,
   warehouse: /stock|inventario|deposit|transfer|mercaderia|llevo/, "loyal-customers": /client|crm|telefono/,
   finance: /gasto|finanza|caja|ingreso|alquiler/, shipping: /envio|entrega|logistica/, alerts: /alerta|aviso/,
   suppliers: /proveedor|compra|reposicion/, ecommerce: /ecommerce|pedido|tienda|pago/,

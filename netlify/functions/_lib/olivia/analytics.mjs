@@ -20,6 +20,7 @@ export function panelMetricsSummary(rows, period, args = {}) {
     source: "Panel de Métricas generales · cálculos compartidos",
     count: panel.salesCount, total: panel.total, averageTicket: panel.salesCount ? panel.ticket : null, units: panel.totalItems,
     products: panel.byProduct.map((item) => ({ productId: item.key, name: item.name, units: item.items, revenue: item.total, mix: panel.totalItems ? item.items / panel.totalItems : 0 })),
+    topProductsByUnits: [...panel.byProduct].sort((a, b) => b.items - a.items || a.name.localeCompare(b.name)).slice(0, 20).map((item) => ({ productId: item.key, name: item.name, units: item.items, revenue: item.total })),
     locations: groups(panel.byLocation), sellers: groups(panel.bySeller), payments: groups(panel.byPayment),
     channels: groups(panel.byChannel), stockOrigins: groups(panel.byStockOrigin),
     promotions: panel.byDiscount.map((item) => ({ id: item.key, name: item.name, amount: item.salesTotal, discount: item.total })),
@@ -34,13 +35,13 @@ export function analyticsPeriod(args = {}, now = new Date()) {
   const endKey = args.endDate || argentinaDateKey(now);
   let start, end;
   try { start = argentinaDateFromKey(startKey); end = new Date(argentinaDateFromKey(endKey).getTime() + 86400000); } catch { throw oliviaError("invalid-period", "Indicá un período válido."); }
-  if (end <= start || end - start > 366 * 86400000) throw oliviaError("invalid-period", "El período debe ser de hasta un año.");
+  if (end <= start) throw oliviaError("invalid-period", "La fecha de cierre debe ser igual o posterior al inicio.");
   return { start, end, startKey, endKey };
 }
-export async function readSales({ store, args = {}, now = new Date(), maxPages = 10 }) {
-  const period = analyticsPeriod(args, now), sales = [];
+export async function readSales({ store, args = {}, now = new Date(), maxPages = args.allTime ? 100 : 10 }) {
+  const period = analyticsPeriod(args.allTime ? { startDate: argentinaDateKey(now), endDate: argentinaDateKey(now) } : args, now), sales = [];
   let after, partial = false;
-  const filters = [["createdAt", "GREATER_THAN_OR_EQUAL", period.start], ["createdAt", "LESS_THAN", period.end]];
+  const filters = [...(args.allTime ? [] : [["createdAt", "GREATER_THAN_OR_EQUAL", period.start]]), ["createdAt", "LESS_THAN", period.end]];
   if (args.locationId) filters.push(["locationId", "EQUAL", args.locationId]);
   if (args.sellerId) filters.push(["sellerId", "EQUAL", args.sellerId]);
   for (let page = 0; page < maxPages; page++) {
@@ -50,9 +51,18 @@ export async function readSales({ store, args = {}, now = new Date(), maxPages =
     partial = true; after = { id: rows.at(-1).id, createdAt: rows.at(-1).createdAt };
   }
   const scoped = args.productId ? sales.filter((sale) => (sale.items || []).some((item) => (item.productId || item.id) === args.productId)) : sales;
-  return { sales: scoped, partial, fetched: sales.length, limit: 150 * maxPages, period: { start: period.startKey, end: period.endKey }, observedAt: now.toISOString() };
+  const observedStart = scoped.map(saleDate).filter(Boolean).sort((a, b) => a - b)[0];
+  return { sales: scoped, partial, fetched: sales.length, limit: 150 * maxPages, period: { start: args.allTime ? observedStart ? argentinaDateKey(observedStart) : null : period.startKey, end: period.endKey, ...(args.allTime ? { scope: "all-time", startComplete: !partial } : {}) }, observedAt: now.toISOString() };
 }
 export async function salesMetrics({ store, args, now }) {
+  if (args.allTime) {
+    const current = await readSales({ store, args, now });
+    const period = analyticsPeriod({ startDate: current.period.start || current.period.end, endDate: current.period.end }, now);
+    return { ...panelMetricsSummary(current.sales, period, args), period: current.period, previous: null, changePercent: null,
+      amountBasis: "Total cobrado por ventas; facturación por producto basada en renglones, antes de descuentos globales y envío.",
+      comparisonBasis: "Todo el historial registrado: no existe un período anterior equivalente.", partial: current.partial, fetched: current.fetched, limit: current.limit, observedAt: now.toISOString() };
+  }
+  if (!args.startDate || !args.endDate) throw oliviaError("period-required", "¿Qué período querés consultar: un mes, un rango de fechas o todo el historial?");
   const period = analyticsPeriod(args, now), duration = period.end - period.start;
   const previousArgs = { ...args, startDate: argentinaDateKey(new Date(period.start - duration)), endDate: argentinaDateKey(new Date(period.start - 1)) };
   const [current, previous] = await Promise.all([readSales({ store, args, now }), readSales({ store, args: previousArgs, now })]);

@@ -1,6 +1,6 @@
 import { oliviaMessageBlocks, oliviaInlineParts } from "./messageFormatting.mjs";
 
-const inline = (text) => oliviaInlineParts(text).map((part, index) => part.strong ? <strong key={index}>{part.text}</strong> : part.text);
+const inline = (text) => oliviaInlineParts(text).map((part, index) => part.href ? <a key={index} href={part.href} target="_blank" rel="noopener noreferrer">{part.text}</a> : part.strong ? <strong key={index}>{part.text}</strong> : part.text);
 
 export default function OliviaMessageContent({ content }) {
   return oliviaMessageBlocks(content).map((block, index) => {

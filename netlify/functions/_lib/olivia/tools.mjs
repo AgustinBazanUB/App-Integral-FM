@@ -100,6 +100,7 @@ export async function runTool({
   now = new Date(),
   provider,
   env,
+  researchOptions,
 }) {
   const liveProfile = await store.get(`users/${session.uid}`);
   if (!liveProfile)
@@ -111,7 +112,7 @@ export async function runTool({
   session = { ...session, profile: { ...liveProfile, id: session.uid } };
   assertCapability(session, name);
   validateSchema(args, OLIVIA_TOOL_SCHEMAS[name] || OLIVIA_CAPABILITIES[name]?.parameters);
-  if (OLIVIA_CAPABILITIES[name]) return runExtendedTool({ session, name, args, store, context, now, provider, env });
+  if (OLIVIA_CAPABILITIES[name]) return runExtendedTool({ session, name, args, store, context, now, provider, env, researchOptions });
   if (name === "get_current_user_context")
     return { data: userContext(session) };
   if (name === "list_locations")

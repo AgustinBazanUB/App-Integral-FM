@@ -1,4 +1,4 @@
-// A deliberately small text grammar. HTML, links and code are never evaluated.
+// A small text grammar. HTML and code stay literal; links allow HTTP(S) only.
 export function oliviaMessageBlocks(content = "") {
   const blocks = [];
   for (const line of String(content).split(/\r?\n/)) {
@@ -15,6 +15,13 @@ export function oliviaMessageBlocks(content = "") {
 }
 
 export function oliviaInlineParts(text = "") {
-  return String(text).split(/(\*\*[^*\n]+\*\*)/g).filter(Boolean).map((part) =>
-    part.startsWith("**") && part.endsWith("**") ? { strong: true, text: part.slice(2, -2) } : { strong: false, text: part });
+  return String(text).split(/(\*\*[^*\n]+\*\*|\[[^\]\n]+\]\(https?:\/\/[^\s)]+\))/g).filter(Boolean).map((part) => {
+    if (part.startsWith("**") && part.endsWith("**")) return { strong: true, text: part.slice(2, -2) };
+    const match = /^\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)$/.exec(part);
+    if (match) try {
+      const url = new URL(match[2]);
+      if (!url.username && !url.password) return { strong: false, text: match[1], href: url.href };
+    } catch { /* Invalid links remain text. */ }
+    return { strong: false, text: part };
+  });
 }

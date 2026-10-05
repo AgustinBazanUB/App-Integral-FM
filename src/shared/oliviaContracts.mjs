@@ -437,6 +437,11 @@ export function retentionDate(months, now = new Date()) {
   return date;
 }
 export function costForUsage(usage, configuration) {
+  if (usage.modelCalls?.length) {
+    const calls = usage.modelCalls.map((call) => costForUsage(call, configuration));
+    const usd = calls.every((call) => call.actualCostUsd != null) ? calls.reduce((total, call) => total + call.actualCostUsd, 0) : null;
+    return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null };
+  }
   if (usage.billingUnit === "realtime-tokens") {
     const costs = realtimeMiniCosts(usage);
     const usd = costs ? costs.voiceUsd + costs.transcriptionUsd : null;
@@ -450,7 +455,7 @@ export function costForUsage(usage, configuration) {
   const rate = configuration.pricing?.[usage.model];
   if (!rate || (usage.measurement && usage.measurement !== "provider"))
     return { actualCostUsd: null, actualCostArs: null };
-  const usd =
+  const usd = (usage.webSearchCalls || 0) * 0.01 +
     ((usage.inputTokens || 0) * rate.inputUsdPerMillion +
       (usage.outputTokens || 0) * rate.outputUsdPerMillion) /
     1000000;

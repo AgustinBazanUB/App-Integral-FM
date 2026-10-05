@@ -9,6 +9,8 @@ const labels = { inventoryType: "si es un depósito o una ubicación", inventory
 export function requiredFields(intent) {
   if (intent === "forecast_fair") return ["locationId", "startDate", "days"];
   if (intent === "creative_brief") return ["objective", "audience", "format"];
+  if (["get_sales_metrics", "get_location_metrics", "compare_locations", "get_product_performance", "get_seller_performance", "get_sales_history", "get_product_sales_history"].includes(intent)) return ["startDate", "endDate"];
+  if (intent === "get_all_time_sales_metrics") return [];
   const minimum = {
     prepare_stock_load: ["locationId", "productId", "quantity"],
     prepare_sale: ["locationId", "items", "paymentMethod", "ticketRequested", "customerDecision", "promotionDecision"],

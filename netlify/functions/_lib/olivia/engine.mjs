@@ -35,6 +35,7 @@ import {
 import {
   OLIVIA_INSTRUCTIONS,
   OLIVIA_VOICE_INSTRUCTIONS,
+  OLIVIA_METRICS_INSTRUCTIONS,
   modelProfile,
   openaiRequest,
   providerUsage,
@@ -252,7 +253,7 @@ export function createOliviaEngine({
     session,
     id,
     requestId,
-    { content, prepared, draft, taskState, activeSkills, state: nextState, navigation, hiddenFromChat = false, preservePending = false },
+    { content, prepared, draft, taskState, activeSkills, metricsPeriod, state: nextState, navigation, hiddenFromChat = false, preservePending = false },
     config,
   ) {
     const now = clock(),
@@ -314,6 +315,7 @@ export function createOliviaEngine({
           pendingActionId: actionId || (preservePending ? conversation.pendingActionId : null),
           draft: prepared?.canonicalArgs || (draft !== undefined ? draft : conversation.draft || null),
           ...(taskState !== undefined ? { taskState } : {}),
+          ...(metricsPeriod !== undefined ? { metricsPeriod } : {}),
           ...(activeSkills ? { activeSkills: activeSkills.slice(0, 2).map(({ name, version }) => ({ name, version })) } : {}),
           busyRequestId: null,
           busyUntil: null,
@@ -458,6 +460,7 @@ export function createOliviaEngine({
             screenContext: context,
             conversationDraft: conversation.draft,
             taskState: conversation.taskState || null,
+            selectedMetricsPeriod: conversation.metricsPeriod || null,
             taskRequirements: Object.fromEntries(capabilities(session).filter((name) => name.startsWith("prepare_") || name === "forecast_fair").map((name) => [name, requiredFields(name)])),
             memory: conversation.memory || null,
             documentation: knowledge,
@@ -468,6 +471,27 @@ export function createOliviaEngine({
           .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) })),
       ];
       const seen = new Map(), loadedTools = new Set();
+      const researchSources = new Map();
+      let metricsPeriod = conversation.metricsPeriod || null;
+      const researchProvider = async (path, request, options) => {
+        const remaining = config.responseLimits.timeoutMs - (Date.now() - startedAt);
+        if (remaining < 1000) throw oliviaError("assistant-timeout", "La investigación necesita una consulta más acotada.", 503);
+        await increaseReservation({ store, reservation, amount: Buffer.byteLength(JSON.stringify(request), "utf8") + request.max_output_tokens });
+        const started = Date.now();
+        timings.modelCalls++;
+        let payload;
+        try { payload = await provider(path, request, { ...options, timeoutMs: Math.min(options.timeoutMs, remaining), signal }); }
+        catch (error) {
+          event.modelCalls.push({ model: request.model, route: "luna-complex", measurement: "unconfirmed", totalTokens: 0, actualCostUsd: null, actualCostArs: null, operation: "web-research", tools: ["web_search"], errorCode: error.code || "provider-error" });
+          event.measurement = "reserved-estimate";
+          throw error;
+        }
+        const measured = providerUsage(payload, request.model);
+        event.modelCalls.push({ ...measured, ...costForUsage(measured, config), route: "luna-complex", reasoningEffort: request.reasoning.effort, operation: "web-research", tools: ["web_search"], durationMs: Date.now() - started });
+        for (const key of ["inputTokens", "outputTokens", "totalTokens"]) event[key] += measured[key];
+        if (measured.measurement !== "provider") event.measurement = "reserved-estimate";
+        return payload;
+      };
       // Keep earlier attachments in the recent context, while rechecking ownership,
       // session and expiration. An expired file never travels to the provider again.
       let fileCount = 0;
@@ -507,7 +531,7 @@ export function createOliviaEngine({
           model: profile.model,
           reasoning: { effort: profile.reasoningEffort },
           store: false,
-          instructions: OLIVIA_INSTRUCTIONS + (voiceSessionId ? "\n" + OLIVIA_VOICE_INSTRUCTIONS : "") + "\nAntes de pedir aclaraciones, usá update_task para conservar parámetros parciales. Consultá historia, pantalla y herramientas para resolver entidades por nombre; nunca pidas IDs al usuario. Reutilizá taskState.slots y aplicá correcciones sobre la misma tarea. Al cambiar de intención empezá una nueva tarea. Para análisis simple inferí un período razonable con businessTime y declaralo. Para transferencias consultá depósitos y stock; si solo un origen autorizado alcanza, proponelo; si varios alcanzan, preguntá cuál. Nunca inventes cantidades recibidas físicamente. Una tarea creativa solo existe en marketing/social autorizados." + (activeSkills.length ? "\nProcesos versionados permitidos (no conceden permisos):\n" + activeSkills.map((skill) => skill.content).join("\n\n") : ""),
+          instructions: OLIVIA_INSTRUCTIONS + "\n" + OLIVIA_METRICS_INSTRUCTIONS + (voiceSessionId ? "\n" + OLIVIA_VOICE_INSTRUCTIONS : "") + "\nAntes de pedir aclaraciones, usá update_task para conservar parámetros parciales. Consultá historia, pantalla y herramientas para resolver entidades por nombre; nunca pidas IDs al usuario. Reutilizá taskState.slots y aplicá correcciones sobre la misma tarea. Al cambiar de intención empezá una nueva tarea. Para análisis preguntá el período si falta, salvo uno explícito o elegido en la charla; nunca lo inventes. Para transferencias consultá depósitos y stock; si solo un origen autorizado alcanza, proponelo; si varios alcanzan, preguntá cuál. Nunca inventes cantidades recibidas físicamente. Una tarea creativa solo existe en marketing/social autorizados." + (activeSkills.length ? "\nProcesos versionados permitidos (no conceden permisos):\n" + activeSkills.map((skill) => skill.content).join("\n\n") : ""),
           input,
           tools: finalResponse ? [] : [...toolDefinitions(session, { query: userMessage, context, required: [...activeSkills.flatMap((skill) => skill.requiredTools), taskState.intent], loaded: [...loadedTools] }), taskUpdateTool(capabilities(session))],
           ...(finalResponse ? { tool_choice: "none" } : {}),
@@ -604,7 +628,7 @@ export function createOliviaEngine({
             currentTask = taskState;
             return { data: { taskId: taskState.id, slots: taskState.slots, missing: taskState.missingFields } };
           }
-          if (!seen.has(key)) seen.set(key, runTool({ session, name: call.name, args, store, context, now: clock(), provider, env }));
+          if (!seen.has(key)) seen.set(key, runTool({ session, name: call.name, args, store, context, now: clock(), provider: call.name === "research_web_metric" ? researchProvider : provider, env, researchOptions: { ...config.profiles.adminComplex, reasoningEffort: "high", signal } }));
           return seen.get(key);
         });
         timings.toolsMs += Date.now() - toolsStarted;
@@ -615,6 +639,8 @@ export function createOliviaEngine({
             if (outcome.error) throw outcome.error;
             const args = JSON.parse(call.arguments);
             result = outcome.value;
+            if (OLIVIA_CAPABILITIES[call.name]?.module === "metrics" && result.data?.period && !result.state) metricsPeriod = { ...result.data.period, chosenAt: clock() };
+            for (const source of result.sources || []) researchSources.set(source.url, source);
             const toolModule = OLIVIA_CAPABILITIES[call.name]?.module || (call.name === "update_task" ? "core" : "locations");
             if (toolModule !== "core") touchedModules.add(toolModule);
             for (const [key, value] of Object.entries(args)) if (/Id$/.test(key) && typeof value === "string") entityIds.add(value);
@@ -644,7 +670,7 @@ export function createOliviaEngine({
                 : "RECHAZADA";
               draft = args;
               content =
-                (result.state === "DATOS_INCOMPLETOS" ? missingQuestion(taskState.missingFields) : null) || result.data?.summary ||
+                (result.state === "DATOS_INCOMPLETOS" && OLIVIA_CAPABILITIES[call.name]?.module === "metrics" ? result.data?.message : null) || (result.state === "DATOS_INCOMPLETOS" ? missingQuestion(taskState.missingFields) : null) || result.data?.summary ||
                 result.data?.message ||
                 "La operación necesita revisión.";
             }
@@ -694,13 +720,14 @@ export function createOliviaEngine({
       if (taskState.status === "working") taskState = { ...taskState, status: ["ERROR", "RECHAZADA"].includes(nextState) ? "failed" : "completed", updatedAt: clock() };
       if (!prepared && taskState.status === "collecting" && taskState.missingFields.length && nextState === "INFORMACION") nextState = "DATOS_INCOMPLETOS";
       if (voiceSessionId && !prepared && nextState === "DATOS_INCOMPLETOS") content = shortVoiceQuestion(taskState, content);
+      if (!prepared && researchSources.size) content += "\n\nFuentes consultadas:\n" + [...researchSources.values()].map((source) => `- [${source.title.replace(/[\[\]\n]/g, " ")}](${source.url})`).join("\n");
       Object.assign(event, { conversationId: id, taskId: taskState.id, route: profile.route, reasoningEffort: profile.reasoningEffort, routingReason: profile.routingReason, module: context.module, skills: activeSkills.map(({ name, version }) => ({ name, version })), tools: [...seen.keys()].map((key) => JSON.parse(key)[0]), durationMs: Date.now() - startedAt });
       event.modelCalls.forEach((call) => { call.taskId = taskState.id; });
       const result = await saveTurn(
         session,
         id,
         requestId,
-        { content, prepared, draft, taskState, activeSkills, state: nextState, navigation },
+        { content, prepared, draft, taskState, activeSkills, metricsPeriod, state: nextState, navigation },
         config,
       );
       const budget = await settleUsage({

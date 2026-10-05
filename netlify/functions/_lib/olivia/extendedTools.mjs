@@ -11,6 +11,7 @@ import { discoverSkills, loadSkill } from "./skills.mjs";
 import { retrieveKnowledge } from "./knowledge.mjs";
 import { customerHistoryGroups } from "../../../../src/shared/customerHistoryQueries.mjs";
 import { saleDate } from "../../../../src/modules/locations/domain/saleFacts.js";
+import { researchWebMetric } from "./research.mjs";
 const project = (row, fields) => Object.fromEntries(["id", ...fields].filter((key) => row[key] !== undefined).map((key) => [key, row[key]]));
 const common = ["name", "title", "code", "notes", "status", "active", "createdAt", "updatedAt", "responsibleId"];
 const sources = {
@@ -25,7 +26,9 @@ const sources = {
   get_audit_activity: ["auditLogs", ["action", "title", "description", "moduleId", "entityId", "userId", "userName", "role", "createdAt", "status", "origin", "conversationId", "requestId", "confirmationId", "skill", "tool"]],
   get_users: ["users", ["name", "role", "active", "allowedLocationIds"]],
 };
-export async function runExtendedTool({ session, name, args, store, context, now, provider, env }) {
+export async function runExtendedTool({ session, name, args, store, context, now, provider, env, researchOptions }) {
+  if (name === "research_web_metric") return researchWebMetric({ topic: args.topic, provider, env, now, ...researchOptions });
+  if (name === "get_all_time_sales_metrics") return { data: await salesMetrics({ store, args: { ...args, allTime: true }, now }) };
   if (name === "search_knowledge") return { data: await retrieveKnowledge({ session, query: args.query, context, store, ...(provider ? { provider } : {}), ...(env ? { env } : {}) }) };
   if (name === "discover_skills") return { data: { skills: discoverSkills(session) } };
   if (name === "load_skill") { const skill = await loadSkill(session, args.name); return { data: skill, skill, loadTools: skill.requiredTools }; }
@@ -60,9 +63,11 @@ export async function runExtendedTool({ session, name, args, store, context, now
     return { data: { locations: rows.filter((row) => !row.deleted && ["fair", "event"].includes(row.type) && normalizedSearchText(row.name).includes(query)).map((row) => project(row, ["name", "type", "active", "scheduleStartAt", "scheduleEndAt", "startDateTime", "endDateTime", "operatingCalendar"])), partial: rows.length === 150, observedAt: now.toISOString() } };
   }
   if (["get_sales_metrics", "get_location_metrics", "compare_locations", "get_product_performance", "get_seller_performance"].includes(name)) {
+    if (!args.startDate || !args.endDate) return { state: "DATOS_INCOMPLETOS", data: { message: "¿Qué período querés consultar: un mes, un rango de fechas o todo el historial?" } };
     return { data: await salesMetrics({ store, args, now }) };
   }
   if (["get_sales_history", "get_product_sales_history"].includes(name)) {
+    if (!args.startDate || !args.endDate) return { state: "DATOS_INCOMPLETOS", data: { message: "¿Qué período querés consultar: un mes, un rango de fechas o todo el historial?" } };
     const result = await readSales({ store, args, now });
     return { data: { ...result, sales: result.sales.slice(0, 100).map((sale) => project(sale, ["saleCode", "locationId", "sellerId", "total", "items", "payments", "status", "createdAt"])), summary: aggregateSales(result.sales), displayedLimit: 100 } };
   }
