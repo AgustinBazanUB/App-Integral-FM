@@ -722,7 +722,8 @@ export function createOliviaEngine({
       if (taskState.status === "working") taskState = { ...taskState, status: ["ERROR", "RECHAZADA"].includes(nextState) ? "failed" : "completed", updatedAt: clock() };
       if (!prepared && taskState.status === "collecting" && taskState.missingFields.length && nextState === "INFORMACION") nextState = "DATOS_INCOMPLETOS";
       if (voiceSessionId && !prepared && nextState === "DATOS_INCOMPLETOS") content = shortVoiceQuestion(taskState, content);
-      if (!prepared && researchSources.size) content += "\n\nFuentes consultadas:\n" + [...researchSources.values()].map((source) => `- [${source.title.replace(/[\[\]\n]/g, " ")}](${source.url})`).join("\n");
+      const missingSources = [...researchSources.values()].filter((source) => !content.includes(`](${source.url})`));
+      if (!prepared && missingSources.length) content += "\n\nFuentes consultadas:\n" + missingSources.map((source) => `- [${source.title.replace(/[\[\]\n]/g, " ")}](${source.url})`).join("\n");
       Object.assign(event, { conversationId: id, taskId: taskState.id, route: profile.route, reasoningEffort: profile.reasoningEffort, routingReason: profile.routingReason, module: context.module, skills: activeSkills.map(({ name, version }) => ({ name, version })), tools: [...seen.keys()].map((key) => JSON.parse(key)[0]), durationMs: Date.now() - startedAt });
       event.modelCalls.forEach((call) => { call.taskId = taskState.id; });
       const result = await saveTurn(
