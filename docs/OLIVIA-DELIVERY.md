@@ -6,11 +6,15 @@ PR34 incorpora la política central v2: Luna HIGH habitual, la misma Luna XHIGH 
 
 GPT-Live es el protocolo predeterminado de conversación, con backend cliente compartido con texto y sideband privado. El browser no puede inyectar herramientas/instrucciones/resultados. Se deduplican delegaciones, persisten transcripciones, invalidan resultados tardíos y separan duración de voz del consumo por llamada backend. La configuración y modo desarrollador muestran límites, ruta, motivo, tarea y distribución de llamadas.
 
-Validación final del anexo y ajustes de QA: 742 pruebas Node, 19 pruebas previas de reglas en emulador demo, build unificado y builds Gestión/Ecommerce. Las 47 pruebas nuevas usan proveedor/store/media controlados. La carga de stock requiere producto, ubicación y cantidad; el motivo es opcional. Sin motivo conserva la descripción estándar del movimiento y exige igualmente confirmación visual. La prueba manual autenticada confirma arranque, tareas progresivas, correcciones, cancelación, confirmación visual, ventas con Luna HIGH, aclaración de pronóstico con Luna XHIGH, concepto con Sol HIGH e inicio GPT-Live retomando el mismo chat. La verificación de micrófono/altavoz físicos y límites pendientes se informa por separado; no se confirmó ninguna operación comercial ni se desplegaron reglas/índices a producción. [Resultados de QA manual](OLIVIA-MANUAL-QA.md).
+Validación final del anexo y ajustes de QA: 769 pruebas Node, 19 pruebas previas de reglas en emulador demo, build unificado y builds Gestión/Ecommerce. Las 74 pruebas nuevas usan proveedor/store/media controlados. La carga de stock requiere producto, ubicación y cantidad; el motivo es opcional. Sin motivo conserva la descripción estándar del movimiento y exige igualmente confirmación visual. La prueba manual autenticada confirma arranque, tareas progresivas, correcciones, cancelación, confirmación visual, ventas con Luna HIGH, aclaración de pronóstico con Luna XHIGH, concepto con Sol HIGH e inicio GPT-Live retomando el mismo chat. La verificación de micrófono/altavoz físicos y límites pendientes se informa por separado; no se confirmó ninguna operación comercial ni se desplegaron reglas/índices a producción. [Resultados de QA manual](OLIVIA-MANUAL-QA.md).
 
 [Matriz del anexo: 52 secciones](OLIVIA-ANNEX-REQUIREMENTS.md). [Política, tareas, diagramas y fuentes oficiales](OLIVIA-MODEL-ROUTER.md).
 
-[PR 34 de revisión](https://github.com/AgustinBazanUB/App-Integral-FM/pull/34), draft con base `codex/olivia-integration`. [Preview actual del anexo](https://olivia-evolution-pr31--appintegralflormia.netlify.app/gestion): deploy Netlify `6ac3f27f87682eb43b448250`, implementación `a6c60a4d7a1caa03894613ff2830b7f70485a62e`. La pantalla privada exige iniciar sesión con Firebase. El despliegue compila el build unificado y empaqueta las Functions; no publica rules ni índices.
+[PR 34 de revisión](https://github.com/AgustinBazanUB/App-Integral-FM/pull/34), draft con base `codex/olivia-integration`. [Preview actual del anexo](https://olivia-evolution-pr31--appintegralflormia.netlify.app/gestion): deploy Netlify `6ac431311e4ae920bb5e8883`, implementación `40d9fe2`. La pantalla privada exige iniciar sesión con Firebase. El despliegue compila el build unificado y empaqueta las Functions; no publica rules ni índices.
+
+## Prueba de voz económica
+
+La preview incorpora una prueba administrativa de Realtime 2.1 Mini con transcripción económica y consultas de negocio en Luna. El modo normal suma costos de la sesión y el desarrollador separa transcripción, voz y backend. Los importes usan un decimal en pesos y tres cifras significativas en dólares. Las mediciones incompletas permanecen pendientes. [Alcance, tarifas y verificación](OLIVIA-VOICE-MINI-TRIAL.md).
 
 ## Entrega inicial conservada como evidencia histórica
 
@@ -67,3 +71,12 @@ La preview inicial tuvo deploy Netlify `6ac346a6baa0d78cbf5e70ab`, código de im
 Límites externos observados: no se recibió login humano para recorrer datos privados; no se probaron micrófono/altavoz físicos en Android/iPhone ni llamadas reales al proveedor; no se desplegaron rules/índices al Firebase empresarial para cumplir la orden de no tocar producción. El índice versionado de movimientos por depósito acompaña una futura promoción de infraestructura. Estos puntos no se presentan como pruebas completadas en preview.
 
 [Matriz completa de requisitos, implementación y pruebas](OLIVIA-REQUIREMENTS.md). [Pruebas y evidencia](OLIVIA-TESTING.md). [Auditoría de base](OLIVIA-AUDIT.md).
+
+
+## Consultas de inventario y métricas verificadas
+
+Stock general pregunta primero el depósito o ubicación, ofrece nombres reales con estado activo/inactivo y consulta get_inventory_summary para listar productos/unidades. No exige un producto para leer el inventario completo. La selección persiste entre mensajes y el esquema permitido de la tarea queda disponible aunque el siguiente mensaje no contenga keywords. Los nombres omitidos en inventarios antiguos se resuelven desde el catálogo con concurrencia acotada; el stock desconocido conserva su estado.
+
+Las herramientas de métricas reutilizan calculateMetrics del Panel de Métricas generales. Mantienen períodos en Argentina, alcance, límites, parcialidad, comparación anterior y cálculos de ventas/operaciones/ticket/unidades/productos/pagos/descuentos. Una consulta sin ubicación explícita no exige un local. Las lecturas exitosas completan la tarea y dejan de mostrar Faltan datos por filtros opcionales.
+
+La interfaz representa listas y negritas con una gramática de texto limitada; HTML y links quedan literales, sin evaluación. QA autenticada: inventario del depósito elegido y los cuatro indicadores de ayer coincidieron con sus pantallas. Se verifican también cantidades cero/desconocidas, permisos denegados, límites del día argentino y ausencia de ventas en pruebas controladas. No hubo escrituras de inventario ni ventas de prueba. Las evidencias con datos reales permanecen locales y no se publican en el repositorio.

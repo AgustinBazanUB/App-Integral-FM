@@ -51,3 +51,19 @@ No se confirmó ninguna operación comercial, publicó contenido ni cambió conf
 El altavoz fue confirmado por el usuario. La captura/transcripción del micrófono requiere su frase de prueba y no se sustituye por audio simulado. La ejecución empresarial de forecast/transferencias, un perfil Vendedor autenticado y los adjuntos privados permanecen fuera de los casos reales aprobados de este recorrido.
 
 La salida de `netlify env:list` oculta secretos; intentar interpretar ese texto como una clave privada no valida la clave real. La corrección la realizó el usuario en Netlify y el arranque autenticado posterior confirmó que funciona, sin extraer ni guardar la clave.
+
+
+## QA posterior: voz Mini, inventarios y Panel de Métricas
+
+Prueba autenticada en Chrome del 5 de octubre de 2026, separada de los resultados históricos de arriba. Se mantuvo la voz estándar como alternativa. El usuario escuchó Mini; el procesamiento dejó de usar la síntesis del navegador y la voz Mini quedó fija. Entrada escrita con audio de salida y micrófono silenciado: respuesta de carga breve, iconos de micrófono/finalizar y cierre remoto con contadores completos. La entrada humana de la primera sesión capturó conversación simultánea con Codex; no acredita reconocimiento correcto de una frase de stock prevista. No se sustituyó la contabilidad incompleta de esa sesión.
+
+| Caso | Resultado verificado |
+| --- | --- |
+| Stock general sin producto ni ubicación | Pregunta qué inventario consultar y ofrece depósitos y locales reales; identifica el depósito inactivo |
+| Elegir un depósito en el siguiente mensaje | Conserva la tarea, devuelve productos y cantidades en lista; coincide con la pantalla del depósito |
+| Ayer en Métricas | Consulta el día argentino anterior; total, operaciones, unidades y ticket coinciden con el panel sin otros filtros |
+| Estado de lectura completada | Se corrige Faltan datos cuando una lectura exitosa dejó filtros opcionales en null |
+| Referencia de costo | Muestra $10,0–$20,0 ARS por consulta corta como estimado; importe medido y subtotal pendiente conservan su significado |
+| Formato de la respuesta | Listas visibles y negritas sin interpretar HTML ni links arbitrarios |
+
+Regresión final: 769 pruebas Node aprobadas; build unificado/empaquetado de Functions en la preview. CI del código se consulta en GitHub. Sin confirmaciones comerciales, publicaciones, cambios de roles ni despliegues de reglas/índices. El perfil Vendedor autenticado, hardware móvil y cobertura manual exhaustiva de los demás módulos siguen fuera de esta QA; las pruebas automáticas no se presentan como prueba física.
