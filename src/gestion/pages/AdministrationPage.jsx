@@ -12,6 +12,7 @@ import {
   Skeleton,
 } from "../../design-system";
 import { useAuth } from "../AuthContext";
+import { useOliviaVisibility } from "../olivia/ScreenContext";
 import { normalizedRole, ROLE_TEMPLATES } from "../permissions";
 import {
   createManagedUser,
@@ -44,6 +45,7 @@ const emptyForm = {
 };
 
 export default function AdministrationPage() {
+  const { review } = useOliviaVisibility();
   const { profile } = useAuth();
   const result = useAsyncData(async () => {
     const [users, locations] = await Promise.all([listUsers(), listLocations(profile)]);
@@ -88,7 +90,7 @@ export default function AdministrationPage() {
         {result.status === "error" ? <EmptyState icon="ShieldCheck" title="No se pudieron leer los usuarios" description={result.error.message} /> : null}
         {result.status === "ready" ? (
           <DataTable
-            rows={result.data.users}
+            rows={review?.toolName === "prepare_user_role_review" ? result.data.users.filter((user) => user.id === review.entityId) : result.data.users}
             columns={[
               { key: "name", label: "Persona", render: (user) => <div><strong>{user.name || "Sin nombre"}</strong><small>{user.email}</small></div> },
               { key: "role", label: "Rol", render: (user) => roleLabels[normalizedRole(user)] || normalizedRole(user) },

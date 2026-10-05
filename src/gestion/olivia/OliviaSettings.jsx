@@ -7,6 +7,7 @@ import { canAccessAdministration } from "../permissions";
 import { formatDateTime } from "../formatters";
 import { operationLabel, prependHistoryMessages, requestId } from "./client.mjs";
 import { oliviaClient } from "./service";
+import OliviaKnowledgeManager from "./OliviaKnowledgeManager";
 import "./olivia.css";
 
 const frequencies = { daily: "Diaria", weekly: "Semanal", monthly: "Mensual" };
@@ -121,6 +122,7 @@ export default function OliviaSettings() {
 
   return <Panel title="Olivia · Configuración de IA" description="Administrá modelos, cupos y retención. Los administradores no tienen límite de tokens. Los vendedores tienen cupos y ven sus costos en pesos." action={<Badge tone={state.data?.providerConfigured ? "success" : "warning"}>{state.data?.providerConfigured ? "Proveedor configurado" : "Falta configurar el proveedor"}</Badge>}>
     <div className="fm-olivia-settings">
+      <OliviaKnowledgeManager />
       {notice ? <Toast>{notice}</Toast> : null}
       {!state.data?.providerConfigured ? <p>Olivia necesita una conexión con OpenAI configurada en el servidor para responder. Tu aplicación y los paneles manuales continúan disponibles.</p> : null}
       <div className="fm-olivia-settings-grid">

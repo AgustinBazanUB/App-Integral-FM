@@ -231,6 +231,8 @@ export function defaultOliviaConfiguration(env = {}) {
     complexModules: ["marketing"],
     pricing: {},
     officialDollarSellRate: null,
+    audioLimits: { maxSeconds: 60, maxBytes: 4194304 },
+    forecast: { safetyStockPercent: 20 },
   };
 }
 export function validateConfiguration(value) {
@@ -243,6 +245,8 @@ export function validateConfiguration(value) {
   )
     throw oliviaError("invalid-configuration", "Configuración inválida.");
   const clean = { ...defaults, ...value };
+  validateSchema(clean.audioLimits, { type: "object", additionalProperties: false, required: ["maxSeconds", "maxBytes"], properties: { maxSeconds: { type: "integer", minimum: 5, maximum: 60 }, maxBytes: { type: "integer", minimum: 65536, maximum: 4194304 } } });
+  validateSchema(clean.forecast, { type: "object", additionalProperties: false, required: ["safetyStockPercent"], properties: { safetyStockPercent: { type: "integer", minimum: 0, maximum: 100 } } });
   if (
     typeof clean.enabled !== "boolean" ||
     !Number.isInteger(clean.retentionMonths) ||

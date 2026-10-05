@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
+import { executeExtendedOperation } from "./extendedOperations.mjs";
 import {
   can,
   canAccessAdministration,
@@ -461,6 +463,7 @@ export async function executeOperation({
   now = new Date(),
   correlation,
 }) {
+  if (OLIVIA_CAPABILITIES[prepared.toolName]) return executeExtendedOperation({ session, prepared, transaction, now, correlation });
   const uid = identity(session);
   const profileDocument = await transaction.getDocument(`users/${uid}`);
   const freshSession = {
@@ -581,7 +584,7 @@ export async function executeOperation({
       },
       true,
     );
-    write(`auditLogs/${saleId}`, { ...plan.auditData, ...marker }, true);
+    write(`auditLogs/${saleId}`, { ...plan.auditData, ...marker, before: plan.stockWrites.map((line) => ({ productId: line.productId, currentStock: line.movementData.previousStock })), after: { saleId, total: plan.result.total, stocks: plan.stockWrites.map((line) => ({ productId: line.productId, currentStock: line.stockData.currentStock })) } }, true);
     return {
       result: {
         ...plan.result,
@@ -649,6 +652,8 @@ export async function executeOperation({
       userId: uid,
       userName: context.profile.name || context.profile.email || "Usuario",
       createdAt: now,
+      before: { currentStock: plan.movementData.previousStock },
+      after: { currentStock: plan.stockData.currentStock },
       ...marker,
     },
     true,

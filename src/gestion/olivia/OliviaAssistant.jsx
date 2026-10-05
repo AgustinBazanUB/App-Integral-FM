@@ -10,6 +10,11 @@ import { conversationForUser, forgetConversation, operationLabel, pendingExpired
 import { useOliviaContext, useOliviaVisibility } from "./ScreenContext";
 import { oliviaClient } from "./service";
 import { OliviaRealtime } from "./realtime.mjs";
+import { DictationCapture } from "./dictation.mjs";
+import OliviaComposer from "./OliviaComposer";
+import OliviaDeveloperPanel from "./OliviaDeveloperPanel";
+import OliviaVoiceControls from "./OliviaVoiceControls";
+import OliviaUsage from "./OliviaUsage";
 import "./olivia.css";
 
 function OliviaFace({ active }) {
@@ -29,7 +34,7 @@ export default function OliviaAssistant() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const context = useOliviaContext();
-  const { setAssistantOpen } = useOliviaVisibility();
+  const { setAssistantOpen, setReview } = useOliviaVisibility();
   const contextRef = useRef(context);
   contextRef.current = context;
   const admin = canAccessAdministration(profile);
@@ -52,6 +57,18 @@ export default function OliviaAssistant() {
   const [error, setError] = useState("");
   const [errorCode, setErrorCode] = useState("");
   const [recording, setRecording] = useState(false);
+  const [audioFrame, setAudioFrame] = useState({ seconds: 0, bars: Array(24).fill(0) });
+  const [muted, setMuted] = useState(false);
+  const [streamText, setStreamText] = useState("");
+  const [phase, setPhase] = useState("");
+  const [optimistic, setOptimistic] = useState(null);
+  const [attachments, setAttachments] = useState([]);
+  const attachmentControllers = useRef(new Map());
+  const attachmentFiles = useRef(new Map());
+  const streamStart = useRef(null);
+  const [latency, setLatency] = useState(null);
+  const [voiceMetrics, setVoiceMetrics] = useState({});
+  const [viewport, setViewport] = useState(null);
   const [voiceState, setVoiceState] = useState("idle");
   const [caption, setCaption] = useState("");
   const [now, setNow] = useState(Date.now());
@@ -69,6 +86,7 @@ export default function OliviaAssistant() {
   const launcherRef = useRef(null);
   const textareaRef = useRef(null);
   const messagesRef = useRef(null);
+  const stickToBottom = useRef(true);
   const estimateContextRef = useRef("");
   const estimateContextKey = `${context.route}:${context.module}`;
   const exhausted = snapshot.usage?.remainingPercent === 0;
@@ -77,12 +95,26 @@ export default function OliviaAssistant() {
   const expired = pendingExpired(snapshot.pendingAction, now);
 
   useEffect(() => {
+    const view = window.visualViewport;
+    if (!view) return;
+    const measure = () => setViewport({ height: view.height, top: view.offsetTop });
+    measure(); view.addEventListener("resize", measure); view.addEventListener("scroll", measure);
+    return () => { view.removeEventListener("resize", measure); view.removeEventListener("scroll", measure); };
+  }, []);
+  useEffect(() => {
+    if (!optimistic || !streamStart.current || streamStart.current.visibleMs != null) return;
+    const frame = requestAnimationFrame(() => { if (streamStart.current) streamStart.current.visibleMs = performance.now() - streamStart.current.sentAt; });
+    return () => cancelAnimationFrame(frame);
+  }, [optimistic]);
+
+  useEffect(() => {
     setAssistantOpen(open);
     return () => setAssistantOpen(false);
   }, [open, setAssistantOpen]);
 
   const apply = useCallback((result) => {
     if (!mounted.current) return;
+    if (Array.isArray(result.messages)) { setOptimistic(null); setStreamText(""); }
     if (result.conversationId) {
       conversationRef.current = result.conversationId;
       rememberConversation(user.uid, result.conversationId);
@@ -90,12 +122,13 @@ export default function OliviaAssistant() {
     setSnapshot((current) => ({ ...current, ...result, messages: Array.isArray(result.messages) ? result.messages : current.messages,
       pendingAction: Object.hasOwn(result, "pendingAction") ? result.pendingAction : current.pendingAction }));
     const destination = safeNavigation(result.navigation?.path, window.location.origin);
+    if (destination && result.navigation?.review) setReview?.({ ...result.navigation.review, path: destination });
     if (destination) navigate(destination);
     if (["completed", "COMPLETADA"].includes(typeof result.state === "string" ? result.state : result.state?.status)) {
       clearRuntimeCache();
       window.dispatchEvent(new CustomEvent("flor-mia:olivia-completed"));
     }
-  }, [navigate, user.uid]);
+  }, [navigate, user.uid, setReview]);
 
   const perform = useCallback(async (operation, fields = {}, identity = requestId()) => {
     if (requestRef.current) throw new Error("Esperá a que termine la solicitud actual.");
@@ -105,13 +138,31 @@ export default function OliviaAssistant() {
     retryRef.current = { operation, fields, identity };
     setBusy(true); setError(""); setErrorCode("");
     try {
-      const result = await oliviaClient.request(payload, { signal: controller.signal });
+      if (operation === "chat") {
+        stickToBottom.current = true;
+        setStreamText(""); setPhase("Olivia está pensando la respuesta…");
+        setOptimistic({ id: `optimistic-${identity}`, role: "user", content: fields.message, attachments: fields.attachmentPreviews || [] });
+        streamStart.current = { sentAt: performance.now(), firstDeltaMs: null, visibleMs: null };
+      }
+      if (operation === "chat") streamStart.current.requestMs = performance.now() - streamStart.current.sentAt;
+      const result = await oliviaClient.request({ ...payload, ...(operation === "chat" ? { stream: true } : {}) }, { signal: controller.signal,
+        onEvent: operation === "chat" ? (event) => {
+          if (!mounted.current) return;
+          if (event.type === "accepted") { setOptimistic(event.message); conversationRef.current = event.conversationId; }
+          if (event.type === "delta") {
+            if (streamStart.current.firstDeltaMs == null) streamStart.current.firstDeltaMs = performance.now() - streamStart.current.sentAt;
+            setStreamText((current) => current + event.delta);
+          }
+          if (event.type === "phase") { setPhase(event.label); if (event.tools) setStreamText(""); }
+        } : undefined });
       apply(result);
+      if (operation === "chat") { setOptimistic(null); setStreamText(""); setLatency({ ...streamStart.current, totalMs: performance.now() - streamStart.current.sentAt }); }
       retryRef.current = null;
       return result;
     } catch (failure) {
       if (mounted.current && failure.name !== "AbortError") { setError(failure.message); setErrorCode(failure.code || ""); }
-      if (failure.code === "request-already-used") retryRef.current = { operation: "state", fields: {}, identity: requestId() };
+      if (["request-already-used", "stream-incomplete"].includes(failure.code) || failure.name === "AbortError") retryRef.current = { operation: "state", fields: {}, identity: requestId() };
+      if (failure.name === "AbortError" && mounted.current && operation === "chat") { setPhase("Respuesta detenida. El chat se conserva."); setError("Respuesta detenida. Recuperá el chat para ver lo guardado."); setErrorCode("stream-incomplete"); }
       throw failure;
     } finally {
       if (requestRef.current === controller) requestRef.current = null;
@@ -119,19 +170,10 @@ export default function OliviaAssistant() {
     }
   }, [apply]);
 
-  const stopRecording = useCallback((discard = false) => {
+  const stopRecording = useCallback((discard = false, send = false) => {
     const current = audioRef.current;
     if (!current) return;
-    current.discard = discard;
-    clearTimeout(current.timer);
-    if (!current.recorder) {
-      current.discard = true;
-      audioRef.current = null;
-      if (mounted.current) setRecording(false);
-      return;
-    }
-    if (current.recorder?.state === "recording") current.recorder.stop();
-    current.stream?.getTracks().forEach((track) => track.stop());
+    current.stop(discard ? "cancel" : send ? "send" : "stop");
     if (discard) { audioRef.current = null; if (mounted.current) setRecording(false); }
   }, []);
 
@@ -148,6 +190,8 @@ export default function OliviaAssistant() {
       requestRef.current?.abort();
       historyRef.current?.abort();
       estimateRef.current?.abort();
+      attachmentControllers.current.forEach((controller) => controller.abort());
+      attachmentFiles.current.forEach((file) => { if (file.preview) URL.revokeObjectURL(file.preview); });
       stopRecording(true);
       stopVoice();
     };
@@ -206,6 +250,7 @@ export default function OliviaAssistant() {
     try {
       await perform("resume", { conversationId: id });
       setArchived([]); setMessagesCursor(undefined); setDraft(""); setDraftEstimate(null); setChatsOpen(false);
+      attachmentFiles.current.forEach((_, localId) => removeFile(localId));
     } catch { /* Keep the selected chat visible on failure. */ }
   };
 
@@ -216,16 +261,16 @@ export default function OliviaAssistant() {
   }, [open, perform]);
 
   useEffect(() => {
-    messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth" });
-  }, [snapshot.messages, busy, open]);
+    if (stickToBottom.current) messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "auto" });
+  }, [snapshot.messages, busy, open, streamText, optimistic]);
 
   useEffect(() => {
-    voiceRef.current?.setMuted(Boolean(snapshot.pendingAction));
+    voiceRef.current?.setMuted(muted || Boolean(snapshot.pendingAction));
     if (!snapshot.pendingAction) return undefined;
     setNow(Date.now());
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [snapshot.pendingAction]);
+  }, [snapshot.pendingAction, muted]);
 
   useEffect(() => {
     setQuotaRequested(false); setQuotaNotice(""); quotaRequestIdRef.current = null;
@@ -238,15 +283,21 @@ export default function OliviaAssistant() {
     return () => { window.removeEventListener("offline", disconnect); window.removeEventListener("pagehide", disconnect); };
   }, [stopRecording, stopVoice]);
 
-  const sendMessage = async () => {
-    const message = draft.trim();
-    if (!message || busy || recording || voiceActive || exhausted || unavailable) return;
-    try { await perform("chat", { message, inputMode: "text" }); setDraft(""); } catch { /* Error and retry use the original request ID. */ }
+  const sendMessage = async (dictated) => {
+    const ready = attachments.filter((file) => file.id);
+    const message = (typeof dictated === "string" ? dictated : draft).trim() || (ready.length ? "Analizá los archivos adjuntos." : "");
+    if (!message || busy || recording || exhausted || unavailable || attachments.some((file) => file.status === "uploading")) return;
+    setDraft("");
+    try {
+      const result = await perform("chat", { message, inputMode: typeof dictated === "string" ? "dictation" : "text", attachmentIds: ready.map((file) => file.id), attachmentPreviews: ready.map(({ name, type }) => ({ name, type })) });
+      if (voiceActive) voiceRef.current?.shareTextTurn(message, result);
+      ready.forEach((file) => removeFile(file.localId));
+    } catch { /* Error and retry use the original request ID. */ }
   };
 
   const newConversation = async () => {
     if (busy || recording || voiceActive) return;
-    if (snapshot.pendingAction && !["conversation-not-found", "session-changed", "conversation-expired"].includes(errorCode)) {
+    if (snapshot.pendingAction && !["conversation-not-found", "session-changed", "permission-scope-changed", "conversation-expired"].includes(errorCode)) {
       try { await perform("cancel", { confirmationToken: snapshot.pendingAction.confirmationToken, actionId: snapshot.pendingAction.id }); }
       catch { return; }
     }
@@ -255,6 +306,7 @@ export default function OliviaAssistant() {
     confirmationIds.current.clear();
     setSnapshot({ messages: [], state: "INFORMACION", pendingAction: null, usage: null });
     setDraft(""); setArchived([]); setMessagesCursor(undefined); setDraftEstimate(null); setChatsOpen(false);
+    attachmentFiles.current.forEach((_, localId) => removeFile(localId));
     perform("state").catch(() => {});
   };
 
@@ -281,63 +333,88 @@ export default function OliviaAssistant() {
 
   const startRecording = async () => {
     if (busy || audioRef.current || voiceActive || exhausted || unavailable || !conversationRef.current) return;
-    const capture = { chunks: [], bytes: 0, discard: false };
-    audioRef.current = capture;
-    setRecording(true);
-    setError("");
-    try {
-      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") throw new Error("Este navegador no admite grabación. Podés escribir o usar otro navegador.");
-      capture.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (audioRef.current !== capture || !mounted.current) { capture.stream.getTracks().forEach((track) => track.stop()); return; }
-      const type = ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"].find((mime) => MediaRecorder.isTypeSupported(mime));
-      capture.recorder = new MediaRecorder(capture.stream, type ? { mimeType: type } : undefined);
-      capture.recorder.ondataavailable = (event) => {
-        capture.bytes += event.data.size;
-        if (capture.bytes > 4 * 1024 * 1024) { setError("El audio excedió 4 MB. Grabá un mensaje más corto."); stopRecording(true); return; }
-        if (!capture.discard && event.data.size) capture.chunks.push(event.data);
-      };
-      capture.recorder.onerror = () => { stopRecording(true); if (mounted.current) setError("La grabación se interrumpió. Podés reintentar o escribir."); };
-      capture.recorder.onstop = async () => {
-        clearTimeout(capture.timer);
-        capture.stream.getTracks().forEach((track) => track.stop());
+    setRecording(true); setError(""); setAudioFrame({ seconds: 0, bars: Array(24).fill(0) });
+    const capture = new DictationCapture({
+      limits: snapshot.audioLimits,
+      onFrame: (frame) => { if (mounted.current) setAudioFrame(frame); },
+      onError: (failure) => { audioRef.current = null; if (mounted.current) { setRecording(false); setError(failure.name === "NotAllowedError" ? "Permití el micrófono en tu navegador para dictar." : failure.message); } },
+      onComplete: async (audio, action) => {
         if (audioRef.current === capture) audioRef.current = null;
-        if (!mounted.current || capture.discard) return;
-        setRecording(false);
-        const controller = new AbortController();
-        requestRef.current = controller;
-        setBusy(true);
+        if (!mounted.current) return;
+        setRecording(false); setBusy(true); setPhase("Transcribiendo…");
+        const controller = new AbortController(); requestRef.current = controller;
+        let text = "";
         try {
-          const blob = new Blob(capture.chunks, { type: capture.recorder.mimeType || "audio/webm" });
-          const result = await oliviaClient.transcribe(blob, { conversationId: conversationRef.current, requestId: requestId() }, { signal: controller.signal });
-          if (!mounted.current) return;
-          if (result.conversationId) { conversationRef.current = result.conversationId; rememberConversation(user.uid, result.conversationId); }
-          setDraft(result.text || "");
+          const result = await oliviaClient.transcribe(audio, { conversationId: conversationRef.current, requestId: requestId() }, { signal: controller.signal });
+          if (!mounted.current || controller.signal.aborted) return;
+          text = result.text || ""; setDraft(text);
           if (result.usage) setSnapshot((current) => ({ ...current, usage: result.usage }));
-          if (!result.text?.trim()) setError("No se reconoció texto. Podés volver a grabar.");
+          if (!text.trim()) setError("No se reconoció texto. Podés volver a dictar.");
           textareaRef.current?.focus();
         } catch (failure) { if (mounted.current && failure.name !== "AbortError") setError(failure.message); }
-        finally { if (requestRef.current === controller) requestRef.current = null; if (mounted.current) setBusy(false); capture.chunks = []; }
-      };
-      capture.recorder.start(500);
-      setRecording(true);
-      capture.timer = setTimeout(() => stopRecording(), 60000);
-    } catch (failure) {
-      capture.stream?.getTracks().forEach((track) => track.stop());
-      if (audioRef.current === capture) audioRef.current = null;
-      if (mounted.current) { setRecording(false); setError(failure.name === "NotAllowedError" ? "Permití el micrófono en tu navegador para grabar. Podés continuar escribiendo." : failure.message); }
+        finally { if (requestRef.current === controller) requestRef.current = null; if (mounted.current) setBusy(false); }
+        // perform uses the ref lock, so send only after transcription released it.
+        if (action === "send" && text.trim() && mounted.current && !controller.signal.aborted) {
+          setDraft("");
+          const ready = [...attachmentFiles.current.values()].filter((file) => file.id && file.status === "ready");
+          perform("chat", { message: text, inputMode: "dictation", attachmentIds: ready.map((file) => file.id), attachmentPreviews: ready.map(({ name, type }) => ({ name, type })) }).then(() => ready.forEach((file) => removeFile(file.localId))).catch(() => {});
+        }
+      },
+    });
+    audioRef.current = capture;
+    await capture.start();
+  };
+
+  const removeFile = (localId) => {
+    attachmentControllers.current.get(localId)?.abort(); attachmentControllers.current.delete(localId);
+    const file = attachmentFiles.current.get(localId);
+    if (file?.preview) URL.revokeObjectURL(file.preview);
+    attachmentFiles.current.delete(localId);
+    setAttachments((current) => current.filter((item) => item.localId !== localId));
+  };
+  const addFiles = async (files) => {
+    for (const file of Array.from(files || []).slice(0, 4 - attachmentFiles.current.size)) {
+      const localId = requestId(), controller = new AbortController();
+      const item = { localId, name: file.name, type: file.type || file.name.split(".").at(-1), status: "uploading", preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : null };
+      attachmentFiles.current.set(localId, item); attachmentControllers.current.set(localId, controller);
+      setAttachments((current) => [...current, item]);
+      try {
+        const result = await oliviaClient.upload(file, { conversationId: conversationRef.current, requestId: localId }, { signal: controller.signal });
+        if (mounted.current && !controller.signal.aborted) {
+          attachmentFiles.current.set(localId, { ...item, ...result.attachment, status: "ready" });
+          setAttachments((current) => current.map((entry) => entry.localId === localId ? { ...entry, ...result.attachment, status: "ready" } : entry));
+        }
+      } catch (failure) {
+        if (mounted.current && !controller.signal.aborted) setAttachments((current) => current.map((entry) => entry.localId === localId ? { ...entry, status: "error", error: failure.message } : entry));
+      } finally { attachmentControllers.current.delete(localId); }
     }
   };
 
   const startVoice = () => {
     if (busy || recording || voiceRef.current || exhausted || unavailable || snapshot.pendingAction || !conversationRef.current) return;
-    setError(""); setCaption("");
+    setError(""); setCaption(""); setMuted(false);
     const voiceConversationId = conversationRef.current;
+    const voiceRequest = async (operation, fields) => {
+      const started = Date.now();
+      while (requestRef.current && Date.now() - started < 45000) await new Promise((resolve) => setTimeout(resolve, 100));
+      if (connection.closed && operation !== "realtimeTranscript") return null;
+      if (operation === "realtimeTranscript") {
+        const result = await oliviaClient.request({ operation, ...fields, conversationId: voiceConversationId, requestId: requestId() }, { keepalive: true });
+        if (mounted.current && conversationRef.current === voiceConversationId) apply(result);
+        return result;
+      }
+      return perform(operation, fields);
+    };
     const connection = new OliviaRealtime({
-      createSession: (sdp, signal) => oliviaClient.request({ operation: "realtime", sdp, conversationId: voiceConversationId, requestId: requestId(), screenContext: contextRef.current }, { signal }).then((result) => { apply(result); return result; }),
+      createSession: (sdp, signal) => oliviaClient.request({ operation: "realtime", sdp, nativeTools: true, conversationId: voiceConversationId, requestId: requestId(), screenContext: contextRef.current }, { signal }).then((result) => { apply(result); return result; }),
       stopSession: (realtimeSessionId) => oliviaClient.request({ operation: "stopRealtime", realtimeSessionId, conversationId: voiceConversationId, requestId: requestId() }, { keepalive: true }),
       onRequest: (message, realtimeSessionId) => perform("chat", { message, inputMode: "realtime", realtimeSessionId }),
+      onTool: (fields) => voiceRequest("realtimeTool", fields),
+      onTranscript: (fields) => voiceRequest("realtimeTranscript", fields),
+      onMetrics: (metrics) => { if (mounted.current) setVoiceMetrics((current) => ({ ...current, ...metrics })); },
+      onInput: ({ message, itemId }) => { if (mounted.current) { stickToBottom.current = true; setOptimistic({ id: `voice-${itemId}`, role: "user", content: message }); } },
       onState: (state) => { if (mounted.current) setVoiceState(state); },
-      onError: (failure) => { if (voiceRef.current === connection) voiceRef.current = null; if (mounted.current) setError(failure.name === "NotAllowedError" ? "Permití el micrófono para conversar por voz." : failure.message); },
+      onError: (failure) => { if (connection.closed && voiceRef.current === connection) voiceRef.current = null; if (mounted.current) setError(failure.name === "NotAllowedError" ? "Permití el micrófono para conversar por voz." : failure.message); },
       onCaption: (text, append) => { if (mounted.current) setCaption((current) => append ? current + text : text); },
     });
     voiceRef.current = connection;
@@ -350,14 +427,14 @@ export default function OliviaAssistant() {
   const quota = snapshot.usage;
   const estimate = draftEstimate || snapshot.estimate;
   const money = (value) => Number.isFinite(value) ? new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(value) : "No disponible";
-  const visibleMessages = prependHistoryMessages(archived, snapshot.messages);
+  const visibleMessages = prependHistoryMessages(archived, optimistic ? [...snapshot.messages.filter((entry) => entry.id !== optimistic.id), optimistic] : snapshot.messages);
   const toggleDeveloper = () => { const next = !developer; setDeveloper(next); try { localStorage.setItem(`flor-mia-olivia-dev:${user.uid}`, String(next)); } catch { /* Optional preference. */ } };
 
   return <>
     <button ref={launcherRef} type="button" className="fm-olivia-launcher" aria-label={open ? "Cerrar Olivia" : "Abrir Olivia, asistente de Flor Mía"} aria-expanded={open} aria-controls="fm-olivia-drawer" onClick={() => open ? close() : setOpen(true)}>
       <OliviaFace active={busy || recording || voiceActive} /><span>Olivia</span>
     </button>
-    {open ? <aside id="fm-olivia-drawer" className="fm-olivia-drawer" role="dialog" aria-modal="false" aria-labelledby="fm-olivia-title">
+    {open ? <aside id="fm-olivia-drawer" className={`fm-olivia-drawer${viewport?.height < 500 ? " is-compact" : ""}`} style={viewport ? { "--olivia-viewport-height": `${viewport.height}px`, "--olivia-viewport-top": `${viewport.top}px` } : undefined} role="dialog" aria-modal="false" aria-labelledby="fm-olivia-title">
       <header className="fm-olivia-header">
         <OliviaFace active={busy || recording || voiceActive}/><div><h2 id="fm-olivia-title">Olivia</h2><span>Asistente de Flor Mía</span></div>
         <IconButton label="Mis chats" icon="ScrollText" disabled={busy || recording || voiceActive || historyBusy} onClick={() => { setChatsOpen(!chatsOpen); if (!chatsOpen) loadHistory("chats"); }}/>
@@ -368,30 +445,20 @@ export default function OliviaAssistant() {
       {admin ? <div className="fm-olivia-mode"><label><input type="checkbox" checked={developer} onChange={toggleDeveloper}/> Modo desarrollador</label></div> : null}
       {chatsOpen ? <section className="fm-olivia-chats" aria-label="Mis chats"><h3>Mis chats</h3><p>Retomá una conversación o creá una nueva. El historial se guarda en tu cuenta durante el período de retención.</p>{chats.map((chat) => <button type="button" key={chat.id} disabled={busy || historyBusy} aria-current={chat.id === snapshot.conversationId ? "true" : undefined} onClick={() => reopen(chat.id)}><strong>{chat.title}</strong><small>{formatDateTime(chat.updatedAt)}</small></button>)}{!chats.length && !historyBusy ? <p>Todavía no hay chats guardados.</p> : null}{chatsCursor ? <Button variant="secondary" disabled={historyBusy} onClick={() => loadHistory("chats", true)}>Ver más chats</Button> : null}{historyBusy ? <p role="status">Cargando chats…</p> : null}</section> : null}
       {historyError ? <p className="fm-olivia-error" role="alert">{historyError}</p> : null}
-      <div ref={messagesRef} className="fm-olivia-messages" role="log" aria-live="polite" aria-label="Conversación con Olivia">
+      <div ref={messagesRef} onScroll={(event) => { const area = event.currentTarget; stickToBottom.current = area.scrollHeight - area.clientHeight - area.scrollTop < 70; }} className="fm-olivia-messages" role="log" aria-live="polite" aria-label="Conversación con Olivia">
         {snapshot.messages.length && messagesCursor !== null ? <Button variant="secondary" disabled={historyBusy || busy || recording || voiceActive} onClick={() => loadHistory("messages")}>Ver mensajes anteriores</Button> : null}
         {!snapshot.messages.length && !busy ? <div className="fm-olivia-welcome"><h3>Hola, soy Olivia.</h3><p>Te ayudo a consultar Flor Mía y preparar operaciones de tu panel. Los cambios siempre se confirman con Sí o No.</p><p>Podés escribir, dictar un mensaje o conversar por voz.</p></div> : null}
-        {visibleMessages.filter((message) => ["user", "assistant"].includes(message.role)).map((message, index) => <article key={message.id || `${index}:${message.role}`} className={`fm-olivia-message fm-olivia-message--${message.role}`}><strong>{message.role === "user" ? "Vos" : "Olivia"}</strong><p>{String(message.content || "")}</p></article>)}
-        {busy ? <p className="fm-olivia-working" role="status">Olivia está procesando tu solicitud…</p> : null}
+        {visibleMessages.filter((message) => !message.hiddenFromChat && ["user", "assistant"].includes(message.role)).map((message, index) => <article key={message.id || `${index}:${message.role}`} className={`fm-olivia-message fm-olivia-message--${message.role}`}><strong>{message.role === "user" ? "Vos" : "Olivia"}</strong><p>{String(message.content || "")}</p>{message.attachments?.length ? <ul className="fm-olivia-attachments" aria-label="Archivos de este mensaje">{message.attachments.map((file, fileIndex) => <li key={file.id || fileIndex}>{file.name} · {file.type}</li>)}</ul> : null}</article>)}
+        {streamText ? <article className="fm-olivia-message fm-olivia-message--assistant"><strong>Olivia</strong><p>{streamText}</p>{!busy ? <small>Respuesta incompleta</small> : null}</article> : null}
+        {busy ? <p className="fm-olivia-working" role="status">{phase || "Olivia está pensando la respuesta…"}</p> : null}
       </div>
       {pending ? <section className="fm-olivia-confirmation" aria-labelledby="fm-olivia-confirm-title"><h3 id="fm-olivia-confirm-title">¿Confirmar esta acción?</h3><p>{typeof pending.summary === "string" ? pending.summary : JSON.stringify(pending.summary, null, 2)}</p>{expired ? <p role="alert">La confirmación venció. Pedile a Olivia que prepare la acción nuevamente.</p> : null}<div><Button onClick={() => answer(true)} disabled={busy || expired || exhausted || unavailable}>Sí</Button><Button variant="secondary" onClick={() => answer(false)} disabled={busy || !online}>No</Button></div><small>La acción se ejecuta únicamente al tocar Sí. Podés corregir los datos escribiendo.</small></section> : null}
       {unavailable ? <div className="fm-olivia-error" role="status"><p>{!online ? "Olivia necesita conexión a Internet." : snapshot.enabled === false ? "Olivia está deshabilitada por el Administrador." : "Olivia todavía necesita configurar su conexión con OpenAI."}</p><small>Podés continuar operando desde tu panel.</small>{admin && online ? <Button variant="secondary" onClick={() => navigate("/gestion/settings")}>Abrir configuración</Button> : null}</div> : null}
-      {error ? <div className="fm-olivia-error" role="alert"><p>{error}</p>{["conversation-not-found", "session-changed", "conversation-expired"].includes(errorCode) ? <Button variant="secondary" disabled={busy} onClick={newConversation}>Iniciar nueva conversación</Button> : retryRef.current && !busy ? <Button variant="secondary" onClick={() => { const retry = retryRef.current; perform(retry.operation, retry.fields, retry.identity).then(() => { if (retry.operation === "chat") setDraft(""); }).catch(() => {}); }}>{errorCode === "request-already-used" ? "Actualizar conversación" : "Reintentar solicitud"}</Button> : null}<small>Tu panel sigue disponible para operar manualmente.</small></div> : null}
-      {voiceActive || voiceState === "ended" ? <section className="fm-olivia-voice" aria-live="polite"><strong>{voiceState === "connecting" ? "Conectando voz…" : voiceState === "processing" ? "Consultando el sistema…" : voiceState === "speaking" ? "Olivia está hablando" : voiceState === "ended" ? "La sesión de voz terminó" : pending ? "Confirmá en la tarjeta para continuar" : "Micrófono activo"}</strong>{caption ? <p>{caption}</p> : null}<div>{voiceActive ? <><Button variant="secondary" onClick={() => voiceRef.current?.interrupt()}>Interrumpir</Button><Button variant="secondary" onClick={stopVoice}>Finalizar voz</Button></> : <Button variant="secondary" onClick={() => { stopVoice(); startVoice(); }}>Reconectar voz</Button>}</div></section> : null}
-      <form className="fm-olivia-composer" onSubmit={(event) => { event.preventDefault(); sendMessage(); }}>
-        <label className="sr-only" htmlFor="fm-olivia-message">Mensaje para Olivia</label>
-        <textarea ref={textareaRef} id="fm-olivia-message" rows="2" maxLength={4000} value={draft} placeholder={recording ? "Grabando…" : "Escribile a Olivia…"} disabled={busy || recording || voiceActive || exhausted || unavailable} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(); } }}/>
-        <div className="fm-olivia-composer-actions">
-          {recording ? <><Button variant="secondary" icon="Square" onClick={() => stopRecording()}>Transcribir</Button><Button variant="secondary" onClick={() => stopRecording(true)}>Descartar</Button></> : <><IconButton label="Grabar audio para transcribir" icon="Mic" disabled={busy || voiceActive || exhausted || unavailable || !conversationRef.current} onClick={startRecording}/><Button variant="secondary" icon="AudioLines" disabled={busy || voiceActive || exhausted || unavailable || Boolean(pending) || !conversationRef.current} onClick={startVoice}>{voiceState === "error" ? "Reconectar voz" : "Conversar"}</Button><Button type="submit" icon="Send" disabled={!draft.trim() || busy || voiceActive || exhausted || unavailable}>Enviar</Button></>}
-        </div>
-        <small>{recording ? "Hasta 60 segundos. Al transcribir podés revisar el texto antes de enviarlo." : "El dictado se transcribe y podés revisarlo antes de enviarlo."}</small>
-      </form>
-      <footer className="fm-olivia-usage">
-        {quota?.unlimited ? <span>Administrador · <strong>Uso sin límite de tokens</strong></span> : quota ? <><span>Asistente IA disponible: <strong>{quota.remainingPercent}%</strong></span>{quota.renewsAt ? <small>Próxima renovación: {formatDateTime(quota.renewsAt)}</small> : null}{quota.remainingPercent <= 25 ? <small>{exhausted ? "Tu cupo está agotado. Podés solicitar una ampliación al Administrador." : "Tu cupo disponible es bajo."}</small> : null}</> : null}
-        <div className="fm-olivia-costs"><div><small>Próxima consulta escrita · estimado</small><strong>{money(estimate?.estimatedCostArs)}</strong></div><div><small>Última llamada{quota?.lastCost?.estimated ? " · sin medición completa" : ""}</small><strong>{quota?.lastCost ? money(quota.lastCost.ars) : "Sin llamadas previas"}</strong></div></div>
-        <small>Costo de IA aproximado en pesos argentinos. Incluye 5% sobre la conversión; el consumo final puede variar. La voz requiere medición de audio.</small>
-      </footer>
-      {admin && developer ? <section className="fm-olivia-developer" aria-label="Métricas de desarrollo"><h3>Métricas de desarrollo</h3><dl><dt>Modelo próximo</dt><dd>{estimate?.model || "—"}</dd><dt>Razonamiento</dt><dd>{estimate?.reasoningEffort || "—"}</dd><dt>Tokens próximos estimados</dt><dd>{estimate?.estimatedTokens?.toLocaleString("es-AR") || "—"}</dd><dt>Última llamada: entrada / salida</dt><dd>{quota?.inputTokens ?? "—"} / {quota?.outputTokens ?? "—"}</dd><dt>Última llamada: total</dt><dd>{quota?.totalTokens ?? "—"}{quota?.measurement === "reserved-estimate" ? " (reserva estimada)" : ""}</dd><dt>Consumo / reservas del período</dt><dd>{quota?.usedTokens ?? 0} / {quota?.reservedTokens ?? 0}</dd><dt>Último costo USD</dt><dd>{quota?.actualCostUsd != null ? Number(quota.actualCostUsd).toFixed(6) : "Sin medición disponible"}</dd><dt>Contexto enviado</dt><dd>Hasta 16 mensajes recientes; archivo consultable por separado</dd><dt>Cotización de referencia</dt><dd>{estimate?.reference ? `${money(estimate.reference.rate)} por USD · ${estimate.reference.date || "Manual"}` : "Sin cotización disponible"}</dd></dl>{estimate?.reference?.source?.startsWith("https://") ? <a href={estimate.reference.source} target="_blank" rel="noreferrer">Fuente de cotización</a> : null}</section> : null}
+      {error ? <div className="fm-olivia-error" role="alert"><p>{error}</p>{["conversation-not-found", "session-changed", "permission-scope-changed", "conversation-expired"].includes(errorCode) ? <Button variant="secondary" disabled={busy} onClick={newConversation}>Iniciar nueva conversación</Button> : retryRef.current && !busy ? <Button variant="secondary" onClick={() => { const retry = retryRef.current; perform(retry.operation, retry.fields, retry.identity).then(() => { if (retry.operation === "chat") setDraft(""); }).catch(() => {}); }}>{errorCode === "request-already-used" ? "Actualizar conversación" : "Reintentar solicitud"}</Button> : null}<small>Tu panel sigue disponible para operar manualmente.</small></div> : null}
+      <OliviaVoiceControls active={voiceActive} state={voiceState} caption={caption} pending={pending} muted={muted} toggleMute={() => { const next = !muted; setMuted(next); voiceRef.current?.setMuted(next || Boolean(pending)); }} interrupt={() => voiceRef.current?.interrupt()} stop={stopVoice} reconnect={() => { stopVoice(); startVoice(); }} />
+      <OliviaComposer textareaRef={textareaRef} draft={draft} setDraft={setDraft} sendMessage={sendMessage} recording={recording} frame={audioFrame} stopRecording={stopRecording} startRecording={startRecording} startVoice={startVoice} voiceActive={voiceActive} disabled={exhausted || unavailable || !conversationRef.current} busy={busy} cancelRequest={() => requestRef.current?.abort()} attachments={attachments} addFiles={addFiles} removeFile={removeFile} />
+      <OliviaUsage quota={quota} estimate={estimate} money={money} compact={viewport?.height < 500} exhausted={exhausted} />
+      {admin && developer ? <OliviaDeveloperPanel estimate={estimate} quota={quota} latency={latency} voiceMetrics={voiceMetrics} telemetry={snapshot.telemetry} money={money} /> : null}
       {!admin && exhausted ? <div className="fm-olivia-quota-request"><Button variant="secondary" disabled={busy || !online || quotaRequested} onClick={() => setQuotaRequestOpen(true)}>{quotaRequested ? "Ampliación solicitada" : "Solicitar ampliación"}</Button>{quotaNotice ? <p role="status">{quotaNotice}</p> : null}</div> : null}
     </aside> : null}
     <Modal open={quotaRequestOpen} title="Solicitar ampliación de Olivia" description="Enviaremos al Administrador una solicitud de ampliación para tu cupo del período actual." onClose={() => { if (!busy) setQuotaRequestOpen(false); }} footer={<div className="fm-dialog-actions"><Button variant="secondary" disabled={busy} onClick={() => setQuotaRequestOpen(false)}>No</Button><Button loading={busy} onClick={requestQuotaExtension}>Sí, solicitar</Button></div>}><p>La solicitud no cambia tu cupo. El Administrador puede conceder una ampliación temporal desde Configuración de IA.</p>{error ? <p className="fm-form-error" role="alert">{error}</p> : null}</Modal>

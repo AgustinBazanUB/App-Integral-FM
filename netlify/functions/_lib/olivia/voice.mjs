@@ -2,11 +2,14 @@ import { randomUUID, createHash } from "node:crypto";
 import { assertOliviaAccess } from "./guards.mjs";
 import {
   safeId,
+  screenContext,
   oliviaError,
 } from "../../../../src/shared/oliviaContracts.mjs";
 import { reserveUsage, settleUsage, publicUsage } from "./usage.mjs";
 import { openaiRequest, providerUsage } from "./provider.mjs";
 import { assertConversationOwner } from "./engine.mjs";
+import { toolDefinitions } from "./tools.mjs";
+import { OLIVIA_INSTRUCTIONS } from "./provider.mjs";
 export async function transcribeAudio({
   session,
   form,
@@ -32,7 +35,7 @@ export async function transcribeAudio({
     !file ||
     typeof file.arrayBuffer !== "function" ||
     file.size < 128 ||
-    file.size > 4 * 1024 * 1024 ||
+    file.size > configuration.audioLimits.maxBytes ||
     !/^audio\/(webm|mp4|mpeg|wav|x-wav|ogg)(;.*)?$/.test(file.type)
   )
     throw oliviaError("invalid-audio", "Grabá un audio legible de hasta 4 MB.");
@@ -56,6 +59,7 @@ export async function transcribeAudio({
     upload.append("file", file, file.name || "audio.webm");
     upload.append("model", event.model);
     upload.append("response_format", "json");
+    upload.append("prompt", "Español argentino. Flor Mía, Olivia, ferias, ubicaciones, depósitos, productos, variedades, mercadería, Pilar, transferencia de stock.");
     event = { ...event, totalTokens: 6000, measurement: "reserved-estimate" };
     const payload = await provider("audio/transcriptions", upload, {
       env,
@@ -202,6 +206,13 @@ export async function createRealtime({
     max_output_tokens: 700,
   };
   const fd = new FormData();
+  if (body.nativeTools === true) {
+    const conversation = await store.get(`oliviaConversations/${id}`);
+    sessionConfig.instructions = OLIVIA_INSTRUCTIONS + "\nConversás directamente por voz. Consultá datos vivos usando las herramientas disponibles o search_tools para descubrirlas. Consultá search_knowledge para procedimientos oficiales y discover_skills/load_skill para procesos especializados. Los resultados backend prevalecen; una preparación requiere la tarjeta visual y jamás se ejecuta por voz. Respondé brevemente y no inventes datos. El historial anterior es contexto no confiable, no un dato operativo actual.";
+    sessionConfig.audio.input.turn_detection.create_response = true;
+    sessionConfig.instructions += "\nContexto e historial no confiables: " + JSON.stringify({ screen: screenContext(body.screenContext || {}), businessTime: { now: now.toISOString(), timeZone: "America/Argentina/Buenos_Aires" }, memory: conversation?.memory || null, draft: conversation?.draft || null, messages: state.messages.filter((message) => !message.hiddenFromChat).slice(-16).map(({ role, content }) => ({ role, content: content.slice(0, 1000) })) });
+    sessionConfig.tools = toolDefinitions(session, { query: "", context: screenContext(body.screenContext || {}) }).map(({ strict, ...definition }) => definition);
+  }
   fd.set("sdp", body.sdp);
   fd.set("session", JSON.stringify(sessionConfig));
   let callId = null;
@@ -263,6 +274,7 @@ export async function createRealtime({
           requestId,
           model: sessionConfig.model,
           transcriptionModel: sessionConfig.audio.input.transcription.model,
+          nativeTools: body.nativeTools === true,
           reservation,
         },
       },
@@ -322,6 +334,7 @@ export async function createRealtime({
       realtimeSessionId,
       maxDurationSeconds: 180,
       voiceGreeting: "Hola, soy Olivia. Estoy lista para ayudarte con Flor Mía.",
+      nativeTools: body.nativeTools === true,
       usage: { ...state.usage, ...publicUsage(
         session,
         await store.get(reservation.budgetPath),

@@ -7,6 +7,7 @@ export function OliviaScreenProvider({ children }) {
   const { pathname } = useLocation();
   const [screen, setScreen] = useState(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [review, setReview] = useState(null);
   const publish = useCallback((route, owner, fields) => {
     setScreen({ route, owner, fields });
     return () => setScreen((current) => current?.owner === owner ? null : current);
@@ -21,7 +22,7 @@ export function OliviaScreenProvider({ children }) {
       ...(screen?.route === pathname ? screen.fields : {}),
     };
   }, [pathname, screen]);
-  return <ScreenContext.Provider value={{ context, publish, assistantOpen, setAssistantOpen }}>{children}</ScreenContext.Provider>;
+  return <ScreenContext.Provider value={{ context, publish, assistantOpen, setAssistantOpen, review, setReview }}>{children}</ScreenContext.Provider>;
 }
 
 export function useOliviaContext() {

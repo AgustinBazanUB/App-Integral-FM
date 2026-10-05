@@ -22,6 +22,8 @@ import {
   addArgentinaDays,
 } from "../../../../src/modules/locations/domain/time.js";
 import { prepareOperation } from "./operations.mjs";
+import { OLIVIA_CAPABILITIES, selectCapabilities } from "../../../../src/shared/oliviaCapabilities.mjs";
+import { runExtendedTool } from "./extendedTools.mjs";
 const descriptions = {
   get_current_user_context:
     "Permisos y capacidades actuales del usuario autenticado, sin credenciales.",
@@ -42,13 +44,14 @@ const descriptions = {
   prepare_stock_load:
     "Preparar ingreso positivo de stock en ubicación activa para administrador autorizado. NO ejecuta, pide tarjeta de confirmación.",
 };
-export function toolDefinitions(session) {
-  return capabilities(session).map((name) => ({
+export function toolDefinitions(session, { query, context = {}, required = [], loaded = [] } = {}) {
+  const selected = query === undefined ? null : new Set([...selectCapabilities(session, query, context, required), ...loaded]);
+  return capabilities(session).filter((name) => !selected || !OLIVIA_CAPABILITIES[name] || selected.has(name)).map((name) => ({
     type: "function",
     name,
-    description: descriptions[name],
+    description: descriptions[name] || OLIVIA_CAPABILITIES[name]?.description,
     strict: true,
-    parameters: OLIVIA_TOOL_SCHEMAS[name],
+    parameters: OLIVIA_TOOL_SCHEMAS[name] || OLIVIA_CAPABILITIES[name]?.parameters,
   }));
 }
 const publicStock = (product, item, location) => ({
@@ -95,6 +98,8 @@ export async function runTool({
   store,
   context,
   now = new Date(),
+  provider,
+  env,
 }) {
   const liveProfile = await store.get(`users/${session.uid}`);
   if (!liveProfile)
@@ -105,7 +110,8 @@ export async function runTool({
     );
   session = { ...session, profile: { ...liveProfile, id: session.uid } };
   assertCapability(session, name);
-  validateSchema(args, OLIVIA_TOOL_SCHEMAS[name]);
+  validateSchema(args, OLIVIA_TOOL_SCHEMAS[name] || OLIVIA_CAPABILITIES[name]?.parameters);
+  if (OLIVIA_CAPABILITIES[name]) return runExtendedTool({ session, name, args, store, context, now, provider, env });
   if (name === "get_current_user_context")
     return { data: userContext(session) };
   if (name === "list_locations")

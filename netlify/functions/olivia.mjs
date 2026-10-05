@@ -4,6 +4,7 @@ import { createOliviaEngine } from "./_lib/olivia/engine.mjs";
 import { createRealtime, stopRealtime } from "./_lib/olivia/voice.mjs";
 import { oliviaSession, json, errorResponse } from "./_lib/olivia/http.mjs";
 import { oliviaError } from "../../src/shared/oliviaContracts.mjs";
+import { streamFrame } from "../../src/shared/oliviaStream.mjs";
 export default async function handler(request) {
   if (request.method !== "POST")
     return json(
@@ -28,6 +29,21 @@ export default async function handler(request) {
     }
     const store = createOliviaStore(),
       engine = createOliviaEngine({ store, pricingResolver: resolveOliviaPricing });
+    if (body.operation === "chat" && body.stream === true) {
+      const abort = new AbortController();
+      const stream = new ReadableStream({
+        start(controller) {
+          const emit = (event) => { if (!abort.signal.aborted) controller.enqueue(streamFrame(event)); };
+          emit({ type: "phase", label: "Olivia está pensando la respuesta…" });
+          engine.chat(session, body, { onEvent: emit, signal: abort.signal })
+            .then((result) => emit({ type: "completed", result }))
+            .catch((error) => emit({ type: "failed", code: error.code || "assistant-error", message: error.status && error.status < 500 ? error.message : "La respuesta se interrumpió. El chat se conserva y podés recuperarlo." }))
+            .finally(() => { if (!abort.signal.aborted) controller.close(); });
+        },
+        cancel() { abort.abort(); },
+      });
+      return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+    }
     let result;
     if (body.operation === "state")
       result = await engine.state(
@@ -39,6 +55,10 @@ export default async function handler(request) {
       result = await engine.chat(session, body);
     else if (body.operation === "confirm")
       result = await engine.confirm(session, body);
+    else if (body.operation === "realtimeTool")
+      result = await engine.realtimeTool(session, body);
+    else if (body.operation === "realtimeTranscript")
+      result = await engine.realtimeTranscript(session, body);
     else if (body.operation === "cancel")
       result = await engine.cancel(session, body);
     else if (body.operation === "estimate")
