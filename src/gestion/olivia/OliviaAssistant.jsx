@@ -424,7 +424,10 @@ export default function OliviaAssistant() {
       interruptSession: (realtimeSessionId) => oliviaClient.request({ operation: "interruptVoice", realtimeSessionId, conversationId: voiceConversationId, requestId: requestId() }),
       onMetrics: (metrics) => { if (mounted.current) setVoiceMetrics((current) => ({ ...current, ...metrics })); },
       onInput: ({ message, itemId }) => { if (mounted.current) { stickToBottom.current = true; setOptimistic({ id: `voice-${itemId}`, role: "user", content: message }); } },
-      onState: (state) => { if (mounted.current) setVoiceState(state); },
+      onState: (state) => {
+        if (connection.closed && voiceRef.current === connection) voiceRef.current = null;
+        if (mounted.current) setVoiceState(state);
+      },
       onError: (failure) => { if (connection.closed && voiceRef.current === connection) voiceRef.current = null; if (mounted.current) setError(failure.name === "NotAllowedError" ? "Permití el micrófono para conversar por voz." : failure.message); },
       onCaption: (text, append) => { if (mounted.current) setCaption((current) => append ? current + text : text); },
     });
