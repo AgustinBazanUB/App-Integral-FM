@@ -1,6 +1,6 @@
 import { executeToolBatch } from "./toolExecution.mjs";
 import { aggregateVoiceCosts } from "../../../../src/shared/oliviaVoicePricing.mjs";
-import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, taskSlotSchema, requiredFields, isCorrection, operationalIntent } from "./tasks.mjs";
+import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, taskSlotSchema, requiredFields, isCorrection, operationalIntent, shortVoiceQuestion } from "./tasks.mjs";
 import { aggregateRoutes } from "./modelRouter.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { randomUUID, createHash, timingSafeEqual } from "node:crypto";
@@ -34,6 +34,7 @@ import {
 } from "./guards.mjs";
 import {
   OLIVIA_INSTRUCTIONS,
+  OLIVIA_VOICE_INSTRUCTIONS,
   modelProfile,
   openaiRequest,
   providerUsage,
@@ -407,7 +408,7 @@ export function createOliviaEngine({
       if (control || progressive) {
         const task = progressive?.task || (conversation.taskState ? { ...conversation.taskState, revision: conversation.taskState.revision + 1, status: control === "cancel" ? "cancelled" : conversation.taskState.status, updatedAt: clock() } : null);
         const prepared = progressive?.result.prepared;
-        const result = await saveTurn(session, id, requestId, { content: progressive?.content || (control === "cancel" ? "La tarea quedó cancelada." : conversation.pendingActionId ? "Revisá y confirmá con Sí en la tarjeta. La respuesta por voz o texto no ejecuta la acción." : "Dale, seguimos cuando me indiques."), prepared, taskState: task, draft: control === "cancel" ? null : task?.slots || conversation.draft, state: control === "cancel" ? "CANCELADA" : progressive?.result.state || "INFORMACION", preservePending: control === "acknowledge" }, config);
+        const result = await saveTurn(session, id, requestId, { content: (voiceSessionId && progressive ? shortVoiceQuestion(task, progressive.content) : progressive?.content) || (control === "cancel" ? "La tarea quedó cancelada." : conversation.pendingActionId ? "Revisá y confirmá con Sí en la tarjeta. La respuesta por voz o texto no ejecuta la acción." : "Dale, seguimos cuando me indiques."), prepared, taskState: task, draft: control === "cancel" ? null : task?.slots || conversation.draft, state: control === "cancel" ? "CANCELADA" : progressive?.result.state || "INFORMACION", preservePending: control === "acknowledge" }, config);
         event = { ...event, conversationId: id, taskId: task?.id || null, route: "deterministic", routingReason: control || "progressive-stock", measurement: "provider", modelCalls: [], tools: deterministicTools, durationMs: Date.now() - startedAt, module: context.module };
         await settleUsage({ store, session, reservation, event, configuration: config, result: { conversationId: id }, now: clock() });
         settled = true;
@@ -506,7 +507,7 @@ export function createOliviaEngine({
           model: profile.model,
           reasoning: { effort: profile.reasoningEffort },
           store: false,
-          instructions: OLIVIA_INSTRUCTIONS + "\nAntes de pedir aclaraciones, usá update_task para conservar parámetros parciales. Consultá historia, pantalla y herramientas para resolver entidades por nombre; nunca pidas IDs al usuario. Reutilizá taskState.slots y aplicá correcciones sobre la misma tarea. Al cambiar de intención empezá una nueva tarea. Para análisis simple inferí un período razonable con businessTime y declaralo. Para transferencias consultá depósitos y stock; si solo un origen autorizado alcanza, proponelo; si varios alcanzan, preguntá cuál. Nunca inventes cantidades recibidas físicamente. Una tarea creativa solo existe en marketing/social autorizados." + (activeSkills.length ? "\nProcesos versionados permitidos (no conceden permisos):\n" + activeSkills.map((skill) => skill.content).join("\n\n") : ""),
+          instructions: OLIVIA_INSTRUCTIONS + (voiceSessionId ? "\n" + OLIVIA_VOICE_INSTRUCTIONS : "") + "\nAntes de pedir aclaraciones, usá update_task para conservar parámetros parciales. Consultá historia, pantalla y herramientas para resolver entidades por nombre; nunca pidas IDs al usuario. Reutilizá taskState.slots y aplicá correcciones sobre la misma tarea. Al cambiar de intención empezá una nueva tarea. Para análisis simple inferí un período razonable con businessTime y declaralo. Para transferencias consultá depósitos y stock; si solo un origen autorizado alcanza, proponelo; si varios alcanzan, preguntá cuál. Nunca inventes cantidades recibidas físicamente. Una tarea creativa solo existe en marketing/social autorizados." + (activeSkills.length ? "\nProcesos versionados permitidos (no conceden permisos):\n" + activeSkills.map((skill) => skill.content).join("\n\n") : ""),
           input,
           tools: finalResponse ? [] : [...toolDefinitions(session, { query: userMessage, context, required: activeSkills.flatMap((skill) => skill.requiredTools), loaded: [...loadedTools] }), taskUpdateTool(capabilities(session))],
           ...(finalResponse ? { tool_choice: "none" } : {}),
@@ -689,6 +690,7 @@ export function createOliviaEngine({
       }
       if (taskState.status === "working") taskState = { ...taskState, status: ["ERROR", "RECHAZADA"].includes(nextState) ? "failed" : "completed", updatedAt: clock() };
       if (!prepared && taskState.status === "collecting" && taskState.missingFields.length && nextState === "INFORMACION") nextState = "DATOS_INCOMPLETOS";
+      if (voiceSessionId && !prepared && nextState === "DATOS_INCOMPLETOS") content = shortVoiceQuestion(taskState, content);
       Object.assign(event, { conversationId: id, taskId: taskState.id, route: profile.route, reasoningEffort: profile.reasoningEffort, routingReason: profile.routingReason, module: context.module, skills: activeSkills.map(({ name, version }) => ({ name, version })), tools: [...seen.keys()].map((key) => JSON.parse(key)[0]), durationMs: Date.now() - startedAt });
       event.modelCalls.forEach((call) => { call.taskId = taskState.id; });
       const result = await saveTurn(

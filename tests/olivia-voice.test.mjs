@@ -281,6 +281,7 @@ test("Mini trial is administrator-only and fixes both audio models without chang
   const result = await createRealtime(f), config = JSON.parse(f.calls[0].init.body.get("session"));
   assert.equal(config.model, "gpt-realtime-2.1-mini");
   assert.equal(config.audio.input.transcription.model, "gpt-4o-mini-transcribe");
+  assert.equal(config.audio.output.voice, "marin");
   assert.equal(config.audio.input.turn_detection.create_response, false);
   assert.deepEqual(config.tools.map(({ name }) => name), ["olivia_request"]);
   assert.equal(result.voiceProtocol, "realtime");

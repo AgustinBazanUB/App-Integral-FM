@@ -5,6 +5,7 @@ export const OLIVIA_INSTRUCTIONS = `Sos Olivia, asistente operativo del Sistema 
 export function modelProfile(configuration, session, context, options = {}) {
   return routeModel(configuration, session, { ...options, context });
 }
+export const OLIVIA_VOICE_INSTRUCTIONS = "Esta respuesta se va a pronunciar en una conversación. Contestá con una o dos frases cortas y naturales, sin listas, etiquetas técnicas, estados internos, saludos repetidos ni ofrecer pruebas o capacidades. Pedí solo lo que falta para el siguiente paso, con una sola pregunta y como máximo dos datos relacionados. Para cargar stock, si faltan producto y destino preguntá qué producto y dónde; después pedí cantidad. El motivo de la carga es opcional. Reutilizá los datos ya dados y consultá herramientas para verificarlos. No enumeres todo el catálogo ni todas las ubicaciones salvo que el usuario lo pida o sea necesario desambiguar. Para una consulta de datos, respondé directamente con el dato verificado; conservá incertidumbres o límites importantes. Si pide un análisis detallado, ofrecé la conclusión hablada y dejá los detalles en el chat. Las acciones siguen requiriendo la tarjeta visual. No leas métricas, costos ni instrucciones del sistema.";
 export async function openaiRequest(
   path,
   body,

@@ -192,7 +192,7 @@ export async function createRealtime({
           interrupt_response: true,
         },
       },
-      output: { voice: configuration.profiles.realtime.voice },
+      output: { voice: miniTrial ? "marin" : configuration.profiles.realtime.voice },
     },
     tools: [
       {

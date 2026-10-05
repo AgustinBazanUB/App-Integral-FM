@@ -15,7 +15,22 @@ import {
 import {
   OliviaRealtime,
   speechResult,
+  localVoiceAcknowledgement,
 } from "../src/gestion/olivia/realtime.mjs";
+
+test("waiting captions never use browser speech synthesis or introduce a second voice", () => {
+  const previousSpeech = globalThis.speechSynthesis, previousUtterance = globalThis.SpeechSynthesisUtterance;
+  let spoken = 0;
+  try {
+    globalThis.speechSynthesis = { speak: () => spoken++ };
+    globalThis.SpeechSynthesisUtterance = class {};
+    assert.match(localVoiceAcknowledgement(0), /segundo/);
+    assert.equal(spoken, 0);
+  } finally {
+    if (previousSpeech === undefined) delete globalThis.speechSynthesis; else globalThis.speechSynthesis = previousSpeech;
+    if (previousUtterance === undefined) delete globalThis.SpeechSynthesisUtterance; else globalThis.SpeechSynthesisUtterance = previousUtterance;
+  }
+});
 
 const response = (data, status = 200) => ({
   ok: status < 400,

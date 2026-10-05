@@ -46,6 +46,15 @@ export function missingQuestion(fields = []) {
   const names = [...new Set(fields.map((field) => /receivedQuantity/.test(field) ? "cuántas unidades llegaron físicamente" : /preparedQuantity/.test(field) ? "cuántas unidades preparaste" : labels[field] || more[field] || "un dato del registro; indicame qué querés completar") )];
   return names.length ? `Me falta ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} y ${names.at(-1)}`}.` : "Revisá la propuesta antes de confirmar.";
 }
+export function shortVoiceQuestion(task, fallback) {
+  if (task?.intent !== "prepare_stock_load" || task.status !== "collecting" || Object.values(task.ambiguities || {}).some((options) => options?.length) || /no (?:pude|encontr)/i.test(fallback || "")) return fallback;
+  const missing = task.missingFields || [];
+  if (missing.includes("productId") && missing.includes("locationId")) return "Ok. ¿Qué producto y en dónde querés cargarlo?";
+  if (missing.includes("productId")) return "¿Qué producto querés cargar?";
+  if (missing.includes("locationId")) return "¿En qué ubicación querés cargarlo?";
+  if (missing.includes("quantity")) return "¿Cuántas unidades querés cargar?";
+  return fallback;
+}
 export function taskFromTool(previous, intent, args, result, now = new Date()) {
   if (!intent.startsWith("prepare_")) return previous;
   const same = previous?.intent === intent && !["cancelled", "completed"].includes(previous.status);
@@ -81,11 +90,11 @@ export async function progressiveStock({ previous, initialId, message, context, 
   } else if (quantityCorrection) task.slots.quantity = Number(quantityCorrection[1]);
   else if (/^(?:mejor |no |destino )/.test(text) && task.slots.locationId) locationQuery = text.replace(/^(?:mejor |no |destino )/, "").replace(/^(?:en |a )/, "");
   else if (task.ambiguities.productId?.length) productQuery = text;
-  else if (!task.slots.productId) productQuery = text;
+  else if (!task.slots.productId) { const parts = text.split(/ en /); productQuery = parts[0]; if (parts[1] && !task.slots.locationId) locationQuery = parts[1]; }
   else if (!task.slots.locationId) locationQuery = text.replace(/^(en |a )/, "");
   else if (!task.slots.reason) task.slots.reason = message.trim().slice(0, 400);
   else return null; // A new query or complex correction belongs to Luna.
-  validateSchema(task.slots.quantity, OLIVIA_TOOL_SCHEMAS.prepare_stock_load.properties.quantity, "cantidad");
+  if (task.slots.quantity != null) validateSchema(task.slots.quantity, OLIVIA_TOOL_SCHEMAS.prepare_stock_load.properties.quantity, "cantidad");
   if (productQuery) {
     let products = task.ambiguities.productId || [];
     if (!products.length || start) {

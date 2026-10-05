@@ -1,12 +1,8 @@
 // WebRTC with explicit tools verified by the backend. Spoken confirmations never write.
 export const VOICE_ACKNOWLEDGEMENTS = ["Sí, dame un segundo que lo reviso.", "Ya lo estoy viendo.", "Perfecto, reviso eso."];
 export function localVoiceAcknowledgement(index = 0) {
-  const text = VOICE_ACKNOWLEDGEMENTS[index % VOICE_ACKNOWLEDGEMENTS.length];
-  if (globalThis.speechSynthesis && globalThis.SpeechSynthesisUtterance) {
-    const utterance = new SpeechSynthesisUtterance(text); utterance.lang = "es-AR"; utterance.rate = 1.08;
-    speechSynthesis.speak(utterance);
-  }
-  return text;
+  // Waiting is a visual caption. Browser TTS would introduce a second voice.
+  return VOICE_ACKNOWLEDGEMENTS[index % VOICE_ACKNOWLEDGEMENTS.length];
 }
 export class OliviaRealtime {
   constructor({ createSession, stopSession = async () => {}, onRequest, onTool, onTranscript, onInterrupt = () => {}, onInput = () => {}, onState = () => {}, onError = () => {}, onCaption = () => {}, onMetrics = () => {}, acknowledge = localVoiceAcknowledgement,
@@ -225,7 +221,7 @@ export class OliviaRealtime {
     if (this.responseActive) { this.pendingSpeech = result; this.interrupt(true); return; }
     this.readingVerified = true;
     const verified = speechResult(result);
-    const spokenText = verified.messages.at(-1)?.content || verified.pendingAction?.summary || "Podés continuar en el chat.";
+    const spokenText = verified.pendingAction ? "La propuesta está lista." : verified.messages.at(-1)?.content || "Podés continuar en el chat.";
     // The voice model reads only a server-verified response. Confirmation credentials,
     // costs and operational tool arguments are never added to its context.
     this.send({ type: "response.create", response: {

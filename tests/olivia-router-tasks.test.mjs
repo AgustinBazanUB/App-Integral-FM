@@ -68,6 +68,23 @@ function stockFixture(extra = {}) {
   return f;
 }
 async function turn(f, id, message, requestId, extra = {}) { f.advance(2000); return f.engine.chat(f.session, { conversationId: id, message, requestId, screenContext: { module: "locations" }, ...extra }); }
+test("voz: Luna inicia la carga con dos datos, luego conserva producto/destino y pide solo cantidad", async () => {
+  const f = stockFixture({ provider: async (path, body, options, calls) => calls === 1 ? functionResponse("update_task", { intent: "prepare_stock_load", slotsJson: JSON.stringify({ productId: null, locationId: null, quantity: null }) }) : textResponse("Para completar esta tarea necesitamos revisar todos los datos necesarios para el proceso.") });
+  const { conversationId: id } = await start(f);
+  f.documents.set("oliviaRealtime/voice_a", { userId: f.session.uid, sessionBinding: String(f.session.authTime), conversationId: id, status: "active", expiresAt: new Date(f.clock().getTime() + 180000) });
+  const voice = { inputMode: "realtime", realtimeSessionId: "voice_a" };
+  const first = await turn(f, id, "Quiero cargar un producto", "a", voice);
+  assert.equal(first.messages.at(-1).content, "Ok. ¿Qué producto y en dónde querés cargarlo?");
+  assert.equal(f.providerRequests[0].model, "gpt-6-luna");
+  const second = await turn(f, id, "Original en Tribunales", "b", voice);
+  assert.equal(second.messages.at(-1).content, "¿Cuántas unidades querés cargar?");
+  const calls = f.providerCalls();
+  const third = await turn(f, id, "3", "c", voice);
+  assert.ok(third.pendingAction); assert.match(third.pendingAction.summary, /Stock: 4 → 7/);
+  assert.equal(f.providerCalls(), calls);
+  assert.equal(f.documents.get("locationStock/local_a/items/oil").currentStock, 4);
+  await turn(f, id, "Cancelá", "d", voice);
+});
 test("carga progresiva real: producto → destino → tarjeta, con motivo opcional y sin llamadas de modelo", async () => {
   const f = stockFixture(), { conversationId: id } = await start(f);
   const first = await turn(f, id, "Cargame 12 botellas de Original", "a");
