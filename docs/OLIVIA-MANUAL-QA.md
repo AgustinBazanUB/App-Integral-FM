@@ -27,6 +27,8 @@ Fecha: 5 de octubre de 2026. Chrome con la sesión del usuario, preview privada 
 | GPT-Live después de corregir selectores | Conexión WebRTC activa y transcripción de salida del saludo; retoma las fechas y la pregunta del mismo chat |
 | Audio físico de salida | El usuario confirmó «ahora sí la escuché» después de reconectar y reproducir el saludo |
 | Sesión de voz finalizada | La interfaz volvió al composer y mostró el costo de audio; el texto siguió disponible |
+| Operación ajena a Marketing desde Marketing | Consulta de stock real usa `gpt-6-luna` HIGH, ruta `luna-normal`, con tres llamadas y tres herramientas; no usa Sol |
+| Stock después de las propuestas canceladas | La consulta viva conserva el stock original: las propuestas, correcciones y sí escrito no lo modificaron |
 
 ## Problemas encontrados y correcciones
 
@@ -42,5 +44,7 @@ Regresión: 740 pruebas Node aprobadas. Se añadieron seis casos para productos/
 ## Límites de la prueba
 
 No se confirmó ninguna operación comercial, publicó contenido ni cambió configuración empresarial. Las pruebas automáticas de proveedor/media usan fixtures; su aprobación no acredita hardware ni disponibilidad real de cada modelo. Los resultados de consultas reales y audio se registran por separado a continuación.
+
+El altavoz fue confirmado por el usuario. La captura/transcripción del micrófono requiere su frase de prueba y no se sustituye por audio simulado. La ejecución empresarial de forecast/transferencias, un perfil Vendedor autenticado y los adjuntos privados permanecen fuera de los casos reales aprobados de este recorrido.
 
 La salida de `netlify env:list` oculta secretos; intentar interpretar ese texto como una clave privada no valida la clave real. La corrección la realizó el usuario en Netlify y el arranque autenticado posterior confirmó que funciona, sin extraer ni guardar la clave.
