@@ -31,7 +31,7 @@ jobs:
             exit 2
           fi
           SITE="${NETLIFY_SITE_ID:-appintegralflormia}"
-          npx --yes netlify-cli@23.8.4 deploy \
+          npx --yes netlify-cli deploy \
             --dir=dist \
             --site="$SITE" \
             --auth="$NETLIFY_AUTH_TOKEN" \
