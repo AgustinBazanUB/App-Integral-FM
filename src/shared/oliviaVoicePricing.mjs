@@ -50,7 +50,7 @@ export function aggregateVoiceCosts(live, voiceUsage, backendUsage, { truncated 
   if (backend.pending) { backend.usd = null; backend.ars = null; }
   const parts = [voice, transcription, backend];
   const complete = settled && parts.every((part) => priced(part.ars));
-  return { voiceMode: live.voiceMode || live.protocol || "realtime", voiceModel: live.model, measurement: voiceUsage?.measurement || "pending", closeReason: voiceUsage?.closeReason || null, settled, backendPending, truncated, voice, transcription, backend,
+  return { voiceMode: live.voiceMode || live.protocol || "realtime", voiceModel: live.model, measurement: voiceUsage?.measurement || "pending", closeReason: voiceUsage?.closeReason || null, meteringGaps: voiceUsage?.meteringGaps || null, settled, backendPending, truncated, voice, transcription, backend,
     complete, totalArs: complete ? parts.reduce((sum, part) => sum + part.ars, 0) : null,
     totalUsd: settled && parts.every((part) => priced(part.usd)) ? parts.reduce((sum, part) => sum + part.usd, 0) : null,
     knownArs: backend.knownArs + (voice.ars ?? 0) + (transcription.ars ?? 0) };

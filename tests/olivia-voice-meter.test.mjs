@@ -250,6 +250,17 @@ test("Mini greeting-only session is priced without inventing transcription usage
   assert.equal(usage.measurement, "provider"); assert.equal(usage.transcriptionCostUsd, 0); assert.ok(usage.voiceCostUsd > 0);
 });
 
+for (const requestedClose of [true, false]) test(`unclean socket close is trusted only with server stop and complete usage: requested=${requestedClose}`, async () => {
+  const f = fixture();
+  Object.assign(f.documents.get("oliviaRealtime/live_a"), { voiceMode: "realtime-mini", model: "gpt-realtime-2.1-mini", transcriptionModel: "gpt-4o-mini-transcribe", ...(requestedClose ? { closeRequestedAt: start } : {}) });
+  const monitoring = f.start(), socket = await open(f);
+  socket.provider(response("complete", 100, 20, { usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120, input_token_details: { text_tokens: 100, audio_tokens: 0, cached_tokens: 0 }, output_token_details: { text_tokens: 0, audio_tokens: 20 } } }));
+  socket.emit("close", 1006); await monitoring;
+  const usage = f.documents.get("oliviaUsage/user_a_voice_a");
+  assert.equal(usage.measurement, requestedClose ? "provider" : "reserved-estimate");
+  assert.equal(usage.actualCostUsd !== null, requestedClose);
+});
+
 test("server sideband authenticates privately and records exact provider usage only once", async () => {
   const f = fixture(),
     monitoring = f.start(),

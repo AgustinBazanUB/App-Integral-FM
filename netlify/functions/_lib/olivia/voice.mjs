@@ -406,6 +406,8 @@ export async function stopRealtime({
       403,
     );
   if (live.status === "active") {
+    // Record the trusted close intent before hangup can drop the sideband socket.
+    await store.commit([{ type: "update", path: `oliviaRealtime/${id}`, data: { closeRequestedAt: now } }]);
     await hangupCall(live.callId, { env, fetchImpl });
     await store.commit([
       {

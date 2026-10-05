@@ -40,7 +40,7 @@
 .fm-olivia-composer-actions > .fm-button:last-child { margin-left: auto; }
 .fm-olivia-composer small { display: block; margin-top: 8px; font-size: 10px; color: var(--fm-text-secondary); }
 .fm-olivia-voice-mode { margin-top: 8px; max-width: 100%; font: inherit; font-size: 12px; }
-.fm-olivia-composer-bar .fm-icon-button[aria-pressed="true"] { background: var(--fm-olive-pale); color: var(--fm-olive-primary); }
+.fm-olivia-composer-bar .fm-icon-button[aria-pressed="true"] { background: var(--fm-olive-pale); color: var(--fm-olive-dark); }
 .fm-olivia-usage { padding: 9px 16px; background: var(--fm-bg-subtle); font-size: 12px; border-top: 1px solid var(--fm-border); }
 .fm-olivia-usage small { display: block; font-size: 10px; margin-top: 4px; }
 .fm-olivia-usage.is-low { background: var(--fm-warning-bg); }

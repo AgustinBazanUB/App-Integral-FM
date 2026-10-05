@@ -181,6 +181,13 @@ export async function monitorRealtime({
         try {
           await hangup(live.callId, { env });
           remotelyClosed = true;
+          // Hangup can drop WebSocket without a close frame (1006). This is an
+          // expected end only after a server-authenticated stop request and a
+          // confirmed remote hangup; all usage-completeness checks still apply.
+          if (reason === "provider-closed" && failed && connected) {
+            const current = await store.get(path);
+            if (current?.closeRequestedAt && Number.isFinite(dateMs(current.closeRequestedAt))) failed = false;
+          }
         } catch {
           failed = true;
           reason = "realtime-close-error";
@@ -205,6 +212,7 @@ export async function monitorRealtime({
         resolve({
           ...measured,
           realtimeUsage: pricingComplete ? measured.realtimeUsage : null,
+          meteringGaps: { disconnected: failed, invalidUsage: uncertain, durationOnlyTranscription: durationUsage, pendingResponses: inFlightResponses.size, pendingTranscriptions: inFlightTranscriptions.size, missingModalityDetails: !pricingComplete },
           reason,
           failed,
           remotelyClosed,
@@ -452,6 +460,7 @@ export async function monitorRealtime({
   const event = {
     ...(live.voiceMode === "realtime-mini" ? { billingUnit: "realtime-tokens", voiceMode: live.voiceMode } : {}),
     realtimeUsage: result.realtimeUsage || null,
+    meteringGaps: result.meteringGaps || null,
     model: live.model || config.profiles.realtime.model,
     transcriptionModel:
       live.transcriptionModel ||

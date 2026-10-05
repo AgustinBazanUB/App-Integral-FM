@@ -219,6 +219,7 @@ export class OliviaRealtime {
     if (!result || this.closed) return;
     globalThis.speechSynthesis?.cancel();
     if (this.responseActive) { this.pendingSpeech = result; this.interrupt(true); return; }
+    this.onCaption("");
     this.readingVerified = true;
     const verified = speechResult(result);
     const spokenText = verified.pendingAction ? "La propuesta está lista." : verified.messages.at(-1)?.content || "Podés continuar en el chat.";
