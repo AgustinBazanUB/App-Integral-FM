@@ -2,7 +2,7 @@
 
 ## Alcance autorizado
 
-La preview ofrece al administrador «Probar voz económica», en paralelo con la voz GPT-Live predeterminada. La prueba fija `gpt-realtime-2.1-mini` para audio y `gpt-4o-mini-transcribe` para transcripción. Cada entrada transcrita pasa al mismo engine de texto: Luna HIGH para consultas habituales, Luna XHIGH para complejidad y la política Sol creativa existente. Mini recibe solo la respuesta verificada para leer, sin herramientas empresariales nativas. Una confirmación oral sigue sin ejecutar operaciones.
+La preview ofrece al administrador el selector «Voz económica · prueba», en paralelo con la voz GPT-Live predeterminada. La prueba fija `gpt-realtime-2.1-mini` para audio y `gpt-4o-mini-transcribe` para transcripción. Cada entrada transcrita pasa al mismo engine de texto: Luna HIGH para consultas habituales, Luna XHIGH para complejidad y la política Sol creativa existente. Mini recibe solo la respuesta verificada para leer, sin herramientas empresariales nativas. Una confirmación oral sigue sin ejecutar operaciones.
 
 La conversación admite interrupciones; se aborta la consulta de chat y se descartan respuestas/transcripciones anteriores. No se abortan confirmaciones empresariales por una interrupción de voz. Los avisos de procesamiento son solo subtítulos: se eliminó la síntesis local del navegador que alternaba la voz. Mini usa siempre marin; la respuesta verificada de Luna se pronuncia sin etiquetas técnicas. Las preguntas de carga piden producto/destino y luego cantidad; el motivo sigue siendo opcional.
 
@@ -21,3 +21,5 @@ Tarifas estándar consultadas el 5 de octubre de 2026: Mini audio entrada/caché
 759 pruebas Node aprobadas, incluyendo 17 casos nuevos sobre precios, caché, transcripción, acumulación, importes faltantes, aislamiento entre usuarios/sesiones, arranque administrativo e interrupciones. Build unificado aprobado. La medición de fluidez y entrada de micrófono humano debe verificarse en la preview; los medios de las pruebas automatizadas están controlados.
 
 Primera QA real: Mini inició WebRTC y el usuario escuchó audio. Capturó la conversación simultánea con Codex; Luna HIGH resolvió dos consultas y el subtotal backend fue $7,2 ARS. La sesión terminó con medición de voz incompleta y su total se conserva desconocido. Se detectó lectura de etiquetas técnicas; la salida ahora envía solo texto verificado para pronunciar, sin estados/objetos. La siguiente prueba debe evitar audio de otras conversaciones y cerrar después de terminar la respuesta.
+
+Controles: el composer conserva los dos iconos. Durante una conversación, el icono de micrófono silencia/activa la captura; el icono de conversación inicia/finaliza la sesión. Se retiró la fila adicional de botones y el botón Interrumpir: hablar interrumpe automáticamente. Los subtítulos y el estado siguen visibles. El selector de voz actual/económica aparece solo antes de iniciar.
