@@ -377,6 +377,18 @@ test("voice startup reads the server greeting once as audio without creating a c
   assert.equal(fixture.channel.onopen, null);
 });
 
+test("Mini speech receives natural answer text without internal state labels or irrelevant confirmation instructions", async () => {
+  const f = voiceFixture(); await f.connection.connect();
+  f.connection.speakResult({ state: "DATOS_INCOMPLETOS", messages: [{ role: "assistant", content: "¿Qué producto querés consultar?" }] });
+  const instructions = f.events.at(-1).response.instructions;
+  assert.match(instructions, /¿Qué producto querés consultar/);
+  assert.equal(instructions.includes("DATOS_INCOMPLETOS"), false);
+  assert.equal(instructions.includes('"state"'), false);
+  assert.equal(instructions.includes('"messages"'), false);
+  assert.equal(instructions.includes("tocá Sí"), false);
+  f.connection.close();
+});
+
 test("streamless remote audio is played and a playback rejection closes capture and the provider", async () => {
   const fallback = { remote: true };
   const fixture = voiceFixture({ createStream: (tracks) => { assert.equal(tracks[0], "remote-track"); return fallback; } });

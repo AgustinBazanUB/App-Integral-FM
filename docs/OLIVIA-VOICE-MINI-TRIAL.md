@@ -18,4 +18,6 @@ Tarifas estándar consultadas el 5 de octubre de 2026: Mini audio entrada/caché
 
 ## Verificación
 
-756 pruebas Node aprobadas, incluyendo 14 casos nuevos sobre precios, caché, transcripción, acumulación, importes faltantes, aislamiento entre usuarios/sesiones, arranque administrativo e interrupciones. Build unificado aprobado. La medición de fluidez y entrada de micrófono humano debe verificarse en la preview; los medios de las pruebas automatizadas están controlados.
+757 pruebas Node aprobadas, incluyendo 15 casos nuevos sobre precios, caché, transcripción, acumulación, importes faltantes, aislamiento entre usuarios/sesiones, arranque administrativo e interrupciones. Build unificado aprobado. La medición de fluidez y entrada de micrófono humano debe verificarse en la preview; los medios de las pruebas automatizadas están controlados.
+
+Primera QA real: Mini inició WebRTC y el usuario escuchó audio. Capturó la conversación simultánea con Codex; Luna HIGH resolvió dos consultas y el subtotal backend fue $7,2 ARS. La sesión terminó con medición de voz incompleta y su total se conserva desconocido. Se detectó lectura de etiquetas técnicas; la salida ahora envía solo texto verificado para pronunciar, sin estados/objetos. La siguiente prueba debe evitar audio de otras conversaciones y cerrar después de terminar la respuesta.
