@@ -12,7 +12,14 @@ test("creación GPT-Live: delegación cliente, credencial privada y canal sin au
   const f = fixture({ role: "admin" }), { conversationId } = await start(f);
   let providerBody;
   const result = await createLive({ session: f.session, body: { conversationId, requestId: "live_a", sdp: "v=0\nfull-offer", screenContext: { module: "locations" } }, engine: f.engine, store: f.store, env: { OPENAI_API_KEY: "private-test-key" }, now: f.clock(), applicationOrigin: "https://preview.example", fetchImpl: async (url, options) => {
-    if (url.includes("api.openai.com")) { providerBody = JSON.parse(options.body); return Response.json({ session: { id: "live_test" }, transport: { sdp: "v=0\nanswer" } }); }
+    if (url.includes("api.openai.com")) {
+      providerBody = JSON.parse(options.body);
+      // The API accepts ServerEventSelector objects, not bare event-name strings.
+      const selectors = providerBody.session.client.data_channel.allowed_server_events;
+      assert.ok(selectors.every((selector) => typeof selector.type === "string" && Object.keys(selector).length === 1));
+      assert.ok(selectors.some((selector) => selector.type === "session.started"));
+      return Response.json({ session: { id: "live_test" }, transport: { sdp: "v=0\nanswer" } });
+    }
     const { realtimeSessionId } = JSON.parse(options.body);
     await f.store.commit([{ type: "update", path: `oliviaRealtime/${realtimeSessionId}`, data: { meteringConnectedAt: f.clock() } }]);
     return new Response(null, { status: 202 });
