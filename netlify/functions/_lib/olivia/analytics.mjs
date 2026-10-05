@@ -1,6 +1,34 @@
-import { aggregateSales } from "../../../../src/shared/oliviaAnalytics.mjs";
 import { argentinaDateFromKey, argentinaDateKey } from "../../../../src/modules/locations/domain/time.js";
 import { oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
+import { calculateMetrics, buildMetricsCustomRange } from "../../../../src/modules/locations/domain/metrics.js";
+import { saleDate } from "../../../../src/modules/locations/domain/saleFacts.js";
+
+// The assistant and Metrics panel share the same commercial calculations.
+// Keep the compact tool contract, including cancelled sales outside revenue.
+export function panelMetricsSummary(rows, period, args = {}) {
+  const panel = calculateMetrics(rows, buildMetricsCustomRange(period.startKey, period.endKey), args.productId ? { productId: args.productId } : {});
+  const groups = (items) => items.map((item) => ({ id: item.key, name: item.name, amount: item.total }));
+  const daily = new Map();
+  for (const sale of panel.active) {
+    const date = saleDate(sale);
+    if (date) {
+      const day = argentinaDateKey(date);
+      daily.set(day, (daily.get(day) || 0) + Number(sale.total || 0));
+    }
+  }
+  return {
+    source: "Panel de Métricas generales · cálculos compartidos",
+    count: panel.salesCount, total: panel.total, averageTicket: panel.salesCount ? panel.ticket : null, units: panel.totalItems,
+    products: panel.byProduct.map((item) => ({ productId: item.key, name: item.name, units: item.items, revenue: item.total, mix: panel.totalItems ? item.items / panel.totalItems : 0 })),
+    locations: groups(panel.byLocation), sellers: groups(panel.bySeller), payments: groups(panel.byPayment),
+    channels: groups(panel.byChannel), stockOrigins: groups(panel.byStockOrigin),
+    promotions: panel.byDiscount.map((item) => ({ id: item.key, name: item.name, amount: item.salesTotal, discount: item.total })),
+    daily: [...daily].map(([id, amount]) => ({ id, amount })),
+    discounts: { total: panel.discountTotal, sales: panel.discountedSales },
+    cancelled: { count: panel.cancelled.length, total: panel.cancelledTotal },
+    attribution: "La facturación asociada a promociones no mide causalidad ni ganancia incremental.",
+  };
+}
 export function analyticsPeriod(args = {}, now = new Date()) {
   const startKey = args.startDate || argentinaDateKey(new Date(now.getTime() - 30 * 86400000));
   const endKey = args.endDate || argentinaDateKey(now);
@@ -28,7 +56,7 @@ export async function salesMetrics({ store, args, now }) {
   const period = analyticsPeriod(args, now), duration = period.end - period.start;
   const previousArgs = { ...args, startDate: argentinaDateKey(new Date(period.start - duration)), endDate: argentinaDateKey(new Date(period.start - 1)) };
   const [current, previous] = await Promise.all([readSales({ store, args, now }), readSales({ store, args: previousArgs, now })]);
-  const metrics = aggregateSales(current.sales), previousMetrics = aggregateSales(previous.sales);
+  const metrics = panelMetricsSummary(current.sales, period, args), previousMetrics = panelMetricsSummary(previous.sales, analyticsPeriod(previousArgs, now), args);
   const compare = (rows, old) => [...new Set([...rows, ...old].map((row) => row.id))].map((id) => { const row = rows.find((item) => item.id === id) || { id, amount: 0 }; const previous = old.find((item) => item.id === id)?.amount || 0; return { ...row, previous, changePercent: previous ? (row.amount - previous) / previous * 100 : null }; });
   return { ...metrics, period: current.period, previous: { ...previousMetrics, period: previous.period }, changePercent: previousMetrics.total ? (metrics.total - previousMetrics.total) / previousMetrics.total * 100 : null,
     locations: compare(metrics.locations, previousMetrics.locations), sellers: compare(metrics.sellers, previousMetrics.sellers),

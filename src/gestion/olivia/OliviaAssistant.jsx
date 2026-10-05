@@ -16,6 +16,7 @@ import OliviaDeveloperPanel from "./OliviaDeveloperPanel";
 import { OliviaLive } from "./live.mjs";
 import OliviaVoiceControls from "./OliviaVoiceControls";
 import OliviaUsage from "./OliviaUsage";
+import OliviaMessageContent from "./OliviaMessageContent";
 import { formatOliviaCost } from "../../shared/oliviaVoicePricing.mjs";
 import "./olivia.css";
 
@@ -499,7 +500,7 @@ export default function OliviaAssistant() {
       <div ref={messagesRef} onScroll={(event) => { const area = event.currentTarget; stickToBottom.current = area.scrollHeight - area.clientHeight - area.scrollTop < 70; }} className="fm-olivia-messages" role="log" aria-live="polite" aria-label="Conversación con Olivia">
         {snapshot.messages.length && messagesCursor !== null ? <Button variant="secondary" disabled={historyBusy || busy || recording || voiceActive} onClick={() => loadHistory("messages")}>Ver mensajes anteriores</Button> : null}
         {!snapshot.messages.length && !busy ? <div className="fm-olivia-welcome"><h3>Hola, soy Olivia.</h3><p>Te ayudo a consultar Flor Mía y preparar operaciones de tu panel. Los cambios siempre se confirman con Sí o No.</p><p>Podés escribir, dictar un mensaje o conversar por voz.</p></div> : null}
-        {visibleMessages.filter((message) => !message.hiddenFromChat && ["user", "assistant"].includes(message.role)).map((message, index) => <article key={message.id || `${index}:${message.role}`} className={`fm-olivia-message fm-olivia-message--${message.role}`}><strong>{message.role === "user" ? "Vos" : "Olivia"}</strong><p>{String(message.content || "")}</p>{message.attachments?.length ? <ul className="fm-olivia-attachments" aria-label="Archivos de este mensaje">{message.attachments.map((file, fileIndex) => <li key={file.id || fileIndex}>{file.name} · {file.type}</li>)}</ul> : null}</article>)}
+        {visibleMessages.filter((message) => !message.hiddenFromChat && ["user", "assistant"].includes(message.role)).map((message, index) => <article key={message.id || `${index}:${message.role}`} className={`fm-olivia-message fm-olivia-message--${message.role}`}><strong>{message.role === "user" ? "Vos" : "Olivia"}</strong>{message.role === "assistant" ? <OliviaMessageContent content={message.content} /> : <p>{String(message.content || "")}</p>}{message.attachments?.length ? <ul className="fm-olivia-attachments" aria-label="Archivos de este mensaje">{message.attachments.map((file, fileIndex) => <li key={file.id || fileIndex}>{file.name} · {file.type}</li>)}</ul> : null}</article>)}
         {streamText ? <article className="fm-olivia-message fm-olivia-message--assistant"><strong>Olivia</strong><p>{streamText}</p>{!busy ? <small>Respuesta incompleta</small> : null}</article> : null}
         {busy ? <p className="fm-olivia-working" role="status">{phase || "Olivia está pensando la respuesta…"}</p> : null}
       </div>
