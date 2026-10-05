@@ -32,6 +32,14 @@ test("la ubicación selecciona productos ya existentes del catálogo maestro", (
   assert.doesNotMatch(detailPage, /Agregar nuevo producto/);
 });
 
+test("el selector permite sumar stock a productos ya vinculados sin duplicarlos", () => {
+  assert.match(detailPage, /assignmentById/);
+  assert.match(detailPage, /selectedAssignment/);
+  assert.match(detailPage, /En ubicación · stock/);
+  assert.match(detailPage, /selectedAssignment \? "Agregar stock" : "Agregar producto"/);
+  assert.doesNotMatch(detailPage, /disabled=\{assigned\}/);
+});
+
 test("el stock de una ubicación permite búsqueda y filtro por categoría", () => {
   assert.match(detailPage, /Buscar en esta ubicación/);
   assert.match(detailPage, /Filtrar stock por categoría/);
