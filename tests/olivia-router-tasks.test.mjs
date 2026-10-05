@@ -202,6 +202,7 @@ test("slots que no se corrigen agotan el presupuesto y no simulan una tarea vál
   assert.equal(result.state, "ERROR");
   assert.match(result.messages.at(-1).content, /No pude completar/);
   assert.deepEqual(f.documents.get(`oliviaConversations/${id}`).taskState.slots, {});
+  assert.equal(f.documents.get(`oliviaConversations/${id}`).taskState.status, "failed");
   assert.ok(f.providerCalls() <= config.responseLimits.maxRounds);
 });
 test("rechazo de tarea creativa no se convierte en reintento de validación", async () => {
