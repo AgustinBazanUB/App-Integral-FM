@@ -46,6 +46,8 @@ test("inventory continuation retains the selected type and exposes its permitted
   const second = await turn("Central", "inventory_choice");
   assert.match(second.messages.at(-1).content, /Aceite: 4/);
   assert.equal(second.pendingAction, null);
+  assert.equal(second.state, "INFORMACION");
+  assert.equal(f.documents.get(`oliviaConversations/${conversationId}`).taskState.status, "completed");
   assert.equal(f.documents.get("warehouseStock/central/items/oil").currentStock, 4);
 });
 

@@ -623,6 +623,9 @@ export function createOliviaEngine({
               taskState = taskFromTool(taskState.intent === call.name ? taskState : conversation.taskState, call.name, args, result, clock());
               taskState.route = profile;
               currentTask = taskState;
+            } else if (call.name === taskState.intent && result.data && !result.state) {
+              taskState = { ...taskState, slots: { ...taskState.slots, ...args }, status: "completed", missingFields: [], updatedAt: clock() };
+              currentTask = taskState;
             }
             if (result.skill && !activeSkills.some((skill) => skill.name === result.skill.name)) activeSkills.push(result.skill);
             for (const tool of result.loadTools || []) loadedTools.add(tool);

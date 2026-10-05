@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fixture } from "./helpers/olivia-fixture.mjs";
+import { fixture, start, functionResponse, textResponse } from "./helpers/olivia-fixture.mjs";
 import { salesMetrics } from "../netlify/functions/_lib/olivia/analytics.mjs";
 import { calculateMetrics, buildMetricsDateRange } from "../src/modules/locations/domain/metrics.js";
 
@@ -38,4 +38,20 @@ test("metrics retain location scope and distinguish no sales from a zero average
   assert.equal(result.total, 0);
   assert.equal(result.averageTicket, null);
   assert.equal(result.partial, false);
+});
+
+test("successful metrics reading clears optional filters from missing-data status", async () => {
+  const args = { startDate: "2026-10-03", endDate: "2026-10-03", locationId: null, productId: null, sellerId: null };
+  let calls = 0;
+  const f = fixture({ role: "admin", provider: async () => {
+    calls++;
+    if (calls === 1) return functionResponse("update_task", { intent: "get_sales_metrics", slotsJson: JSON.stringify(args) });
+    if (calls === 2) return functionResponse("get_sales_metrics", args);
+    return textResponse("Ayer no se registraron ventas; el ticket promedio no aplica.");
+  } });
+  const { conversationId } = await start(f);
+  const result = await f.engine.chat(f.session, { conversationId, requestId: "metrics_yesterday", message: "¿Cuánto vendimos ayer?", screenContext: { route: "/gestion/metrics/sales", module: "metrics" } });
+  assert.equal(result.state, "INFORMACION");
+  assert.equal(f.documents.get(`oliviaConversations/${conversationId}`).taskState.status, "completed");
+  assert.deepEqual(f.documents.get(`oliviaConversations/${conversationId}`).taskState.missingFields, []);
 });
