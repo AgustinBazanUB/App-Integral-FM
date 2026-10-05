@@ -1,3 +1,4 @@
+import { buildLocationPayload } from "../../shared/managementWritePlans.mjs";
 import { buildLocationStockLinePlan, locationStockQuantity } from "../../shared/operationalWritePlans.mjs";
 import {
   collection,
@@ -104,23 +105,7 @@ export async function saveManagedLocation(data, profile, locationId = null) {
     }
     if (!Object.hasOwn(LOCATION_TYPES, data.type) && (!previous.exists() || previous.data().type !== data.type)) throw new Error("Elegí Local, Feria o Evento. Los depósitos se crean en su propio módulo.");
     const operatingCalendar = normalizeOperatingCalendar(data.operatingCalendar ?? (previous.exists() ? previous.data().operatingCalendar : undefined));
-    transaction.set(locationRef, {
-      name,
-      type: data.type,
-      codePrefix: prefix,
-      operatingCalendar,
-      dniMode: data.dniMode,
-      active: data.active !== false,
-      ...(!locationId ? { deleted: false } : {}),
-      scheduleStartAt: scheduleStartAt || null,
-      scheduleEndAt: scheduleEndAt || null,
-      startDateTime: data.scheduleStartAt || "",
-      endDateTime: data.scheduleEndAt || "",
-      updatedBy: profile.id,
-      updatedByName: userName(profile),
-      updatedAt: serverTimestamp(),
-      ...(locationId ? {} : { createdAt: serverTimestamp(), createdBy: profile.id, assignedSellerIds: [], enabledDiscountIds: [] }),
-    }, { merge: true });
+    transaction.set(locationRef, buildLocationPayload({ values: data, previous: previous.exists() ? previous.data() : null, profile, stamp: serverTimestamp(), startAt: scheduleStartAt, endAt: scheduleEndAt }), { merge: true });
     transaction.set(auditRef, auditFields(profile, {
       action: locationId ? "location.updated" : "location.created",
       title: locationId ? "Ubicación actualizada" : "Ubicación creada",

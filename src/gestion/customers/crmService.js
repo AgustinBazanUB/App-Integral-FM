@@ -7,7 +7,7 @@ import { listMasterProductsShared } from "../services/sharedResources";
 import { addArgentinaDays, argentinaDateKey, argentinaDateFromKey } from "../../modules/locations/domain/time";
 import { isActiveSale, saleDate } from "../../modules/locations/domain/saleFacts";
 import { customerPurchaseIndex, validateLoyaltyPolicy } from "./customerPurchases";
-import { normalizeCustomerPhone } from "./customerDomain";
+import { customerHistoryGroups } from "../../shared/customerHistoryQueries.mjs";
 
 const requireCRM = profile => { if (!can(profile, "loyal-customers", "view")) throw new Error("No tenés permiso para consultar el CRM."); };
 export async function listCustomerPage(profile, cursor = null) {
@@ -61,11 +61,7 @@ export async function customerHistoryPage(profile, customer, cursor = {}, active
     if (!parent || identities.has(parent)) break;
     identities.add(parent); legacyId = parent;
   }
-  const ids = [...identities];
-  const groups = Array.from({ length: Math.ceil(ids.length / 10) }, (_, index) => ({ key: `id:${index}`, field: "customerId", values: ids.slice(index * 10, index * 10 + 10) }));
-  const phone = normalizeCustomerPhone(customer.phoneNormalized || customer.phone);
-  const phones = phone ? [...new Set([customer.phone, phone, `+54${phone}`, `+549${phone}`, `54${phone}`, `549${phone}`].filter(Boolean))] : [];
-  if (phones.length) groups.push({ key: "phone", field: "customerPhoneSnapshot", values: phones });
+  const groups = customerHistoryGroups(customer, [...identities]);
   const pages = await Promise.all(groups.map(async group => {
     const constraints = [where(group.field, "in", group.values), orderBy("createdAt", "desc"), ...(cursor[group.key] ? [startAfter(cursor[group.key])] : []), limit(21)];
     const snapshot = await getDocs(query(collection(db, "sales"), ...constraints));
