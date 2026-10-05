@@ -8,6 +8,7 @@ export function webSources(payload) {
     try {
       const url = new URL(annotation.url);
       if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) continue;
+      for (const key of [...url.searchParams.keys()]) if (/^utm_/i.test(key)) url.searchParams.delete(key);
       sources.set(url.href, { url: url.href, title: String(annotation.title || url.hostname).slice(0, 180) });
     } catch { /* Invalid citations are not links. */ }
   }

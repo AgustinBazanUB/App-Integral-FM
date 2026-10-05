@@ -10,7 +10,7 @@ import { oliviaInlineParts } from "../src/gestion/olivia/messageFormatting.mjs";
 
 const historyArgs = { startDate: null, endDate: null, locationId: null, productId: null, sellerId: null };
 const citation = { type: "url_citation", url: "https://example.org/formula", title: "Fórmula" };
-const researchResponse = () => ({ ...textResponse("Método externo verificado."), output: [{ type: "web_search_call", action: { type: "search" } }, { type: "message", content: [{ type: "output_text", text: "Método externo verificado.", annotations: [citation, citation, { type: "url_citation", url: "javascript:alert(1)" }] }] }] });
+const researchResponse = () => ({ ...textResponse("Método externo verificado."), output: [{ type: "web_search_call", action: { type: "search" } }, { type: "message", content: [{ type: "output_text", text: "Método externo verificado.", annotations: [citation, { ...citation, url: citation.url + "?utm_source=openai" }, { type: "url_citation", url: "javascript:alert(1)" }] }] }] });
 
 test("long metric details retain full computed totals, dates and unit leaders within the model budget", () => {
   const data = { source: "Panel de Métricas", total: 12345, count: 50, averageTicket: 246.9, partial: false, daily: Array.from({ length: 1000 }, (_, n) => ({ id: String(n), amount: n })), products: Array.from({ length: 100 }, (_, n) => ({ name: "Producto ".repeat(20), units: n })), topProductsByUnits: [{ name: "Primero", units: 100 }], period: { start: "2022-01-01", end: "2026-10-05", scope: "all-time" } };
