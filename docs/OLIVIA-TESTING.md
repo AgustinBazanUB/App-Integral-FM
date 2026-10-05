@@ -27,6 +27,7 @@ La matriz final registra evidencia y límites externos observados. Una compilaci
 - `npm run build:surfaces`: Gestión y Ecommerce aprobadas. Vite mantiene advertencia de chunks mayores de 500 kB; no es un fallo del build.
 - Navegador local con componentes y CSS reales: 1280×900, 390×844 y 360×400; textarea multilínea, Enter/Shift+Enter, envío inmediato/estado/cancelación, mute y escritura, selector múltiple TXT/PNG, chips, eliminación y retorno de foco. Las dimensiones son simulaciones responsive, no dispositivos físicos.
 - Preview privada: carga/login Firebase verificados; sin sesión humana proporcionada no se verificaron consultas ni mutaciones contra datos empresariales. La preview utiliza el proyecto Firebase configurado y no constituye una base comercial aislada.
+- Los tres endpoints publicados (`olivia`, `olivia-attachment`, `olivia-knowledge`) responden 401 a solicitudes anónimas. La retención de recursos se verificó nuevamente con las 12 pruebas de integración después de ajustar su finalización como Scheduled Function.
 - Voz física/proveedor en Android/iPhone: no verificada en esta sesión. MediaRecorder, AnalyserNode, WebRTC, mute, interrupción, fallos, reconexión y orden de eventos se verificaron con dependencias controladas; no se presenta esa evidencia como una llamada real al proveedor.
 
 [Matriz requisito → implementación → prueba](OLIVIA-REQUIREMENTS.md). [Auditoría de la base](OLIVIA-AUDIT.md).

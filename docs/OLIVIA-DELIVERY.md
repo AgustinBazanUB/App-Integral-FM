@@ -40,11 +40,12 @@ Commits de implementación:
 
 - `2b688e2`: planes comerciales compartidos e historial CRM, sin perder identidades/teléfonos históricos.
 - `841857f`: evolución multimodal, voz nativa, capacidades, permisos, pruebas y Skills.
-- Commit documental posterior: auditoría de base, documentación de nueve áreas y matriz de las 65 secciones.
+- `0cc7847`: auditoría de base, documentación de nueve áreas y matriz de las 65 secciones.
+- `94f36d1`: finalización de retención de recursos compatible con Scheduled Functions.
 
 Archivos principales: `OliviaAssistant`, `OliviaComposer`, `dictation`, `realtime`, `OliviaVoiceControls`, `OliviaUsage`, `OliviaKnowledgeManager`, `OliviaDeveloperPanel`; backend `engine`, `conversations`, `extendedTools`, `extendedOperations`, `knowledge`, `skills`, `attachments`, `analytics`; shared `oliviaCapabilities`, `oliviaAnalytics`, `oliviaStream` y planes de dominio; nuevos endpoints, rules/indexes y tres suites de evolución.
 
-[Preview final de revisión](https://olivia-evolution-pr31--appintegralflormia.netlify.app/gestion), draft Netlify `6ac345bf51629180ff1bdd51`. La autenticación Firebase está preservada. La preview usa el proyecto Firebase configurado; no es una base comercial aislada.
+[PR 34 de revisión](https://github.com/AgustinBazanUB/App-Integral-FM/pull/34), draft con base `codex/olivia-integration`. [Preview final de revisión](https://olivia-evolution-pr31--appintegralflormia.netlify.app/gestion), draft Netlify `6ac346a6baa0d78cbf5e70ab`, código de implementación `94f36d1`. La autenticación Firebase está preservada: los endpoints `olivia`, `olivia-attachment` y `olivia-knowledge` rechazaron solicitudes anónimas con 401. La preview usa el proyecto Firebase configurado; no es una base comercial aislada.
 
 Límites externos observados: no se recibió login humano para recorrer datos privados; no se probaron micrófono/altavoz físicos en Android/iPhone ni llamadas reales al proveedor; no se desplegaron rules/índices al Firebase empresarial para cumplir la orden de no tocar producción. El índice versionado de movimientos por depósito acompaña una futura promoción de infraestructura. Estos puntos no se presentan como pruebas completadas en preview.
 
