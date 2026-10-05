@@ -1,3 +1,4 @@
+# Deployment trigger for PR #35 location product permissions — 2026-10-05
 name: Deploy Firestore Rules — Preview 16
 
 on:
