@@ -36,4 +36,8 @@ export async function purgeOliviaResources({ store = createOliviaStore(), provid
   }
   return { removed, pending, backlog };
 }
-export default async function handler() { return purgeOliviaResources(); }
+export default async function handler() {
+  const result = await purgeOliviaResources();
+  // Scheduled Functions complete without an HTTP response body.
+  console.log(JSON.stringify({ event: "olivia.resources.retention", ...result }));
+}
