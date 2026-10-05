@@ -135,7 +135,7 @@ test("native knowledge uses authorized semantic retrieval and records only backe
   assert.equal(action.prepared.skill, null);
   await engine.realtimeTool(f.session, { ...base, requestId: "load", callId: "load_call", tool: "load_skill", args: { name: "pronosticar-feria" } });
   const verified = await engine.realtimeTool(f.session, { ...base, requestId: "verified", callId: "verified_call", tool: "prepare_stock_transfer", args: transfer });
-  assert.deepEqual(f.documents.get(`oliviaConfirmations/${verified.pendingAction.id}`).prepared.skill, { name: "pronosticar-feria", version: "1.0.0" });
+  assert.deepEqual(f.documents.get(`oliviaConfirmations/${verified.pendingAction.id}`).prepared.skill, { name: "pronosticar-feria", version: "1.1.0" });
 });
 test("CRM confirmation uses canonical identity and preserves existing nonempty data and history", async () => {
   const args = { customerId: null, phone: "+54 9 11 2345 6789", name: "Cliente QA", zoneId: null, zoneName: "" };

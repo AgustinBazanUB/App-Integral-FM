@@ -5,6 +5,7 @@ import { createRealtime, stopRealtime } from "./_lib/olivia/voice.mjs";
 import { oliviaSession, json, errorResponse } from "./_lib/olivia/http.mjs";
 import { oliviaError } from "../../src/shared/oliviaContracts.mjs";
 import { streamFrame } from "../../src/shared/oliviaStream.mjs";
+import { createLive, interruptLive } from "./_lib/olivia/live.mjs";
 export default async function handler(request) {
   if (request.method !== "POST")
     return json(
@@ -74,13 +75,15 @@ export default async function handler(request) {
     else if (body.operation === "saveConfiguration")
       result = await engine.saveConfiguration(session, body);
     else if (body.operation === "realtime")
-      result = await createRealtime({
+      result = await ((await engine.configuration()).voiceProtocol === "live" ? createLive : createRealtime)({
         session,
         body,
         store,
         engine,
         applicationOrigin: new URL(request.url).origin,
       });
+    else if (body.operation === "interruptVoice")
+      result = await interruptLive({ session, body, store });
     else if (body.operation === "stopRealtime")
       result = await stopRealtime({ session, body, store });
     else throw oliviaError("invalid-operation", "Operación no disponible.");

@@ -1,5 +1,7 @@
 # Skills de Olivia
 
+`pronosticar-feria` pasa a versión 1.1.0: añade `resolve_transfer_origin` a contrato y contenido. Las otras dos Skills conservan 1.0.0. La ruta de pronóstico usa Luna XHIGH; la Skill sigue sin conceder permisos.
+
 El catálogo está en `netlify/functions/_lib/olivia/skills.mjs`; los procesos reales residen en `skills/<nombre>/SKILL.md` y se incluyen en el bundle de Netlify. Solo esos nombres cerrados pueden cargarse, sin rutas proporcionadas por el modelo.
 
 | Skill | Versión | Uso |

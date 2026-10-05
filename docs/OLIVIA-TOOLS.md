@@ -1,5 +1,7 @@
 # Catálogo de herramientas
 
+El anexo añade `update_task` para slots parciales validados, sin ejecutar acciones, y `resolve_transfer_origin` para consultar inventarios suficientes y detectar ambigüedad. Cantidades preparadas/recibidas desconocidas en transferencias aceptan null y producen preguntas solo de esos campos. [Política vigente](OLIVIA-MODEL-ROUTER.md).
+
 El catálogo combina los contratos existentes en `oliviaContracts.mjs` con `oliviaCapabilities.mjs`. Cada capacidad tiene descripción, módulo, esquema cerrado, clase y acción requerida. Se seleccionan herramientas por intención, pantalla y Skills, y `search_tools` descubre otras permitidas. No hay consultas Firestore arbitrarias.
 
 | Área | Lecturas y preparaciones |

@@ -5,7 +5,7 @@ import { capabilities } from "./guards.mjs";
 import { normalizeIntent } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
 const catalog = [
-  { name: "pronosticar-feria", version: "1.0.0", description: "Pronóstico y mercadería para una feria futura", roles: ["admin", "general_admin"], requiredTools: ["list_fair_events", "forecast_fair", "list_warehouses", "get_inventory_summary", "prepare_stock_transfer"], intent: /pronostic|cuanto.*vend|cuanto.*factur|que.*llevo|mercaderia|stock.*(mand|env|feria)|feria.*(pilar|fin de semana|sabado|domingo)/ },
+  { name: "pronosticar-feria", version: "1.1.0", description: "Pronóstico y mercadería para una feria futura", roles: ["admin", "general_admin"], requiredTools: ["list_fair_events", "forecast_fair", "list_warehouses", "get_inventory_summary", "resolve_transfer_origin", "prepare_stock_transfer"], intent: /pronostic|cuanto.*vend|cuanto.*factur|que.*llevo|mercaderia|stock.*(mand|env|feria)|feria.*(pilar|fin de semana|sabado|domingo)/ },
   { name: "analizar-ventas", version: "1.0.0", description: "Analizar ventas y comparación de períodos", roles: ["admin", "general_admin"], requiredTools: ["get_sales_metrics"], intent: /vend|venta|compar|rendim|ticket|producto.*cayo|ubicacion.*crec/ },
   { name: "operar-panel-vendedor", version: "1.0.0", description: "Venta y ayuda del Panel Vendedor", roles: ["seller"], requiredTools: ["search_products", "get_stock", "prepare_sale"], intent: /venta|vend|producto|precio|stock|cobr|pago/ },
 ];

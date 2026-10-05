@@ -11,6 +11,7 @@ const OPERATIONS = new Set([
   "text",
   "transcription",
   "realtime",
+  "live",
   "sale",
   "stock_load",
   "observation",

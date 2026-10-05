@@ -1345,6 +1345,7 @@ service cloud.firestore {
     match /oliviaRequests/{document=**} { allow read, write: if false; }
     match /oliviaUsage/{document=**} { allow read, write: if false; }
     match /oliviaRealtime/{document=**} { allow read, write: if false; }
+    match /oliviaLiveDelegations/{document=**} { allow read, write: if false; }
     match /oliviaAnonymousUsage/{document=**} { allow read, write: if false; }
     match /oliviaQuotaRequests/{document=**} { allow read, write: if false; }
     match /{document=**} {

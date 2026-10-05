@@ -1,5 +1,9 @@
 # Seguridad y auditoría
 
+Actualización del 5 de octubre de 2026: el [anexo de modelos y tareas](OLIVIA-MODEL-ROUTER.md) y su [matriz de 52 secciones](OLIVIA-ANNEX-REQUIREMENTS.md) definen la política vigente: Luna HIGH/XHIGH, Sol solo creativo en módulos autorizados y GPT-Live con delegación al mismo backend de texto.
+
+El estado de tarea es privado y se valida por contrato. Las correcciones revocan la lease y propuestas anteriores; un resultado tardío no puede publicar una tarjeta. El canal Live del navegador solo permite mute/unmute/cierre. La delegación, los resúmenes y la duración provienen del sideband privado. `oliviaLiveDelegations` se protege por reglas backend-only y retención.
+
 Firebase ID token y perfil activo server-side determinan autoridad. Herramientas releen el perfil; confirmaciones revalidan dentro de la transacción. UID, rol, precio, stock o permiso del cliente no son autoridad.
 
 El registro ofrece esquemas explícitos cerrados y selección por permisos. Skills, pantalla, documentos y archivos no conceden acceso. El contexto identifica datos no confiables para evitar convertir documentos recuperados en instrucciones operativas.

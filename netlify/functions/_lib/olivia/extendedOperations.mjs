@@ -25,7 +25,13 @@ export async function extendedOperationPlan({ session, toolName, args, store, no
   const read = async (path) => { const row = await store.get(path); documents[path] = row || null; return row ? { ...row, id: path.split("/").at(-1) } : null; };
   let writes = [], summary, module = OLIVIA_CAPABILITIES[toolName].module, affectedId = entityId, navigation = null;
   if (toolName === "prepare_stock_transfer") {
-    if (!args.originId || !args.destinationId || !args.lines.length || !args.reason.trim()) return { state: "DATOS_INCOMPLETOS", missing: ["origen", "destino", "productos", "motivo"], summary: "Indicá origen, destino, mercadería y motivo. Confirmá también las cantidades preparadas y recibidas físicamente." };
+    const missing = [];
+    if (!args.originId) missing.push("originId");
+    if (!args.destinationId) missing.push("destinationId");
+    if (!args.lines.length) missing.push("lines");
+    if (!args.reason.trim()) missing.push("reason");
+    args.lines.forEach((line, index) => { if (line.preparedQuantity == null) missing.push(`lines.${index}.preparedQuantity`); if (line.receivedQuantity == null) missing.push(`lines.${index}.receivedQuantity`); });
+    if (missing.length) return { state: "DATOS_INCOMPLETOS", missing, summary: "Completá los datos faltantes y las cantidades preparadas y recibidas físicamente." };
     if (args.originType === args.destinationType && args.originId === args.destinationId) throw oliviaError("same-inventory", "El origen y el destino deben ser distintos.", 422);
     assertUniqueInventoryProducts(args.lines);
     const origin = await read(ownerPath(args.originType, args.originId)), destination = await read(ownerPath(args.destinationType, args.destinationId));

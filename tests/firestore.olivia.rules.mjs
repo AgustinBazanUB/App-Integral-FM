@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {initializeTestEnvironment,assertFails} from '@firebase/rules-unit-testing';
 import {doc,getDoc,setDoc,collection,getDocs} from 'firebase/firestore';
 let environment;
-const paths=['oliviaConfiguration/global','oliviaConversations/conversation','oliviaConversations/conversation/messages/message','oliviaConfirmations/confirmation','oliviaBudgets/budget','oliviaRequests/request','oliviaUsage/usage','oliviaRealtime/voice','oliviaAnonymousUsage/day','oliviaQuotaRequests/request','oliviaAttachments/file','oliviaUploadBudgets/day','oliviaKnowledgeDocuments/document','oliviaKnowledgeSettings/global','oliviaToolEvents/event','oliviaRealtimeToolCalls/call','oliviaRealtimeTurns/turn'];
+const paths=['oliviaConfiguration/global','oliviaConversations/conversation','oliviaConversations/conversation/messages/message','oliviaConfirmations/confirmation','oliviaBudgets/budget','oliviaRequests/request','oliviaUsage/usage','oliviaRealtime/voice','oliviaAnonymousUsage/day','oliviaQuotaRequests/request','oliviaAttachments/file','oliviaUploadBudgets/day','oliviaKnowledgeDocuments/document','oliviaKnowledgeSettings/global','oliviaToolEvents/event','oliviaRealtimeToolCalls/call','oliviaRealtimeTurns/turn','oliviaLiveDelegations/delegation'];
 before(async()=>{
  environment=await initializeTestEnvironment({projectId:'demo-flor-mia-olivia',firestore:{rules:await readFile(new URL('../firestore.rules',import.meta.url),'utf8')}});
  await environment.clearFirestore();

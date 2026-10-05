@@ -145,11 +145,11 @@ test("selective tools and Skills exclude all administrative schemas from sellers
   assert.equal(selectCapabilities(admin, "envíos", {}).includes("get_users"), false);
   assert.ok(discoverSkills(admin).some((skill) => skill.name === "pronosticar-feria"));
   assert.ok((await routeSkills(admin, "¿Qué mercadería llevo a Pilar el fin de semana?")).some((skill) => skill.name === "pronosticar-feria"));
-  assert.equal((await loadSkill(admin, "pronosticar-feria")).version, "1.0.0");
-  assert.equal((await routeSkills(admin, "Prepará eso", [{ name: "pronosticar-feria", version: "1.0.0" }]))[0].name, "pronosticar-feria");
-  assert.equal((await routeSkills(seller, "Prepará eso", [{ name: "pronosticar-feria", version: "1.0.0" }])).length, 0);
+  assert.equal((await loadSkill(admin, "pronosticar-feria")).version, "1.1.0");
+  assert.equal((await routeSkills(admin, "Prepará eso", [{ name: "pronosticar-feria", version: "1.1.0" }]))[0].name, "pronosticar-feria");
+  assert.equal((await routeSkills(seller, "Prepará eso", [{ name: "pronosticar-feria", version: "1.1.0" }])).length, 0);
   assert.equal((await routeSkills(admin, "Prepará eso", [{ name: "pronosticar-feria", version: "0.1" }])).length, 0);
-  assert.equal((await routeSkills(admin, "Hola", [{ name: "pronosticar-feria", version: "1.0.0" }])).length, 0);
+  assert.equal((await routeSkills(admin, "Hola", [{ name: "pronosticar-feria", version: "1.1.0" }])).length, 0);
   await assert.rejects(loadSkill(seller, "pronosticar-feria"), { code: "skill-not-allowed" });
   await assert.rejects(loadSkill(admin, "../../secret"), { code: "skill-not-allowed" });
 });

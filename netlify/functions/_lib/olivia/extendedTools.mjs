@@ -37,6 +37,23 @@ export async function runExtendedTool({ session, name, args, store, context, now
     const prepared = await prepareExtendedOperation({ session, toolName: name, args, store, now });
     return prepared.canonicalArgs ? { prepared, data: { state: "ESPERANDO_CONFIRMACION", summary: prepared.summary } } : { state: prepared.state || "DATOS_INCOMPLETOS", data: prepared };
   }
+  if (name === "resolve_transfer_origin") {
+    const product = await store.get(`products/${safeId(args.productId)}`);
+    if (!product || product.deleted || product.active === false) throw oliviaError("product-unavailable", "El producto no está disponible.", 404);
+    const warehouses = await store.query("warehouses", [], 100);
+    const locations = can(session.profile, "locations", "viewStock") && can(session.profile, "locations", "viewAllLocations") ? await store.query("locations", [], 100) : [];
+    const owners = [...warehouses.map((owner) => ({ ...owner, type: "warehouse" })), ...locations.map((owner) => ({ ...owner, type: "location" }))].filter((owner) => !owner.deleted && owner.active !== false && !(owner.type === args.destinationType && owner.id === args.destinationId));
+    const candidates = [];
+    for (let index = 0; index < owners.length; index += 3) {
+      const batch = await Promise.all(owners.slice(index, index + 3).map(async (owner) => {
+        const stock = await store.get(`${owner.type === "warehouse" ? "warehouseStock" : "locationStock"}/${safeId(owner.id)}/items/${safeId(args.productId)}`);
+        return stock && !stock.deleted && stock.active !== false && Number.isSafeInteger(stock.currentStock) && stock.currentStock >= args.quantity ? { id: owner.id, type: owner.type, name: owner.name, available: stock.currentStock } : null;
+      }));
+      candidates.push(...batch.filter(Boolean));
+    }
+    const partial = warehouses.length === 100 || locations.length === 100;
+    return { data: { product: { id: args.productId, name: product.name }, quantity: args.quantity, candidates, recommendedOrigin: candidates.length === 1 && !partial ? candidates[0] : null, requiresChoice: candidates.length > 1 || partial, partial, observedAt: now.toISOString() } };
+  }
   if (name === "list_fair_events") {
     const rows = await store.query("locations", [], 150, [["name", "ASCENDING"]]);
     const query = normalizedSearchText(args.query);

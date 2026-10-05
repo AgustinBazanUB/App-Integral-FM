@@ -113,10 +113,10 @@ export async function hangupCall(
   callId,
   { env = process.env, fetchImpl = fetch } = {},
 ) {
-  if (!/^rtc_[A-Za-z0-9_-]+$/.test(callId))
+  if (!/^(rtc|live)_[A-Za-z0-9_-]+$/.test(callId))
     throw oliviaError("realtime-invalid", "La sesión de voz no es válida.");
   const response = await fetchImpl(
-    `https://api.openai.com/v1/realtime/calls/${encodeURIComponent(callId)}/hangup`,
+    `https://api.openai.com/v1/${callId.startsWith("live_") ? "live/sessions" : "realtime/calls"}/${encodeURIComponent(callId)}/hangup`,
     {
       method: "POST",
       headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}` },

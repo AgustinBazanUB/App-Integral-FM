@@ -1,5 +1,18 @@
 # Entrega técnica de la evolución de Olivia
 
+## Anexo aprobado: Luna, tareas persistentes y GPT-Live
+
+PR34 incorpora la política central v2: Luna HIGH habitual, la misma Luna XHIGH para complejidad y Sol HIGH/XHIGH solo creativo en Marketing/Redes autorizados. Añade estado privado de tareas, mínimos por intención, correcciones y cancelación sin perder slots, carga progresiva determinística, selección de origen suficiente y recepción física desconocida explícita.
+
+GPT-Live es el protocolo predeterminado de conversación, con backend cliente compartido con texto y sideband privado. El browser no puede inyectar herramientas/instrucciones/resultados. Se deduplican delegaciones, persisten transcripciones, invalidan resultados tardíos y separan duración de voz del consumo por llamada backend. La configuración y modo desarrollador muestran límites, ruta, motivo, tarea y distribución de llamadas.
+
+Validación final del anexo: 732 pruebas Node, 19 pruebas de reglas en emulador demo, build unificado y builds Gestión/Ecommerce. Las 37 pruebas nuevas usan proveedor/store/media controlados. Ninguna demuestra audio físico, disponibilidad de la cuenta OpenAI ni operaciones privadas del Firebase empresarial. No se desplegaron reglas ni índices a producción.
+
+[Matriz del anexo: 52 secciones](OLIVIA-ANNEX-REQUIREMENTS.md). [Política, tareas, diagramas y fuentes oficiales](OLIVIA-MODEL-ROUTER.md).
+
+La sección siguiente conserva la entrega inicial de la evolución; la política y voz actuales se describen arriba.
+
+
 La evolución está implementada en `codex/olivia-evolution`, derivada de PR 31. Se conserva el núcleo operativo previo y se amplía la capa conversacional. No se modificó producción ni se crearon operaciones empresariales de prueba.
 
 Antes: un componente principal coordinaba UI/audio/historial y el engine combinaba almacenamiento, Responses y herramientas acotadas. Voz transcribía, pasaba por chat Responses y volvía a Realtime para hablar. Conocimiento era una selección documental por keywords.

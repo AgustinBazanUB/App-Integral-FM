@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import WebSocket from "ws";
+import { monitorLive } from "./_lib/olivia/liveMonitor.mjs";
 import { oliviaSession, json, errorResponse } from "./_lib/olivia/http.mjs";
 import { createOliviaStore } from "./_lib/olivia/store.mjs";
 import { createOliviaEngine } from "./_lib/olivia/engine.mjs";
@@ -538,10 +539,12 @@ export default async function handler(request) {
     }
     if (!body || Object.keys(body).some((key) => key !== "realtimeSessionId"))
       throw oliviaError("invalid-input", "Solicitud de voz inválida.");
-    await monitorRealtime({
+    const store = createOliviaStore();
+    const live = await store.get(`oliviaRealtime/${safeId(body.realtimeSessionId)}`);
+    await (live?.protocol === "live" ? monitorLive : monitorRealtime)({
       session,
       realtimeSessionId: body.realtimeSessionId,
-      store: createOliviaStore(),
+      store,
     });
     return json({ accepted: true }, 202);
   } catch (error) {

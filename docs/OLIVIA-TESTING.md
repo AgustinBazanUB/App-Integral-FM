@@ -1,5 +1,9 @@
 # Verificación
 
+Actualización del 5 de octubre de 2026: el [anexo de modelos y tareas](OLIVIA-MODEL-ROUTER.md) y su [matriz de 52 secciones](OLIVIA-ANNEX-REQUIREMENTS.md) definen la política vigente: Luna HIGH/XHIGH, Sol solo creativo en módulos autorizados y GPT-Live con delegación al mismo backend de texto.
+
+Anexo: 37 pruebas nuevas en `olivia-router-tasks.test.mjs` y `olivia-live.test.mjs`; cubren rutas, tareas, orígenes vivos, parámetros físicos faltantes, cliente sin autoridad, delegación duplicada, transcripción simple, ICE y cierre/consumo incompleto. La cuenta de proveedor y los dispositivos físicos no se sustituyen por una simulación aprobada.
+
 Base PR31: 634 pruebas Node aprobadas antes de cambios. La evolución agrega pruebas de transporte SSE, dictado real mediante dependencias controladas, adjuntos y límites, RAG, Skills, permisos, métricas, pronóstico y operaciones.
 
 Comandos:

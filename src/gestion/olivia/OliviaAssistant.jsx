@@ -13,6 +13,7 @@ import { OliviaRealtime } from "./realtime.mjs";
 import { DictationCapture } from "./dictation.mjs";
 import OliviaComposer from "./OliviaComposer";
 import OliviaDeveloperPanel from "./OliviaDeveloperPanel";
+import { OliviaLive } from "./live.mjs";
 import OliviaVoiceControls from "./OliviaVoiceControls";
 import OliviaUsage from "./OliviaUsage";
 import "./olivia.css";
@@ -265,12 +266,12 @@ export default function OliviaAssistant() {
   }, [snapshot.messages, busy, open, streamText, optimistic]);
 
   useEffect(() => {
-    voiceRef.current?.setMuted(muted || Boolean(snapshot.pendingAction));
+    voiceRef.current?.setMuted(muted || (snapshot.voiceProtocol !== "live" && Boolean(snapshot.pendingAction)));
     if (!snapshot.pendingAction) return undefined;
     setNow(Date.now());
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [snapshot.pendingAction, muted]);
+  }, [snapshot.pendingAction, snapshot.voiceProtocol, muted]);
 
   useEffect(() => {
     setQuotaRequested(false); setQuotaNotice(""); quotaRequestIdRef.current = null;
@@ -397,7 +398,7 @@ export default function OliviaAssistant() {
     const voiceRequest = async (operation, fields) => {
       const started = Date.now();
       while (requestRef.current && Date.now() - started < 45000) await new Promise((resolve) => setTimeout(resolve, 100));
-      if (connection.closed && operation !== "realtimeTranscript") return null;
+      if (connection.closed && !["realtimeTranscript", "state"].includes(operation)) return null;
       if (operation === "realtimeTranscript") {
         const result = await oliviaClient.request({ operation, ...fields, conversationId: voiceConversationId, requestId: requestId() }, { keepalive: true });
         if (mounted.current && conversationRef.current === voiceConversationId) apply(result);
@@ -405,12 +406,22 @@ export default function OliviaAssistant() {
       }
       return perform(operation, fields);
     };
-    const connection = new OliviaRealtime({
-      createSession: (sdp, signal) => oliviaClient.request({ operation: "realtime", sdp, nativeTools: true, conversationId: voiceConversationId, requestId: requestId(), screenContext: contextRef.current }, { signal }).then((result) => { apply(result); return result; }),
+    const VoiceClient = snapshot.voiceProtocol === "live" ? OliviaLive : OliviaRealtime;
+    const connection = new VoiceClient({
+      createSession: (sdp, signal) => oliviaClient.request({ operation: "realtime", sdp, nativeTools: true, conversationId: voiceConversationId, requestId: requestId(), screenContext: contextRef.current }, { signal }).then(async (result) => {
+        apply(result);
+        if (result.voiceProtocol !== snapshot.voiceProtocol) {
+          await oliviaClient.request({ operation: "stopRealtime", realtimeSessionId: result.realtimeSessionId, conversationId: voiceConversationId, requestId: requestId() }, { keepalive: true });
+          throw new Error("La configuración de voz cambió. Volvé a conectar para usarla.");
+        }
+        return result;
+      }),
       stopSession: (realtimeSessionId) => oliviaClient.request({ operation: "stopRealtime", realtimeSessionId, conversationId: voiceConversationId, requestId: requestId() }, { keepalive: true }),
       onRequest: (message, realtimeSessionId) => perform("chat", { message, inputMode: "realtime", realtimeSessionId }),
       onTool: (fields) => voiceRequest("realtimeTool", fields),
       onTranscript: (fields) => voiceRequest("realtimeTranscript", fields),
+      onRefresh: () => voiceRequest("state", {}),
+      interruptSession: (realtimeSessionId) => oliviaClient.request({ operation: "interruptVoice", realtimeSessionId, conversationId: voiceConversationId, requestId: requestId() }),
       onMetrics: (metrics) => { if (mounted.current) setVoiceMetrics((current) => ({ ...current, ...metrics })); },
       onInput: ({ message, itemId }) => { if (mounted.current) { stickToBottom.current = true; setOptimistic({ id: `voice-${itemId}`, role: "user", content: message }); } },
       onState: (state) => { if (mounted.current) setVoiceState(state); },
@@ -455,7 +466,7 @@ export default function OliviaAssistant() {
       {pending ? <section className="fm-olivia-confirmation" aria-labelledby="fm-olivia-confirm-title"><h3 id="fm-olivia-confirm-title">¿Confirmar esta acción?</h3><p>{typeof pending.summary === "string" ? pending.summary : JSON.stringify(pending.summary, null, 2)}</p>{expired ? <p role="alert">La confirmación venció. Pedile a Olivia que prepare la acción nuevamente.</p> : null}<div><Button onClick={() => answer(true)} disabled={busy || expired || exhausted || unavailable}>Sí</Button><Button variant="secondary" onClick={() => answer(false)} disabled={busy || !online}>No</Button></div><small>La acción se ejecuta únicamente al tocar Sí. Podés corregir los datos escribiendo.</small></section> : null}
       {unavailable ? <div className="fm-olivia-error" role="status"><p>{!online ? "Olivia necesita conexión a Internet." : snapshot.enabled === false ? "Olivia está deshabilitada por el Administrador." : "Olivia todavía necesita configurar su conexión con OpenAI."}</p><small>Podés continuar operando desde tu panel.</small>{admin && online ? <Button variant="secondary" onClick={() => navigate("/gestion/settings")}>Abrir configuración</Button> : null}</div> : null}
       {error ? <div className="fm-olivia-error" role="alert"><p>{error}</p>{["conversation-not-found", "session-changed", "permission-scope-changed", "conversation-expired"].includes(errorCode) ? <Button variant="secondary" disabled={busy} onClick={newConversation}>Iniciar nueva conversación</Button> : retryRef.current && !busy ? <Button variant="secondary" onClick={() => { const retry = retryRef.current; perform(retry.operation, retry.fields, retry.identity).then(() => { if (retry.operation === "chat") setDraft(""); }).catch(() => {}); }}>{errorCode === "request-already-used" ? "Actualizar conversación" : "Reintentar solicitud"}</Button> : null}<small>Tu panel sigue disponible para operar manualmente.</small></div> : null}
-      <OliviaVoiceControls active={voiceActive} state={voiceState} caption={caption} pending={pending} muted={muted} toggleMute={() => { const next = !muted; setMuted(next); voiceRef.current?.setMuted(next || Boolean(pending)); }} interrupt={() => voiceRef.current?.interrupt()} stop={stopVoice} reconnect={() => { stopVoice(); startVoice(); }} />
+      <OliviaVoiceControls active={voiceActive} state={voiceState} caption={caption} pending={pending} muted={muted} toggleMute={() => { const next = !muted; setMuted(next); voiceRef.current?.setMuted(next || (snapshot.voiceProtocol !== "live" && Boolean(pending))); }} interrupt={() => voiceRef.current?.interrupt()} stop={stopVoice} reconnect={() => { stopVoice(); startVoice(); }} />
       <OliviaComposer textareaRef={textareaRef} draft={draft} setDraft={setDraft} sendMessage={sendMessage} recording={recording} frame={audioFrame} stopRecording={stopRecording} startRecording={startRecording} startVoice={startVoice} voiceActive={voiceActive} disabled={exhausted || unavailable || !conversationRef.current} busy={busy} cancelRequest={() => requestRef.current?.abort()} attachments={attachments} addFiles={addFiles} removeFile={removeFile} />
       <OliviaUsage quota={quota} estimate={estimate} money={money} compact={viewport?.height < 500} exhausted={exhausted} />
       {admin && developer ? <OliviaDeveloperPanel estimate={estimate} quota={quota} latency={latency} voiceMetrics={voiceMetrics} telemetry={snapshot.telemetry} money={money} /> : null}

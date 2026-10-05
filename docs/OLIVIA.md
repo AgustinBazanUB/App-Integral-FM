@@ -1,5 +1,7 @@
 # Olivia en el Sistema Integral Flor Mía
 
+Actualización del 5 de octubre de 2026: el [anexo de modelos y tareas](OLIVIA-MODEL-ROUTER.md) y su [matriz de 52 secciones](OLIVIA-ANNEX-REQUIREMENTS.md) definen la política vigente: Luna HIGH/XHIGH, Sol solo creativo en módulos autorizados y GPT-Live con delegación al mismo backend de texto.
+
 Olivia es una capa conversacional autenticada de Gestión y Panel Vendedor. La evolución parte de PR 31 y conserva operación manual, historial, costos, cuotas, permisos, auditoría y confirmaciones existentes.
 
 ## Experiencia

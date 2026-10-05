@@ -204,19 +204,27 @@ export function defaultOliviaConfiguration(env = {}) {
     retentionMonths: 1,
     defaultQuota: { tokens: 100000, frequency: "monthly" },
     userQuotas: {},
+    modelPolicyVersion: 2,
+    routing: { toolThreshold: 6, entityThreshold: 5, rowThreshold: 500, documentThreshold: 2 },
+    responseLimits: { maxOutputTokens: 2400, maxToolCalls: 12, maxRounds: 8, timeoutMs: 45000, providerTimeoutMs: 20000 },
+    voiceProtocol: "live",
+    liveUsdPerMinute: 0.05,
     profiles: {
       adminDefault: {
         model: env.OLIVIA_MODEL_ADMIN || "gpt-6-luna",
-        reasoningEffort: "xhigh",
+        reasoningEffort: "high",
       },
       adminComplex: {
-        model: env.OLIVIA_MODEL_COMPLEX || "gpt-6-sol",
-        reasoningEffort: "high",
+        model: env.OLIVIA_MODEL_ADMIN || "gpt-6-luna",
+        reasoningEffort: "xhigh",
       },
       seller: {
         model: env.OLIVIA_MODEL_SELLER || "gpt-6-luna",
-        reasoningEffort: "medium",
+        reasoningEffort: "high",
       },
+      creative: { model: env.OLIVIA_MODEL_CREATIVE || "gpt-6.1-sol", reasoningEffort: "high" },
+      creativeComplex: { model: env.OLIVIA_MODEL_CREATIVE || "gpt-6.1-sol", reasoningEffort: "xhigh" },
+      live: { model: env.OLIVIA_MODEL_LIVE || "gpt-live-1", voice: "marin" },
       transcription: {
         model: env.OLIVIA_MODEL_TRANSCRIPTION || "gpt-transcribe",
       },
@@ -228,7 +236,7 @@ export function defaultOliviaConfiguration(env = {}) {
         voice: "marin",
       },
     },
-    complexModules: ["marketing"],
+    complexModules: [],
     pricing: {},
     officialDollarSellRate: null,
     audioLimits: { maxSeconds: 60, maxBytes: 4194304 },
@@ -245,6 +253,16 @@ export function validateConfiguration(value) {
   )
     throw oliviaError("invalid-configuration", "Configuración inválida.");
   const clean = { ...defaults, ...value };
+  // Read-time migration only: old expensive administrative profiles cannot
+  // silently survive the new policy. No production document is rewritten.
+  if (value.modelPolicyVersion !== 2) {
+    clean.profiles = { ...clean.profiles, adminDefault: defaults.profiles.adminDefault, adminComplex: defaults.profiles.adminComplex, seller: defaults.profiles.seller, creative: defaults.profiles.creative };
+    clean.complexModules = [];
+  }
+  clean.modelPolicyVersion = 2;
+  validateSchema(clean.responseLimits, object({ maxOutputTokens: { type: "integer", minimum: 700, maximum: 8000 }, maxToolCalls: { type: "integer", minimum: 2, maximum: 12 }, maxRounds: { type: "integer", minimum: 2, maximum: 8 }, timeoutMs: { type: "integer", minimum: 10000, maximum: 55000 }, providerTimeoutMs: { type: "integer", minimum: 5000, maximum: 30000 } }));
+  validateSchema(clean.routing, object({ toolThreshold: { type: "integer", minimum: 2, maximum: 12 }, entityThreshold: { type: "integer", minimum: 2, maximum: 100 }, rowThreshold: { type: "integer", minimum: 50, maximum: 10000 }, documentThreshold: { type: "integer", minimum: 1, maximum: 4 } }));
+  if (!["live", "realtime"].includes(clean.voiceProtocol) || !Number.isFinite(clean.liveUsdPerMinute) || clean.liveUsdPerMinute <= 0 || clean.liveUsdPerMinute > 10) throw oliviaError("invalid-configuration", "Política de voz inválida.");
   validateSchema(clean.audioLimits, { type: "object", additionalProperties: false, required: ["maxSeconds", "maxBytes"], properties: { maxSeconds: { type: "integer", minimum: 5, maximum: 60 }, maxBytes: { type: "integer", minimum: 65536, maximum: 4194304 } } });
   validateSchema(clean.forecast, { type: "object", additionalProperties: false, required: ["safetyStockPercent"], properties: { safetyStockPercent: { type: "integer", minimum: 0, maximum: 100 } } });
   if (
@@ -324,15 +342,15 @@ export function validateConfiguration(value) {
     )
       throw oliviaError("invalid-configuration", "Perfil de modelo inválido.");
     if (
-      ["adminDefault", "adminComplex", "seller"].includes(key) &&
-      !["low", "medium", "high", "xhigh", "max"].includes(p.reasoningEffort)
+      ["adminDefault", "adminComplex", "seller", "creative", "creativeComplex"].includes(key) &&
+      !["high", "xhigh"].includes(p.reasoningEffort)
     )
       throw oliviaError(
         "invalid-configuration",
         "Nivel de razonamiento inválido.",
       );
     if (
-      key === "realtime" &&
+      ["realtime", "live"].includes(key) &&
       ![
         "alloy",
         "ash",
@@ -348,6 +366,7 @@ export function validateConfiguration(value) {
     )
       throw oliviaError("invalid-configuration", "Voz inválida.");
   }
+  if (["adminDefault", "adminComplex", "seller"].some((key) => !/^gpt-6-luna(?:-|$)/.test(clean.profiles[key].model)) || clean.profiles.adminComplex.model !== clean.profiles.adminDefault.model || !/^gpt-6\.1-sol(?:-|$)/.test(clean.profiles.creative.model) || clean.profiles.creativeComplex.model !== clean.profiles.creative.model || clean.profiles.live.model !== "gpt-live-1") throw oliviaError("invalid-configuration", "Usá Luna para operación y análisis, el mismo modelo en ambos niveles, Sol solo para creatividad y GPT-Live para voz.");
   if (
     !Array.isArray(clean.complexModules) ||
     clean.complexModules.length > 20 ||
@@ -417,6 +436,11 @@ export function retentionDate(months, now = new Date()) {
   return date;
 }
 export function costForUsage(usage, configuration) {
+  if (usage.route === "deterministic") return { actualCostUsd: 0, actualCostArs: configuration.officialDollarSellRate ? 0 : null };
+  if (usage.operation === "live" || usage.billingUnit === "live-seconds") {
+    const usd = usage.measurement === "provider" && Number.isFinite(usage.billedSeconds) ? usage.billedSeconds * configuration.liveUsdPerMinute / 60 : null;
+    return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null };
+  }
   const rate = configuration.pricing?.[usage.model];
   if (!rate || (usage.measurement && usage.measurement !== "provider"))
     return { actualCostUsd: null, actualCostArs: null };

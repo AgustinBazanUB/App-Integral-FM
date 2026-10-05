@@ -1,7 +1,7 @@
 import { createOliviaStore } from "./_lib/olivia/store.mjs";
 import { openaiRequest } from "./_lib/olivia/provider.mjs";
 export const config = { schedule: "@daily" };
-const TEMPORARY = ["oliviaAttachments", "oliviaUploadBudgets", "oliviaRealtimeToolCalls", "oliviaRealtimeTurns", "oliviaToolEvents"];
+const TEMPORARY = ["oliviaAttachments", "oliviaUploadBudgets", "oliviaRealtimeToolCalls", "oliviaRealtimeTurns", "oliviaToolEvents", "oliviaLiveDelegations"];
 export async function purgeOliviaResources({ store = createOliviaStore(), provider = openaiRequest, now = new Date(), env = process.env, limit = 20, timeBudgetMs = 18000 } = {}) {
   const deadline = Date.now() + Math.min(18000, Math.max(0, timeBudgetMs)), size = Math.min(20, Math.max(1, limit));
   let removed = 0, pending = 0, backlog = false;

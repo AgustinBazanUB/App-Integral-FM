@@ -1,5 +1,7 @@
 # Matriz de requisitos de la evolución
 
+Actualización del 5 de octubre de 2026: el [anexo de modelos y tareas](OLIVIA-MODEL-ROUTER.md) y su [matriz de 52 secciones](OLIVIA-ANNEX-REQUIREMENTS.md) definen la política vigente: Luna HIGH/XHIGH, Sol solo creativo en módulos autorizados y GPT-Live con delegación al mismo backend de texto. Esta matriz conserva la evidencia del prompt maestro; sus perfiles y ruta de voz anteriores quedan reemplazados por el anexo aprobado posteriormente.
+
 Fuente: prompt maestro de 65 secciones aportado por el usuario. Se releyeron sus secciones y se compararon con código, contratos y pruebas. Las filas desglosan requisitos funcionales paralelos dentro de una sección. «Sí» identifica implementación presente; la columna resultado distingue evidencia automatizada, inspección y revisión visual. No significa que se haya probado audio físico o una operación empresarial real.
 
 Rutas abreviadas: `UI` = `src/gestion/olivia/`; `B` = `netlify/functions/_lib/olivia/`; `S` = `src/shared/`. Pruebas: `E` = `tests/olivia-evolution.test.mjs`; `W` = `tests/olivia-workflows.test.mjs`; `I` = `tests/olivia-integrations.test.mjs`; `Base` = suites previas; `Rules` = cuatro suites Firestore descritas en OLIVIA-TESTING. «Visual local» usa componentes/CSS de producción con datos sintéticos y sin proveedor ni escrituras empresariales.
