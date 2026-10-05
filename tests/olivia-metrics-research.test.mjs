@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fixture, start, functionResponse, textResponse } from "./helpers/olivia-fixture.mjs";
 import { runTool } from "../netlify/functions/_lib/olivia/tools.mjs";
-import { salesMetrics, readSales } from "../netlify/functions/_lib/olivia/analytics.mjs";
+import { salesMetrics, readSales, metricsForModel } from "../netlify/functions/_lib/olivia/analytics.mjs";
 import { capabilityAllowed, selectCapabilities } from "../src/shared/oliviaCapabilities.mjs";
 import { providerUsage } from "../netlify/functions/_lib/olivia/provider.mjs";
 import { costForUsage } from "../src/shared/oliviaContracts.mjs";
@@ -11,6 +11,15 @@ import { oliviaInlineParts } from "../src/gestion/olivia/messageFormatting.mjs";
 const historyArgs = { startDate: null, endDate: null, locationId: null, productId: null, sellerId: null };
 const citation = { type: "url_citation", url: "https://example.org/formula", title: "Fórmula" };
 const researchResponse = () => ({ ...textResponse("Método externo verificado."), output: [{ type: "web_search_call", action: { type: "search" } }, { type: "message", content: [{ type: "output_text", text: "Método externo verificado.", annotations: [citation, citation, { type: "url_citation", url: "javascript:alert(1)" }] }] }] });
+
+test("long metric details retain full computed totals, dates and unit leaders within the model budget", () => {
+  const data = { source: "Panel de Métricas", total: 12345, count: 50, averageTicket: 246.9, partial: false, daily: Array.from({ length: 1000 }, (_, n) => ({ id: String(n), amount: n })), products: Array.from({ length: 100 }, (_, n) => ({ name: "Producto ".repeat(20), units: n })), topProductsByUnits: [{ name: "Primero", units: 100 }], period: { start: "2022-01-01", end: "2026-10-05", scope: "all-time" } };
+  const result = metricsForModel(data);
+  assert.ok(JSON.stringify(result).length <= 12000);
+  assert.equal(result.total, 12345); assert.equal(result.averageTicket, 246.9); assert.equal(result.partial, false);
+  assert.deepEqual(result.period, data.period); assert.equal(result.topProductsByUnits[0].units, 100);
+  assert.equal(result.detailsTruncated, true); assert.equal(result.detailLimits.daily.available, 1000);
+});
 
 test("missing metric period asks instead of reading an assumed month", async () => {
   const f = fixture({ role: "admin" });

@@ -1,4 +1,5 @@
 import { executeToolBatch } from "./toolExecution.mjs";
+import { metricsForModel } from "./analytics.mjs";
 import { aggregateVoiceCosts } from "../../../../src/shared/oliviaVoicePricing.mjs";
 import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, taskSlotSchema, requiredFields, isCorrection, operationalIntent, shortVoiceQuestion } from "./tasks.mjs";
 import { aggregateRoutes } from "./modelRouter.mjs";
@@ -698,10 +699,11 @@ export function createOliviaEngine({
               content = result.data.message;
             }
           }
+          const modelData = result.data?.source?.startsWith("Panel de Métricas") ? metricsForModel(result.data) : result.data || {};
           input.push({
             type: "function_call_output",
             call_id: call.call_id,
-            output: JSON.stringify(result.data || {}).length <= 12000 ? JSON.stringify(result.data || {}) : JSON.stringify({ truncated: true, summary: JSON.stringify(result.data || {}).slice(0, 10000) }),
+            output: JSON.stringify(modelData).length <= 12000 ? JSON.stringify(modelData) : JSON.stringify({ truncated: true, summary: JSON.stringify(modelData).slice(0, 10000) }),
           });
           await store.commit([{ type: "create", path: `oliviaToolEvents/${hash(`${session.uid}:${requestId}:${toolCallCount}:${outcomes.indexOf(outcome)}:${call.call_id}`)}`, data: { userId: session.uid, userName: session.profile.name || "Usuario", role: normalizedRole(session.profile), conversationId: id, requestId, tool: call.name, skills: activeSkills.map(({ name, version }) => ({ name, version })), module: context.module, mode: body.inputMode || "text", result: outcome.error ? "failed" : "completed", origin: "Asistente IA / Olivia", createdAt: clock(), expiresAt: new Date(clock().getTime() + 30 * 86400000) } }]);
         }

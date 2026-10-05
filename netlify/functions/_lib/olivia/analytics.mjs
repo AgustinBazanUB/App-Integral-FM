@@ -3,6 +3,26 @@ import { oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
 import { calculateMetrics, buildMetricsCustomRange } from "../../../../src/modules/locations/domain/metrics.js";
 import { saleDate } from "../../../../src/modules/locations/domain/saleFacts.js";
 
+// Bound the model's detailed lists, never the computed totals or period.
+// Data-read partiality and display truncation are independent facts.
+export function metricsForModel(data, maxBytes = 12000) {
+  if (JSON.stringify(data).length <= maxBytes) return data;
+  let limit = 20;
+  for (;;) {
+    const detailLimits = {};
+    const compact = (value, prefix = "") => Object.fromEntries(Object.entries(value).map(([key, item]) => {
+      if (Array.isArray(item)) {
+        if (item.length > limit) detailLimits[prefix + key] = { shown: limit, available: item.length };
+        return [key, item.slice(0, limit)];
+      }
+      return [key, key === "previous" && item ? compact(item, "previous.") : item];
+    }));
+    const result = { ...compact(data), detailsTruncated: true, detailLimits };
+    if (JSON.stringify(result).length <= maxBytes || limit === 1) return result;
+    limit = Math.max(1, Math.floor(limit / 2));
+  }
+}
+
 // The assistant and Metrics panel share the same commercial calculations.
 // Keep the compact tool contract, including cancelled sales outside revenue.
 export function panelMetricsSummary(rows, period, args = {}) {
