@@ -509,7 +509,7 @@ export function createOliviaEngine({
           store: false,
           instructions: OLIVIA_INSTRUCTIONS + (voiceSessionId ? "\n" + OLIVIA_VOICE_INSTRUCTIONS : "") + "\nAntes de pedir aclaraciones, usá update_task para conservar parámetros parciales. Consultá historia, pantalla y herramientas para resolver entidades por nombre; nunca pidas IDs al usuario. Reutilizá taskState.slots y aplicá correcciones sobre la misma tarea. Al cambiar de intención empezá una nueva tarea. Para análisis simple inferí un período razonable con businessTime y declaralo. Para transferencias consultá depósitos y stock; si solo un origen autorizado alcanza, proponelo; si varios alcanzan, preguntá cuál. Nunca inventes cantidades recibidas físicamente. Una tarea creativa solo existe en marketing/social autorizados." + (activeSkills.length ? "\nProcesos versionados permitidos (no conceden permisos):\n" + activeSkills.map((skill) => skill.content).join("\n\n") : ""),
           input,
-          tools: finalResponse ? [] : [...toolDefinitions(session, { query: userMessage, context, required: activeSkills.flatMap((skill) => skill.requiredTools), loaded: [...loadedTools] }), taskUpdateTool(capabilities(session))],
+          tools: finalResponse ? [] : [...toolDefinitions(session, { query: userMessage, context, required: [...activeSkills.flatMap((skill) => skill.requiredTools), taskState.intent], loaded: [...loadedTools] }), taskUpdateTool(capabilities(session))],
           ...(finalResponse ? { tool_choice: "none" } : {}),
           parallel_tool_calls: true,
           max_output_tokens: config.responseLimits.maxOutputTokens,

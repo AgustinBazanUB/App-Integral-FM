@@ -75,7 +75,19 @@ export async function runExtendedTool({ session, name, args, store, context, now
     const rows = name === "get_stock_movements"
       ? await store.query("stockMovements", [[args.inventoryType === "warehouse" ? "warehouseId" : "locationId", "EQUAL", id], ...(args.productId ? [["productId", "EQUAL", args.productId]] : [])], 100, [["createdAt", "DESCENDING"]])
       : await store.query(`${args.inventoryType === "warehouse" ? "warehouseStock" : "locationStock"}/${safeId(id)}/items`, [], 150);
-    return { data: { owner: { id, name: owner.name, type: args.inventoryType }, items: rows.filter((row) => !row.deleted).map((row) => project(row, ["productId", "productName", "currentStock", "previousStock", "newStock", "type", "qty", "requestedQty", "receivedQty", "reason", "createdAt"])), partial: rows.length === (name === "get_stock_movements" ? 100 : 150), observedAt: now.toISOString() } };
+    const items = rows.filter((row) => !row.deleted).map((row) => project(row, ["productId", "productName", "currentStock", "previousStock", "newStock", "type", "qty", "requestedQty", "receivedQty", "reason", "createdAt"]));
+    if (name === "get_inventory_summary") {
+      // Old inventory records may omit the display name. Resolve only those
+      // products, with bounded concurrency; unknown quantities remain unknown.
+      const missingNames = items.filter((item) => !item.productName);
+      for (let index = 0; index < missingNames.length; index += 3) {
+        await Promise.all(missingNames.slice(index, index + 3).map(async (item) => {
+          const product = await store.get(`products/${safeId(item.productId || item.id)}`);
+          if (product?.name) item.productName = product.name;
+        }));
+      }
+    }
+    return { data: { owner: { id, name: owner.name, type: args.inventoryType }, items, partial: rows.length === (name === "get_stock_movements" ? 100 : 150), observedAt: now.toISOString() } };
   }
   if (name === "list_warehouses" || name === "get_transfer_history") {
     const rows = await store.query(name === "list_warehouses" ? "warehouses" : "stockTransfers", [], 100, name === "list_warehouses" ? [] : [["createdAt", "DESCENDING"]]);

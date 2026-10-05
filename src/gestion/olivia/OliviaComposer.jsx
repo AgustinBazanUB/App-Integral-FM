@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { IconButton } from "../../design-system";
 
 export default function OliviaComposer({ textareaRef, draft, setDraft, sendMessage, recording, frame, stopRecording,
-  startRecording, startVoice, stopVoice, voiceTrialAvailable, voiceMode, setVoiceMode, voiceActive, muted, toggleMute, disabled, busy, cancelRequest, attachments = [], addFiles, removeFile }) {
+  startRecording, startVoice, stopVoice, voiceTrialAvailable, voiceMode, setVoiceMode, voiceActive, muted, toggleMute, sendingDisabled = false, disabled, busy, cancelRequest, attachments = [], addFiles, removeFile }) {
   const picker = useRef(null), camera = useRef(null), menu = useRef(null);
   const selectFiles = (event) => { addFiles(Array.from(event.target.files || [])); event.target.value = ""; if (menu.current) menu.current.open = false; textareaRef.current?.focus(); };
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function OliviaComposer({ textareaRef, draft, setDraft, sendMessa
       <textarea ref={textareaRef} id="fm-olivia-message" rows="1" maxLength={4000} value={draft} placeholder="Escribile a Olivia…" disabled={disabled} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); sendMessage(); } }} />
       <IconButton label={voiceActive ? muted ? "Activar micrófono" : "Silenciar micrófono" : "Dictar un mensaje"} icon={voiceActive && muted ? "MicOff" : "Mic"} aria-pressed={voiceActive ? muted : undefined} disabled={!voiceActive && (busy || disabled)} onClick={voiceActive ? toggleMute : startRecording} />
       <IconButton label={voiceActive ? "Finalizar conversación por voz" : "Conversar con Olivia por voz"} icon="AudioLines" aria-pressed={voiceActive} disabled={!voiceActive && (busy || disabled)} onClick={voiceActive ? stopVoice : startVoice} />
-      {busy ? <IconButton label="Detener respuesta" icon="Square" onClick={cancelRequest} /> : <IconButton label="Enviar mensaje" icon="Send" disabled={disabled || uploading || (!draft.trim() && !attachments.some((file) => file.id))} onClick={sendMessage} />}
+      {busy ? <IconButton label="Detener respuesta" icon="Square" onClick={cancelRequest} /> : <IconButton label="Enviar mensaje" icon="Send" disabled={disabled || sendingDisabled || uploading || (!draft.trim() && !attachments.some((file) => file.id))} onClick={sendMessage} />}
     </div>}
     <small>{recording ? "Escuchando. Podés cancelar, revisar el dictado o enviarlo directamente." : "Los cambios del negocio requieren confirmación en la tarjeta."}</small>
     {voiceTrialAvailable && !recording && !voiceActive ? <select className="fm-olivia-voice-mode" aria-label="Modo de conversación por voz" value={voiceMode} disabled={disabled || busy} onChange={(event) => setVoiceMode(event.target.value)}><option value="default">Voz actual</option><option value="realtime-mini">Voz económica · prueba</option></select> : null}
