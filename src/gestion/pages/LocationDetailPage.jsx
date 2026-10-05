@@ -174,7 +174,7 @@ function AddLocationProductModal({ open, location, inventory, categories, profil
       open={open}
       onClose={() => !state.busy && onClose?.()}
       title="Agregar producto"
-      description={`Elegí un producto del catálogo. Si todavía no está en ${location?.name || "esta ubicación"}, se agrega; si ya está, podés sumar stock sin crear un duplicado.`}
+      description={`Agrega a ${location?.name || "esta ubicación"} un producto que ya existe en el catálogo de Flor Mía. Si ya está vinculado, podés sumar stock sin crear un duplicado.`}
     >
       <form className="fm-inventory-modal" onSubmit={submit}>
         <div className="fm-inventory-picker-filters">
