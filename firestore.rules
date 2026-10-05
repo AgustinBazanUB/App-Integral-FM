@@ -9,26 +9,50 @@ service cloud.firestore {
       let user = profile();
       return signedIn() && user.active == true;
     }
+    function normalizedRoleValue(role) {
+      return role in ["administrator", "administrador"] ? "admin"
+        : role == "administrador_general" ? "general_admin"
+        : role == "administrador_operativo" ? "operational_admin"
+        : role == "encargado_ubicacion" ? "location_manager"
+        : role == "responsable_deposito" ? "warehouse_manager"
+        : role == "responsable_marketing" ? "marketing_manager"
+        : role == "responsable_ecommerce" ? "ecommerce_manager"
+        : role == "responsable_envios" ? "shipping_manager"
+        : role == "responsable_proveedores" ? "supplier_manager"
+        : role == "responsable_financiero" ? "financial_manager"
+        : role == "analista_metricas" ? "analyst"
+        : role;
+    }
     function adminRole() {
       let user = profile();
+      let role = normalizedRoleValue(user.role);
       return (
-        user.role == "admin"
-        || user.role == "general_admin"
+        role in ["admin", "general_admin"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
       );
     }
     function isAdmin() { return activeUser() && adminRole(); }
-    function explicitPermission(moduleId, action) {
-      let user = profile();
+    function explicitPermissionFor(user, moduleId, action) {
       return ("permissions" in user)
         && (moduleId in user.permissions)
-        && (user.permissions[moduleId] is list)
-        && (action in user.permissions[moduleId] || "admin" in user.permissions[moduleId]);
+        && (
+          ((user.permissions[moduleId] is list)
+            && (action in user.permissions[moduleId] || "admin" in user.permissions[moduleId]))
+          || ((user.permissions[moduleId] is map)
+            && (
+              ((action in user.permissions[moduleId]) && user.permissions[moduleId][action] == true)
+              || (("admin" in user.permissions[moduleId]) && user.permissions[moduleId]["admin"] == true)
+            ))
+        );
+    }
+    function explicitPermission(moduleId, action) {
+      let user = profile();
+      return explicitPermissionFor(user, moduleId, action);
     }
     function roleModule(moduleId) {
-      let role = profile().role;
+      let role = normalizedRoleValue(profile().role);
       return (
         (role == "seller" && moduleId in ["locations", "quick-sales", "alerts"])
         || (role == "location_manager" && moduleId in ["locations", "quick-sales", "metrics", "alerts"])
@@ -43,7 +67,7 @@ service cloud.firestore {
       );
     }
     function rolePermission(moduleId, action) {
-      let role = profile().role;
+      let role = normalizedRoleValue(profile().role);
       return (
         (action == "view" && roleModule(moduleId))
         || (role == "seller"
@@ -81,7 +105,7 @@ service cloud.firestore {
           && action in ["create", "edit", "export", "approve", "transferStock"])
         || (role == "financial_manager"
           && moduleId == "finance"
-          && action in ["create", "edit", "export", "approve"])
+          && action in ["create", "edit", "export", "approve", "admin"])
         || (role == "analyst" && moduleId == "metrics" && action == "export")
         || (role == "operational_admin"
           && moduleId != "finance"
@@ -100,31 +124,105 @@ service cloud.firestore {
     }
     function allowedLocation(locationId) {
       let user = profile();
+      let role = normalizedRoleValue(user.role);
       return signedIn() && user.active == true && (
-        user.role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
+        role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
-        || (("permissions" in user)
-          && ("locations" in user.permissions)
-          && (user.permissions.locations is list)
-          && ("viewAllLocations" in user.permissions.locations || "admin" in user.permissions.locations))
+        || explicitPermissionFor(user, "locations", "viewAllLocations")
         || (("allowedLocationIds" in user) && locationId in user.allowedLocationIds)
       );
     }
     function quickSalesPermission(action) {
       let user = profile();
+      let role = normalizedRoleValue(user.role);
       return signedIn() && user.active == true && (
-        user.role in ["admin", "general_admin", "operational_admin"]
+        role in ["admin", "general_admin", "operational_admin"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
-        || (user.role in ["seller", "location_manager"] && action in ["view", "create", "edit"])
-        || (("permissions" in user)
-          && ("quick-sales" in user.permissions)
-          && (user.permissions["quick-sales"] is list)
-          && (action in user.permissions["quick-sales"] || "admin" in user.permissions["quick-sales"]))
+        || (role in ["seller", "location_manager"] && action in ["view", "create", "edit"])
+        || explicitPermissionFor(user, "quick-sales", action)
       );
+    }
+    function validOperationalLocationStockCreate(locationId, productId) {
+      let user = profile();
+      let role = normalizedRoleValue(user.role);
+      let locationAllowed = role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles))
+        || explicitPermissionFor(user, "locations", "viewAllLocations")
+        || (("allowedLocationIds" in user) && locationId in user.allowedLocationIds);
+      let canManage = role in ["admin", "general_admin", "operational_admin", "location_manager"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles))
+        || explicitPermissionFor(user, "locations", "configureLocationProducts")
+        || explicitPermissionFor(user, "locations", "loadStock")
+        || explicitPermissionFor(user, "locations", "adjustStock")
+        || role in ["warehouse_manager", "supplier_manager"]
+        || explicitPermissionFor(user, "warehouse", "transferStock");
+      return signedIn()
+        && user.active == true
+        && locationAllowed
+        && canManage
+        && request.resource.data.productId == productId
+        && request.resource.data.currentStock is int
+        && request.resource.data.currentStock >= 0;
+    }
+    function validOperationalLocationStockMutation(locationId, productId) {
+      let user = profile();
+      let role = normalizedRoleValue(user.role);
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let locationAllowed = role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles))
+        || explicitPermissionFor(user, "locations", "viewAllLocations")
+        || (("allowedLocationIds" in user) && locationId in user.allowedLocationIds);
+      let commonManager = role in ["admin", "general_admin", "operational_admin", "location_manager"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles));
+      let configureAllowed = commonManager
+        || explicitPermissionFor(user, "locations", "configureLocationProducts");
+      let loadAllowed = commonManager
+        || explicitPermissionFor(user, "locations", "loadStock")
+        || explicitPermissionFor(user, "locations", "adjustStock");
+      let transferAllowed = role in ["admin", "general_admin", "operational_admin", "warehouse_manager", "supplier_manager"]
+        || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
+        || (("isAdmin" in user) && user.isAdmin == true)
+        || (("roles" in user) && ("admin" in user.roles))
+        || explicitPermissionFor(user, "warehouse", "transferStock");
+      let configureShape = changed.hasOnly([
+        "productId", "productName", "abbreviation", "presentation",
+        "categoryId", "categoryName", "imageUrl", "thumbUrl",
+        "price", "priceMode", "priceOverride", "masterDefaultPrice",
+        "yellowAlertQty", "redAlertQty", "active", "deleted",
+        "updatedAt", "updatedBy"
+      ]);
+      let loadShape = changed.hasOnly([
+        "productId", "productName", "abbreviation", "presentation",
+        "categoryId", "categoryName", "imageUrl", "thumbUrl",
+        "price", "priceMode", "priceOverride", "masterDefaultPrice",
+        "initialStock", "currentStock", "lastSaleId", "lastMovementId",
+        "yellowAlertQty", "redAlertQty", "active", "deleted", "deletedAt",
+        "productDeleted", "updatedAt", "updatedBy"
+      ]);
+      let transferShape = changed.hasOnly([
+        "currentStock", "lastMovementId", "updatedAt", "updatedBy"
+      ]);
+      return signedIn()
+        && user.active == true
+        && locationAllowed
+        && request.resource.data.productId == productId
+        && request.resource.data.currentStock is int
+        && request.resource.data.currentStock >= 0
+        && ((configureAllowed && configureShape)
+          || (loadAllowed && loadShape)
+          || (transferAllowed && transferShape));
     }
     function locationNotDeleted(location) {
       return !("deleted" in location) || location.deleted != true;
@@ -158,8 +256,6 @@ service cloud.firestore {
       return allowedLocation(locationId)
         && locationNotDeleted(location)
         && locationNotPaused(location)
-        && locationScheduleStarted(location)
-        && locationScheduleNotEnded(location)
         && location.active == true;
     }
     function validPaymentPart(part) {
@@ -198,9 +294,10 @@ service cloud.firestore {
       let sale = getAfter(/databases/$(database)/documents/sales/$(request.resource.data.lastSaleId)).data;
       let movementPath = /databases/$(database)/documents/stockMovements/$(request.resource.data.lastMovementId);
       let movement = getAfter(movementPath).data;
-      return !exists(movementPath)
-        && existsAfter(movementPath)
-        && sale.sellerId == request.auth.uid
+      return ((resource.data.currentStock < 0 || request.resource.data.currentStock < 0)
+          ? movement.createdAt == request.time
+          : (!exists(movementPath) && existsAfter(movementPath)))
+        && (sale.sellerId == request.auth.uid || isAdmin())
         && sale.locationId == locationId
         && sale.status in ["active", "cancelled"]
         && movement.userId == request.auth.uid
@@ -208,7 +305,8 @@ service cloud.firestore {
         && movement.productId == productId
         && movement.saleId == request.resource.data.lastSaleId
         && movement.previousStock == resource.data.currentStock
-        && movement.newStock == request.resource.data.currentStock;
+        && movement.newStock == request.resource.data.currentStock
+        && movement.newStock == movement.previousStock + movement.qty;
     }
     function validSellerStockMutation(locationId, productId) {
       return quickSalesPermission("edit")
@@ -217,10 +315,62 @@ service cloud.firestore {
           "currentStock", "lastSaleId", "lastMovementId", "updatedAt"
         ])
         && request.resource.data.currentStock is int
-        && request.resource.data.currentStock >= 0
+        && (request.resource.data.currentStock >= 0 || (
+          resource.data.get("active", true) == true
+          && resource.data.get("deleted", false) != true
+          && resource.data.get("productDeleted", false) != true))
         && request.resource.data.lastSaleId is string
         && request.resource.data.lastMovementId is string
         && linkedSellerStockMutation(locationId, productId);
+    }
+    // Sólo ventas atómicas pueden originar un saldo negativo. Los índices
+    // enlazan la cantidad del movimiento con los ítems antes/después de la venta.
+    function validNegativeSaleEffect(data) {
+      let salePath = /databases/$(database)/documents/sales/$(data.saleId);
+      let sale = getAfter(salePath).data;
+      let original = exists(salePath) ? get(salePath).data : {"items": [], "status": ""};
+      let beforeIndex = data.get("previousSaleItemIndex", -2);
+      let afterIndex = data.get("saleItemIndex", -2);
+      let before = beforeIndex >= 0 && beforeIndex < original.items.size() ? original.items[beforeIndex] : {"productId": data.productId, "qty": 0};
+      let after = afterIndex >= 0 && afterIndex < sale.items.size() ? sale.items[afterIndex] : {"productId": data.productId, "qty": 0};
+      return sale.locationId == data.locationId
+        && (sale.sellerId == request.auth.uid || isAdmin())
+        && sale.updatedAt == request.time
+        && sale.get("deleted", false) != true
+        && original.get("deleted", false) != true
+        && beforeIndex is int && beforeIndex >= -1 && beforeIndex < original.items.size()
+        && afterIndex is int && afterIndex >= -1 && afterIndex < sale.items.size()
+        && before.productId == data.productId && after.productId == data.productId
+        && before.qty is int && before.qty >= 0 && after.qty is int && after.qty >= 0
+        && data.qty != 0 && data.qty == before.qty - after.qty
+        && ((data.type == "sale" && !exists(salePath) && sale.status == "active" && beforeIndex == -1 && afterIndex >= 0)
+          || (data.type == "sale_edit" && original.status == "active" && sale.status == "active" && (beforeIndex >= 0 || afterIndex >= 0))
+          || (data.type == "sale_cancel" && original.status == "active" && sale.status == "cancelled" && beforeIndex >= 0 && afterIndex == -1));
+    }
+    function linkedNegativeLocationMovement(data, movementId) {
+      let stock = getAfter(/databases/$(database)/documents/locationStock/$(data.locationId)/items/$(data.productId)).data;
+      return stock.lastMovementId == movementId
+        && stock.currentStock == data.newStock
+        && data.newStock == data.previousStock + data.qty
+        && data.createdAt == request.time
+        && ((data.type in ["sale", "sale_edit", "sale_cancel"]
+            && stock.lastSaleId == data.saleId && validNegativeSaleEffect(data))
+          || (data.type == "add" && data.previousStock < 0 && data.qty > 0));
+    }
+    function validNegativeStockRecovery(locationId, productId) {
+      let movement = getAfter(/databases/$(database)/documents/stockMovements/$(request.resource.data.lastMovementId)).data;
+      return canModule("locations", "loadStock") && allowedLocation(locationId)
+        && resource.data.currentStock < 0
+        && request.resource.data.currentStock is int
+        && request.resource.data.currentStock > resource.data.currentStock
+        && request.resource.data.productId == productId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["currentStock", "lastMovementId", "updatedAt", "updatedBy"])
+        && movement.userId == request.auth.uid && movement.locationId == locationId && movement.productId == productId
+        && movement.type == "add" && movement.qty > 0
+        && movement.previousStock == resource.data.currentStock
+        && movement.newStock == request.resource.data.currentStock
+        && movement.newStock == movement.previousStock + movement.qty
+        && movement.createdAt == request.time;
     }
     function ownsNewRecord() {
       return request.resource.data.createdBy == request.auth.uid;
@@ -384,7 +534,8 @@ service cloud.firestore {
       return profile().role == "marketing_manager" && action in [
         "metaAdsView", "metaAdsCreateProject", "metaAdsEditProject", "metaAdsArchiveProject",
         "metaAdsManageKnowledge", "metaAdsManageTheory",
-        "metaAdsPlanCampaign", "metaAdsApprovePlan"
+        "metaAdsPlanCampaign", "metaAdsApprovePlan",
+        "metaAdsViewCreativeWorkspace", "metaAdsUploadCreative"
       ];
     }
     function metaAdsCan(action) {
@@ -492,11 +643,27 @@ service cloud.firestore {
           && (data.approvedPlanRevision == null || (data.approvedPlanRevision is int && data.approvedPlanRevision >= 1 && data.approvedPlanRevision <= data.latestPlanRevision))
           && data.lastPlanningAt is timestamp && data.lastPlanningBy is string && data.lastPlanningBy.size() > 0);
     }
+    function validMetaAdsDriveFields(data) {
+      let fields = ["driveFolderId","driveConnectionId","driveId","driveProvisionedAt","driveStructure"];
+      return !data.keys().hasAny(fields)
+        || (data.keys().hasAll(fields)
+          && data.driveFolderId is string && data.driveFolderId.size() > 0 && data.driveFolderId.size() <= 220
+          && data.driveConnectionId == "googleDrive"
+          && (data.driveId == null || (data.driveId is string && data.driveId.size() <= 220))
+          && data.driveProvisionedAt is timestamp
+          && data.driveStructure is map
+          && data.driveStructure.keys().hasAll(["sourceFolderId","rendersFolderId","finalFolderId","categories"])
+          && data.driveStructure.keys().hasOnly(["sourceFolderId","rendersFolderId","finalFolderId","categories"])
+          && data.driveStructure.sourceFolderId is string && data.driveStructure.sourceFolderId.size() <= 220
+          && data.driveStructure.rendersFolderId is string && data.driveStructure.rendersFolderId.size() <= 220
+          && data.driveStructure.finalFolderId is string && data.driveStructure.finalFolderId.size() <= 220
+          && data.driveStructure.categories is map && data.driveStructure.categories.size() <= 40);
+    }
     function validMetaAdsCampaignProject(data) {
-      return data.keys().hasOnly(["name","channel","status","schemaVersion","productId","productNameSnapshot","archived","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt","archivedAt","archivedBy","archivedByName","planningStatus","theoryId","theoryVersionId","theoryVersion","theoryNameSnapshot","latestPlanRevision","approvedPlanRevision","lastPlanningAt","lastPlanningBy"])
+      return data.keys().hasOnly(["name","channel","status","schemaVersion","productId","productNameSnapshot","archived","createdBy","createdByName","createdAt","updatedBy","updatedByName","updatedAt","archivedAt","archivedBy","archivedByName","planningStatus","theoryId","theoryVersionId","theoryVersion","theoryNameSnapshot","latestPlanRevision","approvedPlanRevision","lastPlanningAt","lastPlanningBy","driveFolderId","driveConnectionId","driveId","driveProvisionedAt","driveStructure"])
         && data.name is string && data.name.size() > 0 && data.name.size() <= 120 && data.channel == "meta_ads" && data.schemaVersion == 1
         && validMetaAdsStatus(data.status) && data.archived is bool && data.archived == (data.status == "archived")
-        && validMetaAdsProduct(data) && validMetaAdsPlanningFields(data)
+        && validMetaAdsProduct(data) && validMetaAdsPlanningFields(data) && validMetaAdsDriveFields(data)
         && data.createdBy is string && data.createdBy.size() > 0 && data.createdByName is string && data.createdByName.size() > 0 && data.createdAt is timestamp
         && data.updatedBy is string && data.updatedBy.size() > 0 && data.updatedByName is string && data.updatedByName.size() > 0 && data.updatedAt is timestamp
         && ((data.status == "archived" && ("archivedAt" in data) && data.archivedAt is timestamp && ("archivedBy" in data) && data.archivedBy is string && data.archivedBy.size() > 0 && ("archivedByName" in data) && data.archivedByName is string && data.archivedByName.size() > 0)
@@ -619,7 +786,7 @@ service cloud.firestore {
         && plan.creativePieces is list && plan.creativePieces.size() <= 100 && plan.assumptions is list && plan.assumptions.size() <= 30 && plan.warnings is list && plan.warnings.size() <= 30;
     }
     function campaignPlanTheoryMatches(data,campaignId) {
-      let project = get(/databases/$(database)/documents/metaCampaignProjects/$(campaignId)).data;
+      let project = getAfter(/databases/$(database)/documents/metaCampaignProjects/$(campaignId)).data;
       return data.theoryId == project.theoryId && data.theoryVersionId == project.theoryVersionId && data.theoryVersion == project.theoryVersion;
     }
     function validCampaignPlanRecord(data,campaignId) {
@@ -696,27 +863,37 @@ service cloud.firestore {
           "price", "effectivePrice", "priceMode", "priceOverride", "masterDefaultPrice"
         ]);
     }
-    function validInventoryMovement(data) {
+    function validInventoryMovement(data, movementId) {
       return data.userId == request.auth.uid
         && data.productId is string
         && data.previousStock is int
-        && data.previousStock >= 0
+        && (data.previousStock >= 0 || (data.get("locationId", null) is string && data.type in ["sale", "sale_edit", "sale_cancel", "add", "adjustment"]))
         && data.newStock is int
-        && data.newStock >= 0
+        && ((data.previousStock >= 0 && data.newStock >= 0)
+          || (data.get("locationId", null) is string && (
+            (data.type == "adjustment" && data.newStock >= 0)
+            || linkedNegativeLocationMovement(data, movementId))))
         && data.qty is int
         && data.saleId is string
-        && ((data.inventoryType == "warehouse"
-            && data.warehouseId is string
-            && canModule("warehouse", "edit"))
-          || (data.inventoryType == "location"
-            && data.locationId is string
-            && allowedLocation(data.locationId)
-            && (canModule("locations", "loadStock")
-              || canModule("locations", "configureLocationProducts")
-              || canModule("warehouse", "transferStock")))
-          || (data.locationId is string
-            && allowedLocation(data.locationId)
-            && quickSalesPermission("edit")));
+        && (!(data.type in ["adjustment", "initial_adjustment"])
+          || (data.inventoryType == "location" && canModule("locations", "adjustStock"))
+          || (data.inventoryType == "warehouse" && canModule("warehouse", "adjustStock")))
+        && (
+          (data.locationId is string
+            && data.type in ["sale", "sale_edit", "sale_cancel"]
+            && quickSalesPermission("edit")
+            && allowedLocation(data.locationId))
+          || ((data.inventoryType == "warehouse"
+                && data.warehouseId is string
+                && canModule("warehouse", "edit"))
+              || (data.inventoryType == "location"
+                && data.locationId is string
+                && allowedLocation(data.locationId)
+                && (canModule("locations", "loadStock")
+                  || canModule("locations", "adjustStock")
+                  || canModule("locations", "configureLocationProducts")
+                  || canModule("warehouse", "transferStock"))))
+        );
     }
 
     match /users/{uid} {
@@ -740,8 +917,8 @@ service cloud.firestore {
           && allowedLocation(locationId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "name", "type", "codePrefix", "dniMode", "active",
-            "scheduleStartAt", "scheduleEndAt", "startDateTime", "endDateTime",
-            "manualInactiveUntil", "manualInactiveDays", "updatedBy", "updatedByName",
+            "scheduleStartAt", "scheduleEndAt", "startDateTime", "endDateTime", "operatingCalendar",
+            "manualInactiveUntil", "manualInactiveUntilDateTime", "manualInactiveDays", "updatedBy", "updatedByName",
             "updatedAt"
           ]))
         || (canModule("locations", "archive")
@@ -785,51 +962,19 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /settings/{settingId} {
-      allow get: if activeUser();
-      allow list, create, update: if isAdmin();
+      allow get: if activeUser() && (settingId != "financeConfig" || canModule("finance", "view"));
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() || (settingId == "financeConfig" && canModule("finance", "admin"));
       allow delete: if false;
     }
     match /locationStock/{locationId} {
       allow read, write: if isAdmin();
       match /items/{productId} {
         allow read: if activeUser() && allowedLocation(locationId);
-        allow create: if isAdmin()
-          || ((canModule("warehouse", "transferStock")
-              || canModule("locations", "configureLocationProducts")
-              || canModule("locations", "loadStock")
-              || canModule("locations", "adjustStock"))
-            && allowedLocation(locationId)
-            && request.resource.data.productId == productId
-            && request.resource.data.currentStock is int
-            && request.resource.data.currentStock >= 0);
-        allow update: if isAdmin()
+        allow create: if validOperationalLocationStockCreate(locationId, productId);
+        allow update: if validOperationalLocationStockMutation(locationId, productId)
           || validSellerStockMutation(locationId, productId)
-          || (canModule("warehouse", "transferStock")
-            && allowedLocation(locationId)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              "currentStock", "lastMovementId", "updatedAt", "updatedBy"
-            ])
-            && request.resource.data.currentStock is int
-            && request.resource.data.currentStock >= 0)
-          || (canModule("locations", "configureLocationProducts")
-            && allowedLocation(locationId)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              "productId", "productName", "abbreviation", "categoryId", "categoryName",
-              "imageUrl", "thumbUrl", "price", "priceMode", "priceOverride",
-              "masterDefaultPrice", "yellowAlertQty", "redAlertQty",
-              "active", "deleted", "updatedAt", "updatedBy"
-            ]))
-          || ((canModule("locations", "loadStock") || canModule("locations", "adjustStock"))
-            && allowedLocation(locationId)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              "productId", "productName", "abbreviation", "categoryId", "categoryName",
-              "imageUrl", "thumbUrl", "price", "priceMode", "priceOverride",
-              "masterDefaultPrice", "initialStock", "currentStock", "lastMovementId",
-              "yellowAlertQty", "redAlertQty", "active", "deleted", "deletedAt",
-              "productDeleted", "updatedAt", "updatedBy"
-            ])
-            && request.resource.data.currentStock is int
-            && request.resource.data.currentStock >= 0);
+          || validNegativeStockRecovery(locationId, productId);
         allow delete: if false;
       }
     }
@@ -855,26 +1000,50 @@ service cloud.firestore {
         allow delete: if false;
       }
     }
+    function hasFiscalInvoice(saleId, data) {
+      return ("fiscalInvoiceId" in data && data.fiscalInvoiceId != null)
+        || ("fiscalInvoice" in data && data.fiscalInvoice != null)
+        || exists(/databases/$(database)/documents/invoices/$("invoice_homologation_admin_quick_sale_" + saleId))
+        || exists(/databases/$(database)/documents/invoices/$("invoice_production_admin_quick_sale_" + saleId))
+        || exists(/databases/$(database)/documents/invoices/$("invoice_homologation_seller_sale_" + saleId))
+        || exists(/databases/$(database)/documents/invoices/$("invoice_production_seller_sale_" + saleId))
+        || exists(/databases/$(database)/documents/invoices/$("invoice_admin_quick_sale_" + saleId))
+        || exists(/databases/$(database)/documents/invoices/$("invoice_seller_sale_" + saleId));
+    }
+    function safeNewSaleFiscalFields(data) {
+      return !data.keys().hasAny(["fiscalInvoiceId", "fiscalInvoice", "fiscalEnvironment", "fiscalUpdatedAt", "authorization", "verification", "cae", "voucherNumber"])
+        && (!("invoiceStatus" in data) || data.invoiceStatus in ["pending", "not_requested"]);
+    }
     match /sales/{saleId} {
-      allow get: if isAdmin()
+      allow get: if isAdmin() || canModule("finance", "view") || canModule("loyal-customers", "view")
+        || (canModule("metrics", "view") && profile().role == "analyst")
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
-      allow list: if isAdmin()
+      allow list: if isAdmin() || canModule("finance", "view") || canModule("loyal-customers", "view")
+        || (canModule("metrics", "view") && profile().role == "analyst")
         || (activeUser() && resource.data.sellerId == request.auth.uid)
         || (canModule("quick-sales", "view") && allowedLocation(resource.data.locationId));
-      allow create: if isAdmin()
-        || (quickSalesPermission("create")
+      // Las ventas Ecommerce se crean exclusivamente desde backend después de
+      // validar precio/stock/pago. Ni siquiera un admin cliente puede fabricarlas.
+      allow create: if (!("sourceType" in request.resource.data) || request.resource.data.sourceType != "ecommerce")
+        && safeNewSaleFiscalFields(request.resource.data)
+        && ((quickSalesPermission("create")
           && activeQuickSalesLocation(request.resource.data.locationId)
-          && validSale(request.resource.data));
-      allow update: if isAdmin()
-        || (quickSalesPermission("edit")
+          && validSale(request.resource.data))
+        || isAdmin());
+      allow update: if (!("sourceType" in resource.data) || resource.data.sourceType != "ecommerce")
+        && !hasFiscalInvoice(saleId, resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["fiscalInvoiceId", "fiscalInvoice", "fiscalEnvironment", "fiscalUpdatedAt", "invoiceStatus", "authorization", "verification", "cae", "voucherNumber", "sourceType", "paymentStatus", "paymentProvider"])
+        && (!("sourceType" in request.resource.data) || request.resource.data.sourceType != "ecommerce")
+        && ((quickSalesPermission("edit")
           && resource.data.sellerId == request.auth.uid
           && request.resource.data.sellerId == resource.data.sellerId
           && request.resource.data.locationId == resource.data.locationId
           && resource.data.status == "active"
           && request.resource.data.status in ["active", "cancelled"]
           && ((request.resource.data.status == "active" && activeQuickSalesLocation(resource.data.locationId))
-            || (request.resource.data.status == "cancelled" && allowedLocation(resource.data.locationId))));
+            || (request.resource.data.status == "cancelled" && allowedLocation(resource.data.locationId))))
+        || isAdmin());
       allow delete: if false;
     }
     match /stockMovements/{movementId} {
@@ -884,7 +1053,7 @@ service cloud.firestore {
         || (canModule("locations", "view")
           && ("locationId" in resource.data)
           && allowedLocation(resource.data.locationId));
-      allow create: if signedIn() && validInventoryMovement(request.resource.data);
+      allow create: if signedIn() && validInventoryMovement(request.resource.data, movementId);
       allow update, delete: if false;
     }
     match /stockOperations/{operationId} {
@@ -911,9 +1080,12 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if activeUser()
         && request.resource.data.userId == request.auth.uid
+        && (!("operationType" in request.resource.data) || request.resource.data.operationType != "adjust_stock"
+          || (request.resource.data.inventoryType == "location" && canModule("locations", "adjustStock"))
+          || (request.resource.data.inventoryType == "warehouse" && canModule("warehouse", "adjustStock")))
         && ((request.resource.data.inventoryType == "location"
             && allowedLocation(request.resource.data.inventoryId)
-            && (canModule("locations", "loadStock") || canModule("locations", "configureLocationProducts")))
+            && (canModule("locations", "loadStock") || canModule("locations", "adjustStock") || canModule("locations", "configureLocationProducts")))
           || (request.resource.data.inventoryType == "warehouse"
             && canModule("warehouse", "edit")));
       allow update, delete: if false;
@@ -960,21 +1132,38 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /orders/{orderId} {
-      allow read: if canModule("ecommerce", "view");
-      allow create: if canModule("ecommerce", "create") && ownsNewRecord();
-      allow update: if canModule("ecommerce", "edit") && logicalMutation();
-      allow delete: if false;
+      allow get: if canModule("ecommerce", "view") || canModule("finance", "view");
+      allow list: if canModule("ecommerce", "view");
+      // Checkout público usa backend server-side. Precio, total, paymentStatus,
+      // saleId e invoiceStatus nunca son autoridad del navegador.
+      allow create, update, delete: if false;
+    }
+    match /payments/{paymentId} {
+      allow read: if canModule("ecommerce", "view") || canModule("finance", "view");
+      // Sólo backend/Payway futuro puede crear o transicionar pagos.
+      allow create, update, delete: if false;
     }
     match /shipments/{shipmentId} {
-      allow read: if canModule("shipping", "view");
+      allow get: if canModule("shipping", "view") || canModule("finance", "view");
+      allow list: if canModule("shipping", "view");
       allow create: if canModule("shipping", "create") && ownsNewRecord();
       allow update: if canModule("shipping", "edit") && logicalMutation();
       allow delete: if false;
     }
     match /invoices/{invoiceId} {
       allow read: if canModule("finance", "view");
-      allow create, update: if canModule("finance", "edit");
-      allow delete: if false;
+      // CAE, numeración fiscal y estados de autorización son autoridad exclusiva
+      // del backend de facturación. El navegador nunca crea ni muta comprobantes.
+      allow create, update, delete: if false;
+    }
+    match /arcaWsaaTickets/{ticketId} {
+      // Contiene únicamente payload WSAA cifrado + metadatos de lease.
+      // Es exclusivo del backend con cuenta de servicio; ningún cliente lo lee/escribe.
+      allow read, write: if false;
+    }
+    match /arcaSequenceLocks/{lockId} {
+      // Serializa numeración fiscal por entorno/PV/tipo. Autoridad exclusiva del backend.
+      allow read, write: if false;
     }
     match /financialEntries/{entryId} {
       allow read: if canModule("finance", "view");
@@ -988,7 +1177,8 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /suppliers/{supplierId} {
-      allow read: if canModule("suppliers", "view");
+      allow get: if canModule("suppliers", "view") || canModule("finance", "view");
+      allow list: if canModule("suppliers", "view");
       allow create: if canModule("suppliers", "create") && ownsNewRecord();
       allow update: if canModule("suppliers", "edit") && logicalMutation();
       allow delete: if false;
@@ -1042,7 +1232,22 @@ service cloud.firestore {
         allow create: if metaAdsCan("metaAdsPlanCampaign") && request.resource.data.status == "draft" && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedBy == request.auth.uid && campaignPlanTheoryMatches(request.resource.data,campaignId) && validCampaignPlanRecord(request.resource.data,campaignId);
         allow update: if request.resource.data.status == "approved" ? campaignPlanApproveAllowed(campaignId) : campaignPlanDraftUpdateAllowed(campaignId); allow delete: if false;
       }
+      match /recordingTasks/{taskId} {
+        allow get,list: if metaAdsCan("metaAdsViewCreativeWorkspace");
+        allow create,update,delete: if false;
+      }
+      match /creativeAssets/{assetId} {
+        allow get,list: if metaAdsCan("metaAdsViewCreativeWorkspace");
+        allow create,update,delete: if false;
+      }
     }
+    match /integrationConnections/{integrationId} {
+      allow get: if integrationId == "googleDrive" && (metaAdsCan("metaAdsViewCreativeWorkspace") || metaAdsCan("metaAdsManageDrive"));
+      allow list,create,update,delete: if false;
+    }
+    match /integrationSecrets/{secretId} { allow read,write: if false; }
+    match /integrationOauthStates/{stateId} { allow read,write: if false; }
+    match /creativeUploadSessions/{sessionId} { allow read,write: if false; }
     match /whatsappCampaigns/{campaignId} {
       allow get, list: if whatsappCanView();
       allow create: if whatsappCanCreate()
@@ -1084,10 +1289,12 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /alerts/{alertId} {
-      allow read: if canModule("alerts", "view")
+      allow get: if canModule("finance", "view") && alertId.matches("finance_.*")
+        && (!exists(/databases/$(database)/documents/alerts/$(alertId)) || resource.data.moduleId == "finance");
+      allow read: if (canModule("finance", "view") && ("moduleId" in resource.data) && resource.data.moduleId == "finance") || canModule("alerts", "view")
         && (!("responsibleId" in resource.data) || resource.data.responsibleId == request.auth.uid || isAdmin());
-      allow create: if canModule("alerts", "create") && ownsNewRecord();
-      allow update: if canModule("alerts", "edit") && logicalMutation();
+      allow create: if (canModule("alerts", "create") || (canModule("finance", "edit") && request.resource.data.moduleId == "finance" && alertId.matches("finance_.*"))) && ownsNewRecord();
+      allow update: if (canModule("alerts", "edit") || (canModule("finance", "edit") && resource.data.moduleId == "finance" && request.resource.data.moduleId == "finance" && alertId.matches("finance_.*"))) && logicalMutation();
       allow delete: if false;
     }
     match /dailySummaries/{summaryId} {
@@ -1096,7 +1303,7 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /auditLogs/{logId} {
-      allow read: if isAdmin()
+      allow read: if (canModule("finance", "view") && ("moduleId" in resource.data) && resource.data.moduleId == "finance") || isAdmin()
         || (canModule("locations", "view")
           && ("locationId" in resource.data)
           && allowedLocation(resource.data.locationId))
@@ -1104,6 +1311,9 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && (isAdmin()
+          || (("moduleId" in request.resource.data)
+            && request.resource.data.moduleId == "finance"
+            && (canModule("finance", "create") || canModule("finance", "edit") || canModule("finance", "admin")))
           || (("moduleId" in request.resource.data)
             && request.resource.data.moduleId == "products"
             && (canModule("products", "create") || canModule("products", "edit")))
@@ -1125,6 +1335,9 @@ service cloud.firestore {
               || metaAdsCan("metaAdsManageTheory")
               || metaAdsCan("metaAdsPlanCampaign")
               || metaAdsCan("metaAdsApprovePlan")
+              || metaAdsCan("metaAdsViewCreativeWorkspace")
+              || metaAdsCan("metaAdsUploadCreative")
+              || metaAdsCan("metaAdsManageDrive")
               || canModule("marketing", "edit")))
           || (("locationId" in request.resource.data)
             && allowedLocation(request.resource.data.locationId)));
