@@ -1,4 +1,5 @@
 import { executeToolBatch } from "./toolExecution.mjs";
+import { aggregateVoiceCosts } from "../../../../src/shared/oliviaVoicePricing.mjs";
 import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, taskSlotSchema, requiredFields, isCorrection, operationalIntent } from "./tasks.mjs";
 import { aggregateRoutes } from "./modelRouter.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
@@ -152,6 +153,7 @@ export function createOliviaEngine({
       enabled: config.enabled,
       audioLimits: config.audioLimits,
       voiceProtocol: config.voiceProtocol,
+      voiceTrialAvailable: canAccessAdministration(session.profile),
       policyVersion: OLIVIA_POLICY_VERSION,
       ...(estimate ? { estimate } : {}),
     };
@@ -339,9 +341,10 @@ export function createOliviaEngine({
       id = body.conversationId
         ? safeId(body.conversationId)
         : (await state(session)).conversationId;
-    if (body.inputMode === "realtime") {
+    const voiceSessionId = body.inputMode === "realtime" ? safeId(body.realtimeSessionId, "sesión de voz") : body.voiceSessionId ? safeId(body.voiceSessionId, "sesión de voz") : null;
+    if (voiceSessionId) {
       const live = await store.get(
-        `oliviaRealtime/${safeId(body.realtimeSessionId, "sesión de voz")}`,
+        `oliviaRealtime/${voiceSessionId}`,
       );
       if (
         !live ||
@@ -366,7 +369,7 @@ export function createOliviaEngine({
       reservedTokens: 0,
       now: clock(),
     });
-    let event = { model: "", inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+    let event = { model: "", inputTokens: 0, outputTokens: 0, totalTokens: 0, ...(voiceSessionId ? { realtimeSessionId: voiceSessionId } : {}) },
       claimed = false,
       settled = false,
       currentTask = undefined;
@@ -755,6 +758,23 @@ export function createOliviaEngine({
         }
       throw e;
     }
+  }
+  async function voiceCosts(session, body) {
+    assertOliviaAccess(session);
+    const id = safeId(body.conversationId), voiceId = safeId(body.realtimeSessionId, "sesión de voz");
+    const live = await store.get(`oliviaRealtime/${voiceId}`);
+    if (!live || live.userId !== session.uid || live.conversationId !== id || live.sessionBinding !== sessionBinding(session)) throw oliviaError("permission-denied", "Esta sesión de voz no está disponible.", 403);
+    const conversation = await store.get(`oliviaConversations/${id}`);
+    assertConversationOwner(session, conversation, clock());
+    const [voiceUsage, events] = await Promise.all([
+      store.get(`oliviaUsage/${session.uid}_${safeId(live.requestId)}`),
+      store.query("oliviaUsage", [["realtimeSessionId", "EQUAL", voiceId]], 101),
+    ]);
+    const owned = events.filter((event) => event.userId === session.uid && event.conversationId === id && event.requestId !== live.requestId);
+    return { voiceCosts: aggregateVoiceCosts(live, voiceUsage?.userId === session.uid ? voiceUsage : null, owned.slice(0, 100), {
+      truncated: events.length > 100,
+      backendPending: Boolean(conversation.busyRequestId && dateMs(conversation.busyUntil) > clock().getTime()),
+    }) };
   }
   async function requireLiveVoice(session, body, { transcript = false } = {}) {
     assertOliviaAccess(session);
@@ -1203,6 +1223,7 @@ export function createOliviaEngine({
     confirm,
     realtimeTool,
     realtimeTranscript,
+    voiceCosts,
     cancel,
     configuration,
     getConfiguration,

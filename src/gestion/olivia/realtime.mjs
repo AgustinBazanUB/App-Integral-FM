@@ -9,7 +9,7 @@ export function localVoiceAcknowledgement(index = 0) {
   return text;
 }
 export class OliviaRealtime {
-  constructor({ createSession, stopSession = async () => {}, onRequest, onTool, onTranscript, onInput = () => {}, onState = () => {}, onError = () => {}, onCaption = () => {}, onMetrics = () => {}, acknowledge = localVoiceAcknowledgement,
+  constructor({ createSession, stopSession = async () => {}, onRequest, onTool, onTranscript, onInterrupt = () => {}, onInput = () => {}, onState = () => {}, onError = () => {}, onCaption = () => {}, onMetrics = () => {}, acknowledge = localVoiceAcknowledgement,
     mediaDevices = globalThis.navigator?.mediaDevices, PeerConnection = globalThis.RTCPeerConnection,
     createAudio = () => document.createElement("audio"),
     createStream = (tracks) => new globalThis.MediaStream(tracks),
@@ -21,8 +21,8 @@ export class OliviaRealtime {
     this.pendingNative = []; this.nativeToolCount = 0; this.loadedSkills = new Set(); this.transcripts = new Map();
     this.userMuted = false; this.internalMuted = false;
     this.inputs = new Map(); this.responseInputs = new Map(); this.pendingTranscripts = []; this.responseActive = false;
-    this.closed = false;
-    this.seenInputs = new Set();
+    this.closed = false; this.generation = 0; this.onInterrupt = onInterrupt;
+    this.seenInputs = new Set(); this.inputGenerations = new Map();
     this.seenCalls = new Set();
     this.queue = Promise.resolve();
     this.abort = new AbortController();
@@ -96,7 +96,7 @@ export class OliviaRealtime {
 
   handleEvent(event) {
     if (this.closed) return;
-    if (event.type === "input_audio_buffer.speech_started") { this.onCaption(""); this.onState("listening"); this.nativeModelDone = false; this.speechStartedAt = performance.now(); this.latestResponseInput = null; }
+    if (event.type === "input_audio_buffer.speech_started") { if (!this.session?.nativeTools) { this.generation++; if (event.item_id) this.inputGenerations.set(event.item_id, this.generation); this.pendingSpeech = null; this.onInterrupt(); globalThis.speechSynthesis?.cancel(); } this.onCaption(""); this.onState("listening"); this.nativeModelDone = false; this.speechStartedAt = performance.now(); this.latestResponseInput = null; }
     if (event.type === "input_audio_buffer.speech_stopped") this.speechStoppedAt = performance.now();
     if (event.type === "input_audio_buffer.committed") this.currentInputId = event.item_id;
     if (event.type === "response.created") {
@@ -125,14 +125,17 @@ export class OliviaRealtime {
         for (const transcript of this.pendingTranscripts.splice(0)) this.persistTranscript(transcript);
         return;
       }
+      const generation = this.inputGenerations.get(itemId) ?? this.generation;
+      if (generation !== this.generation) return;
+      this.onInput(this.lastInput);
       this.lastResult = this.queue = this.queue.then(async () => {
-        if (this.closed) return null;
+        if (this.closed || generation !== this.generation) return null;
         this.onState("processing");
         this.onCaption(this.acknowledge(this.seenInputs.size));
         const result = await this.onRequest(message, this.session.realtimeSessionId);
-        if (!this.closed) this.speakResult(result);
+        if (!this.closed && generation === this.generation) this.speakResult(result);
         return result;
-      }).catch((error) => { this.fail(error); return null; });
+      }).catch((error) => { if (error.name !== "AbortError" && generation === this.generation) this.fail(error); return null; });
     }
     if (event.type === "response.function_call_arguments.done" && event.call_id && !this.seenCalls.has(event.call_id)) {
       this.seenCalls.add(event.call_id);
@@ -218,7 +221,8 @@ export class OliviaRealtime {
 
   speakResult(result) {
     if (!result || this.closed) return;
-    if (this.responseActive) { this.pendingSpeech = result; this.interrupt(); return; }
+    globalThis.speechSynthesis?.cancel();
+    if (this.responseActive) { this.pendingSpeech = result; this.interrupt(true); return; }
     this.readingVerified = true;
     // The voice model reads only a server-verified response. Confirmation credentials,
     // costs and operational tool arguments are never added to its context.
@@ -238,7 +242,8 @@ export class OliviaRealtime {
   applyMute() { this.stream?.getAudioTracks?.().forEach((track) => { track.enabled = !(this.userMuted || this.internalMuted); }); }
   setMuted(muted) { this.userMuted = Boolean(muted); this.applyMute(); }
   setInternalMuted(muted) { this.internalMuted = Boolean(muted); this.applyMute(); }
-  interrupt() {
+  interrupt(preservePending = false) {
+    if (!preservePending && !this.session?.nativeTools) { this.generation++; this.pendingSpeech = null; this.onInterrupt(); }
     if (this.awaitingGreeting) { this.awaitingGreeting = false; this.setInternalMuted(false); }
     globalThis.speechSynthesis?.cancel();
     this.send({ type: "response.cancel" });

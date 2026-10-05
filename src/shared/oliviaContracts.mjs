@@ -1,4 +1,5 @@
 /** Shared public Olivia contracts. All business authorization is server-side. */
+import { realtimeMiniCosts } from "./oliviaVoicePricing.mjs";
 export const OLIVIA_POLICY_VERSION = "olivia-1.0.0";
 export const OLIVIA_STATES = Object.freeze([
   "INFORMACION",
@@ -436,6 +437,11 @@ export function retentionDate(months, now = new Date()) {
   return date;
 }
 export function costForUsage(usage, configuration) {
+  if (usage.billingUnit === "realtime-tokens") {
+    const costs = realtimeMiniCosts(usage);
+    const usd = costs ? costs.voiceUsd + costs.transcriptionUsd : null;
+    return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null, ...(costs ? { voiceCostUsd: costs.voiceUsd, transcriptionCostUsd: costs.transcriptionUsd, voiceCostArs: configuration.officialDollarSellRate ? costs.voiceUsd * configuration.officialDollarSellRate * 1.05 : null, transcriptionCostArs: configuration.officialDollarSellRate ? costs.transcriptionUsd * configuration.officialDollarSellRate * 1.05 : null } : {}) };
+  }
   if (usage.route === "deterministic") return { actualCostUsd: 0, actualCostArs: configuration.officialDollarSellRate ? 0 : null };
   if (usage.operation === "live" || usage.billingUnit === "live-seconds") {
     const usd = usage.measurement === "provider" && Number.isFinite(usage.billedSeconds) ? usage.billedSeconds * configuration.liveUsdPerMinute / 60 : null;

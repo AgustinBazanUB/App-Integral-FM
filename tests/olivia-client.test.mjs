@@ -291,6 +291,24 @@ function voiceFixture(overrides = {}) {
   };
 }
 
+test("Mini interruption suppresses a late backend response and ignores stale transcriptions", async () => {
+  let resolveFirst, interrupted = 0; const requests = [];
+  const f = voiceFixture({ acknowledge: () => "Reviso", onInterrupt: () => interrupted++, onRequest: (message) => { requests.push(message); return requests.length === 1 ? new Promise((resolve) => { resolveFirst = resolve; }) : Promise.resolve({ messages: [{ role: "assistant", content: "Respuesta nueva" }] }); } });
+  await f.connection.connect();
+  const input = (id, text) => f.connection.handleEvent({ type: "conversation.item.input_audio_transcription.completed", item_id: id, transcript: text });
+  f.connection.handleEvent({ type: "input_audio_buffer.speech_started", item_id: "old" }); input("old", "Consulta anterior");
+  await new Promise((resolve) => setImmediate(resolve));
+  f.connection.handleEvent({ type: "input_audio_buffer.speech_started", item_id: "new" });
+  resolveFirst({ messages: [{ role: "assistant", content: "Respuesta obsoleta" }] }); await f.connection.queue;
+  f.connection.handleEvent({ type: "input_audio_buffer.speech_started", item_id: "late" });
+  f.connection.handleEvent({ type: "input_audio_buffer.speech_started", item_id: "latest" });
+  input("late", "Transcripción obsoleta"); input("latest", "Consulta nueva"); await f.connection.queue;
+  assert.deepEqual(requests, ["Consulta anterior", "Consulta nueva"]);
+  assert.equal(JSON.stringify(f.events).includes("Respuesta obsoleta"), false);
+  assert.equal(JSON.stringify(f.events).includes("Respuesta nueva"), true);
+  assert.ok(interrupted >= 2); assert.equal(f.errors.length, 0); f.connection.close();
+});
+
 test("WebRTC receives a server SDP answer and hangup always releases microphone, channel and audio", async () => {
   const fixture = voiceFixture();
   await fixture.connection.connect();

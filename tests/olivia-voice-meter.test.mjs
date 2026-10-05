@@ -225,6 +225,31 @@ async function open(f) {
   return socket;
 }
 
+for (const missingDetails of [false, true]) test(`Mini sideband settles modality and ASR costs once; incomplete details=${missingDetails}`, async () => {
+  const f = fixture({ role: "admin" });
+  Object.assign(f.documents.get("oliviaRealtime/live_a"), { voiceMode: "realtime-mini", model: "gpt-realtime-2.1-mini", transcriptionModel: "gpt-4o-mini-transcribe", billingConfig: { officialDollarSellRate: 1000 } });
+  const monitoring = f.start(), socket = await open(f);
+  const extra = missingDetails ? {} : { usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120, input_token_details: { text_tokens: 40, audio_tokens: 60, cached_tokens: 0 }, output_token_details: { text_tokens: 5, audio_tokens: 15 } } };
+  socket.provider(response("mini_a", 100, 20, extra)); socket.provider(response("mini_a", 100, 20, extra));
+  socket.provider(transcription("audio_a", { type: "tokens", input_tokens: 17, output_tokens: 9, total_tokens: 26 }));
+  socket.emit("close", 1000); await monitoring;
+  const usage = f.documents.get("oliviaUsage/user_a_voice_a");
+  assert.equal(usage.observedResponses, 1);
+  assert.equal(usage.billingUnit, "realtime-tokens");
+  if (missingDetails) assert.equal(usage.actualCostUsd, null);
+  else { assert.ok(Math.abs(usage.voiceCostUsd - 0.000936) < 1e-12); assert.ok(Math.abs(usage.transcriptionCostUsd - 0.00006625) < 1e-12); assert.ok(Math.abs(usage.actualCostArs - 1.0523625) < 1e-10); }
+});
+
+test("Mini greeting-only session is priced without inventing transcription usage", async () => {
+  const f = fixture();
+  Object.assign(f.documents.get("oliviaRealtime/live_a"), { voiceMode: "realtime-mini", model: "gpt-realtime-2.1-mini", transcriptionModel: "gpt-4o-mini-transcribe" });
+  const monitoring = f.start(), socket = await open(f);
+  socket.provider(response("greeting", 100, 20, { usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120, input_token_details: { text_tokens: 100, audio_tokens: 0, cached_tokens: 0 }, output_token_details: { text_tokens: 0, audio_tokens: 20 } } }));
+  socket.emit("close", 1000); await monitoring;
+  const usage = f.documents.get("oliviaUsage/user_a_voice_a");
+  assert.equal(usage.measurement, "provider"); assert.equal(usage.transcriptionCostUsd, 0); assert.ok(usage.voiceCostUsd > 0);
+});
+
 test("server sideband authenticates privately and records exact provider usage only once", async () => {
   const f = fixture(),
     monitoring = f.start(),

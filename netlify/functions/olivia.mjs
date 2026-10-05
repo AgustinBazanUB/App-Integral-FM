@@ -49,6 +49,8 @@ export default async function handler(request) {
       result = await engine.realtimeTool(session, body);
     else if (body.operation === "realtimeTranscript")
       result = await engine.realtimeTranscript(session, body);
+    else if (body.operation === "voiceCosts")
+      result = await engine.voiceCosts(session, body);
     else if (body.operation === "cancel")
       result = await engine.cancel(session, body);
     else if (body.operation === "estimate")
@@ -64,7 +66,7 @@ export default async function handler(request) {
     else if (body.operation === "saveConfiguration")
       result = await engine.saveConfiguration(session, body);
     else if (body.operation === "realtime")
-      result = await ((await engine.configuration()).voiceProtocol === "live" ? createLive : createRealtime)({
+      result = await (body.voiceMode === "realtime-mini" ? createRealtime : (await engine.configuration()).voiceProtocol === "live" ? createLive : createRealtime)({
         session,
         body,
         store,

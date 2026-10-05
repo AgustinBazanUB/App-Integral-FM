@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import { IconButton } from "../../design-system";
+import { Button, IconButton } from "../../design-system";
 
 export default function OliviaComposer({ textareaRef, draft, setDraft, sendMessage, recording, frame, stopRecording,
-  startRecording, startVoice, voiceActive, disabled, busy, cancelRequest, attachments = [], addFiles, removeFile }) {
+  startRecording, startVoice, voiceTrialAvailable, startMiniVoice, voiceActive, disabled, busy, cancelRequest, attachments = [], addFiles, removeFile }) {
   const picker = useRef(null), camera = useRef(null), menu = useRef(null);
   const selectFiles = (event) => { addFiles(Array.from(event.target.files || [])); event.target.value = ""; if (menu.current) menu.current.open = false; textareaRef.current?.focus(); };
   useEffect(() => {
@@ -32,5 +32,6 @@ export default function OliviaComposer({ textareaRef, draft, setDraft, sendMessa
       {busy ? <IconButton label="Detener respuesta" icon="Square" onClick={cancelRequest} /> : <IconButton label="Enviar mensaje" icon="Send" disabled={disabled || uploading || (!draft.trim() && !attachments.some((file) => file.id))} onClick={sendMessage} />}
     </div>}
     <small>{recording ? "Escuchando. Podés cancelar, revisar el dictado o enviarlo directamente." : "Los cambios del negocio requieren confirmación en la tarjeta."}</small>
+    {voiceTrialAvailable && !recording && !voiceActive ? <Button variant="secondary" disabled={disabled || busy} onClick={startMiniVoice}>Probar voz económica</Button> : null}
   </form>;
 }

@@ -6,6 +6,7 @@ import { createOliviaStore } from "./_lib/olivia/store.mjs";
 import { createOliviaEngine } from "./_lib/olivia/engine.mjs";
 import { hangupCall } from "./_lib/olivia/voice.mjs";
 import { settleUsage } from "./_lib/olivia/usage.mjs";
+import { emptyRealtimeUsage, realtimeTokenBreakdown } from "../../src/shared/oliviaVoicePricing.mjs";
 import { canAccessAdministration } from "../../src/gestion/permissions.js";
 import { assertOliviaAccess } from "./_lib/olivia/guards.mjs";
 import {
@@ -158,6 +159,7 @@ export async function monitorRealtime({
       const transcriptionModel =
         live.transcriptionModel || config.profiles.liveTranscription?.model;
       const measured = {
+        realtimeUsage: emptyRealtimeUsage(),
         inputTokens: 0,
         outputTokens: 0,
         totalTokens: 0,
@@ -169,6 +171,7 @@ export async function monitorRealtime({
         transcriptions: 0,
       };
       let durationUsage = false;
+      let pricingComplete = true;
       async function finish(reason, failed = false) {
         if (finishing) return;
         finishing = true;
@@ -198,9 +201,10 @@ export async function monitorRealtime({
           !inFlightResponses.size &&
           !inFlightTranscriptions.size &&
           measured.responses > 0 &&
-          (!transcriptionModel || measured.transcriptions > 0);
+          (!transcriptionModel || measured.transcriptions > 0 || live.voiceMode === "realtime-mini");
         resolve({
           ...measured,
+          realtimeUsage: pricingComplete ? measured.realtimeUsage : null,
           reason,
           failed,
           remotelyClosed,
@@ -385,6 +389,9 @@ export async function monitorRealtime({
             uncertain = true;
             return;
           }
+          const breakdown = realtimeTokenBreakdown(usage);
+          if (!breakdown) pricingComplete = false;
+          else for (const key of Object.keys(measured.realtimeUsage)) measured.realtimeUsage[key] += breakdown[key];
           measured.inputTokens += usage.input_tokens;
           measured.outputTokens += usage.output_tokens;
           measured.totalTokens += usage.total_tokens;
@@ -443,6 +450,8 @@ export async function monitorRealtime({
   }
   const finishedAt = clock();
   const event = {
+    ...(live.voiceMode === "realtime-mini" ? { billingUnit: "realtime-tokens", voiceMode: live.voiceMode } : {}),
+    realtimeUsage: result.realtimeUsage || null,
     model: live.model || config.profiles.realtime.model,
     transcriptionModel:
       live.transcriptionModel ||
@@ -464,8 +473,8 @@ export async function monitorRealtime({
   // charge the full allocated token quota, never a fabricated actual price.
   // Realtime audio/text/cache tariffs and the separate ASR rate card cannot
   // be represented by the current single input/output pricing configuration.
-  // Provider counters are exact when complete; actual session price is unknown.
-  const settlementConfig = { ...config, pricing: {} };
+  // Mini is priced only with complete provider modality/cache and ASR counters.
+  const settlementConfig = { ...config, ...(live.billingConfig || {}), pricing: {} };
   await settle({
     store,
     session,
@@ -498,6 +507,7 @@ export async function monitorRealtime({
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens,
           totalTokens: result.totalTokens,
+          realtimeUsage: result.realtimeUsage || null,
           closeReason: result.reason,
           ...(result.remotelyClosed
             ? { closedAt: finishedAt }

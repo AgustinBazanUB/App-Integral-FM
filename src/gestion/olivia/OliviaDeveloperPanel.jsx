@@ -1,4 +1,4 @@
-export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, telemetry, money }) {
+export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceCosts, telemetry, money }) {
   const ms = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
   const rows = [
     ["Modelo / razonamiento", `${telemetry?.model || estimate?.model || "—"} / ${telemetry?.reasoningEffort || estimate?.reasoningEffort || "—"}`],
@@ -7,7 +7,17 @@ export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMe
     ["Tokens próximos estimados", estimate?.estimatedTokens ?? "—"],
     ["Entrada / salida / total de última llamada", `${quota?.inputTokens ?? "—"} / ${quota?.outputTokens ?? "—"} / ${quota?.totalTokens ?? "—"}`],
     ["Consumo / reservas", `${quota?.usedTokens ?? 0} / ${quota?.reservedTokens ?? 0}`],
-    ["Último costo USD", quota?.actualCostUsd != null ? Number(quota.actualCostUsd).toFixed(6) : "Sin medición"],
+    ["Último costo USD", money(quota?.actualCostUsd, "USD")],
+    ...(voiceCosts ? [
+      ["Modelo de voz", voiceCosts.voiceModel || "—"],
+      ["Transcripción · sesión", voiceCosts.transcription.included ? "Incluida en la voz" : money(voiceCosts.transcription.ars)],
+      ["Voz y contexto · sesión", money(voiceCosts.voice.ars)],
+      ["Luna / consultas del negocio · sesión", money(voiceCosts.backend.ars)],
+      ["Consultas del negocio medidas", voiceCosts.backend.queries],
+      ["Total de la conversación", money(voiceCosts.totalArs)],
+      ["Total de la conversación USD", money(voiceCosts.totalUsd, "USD")],
+      ["Medición de la conversación", voiceCosts.complete ? "Completa" : voiceCosts.truncated ? "Parcial: historial de consultas excedido" : "Pendiente: falta medición o conversión"],
+    ] : []),
     ["Click → mensaje visible (ms)", ms(latency?.visibleMs)],
     ["Mensaje → request (ms)", ms(latency?.requestMs)],
     ["Request → primer texto (ms)", ms(latency?.firstDeltaMs)],
