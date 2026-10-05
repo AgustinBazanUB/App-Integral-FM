@@ -9,11 +9,25 @@ service cloud.firestore {
       let user = profile();
       return signedIn() && user.active == true;
     }
+    function normalizedRoleValue(role) {
+      return role in ["administrator", "administrador"] ? "admin"
+        : role == "administrador_general" ? "general_admin"
+        : role == "administrador_operativo" ? "operational_admin"
+        : role == "encargado_ubicacion" ? "location_manager"
+        : role == "responsable_deposito" ? "warehouse_manager"
+        : role == "responsable_marketing" ? "marketing_manager"
+        : role == "responsable_ecommerce" ? "ecommerce_manager"
+        : role == "responsable_envios" ? "shipping_manager"
+        : role == "responsable_proveedores" ? "supplier_manager"
+        : role == "responsable_financiero" ? "financial_manager"
+        : role == "analista_metricas" ? "analyst"
+        : role;
+    }
     function adminRole() {
       let user = profile();
+      let role = normalizedRoleValue(user.role);
       return (
-        user.role == "admin"
-        || user.role == "general_admin"
+        role in ["admin", "general_admin"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
@@ -23,15 +37,22 @@ service cloud.firestore {
     function explicitPermissionFor(user, moduleId, action) {
       return ("permissions" in user)
         && (moduleId in user.permissions)
-        && (user.permissions[moduleId] is list)
-        && (action in user.permissions[moduleId] || "admin" in user.permissions[moduleId]);
+        && (
+          ((user.permissions[moduleId] is list)
+            && (action in user.permissions[moduleId] || "admin" in user.permissions[moduleId]))
+          || ((user.permissions[moduleId] is map)
+            && (
+              ((action in user.permissions[moduleId]) && user.permissions[moduleId][action] == true)
+              || (("admin" in user.permissions[moduleId]) && user.permissions[moduleId]["admin"] == true)
+            ))
+        );
     }
     function explicitPermission(moduleId, action) {
       let user = profile();
       return explicitPermissionFor(user, moduleId, action);
     }
     function roleModule(moduleId) {
-      let role = profile().role;
+      let role = normalizedRoleValue(profile().role);
       return (
         (role == "seller" && moduleId in ["locations", "quick-sales", "alerts"])
         || (role == "location_manager" && moduleId in ["locations", "quick-sales", "metrics", "alerts"])
@@ -46,7 +67,7 @@ service cloud.firestore {
       );
     }
     function rolePermission(moduleId, action) {
-      let role = profile().role;
+      let role = normalizedRoleValue(profile().role);
       return (
         (action == "view" && roleModule(moduleId))
         || (role == "seller"
@@ -103,51 +124,45 @@ service cloud.firestore {
     }
     function allowedLocation(locationId) {
       let user = profile();
+      let role = normalizedRoleValue(user.role);
       return signedIn() && user.active == true && (
-        user.role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
+        role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
-        || (("permissions" in user)
-          && ("locations" in user.permissions)
-          && (user.permissions.locations is list)
-          && ("viewAllLocations" in user.permissions.locations || "admin" in user.permissions.locations))
+        || explicitPermissionFor(user, "locations", "viewAllLocations")
         || (("allowedLocationIds" in user) && locationId in user.allowedLocationIds)
       );
     }
     function quickSalesPermission(action) {
       let user = profile();
+      let role = normalizedRoleValue(user.role);
       return signedIn() && user.active == true && (
-        user.role in ["admin", "general_admin", "operational_admin"]
+        role in ["admin", "general_admin", "operational_admin"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
-        || (user.role in ["seller", "location_manager"] && action in ["view", "create", "edit"])
-        || (("permissions" in user)
-          && ("quick-sales" in user.permissions)
-          && (user.permissions["quick-sales"] is list)
-          && (action in user.permissions["quick-sales"] || "admin" in user.permissions["quick-sales"]))
+        || (role in ["seller", "location_manager"] && action in ["view", "create", "edit"])
+        || explicitPermissionFor(user, "quick-sales", action)
       );
     }
     function validOperationalLocationStockCreate(locationId, productId) {
       let user = profile();
-      let locationAllowed = user.role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
+      let role = normalizedRoleValue(user.role);
+      let locationAllowed = role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
-        || (("permissions" in user)
-          && ("locations" in user.permissions)
-          && (user.permissions.locations is list)
-          && ("viewAllLocations" in user.permissions.locations || "admin" in user.permissions.locations))
+        || explicitPermissionFor(user, "locations", "viewAllLocations")
         || (("allowedLocationIds" in user) && locationId in user.allowedLocationIds);
-      let canManage = user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
+      let canManage = role in ["admin", "general_admin", "operational_admin", "location_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
         || explicitPermissionFor(user, "locations", "configureLocationProducts")
         || explicitPermissionFor(user, "locations", "loadStock")
         || explicitPermissionFor(user, "locations", "adjustStock")
-        || user.role in ["warehouse_manager", "supplier_manager"]
+        || role in ["warehouse_manager", "supplier_manager"]
         || explicitPermissionFor(user, "warehouse", "transferStock");
       return signedIn()
         && user.active == true
@@ -159,17 +174,15 @@ service cloud.firestore {
     }
     function validOperationalLocationStockMutation(locationId, productId) {
       let user = profile();
+      let role = normalizedRoleValue(user.role);
       let changed = request.resource.data.diff(resource.data).affectedKeys();
-      let locationAllowed = user.role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
+      let locationAllowed = role in ["admin", "general_admin", "operational_admin", "warehouse_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
-        || (("permissions" in user)
-          && ("locations" in user.permissions)
-          && (user.permissions.locations is list)
-          && ("viewAllLocations" in user.permissions.locations || "admin" in user.permissions.locations))
+        || explicitPermissionFor(user, "locations", "viewAllLocations")
         || (("allowedLocationIds" in user) && locationId in user.allowedLocationIds);
-      let commonManager = user.role in ["admin", "general_admin", "operational_admin", "location_manager"]
+      let commonManager = role in ["admin", "general_admin", "operational_admin", "location_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles));
@@ -178,7 +191,7 @@ service cloud.firestore {
       let loadAllowed = commonManager
         || explicitPermissionFor(user, "locations", "loadStock")
         || explicitPermissionFor(user, "locations", "adjustStock");
-      let transferAllowed = user.role in ["admin", "general_admin", "operational_admin", "warehouse_manager", "supplier_manager"]
+      let transferAllowed = role in ["admin", "general_admin", "operational_admin", "warehouse_manager", "supplier_manager"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
