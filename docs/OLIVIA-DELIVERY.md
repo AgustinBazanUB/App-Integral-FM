@@ -10,7 +10,7 @@ Validación final del anexo y ajustes de QA: 740 pruebas Node, 19 pruebas previa
 
 [Matriz del anexo: 52 secciones](OLIVIA-ANNEX-REQUIREMENTS.md). [Política, tareas, diagramas y fuentes oficiales](OLIVIA-MODEL-ROUTER.md).
 
-[PR 34 de revisión](https://github.com/AgustinBazanUB/App-Integral-FM/pull/34), draft con base `codex/olivia-integration`. [Preview actual del anexo](https://olivia-evolution-pr31--appintegralflormia.netlify.app/gestion): deploy Netlify `6ac3ed34acc8d700fc1ec385`, implementación `6d649b3632b9589d1c48c00c1bfcb4d36c79d66c`. La pantalla privada exige iniciar sesión con Firebase. El despliegue compila el build unificado y empaqueta las Functions; no publica rules ni índices.
+[PR 34 de revisión](https://github.com/AgustinBazanUB/App-Integral-FM/pull/34), draft con base `codex/olivia-integration`. [Preview actual del anexo](https://olivia-evolution-pr31--appintegralflormia.netlify.app/gestion): deploy Netlify `6ac3ef46a99697a3bdbdf97f`, implementación `69a9a7198d07cf258fba7a4fb6f199ab8574e903`. La pantalla privada exige iniciar sesión con Firebase. El despliegue compila el build unificado y empaqueta las Functions; no publica rules ni índices.
 
 ## Entrega inicial conservada como evidencia histórica
 

@@ -25,6 +25,8 @@ Fecha: 5 de octubre de 2026. Chrome con la sesión del usuario, preview privada 
 | Luna XHIGH y cambio de intención | Después de la tarea creativa, el pronóstico usa `gpt-6-luna` XHIGH, conserva las dos fechas, declara que no hay ferias registradas y pide la ubicación; tarea nueva sin los slots creativos |
 | Stream complejo después de heartbeats | Tres llamadas y tres herramientas, unos 27 segundos, con respuesta final y telemetría completas |
 | GPT-Live después de corregir selectores | Conexión WebRTC activa y transcripción de salida del saludo; retoma las fechas y la pregunta del mismo chat |
+| Audio físico de salida | El usuario confirmó «ahora sí la escuché» después de reconectar y reproducir el saludo |
+| Sesión de voz finalizada | La interfaz volvió al composer y mostró el costo de audio; el texto siguió disponible |
 
 ## Problemas encontrados y correcciones
 
@@ -33,6 +35,7 @@ Fecha: 5 de octubre de 2026. Chrome con la sesión del usuario, preview privada 
 3. Una consulta real de métricas produjo parámetros inválidos en `update_task`. Se explica el contrato de campos y se devuelve su esquema al modelo para corregirlos dentro del presupuesto existente. Los parámetros inválidos no se persisten; permisos rechazados siguen deteniendo la operación.
 4. Dos consultas largas perdieron el stream antes de la respuesta final. Una consulta de ventas se recuperó completa desde el servidor; una comparación terminó en error sin efectos comerciales. Se agregaron heartbeats cada cinco segundos durante el razonamiento/herramientas. Se verificó que se detienen al terminar o cancelar y que no se emiten resultados tardíos.
 5. El inicio real de GPT-Live devolvió `live-unavailable` (HTTP 502). La revisión del [contrato oficial de creación](https://developers.openai.com/api/reference/resources/live/methods/create) encontró que `allowed_server_events` exige selectores `{ type }`, mientras la solicitud enviaba strings. Se corrigió ese formato y se reforzó la prueba de creación. El rechazo inicial por sí solo no prueba falta de acceso a GPT-Live en la cuenta.
+6. Después del cierre automático de voz, el botón de inicio conservaba la referencia al cliente ya cerrado. Se libera esa referencia cuando el cliente termina para permitir reconectar desde el mismo chat. La reconexión de QA inicialmente se completó cerrando/reabriendo el drawer; el ajuste elimina esa necesidad.
 
 Regresión: 740 pruebas Node aprobadas. Se añadieron seis casos para productos/ubicaciones y reparación de parámetros, incluidos JSON malformado, agotamiento de presupuesto y rechazo de creatividad fuera de su módulo, más dos casos para el stream. El build unificado y el empaquetado de Functions se verifican en el despliegue de la preview. Las 19 pruebas previas de reglas en emulador permanecen como evidencia; estos ajustes no cambian reglas.
 
