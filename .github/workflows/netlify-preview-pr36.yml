@@ -1,0 +1,40 @@
+name: Netlify Preview — PR 36
+
+on:
+  push:
+    branches:
+      - fix/location-stock-picker-zero-stock-2026-10-05
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Deploy draft to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
+            echo "NETLIFY_AUTH_TOKEN is not configured in GitHub Actions secrets."
+            exit 2
+          fi
+          SITE="${NETLIFY_SITE_ID:-appintegralflormia}"
+          npx --yes netlify-cli@23.8.4 deploy \
+            --dir=dist \
+            --site="$SITE" \
+            --auth="$NETLIFY_AUTH_TOKEN" \
+            --alias="pr-36-stock-fix" \
+            --message="PR #36 stock picker preview" \
+            --json
