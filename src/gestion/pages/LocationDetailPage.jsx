@@ -112,7 +112,10 @@ function AddLocationProductModal({ open, location, inventory, categories, profil
       .catch((error) => setState({ busy: false, loading: false, error: error.message }));
   }, [open, profile.id]);
 
-  const assignedIds = useMemo(() => new Set(inventory.map((item) => item.productId || item.id)), [inventory]);
+  const assignmentById = useMemo(
+    () => new Map(inventory.map((item) => [item.productId || item.id, item])),
+    [inventory],
+  );
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("es");
     return products.filter((product) => {
@@ -122,6 +125,7 @@ function AddLocationProductModal({ open, location, inventory, categories, profil
     });
   }, [categoryId, products, search]);
   const selected = products.find((product) => product.id === selectedId);
+  const selectedAssignment = selected ? assignmentById.get(selected.id) : null;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -131,15 +135,33 @@ function AddLocationProductModal({ open, location, inventory, categories, profil
     }
     setState((current) => ({ ...current, busy: true, error: "" }));
     try {
-      await addProductToLocation({
-        location,
-        product: selected,
-        initialStock,
-        useDefaultPrice,
-        priceOverride,
-        profile,
-        requestId,
-      });
+      if (selectedAssignment) {
+        if (selectedAssignment.active === false) {
+          throw new Error("Este producto ya está en la ubicación, pero está inactivo. Reactivalo desde Configuración antes de cargar stock.");
+        }
+        if (Number(initialStock || 0) <= 0) {
+          throw new Error("Ingresá una cantidad mayor a cero para agregar stock.");
+        }
+        await addStockToInventory({
+          type: INVENTORY_TYPES.LOCATION,
+          inventory: location,
+          product: selectedAssignment,
+          quantity: initialStock,
+          reason: "Ingreso de mercadería",
+          profile,
+          requestId,
+        });
+      } else {
+        await addProductToLocation({
+          location,
+          product: selected,
+          initialStock,
+          useDefaultPrice,
+          priceOverride,
+          profile,
+          requestId,
+        });
+      }
       await onSaved?.();
       onClose?.();
     } catch (error) {
@@ -152,7 +174,7 @@ function AddLocationProductModal({ open, location, inventory, categories, profil
       open={open}
       onClose={() => !state.busy && onClose?.()}
       title="Agregar producto"
-      description={`Agrega a ${location?.name || "esta ubicación"} un producto que ya existe en el catálogo de Flor Mía.`}
+      description={`Elegí un producto del catálogo. Si todavía no está en ${location?.name || "esta ubicación"}, se agrega; si ya está, podés sumar stock sin crear un duplicado.`}
     >
       <form className="fm-inventory-modal" onSubmit={submit}>
         <div className="fm-inventory-picker-filters">
@@ -166,16 +188,23 @@ function AddLocationProductModal({ open, location, inventory, categories, profil
         {!state.loading ? (
           <div className="fm-product-select-list" role="radiogroup" aria-label="Productos del catálogo">
             {filtered.map((product) => {
-              const assigned = assignedIds.has(product.id);
+              const assignment = assignmentById.get(product.id);
+              const assigned = Boolean(assignment);
+              const assignmentInactive = assignment?.active === false;
+              const stock = Number(assignment?.currentStock || 0);
               return (
-                <label key={product.id} className={`${selectedId === product.id ? "is-selected" : ""} ${assigned ? "is-disabled" : ""}`.trim()}>
-                  <input type="radio" name="location-product" value={product.id} checked={selectedId === product.id} disabled={assigned} onChange={() => {
+                <label key={product.id} className={`${selectedId === product.id ? "is-selected" : ""} ${assignmentInactive ? "is-disabled" : ""}`.trim()}>
+                  <input type="radio" name="location-product" value={product.id} checked={selectedId === product.id} disabled={assignmentInactive || state.busy} onChange={() => {
                     setSelectedId(product.id);
                     setPriceOverride(Number(product.defaultPrice || 0));
                   }} />
                   <ProductImage product={product} />
                   <span><strong>{product.name}</strong><small>{product.categoryName || "Sin categoría"} · {formatMoney(product.defaultPrice || 0)}</small></span>
-                  {assigned ? <Badge tone="neutral">Ya agregado</Badge> : null}
+                  {assigned ? (
+                    <Badge tone={assignmentInactive ? "neutral" : stock > 0 ? "success" : "warning"}>
+                      {assignmentInactive ? "En ubicación · inactivo" : `En ubicación · stock ${stock}`}
+                    </Badge>
+                  ) : <Badge tone="neutral">Disponible para agregar</Badge>}
                 </label>
               );
             })}
@@ -185,29 +214,43 @@ function AddLocationProductModal({ open, location, inventory, categories, profil
 
         {selected ? (
           <section className="fm-inventory-selection-config">
-            <FormField label="Stock inicial" hint={canLoadInitial ? "Cuántas unidades hay físicamente ahora en esta ubicación." : "Se habilita sin cantidades. La carga requiere permiso y una ubicación activa; también puede recibir transferencias."} required>
-              <input disabled={!canLoadInitial || state.busy} type="number" min="0" step="1" inputMode="numeric" value={initialStock} onChange={(event) => setInitialStock(event.target.value)} />
+            <FormField
+              label={selectedAssignment ? "Cantidad a agregar" : "Stock inicial"}
+              hint={selectedAssignment
+                ? (canLoadInitial ? `Stock actual: ${Number(selectedAssignment.currentStock || 0)}. Esta cantidad se suma al stock existente.` : "Necesitás permiso de carga de stock y una ubicación activa.")
+                : (canLoadInitial ? "Cuántas unidades hay físicamente ahora en esta ubicación." : "Se habilita sin cantidades. La carga requiere permiso y una ubicación activa; también puede recibir transferencias.")}
+              required
+            >
+              <input disabled={!canLoadInitial || state.busy} type="number" min={selectedAssignment ? "1" : "0"} step="1" inputMode="numeric" value={initialStock} onChange={(event) => setInitialStock(event.target.value)} />
             </FormField>
-            <div className="fm-price-choice">
-              <p><strong>Precio predeterminado del producto:</strong> {formatMoney(selected.defaultPrice || 0)}</p>
-              <label className="fm-check-row">
-                <input type="checkbox" checked={useDefaultPrice} onChange={(event) => setUseDefaultPrice(event.target.checked)} />
-                <span>Usar precio predeterminado</span>
-              </label>
-              <p className="fm-field__hint">Usa automáticamente el precio definido en Productos. Si ese precio cambia, esta ubicación también se actualiza.</p>
-              {!useDefaultPrice ? (
-                <FormField label={`Precio especial en ${location.name}`} required>
-                  <input type="number" min="0" step="1" inputMode="numeric" value={priceOverride} onChange={(event) => setPriceOverride(event.target.value)} />
-                </FormField>
-              ) : null}
-            </div>
+            {selectedAssignment ? (
+              <p className="fm-field__hint">El producto ya está vinculado a esta ubicación. Se conserva su precio y configuración; sólo se suma la cantidad indicada.</p>
+            ) : (
+              <div className="fm-price-choice">
+                <p><strong>Precio predeterminado del producto:</strong> {formatMoney(selected.defaultPrice || 0)}</p>
+                <label className="fm-check-row">
+                  <input type="checkbox" checked={useDefaultPrice} onChange={(event) => setUseDefaultPrice(event.target.checked)} />
+                  <span>Usar precio predeterminado</span>
+                </label>
+                <p className="fm-field__hint">Usa automáticamente el precio definido en Productos. Si ese precio cambia, esta ubicación también se actualiza.</p>
+                {!useDefaultPrice ? (
+                  <FormField label={`Precio especial en ${location.name}`} required>
+                    <input type="number" min="0" step="1" inputMode="numeric" value={priceOverride} onChange={(event) => setPriceOverride(event.target.value)} />
+                  </FormField>
+                ) : null}
+              </div>
+            )}
           </section>
         ) : null}
 
         {state.error ? <Toast tone="error">{state.error}</Toast> : null}
         <div className="fm-dialog-actions">
           <HelpTooltip label="Cierra esta ventana sin agregar ningún producto."><Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button></HelpTooltip>
-          <HelpTooltip label="Agrega el producto a esta ubicación con el stock inicial y el precio elegidos."><Button type="submit" loading={state.busy} disabled={!selected}>Agregar producto</Button></HelpTooltip>
+          <HelpTooltip label={selectedAssignment ? "Suma la cantidad indicada al stock existente sin duplicar el producto." : "Agrega el producto a esta ubicación con el stock inicial y el precio elegidos."}>
+            <Button type="submit" loading={state.busy} disabled={!selected || (selectedAssignment && Number(initialStock || 0) <= 0)}>
+              {selectedAssignment ? "Agregar stock" : "Agregar producto"}
+            </Button>
+          </HelpTooltip>
         </div>
       </form>
     </Modal>
