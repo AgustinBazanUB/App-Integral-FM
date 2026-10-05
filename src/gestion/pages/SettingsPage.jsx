@@ -3,11 +3,13 @@ import { fiscalPresentation } from "../../shared/fiscalRecovery.mjs";
 import { Badge, Button, EmptyState, PageHeader, Panel, Skeleton, Toast } from "../../design-system";
 import { useAuth } from "../AuthContext";
 import OliviaSettings from "../olivia/OliviaSettings";
+import { useOliviaVisibility } from "../olivia/ScreenContext";
 import { can, canAccessAdministration } from "../permissions";
 import {
   authorizeArcaInvoice,
   dryRunArcaInvoice,
   getArcaSafeStatus,
+  getArcaInvoiceForSale,
   getArcaWsaaCacheStatus,
   listRecentArcaInvoices,
   reconcileArcaInvoice,
@@ -167,7 +169,9 @@ function stageMessage(stage, fallback = "") {
 }
 
 export default function SettingsPage() {
+  const { review, setReview } = useOliviaVisibility();
   const fiscalActionRef = useRef(false);
+  const selectedInvoiceRef = useRef(null);
   const { profile } = useAuth();
   const isAdmin = canAccessAdministration(profile);
   const [arcaState, setArcaState] = useState({
@@ -210,11 +214,26 @@ export default function SettingsPage() {
     error: "",
   });
 
+  useEffect(() => {
+    if (!isAdmin || review?.toolName !== "prepare_invoice_review") return;
+    let active = true;
+    getArcaInvoiceForSale({ saleId: review.entityId, invoiceId: review.invoiceId, sourceType: review.sourceType }).then((invoice) => {
+      if (!active) return;
+      selectedInvoiceRef.current = invoice.id;
+      setInvoiceState((current) => ({ ...current, items: [invoice, ...current.items.filter((row) => row.id !== invoice.id)], message: "Factura seleccionada por Olivia. Revisá sus controles fiscales antes de realizar una acción.", error: "" }));
+      setReview(null);
+    }).catch((error) => { if (active) setInvoiceState((current) => ({ ...current, error: error.message })); });
+    return () => { active = false; };
+  }, [review, isAdmin, setReview]);
+
   const loadInvoices = async () => {
     setInvoiceState((current) => ({ ...current, busy: true, error: "", message: "" }));
     try {
       const items = await listRecentArcaInvoices({ pageSize: 25 });
-      setInvoiceState((current) => ({ ...current, busy: false, items, error: "" }));
+      setInvoiceState((current) => {
+        const selected = current.items.find((row) => row.id === selectedInvoiceRef.current);
+        return { ...current, busy: false, items: selected ? [selected, ...items.filter((row) => row.id !== selected.id)] : items, error: "" };
+      });
     } catch (error) {
       setInvoiceState((current) => ({ ...current, busy: false, error: error.message }));
     }

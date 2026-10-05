@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "../router";
 import { AuthProvider, useAuth } from "./AuthContext";
 import OliviaMount from "./olivia/OliviaMount";
 import { OliviaScreenProvider } from "./olivia/ScreenContext";
+import OliviaReviewPanel from "./olivia/OliviaReviewPanel";
 import ManagementShell from "./ManagementShell";
 import { moduleById, SALES_METRICS_PATH } from "./modules";
 import { managementPageLoaders } from "./routePreload";
@@ -196,6 +197,7 @@ function ManagementRouter() {
   return (
     <ManagementShell>
       <WhatsAppExtensionSync />
+      <OliviaReviewPanel />
       <Suspense fallback={<ModuleFallback />}>{page}</Suspense>
     </ManagementShell>
   );

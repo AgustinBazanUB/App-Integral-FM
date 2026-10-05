@@ -218,12 +218,7 @@ async function arcaDocumentPost(payload, { expectPdf = false } = {}) {
   return data;
 }
 
-export function arcaSourceTypeForSale(sale = {}) {
-  if (["admin_quick_sale", "seller_sale", "ecommerce"].includes(sale.sourceType)) return sale.sourceType;
-  if (sale?.fiscalInvoice?.sourceType) return sale.fiscalInvoice.sourceType;
-  if (sale?.ticketRequested === true || "ticketStatus" in sale) return "seller_sale";
-  return "admin_quick_sale";
-}
+export { arcaSourceTypeForSale } from "../../shared/arcaSourceType.mjs";
 
 export async function getArcaInvoiceForSale({ saleId, sourceType, invoiceId = null }) {
   const data = await arcaDocumentPost({

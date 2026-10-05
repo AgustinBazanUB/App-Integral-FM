@@ -4,6 +4,8 @@ import { createOliviaEngine } from "./_lib/olivia/engine.mjs";
 import { createRealtime, stopRealtime } from "./_lib/olivia/voice.mjs";
 import { oliviaSession, json, errorResponse } from "./_lib/olivia/http.mjs";
 import { oliviaError } from "../../src/shared/oliviaContracts.mjs";
+import { chatStream } from "./_lib/olivia/stream.mjs";
+import { createLive, interruptLive } from "./_lib/olivia/live.mjs";
 export default async function handler(request) {
   if (request.method !== "POST")
     return json(
@@ -28,6 +30,10 @@ export default async function handler(request) {
     }
     const store = createOliviaStore(),
       engine = createOliviaEngine({ store, pricingResolver: resolveOliviaPricing });
+    if (body.operation === "chat" && body.stream === true) {
+      const stream = chatStream((options) => engine.chat(session, body, options));
+      return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+    }
     let result;
     if (body.operation === "state")
       result = await engine.state(
@@ -39,6 +45,12 @@ export default async function handler(request) {
       result = await engine.chat(session, body);
     else if (body.operation === "confirm")
       result = await engine.confirm(session, body);
+    else if (body.operation === "realtimeTool")
+      result = await engine.realtimeTool(session, body);
+    else if (body.operation === "realtimeTranscript")
+      result = await engine.realtimeTranscript(session, body);
+    else if (body.operation === "voiceCosts")
+      result = await engine.voiceCosts(session, body);
     else if (body.operation === "cancel")
       result = await engine.cancel(session, body);
     else if (body.operation === "estimate")
@@ -54,13 +66,15 @@ export default async function handler(request) {
     else if (body.operation === "saveConfiguration")
       result = await engine.saveConfiguration(session, body);
     else if (body.operation === "realtime")
-      result = await createRealtime({
+      result = await (body.voiceMode === "realtime-mini" ? createRealtime : (await engine.configuration()).voiceProtocol === "live" ? createLive : createRealtime)({
         session,
         body,
         store,
         engine,
         applicationOrigin: new URL(request.url).origin,
       });
+    else if (body.operation === "interruptVoice")
+      result = await interruptLive({ session, body, store });
     else if (body.operation === "stopRealtime")
       result = await stopRealtime({ session, body, store });
     else throw oliviaError("invalid-operation", "Operación no disponible.");

@@ -1,3 +1,4 @@
+import { buildModuleRecordPayload } from "../../shared/managementWritePlans.mjs";
 import { createAdministrativeSale } from "./sellerService";
 import { deleteApp, initializeApp } from "firebase/app";
 import {
@@ -60,19 +61,20 @@ export async function listModuleRecords(moduleId, pageSize = 40) {
   }
 }
 
+export async function getModuleRecord(moduleId, recordId, profile) {
+  const definition = moduleById[moduleId];
+  if (!definition?.collection || !can(profile, moduleId, "view")) throw new Error("No tenés permiso para consultar este módulo.");
+  const snapshot = await getDoc(doc(db, definition.collection, recordId));
+  if (!snapshot.exists() || snapshot.data().deleted) throw new Error("El registro ya no está disponible.");
+  return { id: snapshot.id, ...snapshot.data() };
+}
+
 export async function createModuleRecord(moduleId, data, profile) {
   const definition = moduleById[moduleId];
   if (!definition?.collection) throw new Error("El módulo no tiene una colección configurada.");
   if (!can(profile, moduleId, "create")) throw new Error("No tenés permiso para crear registros en este módulo.");
   const target = await addDoc(collection(db, definition.collection), {
-    ...data,
-    moduleId,
-    active: true,
-    deleted: false,
-    createdBy: profile.id,
-    createdByName: profile.name || profile.email || "Usuario",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    ...buildModuleRecordPayload(moduleId, data, profile, serverTimestamp()),
   });
   return target.id;
 }

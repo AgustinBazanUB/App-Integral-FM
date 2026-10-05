@@ -15,7 +15,22 @@ import {
 import {
   OliviaRealtime,
   speechResult,
+  localVoiceAcknowledgement,
 } from "../src/gestion/olivia/realtime.mjs";
+
+test("waiting captions never use browser speech synthesis or introduce a second voice", () => {
+  const previousSpeech = globalThis.speechSynthesis, previousUtterance = globalThis.SpeechSynthesisUtterance;
+  let spoken = 0;
+  try {
+    globalThis.speechSynthesis = { speak: () => spoken++ };
+    globalThis.SpeechSynthesisUtterance = class {};
+    assert.match(localVoiceAcknowledgement(0), /segundo/);
+    assert.equal(spoken, 0);
+  } finally {
+    if (previousSpeech === undefined) delete globalThis.speechSynthesis; else globalThis.speechSynthesis = previousSpeech;
+    if (previousUtterance === undefined) delete globalThis.SpeechSynthesisUtterance; else globalThis.SpeechSynthesisUtterance = previousUtterance;
+  }
+});
 
 const response = (data, status = 200) => ({
   ok: status < 400,
@@ -291,6 +306,24 @@ function voiceFixture(overrides = {}) {
   };
 }
 
+test("Mini interruption suppresses a late backend response and ignores stale transcriptions", async () => {
+  let resolveFirst, interrupted = 0; const requests = [];
+  const f = voiceFixture({ acknowledge: () => "Reviso", onInterrupt: () => interrupted++, onRequest: (message) => { requests.push(message); return requests.length === 1 ? new Promise((resolve) => { resolveFirst = resolve; }) : Promise.resolve({ messages: [{ role: "assistant", content: "Respuesta nueva" }] }); } });
+  await f.connection.connect();
+  const input = (id, text) => f.connection.handleEvent({ type: "conversation.item.input_audio_transcription.completed", item_id: id, transcript: text });
+  f.connection.handleEvent({ type: "input_audio_buffer.speech_started", item_id: "old" }); input("old", "Consulta anterior");
+  await new Promise((resolve) => setImmediate(resolve));
+  f.connection.handleEvent({ type: "input_audio_buffer.speech_started", item_id: "new" });
+  resolveFirst({ messages: [{ role: "assistant", content: "Respuesta obsoleta" }] }); await f.connection.queue;
+  f.connection.handleEvent({ type: "input_audio_buffer.speech_started", item_id: "late" });
+  f.connection.handleEvent({ type: "input_audio_buffer.speech_started", item_id: "latest" });
+  input("late", "Transcripción obsoleta"); input("latest", "Consulta nueva"); await f.connection.queue;
+  assert.deepEqual(requests, ["Consulta anterior", "Consulta nueva"]);
+  assert.equal(JSON.stringify(f.events).includes("Respuesta obsoleta"), false);
+  assert.equal(JSON.stringify(f.events).includes("Respuesta nueva"), true);
+  assert.ok(interrupted >= 2); assert.equal(f.errors.length, 0); f.connection.close();
+});
+
 test("WebRTC receives a server SDP answer and hangup always releases microphone, channel and audio", async () => {
   const fixture = voiceFixture();
   await fixture.connection.connect();
@@ -357,6 +390,18 @@ test("voice startup reads the server greeting once as audio without creating a c
   assert.deepEqual(fixture.requests, []);
   fixture.connection.close();
   assert.equal(fixture.channel.onopen, null);
+});
+
+test("Mini speech receives natural answer text without internal state labels or irrelevant confirmation instructions", async () => {
+  const f = voiceFixture(); await f.connection.connect();
+  f.connection.speakResult({ state: "DATOS_INCOMPLETOS", messages: [{ role: "assistant", content: "¿Qué producto querés consultar?" }] });
+  const instructions = f.events.at(-1).response.instructions;
+  assert.match(instructions, /¿Qué producto querés consultar/);
+  assert.equal(instructions.includes("DATOS_INCOMPLETOS"), false);
+  assert.equal(instructions.includes('"state"'), false);
+  assert.equal(instructions.includes('"messages"'), false);
+  assert.equal(instructions.includes("tocá Sí"), false);
+  f.connection.close();
 });
 
 test("streamless remote audio is played and a playback rejection closes capture and the provider", async () => {

@@ -1013,7 +1013,7 @@ test("a sequential location-product-stock-preparation chain creates a confirmati
   );
 });
 
-test("five sequential tools are followed by a final response with no tools", async () => {
+test("seven sequential tools are followed by a final response with no tools", async () => {
   const f = fixture({
     provider: (_path, body, _options, calls) => {
       if (calls === 1) return functionResponse("get_current_user_context", {});
@@ -1030,7 +1030,9 @@ test("five sequential tools are followed by a final response with no tools", asy
           locationId: "local_a",
           productId: "oil",
         });
-      assert.equal(calls, 6);
+      if (calls === 6) return functionResponse("discover_skills", {});
+      if (calls === 7) return functionResponse("get_stock", { locationId: "local_a", productId: "oil" });
+      assert.equal(calls, 8);
       assert.deepEqual(body.tools, []);
       assert.equal(body.tool_choice, "none");
       assert.equal(JSON.parse(body.input.at(-1).output).currentStock, 4);
@@ -1039,7 +1041,7 @@ test("five sequential tools are followed by a final response with no tools", asy
   });
   const initial = await start(f),
     result = await chat(f, initial.conversationId);
-  assert.equal(f.providerCalls(), 6);
+  assert.equal(f.providerCalls(), 8);
   assert.equal(result.messages.at(-1).content, "Aceite tiene cuatro unidades.");
   assert.equal(result.pendingAction, null);
 });

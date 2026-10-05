@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
+import { executeExtendedOperation } from "./extendedOperations.mjs";
 import {
   can,
   canAccessAdministration,
@@ -420,11 +422,10 @@ export async function prepareOperation({
     if (!validId(args.locationId)) missing.push("locationId");
     if (!validId(args.productId)) missing.push("productId");
     if (args.quantity == null) missing.push("quantity");
-    if (!String(args.reason || "").trim()) missing.push("reason");
     if (missing.length)
       return incomplete(
         missing,
-        "Necesito la ubicación, el producto, la cantidad a ingresar y el motivo de la carga.",
+        "Necesito la ubicación, el producto y la cantidad a ingresar.",
       );
     if (!positiveQuantity(args.quantity))
       throw operationError("La cantidad a cargar debe ser un entero positivo.");
@@ -432,7 +433,7 @@ export async function prepareOperation({
       locationId: args.locationId,
       productId: args.productId,
       quantity: args.quantity,
-      reason: String(args.reason).trim().slice(0, 500),
+      reason: String(args.reason || "").trim().slice(0, 500),
     };
     const context = await stockContext({
       session,
@@ -442,7 +443,7 @@ export async function prepareOperation({
     });
     return {
       toolName,
-      summary: `Agregar ${canonicalArgs.quantity} unidades de ${context.product.name} en ${context.location.name}. Stock: ${context.plan.previousStock} → ${context.plan.currentStock}. Motivo: ${canonicalArgs.reason}.`,
+      summary: `Agregar ${canonicalArgs.quantity} unidades de ${context.product.name} en ${context.location.name}. Stock: ${context.plan.previousStock} → ${context.plan.currentStock}.${canonicalArgs.reason ? ` Motivo: ${canonicalArgs.reason}.` : ""}`,
       canonicalArgs,
       snapshotFingerprint: fingerprint({ ...context, plan: undefined }),
     };
@@ -461,6 +462,7 @@ export async function executeOperation({
   now = new Date(),
   correlation,
 }) {
+  if (OLIVIA_CAPABILITIES[prepared.toolName]) return executeExtendedOperation({ session, prepared, transaction, now, correlation });
   const uid = identity(session);
   const profileDocument = await transaction.getDocument(`users/${uid}`);
   const freshSession = {
@@ -581,7 +583,7 @@ export async function executeOperation({
       },
       true,
     );
-    write(`auditLogs/${saleId}`, { ...plan.auditData, ...marker }, true);
+    write(`auditLogs/${saleId}`, { ...plan.auditData, ...marker, before: plan.stockWrites.map((line) => ({ productId: line.productId, currentStock: line.movementData.previousStock })), after: { saleId, total: plan.result.total, stocks: plan.stockWrites.map((line) => ({ productId: line.productId, currentStock: line.stockData.currentStock })) } }, true);
     return {
       result: {
         ...plan.result,
@@ -649,6 +651,8 @@ export async function executeOperation({
       userId: uid,
       userName: context.profile.name || context.profile.email || "Usuario",
       createdAt: now,
+      before: { currentStock: plan.movementData.previousStock },
+      after: { currentStock: plan.stockData.currentStock },
       ...marker,
     },
     true,

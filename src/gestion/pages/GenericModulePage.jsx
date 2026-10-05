@@ -1,5 +1,5 @@
 import SalesIncomePanel from "../components/SalesIncomePanel";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Button,
@@ -14,6 +14,7 @@ import {
 } from "../../design-system";
 import { Link } from "../../router";
 import { useAuth } from "../AuthContext";
+import { useOliviaVisibility } from "../olivia/ScreenContext";
 import {
   formatDateTime,
   humanizeStatus,
@@ -25,6 +26,7 @@ import { can } from "../permissions";
 import {
   createModuleRecord,
   listModuleRecords,
+  getModuleRecord,
 } from "../services/managementService";
 
 const fieldLabels = {
@@ -64,6 +66,7 @@ function recordTitle(record) {
 }
 
 export default function GenericModulePage({ moduleId }) {
+  const { review } = useOliviaVisibility();
   const { profile } = useAuth();
   const module = moduleById[moduleId];
   const result = useAsyncData(() => listModuleRecords(moduleId), [moduleId]);
@@ -71,8 +74,16 @@ export default function GenericModulePage({ moduleId }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ name: "", notes: "" });
   const [saveState, setSaveState] = useState({ busy: false, error: "" });
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  useEffect(() => {
+    setSelectedRecord(null);
+    if (review?.toolName !== "prepare_ecommerce_order_review" || moduleId !== "ecommerce") return;
+    let active = true;
+    getModuleRecord(moduleId, review.entityId, profile).then((record) => { if (active) { setSelectedRecord(record); setSearch(""); } }).catch((error) => { if (active) setSaveState({ busy: false, error: error.message }); });
+    return () => { active = false; };
+  }, [review, moduleId, profile]);
   const rows = useMemo(() => {
-    const records = result.data || [];
+    const records = review?.toolName === "prepare_ecommerce_order_review" && moduleId === "ecommerce" ? selectedRecord ? [selectedRecord] : [] : result.data || [];
     const term = search.trim().toLocaleLowerCase("es");
     return term
       ? records.filter((record) =>
@@ -81,7 +92,7 @@ export default function GenericModulePage({ moduleId }) {
             .includes(term),
         )
       : records;
-  }, [result.data, search]);
+  }, [result.data, search, review, moduleId, selectedRecord]);
 
   const handleCreate = async (event) => {
     event.preventDefault();
@@ -132,6 +143,7 @@ export default function GenericModulePage({ moduleId }) {
         </Panel>
       ) : null}
       {moduleId === "finance" ? <SalesIncomePanel /> : null}
+      {saveState.error && !modalOpen ? <p className="fm-form-error" role="alert">{saveState.error}</p> : null}
       <Panel
         title="Registros recientes"
         description="Consulta paginada de los registros autorizados en Firestore."

@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import WebSocket from "ws";
+import { monitorLive } from "./_lib/olivia/liveMonitor.mjs";
 import { oliviaSession, json, errorResponse } from "./_lib/olivia/http.mjs";
 import { createOliviaStore } from "./_lib/olivia/store.mjs";
 import { createOliviaEngine } from "./_lib/olivia/engine.mjs";
 import { hangupCall } from "./_lib/olivia/voice.mjs";
 import { settleUsage } from "./_lib/olivia/usage.mjs";
+import { emptyRealtimeUsage, realtimeTokenBreakdown } from "../../src/shared/oliviaVoicePricing.mjs";
 import { canAccessAdministration } from "../../src/gestion/permissions.js";
 import { assertOliviaAccess } from "./_lib/olivia/guards.mjs";
 import {
@@ -157,6 +159,7 @@ export async function monitorRealtime({
       const transcriptionModel =
         live.transcriptionModel || config.profiles.liveTranscription?.model;
       const measured = {
+        realtimeUsage: emptyRealtimeUsage(),
         inputTokens: 0,
         outputTokens: 0,
         totalTokens: 0,
@@ -168,6 +171,7 @@ export async function monitorRealtime({
         transcriptions: 0,
       };
       let durationUsage = false;
+      let pricingComplete = true;
       async function finish(reason, failed = false) {
         if (finishing) return;
         finishing = true;
@@ -177,6 +181,13 @@ export async function monitorRealtime({
         try {
           await hangup(live.callId, { env });
           remotelyClosed = true;
+          // Hangup can drop WebSocket without a close frame (1006). This is an
+          // expected end only after a server-authenticated stop request and a
+          // confirmed remote hangup; all usage-completeness checks still apply.
+          if (reason === "provider-closed" && failed && connected) {
+            const current = await store.get(path);
+            if (current?.closeRequestedAt && Number.isFinite(dateMs(current.closeRequestedAt))) failed = false;
+          }
         } catch {
           failed = true;
           reason = "realtime-close-error";
@@ -197,9 +208,11 @@ export async function monitorRealtime({
           !inFlightResponses.size &&
           !inFlightTranscriptions.size &&
           measured.responses > 0 &&
-          (!transcriptionModel || measured.transcriptions > 0);
+          (!transcriptionModel || measured.transcriptions > 0 || live.voiceMode === "realtime-mini");
         resolve({
           ...measured,
+          realtimeUsage: pricingComplete ? measured.realtimeUsage : null,
+          meteringGaps: { disconnected: failed, invalidUsage: uncertain, durationOnlyTranscription: durationUsage, pendingResponses: inFlightResponses.size, pendingTranscriptions: inFlightTranscriptions.size, missingModalityDetails: !pricingComplete },
           reason,
           failed,
           remotelyClosed,
@@ -384,6 +397,9 @@ export async function monitorRealtime({
             uncertain = true;
             return;
           }
+          const breakdown = realtimeTokenBreakdown(usage);
+          if (!breakdown) pricingComplete = false;
+          else for (const key of Object.keys(measured.realtimeUsage)) measured.realtimeUsage[key] += breakdown[key];
           measured.inputTokens += usage.input_tokens;
           measured.outputTokens += usage.output_tokens;
           measured.totalTokens += usage.total_tokens;
@@ -442,6 +458,9 @@ export async function monitorRealtime({
   }
   const finishedAt = clock();
   const event = {
+    ...(live.voiceMode === "realtime-mini" ? { billingUnit: "realtime-tokens", voiceMode: live.voiceMode } : {}),
+    realtimeUsage: result.realtimeUsage || null,
+    meteringGaps: result.meteringGaps || null,
     model: live.model || config.profiles.realtime.model,
     transcriptionModel:
       live.transcriptionModel ||
@@ -463,8 +482,8 @@ export async function monitorRealtime({
   // charge the full allocated token quota, never a fabricated actual price.
   // Realtime audio/text/cache tariffs and the separate ASR rate card cannot
   // be represented by the current single input/output pricing configuration.
-  // Provider counters are exact when complete; actual session price is unknown.
-  const settlementConfig = { ...config, pricing: {} };
+  // Mini is priced only with complete provider modality/cache and ASR counters.
+  const settlementConfig = { ...config, ...(live.billingConfig || {}), pricing: {} };
   await settle({
     store,
     session,
@@ -497,6 +516,7 @@ export async function monitorRealtime({
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens,
           totalTokens: result.totalTokens,
+          realtimeUsage: result.realtimeUsage || null,
           closeReason: result.reason,
           ...(result.remotelyClosed
             ? { closedAt: finishedAt }
@@ -538,10 +558,12 @@ export default async function handler(request) {
     }
     if (!body || Object.keys(body).some((key) => key !== "realtimeSessionId"))
       throw oliviaError("invalid-input", "Solicitud de voz inválida.");
-    await monitorRealtime({
+    const store = createOliviaStore();
+    const live = await store.get(`oliviaRealtime/${safeId(body.realtimeSessionId)}`);
+    await (live?.protocol === "live" ? monitorLive : monitorRealtime)({
       session,
       realtimeSessionId: body.realtimeSessionId,
-      store: createOliviaStore(),
+      store,
     });
     return json({ accepted: true }, 202);
   } catch (error) {

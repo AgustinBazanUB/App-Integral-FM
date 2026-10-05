@@ -7,6 +7,7 @@ import {
   effectiveSellerLocations,
 } from "../../../../src/gestion/permissions.js";
 import { isLocationActiveNow } from "../../../../src/modules/locations/domain/locations.js";
+import { OLIVIA_CAPABILITIES, assertExtendedCapability } from "../../../../src/shared/oliviaCapabilities.mjs";
 import {
   safeId,
   oliviaError,
@@ -37,6 +38,7 @@ export function assertOliviaAccess(session) {
 }
 export function assertCapability(session, name) {
   assertOliviaAccess(session);
+  if (OLIVIA_CAPABILITIES[name]) { assertExtendedCapability(session, name); return; }
   const p = session.profile;
   const checks = {
     get_current_user_context: () => true,
@@ -72,6 +74,7 @@ export function capabilities(session) {
     "navigate_to_module",
     "prepare_sale",
     "prepare_stock_load",
+    ...Object.keys(OLIVIA_CAPABILITIES),
   ].filter((name) => {
     try {
       assertCapability(session, name);

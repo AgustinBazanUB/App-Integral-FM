@@ -268,3 +268,24 @@ test("starting voice preserves the previous cost while updating its reservation"
   assert.deepEqual(result.usage.lastCost, { ars: 12.50, estimated: false });
   assert.ok(result.usage.remainingPercent < 100);
 });
+
+test("Mini trial is administrator-only and fixes both audio models without changing default voice", async () => {
+  const denied = await realtimeFixture();
+  denied.body.voiceMode = "realtime-mini";
+  await assert.rejects(createRealtime(denied), { code: "permission-denied" });
+  assert.equal(denied.calls.length, 0);
+  const f = await realtimeFixture();
+  f.session.profile.role = "admin"; f.docs.set("users/seller", f.session.profile);
+  f.body.conversationId = (await f.engine.state(f.session)).conversationId;
+  f.body.voiceMode = "realtime-mini"; f.body.nativeTools = true;
+  const result = await createRealtime(f), config = JSON.parse(f.calls[0].init.body.get("session"));
+  assert.equal(config.model, "gpt-realtime-2.1-mini");
+  assert.equal(config.audio.input.transcription.model, "gpt-4o-mini-transcribe");
+  assert.equal(config.audio.output.voice, "marin");
+  assert.equal(config.audio.input.turn_detection.create_response, false);
+  assert.deepEqual(config.tools.map(({ name }) => name), ["olivia_request"]);
+  assert.equal(result.voiceProtocol, "realtime");
+  assert.equal(result.voiceMode, "realtime-mini");
+  assert.equal(f.docs.get(`oliviaRealtime/${result.realtimeSessionId}`).nativeTools, false);
+  assert.equal(f.docs.get("oliviaConfiguration/global").voiceProtocol, "live");
+});

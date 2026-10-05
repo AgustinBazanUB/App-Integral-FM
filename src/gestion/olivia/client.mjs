@@ -1,3 +1,4 @@
+import { readEventStream } from "../../shared/oliviaStream.mjs";
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function requestId() {
@@ -64,7 +65,7 @@ export function prependHistoryMessages(older, current) {
 }
 
 export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, timeoutMs = 60000 }) {
-  const send = async (endpoint, body, { signal, isForm = false, keepalive = false } = {}) => {
+  const send = async (endpoint, body, { signal, isForm = false, keepalive = false, onEvent } = {}) => {
     const token = await getToken();
     if (!token) throw new Error("Iniciá sesión para usar Olivia.");
     const controller = new AbortController();
@@ -79,6 +80,16 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
         headers: { Authorization: `Bearer ${token}`, ...(!isForm ? { "Content-Type": "application/json" } : {}) },
         body: isForm ? body : JSON.stringify(body),
       });
+      if (response.ok && onEvent && response.headers.get("content-type")?.includes("text/event-stream")) {
+        let result;
+        await readEventStream(response.body, (event) => {
+          onEvent(event);
+          if (event.type === "completed") result = event.result;
+          if (event.type === "failed") throw Object.assign(new Error(event.message), { code: event.code });
+        }, { signal: controller.signal });
+        if (!result) throw Object.assign(new Error("La respuesta quedó incompleta. Recuperá el chat antes de reintentar."), { code: "stream-incomplete" });
+        return result;
+      }
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.ok === false) {
         const error = new Error(data.message || data.error?.message || "Olivia no pudo completar la solicitud. Podés continuar en el panel.");
@@ -95,6 +106,18 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
   };
   return {
     request: (payload, options) => send("/.netlify/functions/olivia", payload, options),
+    knowledge: (payload, options) => send("/.netlify/functions/olivia-knowledge", payload, options),
+    publishKnowledge: (file, payload, options) => {
+      const form = new FormData(); form.set("file", file, file.name);
+      Object.entries(payload).forEach(([key, value]) => form.set(key, String(value)));
+      return send("/.netlify/functions/olivia-knowledge", form, { ...options, isForm: true });
+    },
+    upload: (file, payload, options) => {
+      if (!file?.size || file.size > 4 * 1024 * 1024) throw new Error("Elegí un archivo de hasta 4 MB.");
+      const form = new FormData(); form.set("file", file, file.name);
+      Object.entries(payload).forEach(([key, value]) => { if (value != null) form.set(key, String(value)); });
+      return send("/.netlify/functions/olivia-attachment", form, { ...options, isForm: true });
+    },
     transcribe: (audio, payload, options) => {
       if (!audio?.size || audio.size > 4 * 1024 * 1024) throw new Error("El audio debe ocupar entre 1 byte y 4 MB. Grabá un mensaje más corto.");
       const form = new FormData();
