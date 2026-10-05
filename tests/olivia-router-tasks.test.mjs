@@ -107,6 +107,39 @@ test("productos ambiguos requieren presentación y no repiten cantidad", async (
   const task = f.documents.get(`oliviaConversations/${id}`).taskState;
   assert.equal(task.slots.productId, "oil"); assert.equal(task.slots.quantity, 12);
 });
+test("un producto inexistente no enumera opciones ajenas y permite corregir el nombre", async () => {
+  const f = stockFixture(), { conversationId: id } = await start(f);
+  const first = await turn(f, id, "Cargame 12 botellas de Producto Inexistente", "a");
+  assert.match(first.messages.at(-1).content, /No pude identificar el producto/);
+  assert.ok(!first.messages.at(-1).content.includes("Original"));
+  const initial = f.documents.get(`oliviaConversations/${id}`).taskState;
+  assert.deepEqual(initial.ambiguities.productId, []);
+  await turn(f, id, "Original", "b");
+  const corrected = f.documents.get(`oliviaConversations/${id}`).taskState;
+  assert.equal(corrected.id, initial.id);
+  assert.equal(corrected.slots.productId, "oil");
+  assert.equal(corrected.slots.quantity, 12);
+  assert.equal(f.providerCalls(), 0);
+});
+
+test("ubicaciones: alias único se resuelve, coincidencias se aclaran y nombres ajenos no se inventan", async () => {
+  const f = stockFixture(), { conversationId: id } = await start(f);
+  f.documents.set("locations/local_c", { name: "Local Lavalle", active: true });
+  await turn(f, id, "Cargame 12 botellas de Original", "a");
+  const unknown = await turn(f, id, "Inexistente", "b");
+  assert.match(unknown.messages.at(-1).content, /No encontré una ubicación disponible/);
+  assert.equal(f.documents.get(`oliviaConversations/${id}`).taskState.slots.locationId, null);
+  await turn(f, id, "Lavalle", "c");
+  assert.equal(f.documents.get(`oliviaConversations/${id}`).taskState.slots.locationId, "local_c");
+  f.documents.set("locations/local_d", { name: "Local Lavalle Norte", active: true });
+  const ambiguous = await turn(f, id, "Mejor Lavalle", "d");
+  assert.match(ambiguous.messages.at(-1).content, /Local Lavalle o Local Lavalle Norte/);
+  assert.equal(f.documents.get(`oliviaConversations/${id}`).taskState.slots.locationId, null);
+  await turn(f, id, "Local Lavalle", "e");
+  assert.equal(f.documents.get(`oliviaConversations/${id}`).taskState.slots.locationId, "local_c");
+  assert.equal(f.providerCalls(), 0);
+});
+
 test("voz y texto continúan exactamente la misma tarea y permisos", async () => {
   const f = stockFixture(), { conversationId: id } = await start(f);
   await turn(f, id, "Cargame 12 botellas de Original", "a");
@@ -139,6 +172,45 @@ test("Luna conserva los slots de un pronóstico y registra cada llamada", async 
   const usage = [...f.documents].find(([path]) => path.startsWith("oliviaUsage/"))[1];
   assert.equal(usage.modelCalls.length, 2); assert.equal(usage.taskId, task.id);
   assert.equal(result.telemetry.reasoningEffort, "xhigh");
+});
+for (const slotsJson of ['{"period":"este fin de semana"}', '{malformed']) test(`Luna corrige slots inválidos sin guardarlos: ${slotsJson}`, async () => {
+  let calls = 0;
+  const valid = { startDate: "2026-10-03", endDate: "2026-10-04" };
+  const f = stockFixture({ provider: async (_path, body) => {
+    calls++;
+    if (calls === 1) return functionResponse("update_task", { intent: "get_sales_metrics", slotsJson });
+    if (calls === 2) {
+      const feedback = JSON.parse(body.input.filter((item) => item.type === "function_call_output").at(-1).output);
+      assert.equal(feedback.retryable, true);
+      assert.ok(feedback.slotsSchema.startDate);
+      assert.ok(!Object.hasOwn(feedback.slotsSchema, "period"));
+      assert.deepEqual([...f.documents].find(([key]) => key.startsWith("oliviaConversations/"))[1].taskState.slots, {});
+      return functionResponse("update_task", { intent: "get_sales_metrics", slotsJson: JSON.stringify(valid) });
+    }
+    return textResponse("Período corregido; falta consultar las ventas.");
+  } });
+  const { conversationId: id } = await start(f);
+  const result = await turn(f, id, "Cómo nos fue este fin de semana", "a");
+  assert.equal(calls, 3);
+  assert.notEqual(result.state, "ERROR");
+  assert.deepEqual(f.documents.get(`oliviaConversations/${id}`).taskState.slots, valid);
+});
+test("slots que no se corrigen agotan el presupuesto y no simulan una tarea válida", async () => {
+  const f = stockFixture({ provider: async (_path, body) => body.tools.length ? functionResponse("update_task", { intent: "get_sales_metrics", slotsJson: '{"permissions":true}' }) : textResponse("Todo correcto") });
+  const { conversationId: id } = await start(f);
+  const result = await turn(f, id, "Cómo nos fue este fin de semana", "a");
+  assert.equal(result.state, "ERROR");
+  assert.match(result.messages.at(-1).content, /No pude completar/);
+  assert.deepEqual(f.documents.get(`oliviaConversations/${id}`).taskState.slots, {});
+  assert.ok(f.providerCalls() <= config.responseLimits.maxRounds);
+});
+test("rechazo de tarea creativa no se convierte en reintento de validación", async () => {
+  const f = stockFixture({ provider: async () => functionResponse("update_task", { intent: "creative_brief", slotsJson: '{"objective":"campaña"}' }) });
+  const { conversationId: id } = await start(f);
+  const result = await turn(f, id, "Cómo nos fue este fin de semana", "a");
+  assert.equal(result.state, "RECHAZADA");
+  assert.equal(f.providerCalls(), 1);
+  assert.deepEqual(f.documents.get(`oliviaConversations/${id}`).taskState.slots, {});
 });
 test("agregación calcula porcentajes de llamadas y conserva costos desconocidos", () => {
   const rows = aggregateRoutes([{ modelCalls: [{ route: "luna-normal", totalTokens: 10, actualCostUsd: 1 }, { route: "luna-complex", totalTokens: 20, actualCostUsd: null }] }]);

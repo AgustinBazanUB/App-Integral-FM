@@ -25,10 +25,13 @@ export function requiredFields(intent) {
   return (OLIVIA_TOOL_SCHEMAS[intent] || OLIVIA_CAPABILITIES[intent]?.parameters)?.required || [];
 }
 export function taskUpdateTool(intents) {
-  return { type: "function", name: "update_task", description: "Guardar datos parciales y correcciones de la tarea actual antes de pedir lo que falta. No consulta ni ejecuta operaciones. Usá un intento habilitado y slotsJson con campos del esquema; null indica desconocido. Nunca inventes IDs ni datos vivos.", strict: true, parameters: { type: "object", additionalProperties: false, required: ["intent", "slotsJson"], properties: { intent: { type: "string", enum: [...intents, "creative_brief"] }, slotsJson: { type: "string", maxLength: 5000 } } } };
+  return { type: "function", name: "update_task", description: "Guardar datos parciales y correcciones de la tarea actual antes de pedir lo que falta. No consulta ni ejecuta operaciones. slotsJson es un objeto JSON parcial con las mismas claves y tipos que los parámetros de la herramienta intent; si no está cargada, descubrí su esquema con search_tools. No agregues campos descriptivos como period o locationName. null indica desconocido. Para creative_brief solo objective, audience, format y style (strings). Si la validación falla, corregí usando el esquema devuelto antes de continuar. Nunca inventes IDs ni datos vivos.", strict: true, parameters: { type: "object", additionalProperties: false, required: ["intent", "slotsJson"], properties: { intent: { type: "string", enum: [...intents, "creative_brief"] }, slotsJson: { type: "string", maxLength: 5000 } } } };
+}
+export function taskSlotSchema(intent) {
+  return intent === "creative_brief" ? { properties: { objective: { type: "string", maxLength: 500 }, audience: { type: "string", maxLength: 500 }, format: { type: "string", maxLength: 180 }, style: { type: "string", maxLength: 500 } } } : OLIVIA_TOOL_SCHEMAS[intent] || OLIVIA_CAPABILITIES[intent]?.parameters;
 }
 export function updateTask(previous, intent, slotsJson, now = new Date()) {
-  const schema = intent === "creative_brief" ? { properties: { objective: { type: "string", maxLength: 500 }, audience: { type: "string", maxLength: 500 }, format: { type: "string", maxLength: 180 }, style: { type: "string", maxLength: 500 } } } : OLIVIA_TOOL_SCHEMAS[intent] || OLIVIA_CAPABILITIES[intent]?.parameters;
+  const schema = taskSlotSchema(intent);
   const patch = JSON.parse(slotsJson);
   if (!schema || !patch || typeof patch !== "object" || Array.isArray(patch) || Object.keys(patch).some((key) => !Object.hasOwn(schema.properties, key))) throw oliviaError("invalid-input", "Datos de tarea inválidos.");
   for (const [key, value] of Object.entries(patch)) if (value !== null) validateSchema(value, schema.properties[key]);
@@ -91,11 +94,13 @@ export async function progressiveStock({ previous, initialId, message, context, 
     const words = normalize(productQuery).split(" ");
     const matches = products.filter((product) => words.every((word) => normalize(product.name).includes(word)));
     if (matches.length === 1) { task.slots.productId = matches[0].productId; task.productName = matches[0].name; delete task.ambiguities.productId; }
-    else { task.ambiguities.productId = matches.length ? matches : products; task.slots.productId = null; }
+    else { task.ambiguities.productId = matches; task.slots.productId = null; }
   }
   if (locationQuery) {
     const locations = (await run("list_locations", {})).data.locations || [];
-    const matches = locations.filter((location) => normalize(location.name) === normalize(locationQuery));
+    const query = normalize(locationQuery);
+    const exact = locations.filter((location) => normalize(location.name) === query);
+    const matches = exact.length ? exact : locations.filter((location) => query.split(" ").every((word) => normalize(location.name).split(" ").includes(word)));
     if (matches.length === 1) { task.slots.locationId = matches[0].id || matches[0].locationId; task.locationName = matches[0].name; delete task.ambiguities.locationId; }
     else { task.slots.locationId = null; task.ambiguities.locationId = matches.map(({ id, locationId, name }) => ({ id: id || locationId, name })); }
   }
@@ -106,6 +111,8 @@ export async function progressiveStock({ previous, initialId, message, context, 
     return { task, result, content: result.prepared?.summary || missingQuestion(task.missingFields) };
   }
   const options = task.ambiguities.productId?.map((product) => product.name) || [];
-  const content = options.length > 1 ? `Encontré ${options.join(" o ")}. ¿Cuál querés cargar?` : task.missingFields.includes("productId") ? "No pude identificar el producto. Decime su nombre o presentación." : task.missingFields.includes("locationId") ? "¿En qué ubicación lo cargamos?" : missingQuestion(task.missingFields);
+  const destinations = task.ambiguities.locationId?.map((location) => location.name) || [];
+  const locationQuestion = destinations.length > 1 ? `Encontré ${destinations.join(" o ")}. ¿Cuál es el destino?` : Object.hasOwn(task.ambiguities, "locationId") ? "No encontré una ubicación disponible con ese nombre. ¿En qué ubicación lo cargamos?" : "¿En qué ubicación lo cargamos?";
+  const content = options.length > 1 ? `Encontré ${options.join(" o ")}. ¿Cuál querés cargar?` : task.missingFields.includes("productId") ? "No pude identificar el producto. Decime su nombre o presentación." : task.missingFields.includes("locationId") ? locationQuestion : missingQuestion(task.missingFields);
   return { task, result: { state: "DATOS_INCOMPLETOS" }, content };
 }

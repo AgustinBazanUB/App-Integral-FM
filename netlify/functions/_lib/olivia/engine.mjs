@@ -1,5 +1,5 @@
 import { executeToolBatch } from "./toolExecution.mjs";
-import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, requiredFields, isCorrection, operationalIntent } from "./tasks.mjs";
+import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, taskSlotSchema, requiredFields, isCorrection, operationalIntent } from "./tasks.mjs";
 import { aggregateRoutes } from "./modelRouter.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { randomUUID, createHash, timingSafeEqual } from "node:crypto";
@@ -487,6 +487,7 @@ export function createOliviaEngine({
         nextState = "INFORMACION",
         content = "",
         toolCallCount = 0;
+      let taskRepairPending = false;
       const entityIds = new Set(), touchedModules = new Set();
       let dataRows = 0;
       // Bounded rounds support discovery, live reads, analysis and preparation.
@@ -594,6 +595,7 @@ export function createOliviaEngine({
               if (profile.route !== "sol-creative") throw oliviaError("permission-denied", "El trabajo creativo requiere Marketing o Redes autorizado.", 403);
             } else assertCapability(session, args.intent);
             taskState = updateTask(taskState.intent === args.intent ? taskState : conversation.taskState, args.intent, args.slotsJson, clock());
+            taskRepairPending = false;
             taskState.route = profile;
             currentTask = taskState;
             return { data: { taskId: taskState.id, slots: taskState.slots, missing: taskState.missingFields } };
@@ -650,8 +652,18 @@ export function createOliviaEngine({
                     : "No se pudo consultar el backend.",
               },
             };
-            nextState = e.status === 403 ? "RECHAZADA" : "ERROR";
-            content = result.data.message;
+            if (call.name === "update_task" && (e.code === "invalid-input" || e instanceof SyntaxError)) {
+              // A malformed model argument is repairable within the existing round/token budget.
+              // Preserve the task and give only its permitted field schema back to the model.
+              let intent;
+              try { intent = JSON.parse(call.arguments).intent; } catch {}
+              const allowed = capabilities(session).includes(intent) || (intent === "creative_brief" && profile.route === "sol-creative");
+              result.data = { code: "invalid-input", message: "Corregí slotsJson con las claves y tipos del esquema. No se guardó esta actualización.", retryable: true, slotsSchema: allowed ? taskSlotSchema(intent)?.properties || null : null };
+              taskRepairPending = true;
+            } else {
+              nextState = e.status === 403 ? "RECHAZADA" : "ERROR";
+              content = result.data.message;
+            }
           }
           input.push({
             type: "function_call_output",
@@ -667,6 +679,10 @@ export function createOliviaEngine({
         }
         if (["DATOS_INCOMPLETOS", "RECHAZADA", "ERROR"].includes(nextState))
           break;
+      }
+      if (taskRepairPending && !prepared && nextState === "INFORMACION") {
+        nextState = "ERROR";
+        content = "No pude completar los datos de esta consulta. Podés reformularla; la tarea anterior conserva sus datos.";
       }
       if (taskState.status === "working") taskState = { ...taskState, status: "completed", updatedAt: clock() };
       if (!prepared && taskState.status === "collecting" && taskState.missingFields.length && nextState === "INFORMACION") nextState = "DATOS_INCOMPLETOS";
