@@ -67,3 +67,18 @@ Prueba autenticada en Chrome del 5 de octubre de 2026, separada de los resultado
 | Formato de la respuesta | Listas visibles y negritas sin interpretar HTML ni links arbitrarios |
 
 Regresión final: 769 pruebas Node aprobadas; build unificado/empaquetado de Functions en la preview. CI del código se consulta en GitHub. Sin confirmaciones comerciales, publicaciones, cambios de roles ni despliegues de reglas/índices. El perfil Vendedor autenticado, hardware móvil y cobertura manual exhaustiva de los demás módulos siguen fuera de esta QA; las pruebas automáticas no se presentan como prueba física.
+
+## QA adicional: períodos e investigación web
+
+Chrome autenticado, 5 de octubre de 2026. Versión funcional `03291c8`, deploy `6ac438068967a5963132114b`; 777 pruebas Node y CI de implementación aprobadas. El build y empaquetado de Functions se verificaron en la preview.
+
+| Caso | Resultado verificado |
+| --- | --- |
+| Producto más vendido sin período | Pregunta mes, rango o todo el historial; aclara ranking por unidades |
+| Elegir todo el historial | Recupera datos desde el primer registro, fechas, ranking y alcance completo; un listado de detalle limitado no pierde los totales calculados |
+| Repreguntar ticket promedio | Conserva el historial elegido y responde monto / operaciones con las mismas fechas |
+| Ticket promedio en un chat nuevo | Pregunta el período; no asume el filtro del panel ni últimos 30 días |
+| Investigar margen bruto | Luna consulta web, presenta fórmula y fuentes clicables; declara que faltan costos e inventario valorizado y que gastos generales no sustituyen CMV |
+| Unidades por ticket de ayer | Investiga metodología y combina unidades / operaciones reales del Panel; resultado aritmético correcto, con período argentino y fuente |
+
+Se ajustó el texto para evitar códigos de campos internos y citas repetidas. Los permisos de administrador, lectura parcial, presupuesto y suma de costos de búsqueda se verifican también automáticamente. No se ejecutaron operaciones comerciales. Las capturas con datos reales y los valores de las pruebas permanecen en `tmp/`, fuera del repositorio.
