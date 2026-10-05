@@ -6,11 +6,11 @@ PR34 incorpora la política central v2: Luna HIGH habitual, la misma Luna XHIGH 
 
 GPT-Live es el protocolo predeterminado de conversación, con backend cliente compartido con texto y sideband privado. El browser no puede inyectar herramientas/instrucciones/resultados. Se deduplican delegaciones, persisten transcripciones, invalidan resultados tardíos y separan duración de voz del consumo por llamada backend. La configuración y modo desarrollador muestran límites, ruta, motivo, tarea y distribución de llamadas.
 
-Validación final del anexo: 732 pruebas Node, 19 pruebas de reglas en emulador demo, build unificado y builds Gestión/Ecommerce. Las 37 pruebas nuevas usan proveedor/store/media controlados. Ninguna demuestra audio físico, disponibilidad de la cuenta OpenAI ni operaciones privadas del Firebase empresarial. No se desplegaron reglas ni índices a producción.
+Validación final del anexo y ajustes de QA: 740 pruebas Node, 19 pruebas previas de reglas en emulador demo, build unificado y builds Gestión/Ecommerce. Las 45 pruebas nuevas usan proveedor/store/media controlados. La prueba manual autenticada confirma arranque, tareas progresivas, correcciones, cancelación, confirmación visual, ventas con Luna HIGH, aclaración de pronóstico con Luna XHIGH, concepto con Sol HIGH e inicio GPT-Live retomando el mismo chat. La verificación de micrófono/altavoz físicos y límites pendientes se informa por separado; no se confirmó ninguna operación comercial ni se desplegaron reglas/índices a producción. [Resultados de QA manual](OLIVIA-MANUAL-QA.md).
 
 [Matriz del anexo: 52 secciones](OLIVIA-ANNEX-REQUIREMENTS.md). [Política, tareas, diagramas y fuentes oficiales](OLIVIA-MODEL-ROUTER.md).
 
-[PR 34 de revisión](https://github.com/AgustinBazanUB/App-Integral-FM/pull/34), draft con base `codex/olivia-integration`. [Preview actual del anexo](https://olivia-evolution-pr31--appintegralflormia.netlify.app/gestion): deploy Netlify `6ac3b6ddbeda80976b6f48a6`, implementación `d53b0d1ea0c5995d5c7abd9d25cfb5b3b96ce2da`. La pantalla privada exige iniciar sesión con Firebase. El despliegue compila el build unificado y empaqueta las Functions; no publica rules ni índices.
+[PR 34 de revisión](https://github.com/AgustinBazanUB/App-Integral-FM/pull/34), draft con base `codex/olivia-integration`. [Preview actual del anexo](https://olivia-evolution-pr31--appintegralflormia.netlify.app/gestion): deploy Netlify `6ac3ed34acc8d700fc1ec385`, implementación `6d649b3632b9589d1c48c00c1bfcb4d36c79d66c`. La pantalla privada exige iniciar sesión con Firebase. El despliegue compila el build unificado y empaqueta las Functions; no publica rules ni índices.
 
 ## Entrega inicial conservada como evidencia histórica
 

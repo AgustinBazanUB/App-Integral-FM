@@ -59,4 +59,4 @@ Abreviaturas: **R** = `modelRouter.mjs`; **T** = `tasks.mjs`; **E** = `engine.mj
 | 51. Experiencia natural | Sí | T, E, composer existente | Diálogo sin formularios técnicos, contexto persistido | Evaluación humana con audio real |
 | 52. Integración final | Sí en draft PR34 | Rama, preview, regresión y docs | Implementación revisable, sin modificar producción | Promoción y QA real fuera del alcance autorizado |
 
-La evidencia final y los IDs de entrega están en [OLIVIA-DELIVERY](OLIVIA-DELIVERY.md). Las limitaciones externas no se convierten en checks aprobados: no se recibieron credenciales de prueba del proveedor ni una sesión humana de Firebase para recorrer información privada; las pruebas no eluden esa autenticación.
+La evidencia final y los IDs de entrega están en [OLIVIA-DELIVERY](OLIVIA-DELIVERY.md). La matriz conserva la evidencia de fixtures del anexo; los resultados posteriores con la sesión humana de Firebase y el proveedor real están en [QA manual](OLIVIA-MANUAL-QA.md). Las limitaciones externas no se convierten en checks aprobados y las pruebas no eluden la autenticación.
