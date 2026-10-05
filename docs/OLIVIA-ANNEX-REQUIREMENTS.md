@@ -8,7 +8,7 @@ Abreviaturas: **R** = `modelRouter.mjs`; **T** = `tasks.mjs`; **E** = `engine.mj
 |---|---|---|---|---|
 | 1. Objetivos | Sí | R, T, E, L | RT, LT, regresión | Validación real de cuenta/audio |
 | 2. Responsabilidades | Sí | L, E, guards, operations | LT: canal sin autoridad; core compartido | Hardware/proveedor real |
-| 3. Recopilación progresiva | Sí | T, E | RT: producto → destino → motivo → tarjeta | Formulación de modelo real en otras tareas |
+| 3. Recopilación progresiva | Sí | T, E | RT: producto → destino → tarjeta; motivo opcional | Formulación de modelo real en otras tareas |
 | 4. Evitar repreguntas | Sí | T, E, contexto de tarea | RT: cantidad y entidades conservadas | Ninguno de código |
 | 5. Solo datos relevantes | Sí | mínimos T, tools, instrucciones E | RT: carga y recepción física preguntan solo faltantes | Evaluación de lenguaje del proveedor real |
 | 6. Resolver entidades | Sí | progressiveStock, búsqueda, resolve_transfer_origin | RT: producto real, ambigüedad, depósitos vivos | Búsquedas acotadas declaran parcialidad |

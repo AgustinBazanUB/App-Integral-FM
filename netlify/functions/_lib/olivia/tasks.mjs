@@ -10,6 +10,7 @@ export function requiredFields(intent) {
   if (intent === "forecast_fair") return ["locationId", "startDate", "days"];
   if (intent === "creative_brief") return ["objective", "audience", "format"];
   const minimum = {
+    prepare_stock_load: ["locationId", "productId", "quantity"],
     prepare_sale: ["locationId", "items", "paymentMethod", "ticketRequested", "customerDecision", "promotionDecision"],
     prepare_stock_transfer: ["originId", "destinationId", "lines", "reason"],
     prepare_create_location: ["name", "type", "codePrefix", "dniMode"],
@@ -106,7 +107,7 @@ export async function progressiveStock({ previous, initialId, message, context, 
   }
   task.missingFields = requiredFields(task.intent).filter((key) => task.slots[key] == null || task.slots[key] === "");
   if (!task.missingFields.length) {
-    const result = await run(task.intent, task.slots);
+    const result = await run(task.intent, { ...task.slots, reason: task.slots.reason ?? null });
     task = { ...task, ...taskFromTool(task, task.intent, task.slots, result, now), revision: task.revision };
     return { task, result, content: result.prepared?.summary || missingQuestion(task.missingFields) };
   }

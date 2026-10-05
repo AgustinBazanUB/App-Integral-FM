@@ -278,7 +278,7 @@ test("associated customer uses deterministic key and existing enrichment semanti
   assert.equal(customer.data.lastSaleId, sale.path.slice(6));
 });
 
-test("stock loading is admin-only and validates reason and positive quantity", async () => {
+test("stock loading is admin-only and validates positive quantity", async () => {
   const args = {
     locationId: "local_a",
     productId: "product_a",
@@ -289,12 +289,6 @@ test("stock loading is admin-only and validates reason and positive quantity", a
     code: "permission-denied",
   });
   const f = fixture("admin");
-  const incomplete = await prepare(
-    f,
-    { ...args, reason: null },
-    "prepare_stock_load",
-  );
-  assert.equal(incomplete.state, "DATOS_INCOMPLETOS");
   await assert.rejects(
     prepare(f, { ...args, quantity: -1 }, "prepare_stock_load"),
     /entero positivo/,
@@ -312,6 +306,22 @@ test("stock loading is admin-only and validates reason and positive quantity", a
     3,
   );
   assert.match(result.message, /Stock actual: 7/);
+});
+
+test("stock loading without a reason prepares and executes with the standard movement description", async () => {
+  for (const reason of [undefined, null, "", "   "]) {
+    const f = fixture("admin");
+    const args = { locationId: "local_a", productId: "product_a", quantity: 3 };
+    if (reason !== undefined) args.reason = reason;
+    const prepared = await prepare(f, args, "prepare_stock_load");
+    assert.equal(prepared.canonicalArgs.reason, "");
+    assert.match(prepared.summary, /Stock: 4 → 7/);
+    assert.doesNotMatch(prepared.summary, /Motivo:|undefined|null/);
+    const { writes } = await execute(f, prepared);
+    assert.equal(writes.find((write) => write.path.startsWith("locationStock/")).data.currentStock, 7);
+    assert.equal(writes.find((write) => write.path.startsWith("stockMovements/")).data.reason, "Ingreso de mercadería");
+    assert.equal(f.documents.get("locationStock/local_a/items/product_a").currentStock, 4);
+  }
 });
 
 test("stock loading creates only the local relationship for a new configured product", async () => {

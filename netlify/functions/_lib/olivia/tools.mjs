@@ -42,7 +42,7 @@ const descriptions = {
   prepare_sale:
     "Preparar venta con precios vivos y reglas del Panel Vendedor. Requiere decisiones explícitas sobre promoción, factura y cliente. NO ejecuta. Para correcciones enviar propuesta completa nueva.",
   prepare_stock_load:
-    "Preparar ingreso positivo de stock en ubicación activa para administrador autorizado. NO ejecuta, pide tarjeta de confirmación.",
+    "Preparar ingreso positivo de stock en ubicación activa para administrador autorizado. El motivo es opcional: usá reason null si no se indicó, sin pedirlo como dato faltante. NO ejecuta, pide tarjeta de confirmación.",
 };
 export function toolDefinitions(session, { query, context = {}, required = [], loaded = [] } = {}) {
   const selected = query === undefined ? null : new Set([...selectCapabilities(session, query, context, required), ...loaded]);

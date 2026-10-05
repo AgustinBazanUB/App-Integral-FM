@@ -57,7 +57,7 @@ test("slots validados: corrigen la misma tarea, conservan datos y no admiten aut
   assert.throws(() => updateTask(first, "forecast_fair", '{"permissions":{"admin":true}}'));
   assert.throws(() => updateTask(first, "forecast_fair", '{"days":-1}'));
   assert.notEqual(updateTask(first, "prepare_stock_load", '{"quantity":12}').id, first.id);
-  assert.deepEqual(requiredFields("prepare_stock_load"), ["locationId", "productId", "quantity", "reason"]);
+  assert.deepEqual(requiredFields("prepare_stock_load"), ["locationId", "productId", "quantity"]);
 });
 function stockFixture(extra = {}) {
   const f = fixture({ role: "admin", provider: async () => textResponse("Respuesta verificada"), ...extra });
@@ -68,19 +68,39 @@ function stockFixture(extra = {}) {
   return f;
 }
 async function turn(f, id, message, requestId, extra = {}) { f.advance(2000); return f.engine.chat(f.session, { conversationId: id, message, requestId, screenContext: { module: "locations" }, ...extra }); }
-test("carga progresiva real: producto → destino → motivo → tarjeta, sin llamadas de modelo", async () => {
+test("carga progresiva real: producto → destino → tarjeta, con motivo opcional y sin llamadas de modelo", async () => {
   const f = stockFixture(), { conversationId: id } = await start(f);
   const first = await turn(f, id, "Cargame 12 botellas de Original", "a");
   assert.match(first.messages.at(-1).content, /ubicación/);
   const taskId = f.documents.get(`oliviaConversations/${id}`).taskState.id;
   const second = await turn(f, id, "Tribunales", "b");
-  assert.match(second.messages.at(-1).content, /motivo/);
+  assert.match(second.pendingAction.summary, /12.*Original.*Tribunales/);
+  assert.doesNotMatch(second.pendingAction.summary, /Motivo:/);
+  assert.deepEqual(f.documents.get(`oliviaConversations/${id}`).taskState.missingFields, []);
   const third = await turn(f, id, "Reposición", "c");
   assert.match(third.pendingAction.summary, /12.*Original.*Tribunales/);
+  assert.match(third.pendingAction.summary, /Motivo: Reposición/);
+  assert.equal(f.documents.get(`oliviaConfirmations/${second.pendingAction.id}`).status, "superseded");
   assert.equal(f.providerCalls(), 0);
   assert.equal(f.documents.get(`oliviaConversations/${id}`).taskState.id, taskId);
   assert.equal(f.documents.get("locationStock/local_a/items/oil").currentStock, 4);
 });
+test("carga completa sin motivo llega a la tarjeta y solo la confirmación visual modifica el stock", async () => {
+  const f = stockFixture(), { conversationId: id } = await start(f);
+  const proposal = await turn(f, id, "Cargame 12 botellas de Original en Pilar", "a");
+  assert.match(proposal.pendingAction.summary, /Stock: 3 → 15/);
+  assert.doesNotMatch(proposal.pendingAction.summary, /Motivo:/);
+  assert.equal(f.documents.get("locationStock/local_b/items/oil").currentStock, 3);
+  const yes = await turn(f, id, "sí", "b");
+  assert.equal(yes.pendingAction.id, proposal.pendingAction.id);
+  assert.equal(f.documents.get("locationStock/local_b/items/oil").currentStock, 3);
+  await f.engine.confirm(f.session, { conversationId: id, confirmationToken: proposal.pendingAction.confirmationToken, requestId: "confirm-without-reason" });
+  assert.equal(f.documents.get("locationStock/local_b/items/oil").currentStock, 15);
+  const movement = [...f.documents].find(([path]) => path.startsWith("stockMovements/"))[1];
+  assert.equal(movement.reason, "Ingreso de mercadería");
+  assert.equal(f.providerCalls(), 0);
+});
+
 test("corrección de cantidad y destino invalida la tarjeta anterior; sí escrito no ejecuta", async () => {
   const f = stockFixture(), { conversationId: id } = await start(f);
   await turn(f, id, "Cargame 12 botellas de Original", "a");

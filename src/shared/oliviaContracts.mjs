@@ -115,7 +115,7 @@ export const OLIVIA_TOOL_SCHEMAS = {
     locationId: nullable(id),
     productId: nullable(id),
     quantity: nullable(quantity),
-    reason: nullable({ type: "string", maxLength: 400 }),
+    reason: nullable({ type: "string", maxLength: 400, description: "Motivo opcional de la carga. null si no se indicó." }),
   }),
   prepare_sale: object({
     locationId: nullable(id),
