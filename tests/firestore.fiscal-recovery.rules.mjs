@@ -17,6 +17,7 @@ before(async () => {
       await setDoc(doc(db, "invoices", `invoice_homologation_${sourceType}_stale_${sourceType}`), { sourceType, sourceId: `stale_${sourceType}`, status: "pending" });
     }
     await setDoc(doc(db, "sales", "unbilled"), { sellerId: "seller", locationId: "loc1", status: "active", total: 1210 });
+    await setDoc(doc(db, "sales", "backend_fiscal_fields"), { sellerId: "seller", locationId: "loc1", status: "active", total: 1210, pointOfSale: 3, verificationMatched: true });
     await setDoc(doc(db, "invoices", "invoice1"), { status: "authorized", authorization: { cae: "12345678901234", voucherNumber: 8 } });
     await setDoc(doc(db, "arcaWsaaTickets", "ticket1"), { encryptedTicket: "fake", lease: { holder: "backend" } });
     await setDoc(doc(db, "arcaSequenceLocks", "lock1"), { holder: "backend", reservation: { invoiceId: "invoice1" } });
@@ -57,6 +58,15 @@ for (const role of ["admin", "seller"]) {
     await assertFails(updateDoc(ref, { fiscalInvoiceId: "invoice1" }));
     await assertFails(updateDoc(ref, { invoiceStatus: "authorized" }));
     await assertFails(updateDoc(ref, { "authorization.cae": "12345678901234" }));
+    for (const field of ["pointOfSale", "verificationMatched"]) {
+      const value = field === "pointOfSale" ? 999 : true;
+      await assertFails(updateDoc(ref, { [field]: value }));
+      await assertFails(updateDoc(ref, { [`${field}.forged`]: value }));
+      await assertFails(setDoc(doc(ref.firestore, "sales", `forged_${role}_${field}`), {
+        sellerId: role, locationId: "loc1", status: "active", [field]: value,
+      }));
+      await assertFails(updateDoc(doc(ref.firestore, "sales", "backend_fiscal_fields"), { [field]: deleteField() }));
+    }
   });
   test(`${role}: no puede leer WSAA ni locks`, async () => {
     const db = environment.authenticatedContext(role).firestore();

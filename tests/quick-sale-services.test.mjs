@@ -16,7 +16,7 @@ const bundle = await build({stdin:{contents:'export { createQuickSale } from "./
   builder.onResolve({filter:/arcaService$/},()=>({path:"fiscal",namespace:"qa"}));
   builder.onResolve({filter:/sharedResources$/},()=>({path:"shared",namespace:"qa"}));
   builder.onResolve({filter:/^firebase\/(app|auth)$/},()=>({path:"auth",namespace:"qa"}));
-  builder.onLoad({filter:/.*/,namespace:"qa"},({path})=>({contents:path==="firebase"?'export const db = {}; export const auth={}; export const firebaseConfig={};':path==="fiscal"?'export async function requestPendingArcaInvoice(){ throw Error("Fiscal real prohibido en QA"); }':path==="shared"?'export async function listLocationsShared(){return []}; export async function loadSellerResourcesShared(){return {}};':path==="auth"?'export const deleteApp=()=>{};export const initializeApp=()=>{};export const createUserWithEmailAndPassword=()=>{};export const getAuth=()=>{};export const onAuthStateChanged=()=>{};export const signOut=()=>{};':`
+  builder.onLoad({filter:/.*/,namespace:"qa"},({path})=>({contents:path==="firebase"?'export const db = {}; export const auth={}; export const firebaseConfig={};':path==="fiscal"?'export async function requestPendingArcaInvoice(input){ globalThis.__fiscalCalls.push(input); if(globalThis.__fiscalFail) throw Error("Fiscal mock rechazado"); return {id:"invoice-qa", fiscalReadiness:{ready:true}}; }':path==="shared"?'export async function listLocationsShared(){return []}; export async function loadSellerResourcesShared(){return {}};':path==="auth"?'export const deleteApp=()=>{};export const initializeApp=()=>{};export const createUserWithEmailAndPassword=()=>{};export const getAuth=()=>{};export const onAuthStateChanged=()=>{};export const signOut=()=>{};':`
     const mock = globalThis.__quickSaleTest;
     export const collection = (_db,...parts) => ({path:parts.join('/')});
     export const doc = (base,...parts) => { const path=base.path ? base.path+'/'+(parts.join('/') || 'auto-'+(++mock.sequence)) : parts.join('/'); return {path,id:path.split('/').at(-1)}; };
@@ -134,4 +134,39 @@ test("Venta Rápida asociada con pago combinado integra CRM, Métricas y Finanza
   assert.equal(calculateMetrics(sales(), range).total, 0); assert.equal(financeSummary(sales(), [], {}, range).saleIncome, 0);
   assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, 20);
   assert.ok([...mock.data.values()].some(row => row.action === "sale.cancelled" && row.description.includes("Corrección de prueba")));
+});
+
+
+const fiscalSeller = { id: 'seller', name: 'Vendedor QA', role: 'seller', active: true, allowedLocationIds: ['origin'] };
+const fiscalInput = extra => ({ profile: fiscalSeller, location: {id: 'origin'}, items: [{id: 'oil', name: 'Aceite', qty: 1, unitPrice: 2500}], paymentMethod: 'cash', paymentMethodLabel: 'Efectivo', ...extra });
+for (const condition of [5, 1, 6, 4]) test('receiver seller_sale viaja intacto al backend IVA ' + condition, async () => {
+  seed(); globalThis.__fiscalCalls = []; globalThis.__fiscalFail = false;
+  const receiver = { vatConditionId: condition, documentType: condition === 5 ? 99 : 80, documentNumber: condition === 5 ? '0' : '20123456786', anonymousConsumerFinal: condition === 5, concept: 1 };
+  const result = await service.createSellerSale(fiscalInput({ticketRequested: true, invoiceReceiver: receiver}));
+  assert.deepEqual(globalThis.__fiscalCalls, [{sourceType: 'seller_sale', sourceId: result.id, receiver}]);
+  assert.equal(result.fiscalPreparationStatus, 'prepared');
+  assert.equal(sales().length, 1);
+  assert.equal(mock.data.get('locationStock/origin/items/oil').currentStock, 19);
+});
+test('Continuar sin factura no invoca ARCA', async () => {
+  seed(); globalThis.__fiscalCalls = [];
+  const result = await service.createSellerSale(fiscalInput({ticketRequested: false}));
+  assert.equal(globalThis.__fiscalCalls.length, 0);
+  assert.equal(result.ticketRequested, false);
+});
+test('fallo fiscal y reintento offline conservan una venta y un movimiento de stock', async () => {
+  seed(); globalThis.__fiscalCalls = []; globalThis.__fiscalFail = true;
+  const receiver = {vatConditionId: 6, documentType: 80, documentNumber: '20123456786', anonymousConsumerFinal: false, concept: 1};
+  const input = fiscalInput({ticketRequested: true, invoiceReceiver: receiver, offlineSale: {localId: 'local_retry', createdLocallyAt: '2026-10-02T15:00:00Z'}});
+  const first = await service.createSellerSale(input);
+  assert.equal(first.fiscalPreparationStatus, 'error');
+  globalThis.__fiscalFail = false;
+  const retry = await service.createSellerSale(input);
+  assert.equal(first.id, retry.id);
+  assert.equal(retry.alreadySynced, true);
+  assert.equal(retry.fiscalPreparationStatus, 'prepared');
+  assert.deepEqual(globalThis.__fiscalCalls, [1, 2].map(() => ({sourceType: 'seller_sale', sourceId: first.id, receiver})));
+  assert.equal(sales().length, 1);
+  assert.equal(mock.data.get('locationStock/origin/items/oil').currentStock, 19);
+  assert.equal([...mock.data.keys()].filter(k => k.startsWith('stockMovements/')).length, 1);
 });

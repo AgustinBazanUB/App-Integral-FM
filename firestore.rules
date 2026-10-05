@@ -998,7 +998,7 @@ service cloud.firestore {
         || exists(/databases/$(database)/documents/invoices/$("invoice_seller_sale_" + saleId));
     }
     function safeNewSaleFiscalFields(data) {
-      return !data.keys().hasAny(["fiscalInvoiceId", "fiscalInvoice", "fiscalEnvironment", "fiscalUpdatedAt", "authorization", "verification", "cae", "voucherNumber"])
+      return !data.keys().hasAny(["fiscalInvoiceId", "fiscalInvoice", "fiscalEnvironment", "fiscalUpdatedAt", "authorization", "verification", "cae", "voucherNumber", "pointOfSale", "verificationMatched"])
         && (!("invoiceStatus" in data) || data.invoiceStatus in ["pending", "not_requested"]);
     }
     match /sales/{saleId} {
@@ -1020,7 +1020,7 @@ service cloud.firestore {
         || isAdmin());
       allow update: if (!("sourceType" in resource.data) || resource.data.sourceType != "ecommerce")
         && !hasFiscalInvoice(saleId, resource.data)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["fiscalInvoiceId", "fiscalInvoice", "fiscalEnvironment", "fiscalUpdatedAt", "invoiceStatus", "authorization", "verification", "cae", "voucherNumber", "sourceType", "paymentStatus", "paymentProvider"])
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["fiscalInvoiceId", "fiscalInvoice", "fiscalEnvironment", "fiscalUpdatedAt", "invoiceStatus", "authorization", "verification", "cae", "voucherNumber", "pointOfSale", "verificationMatched", "sourceType", "paymentStatus", "paymentProvider"])
         && (!("sourceType" in request.resource.data) || request.resource.data.sourceType != "ecommerce")
         && ((quickSalesPermission("edit")
           && resource.data.sellerId == request.auth.uid

@@ -113,12 +113,12 @@ test("Etapa 6: UI advierte pago simulado y no usa VITE para habilitar backend", 
   assert.doesNotMatch(checkout + service + env, /VITE_.*SIMULATED_PAYMENT/);
 });
 
-test("Etapa 6: allowlist productiva por default sigue limitada a admin_quick_sale", async () => {
+test("Etapa 6: allowlist productiva por default incluye ambos POS y excluye ecommerce", async () => {
   const [config, env] = await Promise.all([
     read("../netlify/functions/_lib/arca/config.mjs"),
     read("../.env.example"),
   ]);
-  assert.match(config, /ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES \?\? "admin_quick_sale"/);
-  assert.match(env, /^ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=admin_quick_sale$/m);
+  assert.match(config, /ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES \?\? "admin_quick_sale,seller_sale"/);
+  assert.match(env, /^ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=admin_quick_sale,seller_sale$/m);
   assert.doesNotMatch(env, /^ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=.*ecommerce/m);
 });

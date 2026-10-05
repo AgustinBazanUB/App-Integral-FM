@@ -795,7 +795,7 @@ export default function SellerPanel() {
             )}
           </div>
 
-          {submitState.message ? <Toast tone={submitState.tone}>{submitState.message}</Toast> : null}
+          {submitState.message && !billingOpen ? <Toast tone={submitState.tone}>{submitState.message}</Toast> : null}
           <div className="fm-seller-sticky-action">
             <div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div>
             {!editSale ? <Button variant="secondary" icon="FileText" disabled={!ticketAllowed || submitState.busy || !currentItems.length || !paymentMethod || !selectedLocation} onClick={() => setBillingOpen(true)}>Generar factura</Button> : null}
@@ -905,6 +905,7 @@ export default function SellerPanel() {
         ) : null}
       </Modal>
       <Modal open={billingOpen} title="Generar factura" description="Confirmá la venta y prepará su comprobante fiscal." onClose={() => !submitState.busy && setBillingOpen(false)} footer={<div className="fm-dialog-actions"><Button variant="secondary" disabled={submitState.busy} onClick={() => setBillingOpen(false)}>Cancelar</Button><Button loading={submitState.busy} disabled={!currentItems.length || !paymentMethod || !selectedLocation} onClick={() => submitSale({ requestInvoice: true })}>Generar factura y continuar</Button></div>}>
+        {submitState.message && submitState.tone === "error" ? <div role="alert"><Toast tone="error">{submitState.message}</Toast></div> : null}
         <p className="fm-seller-billing-total">Total {formatMoney(summary.total)}</p>
         <FormField label="Condición IVA receptor" required><Select disabled={submitState.busy} value={receiverVatConditionId} onChange={(event) => { setReceiverVatConditionId(event.target.value); setReceiverDocument(""); }}><option value="5">Consumidor Final</option><option value="1">IVA Responsable Inscripto</option><option value="6">Responsable Monotributo</option><option value="4">IVA Sujeto Exento</option></Select></FormField>
         <FormField label={receiverVatConditionId === "5" ? "DNI (opcional)" : "CUIT del receptor"} required={receiverVatConditionId !== "5"} hint={receiverVatConditionId === "5" ? "Podés dejarlo vacío para Consumidor Final sin identificar, sujeto a validación fiscal." : "CUIT de 11 dígitos."}><input disabled={submitState.busy} inputMode="numeric" value={receiverDocument} onChange={(event) => setReceiverDocument(event.target.value.replace(/\D/g, "").slice(0, 11))} /></FormField>

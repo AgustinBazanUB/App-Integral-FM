@@ -54,7 +54,7 @@ test("configuración Ecommerce no inventa ubicación ni activa pagos simulados",
   assert.match(env, /^ECOMMERCE_PICKUP_ENABLED=false$/m);
   assert.match(env, /^ECOMMERCE_SIMULATED_PAYMENT_ENABLED=false$/m);
   assert.doesNotMatch(env, /^VITE_.*SIMULATED_PAYMENT/m);
-  assert.match(env, /^ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=admin_quick_sale$/m);
+  assert.match(env, /^ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=admin_quick_sale,seller_sale$/m);
   assert.doesNotMatch(env, /^ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES=.*ecommerce/m);
 });
 
