@@ -244,7 +244,8 @@ export async function addProductToLocation({
     }
     const master = productSnapshot.data();
     const effectivePrice = useDefaultPrice ? Number(master.defaultPrice || 0) : customPrice;
-    transaction.set(stockRef, {
+    const restoringDeletedAssignment = stockSnapshot.exists() && stockSnapshot.data().deleted === true;
+    const stockPayload = {
       productId: product.id,
       productName: master.name,
       abbreviation: master.abbreviation || "",
@@ -264,12 +265,19 @@ export async function addProductToLocation({
       deleted: false,
       deletedAt: null,
       productDeleted: false,
-      assignedAt: serverTimestamp(),
-      assignedBy: profile.id,
       updatedAt: serverTimestamp(),
       updatedBy: profile.id,
       lastMovementId: movementRef.id,
-    }, { merge: true });
+    };
+    if (restoringDeletedAssignment) {
+      transaction.update(stockRef, stockPayload);
+    } else {
+      transaction.set(stockRef, {
+        ...stockPayload,
+        assignedAt: serverTimestamp(),
+        assignedBy: profile.id,
+      });
+    }
     transaction.set(movementRef, {
       operationId: safeId,
       inventoryType: INVENTORY_TYPES.LOCATION,
