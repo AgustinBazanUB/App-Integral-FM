@@ -74,14 +74,14 @@ export default function QuickSalesPage() {
   const [priceDraft, setPriceDraft] = useState("");
   const zonesResult = useAsyncData(() => listActiveCustomerZones(), [profile.id]);
   const [search, setSearch] = useState("");
-  const [manualDiscount, setManualDiscount] = useState(restored?.discounts?.find(d => d.source === "manual") || { type: "percent", value: "" });
+  const [manualDiscounts, setManualDiscounts] = useState((restored?.discounts || []).filter(d => d.source === "manual" || d.discountId === "manual"));
   const [channel, setChannel] = useState(restored?.channel || "");
   const [customerDni, setCustomerDni] = useState(restored?.customerDni || "");
   const [invoiceRequested, setInvoiceRequested] = useState(restored?.invoiceRequested || false);
   const [receiverVatConditionId, setReceiverVatConditionId] = useState(restored?.receiverVatConditionId || "5");
   const [receiverDocument, setReceiverDocument] = useState(restored?.receiverDocument || "");
   const [deliveryMethod, setDeliveryMethod] = useState(restored?.deliveryMethod || "pickup");
-  const [discountIds, setDiscountIds] = useState((restored?.discounts || []).map(d => d.id).filter(Boolean));
+  const [discountIds, setDiscountIds] = useState((restored?.discounts || []).filter(d => d.source !== "manual" && d.discountId !== "manual").map(d => d.discountId || d.id).filter(Boolean));
   const submitRef = useRef(false);
   const [submitState, setSubmitState] = useState({ busy: false, error: "", success: "" });
   const [registeredInvoice, setRegisteredInvoice] = useState(null);
@@ -127,7 +127,7 @@ export default function QuickSalesPage() {
   );
   const selectedLocation = origins.find((item) => item.id === locationId);
   const availableDiscounts = (discountsResult.data || []).filter((discount) => isDiscountAvailable(discount, stockType === "warehouse" ? {} : selectedLocation, new Date(), { profile, items: cart }));
-  const appliedDiscounts = pendingIntent ? pendingIntent.sale.discounts : [...availableDiscounts.filter((discount) => discountIds.includes(discount.id)), ...(Number(manualDiscount.value) > 0 ? [{ discountId: "manual", name: "Descuento manual", source: "manual", ...manualDiscount, value: Number(manualDiscount.value) }] : [])];
+  const appliedDiscounts = pendingIntent ? pendingIntent.sale.discounts : [...availableDiscounts.filter((discount) => discountIds.includes(discount.id)), ...manualDiscounts];
   const saleSummary = useMemo(() => calculateDiscountSummary(appliedDiscounts, subtotal, { paymentMethod, roundCashTotal: true }), [appliedDiscounts, subtotal, paymentMethod]);
 
   const allocation = paymentAllocationSummary(payments, saleSummary.total);
@@ -237,7 +237,7 @@ export default function QuickSalesPage() {
       setPayments(SINGLE_PAYMENT_METHODS.map(method => ({ method, amount: "" })));
       setCustomer({ phone: "", name: "", zoneName: "" });
       setCustomerState({ status: "idle" });
-      setManualDiscount({ type: "percent", value: "" });
+      setManualDiscounts([]);
       setCustomerDni("");
       setPaymentMethod("");
       setInvoiceRequested(false);
@@ -305,7 +305,7 @@ export default function QuickSalesPage() {
             <Button variant="secondary" disabled={locked} aria-pressed={deliveryMethod === "shipping"} onClick={() => setDeliveryMethod(deliveryMethod === "shipping" ? "pickup" : "shipping")}>{deliveryMethod === "shipping" ? "Con envío" : "Retiro"}</Button>
             {customer.phone ? <Button variant="ghost" disabled={locked} onClick={() => setCustomer({ phone: "", name: "", zoneName: "" })}>Quitar cliente</Button> : null}
           </div>
-          {appliedDiscounts.length ? <div className="fm-quick-pos__discounts">{appliedDiscounts.map(discount => <button type="button" disabled={locked} key={discount.id || discount.discountId} aria-label={`Quitar ${discount.name}`} onClick={() => discount.source === "manual" ? setManualDiscount({ type: "percent", value: "" }) : setDiscountIds(ids => ids.filter(id => id !== discount.id))}>{discount.name} ×</button>)}</div> : null}
+          {appliedDiscounts.length ? <div className="fm-quick-pos__discounts">{appliedDiscounts.map((discount, index) => <button type="button" disabled={locked} key={`${discount.id || discount.discountId}-${index}`} aria-label={`Quitar ${discount.name}`} onClick={() => discount.source === "manual" ? setManualDiscounts(manual => manual.filter(entry => entry !== discount)) : setDiscountIds(ids => ids.filter(id => id !== (discount.discountId || discount.id)))}>{discount.name} ×</button>)}</div> : null}
           <div className="fm-quick-pos__totals"><span>{cart.reduce((count, item) => count + item.qty, 0)} productos · Subtotal</span><strong>{formatMoney(subtotal)}</strong>{saleSummary.discountTotal > 0 ? <><span>Descuentos</span><strong>− {formatMoney(saleSummary.discountTotal)}</strong></> : null}{saleSummary.cashRoundingDiscountTotal > 0 ? <><span>Incluye redondeo por efectivo</span><strong>− {formatMoney(saleSummary.cashRoundingDiscountTotal)}</strong></> : null}<span>Total</span><strong className="fm-quick-pos__total">{formatMoney(saleSummary.total)}</strong></div>
           <div className="fm-quick-pos__payments" role="group" aria-label="Forma de pago">{PAYMENT_OPTIONS.map(option => <button type="button" key={option.value} disabled={locked || (option.value === "multiple" && !can(profile, "quick-sales", "useMultiplePayments"))} aria-pressed={paymentMethod === option.value} className={paymentMethod === option.value ? "is-selected" : ""} onClick={() => { setPaymentMethod(option.value); if (option.value === "multiple") setDialog("payments"); }}>{friendlyPayments[option.value] || option.label}{option.value === "multiple" && paymentMethod === "multiple" ? <small>{paymentStatus}</small> : null}</button>)}</div>
         </section>
@@ -321,7 +321,7 @@ export default function QuickSalesPage() {
         <FormField label="Origen físico del stock" required><Select value={locationId} onChange={event => switchOrigin(event.target.value)}><option value="">Elegir origen</option>{origins.map(origin => <option key={origin.id} value={origin.id}>{origin.name}</option>)}</Select></FormField>
         {cart.length ? <p>Cambiar el origen vacía los productos seleccionados.</p> : null}
       </Modal>
-      <DiscountDialog open={dialog === "discount"} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} manualAllowed={can(profile, "quick-sales", "useManualDiscounts")} onClose={() => setDialog("")} onSelectSaved={discount => setDiscountIds(ids => ids.includes(discount.id) ? ids.filter(id => id !== discount.id) : [...ids, discount.id])} onAddManual={discount => { setManualDiscount(discount); setDialog(""); }} />
+      <DiscountDialog open={dialog === "discount"} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} initialManualDiscounts={manualDiscounts} manualAllowed={can(profile, "quick-sales", "useManualDiscounts")} onClose={() => setDialog("")} onApply={({ savedIds, manual }) => { setDiscountIds(savedIds); setManualDiscounts(manual); setDialog(""); }} />
       <CustomerDialog open={dialog === "customer"} zones={zonesResult.data || []} initialCustomer={customer.phone ? customer : null} onClose={() => setDialog("")} onSelect={setCustomer} />
       <Modal open={dialog === "payments"} title="Combinar pagos" description={`Total de la venta: ${formatMoney(saleSummary.total)}`} onClose={() => setDialog("")} footer={<Button disabled={allocation.invalid || allocation.difference !== 0 || allocation.positiveCount < 2} onClick={() => setDialog("")}>Listo</Button>}>
         {payments.map(part => <FormField key={part.method} label={friendlyPayments[part.method]}><div className="fm-quick-pos__payment-input"><input aria-label={friendlyPayments[part.method]} type="number" min="0" step="1" inputMode="numeric" value={part.amount} onChange={event => setPayments(current => current.map(entry => entry.method === part.method ? { ...entry, amount: event.target.value } : entry))} /><Button variant="ghost" disabled={allocation.invalid || allocation.difference <= 0} onClick={() => setPayments(current => completeRemainingPayment(current, part.method, saleSummary.total))}>Completar</Button></div></FormField>)}<p role="status">{paymentStatus}</p>

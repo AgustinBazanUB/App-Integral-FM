@@ -6,4 +6,6 @@ El resumen, la escritura transaccional y las propuestas individuales o por lista
 
 Las ventas administrativas nuevas conservan `cashRoundingEnabled` para recalcular correctamente al editar. Cambiar a transferencia elimina el ajuste, y volver a efectivo lo calcula sobre el subtotal y los descuentos originales; no se acumula en cada edición. Las ventas históricas no se reescriben. El Panel Vendedor y su cola offline conservan el cálculo anterior; la edición de una venta administrativa mantiene su regla.
 
+La integración del diálogo en Venta Rápida administrativa usa `onApply` y `initialManualDiscounts`, igual que el Panel Vendedor. Se corrigen callbacks antiguos que provocaban un error al confirmar. La selección se conserva como borrador hasta confirmar; cancelar no aplica cambios. Se admiten varios descuentos manuales y se recuperan los identificadores guardados al restaurar un intento.
+
 Las pruebas cubren todos los restos de $0 a $999 por ejemplos de borde, descuentos manuales y configurados, porcentajes y montos, repetición sin duplicación, cambios de medio de pago, locales/depósitos, métricas/finanzas, importes fiscales y confirmaciones de Olivia. Las operaciones se prueban con adaptadores en memoria, sin ventas reales.
