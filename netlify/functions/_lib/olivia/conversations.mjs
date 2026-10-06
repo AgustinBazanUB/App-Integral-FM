@@ -17,7 +17,7 @@ export const retainedMessage = (id, m) => ({
   data: { ...m, createdAt: new Date(m.createdAt) },
 });
 export const sessionBinding = (session) => String(session.authTime || "");
-export const permissionScope = (session, allowed = capabilities(session)) => hash(JSON.stringify({ context: userContext(session), capabilities: allowed.sort() }));
+export const permissionScope = (session, allowed = capabilities(session)) => hash(JSON.stringify({ context: { ...userContext(session), capabilities: [...allowed] }, capabilities: [...allowed].sort() }));
 // Adding the batch tool changes capabilities without changing an existing
 // user's authority. Accept only the exact previous scope for this release.
 export const compatiblePermissionScope = (session, scope) => scope === permissionScope(session) || scope === permissionScope(session, capabilities(session).filter(name => name !== "prepare_batch_sales"));
@@ -193,9 +193,9 @@ export function createConversationStorage({ store, clock, configuration, state }
       if (!c || c.userId !== session.uid || dateMs(c.expiresAt) <= now.getTime())
         throw oliviaError("conversation-not-found", "No se encontró este chat o venció.", 404);
       if ((c.roleBinding && c.roleBinding !== normalizedRole(session.profile)) || (c.permissionScope && !compatiblePermissionScope(session, c.permissionScope))) throw oliviaError("permission-scope-changed", "El chat corresponde a otros permisos. Iniciá uno nuevo.", 409);
+      if (c.sessionBinding === sessionBinding(session)) return;
       if (c.busyUntil && dateMs(c.busyUntil) > now.getTime())
         throw oliviaError("conversation-busy", "Este chat todavía está procesando una solicitud.", 409);
-      if (c.sessionBinding === sessionBinding(session)) return;
       const pending = c.pendingActionId ? await tx.getDocument(`oliviaConfirmations/${c.pendingActionId}`) : null;
       await tx.commitDocuments([
         ...(pending?.data.status === "pending" ? [{ type: "update", path: `oliviaConfirmations/${c.pendingActionId}`, data: { status: "superseded", updatedAt: now } }] : []),

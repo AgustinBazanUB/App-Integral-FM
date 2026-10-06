@@ -1,7 +1,8 @@
 import test from "node:test";
+import { createHash } from "node:crypto";
 import { startChatJob, runChatJob, chatJobStatus, cancelChatJob, activeChatJob } from "../netlify/functions/_lib/olivia/chatJobs.mjs";
 import { permissionScope, assertConversationOwner } from "../netlify/functions/_lib/olivia/conversations.mjs";
-import { capabilities } from "../netlify/functions/_lib/olivia/guards.mjs";
+import { capabilities, userContext } from "../netlify/functions/_lib/olivia/guards.mjs";
 import assert from "node:assert/strict";
 import { createOliviaEngine } from "../netlify/functions/_lib/olivia/engine.mjs";
 import {
@@ -529,6 +530,19 @@ test("a failure before AI claims the conversation releases the queue and survive
   const conversation = f.documents.get(`oliviaConversations/${queued.conversationId}`);
   assert.equal(conversation.queuedChatRequestId, null);
   assert.equal(conversation.state, "ERROR"); assert.equal(conversation.lastFailure.reportId, status.failure.reportId);
+});
+test("a same-login reload recovers a running chat instead of rejecting it as disconnected", async () => {
+  let entered, release;
+  const started = new Promise(resolve => entered = resolve), providerWait = new Promise(resolve => release = resolve);
+  const f = fixture({ provider: async () => { entered(); await providerWait; return textResponse("Consulta terminada."); } });
+  const queued = await queuedChat(f), running = runQueued(f, queued.jobId);
+  await started;
+  const resumed = await f.engine.resumeConversation(f.session, { conversationId: queued.conversationId });
+  assert.equal(resumed.state, "PREPARANDO_ACCION");
+  assert.equal((await activeChatJob({ store: f.store, session: f.session, conversationId: queued.conversationId })).jobId, queued.jobId);
+  release(); await running;
+  assert.equal((await statusOf(f, queued.jobId)).status, "completed");
+  assert.equal(f.providerCalls(), 1);
 });
 
 test("correction supersedes the old proposal and old token cannot execute", async () => {
@@ -1483,7 +1497,8 @@ test("expired background jobs report a bounded final failure instead of locking 
 });
 test("batch capability addition preserves existing chat scope but actual permission changes still fail", async () => {
   const f = fixture(), conversationId = (await start(f)).conversationId, conversation = f.documents.get(`oliviaConversations/${conversationId}`);
-  conversation.permissionScope = permissionScope(f.session, capabilities(f.session).filter(name => name !== "prepare_batch_sales"));
+  const previousAllowed = capabilities(f.session).filter(name => name !== "prepare_batch_sales");
+  conversation.permissionScope = createHash("sha256").update(JSON.stringify({ context: { ...userContext(f.session), capabilities: previousAllowed }, capabilities: [...previousAllowed].sort() })).digest("hex");
   assert.doesNotThrow(() => assertConversationOwner(f.session, conversation, f.clock()));
   assert.equal((await f.engine.resumeConversation(f.session, { conversationId })).conversationId, conversationId);
   assert.ok((await f.engine.history(f.session, {})).conversations.some(entry => entry.id === conversationId));
