@@ -1,3 +1,5 @@
+import { buildLocationPayload } from "../../shared/managementWritePlans.mjs";
+import { buildLocationStockLinePlan, locationStockQuantity } from "../../shared/operationalWritePlans.mjs";
 import {
   collection,
   doc,
@@ -103,23 +105,7 @@ export async function saveManagedLocation(data, profile, locationId = null) {
     }
     if (!Object.hasOwn(LOCATION_TYPES, data.type) && (!previous.exists() || previous.data().type !== data.type)) throw new Error("Elegí Local, Feria o Evento. Los depósitos se crean en su propio módulo.");
     const operatingCalendar = normalizeOperatingCalendar(data.operatingCalendar ?? (previous.exists() ? previous.data().operatingCalendar : undefined));
-    transaction.set(locationRef, {
-      name,
-      type: data.type,
-      codePrefix: prefix,
-      operatingCalendar,
-      dniMode: data.dniMode,
-      active: data.active !== false,
-      ...(!locationId ? { deleted: false } : {}),
-      scheduleStartAt: scheduleStartAt || null,
-      scheduleEndAt: scheduleEndAt || null,
-      startDateTime: data.scheduleStartAt || "",
-      endDateTime: data.scheduleEndAt || "",
-      updatedBy: profile.id,
-      updatedByName: userName(profile),
-      updatedAt: serverTimestamp(),
-      ...(locationId ? {} : { createdAt: serverTimestamp(), createdBy: profile.id, assignedSellerIds: [], enabledDiscountIds: [] }),
-    }, { merge: true });
+    transaction.set(locationRef, buildLocationPayload({ values: data, previous: previous.exists() ? previous.data() : null, profile, stamp: serverTimestamp(), startAt: scheduleStartAt, endAt: scheduleEndAt }), { merge: true });
     transaction.set(auditRef, auditFields(profile, {
       action: locationId ? "location.updated" : "location.created",
       title: locationId ? "Ubicación actualizada" : "Ubicación creada",
@@ -220,59 +206,14 @@ export async function loadLocationStock({ location, entries, mode, reason, profi
       }
       const requested = quantity(entry.quantity, `La cantidad de ${entry.product.name}`);
       const existing = stockSnapshot.exists() && stockSnapshot.data().deleted !== true ? stockSnapshot.data() : {};
-      const previousStock = Number(existing.currentStock || 0);
-      const previousInitial = Number(existing.initialStock || 0);
+      const { previousStock, previousInitial, currentStock } = locationStockQuantity({ existing, mode, requested });
       if (mode === "initial" && stockSnapshot.exists() && requested !== previousInitial) assertPermission(profile, "adjustStock", "La modificación del stock inicial existente requiere permiso de ajuste.");
-      const currentStock = mode === "add" ? previousStock + requested : mode === "adjust" ? requested : previousStock + requested - previousInitial;
-      if (currentStock < 0) throw new Error(`El ajuste de ${entry.product.name} dejaría stock negativo.`);
       prepared.push({ entry, existing, stockRef, requested, previousStock, previousInitial, currentStock });
     }
-    prepared.forEach(({ entry, existing, stockRef, requested, previousStock, previousInitial, currentStock }) => {
-      const delta = currentStock - previousStock;
-      const product = entry.product;
-      const yellowAlertQty = quantity(entry.yellowAlertQty ?? existing.yellowAlertQty ?? 0, `La alerta amarilla de ${product.name}`);
-      const redAlertQty = quantity(entry.redAlertQty ?? existing.redAlertQty ?? 0, `La alerta roja de ${product.name}`);
-      if (yellowAlertQty < redAlertQty) throw new Error(`La alerta amarilla de ${product.name} debe ser mayor o igual a la roja.`);
-      transaction.set(stockRef, {
-        productId: product.id,
-        productName: product.name,
-        abbreviation: product.abbreviation || "",
-        categoryId: product.categoryId || "",
-        categoryName: product.categoryName || "",
-        imageUrl: product.imageUrl || "",
-        thumbUrl: product.thumbUrl || "",
-        price: effectiveLocationPrice(product, existing),
-        ...(!Object.keys(existing).length ? { priceMode: "default", priceOverride: null } : {}),
-        initialStock: mode === "initial" ? requested : previousInitial,
-        currentStock,
-        yellowAlertQty,
-        redAlertQty,
-        active: entry.active !== false,
-        deleted: false,
-        deletedAt: null,
-        productDeleted: false,
-        lastMovementId: `${safeOperationId}_${product.id}`,
-        updatedAt: serverTimestamp(),
-        updatedBy: profile.id,
-      }, { merge: true });
-      transaction.set(doc(db, "stockMovements", `${safeOperationId}_${product.id}`), {
-        operationId: safeOperationId,
-        inventoryType: "location", inventoryId: location.id,
-        locationId: location.id,
-        locationName: location.name,
-        productId: product.id,
-        productName: product.name,
-        type: mode === "initial" ? (Object.keys(existing).length ? "initial_adjustment" : "initial") : mode === "add" ? "add" : "adjustment",
-        qty: delta,
-        requestedQty: requested,
-        previousStock,
-        newStock: currentStock,
-        reason: String(reason || (mode === "add" ? "Ingreso de mercadería" : mode === "adjust" ? "Ajuste de inventario" : "Configuración de stock inicial")).trim(),
-        userId: profile.id,
-        userName: userName(profile),
-        saleId: "",
-        createdAt: serverTimestamp(),
-      });
+    prepared.forEach(({ entry, existing, stockRef, requested }) => {
+      const plan = buildLocationStockLinePlan({ product: entry.product, existing, mode, requested, entry: { ...entry, reason }, operationId: safeOperationId, location, profile, stamp: serverTimestamp() });
+      transaction.set(stockRef, plan.stockData, { merge: true });
+      transaction.set(doc(db, "stockMovements", plan.movementId), plan.movementData);
     });
     transaction.set(locationRef, {
       stockConfiguredAt: serverTimestamp(),

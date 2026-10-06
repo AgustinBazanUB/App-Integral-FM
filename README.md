@@ -61,7 +61,7 @@ npm test
 npm run build
 ```
 
-Las pruebas cubren catálogo, assets, búsqueda, permisos, pagos, descuentos, períodos en hora argentina, métricas sin duplicados, siete días completos, catálogo maestro, prevención de stock negativo, acceso inicial persistente, mejoras de Ubicaciones, filtros del Panel General, acceso por rol al Panel Vendedor, ubicaciones efectivas, carrito, botonera, pagos múltiples, offline, idempotencia, transacciones de venta, edición, anulación y responsive.
+Las pruebas cubren catálogo, assets, búsqueda, permisos, pagos, descuentos, períodos en hora argentina, métricas sin duplicados, siete días completos, catálogo maestro, control del stock negativo permitido en ubicaciones y bloqueo en depósitos, acceso inicial persistente, mejoras de Ubicaciones, filtros del Panel General, acceso por rol al Panel Vendedor, ubicaciones efectivas, carrito, botonera, pagos múltiples, offline, idempotencia, transacciones de venta, edición, anulación y responsive.
 
 Para validar reglas con el emulador (requiere Java 21 o superior):
 
@@ -104,3 +104,7 @@ La plataforma usa el proyecto Firebase separado `app-integral-fm`. El sistema an
 ## Estado honesto de integraciones
 
 El E-commerce público aún no procesa pagos ni crea pedidos. Gestión incorpora la integración ARCA server-side para preparar, autorizar y verificar comprobantes fiscales cuando las credenciales y los gates del entorno están configurados. Las pruebas locales ya incluyeron comprobantes reales; un deploy cloud requiere configurar sus propios secretos y mantener los gates de emisión deshabilitados hasta validarlo. El recibo del Panel Vendedor es interno y no reemplaza un comprobante fiscal.
+
+## Olivia · Asistente de Flor Mía
+
+Integración de texto, dictado y voz para Administrador y Vendedor, con permisos verificados por backend, propuestas con confirmación visual, venta básica y carga de stock. [Arquitectura, configuración, despliegue y validación](docs/OLIVIA.md). [Auditoría de la Solución Propuesta](docs/OLIVIA-FUNCTIONAL-AUDIT.md).

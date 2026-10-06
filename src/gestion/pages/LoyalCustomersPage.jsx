@@ -25,6 +25,7 @@ import {
   normalizeCustomerPhone,
 } from "../customers/customerDomain";
 import { useAuth } from "../AuthContext";
+import { useOliviaScreenContext } from "../olivia/ScreenContext";
 import { Icon } from "../components/icons";
 import { formatDateTime } from "../formatters";
 import { useAsyncData } from "../hooks";
@@ -126,6 +127,7 @@ export default function LoyalCustomersPage() {
   const [zoneBusy, setZoneBusy] = useState(false);
   const [zoneError, setZoneError] = useState("");
   const [message, setMessage] = useState("");
+  useOliviaScreenContext({ view: tab, customerId: selectedCustomer?.id, entityType: selectedCustomer?.id ? "customer" : undefined, entityId: selectedCustomer?.id, filters: { search } });
 
   const customers = [...new Map([...(customersResult.data?.items || []), ...extraCustomers].map(customer => [customer.id, customer])).values()];
   const zones = zonesResult.data || [];

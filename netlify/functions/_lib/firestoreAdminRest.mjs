@@ -336,6 +336,9 @@ function commitWriteForOperation(operation, projectId) {
     throw error;
   }
   const name = qualifiedDocumentName(projectId, path);
+  if (type === "delete") {
+    return { delete: name, ...(operation.currentUpdateTime ? { currentDocument: { updateTime: operation.currentUpdateTime } } : {}) };
+  }
   if (type === "create") {
     return {
       update: {

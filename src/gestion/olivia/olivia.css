@@ -1,0 +1,138 @@
+.fm-olivia-launcher { position: fixed; bottom: max(20px, env(safe-area-inset-bottom)); right: max(20px, env(safe-area-inset-right)); z-index: 45; display: flex; align-items: center; gap: 9px; padding: 6px 18px 6px 6px; background: var(--fm-olive-dark); color: var(--fm-text-inverse); border: 1px solid var(--fm-olive); border-radius: 999px; box-shadow: var(--fm-shadow-lg); cursor: pointer; font: 700 15px var(--fm-font-ui); }
+.fm-olivia-launcher:hover { background: var(--fm-olive); }
+.fm-olivia-face { width: 48px; height: 48px; flex: 0 0 48px; }
+.fm-olivia-face.is-active { animation: fm-olivia-breathe 2.5s ease-in-out infinite; }
+.fm-olivia-eyes { transform-origin: 32px 32px; animation: fm-olivia-blink 7s infinite; }
+.fm-olivia-drawer { position: fixed; top: 18px; right: 18px; bottom: 94px; z-index: 46; width: min(440px, calc(100vw - 36px)); display: flex; flex-direction: column; background: var(--fm-surface); color: var(--fm-text); border: 1px solid var(--fm-border-strong); border-radius: var(--fm-radius-modal); box-shadow: 0 20px 70px rgb(36 23 13 / 22%); overflow-x: hidden; overflow-y: auto; font-family: var(--fm-font-ui); }
+.fm-olivia-header { display: flex; gap: 12px; align-items: center; padding: 14px 16px; background: var(--fm-bg-subtle); border-bottom: 1px solid var(--fm-border); }
+.fm-olivia-header > div { flex: 1; }
+.fm-olivia-header h2 { margin: 0; font: 700 24px var(--fm-font-display); }
+.fm-olivia-header span { font-size: 12px; color: var(--fm-text-secondary); }
+.fm-olivia-status { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 9px 16px; border-bottom: 1px solid var(--fm-border-subtle); }
+.fm-olivia-status > span:last-child { font-size: 11px; color: var(--fm-text-secondary); }
+.fm-olivia-messages { flex: 1 1 100px; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px; min-height: 40px; }
+.fm-olivia-welcome { padding: 16px 4px; }
+.fm-olivia-welcome h3 { font: 600 27px var(--fm-font-display); margin: 0 0 12px; }
+.fm-olivia-welcome p { font-size: 14px; line-height: 1.6; color: var(--fm-text-secondary); }
+.fm-olivia-message { border-radius: 12px; padding: 11px 13px; margin-bottom: 12px; background: var(--fm-bg-subtle); margin-right: 20px; overflow-wrap: anywhere; }
+.fm-olivia-message--user { background: var(--fm-olive-pale); margin-right: 0; margin-left: 20px; }
+.fm-olivia-message strong { font-size: 11px; color: var(--fm-text-secondary); }
+.fm-olivia-message p { white-space: pre-wrap; font-size: 14px; line-height: 1.55; margin: 5px 0 0; }
+.fm-olivia-message ul, .fm-olivia-message ol { font-size: 14px; line-height: 1.55; padding-left: 20px; margin: 6px 0; }
+.fm-olivia-message p strong, .fm-olivia-message li strong { font-size: inherit; color: inherit; }
+.fm-olivia-working { font-size: 12px; color: var(--fm-text-secondary); }
+.fm-olivia-confirmation { margin: 0 12px 8px; padding: 12px; background: var(--fm-warning-bg); border: 1px solid var(--fm-warning-border); border-radius: var(--fm-radius-control); flex-shrink: 0; }
+.fm-olivia-confirmation h3 { font-size: 15px; margin: 0 0 8px; }
+.fm-olivia-confirmation p { font-size: 13px; line-height: 1.5; white-space: pre-wrap; margin: 0 0 10px; overflow-wrap: anywhere; }
+.fm-olivia-confirmation > p:first-of-type { overflow-wrap: anywhere; }
+.fm-olivia-confirmation > div { display: flex; gap: 8px; }
+.fm-olivia-confirmation > div .fm-button { min-width: 90px; }
+.fm-olivia-confirmation small { display: block; color: var(--fm-text-secondary); margin-top: 8px; font-size: 11px; }
+.fm-olivia-error { background: var(--fm-error-bg); border-top: 1px solid var(--fm-error-border); padding: 10px 16px; max-height: 170px; overflow: auto; }
+.fm-olivia-error p { margin: 0 0 8px; font-size: 13px; }
+.fm-olivia-error small { display: block; margin-top: 8px; color: var(--fm-text-secondary); }
+.fm-olivia-voice { padding: 10px 16px; background: var(--fm-olive-pale); font-size: 13px; max-height: 180px; overflow-y: auto; }
+.fm-olivia-voice p { margin: 8px 0; }
+.fm-olivia-voice > div { display: flex; gap: 8px; margin-top: 8px; }
+.fm-olivia-composer { padding: 12px 16px; border-top: 1px solid var(--fm-border); }
+.fm-olivia-composer textarea { width: 100%; min-height: 66px; max-height: 150px; resize: vertical; padding: 11px; border: 1px solid var(--fm-border-strong); border-radius: var(--fm-radius-control); color: var(--fm-text); background: var(--fm-surface); font: 14px var(--fm-font-ui); }
+.fm-olivia-composer textarea:focus { outline: none; border-color: var(--fm-gold-primary); box-shadow: var(--fm-shadow-focus); }
+.fm-olivia-composer-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.fm-olivia-composer-actions > .fm-icon-button { flex: 0 0 44px; }
+.fm-olivia-composer-actions > .fm-button:last-child { margin-left: auto; }
+.fm-olivia-composer small { display: block; margin-top: 8px; font-size: 10px; color: var(--fm-text-secondary); }
+.fm-olivia-voice-mode { margin-top: 8px; max-width: 100%; font: inherit; font-size: 12px; }
+.fm-olivia-composer-bar .fm-icon-button[aria-pressed="true"] { background: var(--fm-olive-pale); color: var(--fm-olive-dark); }
+.fm-olivia-usage { padding: 9px 16px; background: var(--fm-bg-subtle); font-size: 12px; border-top: 1px solid var(--fm-border); }
+.fm-olivia-usage small { display: block; font-size: 10px; margin-top: 4px; }
+.fm-olivia-usage.is-low { background: var(--fm-warning-bg); }
+.fm-olivia-header, .fm-olivia-status, .fm-olivia-composer, .fm-olivia-usage, .fm-olivia-estimate, .fm-olivia-voice, .fm-olivia-error { flex-shrink: 0; }
+.fm-olivia-estimate { padding: 6px 16px; background: var(--fm-bg-subtle); border-top: 1px solid var(--fm-border); font-size: 10px; }
+.fm-olivia-estimate small { display: block; margin-top: 3px; }
+.fm-olivia-quota-request { padding: 8px 16px; background: var(--fm-warning-bg); flex-shrink: 0; }
+.fm-olivia-quota-request p { font-size: 12px; margin: 8px 0 0; }
+.fm-olivia-settings { display: grid; gap: 20px; }
+.fm-olivia-settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.fm-olivia-settings fieldset { border: 1px solid var(--fm-border); padding: 16px; border-radius: var(--fm-radius-card); min-width: 0; }
+.fm-olivia-settings legend { padding: 0 8px; font-weight: 650; font-size: 14px; }
+.fm-olivia-model-profile { display: grid; gap: 10px; padding: 12px; background: var(--fm-bg-subtle); border-radius: var(--fm-radius-sm); }
+.fm-olivia-quota-list { padding: 0; list-style: none; margin: 16px 0 0; }
+.fm-olivia-quota-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid var(--fm-border); font-size: 13px; }
+.fm-olivia-settings details summary { cursor: pointer; font-weight: 650; }
+.fm-olivia-config-json, .fm-olivia-config-preview { font: 12px ui-monospace, monospace; width: 100%; overflow: auto; white-space: pre; border: 1px solid var(--fm-border); border-radius: 8px; padding: 12px; background: var(--fm-bg-subtle); color: var(--fm-text); margin: 8px 0; }
+.fm-olivia-config-preview { max-height: 260px; }
+.fm-olivia-supervision-actions { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; }
+.fm-olivia-supervision-actions .fm-field { flex: 1; min-width: 200px; }
+.fm-olivia-supervision h3 { margin-top: 20px; font-size: 15px; }
+.fm-olivia-history-transcript { max-height: 400px; overflow-y: auto; padding: 12px; margin-top: 16px; background: var(--fm-bg-main); border: 1px solid var(--fm-border); border-radius: var(--fm-radius-card); }
+@keyframes fm-olivia-breathe { 50% { transform: translateY(-2px) rotate(2deg); } }
+@keyframes fm-olivia-blink { 0%, 94%, 98%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+@media (max-width: 640px) { .fm-olivia-drawer { top: max(8px, env(safe-area-inset-top)); right: 8px; bottom: max(82px, calc(env(safe-area-inset-bottom) + 72px)); width: calc(100vw - 16px); } .fm-olivia-launcher { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); } .fm-olivia-settings-grid { grid-template-columns: 1fr; } }
+@media (max-height: 600px) { .fm-olivia-drawer { top: 6px; bottom: 6px; } .fm-olivia-header { padding: 8px 12px; } .fm-olivia-launcher[aria-expanded="true"] { display: none; } }
+@media (prefers-reduced-motion: reduce) { .fm-olivia-face, .fm-olivia-eyes { animation: none !important; } }
+
+@media (max-width: 640px) { .fm-olivia-composer-actions > .fm-button { font-size: 11px; padding-inline: 10px; min-width: 0; } }
+
+.fm-olivia-mode { padding: 6px 16px; font-size: 12px; }
+.fm-olivia-mode label { display:flex; gap:8px; align-items:center; }
+.fm-olivia-chats { padding:12px 16px; max-height:240px; overflow:auto; background:#f6f5ef; border-bottom:1px solid #ddd; }
+.fm-olivia-chats h3,.fm-olivia-developer h3 { margin:0 0 8px; font-size:14px; }
+.fm-olivia-chats p { font-size:12px; margin:6px 0; }
+.fm-olivia-chats > button { display:flex; flex-direction:column; text-align:left; gap:3px; width:100%; background:white; border:1px solid #deded4; border-radius:8px; padding:8px; margin-top:6px; cursor:pointer; }
+.fm-olivia-chats > button[aria-current=true] { border-color:#708048; }
+.fm-olivia-chats small { font-size:11px; }
+.fm-olivia-costs { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:8px 0; }
+.fm-olivia-costs > div { display:flex; flex-direction:column; gap:4px; }
+.fm-olivia-costs strong { font-size:15px; }
+.fm-olivia-developer { padding:12px 16px; max-height:200px; overflow:auto; background:#f3f4ee; font-size:12px; border-top:1px solid #deded4; }
+.fm-olivia-developer dl { display:grid; grid-template-columns:1fr 1fr; gap:5px 12px; margin:0; }
+.fm-olivia-developer dd { margin:0; overflow-wrap:anywhere; }
+
+.fm-olivia-mode input[type="checkbox"] { appearance:auto; width:18px; height:18px; min-height:18px; flex:0 0 18px; margin:0; padding:0; box-shadow:none; accent-color:var(--fm-olive); }
+.fm-olivia-mode { flex-shrink:0; }
+.fm-olivia-chats, .fm-olivia-developer { flex-shrink:0; }
+.fm-olivia-drawer { width:min(620px, calc(100vw - 36px)); overflow:hidden; }
+.fm-olivia-composer-bar { display:flex; align-items:flex-end; gap:4px; padding:6px; border:1px solid var(--fm-border-strong); border-radius:24px; background:var(--fm-bg-subtle); }
+.fm-olivia-composer-bar textarea { border:0; background:transparent; resize:none; min-height:42px; max-height:120px; flex:1; min-width:0; padding:12px 6px; }
+.fm-olivia-composer-bar .fm-icon-button { flex-shrink:0; }
+.fm-olivia-attach-menu { position:relative; }
+.fm-olivia-attach-menu summary { display:grid; place-items:center; width:40px; height:42px; cursor:pointer; font-size:26px; list-style:none; border-radius:50%; }
+.fm-olivia-attach-menu summary::-webkit-details-marker { display:none; }
+.fm-olivia-attach-menu div { position:absolute; bottom:48px; left:0; z-index:2; width:220px; padding:6px; background:var(--fm-surface); border:1px solid var(--fm-border); border-radius:12px; box-shadow:var(--fm-shadow-lg); }
+.fm-olivia-attach-menu button { display:block; padding:12px; width:100%; border:0; background:transparent; text-align:left; color:inherit; cursor:pointer; }
+.fm-olivia-dictation { display:flex; align-items:center; gap:6px; min-height:60px; font-variant-numeric:tabular-nums; }
+.fm-olivia-waveform { display:flex; align-items:center; justify-content:center; gap:2px; height:40px; flex:1; }
+.fm-olivia-waveform i { display:block; width:3px; background:var(--fm-olive); border-radius:4px; }
+.fm-olivia-attachments { display:flex; flex-wrap:wrap; gap:6px; list-style:none; padding:0; margin:0 0 8px; }
+.fm-olivia-attachments li { display:flex; align-items:center; gap:6px; border:1px solid var(--fm-border); border-radius:10px; padding:6px; max-width:100%; font-size:12px; overflow-wrap:anywhere; }
+.fm-olivia-attachments img { width:36px; height:36px; object-fit:cover; border-radius:5px; }
+.fm-olivia-attachments small { max-width:200px; }
+.fm-olivia-attachments button { border:0; background:transparent; color:inherit; min-width:32px; min-height:32px; cursor:pointer; }
+.fm-olivia-message--assistant { background:transparent; padding-inline:0; }
+.fm-olivia-voice > div { flex-wrap:wrap; }
+.fm-olivia-confirmation { max-height:220px; overflow-y:auto; }
+@media (max-width:640px) { .fm-olivia-drawer { width:calc(100vw - 16px); max-height:calc(100dvh - 92px); } .fm-olivia-composer { padding:10px; } .fm-olivia-costs strong { font-size:12px; } }
+.fm-olivia-developer dl { display:block; }
+.fm-olivia-developer dl > div { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:6px 0; }
+.fm-olivia-attachments { max-height:110px; overflow:auto; }
+.fm-olivia-attach-menu summary:focus-visible { outline:2px solid var(--fm-olive); outline-offset:2px; }
+.fm-olivia-drawer.is-compact .fm-olivia-usage > small, .fm-olivia-drawer.is-compact .fm-olivia-composer > small { display:none; }
+.fm-olivia-drawer.is-compact .fm-olivia-header { padding:6px 10px; }
+.fm-olivia-drawer.is-compact .fm-olivia-voice { max-height:110px; padding:6px 10px; }
+.fm-olivia-drawer.is-compact .fm-olivia-confirmation { max-height:140px; }
+.fm-olivia-drawer.is-compact .fm-olivia-developer { max-height:90px; }
+.fm-olivia-usage summary { display:none; cursor:pointer; }
+.fm-olivia-drawer.is-compact .fm-olivia-usage summary { display:list-item; }
+.fm-olivia-drawer.is-compact .fm-olivia-usage { max-height:120px; overflow:auto; }
+.fm-olivia-drawer.is-compact { overflow-y:auto; }
+@media (max-width:640px) {
+  .fm-olivia-drawer { top:calc(var(--olivia-viewport-top, 0px) + max(8px, env(safe-area-inset-top))); bottom:auto; height:calc(var(--olivia-viewport-height, 100dvh) - max(16px, env(safe-area-inset-top)) - env(safe-area-inset-bottom)); max-height:calc(100dvh - 16px); }
+  .fm-olivia-composer-bar textarea { font-size:16px; }
+  .fm-olivia-composer-bar { flex-wrap:wrap; }
+  .fm-olivia-composer-bar textarea { order:-1; flex-basis:100%; }
+  .fm-olivia-attach-menu { margin-right:auto; }
+  .fm-olivia-voice > div { flex-wrap:nowrap; }
+  .fm-olivia-voice .fm-button { width:auto; flex:1; min-width:0; padding-inline:6px; font-size:10px; white-space:normal; line-height:1.3; }
+}
+
+.fm-olivia-voice-notice { margin: 8px 16px; padding: 10px 12px; border-radius: 10px; background: #f4f0e6; color: #4b493d; font-size: 0.85rem; line-height: 1.45; }

@@ -196,6 +196,7 @@ test("la interfaz compacta descuentos y prepara ticket sin simular ARCA", async 
 
 test("la venta guarda creador, fecha local, descuentos desglosados y ticket", async () => {
   const service = await read("../src/gestion/services/sellerService.js");
+  const writePlan = await read("../src/shared/operationalWritePlans.mjs");
   for (const field of [
     "createdBy",
     "createdByName",
@@ -206,9 +207,10 @@ test("la venta guarda creador, fecha local, descuentos desglosados y ticket", as
     "discountTotal",
     "ticketRequested",
     "ticketStatus",
-  ]) assert.match(service, new RegExp(field));
+  ]) assert.match(`${service}\n${writePlan}`, new RegExp(field));
   assert.match(service, /runTransaction\(db/);
-  assert.match(service, /previousStock < item\.qty/);
+  assert.match(service, /buildOperationalSalePlan/);
+  assert.match(writePlan, /previousStock < item\.qty/);
   assert.match(service, /lastMovementId/);
   assert.match(service, /sale\.cancelled/);
   assert.match(service, /sale\.updated/);

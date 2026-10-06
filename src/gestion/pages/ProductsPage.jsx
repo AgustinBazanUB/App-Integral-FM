@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Button,
@@ -12,6 +12,7 @@ import {
   Toast,
 } from "../../design-system";
 import { useAuth } from "../AuthContext";
+import { useOliviaRefresh, useOliviaScreenContext, useOliviaVisibility } from "../olivia/ScreenContext";
 import HelpTooltip from "../components/HelpTooltip";
 import ProductForm from "../components/ProductForm";
 import { formatMoney } from "../formatters";
@@ -44,6 +45,14 @@ export default function ProductsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [message, setMessage] = useState("");
+  const { review, setReview } = useOliviaVisibility();
+  useEffect(() => {
+    if (review?.toolName !== "prepare_product_create" || !can(profile, "products", "create")) return;
+    setEditingProduct({ ...review.draft, categoryId: review.draft.categoryId || "" });
+    setFormOpen(true); setReview(null);
+  }, [review, profile, setReview]);
+  useOliviaScreenContext({ entityType: editingProduct?.id && formOpen ? "product" : undefined, entityId: formOpen ? editingProduct?.id : undefined, productId: formOpen ? editingProduct?.id : undefined, filters: { search, categoryId, status } });
+  useOliviaRefresh(result.refresh);
 
   const products = result.data?.products || [];
   const categories = result.data?.categories || [];
@@ -150,7 +159,7 @@ export default function ProductsPage() {
         onClose={() => setFormOpen(false)}
         onSaved={async () => {
           await result.refresh();
-          setMessage(editingProduct ? "Producto actualizado." : "Producto creado en el catálogo general.");
+          setMessage(editingProduct?.id ? "Producto actualizado." : "Producto creado en el catálogo general.");
         }}
       />
     </div>
