@@ -2,6 +2,7 @@ import {
   adminGetDocument,
   adminRunTransaction,
   adminCommitDocuments,
+  adminListDocuments,
   firebaseAdminAccessToken,
 } from "../firestoreAdminRest.mjs";
 import { oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
@@ -89,6 +90,7 @@ export function createOliviaStore({
     fetchImpl: boundedFetch,
   };
   return {
+    list: (collection) => adminListDocuments(collection, { ...options, maxDocuments: 5000 }),
     async get(path) {
       const doc = await adminGetDocument(path, options);
       return doc

@@ -35,6 +35,7 @@ import {
 } from "./guards.mjs";
 import {
   OLIVIA_INSTRUCTIONS,
+  OLIVIA_CATALOG_STOCK_INSTRUCTIONS,
   OLIVIA_VOICE_INSTRUCTIONS,
   OLIVIA_METRICS_INSTRUCTIONS,
   modelProfile,
@@ -532,7 +533,7 @@ export function createOliviaEngine({
           model: profile.model,
           reasoning: { effort: profile.reasoningEffort },
           store: false,
-          instructions: OLIVIA_INSTRUCTIONS + "\n" + OLIVIA_METRICS_INSTRUCTIONS + (voiceSessionId ? "\n" + OLIVIA_VOICE_INSTRUCTIONS : "") + "\nAntes de pedir aclaraciones, usá update_task para conservar parámetros parciales. Consultá historia, pantalla y herramientas para resolver entidades por nombre; nunca pidas IDs al usuario. Reutilizá taskState.slots y aplicá correcciones sobre la misma tarea. Al cambiar de intención empezá una nueva tarea. Para análisis preguntá el período si falta, salvo uno explícito o elegido en la charla; nunca lo inventes. Para transferencias consultá depósitos y stock; si solo un origen autorizado alcanza, proponelo; si varios alcanzan, preguntá cuál. Nunca inventes cantidades recibidas físicamente. Una tarea creativa solo existe en marketing/social autorizados." + (activeSkills.length ? "\nProcesos versionados permitidos (no conceden permisos):\n" + activeSkills.map((skill) => skill.content).join("\n\n") : ""),
+          instructions: OLIVIA_INSTRUCTIONS + "\n" + OLIVIA_CATALOG_STOCK_INSTRUCTIONS + "\n" + OLIVIA_METRICS_INSTRUCTIONS + (voiceSessionId ? "\n" + OLIVIA_VOICE_INSTRUCTIONS : "") + "\nAntes de pedir aclaraciones, usá update_task para conservar parámetros parciales. Consultá historia, pantalla y herramientas para resolver entidades por nombre; nunca pidas IDs al usuario. Reutilizá taskState.slots y aplicá correcciones sobre la misma tarea. Al cambiar de intención empezá una nueva tarea. Para análisis preguntá el período si falta, salvo uno explícito o elegido en la charla; nunca lo inventes. Para transferencias consultá depósitos y stock; si solo un origen autorizado alcanza, proponelo; si varios alcanzan, preguntá cuál. Nunca inventes cantidades recibidas físicamente. Una tarea creativa solo existe en marketing/social autorizados." + (activeSkills.length ? "\nProcesos versionados permitidos (no conceden permisos):\n" + activeSkills.map((skill) => skill.content).join("\n\n") : ""),
           input,
           tools: finalResponse ? [] : [...toolDefinitions(session, { query: userMessage, context, required: [...activeSkills.flatMap((skill) => skill.requiredTools), taskState.intent], loaded: [...loadedTools] }), taskUpdateTool(capabilities(session))],
           ...(finalResponse ? { tool_choice: "none" } : {}),
@@ -671,7 +672,7 @@ export function createOliviaEngine({
                 : "RECHAZADA";
               draft = args;
               content =
-                (result.state === "DATOS_INCOMPLETOS" && OLIVIA_CAPABILITIES[call.name]?.module === "metrics" ? result.data?.message : null) || (result.state === "DATOS_INCOMPLETOS" ? missingQuestion(taskState.missingFields) : null) || result.data?.summary ||
+                (call.name === "prepare_catalog_stock_load" ? result.data?.summary : null) || (result.state === "DATOS_INCOMPLETOS" && OLIVIA_CAPABILITIES[call.name]?.module === "metrics" ? result.data?.message : null) || (result.state === "DATOS_INCOMPLETOS" ? missingQuestion(taskState.missingFields) : null) || result.data?.summary ||
                 result.data?.message ||
                 "La operación necesita revisión.";
             }

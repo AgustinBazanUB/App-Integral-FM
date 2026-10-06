@@ -13,6 +13,7 @@ export function requiredFields(intent) {
   if (intent === "get_all_time_sales_metrics") return [];
   const minimum = {
     prepare_stock_load: ["locationId", "productId", "quantity"],
+    prepare_catalog_stock_load: ["locationId", "items"],
     prepare_sale: ["locationId", "items", "paymentMethod", "ticketRequested", "customerDecision", "promotionDecision"],
     prepare_stock_transfer: ["originId", "destinationId", "lines", "reason"],
     prepare_create_location: ["name", "type", "codePrefix", "dniMode"],

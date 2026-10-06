@@ -10,6 +10,7 @@ import { validateFinancialEntry } from "../../../../src/gestion/finance/financeD
 import { argentinaDateFromKey } from "../../../../src/modules/locations/domain/time.js";
 import { can, canAccessAdministration, normalizedRole } from "../../../../src/gestion/permissions.js";
 import { arcaSourceTypeForSale } from "../../../../src/shared/arcaSourceType.mjs";
+import { catalogStockPlan } from "./catalogStock.mjs";
 const normalize = (value) => value instanceof Date ? value.toISOString() : Array.isArray(value) ? value.map(normalize) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).filter((key) => key !== "id" && !key.startsWith("__")).sort().map((key) => [key, normalize(value[key])])) : value;
 const fingerprint = (value) => createHash("sha256").update(JSON.stringify(normalize(value))).digest("hex");
 const ownerPath = (type, id) => `${type === "warehouse" ? "warehouses" : "locations"}/${safeId(id)}`;
@@ -21,6 +22,7 @@ const generic = { prepare_shipment_create: ["shipping", "shipments", "pending"],
 export async function extendedOperationPlan({ session, toolName, args, store, now = new Date(), entityId = "preview", correlation = {} }) {
   assertExtendedCapability(session, toolName);
   validateSchema(args, OLIVIA_CAPABILITIES[toolName]?.parameters);
+  if (toolName === "prepare_catalog_stock_load") return catalogStockPlan({ session, args, store, now, entityId, correlation });
   const profile = { ...session.profile, id: session.uid }, documents = {};
   const read = async (path) => { const row = await store.get(path); documents[path] = row || null; return row ? { ...row, id: path.split("/").at(-1) } : null; };
   let writes = [], summary, module = OLIVIA_CAPABILITIES[toolName].module, affectedId = entityId, navigation = null;
@@ -129,9 +131,10 @@ export async function prepareExtendedOperation(options) {
 export async function executeExtendedOperation({ session, prepared, transaction, now, correlation }) {
   const profile = await transaction.getDocument(`users/${session.uid}`);
   const fresh = { ...session, profile: { ...profile?.data, id: session.uid } };
-  const store = { get: async (path) => (await transaction.getDocument(path))?.data || null };
+  const store = { get: async (path) => (await transaction.getDocument(path))?.data || null,
+    list: (path) => transaction.listDocuments(path, { maxDocuments: 5000 }) };
   const marker = { ...correlation, skill: prepared.skill || null, userInput: prepared.userInput || null, origin: "Asistente IA / Olivia" };
   const plan = await extendedOperationPlan({ session: fresh, toolName: prepared.toolName, args: prepared.canonicalArgs, store, now, entityId: correlation.confirmationId, correlation: marker });
   if (plan.state || plan.snapshotFingerprint !== prepared.snapshotFingerprint) throw oliviaError("context-changed", "Cambió la información o tus permisos. Prepará una propuesta nueva antes de confirmar.", 409);
-  return { writes: plan.writes, result: { entityId: plan.affectedId, message: plan.navigation ? "Revisión preparada. Abrí el flujo seguro para completar la operación." : `Acción completada. ${plan.summary}`, state: plan.navigation ? "INFORMACION" : "COMPLETADA", navigation: plan.navigation } };
+  return { writes: plan.writes, result: { entityId: plan.affectedId, message: plan.navigation ? "Revisión preparada. Abrí el flujo seguro para completar la operación." : plan.completedMessage || `Acción completada. ${plan.summary}`, state: plan.navigation ? "INFORMACION" : "COMPLETADA", navigation: plan.navigation } };
 }

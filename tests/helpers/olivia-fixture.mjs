@@ -185,6 +185,7 @@ function fixture({
     commits.push(copy(writes));
   }
   const store = {
+    list: async collection => [...documents].filter(([path]) => path.startsWith(`${collection}/`) && path.split("/").length === collection.split("/").length + 1).map(([path, data]) => ({ ...copy(data), id: path.split("/").at(-1) })),
     get: async (path) =>
       documents.has(path)
         ? {
@@ -201,6 +202,10 @@ function fixture({
         );
         let committed = false;
         return work({
+          async listDocuments(collection) {
+            if (committed) throw new Error("Read after commit");
+            return [...snapshot].filter(([path]) => path.startsWith(`${collection}/`) && path.split("/").length === collection.split("/").length + 1).map(([path, data]) => ({ ...copy(data), id: path.split("/").at(-1) }));
+          },
           async getDocument(path) {
             if (committed) throw new Error("Read after commit");
             return snapshot.has(path)
