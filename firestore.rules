@@ -26,15 +26,17 @@ service cloud.firestore {
         "analista_metricas": "analyst"
       }.get(role, role);
     }
-    function adminRole() {
-      let user = profile();
-      let role = normalizedRoleValue(user.role);
+    function adminRoleFor(user, role) {
       return (
         role in ["admin", "general_admin"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
       );
+    }
+    function adminRole() {
+      let user = profile();
+      return adminRoleFor(user, normalizedRoleValue(user.role));
     }
     function isAdmin() { return activeUser() && adminRole(); }
     function explicitPermissionFor(user, moduleId, action) {
@@ -54,8 +56,7 @@ service cloud.firestore {
       let user = profile();
       return explicitPermissionFor(user, moduleId, action);
     }
-    function roleModule(moduleId) {
-      let role = normalizedRoleValue(profile().role);
+    function roleModule(role, moduleId) {
       return (
         (role == "seller" && moduleId in ["locations", "quick-sales", "alerts"])
         || (role == "location_manager" && moduleId in ["locations", "quick-sales", "metrics", "alerts"])
@@ -69,11 +70,11 @@ service cloud.firestore {
         || (role == "operational_admin" && moduleId != "finance")
       );
     }
-    function rolePermission(moduleId, action) {
-      let role = normalizedRoleValue(profile().role);
-      return (
-        (action == "view" && roleModule(moduleId))
-        || (role == "seller"
+    function rolePermission(role, moduleId, action) {
+      // Ninguna de las ramas de escritura concede "view". Resolver esa acción
+      // por separado evita evaluar todas esas ramas cuando un módulo se deniega.
+      return action == "view" ? roleModule(role, moduleId) : (
+        (role == "seller"
           && ((moduleId == "quick-sales" && action in ["create", "edit"])
             || (moduleId == "alerts" && action == "edit")))
         || (role == "location_manager"
@@ -122,8 +123,10 @@ service cloud.firestore {
       );
     }
     function canModule(moduleId, action) {
-      return activeUser()
-        && (adminRole() || explicitPermission(moduleId, action) || rolePermission(moduleId, action));
+      let user = profile();
+      let role = normalizedRoleValue(user.role);
+      return signedIn() && user.active == true
+        && (adminRoleFor(user, role) || explicitPermissionFor(user, moduleId, action) || rolePermission(role, moduleId, action));
     }
     function allowedLocation(locationId) {
       let user = profile();
