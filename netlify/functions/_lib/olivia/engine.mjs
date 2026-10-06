@@ -711,6 +711,7 @@ export function createOliviaEngine({
               taskRepairPending = true;
             } else {
               nextState = e.status === 403 ? "RECHAZADA" : "ERROR";
+              e.oliviaToolName = call.name;
               failure = publicOliviaFailure(e);
               try { failure = await captureOliviaFailure({ store, session, error: e, operation: "chat", conversationId: id, requestId, now: clock() }); } catch { /* Do not hide the original error. */ }
               content = failure.message;

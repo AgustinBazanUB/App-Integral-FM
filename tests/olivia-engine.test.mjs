@@ -1485,6 +1485,9 @@ test("batch capability addition preserves existing chat scope but actual permiss
   const f = fixture(), conversationId = (await start(f)).conversationId, conversation = f.documents.get(`oliviaConversations/${conversationId}`);
   conversation.permissionScope = permissionScope(f.session, capabilities(f.session).filter(name => name !== "prepare_batch_sales"));
   assert.doesNotThrow(() => assertConversationOwner(f.session, conversation, f.clock()));
+  assert.equal((await f.engine.resumeConversation(f.session, { conversationId })).conversationId, conversationId);
+  assert.ok((await f.engine.history(f.session, {})).conversations.some(entry => entry.id === conversationId));
+  assert.ok((await f.engine.history(f.session, { conversationId })).selectedConversation);
   const changed = { ...f.session, profile: { ...f.session.profile, allowedLocationIds: ["other"] } };
   assert.throws(() => assertConversationOwner(changed, conversation, f.clock()), { code: "permission-scope-changed" });
 });

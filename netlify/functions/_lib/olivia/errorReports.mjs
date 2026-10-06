@@ -3,6 +3,8 @@ import { normalizedRole } from "../../../../src/gestion/permissions.js";
 import { oliviaError, safeId } from "../../../../src/shared/oliviaContracts.mjs";
 import { sessionBinding } from "./conversations.mjs";
 import { assertOliviaAccess } from "./guards.mjs";
+import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
+import { OLIVIA_TOOL_SCHEMAS } from "../../../../src/shared/oliviaContracts.mjs";
 const descriptions = {
   "assistant-timeout": "La consulta necesitó más tiempo del disponible.",
   "provider-timeout": "El servicio de IA tardó demasiado en responder.",
@@ -33,6 +35,9 @@ export async function captureOliviaFailure({ store, session, error, operation, c
   if (error.reportId) return publicOliviaFailure(error);
   const failure = publicOliviaFailure(error), reportId = randomUUID();
   const diagnostics = { version: 1, error: { name: failure.code, code: failure.code, status: Number(error.status) >= 400 && Number(error.status) < 600 ? Number(error.status) : 500, description: descriptions[failure.code] || "Una operación de Olivia falló; revisar el código y la traza técnica.", frames: String(error.stack || "").split("\n").slice(1, 7).map(line => line.match(/(?:[\\/])([A-Za-z0-9_.-]+\.(?:mjs|js|jsx)):(\d+):(\d+)/)?.slice(1).join(":")).filter(Boolean) }, operation: ["chat", "confirm", "startChat", "chatStatus", "background-chat"].includes(operation) ? operation : "assistant", conversationId: /^[A-Za-z0-9_-]{1,128}$/.test(conversationId || "") ? conversationId : null, requestId: /^[A-Za-z0-9_-]{1,128}$/.test(requestId || "") ? requestId : null, occurredAt: now.toISOString(), reporterId: session.uid };
+  if (Object.hasOwn(OLIVIA_CAPABILITIES, error.oliviaToolName || "") || Object.hasOwn(OLIVIA_TOOL_SCHEMAS, error.oliviaToolName || "") || error.oliviaToolName === "update_task") diagnostics.tool = error.oliviaToolName;
+  if ([400, 401, 403, 404, 408, 409, 429, 500, 502, 503, 504].includes(error.providerStatus)) diagnostics.error.providerStatus = error.providerStatus;
+  if (["invalid_api_key", "insufficient_quota", "rate_limit_exceeded", "model_not_found", "unsupported_parameter", "invalid_value", "invalid_request_error", "context_length_exceeded", "server_error"].includes(error.providerErrorCode)) diagnostics.error.providerCode = error.providerErrorCode;
   await store.commit([{ type: "create", path: `oliviaErrorReports/${reportId}`, data: { userId: session.uid, sessionBinding: sessionBinding(session), status: "ready", diagnostics, createdAt: now, expiresAt: new Date(now.getTime() + 30 * 86400000) } }]);
   error.reportId = reportId;
   return { ...failure, reportId };

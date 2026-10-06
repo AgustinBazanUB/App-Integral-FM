@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { captureOliviaFailure, sendOliviaErrorReport, publicOliviaFailure } from "../netlify/functions/_lib/olivia/errorReports.mjs";
+import { openaiRequest } from "../netlify/functions/_lib/olivia/provider.mjs";
 const now = new Date("2026-10-06T15:00:00Z");
 function fixture() {
   const documents = new Map([["users/agustin", { name: "Agustín Bazán", role: "admin", active: true }], ["users/sender", { name: "Ana", role: "seller", active: true }], ["users/impostor", { name: "Agustin", role: "seller", active: true }]]);
@@ -54,4 +55,13 @@ test("public failures never expose unexpected internal errors or malformed codes
   assert.doesNotMatch(JSON.stringify(publicOliviaFailure(new Error("PRIVATE credentials"))), /PRIVATE|credentials/);
   assert.equal(publicOliviaFailure({ code: "Bearer PRIVATE SECRET" }).code, "assistant-error");
   assert.match(publicOliviaFailure({ code: "context-changed", status: 409 }).message, /prepar/);
+});
+test("provider diagnostics retain status and an allowed cause without raw API messages", async () => {
+  const f = fixture(); let failure;
+  try { await openaiRequest("responses", {}, { env: { OPENAI_API_KEY: "test-credential" }, fetchImpl: async () => ({ ok: false, status: 401, json: async () => ({ error: { code: "invalid_api_key", message: "PRIVATE credential value" } }) }) }); }
+  catch (error) { failure = error; }
+  const report = await captureOliviaFailure({ ...f, error: failure, operation: "chat", now });
+  const diagnostics = f.documents.get(`oliviaErrorReports/${report.reportId}`).diagnostics;
+  assert.equal(diagnostics.error.providerStatus, 401); assert.equal(diagnostics.error.providerCode, "invalid_api_key");
+  assert.doesNotMatch(JSON.stringify(diagnostics), /PRIVATE|test-credential/);
 });

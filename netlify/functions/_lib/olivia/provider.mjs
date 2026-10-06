@@ -63,14 +63,21 @@ export async function openaiRequest(
     return completed;
   }
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok)
-    throw oliviaError(
+  if (!response.ok) {
+    const error = oliviaError(
       response.status === 429 ? "openai-rate-limit" : "openai-error",
       response.status === 429
         ? "El servicio de IA alcanzó su límite temporal. Intentá más tarde."
         : "El servicio de IA no pudo procesar esta solicitud. Podés continuar manualmente.",
       response.status === 429 ? 429 : 502,
     );
+    error.providerStatus = response.status;
+    // Keep only public diagnostic categories; never propagate provider payloads,
+    // messages, credential values or headers to user error reports.
+    const knownCodes = ["invalid_api_key", "insufficient_quota", "rate_limit_exceeded", "model_not_found", "unsupported_parameter", "invalid_value", "invalid_request_error", "context_length_exceeded", "server_error"];
+    if (knownCodes.includes(payload.error?.code)) error.providerErrorCode = payload.error.code;
+    throw error;
+  }
   return payload;
 }
 export function providerUsage(payload, model) {

@@ -103,7 +103,7 @@ export function createConversationStorage({ store, clock, configuration, state }
         );
       if (userId === session.uid && !canAccessAdministration(session.profile)) {
         await verifyLegacyConversationScope(session, c, store);
-        if ((c.roleBinding && c.roleBinding !== normalizedRole(session.profile)) || (c.permissionScope && c.permissionScope !== permissionScope(session))) throw oliviaError("permission-scope-changed", "El historial corresponde a otros permisos. Iniciá un nuevo chat.", 409);
+        if ((c.roleBinding && c.roleBinding !== normalizedRole(session.profile)) || (c.permissionScope && !compatiblePermissionScope(session, c.permissionScope))) throw oliviaError("permission-scope-changed", "El historial corresponde a otros permisos. Iniciá un nuevo chat.", 409);
       }
       let after = null;
       if (body.messagesCursor) {
@@ -153,7 +153,7 @@ export function createConversationStorage({ store, clock, configuration, state }
     return {
       conversationsCursor: conversationRows.length > 20 ? { id: lastConversation.id, updatedAt: new Date(lastConversation.updatedAt).toISOString() } : null,
       conversations: conversations
-        .filter((c) => dateMs(c.expiresAt) > now.getTime() && (canAccessAdministration(session.profile) || ((!c.roleBinding || c.roleBinding === normalizedRole(session.profile)) && (!c.permissionScope || c.permissionScope === permissionScope(session)))))
+        .filter((c) => dateMs(c.expiresAt) > now.getTime() && (canAccessAdministration(session.profile) || ((!c.roleBinding || c.roleBinding === normalizedRole(session.profile)) && (!c.permissionScope || compatiblePermissionScope(session, c.permissionScope)))))
         .map((c) => ({
           id: c.id,
           userId,
@@ -192,7 +192,7 @@ export function createConversationStorage({ store, clock, configuration, state }
       const record = await tx.getDocument(`oliviaConversations/${id}`), c = record?.data;
       if (!c || c.userId !== session.uid || dateMs(c.expiresAt) <= now.getTime())
         throw oliviaError("conversation-not-found", "No se encontró este chat o venció.", 404);
-      if ((c.roleBinding && c.roleBinding !== normalizedRole(session.profile)) || (c.permissionScope && c.permissionScope !== permissionScope(session))) throw oliviaError("permission-scope-changed", "El chat corresponde a otros permisos. Iniciá uno nuevo.", 409);
+      if ((c.roleBinding && c.roleBinding !== normalizedRole(session.profile)) || (c.permissionScope && !compatiblePermissionScope(session, c.permissionScope))) throw oliviaError("permission-scope-changed", "El chat corresponde a otros permisos. Iniciá uno nuevo.", 409);
       if (c.busyUntil && dateMs(c.busyUntil) > now.getTime())
         throw oliviaError("conversation-busy", "Este chat todavía está procesando una solicitud.", 409);
       if (c.sessionBinding === sessionBinding(session)) return;
