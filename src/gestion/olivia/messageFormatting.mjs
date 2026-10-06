@@ -1,27 +1,43 @@
-// A small text grammar. HTML and code stay literal; links allow HTTP(S) only.
-export function oliviaMessageBlocks(content = "") {
-  const blocks = [];
-  for (const line of String(content).split(/\r?\n/)) {
-    if (!line.trim()) { blocks.push({ type: "break" }); continue; }
-    const bullet = /^\s*(?:[-*•]\s+|\d+[.)]\s+)(.+)$/.exec(line);
-    if (bullet) {
-      const type = /^\s*\d/.test(line) ? "ordered" : "list";
-      if (blocks.at(-1)?.type === type) blocks.at(-1).items.push(bullet[1]);
-      else blocks.push({ type, items: [bullet[1]] });
-    } else if (blocks.at(-1)?.type === "paragraph") blocks.at(-1).text += `\n${line}`;
-    else blocks.push({ type: "paragraph", text: line });
-  }
-  return blocks.filter((block) => block.type !== "break");
+import { createElement } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+export function oliviaSafeLink(value) {
+  try {
+    const url = new URL(value);
+    if (["https:", "http:"].includes(url.protocol) && !url.username && !url.password) return url.href;
+  } catch { /* Unverified destinations render as text. */ }
+  return "";
 }
 
-export function oliviaInlineParts(text = "") {
-  return String(text).split(/(\*\*[^*\n]+\*\*|\[[^\]\n]+\]\(https?:\/\/[^\s)]+\))/g).filter(Boolean).map((part) => {
-    if (part.startsWith("**") && part.endsWith("**")) return { strong: true, text: part.slice(2, -2) };
-    const match = /^\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)$/.exec(part);
-    if (match) try {
-      const url = new URL(match[2]);
-      if (!url.username && !url.password) return { strong: false, text: match[1], href: url.href };
-    } catch { /* Invalid links remain text. */ }
-    return { strong: false, text: part };
-  });
+const literal = text => text.replace(/([\\`*_{}\[\]<>#|~])/g, "\\$1");
+
+// Present known operational replies without changing the saved transcript
+// or interpreting product names as markup.
+export function oliviaDisplayMarkdown(value) {
+  const text = String(value || "");
+  const missing = /^Para completar la lista falta (.+)\. No se creó ni cargó nada todavía\.$/.exec(text);
+  if (missing) return `### Datos que faltan\n\n${missing[1].split("; ").map(item => `- ${literal(item)}`).join("\n")}\n\nNo se creó ni cargó nada todavía.`;
+  const lines = text.split(/\r?\n/);
+  if (lines[0].startsWith("Ingresar mercadería en ") && lines.some(line => /^(Crear|Reutilizar) .+ · /.test(line))) {
+    return `### Ingreso de mercadería\n\n${literal(lines[0])}\n\n### Productos\n\n${lines.slice(1).map(line => {
+      const product = /^(Crear|Reutilizar) (.+?) · (.+)$/.exec(line);
+      return product ? `- **${literal(`${product[1]} ${product[2]}`)}** · ${literal(product[3])}` : `\n${literal(line)}`;
+    }).join("\n")}`;
+  }
+  return text;
+}
+
+const components = {
+  a: ({ href, children }) => href ? createElement("a", { href, target: "_blank", rel: "noopener noreferrer" }, children) : createElement("span", null, children),
+  // Attachments have their own UI; markdown images do not fetch remote content.
+  img: ({ alt }) => createElement("span", null, alt || "Imagen"),
+  table: ({ children }) => createElement("div", { className: "fm-olivia-table-scroll", role: "region", "aria-label": "Tabla de la respuesta", tabIndex: 0 }, createElement("table", null, children)),
+};
+
+export function OliviaRichText({ content }) {
+  const markdown = oliviaDisplayMarkdown(content);
+  return createElement("div", { className: "fm-olivia-rich-text" }, createElement(Markdown, {
+    remarkPlugins: [remarkGfm], skipHtml: true, urlTransform: markdown === String(content || "") ? oliviaSafeLink : () => "", components,
+  }, markdown));
 }

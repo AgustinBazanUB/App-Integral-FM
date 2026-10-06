@@ -6,7 +6,7 @@ import { salesMetrics, readSales, metricsForModel } from "../netlify/functions/_
 import { capabilityAllowed, selectCapabilities } from "../src/shared/oliviaCapabilities.mjs";
 import { providerUsage } from "../netlify/functions/_lib/olivia/provider.mjs";
 import { costForUsage } from "../src/shared/oliviaContracts.mjs";
-import { oliviaInlineParts } from "../src/gestion/olivia/messageFormatting.mjs";
+import { oliviaSafeLink } from "../src/gestion/olivia/messageFormatting.mjs";
 
 const historyArgs = { startDate: null, endDate: null, locationId: null, productId: null, sellerId: null };
 const citation = { type: "url_citation", url: "https://example.org/formula", title: "Fórmula" };
@@ -122,6 +122,6 @@ test("search pricing includes only search actions and keeps unknown nested usage
   const usage = providerUsage(payload, "gpt-6-luna");
   assert.equal(costForUsage(usage, config).actualCostUsd, 0.010009);
   assert.equal(costForUsage({ modelCalls: [usage, { model: "gpt-6-luna", measurement: "unconfirmed" }] }, config).actualCostUsd, null);
-  assert.deepEqual(oliviaInlineParts("[Fuente](https://example.org/formula)"), [{ strong: false, text: "Fuente", href: "https://example.org/formula" }]);
-  assert.equal(oliviaInlineParts("[Clave](https://user:pass@example.org)")[0].href, undefined);
+  assert.equal(oliviaSafeLink("https://example.org/formula"), "https://example.org/formula");
+  assert.equal(oliviaSafeLink("https://user:pass@example.org"), "");
 });
