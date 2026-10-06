@@ -42,10 +42,21 @@ inventario, integración fiscal y la política vigente de stock negativo.
 - Enter sobre un botón activa ese botón. NumpadEnter conserva el atajo de venta.
 - Se quitó `cursor: not-allowed` de los estilos de toda la aplicación. Los
   controles ajenos al vendedor conservan sus validaciones y estados actuales.
+- La validación completa en GitHub detectó ocho fallas que también existían en
+  el main anterior (`37476203478`): reglas de ventas, clientes y WhatsApp
+  superaban el límite de 1.000 expresiones y rechazaban operaciones autorizadas.
+  Se reemplazó la cadena de alias por una consulta de tabla, se reutiliza el
+  perfil y rol dentro de cada comprobación de permisos y la acción de lectura
+  evita evaluar las ramas de escritura. La corrida `37500226668` aprobó las
+  127 pruebas de reglas, incluidas las ocho que fallaban en la base.
 
 El stock cero o negativo **no bloquea** la venta presencial: se mantiene la
 advertencia existente, el movimiento de stock y su registro de auditoría.
-No se modificaron permisos ni reglas de Firestore.
+Los permisos y restricciones se conservan. La optimización de las reglas necesita
+un despliegue de Firestore además de la publicación de la web en Netlify; el
+Deploy Preview sólo publica la web. No se desplegaron reglas en producción
+durante esta revisión. El fallo de reglas se comprobó en emulador, sin afirmar
+que la versión actualmente desplegada de Firestore sea idéntica al repositorio.
 
 ## Códigos para informar problemas
 
@@ -73,6 +84,9 @@ hace falta enviar teléfonos de clientes ni credenciales.
 - `npm test`: 530 pruebas aprobadas, ninguna fallida.
 - `npm run build`: aprobado; persiste la advertencia previa de chunks mayores
   a 500 kB, ajena a este cambio.
+- CI completa: pruebas generales, emulador de Firestore, build y controles ARCA
+  aprobados tras corregir el límite de evaluación. Se agregó además cobertura de
+  alias, permisos explícitos, ubicaciones ajenas, roles desconocidos e inactivos.
 - Pruebas de regresión del dominio y handler real: medios de pago, permisos,
   productos retirados, doble click, error posterior al guardado, cola offline y
   teclado. Servicios sustituidos por adaptadores locales.

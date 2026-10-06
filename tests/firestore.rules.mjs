@@ -20,6 +20,30 @@ import {
 
 let environment;
 
+test("los alias y permisos explícitos conservan el alcance de ubicación; desconocidos e inactivos siguen denegados", async () => {
+  const cases = [
+    { role: "administrator", own: true, other: true },
+    { role: "administrador", own: true, other: true },
+    { role: "administrador_general", own: true, other: true },
+    { role: "encargado_ubicacion", own: true, other: false },
+    { role: "responsable_marketing", own: false, other: false },
+    { role: "unknown", own: false, other: false },
+    { role: "unknown", permissions: { locations: ["view"] }, own: true, other: false },
+    { role: "unknown", permissions: { locations: { view: true } }, own: true, other: false },
+    { role: "administrador", active: false, own: false, other: false },
+  ];
+  await environment.withSecurityRulesDisabled(async context => {
+    for (const [index, entry] of cases.entries()) await setDoc(doc(context.firestore(), "users", `role-context-${index}`), {
+      role: entry.role, active: entry.active !== false, allowedLocationIds: ["loc-1"], ...(entry.permissions ? { permissions: entry.permissions } : {}),
+    });
+  });
+  for (const [index, entry] of cases.entries()) {
+    const database = environment.authenticatedContext(`role-context-${index}`).firestore();
+    await (entry.own ? assertSucceeds : assertFails)(getDoc(doc(database, "locations", "loc-1")));
+    await (entry.other ? assertSucceeds : assertFails)(getDoc(doc(database, "locations", "loc-2")));
+  }
+});
+
 before(async () => {
   environment = await initializeTestEnvironment({
     projectId: "demo-flor-mia-integral",
