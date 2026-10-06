@@ -32,7 +32,7 @@ function normalizedDiscount(discount, index) {
   };
 }
 
-export function calculateDiscountSummary(discounts, subtotal) {
+export function calculateDiscountSummary(discounts, subtotal, { paymentMethod, roundCashTotal = false } = {}) {
   const totalBeforeDiscounts = Number(subtotal);
   if (!Number.isFinite(totalBeforeDiscounts) || totalBeforeDiscounts < 0) {
     throw new Error("El subtotal no es válido");
@@ -66,11 +66,17 @@ export function calculateDiscountSummary(discounts, subtotal) {
     };
   });
 
-  const discountTotal = fixedDiscountTotal + percentageDiscountTotal;
+  const appliedDiscountTotal = fixedDiscountTotal + percentageDiscountTotal;
+  const cashRoundingDiscountTotal = roundCashTotal && paymentMethod === "cash" && appliedDiscountTotal > 0
+    ? remainingTotal - Math.floor(remainingTotal / 1000) * 1000
+    : 0;
+  const discountTotal = appliedDiscountTotal + cashRoundingDiscountTotal;
   return {
     discounts: cleaned,
     fixedDiscountTotal,
     percentageDiscountTotal,
+    cashRoundingEnabled: roundCashTotal,
+    cashRoundingDiscountTotal,
     discountTotal,
     totalBeforeDiscounts,
     total: Math.max(0, totalBeforeDiscounts - discountTotal),
@@ -88,7 +94,7 @@ export function storedDiscountTotal(sale) {
   return saleDiscountList(sale).reduce(
     (sum, discount) => sum + Math.max(0, Number(discount.amountApplied || 0)),
     0,
-  );
+  ) + Math.max(0, Number(sale?.cashRoundingDiscountTotal || 0));
 }
 
 export function storedDiscountTotals(sale) {
@@ -108,6 +114,7 @@ export function storedDiscountTotals(sale) {
   return {
     fixedDiscountTotal,
     percentageDiscountTotal,
-    discountTotal: fixedDiscountTotal + percentageDiscountTotal,
+    cashRoundingDiscountTotal: Math.max(0, Number(sale?.cashRoundingDiscountTotal || 0)),
+    discountTotal: fixedDiscountTotal + percentageDiscountTotal + Math.max(0, Number(sale?.cashRoundingDiscountTotal || 0)),
   };
 }

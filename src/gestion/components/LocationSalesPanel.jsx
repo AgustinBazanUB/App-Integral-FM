@@ -400,6 +400,7 @@ export default function LocationSalesPanel({ profile, location, products = [] })
               <div><span>Subtotal</span><strong>{formatMoney(detail.subtotal ?? detail.totalBeforeDiscounts ?? detail.total)}</strong></div>
               <div><span>Descuentos fijos</span><strong>− {formatMoney(detailDiscountTotals.fixedDiscountTotal)}</strong></div>
               <div><span>Descuentos porcentuales</span><strong>− {formatMoney(detailDiscountTotals.percentageDiscountTotal)}</strong></div>
+              {detailDiscountTotals.cashRoundingDiscountTotal > 0 ? <div><span>Redondeo por efectivo</span><strong>− {formatMoney(detailDiscountTotals.cashRoundingDiscountTotal)}</strong></div> : null}
               <div><span>Total descuentos</span><strong>− {formatMoney(detailDiscountTotals.discountTotal)}</strong></div>
               <div className="is-grand"><span>Total final</span><strong>{formatMoney(detail.total)}</strong></div>
             </section>

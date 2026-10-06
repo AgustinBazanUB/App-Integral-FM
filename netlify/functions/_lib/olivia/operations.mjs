@@ -186,7 +186,7 @@ export async function saleContext({ session, args, store, now }) {
     }
   }
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountSummary = calculateDiscountSummary(discounts, subtotal);
+  const discountSummary = calculateDiscountSummary(discounts, subtotal, { paymentMethod: args.paymentMethod, roundCashTotal: canAccessAdministration(profile) });
   if (
     args.paymentMethod === "multiple" &&
     !can(profile, "quick-sales", "useMultiplePayments")
@@ -401,7 +401,7 @@ export async function prepareOperation({
       currency: "ARS",
       maximumFractionDigits: 0,
     });
-    const summary = `Registrar venta en ${context.location.name}: ${context.items.map((item) => `${item.qty} × ${item.name} a ${money.format(item.unitPrice)}`).join("; ")}. Total ${money.format(context.discountSummary.total)}. Pago: ${PAYMENT_LABELS[canonicalArgs.paymentMethod]}${canonicalArgs.payments.length ? ` (${canonicalArgs.payments.map((part) => `${PAYMENT_LABELS[part.method]} ${money.format(part.amount)}`).join(" + ")})` : ""}. ${context.discountSummary.discounts.length ? `Descuentos: ${context.discountSummary.discounts.map((d) => `${d.name} (${d.type === "percent" ? `${d.value}%` : money.format(d.value)})`).join(", ")}.` : "Sin descuentos."} ${context.customer ? `Cliente: ${context.customer.name || "sin nombre"} (${context.customer.phone}).` : "Sin asociar cliente."} Sin ticket fiscal.${
+    const summary = `Registrar venta en ${context.location.name}: ${context.items.map((item) => `${item.qty} × ${item.name} a ${money.format(item.unitPrice)}`).join("; ")}. Total ${money.format(context.discountSummary.total)}. Pago: ${PAYMENT_LABELS[canonicalArgs.paymentMethod]}${canonicalArgs.payments.length ? ` (${canonicalArgs.payments.map((part) => `${PAYMENT_LABELS[part.method]} ${money.format(part.amount)}`).join(" + ")})` : ""}. ${context.discountSummary.discounts.length ? `Descuentos: ${context.discountSummary.discounts.map((d) => `${d.name} (${d.type === "percent" ? `${d.value}%` : money.format(d.value)})`).join(", ")}.` : "Sin descuentos."} ${context.discountSummary.cashRoundingDiscountTotal > 0 ? `Redondeo por efectivo: − ${money.format(context.discountSummary.cashRoundingDiscountTotal)} (incluido en el total). ` : ""}${context.customer ? `Cliente: ${context.customer.name || "sin nombre"} (${context.customer.phone}).` : "Sin asociar cliente."} Sin ticket fiscal.${
       stockWarnings.length
         ? ` Atención: queda stock negativo en ${stockWarnings
             .map((item) => {

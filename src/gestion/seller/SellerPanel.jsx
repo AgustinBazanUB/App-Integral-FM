@@ -359,8 +359,8 @@ export default function SellerPanel() {
     .map((discount) => ({ ...discount, discountId: discount.id, source: "saved" }));
   const appliedDiscounts = [...savedDiscounts, ...manualDiscounts];
   const summary = useMemo(
-    () => calculateDiscountSummary(appliedDiscounts, subtotal),
-    [appliedDiscounts, subtotal],
+    () => calculateDiscountSummary(appliedDiscounts, subtotal, { paymentMethod, roundCashTotal: editSale?.sourceType === "admin_quick_sale" || editSale?.cashRoundingEnabled === true }),
+    [appliedDiscounts, subtotal, paymentMethod, editSale?.sourceType, editSale?.cashRoundingEnabled],
   );
   const stockDiscrepancies = saleStockDiscrepancies(currentItems);
   const discountAllowed = can(profile, "quick-sales", "useDiscounts");
@@ -800,6 +800,7 @@ export default function SellerPanel() {
             <div className="fm-seller-section-head"><strong>Descuentos</strong><button type="button" onClick={() => { if (!discountAllowed) { setSubmitState({ busy: false, tone: "error", message: sellerProblem("DESCUENTO-PERMISO", "Tu usuario no puede aplicar descuentos. Pedile permiso al administrador.") }); return; } setSuggestedDiscountId(""); setDiscountOpen(true); }}><Icon name="Percent" />Agregar descuento</button></div>
             {summary.discounts.length ? summary.discounts.map((discount, index) => <div key={`${discount.discountId}-${discount.type}-${discount.value}-${index}`} className="fm-seller-applied-discount"><span><strong>{discount.name}</strong><small>{discount.type === "percent" ? `${discount.value} %` : "Monto fijo"}</small></span><strong>− {formatMoney(discount.amountApplied)}</strong><button type="button" aria-label={`Quitar ${discount.name}`} onClick={() => removeDiscount(discount)}><Icon name="X" /></button></div>) : <span className="fm-seller-no-discount">Sin descuentos aplicados</span>}
             {summary.discounts.length ? <div className="fm-seller-discount-total"><span>Total descuentos</span><strong>− {formatMoney(summary.discountTotal)}</strong></div> : null}
+            {summary.cashRoundingDiscountTotal > 0 ? <div className="fm-seller-discount-total"><span>Incluye redondeo por efectivo</span><strong>− {formatMoney(summary.cashRoundingDiscountTotal)}</strong></div> : null}
           </div>
 
           <div className="fm-seller-totals"><div><span>Subtotal</span><strong>{formatMoney(subtotal)}</strong></div><div className="is-grand"><span>Total final</span><strong>{formatMoney(summary.total)}</strong></div></div>

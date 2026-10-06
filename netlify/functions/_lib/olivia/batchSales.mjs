@@ -80,6 +80,7 @@ export async function batchSalesPlan({ session, args, store, now, entityId, corr
       ...context.items.map(item => `- ${item.qty} × ${md(item.name)} · ${money(item.unitPrice)}`),
       `- Total: **${money(plan.result.total)}** · Pago: ${md(plan.result.paymentMethodLabel)}${row.payments.length ? " (" + row.payments.map(payment => `${payment.method}: ${money(payment.amount)}`).join(" + ") + ")" : ""}`,
       `- ${context.discountSummary.discounts.length ? "Descuentos: " + context.discountSummary.discounts.map(discount => `${md(discount.name)} ${discount.type === "percent" ? discount.value + "%" : money(discount.value)}`).join(", ") : "Sin descuentos"} · ${context.customer ? "Cliente: " + md(context.customer.name || context.customer.phone) : "Sin cliente"} · Sin ticket fiscal`);
+    if (context.discountSummary.cashRoundingDiscountTotal > 0) summary.push(`- Redondeo por efectivo: − ${money(context.discountSummary.cashRoundingDiscountTotal)} (incluido en el total).`);
     if (plan.stockWrites.some(line => line.stockData.currentStock < 0)) summary.push("- **Atención:** el stock local quedará negativo; el faltante queda auditado.");
   }
   summary.push(`\n**Total de la lista: ${money(total)}.**\nSe registran todas juntas únicamente al tocar Sí.`);

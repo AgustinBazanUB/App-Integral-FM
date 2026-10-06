@@ -440,6 +440,18 @@ const batchRow = (extra = {}) => {
   return { reference: "Pedido 1", stockOrigin: { type: "location", id: locationId }, channel: "in_person", ...sale, ...extra };
 };
 const prepareBatch = (f, sales) => prepareExtendedOperation({ session: f.session, store: f.store, args: { sales }, toolName: "prepare_batch_sales", now });
+test("Olivia rounds administrative cash discounts in single and batch proposals with matching commits", async () => {
+  const f = fixture("admin"), promotion = { promotionDecision: "apply", discounts: [{ discountId: "promo_a", source: "saved", name: null, type: null, value: null }] };
+  const single = await prepare(f, argsFor(promotion));
+  assert.match(single.summary, /Redondeo por efectivo/);
+  const singleResult = await execute(f, single), singleSale = singleResult.writes.find(write => write.path.startsWith("sales/"));
+  assert.equal(singleSale.data.total, 2000); assert.equal(singleSale.data.cashRoundingDiscountTotal, 700);
+  const batch = await prepareBatch(f, [batchRow(promotion), batchRow({ ...promotion, paymentMethod: "alias" })]);
+  assert.match(batch.summary, /Redondeo por efectivo/);
+  const batchResult = await execute(f, batch), sales = batchResult.writes.filter(write => write.path.startsWith("sales/"));
+  assert.deepEqual(sales.map(write => write.data.total), [2000, 2700]);
+  assert.equal(sales[0].data.discountTotal, 1000); assert.equal(sales[1].data.cashRoundingDiscountTotal, undefined);
+});
 test("batch sale prepares without writes and shares counters and cumulative stock atomically", async () => {
   const f = fixture(), before = clone([...f.documents]);
   const prepared = await prepareBatch(f, [batchRow({ items: [{ productId: "product_a", qty: 1 }] }), batchRow()]);

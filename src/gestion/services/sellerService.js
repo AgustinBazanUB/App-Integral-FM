@@ -340,7 +340,7 @@ async function createSale({
   const saleItems = cleanSaleItems(items);
   const safeDiscounts = await verifiedDiscounts({ profile, location: stockType === "warehouse" ? {} : permittedLocation, discounts, items: saleItems });
   const subtotal = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal);
+  const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal, { paymentMethod, roundCashTotal: administrative });
   const payment = normalizePayment(paymentMethod, paymentMethodLabel, payments, discountSummary.total);
   if (paymentMethod === "multiple" && !can(profile, "quick-sales", "useMultiplePayments")) throw saleValidationError("No tenés permiso para combinar pagos.");
   const preparedCustomer = await prepareSaleCustomer(customer);
@@ -468,7 +468,7 @@ export async function updateSellerSale({
   const newItems = cleanSaleItems(items);
   const safeDiscounts = await verifiedDiscounts({ profile, location, discounts, items: newItems });
   const subtotal = newItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal);
+  const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal, { paymentMethod, roundCashTotal: original.sourceType === "admin_quick_sale" || original.cashRoundingEnabled === true });
   const payment = normalizePayment(paymentMethod, paymentMethodLabel, payments, discountSummary.total);
   const nextTicketRequested = ticketRequested == null ? original.ticketRequested === true : Boolean(ticketRequested);
   if (nextTicketRequested && !can(profile, "quick-sales", "requestTicket")) {
@@ -556,6 +556,8 @@ export async function updateSellerSale({
       discount: null,
       fixedDiscountTotal: discountSummary.fixedDiscountTotal,
       percentageDiscountTotal: discountSummary.percentageDiscountTotal,
+      cashRoundingDiscountTotal: discountSummary.cashRoundingDiscountTotal,
+      ...(discountSummary.cashRoundingEnabled ? { cashRoundingEnabled: true } : {}),
       discountTotal: discountSummary.discountTotal,
       totalBeforeDiscounts: discountSummary.totalBeforeDiscounts,
       ...payment,

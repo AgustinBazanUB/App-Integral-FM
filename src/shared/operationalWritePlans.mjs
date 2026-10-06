@@ -77,6 +77,8 @@ export function buildOperationalSalePlan({ profile, location, items, stocks, cou
     locationPrefix: prefix, sellerId: profile.id, sellerName: userName(profile), createdBy: profile.id, createdByName: userName(profile), items,
     ...(stockDiscrepancies.length ? { stockDiscrepancies } : {}),
     discounts: discountSummary.discounts, discount: null, fixedDiscountTotal: discountSummary.fixedDiscountTotal, percentageDiscountTotal: discountSummary.percentageDiscountTotal, discountTotal: discountSummary.discountTotal, totalBeforeDiscounts: discountSummary.totalBeforeDiscounts,
+    ...(discountSummary.cashRoundingDiscountTotal > 0 ? { cashRoundingDiscountTotal: discountSummary.cashRoundingDiscountTotal } : {}),
+    ...(discountSummary.cashRoundingEnabled ? { cashRoundingEnabled: true } : {}),
     ...payment, ...customerSaleSnapshot(customer), subtotal, totalItems: items.reduce((sum, item) => sum + item.qty, 0), total: discountSummary.total,
     status: "active", sourceChannel: administrative ? channel : "in_person", ticketRequested: Boolean(ticketRequested), ticketStatus, ...localFields,
     ...(offlineSale ? { offlineLocalId: offlineSale.localId, createdOffline: true, createdLocallyAt: new Date(offlineSale.createdLocallyAt).toISOString(), syncedAt: stamp } : {}),
