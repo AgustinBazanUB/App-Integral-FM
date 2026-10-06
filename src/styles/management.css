@@ -158,7 +158,7 @@
 .fm-product-picker article span { color: var(--fm-text-muted); font-size: 10px; }
 .fm-quantity-control { display: flex; align-items: center; gap: 6px; flex: none; }
 .fm-quantity-control button { width: 36px; height: 36px; border: 1px solid var(--fm-border); border-radius: 9px; background: #fff; color: var(--fm-text-accent); cursor: pointer; font-size: 20px; }
-.fm-quantity-control button:disabled { cursor: not-allowed; color: var(--fm-text-subtle); }
+.fm-quantity-control button:disabled { cursor: default; color: var(--fm-text-subtle); }
 .fm-quantity-control output { min-width: 24px; color: var(--fm-text) !important; font-size: 14px !important; font-weight: 700; text-align: center; }
 .fm-cart-summary { margin-bottom: 16px; border: 1px solid var(--fm-border); border-radius: 12px; background: var(--fm-surface-cream); padding: 14px; }
 .fm-cart-summary ul { display: grid; gap: 7px; margin: 0 0 12px; padding: 0; list-style: none; }

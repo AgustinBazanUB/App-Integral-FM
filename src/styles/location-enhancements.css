@@ -3,7 +3,7 @@
 .fm-location-card footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .fm-location-card footer .fm-button,
 .fm-location-pin-action { min-height: 44px; }
-.fm-location-stock-shortcut.is-disabled { cursor: not-allowed; opacity: .58; }
+.fm-location-stock-shortcut.is-disabled { cursor: default; opacity: .58; }
 .fm-location-pin-action { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--fm-border); border-radius: var(--fm-radius-control); background: #fff; padding: 0 13px; color: #76510f; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .fm-location-pin-action:hover { border-color: #b88a2d; background: var(--fm-gold-pale); }
 .fm-location-pin-action:focus-visible { outline: 3px solid rgb(184 138 45 / 35%); outline-offset: 2px; }
@@ -43,7 +43,7 @@
 .fm-product-scope legend { padding: 0 6px; color: #2f2924; font-weight: 750; }
 .fm-product-scope label { display: flex; min-height: 58px; align-items: flex-start; gap: 10px; border: 1px solid var(--fm-border-subtle); border-radius: 10px; padding: 10px; cursor: pointer; }
 .fm-product-scope label:has(input:checked) { border-color: #b88a2d; background: #fbf2dc; }
-.fm-product-scope label.is-disabled { cursor: not-allowed; opacity: .58; }
+.fm-product-scope label.is-disabled { cursor: default; opacity: .58; }
 .fm-product-scope input { width: 18px; height: 18px; margin-top: 2px; }
 .fm-product-scope span { display: grid; gap: 2px; }
 .fm-product-scope small { color: var(--fm-text-muted); }

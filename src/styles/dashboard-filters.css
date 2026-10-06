@@ -45,7 +45,7 @@
 .fm-dashboard-year-grid button:hover:not(:disabled),
 .fm-dashboard-month-grid button:hover:not(:disabled) { border-color: #b88a2d; background: #f7f1e8; }
 .fm-dashboard-calendar button.is-selected { border-color: #9d721d; background: #f3e8cf; color: #5e430f; box-shadow: inset 0 0 0 1px #cda852; }
-.fm-dashboard-calendar button:disabled { cursor: not-allowed; opacity: .42; }
+.fm-dashboard-calendar button:disabled { cursor: default; opacity: .42; }
 .fm-dashboard-weekdays,
 .fm-dashboard-day-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
 .fm-dashboard-weekdays { margin-bottom: 6px; }

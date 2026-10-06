@@ -89,7 +89,8 @@ export function useSellerLocationStock(profile, locationId) {
     let disposed = false;
     let unsubscribe = null;
     let hydration = 0;
-    setState((current) => ({ ...current, status: current.data?.length ? "ready" : "loading", error: null }));
+    // Al cambiar de ubicación nunca mostramos ni vendemos el stock de la anterior.
+    setState({ status: "loading", data: [], error: null });
 
     const refreshHydratedStock = async () => {
       const currentHydration = ++hydration;
@@ -228,6 +229,9 @@ export function useSellerKeyboard({
         isEditableTarget(event.target) ||
         document.querySelector(".fm-overlay")
       ) return;
+      // Enter sobre un botón activa ese botón; no debe guardar otra acción.
+      // NumpadEnter conserva el atajo explícito de la botonera para continuar.
+      if (event.key === "Enter" && event.code !== "NumpadEnter" && event.target?.closest?.("button, a, [role='button']")) return;
       if (event.code === "NumpadEnter" || event.key === "Enter") {
         event.preventDefault();
         current.onContinue?.();

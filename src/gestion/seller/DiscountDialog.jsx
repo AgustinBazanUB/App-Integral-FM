@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Modal } from "../../design-system";
 import { formatMoney } from "../formatters";
 import { Icon } from "../components/icons";
@@ -11,51 +11,60 @@ function discountValue(discount) {
 
 export default function DiscountDialog({
   open,
-  availableDiscounts,
-  selectedDiscountIds,
+  availableDiscounts = [],
+  selectedDiscountIds = [],
+  initialManualDiscounts = [],
+  suggestedDiscountId = "",
   manualAllowed,
   onClose,
-  onSelectSaved,
-  onAddManual,
+  onApply,
 }) {
+  const [draftIds, setDraftIds] = useState([]);
+  const [draftManual, setDraftManual] = useState([]);
   const [manualType, setManualType] = useState("fixed");
   const [manualValue, setManualValue] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
+    setDraftIds([...new Set([...selectedDiscountIds, ...(suggestedDiscountId ? [suggestedDiscountId] : [])])]);
+    setDraftManual([...initialManualDiscounts]);
     setManualType("fixed");
     setManualValue("");
     setError("");
   }, [open]);
 
   const parsedValue = Number(manualValue);
-  const manualValid = useMemo(() => {
-    if (!Number.isInteger(parsedValue) || parsedValue <= 0) return false;
-    if (manualType === "percent" && parsedValue > 100) return false;
-    return true;
-  }, [manualType, parsedValue]);
+  const manualValid = Number.isInteger(parsedValue) && parsedValue > 0 && (manualType !== "percent" || parsedValue <= 100);
 
-  const applyManual = () => {
-    if (!manualAllowed) {
-      setError("Tu perfil no tiene permiso para aplicar descuentos manuales.");
+  const apply = () => {
+    if (draftIds.some(id => !availableDiscounts.some(discount => discount.id === id))) {
+      setError("[DESCUENTO-NO-DISPONIBLE] Uno de los descuentos elegidos dejó de estar disponible. Volvé a abrir este panel para revisar las opciones.");
       return;
     }
-    if (!manualValid) {
+    const hasManualValue = manualValue !== "";
+    if (hasManualValue && !manualAllowed) {
+      setError("[DESCUENTO-MANUAL-PERMISO] Tu perfil no tiene permiso para aplicar descuentos manuales.");
+      return;
+    }
+    if (hasManualValue && !manualValid) {
       setError(manualType === "percent"
-        ? "Ingresá un porcentaje entero entre 1 y 100."
-        : "Ingresá un monto entero mayor a cero.");
+        ? "[DESCUENTO-PORCENTAJE] Ingresá un porcentaje entero entre 1 y 100."
+        : "[DESCUENTO-MONTO] Ingresá un monto entero mayor a cero.");
       return;
     }
-    onAddManual({
+    if (!draftIds.length && !draftManual.length && !hasManualValue && !selectedDiscountIds.length && !initialManualDiscounts.length) {
+      setError("[DESCUENTO-FALTANTE] Elegí un descuento de la lista o ingresá un valor manual antes de confirmar.");
+      return;
+    }
+    const manual = hasManualValue ? [...draftManual, {
       discountId: "manual",
       name: manualType === "percent" ? `Descuento manual · ${parsedValue} %` : "Descuento manual",
       type: manualType,
       value: parsedValue,
       source: "manual",
-    });
-    setManualValue("");
-    setError("");
+    }] : draftManual;
+    onApply({ savedIds: draftIds, manual });
   };
 
   return (
@@ -63,7 +72,7 @@ export default function DiscountDialog({
       open={open}
       onClose={onClose}
       title="Agregar descuento"
-      description="Elegí un descuento habilitado o cargá uno manual."
+      description="Seleccioná los descuentos y confirmá abajo. El total cambia recién al confirmar."
       className="fm-seller-discount-modal"
     >
       <div className="fm-discount-dialog">
@@ -77,18 +86,18 @@ export default function DiscountDialog({
           </div>
           <div className="fm-discount-options">
             {(availableDiscounts || []).map((discount) => {
-              const selected = selectedDiscountIds.includes(discount.id);
+              const selected = draftIds.includes(discount.id);
               return (
                 <button
                   key={discount.id}
                   type="button"
                   className={selected ? "is-selected" : ""}
                   aria-pressed={selected}
-                  onClick={() => onSelectSaved(discount)}
+                  onClick={() => { setDraftIds(ids => ids.includes(discount.id) ? ids.filter(id => id !== discount.id) : [...ids, discount.id]); setError(""); }}
                 >
                   <span>{discount.name}</span>
                   <strong>{discountValue(discount)}</strong>
-                  <small>{selected ? "Aplicado" : discount.type === "percent" ? "Porcentaje" : "Monto fijo"}</small>
+                  <small>{selected ? "Seleccionado · falta confirmar" : discount.type === "percent" ? "Porcentaje" : "Monto fijo"}</small>
                 </button>
               );
             })}
@@ -106,8 +115,8 @@ export default function DiscountDialog({
             </div>
           </div>
           <div className="fm-manual-discount__types" role="group" aria-label="Tipo de descuento manual">
-            <button type="button" className={manualType === "fixed" ? "is-selected" : ""} aria-pressed={manualType === "fixed"} disabled={!manualAllowed} onClick={() => { setManualType("fixed"); setError(""); }}>Monto fijo</button>
-            <button type="button" className={manualType === "percent" ? "is-selected" : ""} aria-pressed={manualType === "percent"} disabled={!manualAllowed} onClick={() => { setManualType("percent"); setError(""); }}>Porcentaje</button>
+            <button type="button" className={manualType === "fixed" ? "is-selected" : ""} aria-pressed={manualType === "fixed"} onClick={() => { if (!manualAllowed) { setError("[DESCUENTO-MANUAL-PERMISO] Tu perfil no tiene permiso para aplicar descuentos manuales."); return; } setManualType("fixed"); setError(""); }}>Monto fijo</button>
+            <button type="button" className={manualType === "percent" ? "is-selected" : ""} aria-pressed={manualType === "percent"} onClick={() => { if (!manualAllowed) { setError("[DESCUENTO-MANUAL-PERMISO] Tu perfil no tiene permiso para aplicar descuentos manuales."); return; } setManualType("percent"); setError(""); }}>Porcentaje</button>
           </div>
           <label className="fm-field">
             <span>Valor</span>
@@ -118,7 +127,7 @@ export default function DiscountDialog({
                 max={manualType === "percent" ? "100" : undefined}
                 step="1"
                 inputMode="numeric"
-                disabled={!manualAllowed}
+                readOnly={!manualAllowed}
                 value={manualValue}
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? "seller-manual-discount-error" : undefined}
@@ -128,9 +137,10 @@ export default function DiscountDialog({
               <span aria-hidden="true">{manualType === "percent" ? "%" : "$"}</span>
             </div>
           </label>
-          {error ? <p className="fm-form-error" id="seller-manual-discount-error" role="alert">{error}</p> : null}
-          <Button icon="Percent" disabled={!manualAllowed || !manualValid} onClick={applyManual}>Aplicar descuento</Button>
+          {draftManual.map((discount, index) => <div className="fm-seller-applied-discount" key={index}><span>{discount.name} · {discountValue(discount)}</span><button type="button" aria-label={`Quitar descuento manual ${index + 1}`} onClick={() => setDraftManual(current => current.filter((_, position) => position !== index))}><Icon name="X" /></button></div>)}
         </section>
+        <div className="fm-dialog-actions"><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button icon="Check" onClick={apply}>Confirmar descuentos</Button></div>
+        {error ? <p className="fm-form-error" id="seller-manual-discount-error" role="alert">{error}</p> : null}
       </div>
     </Modal>
   );

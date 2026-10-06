@@ -152,7 +152,7 @@
 }
 
 .fm-product-select-list > label.is-disabled {
-  cursor: not-allowed;
+  cursor: default;
   opacity: .62;
 }
 
