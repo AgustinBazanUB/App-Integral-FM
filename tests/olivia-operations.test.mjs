@@ -1,4 +1,7 @@
 import test from "node:test";
+import { prepareExtendedOperation, executeExtendedOperation } from "../netlify/functions/_lib/olivia/extendedOperations.mjs";
+import { OLIVIA_CAPABILITIES, selectCapabilities } from "../src/shared/oliviaCapabilities.mjs";
+import { validateSchema } from "../src/shared/oliviaContracts.mjs";
 import assert from "node:assert/strict";
 import {
   prepareOperation,
@@ -430,4 +433,79 @@ test("shared stock plan preserves legacy custom price and alert thresholds", () 
   assert.equal(plan.stockData.yellowAlertQty, 4);
   assert.equal(plan.movementData.qty, 3);
   assert.equal(plan.movementData.type, "add");
+});
+
+const batchRow = (extra = {}) => {
+  const { locationId, ...sale } = argsFor();
+  return { reference: "Pedido 1", stockOrigin: { type: "location", id: locationId }, channel: "in_person", ...sale, ...extra };
+};
+const prepareBatch = (f, sales) => prepareExtendedOperation({ session: f.session, store: f.store, args: { sales }, toolName: "prepare_batch_sales", now });
+test("batch sale prepares without writes and shares counters and cumulative stock atomically", async () => {
+  const f = fixture(), before = clone([...f.documents]);
+  const prepared = await prepareBatch(f, [batchRow({ items: [{ productId: "product_a", qty: 1 }] }), batchRow()]);
+  assert.deepEqual([...f.documents], before);
+  assert.match(prepared.summary, /Registrar 2 ventas/);
+  const result = await execute(f, prepared);
+  const stocks = result.writes.filter(write => write.path.includes("locationStock/"));
+  assert.equal(stocks.length, 1); assert.equal(stocks[0].data.currentStock, 1);
+  const movements = result.writes.filter(write => write.path.startsWith("stockMovements/"));
+  assert.deepEqual(movements.map(write => [write.data.previousStock, write.data.newStock]), [[4, 3], [3, 1]]);
+  const sales = result.writes.filter(write => write.path.startsWith("sales/"));
+  assert.deepEqual(sales.map(write => write.data.saleCode), ["FM-LA-20261004-0001", "FM-LA-20261004-0002"]);
+  assert.equal(result.writes.filter(write => write.path.startsWith("counters/")).length, 1);
+  assert.equal(result.writes.find(write => write.path.startsWith("counters/")).data.lastNumber, 2);
+  assert.match(result.result.message, /Se registraron 2 ventas/);
+});
+test("batch sales require each origin, channel and commercial decisions without inventing defaults", async () => {
+  const f = fixture();
+  const prepared = await prepareBatch(f, [batchRow(), batchRow({ channel: null, paymentMethod: null, customerDecision: null, stockOrigin: { type: null, id: null } })]);
+  assert.equal(prepared.state, "DATOS_INCOMPLETOS");
+  assert.ok(prepared.missing.includes("sales.1.channel"));
+  assert.match(prepared.summary, /venta 2: forma de pago/);
+  assert.equal(prepared.writes, undefined);
+});
+test("seller batches cannot use another location, remote channels or warehouse stock", async () => {
+  const f = fixture();
+  for (const row of [batchRow({ stockOrigin: { type: "location", id: "local_b" } }), batchRow({ channel: "whatsapp" }), batchRow({ stockOrigin: { type: "warehouse", id: "warehouse_a" } })])
+    await assert.rejects(prepareBatch(f, [batchRow(), row]), { code: "permission-denied" });
+  assert.equal([...f.documents.keys()].some(path => path.startsWith("sales/")), false);
+});
+test("administrative batches preserve warehouse source, live prices and separate commercial channels", async () => {
+  const f = fixture("admin");
+  f.documents.set("warehouses/warehouse_a", { name: "Depósito", active: true });
+  f.documents.set("warehouseStock/warehouse_a/items/product_a", { currentStock: 3, active: true });
+  const prepared = await prepareBatch(f, [batchRow({ channel: "instagram" }), batchRow({ channel: "whatsapp", stockOrigin: { type: "warehouse", id: "warehouse_a" } })]);
+  const result = await execute(f, prepared), sales = result.writes.filter(write => write.path.startsWith("sales/"));
+  assert.deepEqual(sales.map(write => write.data.sourceChannel), ["instagram", "whatsapp"]);
+  assert.equal(sales[1].data.stockOriginType, "warehouse");
+  assert.equal(sales[1].data.warehouseId, "warehouse_a");
+  assert.equal(sales[1].data.items[0].unitPrice, 1500);
+  assert.equal(sales[1].data.sourceType, "admin_quick_sale");
+  assert.equal(result.writes.find(write => write.path.includes("warehouseStock/")).data.currentStock, 1);
+});
+test("insufficient combined warehouse stock rejects the whole batch without partial writes", async () => {
+  const f = fixture("admin");
+  f.documents.set("warehouses/warehouse_a", { name: "Depósito", active: true });
+  f.documents.set("warehouseStock/warehouse_a/items/product_a", { currentStock: 3, active: true });
+  const row = batchRow({ stockOrigin: { type: "warehouse", id: "warehouse_a" } }), before = clone([...f.documents]);
+  await assert.rejects(prepareBatch(f, [row, row]), { code: "seller/insufficient-stock" });
+  assert.deepEqual([...f.documents], before);
+});
+test("batch confirmation rechecks stock, counter and permissions before publishing any writes", async () => {
+  for (const mutate of [f => f.documents.get("locationStock/local_a/items/product_a").currentStock = 99, f => f.documents.set("counters/LA_20261004", { lastNumber: 9 }), f => f.documents.get("users/user_a").permissionDeny = { "quick-sales": ["create"] }]) {
+    const f = fixture(), prepared = await prepareBatch(f, [batchRow()]);
+    mutate(f);
+    await assert.rejects(execute(f, prepared), error => ["context-changed", "permission-denied"].includes(error.code));
+    assert.equal([...f.documents.keys()].some(path => path.startsWith("sales/")), false);
+  }
+});
+test("batch schema is discoverable for sellers and enforces list bounds and fiscal review", async () => {
+  const f = fixture();
+  assert.ok(selectCapabilities(f.session, "anotá estas ventas", { module: "seller" }).includes("prepare_batch_sales"));
+  const schema = OLIVIA_CAPABILITIES.prepare_batch_sales.parameters;
+  validateSchema({ sales: [batchRow()] }, schema);
+  assert.throws(() => validateSchema({ sales: Array.from({ length: 21 }, () => batchRow()) }, schema));
+  assert.throws(() => validateSchema({ sales: [batchRow({ channel: "fake" })] }, schema));
+  const fiscal = await prepareBatch(f, [batchRow({ ticketRequested: true })]);
+  assert.equal(fiscal.state, "RECHAZADA"); assert.equal(fiscal.writes, undefined);
 });

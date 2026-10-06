@@ -22,7 +22,8 @@ import {
 } from "../formatters";
 import { useAsyncData } from "../hooks";
 import { moduleById } from "../modules";
-import { can } from "../permissions";
+import { can, canAccessAdministration } from "../permissions";
+import { subscribeActiveAlerts } from "../services/alertsService";
 import {
   createModuleRecord,
   listModuleRecords,
@@ -70,11 +71,14 @@ export default function GenericModulePage({ moduleId }) {
   const { profile } = useAuth();
   const module = moduleById[moduleId];
   const result = useAsyncData(() => listModuleRecords(moduleId), [moduleId]);
+  useEffect(() => moduleId === "alerts" ? subscribeActiveAlerts(profile, () => result.refresh().catch(() => {})) : undefined, [moduleId, profile, result.refresh]);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ name: "", notes: "" });
   const [saveState, setSaveState] = useState({ busy: false, error: "" });
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [errorReport, setErrorReport] = useState(null);
+  const [copyNotice, setCopyNotice] = useState("");
   useEffect(() => {
     setSelectedRecord(null);
     if (review?.toolName !== "prepare_ecommerce_order_review" || moduleId !== "ecommerce") return;
@@ -166,12 +170,19 @@ export default function GenericModulePage({ moduleId }) {
               { key: "status", label: "Estado", render: (record) => <Badge tone={statusTone(record.status)}>{humanizeStatus(record.status)}</Badge> },
               { key: "updatedAt", label: "Actualización", render: (record) => formatDateTime(record.updatedAt || record.createdAt) },
               { key: "responsible", label: "Responsable", render: (record) => record.responsibleName || record.assignedToName || record.createdByName || "Pendiente" },
+              ...(moduleId === "alerts" && canAccessAdministration(profile) ? [{ key: "errorDetail", label: "Detalle", render: record => record.source === "olivia_error_report" ? <Button variant="secondary" onClick={() => { setErrorReport(record); setCopyNotice(""); }}>Ver error</Button> : null }] : []),
             ]}
             empty={<EmptyState icon={module.icon} title="Todavía no hay registros" description="Cuando se cargue información real en este módulo aparecerá aquí; no se generaron datos ficticios." />}
           />
         ) : null}
       </Panel>
 
+      <Modal open={Boolean(errorReport)} onClose={() => setErrorReport(null)} title={errorReport?.name || "Error de Olivia"} description="Detalle técnico para revisar la función que falló.">
+        <p>{errorReport?.notes}</p>
+        <Button variant="secondary" onClick={async () => { try { await navigator.clipboard.writeText(errorReport.codexDescription); setCopyNotice("Copiado para Codex."); } catch { setCopyNotice("No pude copiar automáticamente. Seleccioná el texto de abajo."); } }}>Copiar para Codex</Button>
+        {copyNotice ? <p role="status">{copyNotice}</p> : null}
+        <pre className="fm-olivia-diagnostic">{errorReport?.codexDescription}</pre>
+      </Modal>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={module.primaryAction || "Nuevo registro"} description="Carga inicial editable; las integraciones externas permanecen pendientes hasta recibir credenciales reales.">
         <form className="fm-form-grid" onSubmit={handleCreate}>
           <FormField label={fieldLabels[moduleId] || "Nombre"} required className="fm-form-grid__full"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></FormField>

@@ -1,6 +1,7 @@
 import { requireFirebaseActiveProfile } from "../firebaseAuth.mjs";
 import { assertOliviaAccess } from "./guards.mjs";
 import { oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
+import { publicOliviaFailure } from "./errorReports.mjs";
 export const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -39,9 +40,9 @@ export function errorResponse(error) {
   const status = error.status >= 400 && error.status < 600 ? error.status : 500;
   return json(
     {
-      code: error.code || "assistant-error",
+      ...(error.reportId ? publicOliviaFailure(error) : { code: error.code || "assistant-error" }),
       message:
-        status < 500
+        error.reportId ? publicOliviaFailure(error).message : status < 500
           ? error.message
           : "Olivia no pudo completar la solicitud. Podés continuar manualmente.",
     },

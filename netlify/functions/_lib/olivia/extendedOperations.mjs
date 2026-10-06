@@ -11,6 +11,7 @@ import { argentinaDateFromKey } from "../../../../src/modules/locations/domain/t
 import { can, canAccessAdministration, normalizedRole } from "../../../../src/gestion/permissions.js";
 import { arcaSourceTypeForSale } from "../../../../src/shared/arcaSourceType.mjs";
 import { catalogStockPlan } from "./catalogStock.mjs";
+import { batchSalesPlan } from "./batchSales.mjs";
 const normalize = (value) => value instanceof Date ? value.toISOString() : Array.isArray(value) ? value.map(normalize) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).filter((key) => key !== "id" && !key.startsWith("__")).sort().map((key) => [key, normalize(value[key])])) : value;
 const fingerprint = (value) => createHash("sha256").update(JSON.stringify(normalize(value))).digest("hex");
 const ownerPath = (type, id) => `${type === "warehouse" ? "warehouses" : "locations"}/${safeId(id)}`;
@@ -23,6 +24,7 @@ export async function extendedOperationPlan({ session, toolName, args, store, no
   assertExtendedCapability(session, toolName);
   validateSchema(args, OLIVIA_CAPABILITIES[toolName]?.parameters);
   if (toolName === "prepare_catalog_stock_load") return catalogStockPlan({ session, args, store, now, entityId, correlation });
+  if (toolName === "prepare_batch_sales") return batchSalesPlan({ session, args, store, now, entityId, correlation });
   const profile = { ...session.profile, id: session.uid }, documents = {};
   const read = async (path) => { const row = await store.get(path); documents[path] = row || null; return row ? { ...row, id: path.split("/").at(-1) } : null; };
   let writes = [], summary, module = OLIVIA_CAPABILITIES[toolName].module, affectedId = entityId, navigation = null;

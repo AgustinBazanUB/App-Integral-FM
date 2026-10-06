@@ -50,10 +50,18 @@ test("deshabilitar voz conserva la autenticación y las rutas de chat, historial
 test("el handler real de la interfaz anuncia la pausa sin pedir micrófono ni crear una conexión", async () => {
   const assistant = await readFile(new URL("../src/gestion/olivia/OliviaAssistant.jsx", import.meta.url), "utf8");
   const handler = assistant.match(/const startVoice = \(mode = "default"\) => \{[\s\S]*?\n  \};/)[0];
-  let notice = "";
-  const context = vm.createContext({ OLIVIA_VOICE_CONVERSATION_ENABLED, OLIVIA_VOICE_UNAVAILABLE_MESSAGE, setVoiceNotice: value => { notice = value; } });
-  vm.runInContext(`${handler}\nstartVoice(); startVoice("realtime-mini");`, context);
+  let notice = "", elapsed = 0, sequence = 0;
+  const timers = new Map();
+  const advance = duration => { elapsed += duration; for (const [id, timer] of timers) if (timer.at <= elapsed) { timers.delete(id); timer.callback(); } };
+  const context = vm.createContext({ OLIVIA_VOICE_CONVERSATION_ENABLED, OLIVIA_VOICE_UNAVAILABLE_MESSAGE, voiceNoticeTimer: { current: null }, clearTimeout: id => timers.delete(id), setTimeout: (callback, duration) => { const id = ++sequence; timers.set(id, { callback, at: elapsed + duration }); return id; }, setVoiceNotice: value => { notice = value; } });
+  vm.runInContext(`${handler}\nstartVoice();`, context);
   assert.equal(notice, OLIVIA_VOICE_UNAVAILABLE_MESSAGE);
+  advance(2999); assert.equal(notice, OLIVIA_VOICE_UNAVAILABLE_MESSAGE);
+  advance(1); assert.equal(notice, "");
+  vm.runInContext('startVoice("realtime-mini");', context);
+  advance(1500); vm.runInContext('startVoice();', context);
+  advance(2999); assert.equal(notice, OLIVIA_VOICE_UNAVAILABLE_MESSAGE);
+  advance(1); assert.equal(notice, "");
 });
 
 const composerBundle = await build({ entryPoints: ["src/gestion/olivia/OliviaComposer.jsx"], bundle: true, write: false, platform: "node", format: "esm", jsx: "automatic", plugins: [{ name: "voice-composer-render", setup(b) {

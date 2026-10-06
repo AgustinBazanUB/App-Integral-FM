@@ -1358,6 +1358,8 @@ service cloud.firestore {
     match /oliviaRealtimeToolCalls/{document=**} { allow read, write: if false; }
     match /oliviaRealtimeTurns/{document=**} { allow read, write: if false; }
     match /oliviaConfiguration/{document=**} { allow read, write: if false; }
+    match /oliviaChatJobs/{document=**} { allow read, write: if false; }
+    match /oliviaErrorReports/{document=**} { allow read, write: if false; }
     match /oliviaConversations/{document=**} { allow read, write: if false; }
     match /oliviaConfirmations/{document=**} { allow read, write: if false; }
     match /oliviaBudgets/{document=**} { allow read, write: if false; }

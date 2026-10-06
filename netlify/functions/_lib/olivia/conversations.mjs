@@ -17,7 +17,10 @@ export const retainedMessage = (id, m) => ({
   data: { ...m, createdAt: new Date(m.createdAt) },
 });
 export const sessionBinding = (session) => String(session.authTime || "");
-export const permissionScope = (session) => hash(JSON.stringify({ context: userContext(session), capabilities: capabilities(session).sort() }));
+export const permissionScope = (session, allowed = capabilities(session)) => hash(JSON.stringify({ context: userContext(session), capabilities: allowed.sort() }));
+// Adding the batch tool changes capabilities without changing an existing
+// user's authority. Accept only the exact previous scope for this release.
+export const compatiblePermissionScope = (session, scope) => scope === permissionScope(session) || scope === permissionScope(session, capabilities(session).filter(name => name !== "prepare_batch_sales"));
 export const dateMs = (value) => new Date(value).getTime();
 export async function verifyLegacyConversationScope(session, conversation, store) {
   if (!conversation || conversation.roleBinding || canAccessAdministration(session.profile) || !(conversation.messageCount || conversation.messages?.length)) return;
@@ -45,7 +48,7 @@ export function assertConversationOwner(
       409,
     );
   if (conversation.roleBinding && conversation.roleBinding !== normalizedRole(session.profile)) throw oliviaError("permission-scope-changed", "Tu rol cambió. Iniciá un nuevo chat con tus permisos actuales.", 409);
-  if (conversation.permissionScope && conversation.permissionScope !== permissionScope(session)) throw oliviaError("permission-scope-changed", "Tus permisos cambiaron. Iniciá un chat con el alcance actual.", 409);
+  if (conversation.permissionScope && !compatiblePermissionScope(session, conversation.permissionScope)) throw oliviaError("permission-scope-changed", "Tus permisos cambiaron. Iniciá un chat con el alcance actual.", 409);
   if (dateMs(conversation.expiresAt) <= now.getTime())
     throw oliviaError(
       "conversation-expired",

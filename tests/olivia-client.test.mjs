@@ -578,3 +578,35 @@ test("supervision prepends older pages once and preserves current messages", () 
     [first, current, last],
   );
 });
+
+test("background client polls independent short requests and returns the complete answer", async () => {
+  const bodies = [], events = []; let polls = 0;
+  const transport = createOliviaTransport({ getToken: async () => "test-token", pollIntervalMs: 1, fetchImpl: async (_, options) => {
+    const body = JSON.parse(options.body); bodies.push(body);
+    if (body.operation === "startChat") return response({ jobId: "job_a", conversationId: "chat_a" });
+    polls++;
+    return response({ jobId: "job_a", conversationId: "chat_a", status: polls === 3 ? "completed" : "running", phase: polls > 1 ? "Revisando datos…" : "Pensando…", accepted: { id: "message_a", role: "user", content: "Lista" }, text: polls > 1 ? "Respuesta" : "", ...(polls === 3 ? { result: { messages: [{ content: "Respuesta completa" }] } } : {}) });
+  } });
+  const result = await transport.request({ operation: "chat", background: true, message: "Lista" }, { onEvent: event => events.push(event) });
+  assert.equal(result.messages[0].content, "Respuesta completa");
+  assert.equal(bodies[0].operation, "startChat"); assert.equal(bodies.slice(1).every(body => body.operation === "chatStatus"), true);
+  assert.equal(events.filter(event => event.type === "accepted").length, 1);
+  assert.ok(events.some(event => event.type === "delta" && event.delta === "Respuesta"));
+});
+test("background recovery waits on the existing job and propagates report identity", async () => {
+  const transport = createOliviaTransport({ getToken: async () => "test-token", fetchImpl: async (_, options) => {
+    assert.equal(JSON.parse(options.body).operation, "chatStatus");
+    return response({ status: "failed", text: "", failure: { code: "provider-timeout", reportId: "report_a", message: "No pude completar la consulta." } });
+  } });
+  await assert.rejects(transport.request({ operation: "waitChat", jobId: "job_a" }), { code: "provider-timeout", reportId: "report_a" });
+});
+test("background polling recovers a transient connection loss without resubmitting the request", async () => {
+  let calls = 0;
+  const transport = createOliviaTransport({ getToken: async () => "test-token", pollIntervalMs: 1, fetchImpl: async (_, options) => {
+    assert.equal(JSON.parse(options.body).operation, "chatStatus");
+    if (++calls === 1) throw new TypeError("network interruption");
+    return response({ status: "completed", text: "", result: { recovered: true } });
+  } });
+  assert.equal((await transport.request({ operation: "waitChat", jobId: "job_a" })).recovered, true);
+  assert.equal(calls, 2);
+});

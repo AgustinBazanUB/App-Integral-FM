@@ -1,10 +1,7 @@
 import { formatDateTime } from "../formatters";
 export default function OliviaUsage({ quota, estimate, money, voiceCosts, voiceMode, compact, exhausted }) {
-  const miniReference = voiceMode === "realtime-mini" || voiceCosts?.voiceMode === "realtime-mini";
-  return <footer className="fm-olivia-usage"><details open={!compact}><summary>Consumo y costos</summary><div>
-    {quota?.unlimited ? <span>Administrador · <strong>Uso sin límite de tokens</strong></span> : quota ? <><span>Asistente IA disponible: <strong>{quota.remainingPercent}%</strong></span>{quota.renewsAt ? <small>Próxima renovación: {formatDateTime(quota.renewsAt)}</small> : null}{quota.remainingPercent <= 25 ? <small>{exhausted ? "Tu cupo está agotado. Podés solicitar una ampliación al Administrador." : "Tu cupo disponible es bajo."}</small> : null}</> : null}
+  return <footer className="fm-olivia-usage">
+    {!quota?.unlimited && quota ? <span className="fm-olivia-quota" title={quota.renewsAt ? `Renovación: ${formatDateTime(quota.renewsAt)}` : undefined}>Cupo disponible: <strong>{quota.remainingPercent}%</strong>{quota.remainingPercent <= 25 ? exhausted ? " · Agotado" : " · Cupo bajo" : ""}</span> : null}
     <div className="fm-olivia-costs"><div><small>Próxima consulta escrita · estimado</small><strong>{money(estimate?.estimatedCostArs)}</strong></div><div>{voiceCosts ? <><small>Conversación de voz · total{voiceCosts.complete ? "" : " pendiente"}</small><strong>{voiceCosts.complete ? money(voiceCosts.totalArs) : "Pendiente de medición"}</strong>{!voiceCosts.complete && voiceCosts.knownArs > 0 ? <small>Subtotal medido: {money(voiceCosts.knownArs)}</small> : null}</> : <><small>Última llamada{quota?.lastCost?.estimated ? " · sin medición completa" : ""}</small><strong>{quota?.lastCost ? money(quota.lastCost.ars) : "Sin llamadas previas"}</strong></>}</div></div>
-    <small>Costos en ARS con 5% sobre la conversión. Los estimados son orientativos; archivos y almacenamiento sin medición se informan aparte.</small>
-    {miniReference ? <small className="fm-olivia-voice-reference" title="Referencia orientativa: una frase breve tuya, 10–20 segundos de Olivia hablando (incluido el saludo, si lo hay) y una consulta simple de Luna. Las respuestas largas pueden costar más. No es una tarifa fija ni el gasto medido.">Consulta corta por voz · estimado: <strong>{money(10)} – {money(20)}</strong></small> : null}
-  </div></details></footer>;
+  </footer>;
 }

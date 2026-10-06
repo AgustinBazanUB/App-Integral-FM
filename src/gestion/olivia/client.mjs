@@ -64,7 +64,7 @@ export function prependHistoryMessages(older, current) {
   return [...messages.values()];
 }
 
-export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, timeoutMs = 60000 }) {
+export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, timeoutMs = 60000, pollIntervalMs = 2000 }) {
   const send = async (endpoint, body, { signal, isForm = false, keepalive = false, onEvent } = {}) => {
     const token = await getToken();
     if (!token) throw new Error("Iniciá sesión para usar Olivia.");
@@ -95,6 +95,7 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
         const error = new Error(data.message || data.error?.message || "Olivia no pudo completar la solicitud. Podés continuar en el panel.");
         error.code = data.code || data.error?.code || "olivia-request-failed";
         error.status = response.status;
+        error.reportId = data.reportId || null;
         throw error;
       }
       return data;
@@ -104,8 +105,46 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
       throw failure;
     } finally { clearTimeout(timer); signal?.removeEventListener("abort", abort); }
   };
+  const delay = signal => new Promise((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); signal?.removeEventListener("abort", abort); reject(new DOMException("Respuesta detenida", "AbortError")); };
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", abort); resolve(); }, pollIntervalMs);
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
+  });
+  const waitForChat = async (jobId, options = {}) => {
+    let acceptedId = null, text = "", phase = "", failures = 0;
+    const started = Date.now();
+    options.onEvent?.({ type: "job", jobId });
+    while (Date.now() - started < 390000) {
+      options.signal?.throwIfAborted();
+      let status;
+      try { status = await send("/.netlify/functions/olivia", { operation: "chatStatus", jobId }, { signal: options.signal }); failures = 0; }
+      catch (error) {
+        if (!["olivia-network-error", "olivia-timeout"].includes(error.code) || ++failures > 5) throw error;
+        options.onEvent?.({ type: "phase", label: "Sigo esperando la respuesta. Estoy recuperando la conexión…" });
+        await delay(options.signal); continue;
+      }
+      if (status.accepted && acceptedId !== status.accepted.id) { acceptedId = status.accepted.id; options.onEvent?.({ type: "accepted", conversationId: status.conversationId, message: status.accepted }); }
+      const elapsed = Date.now() - started;
+      const nextPhase = elapsed > 90000 ? "Sigo trabajando en tu solicitud…" : elapsed > 30000 && status.phase === "Pensando…" ? "Sigo pensando para completar la respuesta…" : status.phase || "Pensando…";
+      if (nextPhase !== phase || !status.text.startsWith(text)) { phase = nextPhase; if (!status.text.startsWith(text)) text = ""; options.onEvent?.({ type: "phase", label: phase, ...(text === "" ? { tools: [] } : {}) }); }
+      if (status.text !== text) { options.onEvent?.({ type: "delta", delta: status.text.slice(text.length) }); text = status.text; }
+      if (status.status === "completed") return status.result;
+      if (status.status === "failed") throw Object.assign(new Error(status.failure.message), { ...status.failure });
+      if (status.status === "cancelled") throw new DOMException("Respuesta detenida", "AbortError");
+      await delay(options.signal);
+    }
+    throw Object.assign(new Error("Olivia no pudo terminar esta consulta a tiempo. Actualizá el chat para recuperar lo guardado."), { code: "chat-job-expired" });
+  };
   return {
-    request: (payload, options) => send("/.netlify/functions/olivia", payload, options),
+    request: async (payload, options) => {
+      if (payload.operation === "waitChat") return waitForChat(payload.jobId, options);
+      if (payload.operation === "chat" && payload.background === true) {
+        const started = await send("/.netlify/functions/olivia", { ...payload, operation: "startChat" }, { signal: options?.signal });
+        return waitForChat(started.jobId, options);
+      }
+      return send("/.netlify/functions/olivia", payload, options);
+    },
     knowledge: (payload, options) => send("/.netlify/functions/olivia-knowledge", payload, options),
     publishKnowledge: (file, payload, options) => {
       const form = new FormData(); form.set("file", file, file.name);

@@ -69,7 +69,7 @@ const requireActive = (profile) => {
     throw operationError("La sesión no está activa.", "permission-denied", 403);
 };
 
-async function saleContext({ session, args, store, now }) {
+export async function saleContext({ session, args, store, now }) {
   const profile = profileFor(session);
   requireActive(profile);
   if (!can(profile, "quick-sales", "create"))
@@ -78,8 +78,11 @@ async function saleContext({ session, args, store, now }) {
       "permission-denied",
       403,
     );
-  const location = await read(store, `locations/${args.locationId}`);
-  if (!location || !effectiveSellerLocations(profile, [location], now).length)
+  const warehouse = args.stockOriginType === "warehouse";
+  if (warehouse && (!canAccessAdministration(profile) || !can(profile, "warehouse", "edit")))
+    throw operationError("No tenés permiso para vender desde un depósito.", "permission-denied", 403);
+  const location = await read(store, `${warehouse ? "warehouses" : "locations"}/${args.locationId}`);
+  if (!location || (warehouse ? location.active === false || location.deleted === true : !effectiveSellerLocations(profile, [location], now).length))
     throw operationError(
       "No tenés permiso para vender desde esta ubicación activa.",
       "permission-denied",
@@ -92,7 +95,7 @@ async function saleContext({ session, args, store, now }) {
     const product = await read(store, `products/${line.productId}`);
     const stock = await read(
       store,
-      `locationStock/${location.id}/items/${line.productId}`,
+      `${warehouse ? "warehouseStock" : "locationStock"}/${location.id}/items/${line.productId}`,
     );
     if (
       !product ||
@@ -108,7 +111,7 @@ async function saleContext({ session, args, store, now }) {
         "context-unavailable",
         409,
       );
-    const unitPrice = effectiveLocationPrice(product, stock);
+    const unitPrice = warehouse ? Number(product.defaultPrice || 0) : effectiveLocationPrice(product, stock);
     if (!Number.isSafeInteger(unitPrice) || unitPrice < 0)
       throw operationError("El precio configurado del producto no es válido.");
     products.push(product);
@@ -282,7 +285,7 @@ async function stockContext({ session, args, store, now }) {
   return { profile, location, product, stock, plan };
 }
 
-function canonicalSaleArgs(args = {}) {
+export function canonicalSaleArgs(args = {}) {
   const missing = [];
   if (!validId(args.locationId)) missing.push("locationId");
   if (!Array.isArray(args.items) || !args.items.length) missing.push("items");

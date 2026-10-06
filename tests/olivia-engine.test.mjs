@@ -1,4 +1,7 @@
 import test from "node:test";
+import { startChatJob, runChatJob, chatJobStatus, cancelChatJob, activeChatJob } from "../netlify/functions/_lib/olivia/chatJobs.mjs";
+import { permissionScope, assertConversationOwner } from "../netlify/functions/_lib/olivia/conversations.mjs";
+import { capabilities } from "../netlify/functions/_lib/olivia/guards.mjs";
 import assert from "node:assert/strict";
 import { createOliviaEngine } from "../netlify/functions/_lib/olivia/engine.mjs";
 import {
@@ -495,6 +498,37 @@ test("incomplete sale creates no confirmation or business writes", async () => {
   assert.equal(result.state, "DATOS_INCOMPLETOS");
   assert.equal(result.pendingAction, null);
   assert.equal(newBusinessSales(f).length, 0);
+});
+
+test("enqueue supersedes an old proposal immediately so another tab cannot confirm stale sales", async () => {
+  const f = fixture({ provider: async () => functionResponse("prepare_batch_sales", twoSales()) });
+  const proposal = await chat(f, (await start(f)).conversationId, { message: "Anotá estas ventas" });
+  const queued = await startChatJob({ store: f.store, engine: f.engine, session: f.session, body: { conversationId: proposal.conversationId, requestId: "corrected_sales", message: "Corregí la primera venta", screenContext: {} }, now: f.clock(), dispatch: async () => {} });
+  await assert.rejects(f.engine.confirm(f.session, { conversationId: proposal.conversationId, confirmationToken: proposal.pendingAction.confirmationToken }), { code: "confirmation-invalid" });
+  assert.equal((await statusOf(f, queued.jobId)).status, "queued");
+  assert.equal(newBusinessSales(f).length, 0);
+});
+test("acknowledgement by text preserves the review card and never executes a sale", async () => {
+  const f = fixture({ provider: async () => functionResponse("prepare_batch_sales", twoSales()) });
+  const proposal = await chat(f, (await start(f)).conversationId, { message: "Anotá estas ventas" });
+  f.advance(2000);
+  const queued = await startChatJob({ store: f.store, engine: f.engine, session: f.session, body: { conversationId: proposal.conversationId, requestId: "ack_sales", message: "dale", screenContext: {} }, now: f.clock(), dispatch: async () => {} });
+  await assert.rejects(f.engine.confirm(f.session, { conversationId: proposal.conversationId, confirmationToken: proposal.pendingAction.confirmationToken }), { code: "confirmation-invalid" });
+  await runQueued(f, queued.jobId);
+  const status = await statusOf(f, queued.jobId);
+  assert.equal(status.status, "completed", JSON.stringify(status.failure));
+  assert.equal(status.result.pendingAction.id, proposal.pendingAction.id);
+  assert.equal(newBusinessSales(f).length, 0);
+});
+test("a failure before AI claims the conversation releases the queue and survives reload", async () => {
+  const f = fixture(), queued = await queuedChat(f);
+  f.documents.get("oliviaConfiguration/global").enabled = false;
+  await runQueued(f, queued.jobId);
+  const status = await statusOf(f, queued.jobId);
+  assert.equal(status.status, "failed");
+  const conversation = f.documents.get(`oliviaConversations/${queued.conversationId}`);
+  assert.equal(conversation.queuedChatRequestId, null);
+  assert.equal(conversation.state, "ERROR"); assert.equal(conversation.lastFailure.reportId, status.failure.reportId);
 });
 
 test("correction supersedes the old proposal and old token cannot execute", async () => {
@@ -1367,4 +1401,130 @@ test("saved chat pagination includes older chats with equal timestamps without o
   assert.equal(new Set([...first.conversations, ...second.conversations].map(c => c.id)).size, 25);
   assert.equal(first.conversations.some(c => c.id === "foreign"), false);
   await assert.rejects(f.engine.history(f.session, { conversationsCursor: { id: "foreign", updatedAt: "bad" } }), { code: "invalid-input" });
+});
+
+async function queuedChat(f, extra = {}) {
+  const conversationId = (await start(f)).conversationId;
+  const body = { requestId: "job_request", conversationId, message: "Consultá esta lista", screenContext: { route: "/vendedor", module: "seller" }, ...extra };
+  const calls = [];
+  const queued = await startChatJob({ store: f.store, engine: f.engine, session: f.session, body, now: f.clock(), dispatch: async id => calls.push(id) });
+  return { ...queued, body, calls };
+}
+const statusOf = (f, jobId) => chatJobStatus({ store: f.store, session: f.session, body: { jobId }, now: f.clock() });
+const runQueued = (f, jobId) => runChatJob({ store: f.store, engine: f.engine, session: f.session, jobId, clock: f.clock });
+test("background chat is authenticated, idempotent and recoverable without replaying the provider", async () => {
+  const f = fixture(), queued = await queuedChat(f);
+  const again = await startChatJob({ store: f.store, engine: f.engine, session: f.session, body: queued.body, now: f.clock(), dispatch: () => assert.fail("duplicate dispatch") });
+  assert.equal(again.jobId, queued.jobId);
+  assert.equal((await activeChatJob({ store: f.store, session: f.session, conversationId: queued.conversationId })).jobId, queued.jobId);
+  await Promise.all([runQueued(f, queued.jobId), runQueued(f, queued.jobId)]);
+  assert.equal(f.providerCalls(), 1);
+  const status = await statusOf(f, queued.jobId);
+  assert.equal(status.status, "completed");
+  assert.equal(status.result.conversationId, queued.conversationId);
+  assert.match(status.result.messages.at(-1).content, /Panel Vendedor/);
+  assert.ok(status.accepted.id);
+  assert.equal(await activeChatJob({ store: f.store, session: f.session, conversationId: queued.conversationId }), null);
+  const stored = JSON.stringify(f.documents.get(`oliviaChatJobs/${queued.jobId}`));
+  assert.equal(stored.includes("idToken"), false);
+  await assert.rejects(chatJobStatus({ store: f.store, session: { ...f.session, uid: "foreign" }, body: { jobId: queued.jobId }, now: f.clock() }), { code: "chat-job-not-found" });
+  await assert.rejects(chatJobStatus({ store: f.store, session: { ...f.session, authTime: 1 }, body: { jobId: queued.jobId }, now: f.clock() }), { code: "chat-job-not-found" });
+});
+test("background chat rejects changed request identities and concurrent requests before invoking AI", async () => {
+  const f = fixture(), queued = await queuedChat(f);
+  const startAgain = body => startChatJob({ store: f.store, engine: f.engine, session: f.session, body, now: f.clock(), dispatch: () => assert.fail("unexpected dispatch") });
+  await assert.rejects(startAgain({ ...queued.body, message: "Otra lista" }), { code: "request-already-used" });
+  await assert.rejects(startAgain({ ...queued.body, requestId: "second_request" }), { code: "conversation-busy" });
+  assert.equal(f.providerCalls(), 0);
+});
+test("background chat allows longer provider work and keeps the complete tail of long user lists", async () => {
+  let f;
+  f = fixture({ provider: async (_, body, options) => {
+    assert.equal(options.timeoutMs, 90000);
+    assert.equal(body.max_output_tokens, 6000);
+    assert.ok(body.input.some(entry => typeof entry.content === "string" && entry.content.endsWith("ULTIMA VENTA CONSERVADA")));
+    const conversation = [...f.documents].find(([path]) => /^oliviaConversations\/[^/]+$/.test(path))[1];
+    assert.equal(new Date(conversation.busyUntil) - f.clock(), 360000);
+    f.advance(90000);
+    return textResponse("Lista completa revisada.");
+  } });
+  const queued = await queuedChat(f, { message: "Analizá estas ventas. " + "Detalle largo de productos. ".repeat(180) + "ULTIMA VENTA CONSERVADA" });
+  await runQueued(f, queued.jobId);
+  assert.equal((await statusOf(f, queued.jobId)).status, "completed");
+  assert.equal(f.providerCalls(), 1);
+});
+test("background failure saves a concise error and private diagnostic without customer text or secrets", async () => {
+  const f = fixture({ provider: async () => { throw Object.assign(new Error("PRIVATE CUSTOMER sk-proj-secret-not-to-store"), { code: "provider-timeout", status: 503 }); } });
+  const queued = await queuedChat(f); await runQueued(f, queued.jobId);
+  const status = await statusOf(f, queued.jobId);
+  assert.equal(status.status, "failed"); assert.equal(status.failure.code, "provider-timeout"); assert.ok(status.failure.reportId);
+  const reports = [...f.documents].filter(([path]) => path.startsWith("oliviaErrorReports/"));
+  assert.equal(reports.length, 1);
+  assert.doesNotMatch(JSON.stringify(reports), /PRIVATE CUSTOMER|sk-proj-secret|Consultá esta lista|idToken/);
+  const recovered = await f.engine.state(f.session, queued.conversationId);
+  assert.equal(recovered.failure.reportId, status.failure.reportId);
+  assert.match(recovered.messages.at(-1).content, /tardó demasiado/);
+  assert.equal([...f.documents].filter(([path]) => path.startsWith("alerts/")).length, 0);
+});
+test("queued cancellation never invokes AI or writes business operations", async () => {
+  const f = fixture(), queued = await queuedChat(f);
+  await cancelChatJob({ store: f.store, session: f.session, body: { jobId: queued.jobId }, now: f.clock() });
+  await runQueued(f, queued.jobId);
+  assert.equal((await statusOf(f, queued.jobId)).status, "cancelled");
+  assert.equal(f.providerCalls(), 0); assert.equal(newBusinessSales(f).length, 0);
+});
+test("expired background jobs report a bounded final failure instead of locking the conversation", async () => {
+  const f = fixture(), queued = await queuedChat(f);
+  f.advance(360001);
+  const status = await statusOf(f, queued.jobId);
+  assert.equal(status.status, "failed"); assert.equal(status.failure.code, "chat-job-expired"); assert.ok(status.failure.reportId);
+  await runQueued(f, queued.jobId); assert.equal(f.providerCalls(), 0);
+  assert.equal(await activeChatJob({ store: f.store, session: f.session, conversationId: queued.conversationId }), null);
+});
+test("batch capability addition preserves existing chat scope but actual permission changes still fail", async () => {
+  const f = fixture(), conversationId = (await start(f)).conversationId, conversation = f.documents.get(`oliviaConversations/${conversationId}`);
+  conversation.permissionScope = permissionScope(f.session, capabilities(f.session).filter(name => name !== "prepare_batch_sales"));
+  assert.doesNotThrow(() => assertConversationOwner(f.session, conversation, f.clock()));
+  const changed = { ...f.session, profile: { ...f.session.profile, allowedLocationIds: ["other"] } };
+  assert.throws(() => assertConversationOwner(changed, conversation, f.clock()), { code: "permission-scope-changed" });
+});
+const twoSales = () => ({ sales: [1, 2].map(index => {
+  const { locationId, ...sale } = saleArgs({ items: [{ productId: "oil", qty: index }] });
+  return { reference: `Pedido ${index}`, stockOrigin: { type: "location", id: locationId }, channel: "in_person", ...sale };
+}) });
+test("background batch creates a review card and a double confirmation registers exactly two sales", async () => {
+  const f = fixture({ provider: async () => functionResponse("prepare_batch_sales", twoSales()) });
+  const queued = await queuedChat(f, { message: "Anotá estas dos ventas presenciales" });
+  await runQueued(f, queued.jobId);
+  const status = await statusOf(f, queued.jobId), result = status.result;
+  assert.equal(result.pendingAction?.toolName, "prepare_batch_sales");
+  assert.equal(newBusinessSales(f).length, 0);
+  const confirmBody = { conversationId: result.conversationId, confirmationToken: result.pendingAction.confirmationToken };
+  const confirmations = await Promise.all([f.engine.confirm(f.session, confirmBody), f.engine.confirm(f.session, confirmBody)]);
+  assert.ok(confirmations.every(reply => reply.state === "COMPLETADA"));
+  assert.equal(newBusinessSales(f).length, 2);
+  assert.equal(f.documents.get("locationStock/local_a/items/oil").currentStock, 1);
+  assert.equal(f.documents.get("counters/LA_20261004").lastNumber, 2);
+  assert.equal([...f.documents].filter(([path]) => path.startsWith("stockMovements/")).length, 2);
+});
+test("batch cancellation and a changed second product cannot leave a first sale registered", async () => {
+  for (const choice of ["cancel", "changed"]) {
+    const f = fixture({ provider: async () => functionResponse("prepare_batch_sales", twoSales()) });
+    const result = await chat(f, (await start(f)).conversationId, { message: "Anotá estas dos ventas" });
+    assert.ok(result.pendingAction);
+    const body = { conversationId: result.conversationId, confirmationToken: result.pendingAction.confirmationToken };
+    if (choice === "cancel") await f.engine.cancel(f.session, body);
+    else { f.documents.get("locationStock/local_a/items/oil").active = false; await assert.rejects(f.engine.confirm(f.session, body)); }
+    assert.equal(newBusinessSales(f).length, 0);
+    assert.equal([...f.documents].filter(([path]) => path.startsWith("stockMovements/")).length, 0);
+  }
+});
+test("tool failures retain the report button after reloading a conversation", async () => {
+  const f = fixture({ provider: async () => functionResponse("prepare_batch_sales", { sales: [{ ...twoSales().sales[0], stockOrigin: { type: "location", id: "local_b" } }] }) });
+  const result = await chat(f, (await start(f)).conversationId, { message: "Anotá esta venta" });
+  assert.equal(result.state, "RECHAZADA");
+  assert.equal(result.failure.code, "permission-denied"); assert.ok(result.failure.reportId);
+  const recovered = await f.engine.resumeConversation(f.session, { conversationId: result.conversationId });
+  assert.equal(recovered.failure.reportId, result.failure.reportId);
+  assert.equal(newBusinessSales(f).length, 0);
 });

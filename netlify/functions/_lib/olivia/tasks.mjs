@@ -15,6 +15,7 @@ export function requiredFields(intent) {
     prepare_stock_load: ["locationId", "productId", "quantity"],
     prepare_catalog_stock_load: ["locationId", "items"],
     prepare_sale: ["locationId", "items", "paymentMethod", "ticketRequested", "customerDecision", "promotionDecision"],
+    prepare_batch_sales: ["sales"],
     prepare_stock_transfer: ["originId", "destinationId", "lines", "reason"],
     prepare_create_location: ["name", "type", "codePrefix", "dniMode"],
     prepare_update_location: ["locationId", "name", "type", "codePrefix", "dniMode"],
@@ -29,7 +30,7 @@ export function requiredFields(intent) {
   return (OLIVIA_TOOL_SCHEMAS[intent] || OLIVIA_CAPABILITIES[intent]?.parameters)?.required || [];
 }
 export function taskUpdateTool(intents) {
-  return { type: "function", name: "update_task", description: "Guardar datos parciales y correcciones de la tarea actual antes de pedir lo que falta. No consulta ni ejecuta operaciones. slotsJson es un objeto JSON parcial con las mismas claves y tipos que los parámetros de la herramienta intent; si no está cargada, descubrí su esquema con search_tools. No agregues campos descriptivos como period o locationName. null indica desconocido. Para creative_brief solo objective, audience, format y style (strings). Si la validación falla, corregí usando el esquema devuelto antes de continuar. Nunca inventes IDs ni datos vivos.", strict: true, parameters: { type: "object", additionalProperties: false, required: ["intent", "slotsJson"], properties: { intent: { type: "string", enum: [...intents, "creative_brief"] }, slotsJson: { type: "string", maxLength: 5000 } } } };
+  return { type: "function", name: "update_task", description: "Guardar datos parciales y correcciones de la tarea actual antes de pedir lo que falta. No consulta ni ejecuta operaciones. slotsJson es un objeto JSON parcial con las mismas claves y tipos que los parámetros de la herramienta intent; si no está cargada, descubrí su esquema con search_tools. No agregues campos descriptivos como period o locationName. null indica desconocido. Para creative_brief solo objective, audience, format y style (strings). Si la validación falla, corregí usando el esquema devuelto antes de continuar. Nunca inventes IDs ni datos vivos.", strict: true, parameters: { type: "object", additionalProperties: false, required: ["intent", "slotsJson"], properties: { intent: { type: "string", enum: [...intents, "creative_brief"] }, slotsJson: { type: "string", maxLength: 30000 } } } };
 }
 export function taskSlotSchema(intent) {
   return intent === "creative_brief" ? { properties: { objective: { type: "string", maxLength: 500 }, audience: { type: "string", maxLength: 500 }, format: { type: "string", maxLength: 180 }, style: { type: "string", maxLength: 500 } } } : OLIVIA_TOOL_SCHEMAS[intent] || OLIVIA_CAPABILITIES[intent]?.parameters;

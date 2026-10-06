@@ -131,6 +131,17 @@ test("resource cleanup retains provider failures for retry and stops at its budg
   const complete = await purgeOliviaResources({ ...f, now: f.clock(), provider: async () => ({ deleted: true }) });
   assert.equal(complete.removed, 1); assert.equal(f.documents.has("oliviaAttachments/file_a"), false);
 });
+test("resource cleanup expires private background jobs and error diagnostics", async () => {
+  const f = fixture({ role: "admin" });
+  f.documents.set("oliviaChatJobs/old_job", { expiresAt: new Date(0), userId: "user_a" });
+  f.documents.set("oliviaErrorReports/old_error", { expiresAt: new Date(0), userId: "user_a" });
+  f.documents.set("oliviaChatJobs/recent_job", { expiresAt: new Date(f.clock().getTime() + 86400000), userId: "user_a" });
+  const result = await purgeOliviaResources({ ...f, now: f.clock(), provider: () => assert.fail("No provider files attached to diagnostics") });
+  assert.equal(result.removed, 2);
+  assert.equal(f.documents.has("oliviaChatJobs/old_job"), false);
+  assert.equal(f.documents.has("oliviaErrorReports/old_error"), false);
+  assert.equal(f.documents.has("oliviaChatJobs/recent_job"), true);
+});
 test("knowledge library pagination exposes all documents without an unbounded provider fanout", async () => {
   const f = fixture({ role: "admin" });
   for (let index = 0; index < 105; index++) f.documents.set(`oliviaKnowledgeDocuments/doc_${String(index).padStart(3, "0")}`, { name: `Doc ${index}`, createdAt: new Date(1000 + index), active: true, status: "in_progress", providerFileId: `file-${index}`, vectorStoreId: "vs_qa" });

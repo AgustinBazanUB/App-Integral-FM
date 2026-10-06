@@ -4,6 +4,7 @@ import { aggregateVoiceCosts } from "../../../../src/shared/oliviaVoicePricing.m
 import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, taskSlotSchema, requiredFields, isCorrection, operationalIntent, shortVoiceQuestion } from "./tasks.mjs";
 import { aggregateRoutes } from "./modelRouter.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
+import { captureOliviaFailure, publicOliviaFailure } from "./errorReports.mjs";
 import { randomUUID, createHash, timingSafeEqual } from "node:crypto";
 import {
   canAccessAdministration,
@@ -36,6 +37,7 @@ import {
 import {
   OLIVIA_INSTRUCTIONS,
   OLIVIA_CATALOG_STOCK_INSTRUCTIONS,
+  OLIVIA_BATCH_SALE_INSTRUCTIONS,
   OLIVIA_VOICE_INSTRUCTIONS,
   OLIVIA_METRICS_INSTRUCTIONS,
   modelProfile,
@@ -151,6 +153,7 @@ export function createOliviaEngine({
           ? "RECHAZADA"
           : conversation.state,
       pendingAction,
+      failure: conversation.lastFailure || null,
       usage: await usage(session, config),
       capabilities: capabilities(session),
       providerConfigured: Boolean(env.OPENAI_API_KEY),
@@ -165,7 +168,7 @@ export function createOliviaEngine({
   function estimateFor(session, config, conversation, context, draft = "") {
     const profile = modelProfile(config, session, screenContext(context), { message: draft, task: conversation.taskState });
     const input = { instructions: OLIVIA_INSTRUCTIONS, tools: toolDefinitions(session, { query: draft, context }), context: userContext(session), screen: screenContext(context), documentation: retrieveOliviaKnowledge(draft, { role: normalizedRole(session.profile), module: context.module, limit: 4 }), memory: conversation.memory, messages: conversation.messages.slice(-16), draft };
-    const inputTokens = Math.ceil(Buffer.byteLength(JSON.stringify(input), "utf8") / 4), outputTokens = config.responseLimits.maxOutputTokens;
+    const inputTokens = Math.ceil(Buffer.byteLength(JSON.stringify(input), "utf8") / 4), outputTokens = Math.max(config.responseLimits.maxOutputTokens, 6000);
     const costs = costForUsage({ model: profile.model, inputTokens, outputTokens }, config);
     const common = { estimatedCostArs: costs.actualCostArs };
     return canAccessAdministration(session.profile) ? { ...common, excludesUnmeasuredAttachmentsAndRetrieval: true, model: profile.model, reasoningEffort: profile.reasoningEffort, route: profile.route, routingReason: profile.routingReason, estimatedTokens: inputTokens + outputTokens, estimatedCostUsd: costs.actualCostUsd, reference: config.pricingReference || null } : common;
@@ -175,7 +178,7 @@ export function createOliviaEngine({
     const c = await store.get(`oliviaConversations/${safeId(body.conversationId)}`);
     assertConversationOwner(session, c, clock());
     await verifyLegacyConversationScope(session, c, store);
-    const draft = typeof body.message === "string" ? body.message.slice(0, 8000) : "";
+    const draft = typeof body.message === "string" ? body.message.slice(0, 12000) : "";
     return { estimate: estimateFor(session, await configuration(), c, body.screenContext || {}, draft) };
   }
 
@@ -189,6 +192,7 @@ export function createOliviaEngine({
     inputId = null,
     preserveInputPending = true,
     context = null,
+    leaseMs = 120000,
   ) {
     const now = clock();
     return store.transaction(async (tx) => {
@@ -196,6 +200,8 @@ export function createOliviaEngine({
       const conversation = snapshot ? { ...snapshot.data, id } : null;
       assertConversationOwner(session, conversation, now);
       await verifyLegacyConversationScope(session, conversation, store);
+      if (conversation.queuedChatRequestId && conversation.queuedChatRequestId !== requestId)
+        throw oliviaError("conversation-busy", "Olivia sigue trabajando en la consulta anterior.", 409);
       if (
         conversation.busyUntil &&
         dateMs(conversation.busyUntil) > now.getTime()
@@ -240,9 +246,10 @@ export function createOliviaEngine({
             state: "PREPARANDO_ACCION",
             pendingActionId: repeatedInput ? conversation.pendingActionId : null,
             busyRequestId: requestId,
+            queuedChatRequestId: null,
             roleBinding: normalizedRole(session.profile),
             permissionScope: permissionScope(session),
-            busyUntil: new Date(now.getTime() + 120000),
+            busyUntil: new Date(now.getTime() + leaseMs),
             updatedAt: now,
             ...(context ? { lastScreenContext: context } : {}),
           },
@@ -255,7 +262,7 @@ export function createOliviaEngine({
     session,
     id,
     requestId,
-    { content, prepared, draft, taskState, activeSkills, metricsPeriod, state: nextState, navigation, hiddenFromChat = false, preservePending = false },
+    { content, prepared, draft, taskState, activeSkills, metricsPeriod, state: nextState, navigation, failure = null, hiddenFromChat = false, preservePending = false },
     config,
   ) {
     const now = clock(),
@@ -315,6 +322,7 @@ export function createOliviaEngine({
             ? "ESPERANDO_CONFIRMACION"
             : preservePending && conversation.pendingActionId ? "ESPERANDO_CONFIRMACION" : nextState || "INFORMACION",
           pendingActionId: actionId || (preservePending ? conversation.pendingActionId : null),
+          lastFailure: failure,
           draft: prepared?.canonicalArgs || (draft !== undefined ? draft : conversation.draft || null),
           ...(taskState !== undefined ? { taskState } : {}),
           ...(metricsPeriod !== undefined ? { metricsPeriod } : {}),
@@ -330,11 +338,14 @@ export function createOliviaEngine({
     if (navigation) result.navigation = navigation;
     return result;
   }
-  async function chat(session, body, { onEvent, signal, voiceInputId = null } = {}) {
+  async function chat(session, body, { onEvent, signal, voiceInputId = null, longRunning = false } = {}) {
     const startedAt = Date.now(), timings = { modelCalls: 0, providerMs: 0, toolsMs: 0 };
     assertOliviaAccess(session);
     const userMessage = safeUserMessage(body.message),
       config = await configuration();
+    // This option is set only by the authenticated background worker, never by
+    // request fields. Quota reservations still include the actual output bound.
+    if (longRunning) config.responseLimits = { ...config.responseLimits, timeoutMs: 300000, providerTimeoutMs: 90000, maxOutputTokens: Math.max(config.responseLimits.maxOutputTokens, 6000) };
     if (!config.enabled)
       throw oliviaError(
         "assistant-disabled",
@@ -395,6 +406,7 @@ export function createOliviaEngine({
         voiceInputId,
         false,
         context,
+        longRunning ? 360000 : 120000,
       );
       claimed = true;
       currentTask = conversation.taskState || null;
@@ -412,6 +424,7 @@ export function createOliviaEngine({
       if (control || progressive) {
         const task = progressive?.task || (conversation.taskState ? { ...conversation.taskState, revision: conversation.taskState.revision + 1, status: control === "cancel" ? "cancelled" : conversation.taskState.status, updatedAt: clock() } : null);
         const prepared = progressive?.result.prepared;
+        signal?.throwIfAborted();
         const result = await saveTurn(session, id, requestId, { content: (voiceSessionId && progressive ? shortVoiceQuestion(task, progressive.content) : progressive?.content) || (control === "cancel" ? "La tarea quedó cancelada." : conversation.pendingActionId ? "Revisá y confirmá con Sí en la tarjeta. La respuesta por voz o texto no ejecuta la acción." : "Dale, seguimos cuando me indiques."), prepared, taskState: task, draft: control === "cancel" ? null : task?.slots || conversation.draft, state: control === "cancel" ? "CANCELADA" : progressive?.result.state || "INFORMACION", preservePending: control === "acknowledge" }, config);
         event = { ...event, conversationId: id, taskId: task?.id || null, route: "deterministic", routingReason: control || "progressive-stock", measurement: "provider", modelCalls: [], tools: deterministicTools, durationMs: Date.now() - startedAt, module: context.module };
         await settleUsage({ store, session, reservation, event, configuration: config, result: { conversationId: id }, now: clock() });
@@ -470,7 +483,7 @@ export function createOliviaEngine({
         },
         ...conversation.messages
           .slice(-16)
-          .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) })),
+          .map((m) => ({ role: m.role, content: m.content.slice(0, 12000) })),
       ];
       const seen = new Map(), loadedTools = new Set();
       const researchSources = new Map();
@@ -508,7 +521,7 @@ export function createOliviaEngine({
         }
         fileCount += selected.length;
         const inputIndex = 1 + index - Math.max(0, conversation.messages.length - 16);
-        if (selected.length) input[inputIndex].content = [{ type: "input_text", text: entry.content.slice(0, 2000) }, ...selected.map(attachmentInput)];
+        if (selected.length) input[inputIndex].content = [{ type: "input_text", text: entry.content.slice(0, 12000) }, ...selected.map(attachmentInput)];
       }
       if (unavailableAttachments.length) input.push({ role: "user", content: JSON.stringify({ type: "UNTRUSTED_CONTEXT_DATA", unavailableAttachments }) });
       let prepared = null,
@@ -516,6 +529,7 @@ export function createOliviaEngine({
         navigation = null,
         nextState = "INFORMACION",
         content = "",
+        failure = null,
         toolCallCount = 0;
       let taskRepairPending = false;
       const entityIds = new Set(), touchedModules = new Set();
@@ -533,7 +547,7 @@ export function createOliviaEngine({
           model: profile.model,
           reasoning: { effort: profile.reasoningEffort },
           store: false,
-          instructions: OLIVIA_INSTRUCTIONS + "\n" + OLIVIA_CATALOG_STOCK_INSTRUCTIONS + "\n" + OLIVIA_METRICS_INSTRUCTIONS + (voiceSessionId ? "\n" + OLIVIA_VOICE_INSTRUCTIONS : "") + "\nAntes de pedir aclaraciones, usá update_task para conservar parámetros parciales. Consultá historia, pantalla y herramientas para resolver entidades por nombre; nunca pidas IDs al usuario. Reutilizá taskState.slots y aplicá correcciones sobre la misma tarea. Al cambiar de intención empezá una nueva tarea. Para análisis preguntá el período si falta, salvo uno explícito o elegido en la charla; nunca lo inventes. Para transferencias consultá depósitos y stock; si solo un origen autorizado alcanza, proponelo; si varios alcanzan, preguntá cuál. Nunca inventes cantidades recibidas físicamente. Una tarea creativa solo existe en marketing/social autorizados." + (activeSkills.length ? "\nProcesos versionados permitidos (no conceden permisos):\n" + activeSkills.map((skill) => skill.content).join("\n\n") : ""),
+          instructions: OLIVIA_INSTRUCTIONS + "\n" + OLIVIA_BATCH_SALE_INSTRUCTIONS + "\n" + OLIVIA_CATALOG_STOCK_INSTRUCTIONS + "\n" + OLIVIA_METRICS_INSTRUCTIONS + (voiceSessionId ? "\n" + OLIVIA_VOICE_INSTRUCTIONS : "") + "\nAntes de pedir aclaraciones, usá update_task para conservar parámetros parciales. Consultá historia, pantalla y herramientas para resolver entidades por nombre; nunca pidas IDs al usuario. Reutilizá taskState.slots y aplicá correcciones sobre la misma tarea. Al cambiar de intención empezá una nueva tarea. Para análisis preguntá el período si falta, salvo uno explícito o elegido en la charla; nunca lo inventes. Para transferencias consultá depósitos y stock; si solo un origen autorizado alcanza, proponelo; si varios alcanzan, preguntá cuál. Nunca inventes cantidades recibidas físicamente. Una tarea creativa solo existe en marketing/social autorizados." + (activeSkills.length ? "\nProcesos versionados permitidos (no conceden permisos):\n" + activeSkills.map((skill) => skill.content).join("\n\n") : ""),
           input,
           tools: finalResponse ? [] : [...toolDefinitions(session, { query: userMessage, context, required: [...activeSkills.flatMap((skill) => skill.requiredTools), taskState.intent], loaded: [...loadedTools] }), taskUpdateTool(capabilities(session))],
           ...(finalResponse ? { tool_choice: "none" } : {}),
@@ -672,7 +686,7 @@ export function createOliviaEngine({
                 : "RECHAZADA";
               draft = args;
               content =
-                (call.name === "prepare_catalog_stock_load" ? result.data?.summary : null) || (result.state === "DATOS_INCOMPLETOS" && OLIVIA_CAPABILITIES[call.name]?.module === "metrics" ? result.data?.message : null) || (result.state === "DATOS_INCOMPLETOS" ? missingQuestion(taskState.missingFields) : null) || result.data?.summary ||
+                (["prepare_catalog_stock_load", "prepare_batch_sales"].includes(call.name) ? result.data?.summary : null) || (result.state === "DATOS_INCOMPLETOS" && OLIVIA_CAPABILITIES[call.name]?.module === "metrics" ? result.data?.message : null) || (result.state === "DATOS_INCOMPLETOS" ? missingQuestion(taskState.missingFields) : null) || result.data?.summary ||
                 result.data?.message ||
                 "La operación necesita revisión.";
             }
@@ -697,7 +711,9 @@ export function createOliviaEngine({
               taskRepairPending = true;
             } else {
               nextState = e.status === 403 ? "RECHAZADA" : "ERROR";
-              content = result.data.message;
+              failure = publicOliviaFailure(e);
+              try { failure = await captureOliviaFailure({ store, session, error: e, operation: "chat", conversationId: id, requestId, now: clock() }); } catch { /* Do not hide the original error. */ }
+              content = failure.message;
             }
           }
           const modelData = result.data?.source?.startsWith("Panel de Métricas") ? metricsForModel(result.data) : result.data || {};
@@ -727,11 +743,12 @@ export function createOliviaEngine({
       if (!prepared && missingSources.length) content += "\n\nFuentes consultadas:\n" + missingSources.map((source) => `- [${source.title.replace(/[\[\]\n]/g, " ")}](${source.url})`).join("\n");
       Object.assign(event, { conversationId: id, taskId: taskState.id, route: profile.route, reasoningEffort: profile.reasoningEffort, routingReason: profile.routingReason, module: context.module, skills: activeSkills.map(({ name, version }) => ({ name, version })), tools: [...seen.keys()].map((key) => JSON.parse(key)[0]), durationMs: Date.now() - startedAt });
       event.modelCalls.forEach((call) => { call.taskId = taskState.id; });
+      signal?.throwIfAborted();
       const result = await saveTurn(
         session,
         id,
         requestId,
-        { content, prepared, draft, taskState, activeSkills, metricsPeriod, state: nextState, navigation },
+        { content, prepared, draft, taskState, activeSkills, metricsPeriod, state: nextState, navigation, failure },
         config,
       );
       const budget = await settleUsage({
@@ -754,6 +771,8 @@ export function createOliviaEngine({
       if (canAccessAdministration(session.profile)) result.telemetry = { requestId, taskId: taskState.id, model: profile.model, reasoningEffort: profile.reasoningEffort, route: profile.route, routingReason: profile.routingReason, calls: event.modelCalls, totalMs: Date.now() - startedAt, ...timings, toolCalls: toolCallCount, responseId: event.responseId, skills: activeSkills.map((skill) => ({ name: skill.name, version: skill.version })), retrieval: knowledgeResult.retrieval, documents: knowledge.map((doc) => ({ id: doc.id, title: doc.title })), retrievalWarning: knowledgeResult.warning || null, knowledgeStorageCostUsd: null };
       return result;
     } catch (e) {
+      let failure = publicOliviaFailure(e);
+      if (e.name !== "AbortError") try { failure = await captureOliviaFailure({ store, session, error: e, operation: "chat", conversationId: id, requestId, now: clock() }); } catch { /* Preserve the original failure. */ }
       if (currentTask?.id) {
         event.taskId = currentTask.id;
         event.modelCalls?.forEach((call) => { call.taskId = currentTask.id; });
@@ -765,10 +784,8 @@ export function createOliviaEngine({
             id,
             requestId,
             {
-              content:
-                e.status && e.status < 500
-                  ? e.message
-                  : "Olivia no pudo completar la consulta. Podés continuar desde el panel manual.",
+              content: failure.message,
+              failure,
               state: "ERROR",
               taskState: currentTask,
               ...(currentTask ? { draft: currentTask.slots } : {}),
@@ -934,7 +951,7 @@ export function createOliviaEngine({
       assertConversationOwner(session, conversation, now);
       if (
         conversation.pendingActionId !== actionId ||
-        conversation.busyRequestId
+        conversation.busyRequestId || conversation.queuedChatRequestId
       )
         throw oliviaError(
           "confirmation-invalid",

@@ -22,6 +22,12 @@ const result = await build({
       export const limit = value => ({limit:value});
       export const startAfter = value => ({cursor:value});
       export const Timestamp = {fromDate: date => date};
+      export function onSnapshot(query, next, error) {
+        const mock = globalThis.__dashboardReadTest;
+        mock.calls.push(query);
+        mock.subscription = { next, error, query };
+        return () => { mock.subscription = null; };
+      }
       export async function getDocs(query) {
         const mock = globalThis.__dashboardReadTest;
         mock.calls.push(query);
@@ -112,4 +118,23 @@ test("errores de lectura se propagan y el reintento de alertas no conserva un re
   mock.error = null;
   assert.deepEqual(await service.listActiveAlerts(admin), []);
   assert.equal(mock.calls.length, 2);
+});
+test("live alerts respect permission scope and unsubscribe when the panel leaves", () => {
+  reset(); let notifications = 0;
+  const denied = { ...admin, permissionDeny: { alerts: ["view", "admin"] } };
+  service.subscribeActiveAlerts(denied, () => notifications++);
+  assert.equal(mock.calls.length, 0);
+  const stop = service.subscribeActiveAlerts({ id: "manager", role: "location_manager", active: true }, () => notifications++);
+  assert.deepEqual(mock.calls[0].constraints[1], { field: "responsibleId", operator: "==", value: "manager" });
+  mock.subscription.next({ docs: [] }); assert.equal(notifications, 1);
+  stop(); assert.equal(mock.subscription, null);
+});
+test("an incoming Olivia report refreshes cached admin alerts without another remote read", async () => {
+  reset(); let notifications = 0;
+  const stop = service.subscribeActiveAlerts(admin, () => notifications++);
+  mock.subscription.next({ docs: [{ id: "report", data: () => ({ name: "Olivia necesita revisión", active: true, severity: "red", responsibleId: "admin" }) }] });
+  assert.equal(notifications, 1);
+  const alerts = await service.listActiveAlerts(admin);
+  assert.equal(alerts[0].id, "report"); assert.equal(mock.calls.length, 1);
+  stop();
 });

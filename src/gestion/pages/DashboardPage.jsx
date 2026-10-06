@@ -35,7 +35,7 @@ import {
   listSalesByRange,
 } from "../services/dashboardService";
 import { invalidateSharedLocations, listLocationsShared } from "../services/sharedResources";
-import { listActiveAlerts } from "../services/alertsService";
+import { listActiveAlerts, subscribeActiveAlerts } from "../services/alertsService";
 
 const SESSION_FORMAT_KEY = "fm-dashboard-period-format";
 const VALID_FORMATS = new Set(["year", "month", "week", "day"]);
@@ -94,6 +94,7 @@ export default function DashboardPage() {
 
   const locationsResult = useAsyncData(() => listLocationsShared(profile), [profile]);
   const alertsResult = useAsyncData(() => listActiveAlerts(profile), [profile]);
+  useEffect(() => subscribeActiveAlerts(profile, () => alertsResult.refresh().catch(() => {})), [profile, alertsResult.refresh]);
   const locations = useMemo(() => locationsResult.data || [], [locationsResult.data]);
   const activeLocations = useMemo(
     () => locations.filter((location) => locationActivity(location).active),
