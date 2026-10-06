@@ -1,16 +1,15 @@
-name: Netlify Preview — PR 36
+name: Netlify Production — PR 36 merge
 
 on:
   push:
     branches:
-      - fix/location-stock-picker-zero-stock-2026-10-05
-  workflow_dispatch:
+      - main
 
 permissions:
   contents: read
 
 jobs:
-  deploy-preview:
+  deploy-production:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -21,7 +20,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Deploy draft to Netlify
+      - name: Deploy production to Netlify
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
@@ -32,9 +31,9 @@ jobs:
           fi
           SITE="${NETLIFY_SITE_ID:-appintegralflormia}"
           npx --yes netlify-cli deploy \
+            --prod \
             --dir=dist \
             --site="$SITE" \
             --auth="$NETLIFY_AUTH_TOKEN" \
-            --alias="pr-36-stock-fix" \
-            --message="PR #36 stock picker preview" \
+            --message="PR #36 merged to main" \
             --json
