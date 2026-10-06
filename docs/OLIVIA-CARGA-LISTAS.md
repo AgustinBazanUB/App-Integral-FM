@@ -4,7 +4,7 @@ El 6 de octubre de 2026 se revisó en Chrome la solicitud de diez productos para
 
 ## Flujo agregado
 
-`prepare_catalog_stock_load` recibe hasta 40 líneas en una sola preparación. Resuelve nombres en el catálogo completo, reutiliza productos y categorías existentes, propone categorías faltantes y abreviaciones únicas basadas en el nombre. Normaliza mayúsculas, acentos, espacios de unidades y singular/plural de categorías. No cambia precios, categorías ni ajustes de productos existentes. Los nombres parecidos o repetidos devuelven opciones verificadas antes de crear un duplicado.
+`prepare_catalog_stock_load` recibe hasta 40 líneas en una sola preparación. Resuelve nombres en el catálogo completo, reutiliza productos y categorías existentes, propone categorías faltantes y abreviaciones únicas basadas en el nombre. Normaliza mayúsculas, acentos, unidades pegadas al nombre, artículos y singular/plural. Muestra los nombres de las coincidencias y conserva sus IDs verificados en la tarea para continuar sin perder la lista. No cambia precios, categorías ni ajustes de productos existentes. Los nombres parecidos o repetidos devuelven opciones verificadas antes de crear un duplicado.
 
 Para un producto nuevo necesita categoría y precio de venta. La categoría puede proponerse por tipo de producto cuando el usuario autorizó crearla; el precio nunca se inventa. Si falta, se pregunta únicamente por esos productos y se conserva la lista entera en la tarea. Un precio cero debe ser indicado explícitamente. Al completar o corregir datos se vuelve a preparar toda la lista.
 
@@ -20,6 +20,7 @@ Las lecturas del catálogo/categorías incluyen todas las páginas y se limitan 
 
 ## Verificación local
 
-814 pruebas generales aprobadas, incluidas diez pruebas nuevas. La lista de diez líneas suma **768 unidades**: el fixture verifica preparación completa, nueve altas y tres categorías nuevas, reutilización de una categoría y del producto existente, stock 4 → 544 y conservación del precio especial y alertas. Comprueba confirmaciones simultáneas, cancelación, cambios concurrentes, pérdida de permisos, repreguntas/correcciones, nombres parecidos, líneas repetidas, auditoría y paginación transaccional.
+815 pruebas generales aprobadas, incluidas once pruebas nuevas. La lista de diez líneas suma **768 unidades**: el fixture verifica preparación completa, nueve altas y tres categorías nuevas, reutilización de una categoría y del producto existente, stock 4 → 544 y conservación del precio especial y alertas. Comprueba confirmaciones simultáneas, cancelación, cambios concurrentes, pérdida de permisos, repreguntas/correcciones, nombres parecidos, líneas repetidas, auditoría y paginación transaccional.
 
 Los nombres/cantidades del caso se usan en fixtures locales con precios ficticios. No se confirman ingresos en la base empresarial durante las pruebas. La entrega se actualiza en el PR 37 y su Deploy Preview; no se hace merge a main ni se despliegan reglas/índices o producción. La conversación por voz permanece pausada.
+

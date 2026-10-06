@@ -5,10 +5,12 @@ import { buildMasterProductPayload } from "../../../../src/shared/productWritePl
 import { buildLocationStockLinePlan } from "../../../../src/shared/operationalWritePlans.mjs";
 import { oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
 
-const key = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/(\d)\s+(cc|ml|kg|gr)\b/g, "$1$2").replace(/[^a-z0-9]+/g, " ").trim();
+const key = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/([a-z])(\d)/g, "$1 $2").replace(/(\d)\s+(cc|ml|kg|gr)\b/g, "$1$2").replace(/[^a-z0-9]+/g, " ").trim();
 const digest = value => createHash("sha256").update(value).digest("hex");
 const entityIdFor = name => `olivia_${digest(key(name)).slice(0, 24)}`;
 const categoryKey = value => key(value).split(" ").map(word => word.length > 3 && word.endsWith("s") ? word.slice(0, -1) : word).join(" ");
+const productWords = value => categoryKey(value).split(" ").filter(word => !["de", "del", "la", "las", "el", "los"].includes(word));
+const productKey = value => productWords(value).join(" ");
 const unavailable = row => !row || row.deleted === true || row.active === false;
 const clean = value => value instanceof Date ? value.toISOString() : Array.isArray(value) ? value.map(clean) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).filter(k => !k.startsWith("__")).sort().map(k => [k, clean(value[k])])) : value;
 const catalogSnapshot = rows => Object.fromEntries(rows.map(row => [row.id, { name: row.name || "", abbreviation: row.abbreviation || "", active: row.active !== false, deleted: row.deleted === true }]));
@@ -67,15 +69,15 @@ export async function catalogStockPlan({ session, args, store, now = new Date(),
       product = products.find(row => row.id === item.productId);
       if (!product) throw oliviaError("product-unavailable", `${name}: el producto elegido ya no existe. Revisá la selección.`, 409);
     } else {
-      const exact = products.filter(row => key(row.name) === key(name) || key(row.abbreviation) === key(name));
-      const words = key(name).split(" ");
+      const exact = products.filter(row => productKey(row.name) === productKey(name) || key(row.abbreviation) === key(name));
+      const words = productWords(name);
       const similar = exact.length ? exact : products.filter(row => {
         const target = key(row.name);
-        return words.length > 1 && words.every(word => target.split(" ").includes(word)) || Math.abs(target.length - key(name).length) <= 2 && key(name).length > 6 && distance(target, key(name)) <= 2;
+        return words.length > 1 && words.every(word => productWords(row.name).includes(word)) || Math.abs(target.length - key(name).length) <= 2 && key(name).length > 6 && distance(target, key(name)) <= 2;
       });
       if (exact.length === 1) product = exact[0];
       else if (similar.length) {
-        missing.push(`items.${index}.productId`); questions.push(`cuál producto corresponde a «${name}»`);
+        missing.push(`items.${index}.productId`); questions.push(`cuál producto corresponde a «${name}»: ${similar.slice(0, 10).map(row => `${row.name}${unavailable(row) ? " (desactivado)" : ""}`).join(" o ")}. Si es otra presentación, indicá el nombre completo para crearla`);
         choices.push({ index, name, products: similar.slice(0, 10).map(row => ({ productId: row.id, name: row.name, available: !unavailable(row) })) });
         continue;
       }

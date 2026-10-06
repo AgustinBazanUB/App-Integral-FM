@@ -42,7 +42,7 @@ export function updateTask(previous, intent, slotsJson, now = new Date()) {
   const same = previous?.intent === intent && !["cancelled", "completed"].includes(previous.status);
   const slots = { ...(same ? previous.slots : {}), ...patch };
   const missing = requiredFields(intent).filter((key) => slots[key] == null || slots[key] === "" || (Array.isArray(slots[key]) && !slots[key].length));
-  return { id: same ? previous.id : randomUUID(), intent, revision: (same ? previous.revision : 0) + 1, status: "collecting", slots, missingFields: missing, ambiguities: {}, route: same ? previous.route || null : null, createdAt: same ? previous.createdAt : now, updatedAt: now };
+  return { id: same ? previous.id : randomUUID(), intent, revision: (same ? previous.revision : 0) + 1, status: "collecting", slots, missingFields: missing, ambiguities: same && intent === "prepare_catalog_stock_load" ? previous.ambiguities || {} : {}, route: same ? previous.route || null : null, createdAt: same ? previous.createdAt : now, updatedAt: now };
 }
 export function missingQuestion(fields = []) {
   const more = { startDate: "la fecha", endDate: "la fecha de cierre", days: "la cantidad de días", objective: "el objetivo", audience: "el público", format: "el formato", name: "el nombre", type: "el tipo", codePrefix: "el prefijo", dniMode: "si el DNI es obligatorio", phone: "el teléfono", amountCents: "el monto", category: "la categoría", nature: "el tipo de gasto", accruedOn: "la fecha del gasto", entityId: "el registro que querés revisar", customerId: "el cliente", items: "los productos y cantidades" };
@@ -63,7 +63,7 @@ export function taskFromTool(previous, intent, args, result, now = new Date()) {
   const same = previous?.intent === intent && !["cancelled", "completed"].includes(previous.status);
   const slots = structuredClone(result.prepared?.canonicalArgs || args);
   const missing = result.data?.missing || result.data?.missingFields || requiredFields(intent).filter((key) => slots[key] == null || slots[key] === "");
-  return { id: same ? previous.id : randomUUID(), intent, revision: (same ? previous.revision : 0) + 1, status: result.prepared ? "prepared" : "collecting", slots, missingFields: result.prepared ? [] : missing, ambiguities: {}, route: same ? previous.route || null : null, createdAt: same ? previous.createdAt : now, updatedAt: now };
+  return { id: same ? previous.id : randomUUID(), intent, revision: (same ? previous.revision : 0) + 1, status: result.prepared ? "prepared" : "collecting", slots, missingFields: result.prepared ? [] : missing, ambiguities: intent === "prepare_catalog_stock_load" && result.data?.choices?.length ? { catalogProducts: structuredClone(result.data.choices) } : {}, route: same ? previous.route || null : null, createdAt: same ? previous.createdAt : now, updatedAt: now };
 }
 export function taskControl(text) {
   const value = normalize(text);

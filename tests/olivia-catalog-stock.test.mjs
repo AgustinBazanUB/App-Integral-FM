@@ -26,6 +26,28 @@ async function proposal(f) {
 const rows = (f, prefix) => [...f.documents].filter(([path]) => path.startsWith(prefix));
 const businessCount = f => [...f.documents].filter(([path]) => !path.startsWith("olivia") && !path.startsWith("users/")).length;
 
+test("los nombres abreviados o plurales reutilizan catálogo y conservan opciones verificadas", async () => {
+  const f = catalogFixture([item("Arbequina500cc", 540, { defaultPrice: null }), item("pasta aceitunas negras", 24, { defaultPrice: null })]);
+  f.documents.set("products/oil", { ...f.documents.get("products/oil"), name: "Aceite de Oliva Arbequina 500cc" });
+  f.documents.set("products/pasta", { name: "Pasta de Aceitunas Negra", abbreviation: "PSTNEGRA", categoryId: "jam", categoryName: "Mermeladas", defaultPrice: 12000, active: true, deleted: false });
+  const before = businessCount(f);
+  const first = await prepareTool(f);
+  assert.equal(first.state, "DATOS_INCOMPLETOS");
+  assert.match(first.data.summary, /Aceite de Oliva Arbequina 500cc/);
+  assert.doesNotMatch(first.data.summary, /precio de venta/);
+  assert.deepEqual(first.data.choices.map(choice => choice.name), ["Arbequina500cc"]);
+  const task = taskFromTool(null, tool, f.args, first);
+  assert.equal(task.ambiguities.catalogProducts[0].products[0].productId, "oil");
+  const patched = updateTask(task, tool, JSON.stringify({ reason: "Mercadería recibida" }));
+  assert.deepEqual(patched.ambiguities, task.ambiguities);
+  f.args.items[0].productId = task.ambiguities.catalogProducts[0].products[0].productId;
+  const ready = await prepareTool(f);
+  assert.match(ready.prepared.summary, /0 productos y 0 categorías/);
+  assert.match(ready.prepared.summary, /Reutilizar Pasta de Aceitunas Negra/);
+  assert.equal(businessCount(f), before);
+  assert.equal(f.commits.length, 0);
+});
+
 test("la lista de diez productos se prepara completa, reutiliza categorías/nombres y no modifica datos", async () => {
   const f = catalogFixture(), before = businessCount(f);
   const result = await prepareTool(f);
