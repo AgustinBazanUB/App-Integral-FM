@@ -10,18 +10,21 @@ service cloud.firestore {
       return signedIn() && user.active == true;
     }
     function normalizedRoleValue(role) {
-      return role in ["administrator", "administrador"] ? "admin"
-        : role == "administrador_general" ? "general_admin"
-        : role == "administrador_operativo" ? "operational_admin"
-        : role == "encargado_ubicacion" ? "location_manager"
-        : role == "responsable_deposito" ? "warehouse_manager"
-        : role == "responsable_marketing" ? "marketing_manager"
-        : role == "responsable_ecommerce" ? "ecommerce_manager"
-        : role == "responsable_envios" ? "shipping_manager"
-        : role == "responsable_proveedores" ? "supplier_manager"
-        : role == "responsable_financiero" ? "financial_manager"
-        : role == "analista_metricas" ? "analyst"
-        : role;
+      // Un lookup evita repetir una cadena de condiciones en cada comprobación.
+      // Mantiene exactamente los mismos alias y el rol original como fallback.
+      return {
+        "administrator": "admin", "administrador": "admin",
+        "administrador_general": "general_admin",
+        "administrador_operativo": "operational_admin",
+        "encargado_ubicacion": "location_manager",
+        "responsable_deposito": "warehouse_manager",
+        "responsable_marketing": "marketing_manager",
+        "responsable_ecommerce": "ecommerce_manager",
+        "responsable_envios": "shipping_manager",
+        "responsable_proveedores": "supplier_manager",
+        "responsable_financiero": "financial_manager",
+        "analista_metricas": "analyst"
+      }.get(role, role);
     }
     function adminRole() {
       let user = profile();
