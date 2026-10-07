@@ -277,11 +277,11 @@ export default function QuickSalesPage() {
     <div className="fm-page-enter fm-quick-pos">
       <PageHeader eyebrow="Administración" title="Venta rápida" description="Elegí productos, completá el pago y continuá." />
       <div className="fm-quick-pos__context">
-        <Button variant="secondary" disabled={locked} onClick={openOriginDialog}>Canal y origen: {SALES_CHANNELS.find(option => option.value === channel)?.label || "Elegir canal"} · {stockType === "warehouse" ? "Depósito" : "Local"} · {selectedLocation?.name || "Elegir ubicación"}</Button>
+        <Button variant="secondary" disabled={locked} onClick={openOriginDialog}>Canal y origen</Button>
       </div>
       <div className="fm-quick-pos__layout">
         <section className="fm-quick-pos__catalog" aria-label="Catálogo de productos">
-          <FormField label="Buscar producto"><input type="search" disabled={locked} value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar en el catálogo" /></FormField>
+          <FormField label="Buscar producto o catálogo"><input type="search" disabled={locked} value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar en catálogo" /></FormField>
           {[locationsResult, warehousesResult, productsResult].some(result => result.status === "error") ? <EmptyState icon="AlertTriangle" title="No se pudieron leer los recursos" description="Revisá conexión y permisos." /> : null}
           {productsResult.status === "loading" || stock.status === "loading" ? <Skeleton lines={4} /> : null}
           {stock.status === "error" ? <EmptyState icon="AlertTriangle" title="No se pudo leer el stock" description={stock.error.message} /> : null}
