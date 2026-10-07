@@ -533,7 +533,7 @@ export default function OliviaAssistant() {
     <OliviaLauncherPortal><button ref={launcherRef} type="button" className="fm-olivia-launcher" aria-label={open ? "Cerrar Olivia" : "Abrir Olivia, asistente de Flor Mía"} aria-expanded={open} aria-controls="fm-olivia-drawer" onClick={() => open ? close() : setOpen(true)}>
       <OliviaFace active={busy || recording || voiceActive} /><span className="fm-olivia-launcher__label"><strong>Olivia</strong><small>Asistente de IA</small></span>
     </button></OliviaLauncherPortal>
-    {createPortal(<>
+    {createPortal(<div className="fm-management-body fm-olivia-modal-host">
     {open ? <div className="fm-olivia-overlay" role="presentation"><aside ref={drawerRef} id="fm-olivia-drawer" className={`fm-olivia-drawer${viewport?.height < 500 ? " is-compact" : ""}`} style={viewport ? { "--olivia-viewport-height": `${viewport.height}px`, "--olivia-viewport-top": `${viewport.top}px` } : undefined} role="dialog" aria-modal="true" aria-labelledby="fm-olivia-title">
       <header className="fm-olivia-header">
         <OliviaFace active={busy || recording || voiceActive}/><div className="fm-olivia-identity"><div className="fm-olivia-title-line"><h2 id="fm-olivia-title">Olivia</h2><span>— Asistente Flor Mía —</span></div><small>Olivia · {context.module === "seller" ? "Panel Vendedor" : "Panel Administrador"}</small></div>
@@ -563,6 +563,6 @@ export default function OliviaAssistant() {
       {!admin && exhausted ? <div className="fm-olivia-quota-request"><Button variant="secondary" disabled={busy || !online || quotaRequested} onClick={() => setQuotaRequestOpen(true)}>{quotaRequested ? "Ampliación solicitada" : "Solicitar ampliación"}</Button>{quotaNotice ? <p role="status">{quotaNotice}</p> : null}</div> : null}
     </aside></div> : null}
     <Modal open={quotaRequestOpen} title="Solicitar ampliación de Olivia" description="Enviaremos al Administrador una solicitud de ampliación para tu cupo del período actual." onClose={() => { if (!busy) setQuotaRequestOpen(false); }} footer={<div className="fm-dialog-actions"><Button variant="secondary" disabled={busy} onClick={() => setQuotaRequestOpen(false)}>No</Button><Button loading={busy} onClick={requestQuotaExtension}>Sí, solicitar</Button></div>}><p>La solicitud no cambia tu cupo. El Administrador puede conceder una ampliación temporal desde Configuración de IA.</p>{error ? <p className="fm-form-error" role="alert">{error}</p> : null}</Modal>
-    </>, document.body)}
+    </div>, document.body)}
   </>;
 }
