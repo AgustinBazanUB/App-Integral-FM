@@ -20,7 +20,6 @@ import {
   Badge,
   Button,
   ConfirmationDialog,
-  Dropdown,
   EmptyState,
   Modal,
   Panel,

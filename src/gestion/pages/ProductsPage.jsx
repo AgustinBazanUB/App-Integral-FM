@@ -82,7 +82,7 @@ export default function ProductsPage() {
     setFormOpen(true);
   };
 
-  if (result.status === "loading") return <div className="fm-page-enter"><Skeleton lines={8} /></div>;
+  if (result.status === "loading" && !result.data) return <div className="fm-page-enter"><Skeleton lines={8} /></div>;
   if (result.status === "error") return <div className="fm-page-enter"><Panel><EmptyState icon="AlertTriangle" title="No se pudo abrir Productos" description={result.error.message} /></Panel></div>;
 
   const canCreate = can(profile, "products", "create");
