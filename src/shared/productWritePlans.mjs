@@ -25,6 +25,7 @@ export function buildMasterProductPayload(values, categoryName, profile, editing
     redAlertQty,
     categoryId: String(values.categoryId || "").trim(),
     categoryName,
+    ...(typeof values.subcategoryId === "string" ? { subcategoryId: values.subcategoryId.trim(), subcategoryName: String(values.subcategoryName || "").trim() } : {}),
     imageUrl: String(values.imageUrl || "").trim(),
     thumbUrl: String(values.thumbUrl || values.imageUrl || "").trim(),
     imageAlt: String(values.imageAlt || name).trim(),

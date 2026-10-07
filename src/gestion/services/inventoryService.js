@@ -1,4 +1,6 @@
 import { buildMasterProductPayload } from "../../shared/productWritePlans.mjs";
+import { categorySubcategories } from "../../shared/productSubcategories.mjs";
+import { invalidateRuntimeCache } from "./runtimeCache";
 import { buildStockTransferWrites } from "../../shared/stockTransferWritePlans.mjs";
 import {
   collection,
@@ -111,6 +113,7 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
     productId ? "No tenés permiso para editar productos." : "No tenés permiso para crear productos.",
   );
   let categoryName = "Sin categoría";
+  let subcategoryName = "";
   const categoryId = String(values.categoryId || "").trim();
   if (categoryId) {
     const categorySnapshot = await getDoc(doc(db, "productCategories", categoryId));
@@ -118,7 +121,13 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
       throw new Error("La categoría seleccionada ya no está disponible.");
     }
     categoryName = categorySnapshot.data().name || "Sin categoría";
+    if (values.subcategoryId) {
+      const subcategory = categorySubcategories(categorySnapshot.data()).find(row => row.id === values.subcategoryId);
+      if (!subcategory) throw new Error("La subcategoría no pertenece a la categoría elegida.");
+      subcategoryName = subcategory.name;
+    }
   }
+  if (!categoryId && values.subcategoryId) throw new Error("Elegí la categoría de esta subcategoría.");
 
   // Crear/editar productos es una acción infrecuente. Esta lectura acotada prioriza
   // no generar duplicados incluso con productos legacy que todavía no tienen nameKey.
@@ -132,7 +141,7 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
   if (duplicate) throw new Error("Ya existe un producto con ese nombre o abreviación.");
 
   const productRef = productId ? doc(db, "products", productId) : doc(collection(db, "products"));
-  const payload = productPayload(values, categoryName, profile, Boolean(productId));
+  const payload = productPayload({ ...values, subcategoryName }, categoryName, profile, Boolean(productId));
   const auditRef = doc(collection(db, "auditLogs"));
   const batch = writeBatch(db);
   batch.set(productRef, payload, { merge: true });
@@ -150,6 +159,8 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
     createdAt: serverTimestamp(),
   });
   await batch.commit();
+  invalidateRuntimeCache("products:");
+  invalidateRuntimeCache("seller-resources:");
   return productRef.id;
 }
 

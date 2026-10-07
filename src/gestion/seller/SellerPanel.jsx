@@ -2,6 +2,7 @@ import { effectiveLocationPrice } from "../../modules/inventory/domain/inventory
 import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
 import SaleStockWarning from "../components/SaleStockWarning";
 import ProductImage from "../components/ProductImage";
+import ProductSubcategoryRows from "../components/ProductSubcategoryRows";
 import PanelLoading from "../../components/PanelLoading";
 import { OliviaLauncherSlot } from "../olivia/LauncherHost";
 import { resolveProductImages } from "../../shared/productImages.mjs";
@@ -95,6 +96,13 @@ const friendlyPayment = {
 const customerZone = (customer = {}) => customer.zoneName || customer.customZone || customer.zone || "";
 const asArray = (value) => Array.isArray(value) ? value : [];
 
+function SellerProfileAvatar({ profile }) {
+  const source = profile.photoUrl || profile.avatarUrl || profile.photoURL;
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [source]);
+  return <span className="fm-avatar">{source && !failed ? <img src={source} alt="" onError={() => setFailed(true)} /> : String(profile.name || profile.email || "V").slice(0, 1).toUpperCase()}</span>;
+}
+
 function SellerHeader({
   profile,
   location,
@@ -125,12 +133,13 @@ function SellerHeader({
           <button type="button" className={`fm-seller-pending-chip ${pendingCount ? "has-pending" : ""}`} onClick={() => setView("pending")}>
             Pendientes <strong>{pendingCount}</strong>
           </button>
-          <Dropdown label={<span className="fm-profile-trigger"><span className="fm-avatar">{String(profile.name || profile.email || "V").slice(0, 1).toUpperCase()}</span><span><strong>{profile.name || "Usuario"}</strong><small>Panel Vendedor</small></span><Icon name="ChevronDown" /></span>}>
+          <details className="fm-dropdown fm-seller-profile">
+            <summary aria-label={`Perfil de ${profile.name || "usuario"}`} title="Abrir opciones del perfil"><SellerProfileAvatar profile={profile} /></summary>
             <div className="fm-profile-menu">
               {canReturnAdmin ? <button type="button" onClick={onReturnAdmin}><Icon name="LayoutDashboard" />Volver al Panel Administrador</button> : null}
               <button type="button" onClick={onLogout}><Icon name="LogOut" />Cerrar sesión</button>
             </div>
-          </Dropdown>
+          </details>
         </div>
       </header>
       <nav className="fm-seller-nav" aria-label="Secciones del Panel Vendedor">
@@ -324,6 +333,8 @@ export default function SellerPanel() {
   const masterById = useMemo(() => new Map((resourcesResult.data?.products || []).map((product) => [product.id, product])), [resourcesResult.data?.products]);
   const products = useMemo(() => stockData.map((item) => ({
     ...item,
+    subcategoryId: masterById.get(item.productId || item.id)?.subcategoryId ?? item.subcategoryId,
+    subcategoryName: masterById.get(item.productId || item.id)?.subcategoryName ?? item.subcategoryName,
     ...resolveProductImages(masterById.get(item.productId || item.id), item),
     price: effectiveLocationPrice(masterById.get(item.productId || item.id) || { defaultPrice: item.masterDefaultPrice ?? item.price ?? 0 }, item),
     availableStock: Number(item.currentStock || 0) - Number(reserved[item.id] || 0) +
@@ -765,20 +776,18 @@ export default function SellerPanel() {
                   </button>
                 </h2>
                 {open ? (
-                  <div className="fm-seller-products" id={controlId}>
-                    {group.items.map((product) => {
+                  <div id={controlId}>
+                    <ProductSubcategoryRows items={group.items} category={categories.find(category => category.id === group.id) || { name: group.name }} className="fm-seller-products" renderProduct={(product) => {
                       const qty = Number(cart[product.id]?.qty || 0);
                       return (
-                        <button key={product.id} type="button" className={qty ? "is-selected" : ""} onClick={() => addProduct(product)}>
-                          {product.buttonKey || product.buttonLabel ? <span className="fm-seller-key">{product.buttonLabel || product.buttonKey}</span> : null}
+                        <button key={product.id} type="button" className={qty ? "is-selected" : ""} aria-label={`Agregar ${product.productName}, stock ${product.currentStock}`} title={product.productName} onClick={() => addProduct(product)}>
                           <ProductImage product={product} eager />
                           <strong>{product.abbreviation || product.productName}</strong>
-                          <span>{product.productName}</span>
-                          <small>{formatMoney(product.price)} · Stock {product.availableStock}</small>
+                          <small>Stock total {product.currentStock}</small>
                           {qty ? <b>{qty}</b> : null}
                         </button>
                       );
-                    })}
+                    }} />
                   </div>
                 ) : null}
               </section>

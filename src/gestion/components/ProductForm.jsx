@@ -10,11 +10,13 @@ import {
 import { productImages } from "../../data/productImages";
 import HelpTooltip from "./HelpTooltip";
 import { saveMasterProduct } from "../services/inventoryService";
+import { categorySubcategories, productSubcategory } from "../../shared/productSubcategories.mjs";
 
 const emptyForm = {
   name: "",
   abbreviation: "",
   categoryId: "",
+  subcategoryId: "",
   description: "",
   defaultPrice: 0,
   arcaVatRate: "",
@@ -28,7 +30,7 @@ const emptyForm = {
   buttonLabel: "",
 };
 
-function initialForm(product) {
+function initialForm(product, categories = []) {
   if (!product) return emptyForm;
   const selectedImage = productImages.find((image) => image.imageUrl === product.imageUrl);
   return {
@@ -36,6 +38,7 @@ function initialForm(product) {
     name: product.name || product.productName || "",
     abbreviation: product.abbreviation || "",
     categoryId: product.categoryId || "",
+    subcategoryId: productSubcategory(product, categories.find(category => category.id === product.categoryId) || { name: product.categoryName })?.id || "",
     description: product.description || "",
     defaultPrice: Number(product.defaultPrice || 0),
     arcaVatRate: product.arcaVatRate == null ? "" : String(product.arcaVatRate),
@@ -52,7 +55,7 @@ function initialForm(product) {
 
 export default function ProductForm({ open, product, categories, profile, onClose, onSaved }) {
   const editing = Boolean(product?.id);
-  const [form, setForm] = useState(() => initialForm(product));
+  const [form, setForm] = useState(() => initialForm(product, categories));
   const [imageSearch, setImageSearch] = useState("");
   const [imageCategory, setImageCategory] = useState("");
   const [recording, setRecording] = useState(false);
@@ -60,7 +63,7 @@ export default function ProductForm({ open, product, categories, profile, onClos
 
   useEffect(() => {
     if (!open) return;
-    setForm(initialForm(product));
+    setForm(initialForm(product, categories));
     setImageSearch("");
     setImageCategory("");
     setRecording(false);
@@ -137,9 +140,15 @@ export default function ProductForm({ open, product, categories, profile, onClos
           <input maxLength="8" value={form.abbreviation} onChange={(event) => setForm({ ...form, abbreviation: event.target.value.toUpperCase() })} />
         </FormField>
         <FormField label="Categoría">
-          <Select value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
+          <Select value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value, subcategoryId: "" })}>
             <option value="">Sin categoría</option>
             {(categories || []).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </Select>
+        </FormField>
+        <FormField label="Subcategoría" hint="Podés crear nuevas desde Subcategorías, en el catálogo.">
+          <Select value={form.subcategoryId} onChange={event => setForm({ ...form, subcategoryId: event.target.value })}>
+            <option value="">Sin subcategoría</option>
+            {categorySubcategories((categories || []).find(category => category.id === form.categoryId)).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}
           </Select>
         </FormField>
         <FormField label="Precio predeterminado" hint="Las ubicaciones que usen este precio se actualizarán automáticamente." required>

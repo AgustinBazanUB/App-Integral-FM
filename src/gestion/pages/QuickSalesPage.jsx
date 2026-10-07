@@ -23,11 +23,12 @@ import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
 import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
 import SaleStockWarning from "../components/SaleStockWarning";
 import ProductImage from "../components/ProductImage";
+import ProductSubcategoryRows from "../components/ProductSubcategoryRows";
 import { can, effectiveSellerLocations } from "../permissions";
 import { joinMasterProducts } from "../../modules/locations/domain/dashboard";
 import { findCustomerByPhone, listActiveCustomerZones } from "../services/customerService";
 import { buildCustomerDraft } from "../customers/customerDomain";
-import { listLocationsShared, listMasterProductsShared, listDiscountsShared } from "../services/sharedResources";
+import { listLocationsShared, listMasterProductsShared, listDiscountsShared, listProductCategoriesShared } from "../services/sharedResources";
 import { readQuickSaleIntent, saveQuickSaleIntent, clearQuickSaleIntent } from "../seller/quickSaleIntent";
 import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
 import { useAuth } from "../AuthContext";
@@ -60,6 +61,7 @@ export default function QuickSalesPage() {
   const locationsResult = useAsyncData(() => listLocationsShared(profile), [profile.id]);
   const warehousesResult = useAsyncData(() => listWarehouses(profile), [profile.id]);
   const productsResult = useAsyncData(() => listMasterProductsShared(profile), [profile.id]);
+  const categoriesResult = useAsyncData(() => listProductCategoriesShared(profile), [profile.id]);
   const discountsResult = useAsyncData(() => listDiscountsShared(profile), [profile.id]);
   const [stockType, setStockType] = useState(restored?.stockOrigin?.type || "location");
   const [locationId, setLocationId] = useState(restored?.stockOrigin?.id || "");
@@ -289,14 +291,14 @@ export default function QuickSalesPage() {
             {stock.status === "ready" && groups.map(group => <section key={group.id} className={`fm-quick-pos__category ${openCategoryId === group.id ? "is-open" : ""}`}>
               <button type="button" className="fm-quick-pos__category-toggle" aria-expanded={openCategoryId === group.id} aria-controls={`quick-category-${group.id}`} onClick={() => setOpenCategoryId(current => current === group.id ? null : group.id)}>{group.name}<span>{group.items.length}</span></button>
               {openCategoryId === group.id ? <div id={`quick-category-${group.id}`}>
-              <div className="fm-quick-pos__carousel">{group.items.map(item => {
+              <ProductSubcategoryRows items={group.items} category={(categoriesResult.data || []).find(category => category.id === group.id) || { name: group.name }} className="fm-quick-pos__carousel" renderProduct={item => {
                 const qty = Number(quantities[item.id] || 0);
                 return <button key={item.id} type="button" className={`fm-quick-pos__tile ${qty ? "is-selected" : ""}`} aria-label={`Agregar ${item.productName}`} disabled={locked || !item.hasLocalRecord || item.active === false || (stockType === "warehouse" && qty >= Number(item.currentStock || 0))} onClick={() => changeQty(item, 1)}>
                   <ProductImage className="fm-quick-pos__product-mark" product={item} eager />
                   <strong>{item.productName}</strong><span>{formatMoney(item.price)}</span><small>{item.currentStock > 0 ? `${item.currentStock} disponibles` : `Stock registrado: ${item.currentStock}`}</small>
                   {qty > 0 ? <b className="fm-quick-pos__count">{qty}</b> : null}
                 </button>;
-              })}</div>
+              }} />
               </div> : null}
             </section>)}
           </div>
