@@ -15,6 +15,7 @@ import {
   moduleById,
 } from "./modules";
 import { preloadManagementRoute } from "./routePreload";
+import { OliviaLauncherSlot } from "./olivia/LauncherHost";
 import {
   canAccessManagementRoute,
   canAccessSellerPanel,
@@ -164,6 +165,7 @@ export default function ManagementShell({ children }) {
           </div>
         </div>
         <div className="fm-management-header__actions">
+          <OliviaLauncherSlot />
           <ConnectionIndicator />
           <button
             ref={profileTriggerRef}

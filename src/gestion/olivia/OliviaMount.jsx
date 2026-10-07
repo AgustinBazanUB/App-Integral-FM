@@ -1,6 +1,7 @@
 import { Component, lazy, Suspense } from "react";
 import { useAuth } from "../AuthContext";
 import { can, canAccessAdministration, canAccessSellerPanel, isPureSeller } from "../permissions";
+import { OliviaLauncherPortal } from "./LauncherHost";
 
 const OliviaAssistant = lazy(() => import("./OliviaAssistant"));
 
@@ -8,7 +9,7 @@ class OliviaBoundary extends Component {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
   render() {
-    if (this.state.failed) return <button type="button" className="fm-button fm-button--secondary" style={{ position: "fixed", bottom: 20, right: 20, zIndex: 45 }} onClick={() => this.setState({ failed: false })}>Reintentar Olivia</button>;
+    if (this.state.failed) return <OliviaLauncherPortal><button type="button" className="fm-button fm-button--secondary" onClick={() => this.setState({ failed: false })}>Reintentar Olivia</button></OliviaLauncherPortal>;
     return this.props.children;
   }
 }

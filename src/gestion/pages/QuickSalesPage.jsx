@@ -275,11 +275,9 @@ export default function QuickSalesPage() {
 
   return (
     <div className="fm-page-enter fm-quick-pos">
-      <PageHeader eyebrow="Administración" title="Venta rápida" description="Elegí productos, completá el pago y continuá." />
-      <div className="fm-quick-pos__context">
-        <Button variant="secondary" disabled={locked} onClick={openOriginDialog}>Canal y origen</Button>
-      </div>
       <div className="fm-quick-pos__layout">
+        <div className="fm-quick-pos__catalog-column">
+        <PageHeader eyebrow="Administración" title="Venta rápida" />
         <section className="fm-quick-pos__catalog" aria-label="Catálogo de productos">
           <FormField label="Buscar producto o catálogo"><input type="search" disabled={locked} value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar en catálogo" /></FormField>
           {[locationsResult, warehousesResult, productsResult].some(result => result.status === "error") ? <EmptyState icon="AlertTriangle" title="No se pudieron leer los recursos" description="Revisá conexión y permisos." /> : null}
@@ -303,6 +301,7 @@ export default function QuickSalesPage() {
             </section>)}
           </div>
         </section>
+        </div>
         <section className="fm-quick-pos__sale" aria-label="Venta actual">
           <div className="fm-quick-pos__cart-head"><h2>Venta actual</h2><Button variant="ghost" disabled={locked || !cart.length} onClick={() => { setQuantities({}); setPrices({}); }}>Vaciar</Button></div>
           <div className="fm-quick-pos__cart">
@@ -314,13 +313,12 @@ export default function QuickSalesPage() {
           </div>
           <SaleStockWarning discrepancies={stockDiscrepancies} />
           <div className="fm-quick-pos__extras">
-            <Button variant="secondary" disabled={locked || discountsResult.status === "loading"} onClick={() => setDialog("discount")}>Agregar descuento</Button>
-            <Button variant="secondary" disabled={locked} onClick={() => setDialog("customer")}>{customer.phone ? customer.name || customer.phone : "Agregar cliente"}</Button>
+            <Button variant="secondary" disabled={locked || discountsResult.status === "loading"} onClick={() => setDialog("discount")}>Descuento</Button>
+            <Button variant="secondary" disabled={locked} title={customer.phone ? customer.name || customer.phone : undefined} onClick={() => setDialog("customer")}>Cliente</Button>
             <Button variant="secondary" disabled={locked} aria-pressed={deliveryMethod === "shipping"} onClick={() => setDeliveryMethod(deliveryMethod === "shipping" ? "pickup" : "shipping")}>{deliveryMethod === "shipping" ? "Con envío" : "Retiro"}</Button>
-            {customer.phone ? <Button variant="ghost" disabled={locked} onClick={() => setCustomer({ phone: "", name: "", zoneName: "" })}>Quitar cliente</Button> : null}
+            <Button variant="secondary" disabled={locked} onClick={openOriginDialog}>Canal</Button>
           </div>
           {appliedDiscounts.length ? <div className="fm-quick-pos__discounts">{appliedDiscounts.map((discount, index) => <button type="button" disabled={locked} key={`${discount.id || discount.discountId}-${index}`} aria-label={`Quitar ${discount.name}`} onClick={() => discount.source === "manual" ? setManualDiscounts(manual => manual.filter(entry => entry !== discount)) : setDiscountIds(ids => ids.filter(id => id !== (discount.discountId || discount.id)))}>{discount.name} ×</button>)}</div> : null}
-          <div className="fm-quick-pos__totals"><span>{cart.reduce((count, item) => count + item.qty, 0)} productos · Subtotal</span><strong>{formatMoney(subtotal)}</strong>{saleSummary.discountTotal > 0 ? <><span>Descuentos</span><strong>− {formatMoney(saleSummary.discountTotal)}</strong></> : null}{saleSummary.cashRoundingDiscountTotal > 0 ? <><span>Incluye redondeo por efectivo</span><strong>− {formatMoney(saleSummary.cashRoundingDiscountTotal)}</strong></> : null}<span>Total</span><strong className="fm-quick-pos__total">{formatMoney(saleSummary.total)}</strong></div>
           <div className="fm-quick-pos__payments" role="group" aria-label="Forma de pago">{PAYMENT_OPTIONS.map(option => <button type="button" key={option.value} disabled={locked || (option.value === "multiple" && !can(profile, "quick-sales", "useMultiplePayments"))} aria-pressed={paymentMethod === option.value} className={paymentMethod === option.value ? "is-selected" : ""} onClick={() => { setPaymentMethod(option.value); if (option.value === "multiple") setDialog("payments"); }}>{friendlyPayments[option.value] || option.label}{option.value === "multiple" && paymentMethod === "multiple" ? <small>{paymentStatus}</small> : null}</button>)}</div>
         </section>
       </div>
@@ -337,7 +335,7 @@ export default function QuickSalesPage() {
         {cart.length ? <p>Cambiar el origen vacía los productos seleccionados.</p> : null}
       </Modal>
       <DiscountDialog open={dialog === "discount"} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} initialManualDiscounts={manualDiscounts} manualAllowed={can(profile, "quick-sales", "useManualDiscounts")} onClose={() => setDialog("")} onApply={({ savedIds, manual }) => { setDiscountIds(savedIds); setManualDiscounts(manual); setDialog(""); }} />
-      <CustomerDialog open={dialog === "customer"} zones={zonesResult.data || []} initialCustomer={customer.phone ? customer : null} onClose={() => setDialog("")} onSelect={setCustomer} />
+      <CustomerDialog open={dialog === "customer"} zones={zonesResult.data || []} initialCustomer={customer.phone ? customer : null} onClose={() => setDialog("")} onSelect={setCustomer} onClear={() => { setCustomer({ phone: "", name: "", zoneName: "" }); setDialog(""); }} />
       <Modal open={dialog === "payments"} title="Combinar pagos" description={`Total de la venta: ${formatMoney(saleSummary.total)}`} onClose={() => setDialog("")} footer={<Button disabled={allocation.invalid || allocation.difference !== 0 || allocation.positiveCount < 2} onClick={() => setDialog("")}>Listo</Button>}>
         {payments.map(part => <FormField key={part.method} label={friendlyPayments[part.method]}><div className="fm-quick-pos__payment-input"><input aria-label={friendlyPayments[part.method]} type="number" min="0" step="1" inputMode="numeric" value={part.amount} onChange={event => setPayments(current => current.map(entry => entry.method === part.method ? { ...entry, amount: event.target.value } : entry))} /><Button variant="ghost" disabled={allocation.invalid || allocation.difference <= 0} onClick={() => setPayments(current => completeRemainingPayment(current, part.method, saleSummary.total))}>Completar</Button></div></FormField>)}<p role="status">{paymentStatus}</p>
       </Modal>

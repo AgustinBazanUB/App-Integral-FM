@@ -3,6 +3,7 @@ import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock
 import SaleStockWarning from "../components/SaleStockWarning";
 import ProductImage from "../components/ProductImage";
 import PanelLoading from "../../components/PanelLoading";
+import { OliviaLauncherSlot } from "../olivia/LauncherHost";
 import { resolveProductImages } from "../../shared/productImages.mjs";
 import { getArcaInvoiceForSale, arcaSourceTypeForSale } from "../services/arcaService";
 import { fiscalPresentation } from "../../shared/fiscalRecovery.mjs";
@@ -117,6 +118,7 @@ function SellerHeader({
           </div>
         </div>
         <div className="fm-seller-header__status">
+          <OliviaLauncherSlot />
           <Badge tone={syncing ? "warning" : online ? "success" : "warning"} icon={syncing ? "RefreshCw" : online ? "Wifi" : "WifiOff"}>
             {syncing ? "Sincronizando" : online ? "Online" : "Sin conexión"}
           </Badge>
@@ -806,7 +808,6 @@ export default function SellerPanel() {
             {summary.cashRoundingDiscountTotal > 0 ? <div className="fm-seller-discount-total"><span>Incluye redondeo por efectivo</span><strong>− {formatMoney(summary.cashRoundingDiscountTotal)}</strong></div> : null}
           </div>
 
-          <div className="fm-seller-totals"><div><span>Subtotal</span><strong>{formatMoney(subtotal)}</strong></div><div className="is-grand"><span>Total final</span><strong>{formatMoney(summary.total)}</strong></div></div>
 
           <fieldset className="fm-seller-payments"><legend>Forma de pago *</legend>{PAYMENT_OPTIONS.filter((option) => option.value !== "multiple" || multiplePaymentAllowed).map((option) => { const selected = paymentMethod === option.value; return <button key={option.value} type="button" className={selected ? "is-selected" : ""} aria-pressed={selected} onClick={() => option.value === "multiple" ? setMultipleOpen(true) : (setPaymentMethod(option.value), setPayments([]), setSubmitState({ busy: false, tone: "info", message: "" }))}>{selected ? <Icon name="Check" /> : null}<span>{friendlyPayment[option.value]}</span></button>; })}</fieldset>
           {paymentMethod === "multiple" ? <p className="fm-seller-payment-summary">{payments.map((payment) => `${friendlyPayment[payment.method]} ${formatMoney(payment.amount)}`).join(" · ")}</p> : null}

@@ -20,6 +20,7 @@ import OliviaMessageContent from "./OliviaMessageContent";
 import { formatOliviaCost } from "../../shared/oliviaVoicePricing.mjs";
 import { OLIVIA_VOICE_CONVERSATION_ENABLED, OLIVIA_VOICE_UNAVAILABLE_MESSAGE } from "../../shared/oliviaVoiceAvailability.mjs";
 import "./olivia.css";
+import { OliviaLauncherPortal } from "./LauncherHost";
 
 function OliviaFace({ active }) {
   return <svg className={`fm-olivia-face ${active ? "is-active" : ""}`} viewBox="0 0 64 64" aria-hidden="true">
@@ -525,9 +526,9 @@ export default function OliviaAssistant() {
   const toggleDeveloper = () => { const next = !developer; setDeveloper(next); try { localStorage.setItem(`flor-mia-olivia-dev:${user.uid}`, String(next)); } catch { /* Optional preference. */ } };
 
   return <>
-    <button ref={launcherRef} type="button" className="fm-olivia-launcher" aria-label={open ? "Cerrar Olivia" : "Abrir Olivia, asistente de Flor Mía"} aria-expanded={open} aria-controls="fm-olivia-drawer" onClick={() => open ? close() : setOpen(true)}>
-      <OliviaFace active={busy || recording || voiceActive} /><span>Olivia</span>
-    </button>
+    <OliviaLauncherPortal><button ref={launcherRef} type="button" className="fm-olivia-launcher" aria-label={open ? "Cerrar Olivia" : "Abrir Olivia, asistente de Flor Mía"} aria-expanded={open} aria-controls="fm-olivia-drawer" onClick={() => open ? close() : setOpen(true)}>
+      <OliviaFace active={busy || recording || voiceActive} /><span className="fm-olivia-launcher__label"><strong>Olivia</strong><small>Asistente de IA</small></span>
+    </button></OliviaLauncherPortal>
     {open ? <aside id="fm-olivia-drawer" className={`fm-olivia-drawer${viewport?.height < 500 ? " is-compact" : ""}`} style={viewport ? { "--olivia-viewport-height": `${viewport.height}px`, "--olivia-viewport-top": `${viewport.top}px` } : undefined} role="dialog" aria-modal="false" aria-labelledby="fm-olivia-title">
       <header className="fm-olivia-header">
         <OliviaFace active={busy || recording || voiceActive}/><div className="fm-olivia-identity"><h2 id="fm-olivia-title">Olivia</h2><span>Asistente de Flor Mía</span><small>{context.module === "seller" ? "Panel Vendedor" : "Panel Administrador"}</small></div>

@@ -1,0 +1,20 @@
+/* Compact the catalog without shrinking quantity controls or touch targets. */
+.fm-seller-products { grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:7px; }
+.fm-seller-products > button { min-height:129px; padding:7px; }
+.fm-seller-products > button .fm-product-image { width:70%; height:45px; justify-self:center; }
+.fm-seller-products strong { margin-top:3px; font-size:11px; line-height:1.2; }
+.fm-seller-header { padding-inline:12px; }
+.fm-seller-brand { gap:8px; }
+.fm-seller-brand strong { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media(max-width:767px) {
+ .fm-seller-products { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+ .fm-seller-products > button { min-height:102px; padding:5px; }
+ .fm-seller-products strong { font-size:10px; }
+ .fm-seller-products span:not(.fm-seller-key), .fm-seller-products small { font-size:9px; line-height:1.2; }
+ .fm-seller-header { gap:8px; padding-inline:9px; }
+ .fm-seller-brand img { width:34px; height:30px; }
+ .fm-seller-brand strong { font-size:14px; }
+ .fm-seller-header__status { gap:6px; flex:none; }
+ .fm-seller-header__status .fm-seller-pending-chip { display:none; }
+}
+@media(max-width:360px) { .fm-seller-brand strong { font-size:13px; } .fm-seller-brand { gap:5px; } }

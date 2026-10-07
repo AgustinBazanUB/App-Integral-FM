@@ -3,6 +3,7 @@ import { Skeleton } from "../design-system";
 import { useLocation, useNavigate } from "../router";
 import { AuthProvider, useAuth } from "./AuthContext";
 import OliviaMount from "./olivia/OliviaMount";
+import { OliviaLauncherProvider } from "./olivia/LauncherHost";
 import { OliviaScreenProvider } from "./olivia/ScreenContext";
 import OliviaReviewPanel from "./olivia/OliviaReviewPanel";
 import ManagementShell from "./ManagementShell";
@@ -208,10 +209,12 @@ export default function ManagementApp() {
   return (
     <AuthProvider>
       <OliviaScreenProvider>
-        <ManagementErrorBoundary>
-          <ManagementRouter />
-        </ManagementErrorBoundary>
-        <OliviaMount />
+        <OliviaLauncherProvider>
+          <ManagementErrorBoundary>
+            <ManagementRouter />
+          </ManagementErrorBoundary>
+          <OliviaMount />
+        </OliviaLauncherProvider>
       </OliviaScreenProvider>
     </AuthProvider>
   );
