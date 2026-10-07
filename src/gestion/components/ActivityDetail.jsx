@@ -12,7 +12,7 @@ export default function ActivityDetail({ selected, state, onClose, onRetry }) {
   const detail = state.data, raw = detail?.raw || selected?.raw || {}, record = detail?.record || raw.detailSnapshot || {};
   const sale = String(selected?.action).startsWith("sale.");
   const items = Array.isArray(record.items) ? record.items : Array.isArray(raw.items) ? raw.items : [], movements = activityStockMovements(record, detail?.movements);
-  const names = Object.fromEntries([...items, ...(record.lines || [])].map(item => [item.productId, item.name || item.productName]));
+  const names = Object.fromEntries([...items, ...(Array.isArray(record.lines) ? record.lines : [])].map(item => [item.productId, item.name || item.productName]));
   const changes = activityChangeRows(raw.before || raw.previous || raw.previousSettings, raw.after || raw.next || raw.newSettings, names);
   const fields = { ...raw, ...record };
   return <Modal open={Boolean(selected)} title={getActivityPresentation(selected).label} description={selected?.description} onClose={onClose}>
