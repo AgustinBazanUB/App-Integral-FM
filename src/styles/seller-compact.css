@@ -8,7 +8,7 @@
 .fm-seller-brand strong { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .fm-seller-profile > summary { display:flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:0; list-style:none; }
 .fm-seller-profile > summary::-webkit-details-marker { display:none; }
-.fm-seller-profile .fm-avatar { width:40px; height:40px; overflow:hidden; }
+.fm-seller-profile .fm-avatar { display:grid; width:40px; height:40px; place-items:center; overflow:hidden; border-radius:50%; background:var(--fm-surface-selected); color:var(--fm-text-accent); font-family:var(--fm-font-display); font-size:20px; font-weight:600; }
 .fm-seller-profile .fm-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
 .fm-seller-profile .fm-profile-menu { right:0; }
 .fm-seller-header__status { align-items:center; }
