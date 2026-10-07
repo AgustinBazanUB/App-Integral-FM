@@ -40,6 +40,7 @@
 .fm-seller-profile > summary { -webkit-tap-highlight-color:transparent; }
 .fm-seller-cart-title { display:flex; align-items:center; gap:8px; white-space:nowrap; }
 .fm-seller-cart-title small { font:500 11px var(--fm-font-ui); color:var(--fm-text-muted); }
+.fm-seller-cart-lines { align-content:start; }
 .fm-seller-cart .fm-panel__header { padding:10px 12px; gap:8px; }
 .fm-seller-cart .fm-panel__header { flex-direction:row; align-items:center; }
 .fm-seller-cart .fm-panel__header h2 { margin:0; font-size:21px; }
