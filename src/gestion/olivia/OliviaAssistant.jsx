@@ -62,6 +62,8 @@ export default function OliviaAssistant() {
   const [errorCode, setErrorCode] = useState("");
   const [errorReportId, setErrorReportId] = useState(null);
   const [reportState, setReportState] = useState("idle");
+  const [reportNotice, setReportNotice] = useState("");
+  useEffect(() => { setReportState("idle"); setReportNotice(""); }, [errorReportId]);
   const jobRef = useRef(null);
   const [recording, setRecording] = useState(false);
   const [audioFrame, setAudioFrame] = useState({ seconds: 0, bars: Array(24).fill(0) });
@@ -208,8 +210,9 @@ export default function OliviaAssistant() {
   const reportError = async () => {
     if (!errorReportId || reportState === "sending" || reportState === "sent") return;
     setReportState("sending");
+    setReportNotice("");
     try { await oliviaClient.request({ operation: "reportError", reportId: errorReportId }); setReportState("sent"); clearRuntimeCache(); window.dispatchEvent(new CustomEvent("flor-mia:olivia-completed")); }
-    catch (failure) { setReportState("idle"); setError(failure.message); }
+    catch (failure) { setReportState("idle"); setReportNotice(failure.message); }
   };
 
   const stopRecording = useCallback((discard = false, send = false) => {
@@ -545,7 +548,7 @@ export default function OliviaAssistant() {
       </div>
       {pending ? <section className="fm-olivia-confirmation" aria-labelledby="fm-olivia-confirm-title"><h3 id="fm-olivia-confirm-title">¿Confirmar esta acción?</h3><OliviaMessageContent content={typeof pending.summary === "string" ? pending.summary : JSON.stringify(pending.summary, null, 2)} />{expired ? <p role="alert">La confirmación venció. Pedile a Olivia que prepare la acción nuevamente.</p> : null}<div className="fm-olivia-confirmation-actions"><Button onClick={() => answer(true)} disabled={busy || expired || exhausted || unavailable}>Sí</Button><Button variant="secondary" onClick={() => answer(false)} disabled={busy || !online}>No</Button></div><small>La acción se ejecuta únicamente al tocar Sí. Podés corregir los datos escribiendo.</small></section> : null}
       {unavailable ? <div className="fm-olivia-error" role="status"><p>{!online ? "Olivia necesita conexión a Internet." : snapshot.enabled === false ? "Olivia está deshabilitada por el Administrador." : "Olivia todavía necesita configurar su conexión con OpenAI."}</p><small>Podés continuar operando desde tu panel.</small>{admin && online ? <Button variant="secondary" onClick={() => navigate("/gestion/settings")}>Abrir configuración</Button> : null}</div> : null}
-      {error ? <div className="fm-olivia-error" role="alert"><p>{error}</p>{errorReportId ? <Button className="fm-olivia-report-error" variant="secondary" loading={reportState === "sending"} disabled={reportState === "sent"} onClick={reportError}>{reportState === "sent" ? "Enviado a Agustín" : "Enviar error a Agustín"}</Button> : ["conversation-not-found", "session-changed", "permission-scope-changed", "conversation-expired"].includes(errorCode) ? <Button variant="secondary" disabled={busy} onClick={newConversation}>Iniciar nueva conversación</Button> : retryRef.current && !busy ? <Button variant="secondary" onClick={() => { const retry = retryRef.current; perform(retry.operation, retry.fields, retry.identity).then(() => { if (retry.operation === "chat") setDraft(""); }).catch(() => {}); }}>{errorCode === "request-already-used" ? "Actualizar conversación" : "Reintentar solicitud"}</Button> : null}</div> : null}
+      {error ? <div className="fm-olivia-error" role="alert"><p>{error}</p>{reportNotice ? <p>{reportNotice}</p> : null}{errorReportId ? <Button className="fm-olivia-report-error" variant="secondary" loading={reportState === "sending"} disabled={reportState === "sent"} onClick={reportError}>{reportState === "sent" ? "Enviado a Agustín" : "Enviar error a Agustín"}</Button> : ["conversation-not-found", "session-changed", "permission-scope-changed", "conversation-expired"].includes(errorCode) ? <Button variant="secondary" disabled={busy} onClick={newConversation}>Iniciar nueva conversación</Button> : retryRef.current && !busy ? <Button variant="secondary" onClick={() => { const retry = retryRef.current; perform(retry.operation, retry.fields, retry.identity).then(() => { if (retry.operation === "chat") setDraft(""); }).catch(() => {}); }}>{errorCode === "request-already-used" ? "Actualizar conversación" : "Reintentar solicitud"}</Button> : null}</div> : null}
       <OliviaVoiceControls active={voiceActive} state={voiceState} caption={caption} modeLabel={voiceMode === "realtime-mini" ? "Voz económica · prueba" : ""} pending={pending} muted={muted} />
       {voiceNotice ? <p className="fm-olivia-voice-notice" role="status">{voiceNotice}</p> : null}
       <OliviaComposer textareaRef={textareaRef} draft={draft} setDraft={setDraft} sendMessage={sendMessage} recording={recording} frame={audioFrame} stopRecording={stopRecording} startRecording={startRecording} startVoice={() => startVoice(voiceMode)} stopVoice={stopVoice} voiceTrialAvailable={admin && snapshot.voiceTrialAvailable} voiceMode={voiceMode} setVoiceMode={setVoiceMode} voiceActive={voiceActive} muted={muted} toggleMute={() => { const next = !muted; setMuted(next); voiceRef.current?.setMuted(next || ((voiceMode === "realtime-mini" || snapshot.voiceProtocol !== "live") && Boolean(pending))); }} disabled={exhausted || unavailable || !conversationRef.current} busy={busy} sendingDisabled={voiceState === "connecting"} cancelRequest={cancelRequest} attachments={attachments} addFiles={addFiles} removeFile={removeFile} />

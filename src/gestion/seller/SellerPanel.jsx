@@ -1,6 +1,9 @@
 import { effectiveLocationPrice } from "../../modules/inventory/domain/inventory";
 import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
 import SaleStockWarning from "../components/SaleStockWarning";
+import ProductImage from "../components/ProductImage";
+import PanelLoading from "../../components/PanelLoading";
+import { resolveProductImages } from "../../shared/productImages.mjs";
 import { getArcaInvoiceForSale, arcaSourceTypeForSale } from "../services/arcaService";
 import { fiscalPresentation } from "../../shared/fiscalRecovery.mjs";
 import ArcaInvoicePrintAction from "../components/ArcaInvoicePrintAction";
@@ -77,7 +80,6 @@ import {
   pendingReservedQuantities,
   SELLER_ACTION_SHORTCUTS,
   SELLER_VIEWS,
-  sellerImage,
   sellerStockStatus,
 } from "./sellerDomain";
 
@@ -320,6 +322,7 @@ export default function SellerPanel() {
   const masterById = useMemo(() => new Map((resourcesResult.data?.products || []).map((product) => [product.id, product])), [resourcesResult.data?.products]);
   const products = useMemo(() => stockData.map((item) => ({
     ...item,
+    ...resolveProductImages(masterById.get(item.productId || item.id), item),
     price: effectiveLocationPrice(masterById.get(item.productId || item.id) || { defaultPrice: item.masterDefaultPrice ?? item.price ?? 0 }, item),
     availableStock: Number(item.currentStock || 0) - Number(reserved[item.id] || 0) +
       Number(editSale?.items?.find((old) => old.productId === item.id)?.qty || 0),
@@ -339,7 +342,7 @@ export default function SellerPanel() {
     if (stockResult.status !== "ready") return;
     setCart((current) => Object.fromEntries(Object.entries(current).map(([id, item]) => {
       const product = products.find((entry) => entry.id === id);
-      return [id, product ? { ...item, categoryId: product.categoryId || null, stock: product.availableStock, imageUrl: sellerImage(product), unavailable: false } : { ...item, unavailable: true }];
+      return [id, product ? { ...item, categoryId: product.categoryId || null, stock: product.availableStock, ...resolveProductImages(product), unavailable: false } : { ...item, unavailable: true }];
     })));
   }, [products, stockResult.status]);
 
@@ -429,7 +432,7 @@ export default function SellerPanel() {
           unitPrice: Number(product.price || 0),
           qty: nextQty,
           stock: Number(product.availableStock ?? product.stock ?? 0),
-          imageUrl: product.imageUrl || sellerImage(product),
+          ...resolveProductImages(product),
           unavailable: product.unavailable === true,
         },
       };
@@ -707,7 +710,7 @@ export default function SellerPanel() {
   };
 
   if (locationsResult.status === "loading") {
-    return <main className="fm-seller-loading" id="main-content"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><Skeleton lines={4} /></main>;
+    return <PanelLoading panel="vendedor" />;
   }
 
   if (!locations.length) {
@@ -766,7 +769,7 @@ export default function SellerPanel() {
                       return (
                         <button key={product.id} type="button" className={qty ? "is-selected" : ""} onClick={() => addProduct(product)}>
                           {product.buttonKey || product.buttonLabel ? <span className="fm-seller-key">{product.buttonLabel || product.buttonKey}</span> : null}
-                          <img src={sellerImage(product)} alt="" loading="lazy" decoding="async" />
+                          <ProductImage product={product} eager />
                           <strong>{product.abbreviation || product.productName}</strong>
                           <span>{product.productName}</span>
                           <small>{formatMoney(product.price)} · Stock {product.availableStock}</small>
@@ -787,7 +790,7 @@ export default function SellerPanel() {
           <div className="fm-seller-cart-lines">
             {currentItems.length ? currentItems.map((item) => (
               <article key={item.id} className={item.qty > item.stock ? "has-stock-warning" : ""}>
-                <img src={item.imageUrl} alt="" loading="lazy" decoding="async" />
+                <ProductImage product={item} />
                 <div><strong>{item.abbreviation || item.name}</strong><small>{formatMoney(item.price)} c/u · {formatMoney(item.qty * item.price)}</small></div>
                 <div className="fm-quantity-control"><button type="button" aria-label={`Quitar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, -1)}><Icon name="Minus" /></button><output aria-label={`Cantidad de ${item.name}`}>{item.qty}</output><button type="button" aria-label={`Agregar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, 1)}><Icon name="Plus" /></button></div>
                 <button type="button" className="fm-seller-line-remove" aria-label={`Eliminar ${item.name} del carrito`} onClick={() => setCart((current) => { const next = { ...current }; delete next[item.id]; return next; })}><Icon name="X" /></button>
@@ -866,7 +869,7 @@ export default function SellerPanel() {
   );
 
   const stockView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Stock restante</h1><p>{selectedLocation?.name || "Ubicación"}</p></div></div><div className="fm-seller-stock-grid">{products.map((product) => { const status = sellerStockStatus({ ...product, currentStock: product.availableStock }); return <article key={product.id}><img src={sellerImage(product)} alt="" loading="lazy" decoding="async" /><div><strong>{product.productName}</strong><span>{product.abbreviation}</span><Badge tone={status.tone}>{status.label}</Badge></div><b>{product.availableStock}</b></article>; })}</div></div>
+    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Stock restante</h1><p>{selectedLocation?.name || "Ubicación"}</p></div></div><div className="fm-seller-stock-grid">{products.map((product) => { const status = sellerStockStatus({ ...product, currentStock: product.availableStock }); return <article key={product.id}><ProductImage product={product} /><div><strong>{product.productName}</strong><span>{product.abbreviation}</span><Badge tone={status.tone}>{status.label}</Badge></div><b>{product.availableStock}</b></article>; })}</div></div>
   );
 
   const pricesView = (

@@ -179,6 +179,7 @@ export default function GenericModulePage({ moduleId }) {
 
       <Modal open={Boolean(errorReport)} onClose={() => setErrorReport(null)} title={errorReport?.name || "Error de Olivia"} description="Detalle técnico para revisar la función que falló.">
         <p>{errorReport?.notes}</p>
+        {errorReport?.reporterName ? <p>Usuario que intentó la acción: <strong>{errorReport.reporterName}</strong>. Fecha: {formatDateTime(errorReport.createdAt)}.</p> : null}
         <Button variant="secondary" onClick={async () => { try { await navigator.clipboard.writeText(errorReport.codexDescription); setCopyNotice("Copiado para Codex."); } catch { setCopyNotice("No pude copiar automáticamente. Seleccioná el texto de abajo."); } }}>Copiar para Codex</Button>
         {copyNotice ? <p role="status">{copyNotice}</p> : null}
         <pre className="fm-olivia-diagnostic">{errorReport?.codexDescription}</pre>

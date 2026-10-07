@@ -19,6 +19,7 @@ import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import NotAuthorizedPage from "./pages/NotAuthorizedPage";
 import SellerPanel from "./seller/SellerPanel";
+import PanelLoading from "../components/PanelLoading";
 import WhatsAppExtensionSync from "./marketing/whatsapp/WhatsAppExtensionSync";
 import {
   listLocationsShared,
@@ -141,7 +142,7 @@ function ManagementRouter() {
   }, [routeId, sellerPath, metaAdsPath]);
 
   if (status === "loading") {
-    return <main className="fm-auth-loading" id="main-content"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><Skeleton lines={3} /></main>;
+    return <PanelLoading panel={sellerPath ? "vendedor" : "administrador"} />;
   }
   if (status === "signed-out" || status === "error") {
     return <LoginPage sessionError={status === "error" ? error : null} />;

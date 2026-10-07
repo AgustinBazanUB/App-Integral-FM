@@ -42,25 +42,33 @@ export async function captureOliviaFailure({ store, session, error, operation, c
   error.reportId = reportId;
   return { ...failure, reportId };
 }
+const ERROR_REPORT_RECIPIENT_EMAIL = "agsreserva@gmail.com";
+const isErrorReportRecipient = user => user?.active === true && user.deleted !== true && ["admin", "general_admin"].includes(normalizedRole(user)) && String(user.email || "").trim().toLowerCase() === ERROR_REPORT_RECIPIENT_EMAIL;
 export async function sendOliviaErrorReport({ store, session, body, now = new Date() }) {
   assertOliviaAccess(session);
   const reportId = safeId(body.reportId), path = `oliviaErrorReports/${reportId}`;
   const own = await store.get(path);
   if (!own || own.userId !== session.uid || own.sessionBinding !== sessionBinding(session) || new Date(own.expiresAt) <= now) throw oliviaError("report-not-found", "Este error ya no está disponible para enviar.", 404);
-  if (own.status === "sent") return { reported: true, message: "Error enviado a Agustín." };
-  const users = await store.list("users");
-  const recipients = users.filter(user => user.active === true && user.deleted !== true && ["admin", "general_admin"].includes(normalizedRole(user)) && String(user.name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().split(/\s+/)[0] === "agustin");
-  if (recipients.length !== 1) throw oliviaError("report-recipient-unavailable", "No encontré una cuenta administradora única de Agustín. El error sigue guardado para revisarlo.", 409);
-  const recipientId = safeId(recipients[0].id), alertId = `olivia_error_${reportId}`;
+  if (own.status === "sent") return { reported: true, alertId: own.alertId, message: "Error enviado a Agustín." };
+  const recipients = (await store.list("users")).filter(isErrorReportRecipient);
+  if (recipients.length !== 1) throw oliviaError("report-recipient-unavailable", "La cuenta administradora de Agustín no está disponible para recibir la alerta. El error sigue guardado.", 409);
+  const recipientId = safeId(recipients[0].id);
+  const alertId = `olivia_error_${reportId}`;
   await store.transaction(async tx => {
     const current = (await tx.getDocument(path))?.data;
     const recipient = (await tx.getDocument(`users/${recipientId}`))?.data;
+    const sender = (await tx.getDocument(`users/${session.uid}`))?.data;
     if (!current || current.userId !== session.uid || current.sessionBinding !== sessionBinding(session) || new Date(current.expiresAt) <= now) throw oliviaError("report-not-found", "Este error ya no está disponible.", 404);
     if (current.status === "sent") return;
-    if (!recipient?.active || !["admin", "general_admin"].includes(normalizedRole(recipient)) || String(recipient.name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().split(/\s+/)[0] !== "agustin") throw oliviaError("report-recipient-unavailable", "La cuenta de Agustín necesita revisión.", 409);
-    const diagnosticJson = JSON.stringify(current.diagnostics, null, 2);
-    const codexDescription = `Revisá este error de Olivia en App Integral FM: ${current.diagnostics.error.code}. ${current.diagnostics.error.description}\nBuscá la causa con el identificador de consulta y la traza; preservá los permisos, la confirmación de acciones y evitá registros duplicados. No hay mensajes, credenciales ni datos de clientes en este reporte.\n\nJSON del error:\n${diagnosticJson}`;
-    await tx.commitDocuments([{ type: "create", path: `alerts/${alertId}`, data: { name: `Olivia necesita revisión: ${current.diagnostics.error.code}`, notes: "Olivia detectó una función que no pudo completar. Revisá el detalle para corregirla.", moduleId: "ai", source: "olivia_error_report", active: true, status: "new", severity: "red", responsibleId: recipientId, responsibleName: recipient.name, createdBy: session.uid, createdAt: now, updatedAt: now, errorCode: current.diagnostics.error.code, diagnosticJson, codexDescription, reportId } }, { type: "update", path, data: { status: "sent", alertId, sentAt: now } }]);
+    if (!isErrorReportRecipient(recipient)) throw oliviaError("report-recipient-unavailable", "La cuenta receptora de Agustín necesita revisión. El error sigue guardado.", 409);
+    const reporterName = String(sender?.name || session.profile?.name || "Usuario").trim().slice(0, 160);
+    const diagnostics = { ...current.diagnostics, reporter: { id: session.uid, name: reporterName, role: normalizedRole(sender || session.profile) } };
+    const diagnosticJson = JSON.stringify(diagnostics, null, 2);
+    const codexDescription = `Revisá este error de Olivia en App Integral FM: ${diagnostics.error.code}. ${diagnostics.error.description}\nUsuario que intentó la acción: ${reporterName} (${session.uid}). Fecha del error: ${diagnostics.occurredAt}.\nBuscá la causa con el identificador de consulta y la traza; preservá los permisos, la confirmación de acciones y evitá registros duplicados. No hay mensajes, credenciales ni datos de clientes en este reporte.\n\nJSON del error:\n${diagnosticJson}`;
+    await tx.commitDocuments([
+      { type: "create", path: `alerts/${alertId}`, data: { name: `Olivia necesita revisión: ${diagnostics.error.code}`, notes: `Olivia no pudo completar una solicitud de ${reporterName}. Revisá el detalle para corregirla.`, moduleId: "ai", source: "olivia_error_report", active: true, status: "new", severity: "red", responsibleId: recipientId, responsibleName: recipient.name, reporterId: session.uid, reporterName, createdBy: session.uid, createdByName: reporterName, createdAt: now, updatedAt: now, errorCode: diagnostics.error.code, diagnosticJson, codexDescription, reportId } },
+      { type: "update", path, data: { status: "sent", alertId, sentAt: now } },
+    ]);
   });
-  return { reported: true, message: "Error enviado a Agustín." };
+  return { reported: true, alertId, message: "Error enviado a Agustín." };
 }

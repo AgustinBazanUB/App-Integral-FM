@@ -1,3 +1,4 @@
+import { resolveProductImages } from "../../../shared/productImages.mjs";
 import {
   ARGENTINA_TIME_ZONE,
   addArgentinaDays,
@@ -100,6 +101,7 @@ export function joinMasterProducts(products = [], stock = []) {
       return {
         ...product,
         ...local,
+        ...resolveProductImages(product, local),
         id: product.id,
         productId: product.id,
         productName: product.name,
