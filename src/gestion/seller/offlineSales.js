@@ -81,6 +81,23 @@ const wholeNumber = (value, label, minimum = 0) => {
   return number;
 };
 
+function normalizePendingInvoiceReceiver(receiver) {
+  if (!receiver || typeof receiver !== "object") return null;
+  const vatConditionId = Number(receiver.vatConditionId || 0);
+  const documentType = Number(receiver.documentType || 0);
+  const documentNumber = String(receiver.documentNumber || "").replace(/\D/g, "");
+  if (![1, 4, 5, 6].includes(vatConditionId)) throw new Error("La condición IVA de la factura pendiente no es válida.");
+  if (![80, 96, 99].includes(documentType)) throw new Error("El tipo de documento de la factura pendiente no es válido.");
+  if (documentType === 80 && documentNumber.length !== 11) throw new Error("La CUIT de la factura pendiente debe tener 11 dígitos.");
+  return {
+    vatConditionId,
+    documentType,
+    documentNumber: documentNumber || "0",
+    anonymousConsumerFinal: receiver.anonymousConsumerFinal === true,
+    concept: Number(receiver.concept || 1),
+  };
+}
+
 function normalizePendingSale(sale) {
   const items = (sale.items || []).map((item) => {
     const unitPrice = wholeNumber(
@@ -116,6 +133,7 @@ function normalizePendingSale(sale) {
     throw new Error("La fecha local de la venta no es válida.");
   }
   const ticketRequested = sale.ticketRequested === true;
+  const invoiceReceiver = ticketRequested ? normalizePendingInvoiceReceiver(sale.invoiceReceiver) : null;
   const customer = sale.customer ? buildCustomerDraft(sale.customer) : null;
   return {
     localId: requiredText(sale.localId, "el identificador local"),
@@ -144,6 +162,7 @@ function normalizePendingSale(sale) {
     ...payment,
     customer,
     ticketRequested,
+    invoiceReceiver,
     ticketStatus: ticketRequested ? "pending" : "not_requested",
     clientStatus: "offline_pending",
   };
