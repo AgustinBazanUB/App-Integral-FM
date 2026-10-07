@@ -10,6 +10,7 @@ import { validateAttachment, uploadAttachment, resolveAttachments } from "../net
 import { boundedMultipart, boundedBody } from "../netlify/functions/_lib/olivia/requestBody.mjs";
 import { OLIVIA_CAPABILITIES, selectCapabilities } from "../src/shared/oliviaCapabilities.mjs";
 import { discoverSkills, routeSkills, loadSkill } from "../netlify/functions/_lib/olivia/skills.mjs";
+import { navigationFor } from "../netlify/functions/_lib/olivia/guards.mjs";
 import { toolDefinitions, runTool } from "../netlify/functions/_lib/olivia/tools.mjs";
 import { executeToolBatch } from "../netlify/functions/_lib/olivia/toolExecution.mjs";
 import { aggregateSales, fairForecast } from "../src/shared/oliviaAnalytics.mjs";
@@ -173,6 +174,16 @@ test("selective tools and Skills exclude all administrative schemas from sellers
   assert.equal((await routeSkills(admin, "Hola", [{ name: "pronosticar-feria", version: "1.1.0" }])).length, 0);
   await assert.rejects(loadSkill(seller, "pronosticar-feria"), { code: "skill-not-allowed" });
   await assert.rejects(loadSkill(admin, "../../secret"), { code: "skill-not-allowed" });
+});
+test("seller how-to questions load the current manual without an obsolete Help destination", async () => {
+  const { session: seller } = fixture();
+  const skills = await routeSkills(seller, "¿Cómo funciona el desglose del monto activo?");
+  assert.equal(skills[0].name, "operar-panel-vendedor");
+  assert.equal(skills[0].version, "1.1.0");
+  assert.match(skills[0].content, /Monto activo/);
+  assert.match(skills[0].content, /Confirmar descuentos/);
+  assert.deepEqual(navigationFor(seller, { module: "prices" }), { path: "/vendedor?view=prices" });
+  assert.throws(() => navigationFor(seller, { module: "help" }), { code: "permission-denied" });
 });
 test("tool batch runs independent reads together and respects preparation barriers", async () => {
   let active = 0, maximum = 0; const order = [];

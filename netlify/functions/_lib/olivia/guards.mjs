@@ -190,7 +190,6 @@ export function navigationFor(session, args) {
       "pending",
       "stock",
       "prices",
-      "help",
     ]);
     if (!views.has(args.module))
       throw oliviaError(

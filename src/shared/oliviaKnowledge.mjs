@@ -3,7 +3,7 @@
  * Documentary data only: live business values and authorization come from tools.
  * Callers must derive role from a trusted server-side profile.
  */
-export const OLIVIA_KNOWLEDGE_VERSION = "2026-10-04.1";
+export const OLIVIA_KNOWLEDGE_VERSION = "2026-10-07.1";
 
 const SOURCE = Object.freeze({
   index: "https://drive.google.com/file/d/1tcV1cAQedA3DasAxb1cclkcjqKEECpll/view?usp=drivesdk",
@@ -168,11 +168,14 @@ const ENTRIES = Object.freeze([
   entry("seller-sale", "sales", "Venta conversacional en Panel Vendedor",
     "Identificar producto y cantidad, consultar promociones aplicables y si corresponde usarlas, preguntar medio de pago, necesidad de factura y asociación de cliente. Pedir solo datos faltantes, mostrar resumen y confirmar Sí/No antes de registrar por el mismo flujo del Panel Vendedor. Correcciones de cantidades o variedades actualizan la venta en curso sin empezar de cero.",
     "seller", "defined", "seller", "venta vender anotar botella producto cantidad promocion factura cliente corregir"),
+  entry("seller-panel-guide", "sales", "Cómo usar el Panel Vendedor",
+    "La ayuda se conversa con Olivia; no hay pestaña Ayuda. Para explicar una función, dar pasos breves sin preparar una venta. Nueva venta: elegir ubicación, abrir categoría y recorrer horizontalmente sus subcategorías fijas; tocar un producto agrega una unidad. En teléfono, bajar del catálogo a Venta actual. La tarjeta muestra abreviación y Stock de inventario; pendientes pueden reducir lo disponible. + y − cambian cantidad, la cruz quita el producto y Vaciar pide confirmación. Botonera usa atajos configurados. Agregar descuento requiere Confirmar descuentos. Elegir pago, asociar cliente si corresponde, seleccionar Generar factura si necesita solicitud fiscal y tocar Continuar para validar y guardar. Mis ventas, Pendientes, Stock y Precios completan el panel. Consultar las reglas específicas antes de guiar cada función.",
+    "seller", "defined", "seller", "ayuda como panel vendedor funciona instrucciones guia botonera categoria subcategoria catalogo tarjeta continuar monto activo lista precios stock factura descuentos pendientes"),
   entry("seller-discounts-payments", "sales", "Descuentos y pagos combinados",
-    "Agregar al menos un producto antes de aplicar descuentos habilitados. Descuentos fijos se aplican primero y porcentuales después. Puede combinar medios de pago si el panel lo permite; los importes deben sumar el total final. Medios previstos: crédito, débito, alias/transferencia y efectivo.",
+    "Agregar al menos un producto y tocar Agregar descuento. Elegir descuentos no cambia el total: tocar Confirmar descuentos para aplicarlos. Se recorren horizontalmente y la cruz quita uno. Los fijos se aplican primero y porcentuales después. Elegir crédito, débito, alias/transferencia o efectivo. +2 pagos abre el desglose si tiene permiso; los importes deben sumar el total final y Completar saldo usa el restante. Generar factura selecciona una solicitud fiscal, no emite por tocarlo. No suponer redondeo a miles para todas las ventas del vendedor: depende del origen y cálculo habilitado.",
     "operations", "defined", "seller", "venta pago efectivo debito credito alias descuento porcentaje combinado"),
   entry("seller-stock", "stock", "Stock y precios de la ubicación",
-    "Puede consultar stock actual, precios disponibles y promociones vigentes únicamente en ubicaciones asignadas. No puede cargar ni aumentar stock por su cuenta. Datos actuales se consultan al sistema; no se infieren del historial del chat. Si stock digital es insuficiente, advertir diferencia y pedir Sí/No para continuar solo si el Panel Vendedor permite esa excepción.",
+    "Puede consultar stock actual, precios disponibles y promociones vigentes únicamente en ubicaciones asignadas. Stock restante y Lista de precios muestran categorías inicialmente abiertas que puede cerrar y subcategorías siempre abiertas. La cantidad disponible para vender puede descontar pendientes locales. No puede cargar ni aumentar stock por su cuenta. Datos actuales se consultan al sistema; no se infieren del historial del chat. Si stock digital es insuficiente, informar el error y solicitar revisión, sin ofrecer una excepción no habilitada.",
     "seller", "defined", "seller", "stock precio disponible existencias insuficiente negativo promocion ubicacion"),
   entry("seller-location", "locations", "Ubicaciones permitidas",
     "Operar únicamente en ubicaciones asignadas. Si hay una, puede usarse como contexto; si hay varias y la instrucción es ambigua, preguntar cuál. Una ubicación no autorizada queda bloqueada. Puede ofrecer solicitar acceso al Administrador mediante observación; solicitar no concede permiso.",
@@ -181,7 +184,7 @@ const ENTRIES = Object.freeze([
     "Buscar primero por teléfono, identificador obligatorio del cliente. Si existe, asociarlo a la venta y completar nombre/zona vacíos cuando corresponde. Si no existe, preparar alta con teléfono; nombre y zona son opcionales. No crear duplicados ni acceder a datos fuera del alcance de su panel.",
     "operations", "defined", "seller", "cliente telefono duplicado asociar crear nombre zona"),
   entry("seller-today", "sales", "Consultas de la jornada actual",
-    "Puede consultar ventas del día actual, total vendido/cobrado hoy y desglose por medios de pago permitidos. No puede consultar semana/mes anterior, comparaciones históricas, producto más vendido del mes ni métricas globales u otros vendedores. Solo información expuesta por su Panel Vendedor.",
+    "Mis ventas muestra las propias ventas del día actual en la ubicación elegida. Tocar Monto activo abre el desglose por crédito, débito, alias y efectivo. Los pagos combinados se distribuyen en sus medios y las anuladas se excluyen del total. Si falta desglose se indica el importe para revisar, sin inventar forma de pago. No puede consultar semana/mes anterior, comparaciones históricas, producto más vendido del mes ni métricas globales u otros vendedores. Solo información expuesta por su Panel Vendedor.",
     "seller", "defined", "seller", "hoy jornada dia ventas total cobros historial ayer semana mes"),
   entry("seller-cancel", "sales", "Editar o anular ventas",
     "Si el Panel Vendedor lo habilita, puede corregir una venta o anularla con confirmación. Edición actualiza importes y stock; anulación conserva operación con estado Anulada, restituye stock y excluye el ingreso efectivo. La actividad conserva usuario y motivo/observación cuando corresponde. Nunca borrar la venta para ocultar trazabilidad.",
@@ -196,7 +199,7 @@ const ENTRIES = Object.freeze([
     "Mostrar solo porcentaje disponible y próxima renovación. Avisos de referencia al 25% y 10%; al 0% no acepta consultas/acciones nuevas y puede solicitar ampliación al Administrador. La ampliación es temporal para período vigente. El Panel Vendedor y sus funciones manuales siguen operativos aunque se agote el cupo.",
     "seller", "defined", "seller", "cupo cuota porcentaje disponible renovar ampliacion agotado consumo"),
   entry("seller-manual-continuity", "assistant", "Texto, dictado, voz y continuidad manual",
-    "Texto, dictado transcripto y conversación por voz comparten contexto y permisos del Panel Vendedor. Si falta información, preguntar; si no comprende tras varios intentos o falla técnicamente, detener automatización, informar y ofrecer carga manual. Se puede preparar observación técnica para el Administrador. Ventas manuales mantienen operación offline y sincronización del panel existente.",
+    "Texto y dictado transcripto respetan el contexto y permisos del Panel Vendedor. La conversación por voz sigue deshabilitada; no ofrecer iniciarla. Olivia abre un panel que bloquea el fondo y se cierra con la cruz. Si falta información, preguntar; ante un fallo explicar el error y ofrecer carga manual después de cerrar Olivia. Enviar error a Agustín, cuando aparece, reporta el problema sin repetir la operación. Las ventas guardadas offline siguen en Pendientes para sincronizarlas, no volver a cargarlas como nuevas.",
     "seller", "defined", "seller", "audio voz dictado transcripcion error falla offline manual ayuda"),
 ]);
 

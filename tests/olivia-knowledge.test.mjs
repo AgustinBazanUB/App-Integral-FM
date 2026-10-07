@@ -103,6 +103,18 @@ test("unknown roles and arbitrary module names fail closed", () => {
   );
 });
 
+test("seller receives current panel guidance, delayed discounts and payment breakdown instructions", () => {
+  const guide = retrieveOliviaKnowledge("ayuda instrucciones panel vendedor", { role: "seller" }).find(item => item.id === "seller-panel-guide");
+  assert.ok(guide);
+  assert.match(guide.text, /sin preparar una venta/);
+  const discounts = retrieveOliviaKnowledge("descuento pago combinado", { role: "seller" }).find(item => item.id === "seller-discounts-payments");
+  assert.match(discounts.text, /Confirmar descuentos/);
+  const today = retrieveOliviaKnowledge("monto activo hoy cobros", { role: "seller" }).find(item => item.id === "seller-today");
+  assert.match(today.text, /pagos combinados se distribuyen/);
+  const stock = retrieveOliviaKnowledge("stock precios categorías", { role: "seller" }).find(item => item.id === "seller-stock");
+  assert.match(stock.text, /subcategorías siempre abiertas/);
+});
+
 test("source status makes pending and future ideas explicit", () => {
   const pending = retrieveOliviaKnowledge("avisos Leído Entendido", {
     role: "seller",

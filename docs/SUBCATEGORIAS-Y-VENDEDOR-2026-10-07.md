@@ -33,3 +33,13 @@ Traslada `currentStock` de origen a destino en el mismo local/depósito, conserv
 Duplicado solicitado: Aceitunas descarozadas (ACEITUNA). Destino: Aceitunas Verdes Sin Carozo 400g (ACEIT400). La preview comparte Firebase: guardar la organización o confirmar el traslado modifica el catálogo/inventario compartido; desplegar código de preview por sí solo no modifica esos datos.
 
 Pruebas: clasificación, grupos vacíos y no asignados, prioridad manual, maestro sobre stock antiguo, creación/asignación con permisos, conservación de unidades por origen, precios del destino, idempotencia concurrente, cambio de fingerprint, rechazo por permisos/referencias/stock inválido y conservación del historial. QA visual de computadora y teléfono se realiza sobre la preview, sin confirmar ventas.
+
+## Consulta y ayuda del vendedor
+
+Las tarjetas móviles son un 20% más estrechas; el marco de imagen pasa de 56 a 67,2 px y centra la foto verticalmente sin recortarla por CSS. Abreviación y «Stock N» comparten fila. Las barras verticales del vendedor vuelven a ser visibles con un indicador dorado claro y pista transparente; las filas horizontales del catálogo y descuentos conservan desplazamiento discreto.
+
+Stock restante y Lista de precios reutilizan las mismas categorías y subcategorías del catálogo: todas las categorías empiezan abiertas al entrar a cada vista y pueden cerrarse; las subcategorías no tienen cierre. Stock restante conserva las reservas de ventas pendientes del dispositivo en el cálculo disponible.
+
+Monto activo abre una consulta por medio de pago de las ventas propias del día y ubicación. Excluye anuladas y distribuye pagos combinados por sus importes. Conserva medios históricos y señala cualquier diferencia entre total y desglose para revisión, sin inventar cobros. No modifica ventas ni stock.
+
+Se elimina Ayuda del menú y de la navegación autorizada de Olivia. La guía `operar-panel-vendedor` 1.1.0 y conocimiento 2026-10-07.1 explican catálogo, cantidades, descuentos confirmados, pagos, cliente, solicitud fiscal, pendientes, stock, precios y consulta de cobros. Las consultas sobre cómo usar una función deben responder con pasos, sin preparar ventas automáticamente. Se mantienen los permisos y la conversación por voz deshabilitada.

@@ -3,6 +3,7 @@ import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock
 import SaleStockWarning from "../components/SaleStockWarning";
 import ProductImage from "../components/ProductImage";
 import ProductSubcategoryRows from "../components/ProductSubcategoryRows";
+import SellerCatalogList from "./SellerCatalogList";
 import PanelLoading from "../../components/PanelLoading";
 import { OliviaLauncherSlot } from "../olivia/LauncherHost";
 import { resolveProductImages } from "../../shared/productImages.mjs";
@@ -81,7 +82,7 @@ import {
   pendingReservedQuantities,
   SELLER_ACTION_SHORTCUTS,
   SELLER_VIEWS,
-  sellerStockStatus,
+  sellerPaymentSummary,
 } from "./sellerDomain";
 
 const friendlyPayment = {
@@ -262,6 +263,7 @@ export default function SellerPanel() {
   const [multipleOpen, setMultipleOpen] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [detailSale, setDetailSale] = useState(null);
+  const [paymentSummaryOpen, setPaymentSummaryOpen] = useState(false);
   const [fiscalDetail, setFiscalDetail] = useState({ ready: false, invoice: null, error: "" });
   useEffect(() => {
     if (!detailSale?.id) return;
@@ -792,8 +794,7 @@ export default function SellerPanel() {
                       return (
                         <button key={product.id} type="button" className={qty ? "is-selected" : ""} aria-label={`Agregar ${product.productName}, stock ${product.currentStock}`} title={product.productName} onClick={() => addProduct(product)}>
                           <ProductImage product={product} eager />
-                          <strong>{product.abbreviation || product.productName}</strong>
-                          <small>Stock total {product.currentStock}</small>
+                          <span className="fm-seller-product-meta"><strong>{product.abbreviation || product.productName}</strong><small>Stock {product.currentStock}</small></span>
                           {qty ? <b>{qty}</b> : null}
                         </button>
                       );
@@ -870,12 +871,13 @@ export default function SellerPanel() {
   );
 
   const salesData = asArray(dailySales.data);
+  const todayPayments = sellerPaymentSummary(salesData);
   const salesView = (
     <div className="fm-seller-view">
       <div className="fm-seller-view-head"><div><h1>Mis ventas de hoy</h1><p>{selectedLocation?.name || "Ubicación"}</p></div><Button icon="ShoppingCart" onClick={() => setView("sale")}>Nueva venta</Button></div>
       {dailySales.status === "loading" ? <Skeleton lines={5} /> : null}
       {dailySales.error ? <Toast tone="error">{sellerErrorMessage(dailySales.error)}</Toast> : null}
-      <div className="fm-seller-sales-summary"><span>Monto activo</span><strong>{formatMoney(salesData.filter((sale) => sale.status === "active").reduce((sum, sale) => sum + Number(sale.total || 0), 0))}</strong><small>{salesData.filter((sale) => sale.status === "active").length} ventas activas</small></div>
+      <button type="button" className="fm-seller-sales-summary" aria-label="Ver desglose del monto activo por forma de pago" onClick={() => setPaymentSummaryOpen(true)}><span>Monto activo <Icon name="ChevronDown" /></span><strong>{formatMoney(todayPayments.total)}</strong><small>{todayPayments.count} ventas activas</small></button>
       <div className="fm-seller-sale-list">{salesData.length ? salesData.map((sale) => <button key={sale.id} type="button" onClick={() => setDetailSale(sale)}><div><strong>{sale.saleCode}</strong><Badge tone={statusTone(sale.status)}>{sale.status === "cancelled" ? "Anulada" : "Activa"}</Badge></div><span>{formatMoney(sale.total)}</span><small>{formatDateTime(sale.createdAt)}</small></button>) : <EmptyState icon="ReceiptText" title="Todavía no registraste ventas" description="Las ventas confirmadas de esta ubicación aparecerán aquí." />}</div>
     </div>
   );
@@ -889,23 +891,22 @@ export default function SellerPanel() {
   );
 
   const stockView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Stock restante</h1><p>{selectedLocation?.name || "Ubicación"}</p></div></div><div className="fm-seller-stock-grid">{products.map((product) => { const status = sellerStockStatus({ ...product, currentStock: product.availableStock }); return <article key={product.id}><ProductImage product={product} /><div><strong>{product.productName}</strong><span>{product.abbreviation}</span><Badge tone={status.tone}>{status.label}</Badge></div><b>{product.availableStock}</b></article>; })}</div></div>
+    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Stock restante</h1><p>{selectedLocation?.name || "Ubicación"}</p></div></div><SellerCatalogList key="stock" groups={productGroups} categories={categories} mode="stock" /></div>
   );
 
   const pricesView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Lista de precios</h1><p>Consulta rápida por categorías</p></div></div>{productGroups.map((group) => <section key={group.id} className="fm-seller-price-category"><h2>{group.name}</h2>{group.items.map((product) => <article key={product.id}><div><strong>{product.productName}</strong><span>{product.abbreviation}</span></div><div><strong>{formatMoney(product.price)}</strong><small>Stock {product.availableStock}</small></div></article>)}</section>)}</div>
+    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Lista de precios</h1><p>{selectedLocation?.name || "Ubicación"}</p></div></div><SellerCatalogList key="prices" groups={productGroups} categories={categories} mode="prices" /></div>
   );
 
-  const helpView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Ayuda</h1><p>Atajos rápidos de operación</p></div></div><ul className="fm-seller-help"><li><Icon name="Keyboard" /><div><strong>Botonera</strong><span>Los códigos configurados agregan productos y aplican pagos.</span></div></li><li><Icon name="Plus" /><div><strong>+</strong><span>Agrega otra unidad del último producto.</span></div></li><li><Icon name="Minus" /><div><strong>−</strong><span>Quita una unidad del último producto.</span></div></li><li><Icon name="WifiOff" /><div><strong>Sin internet</strong><span>Guardá la venta pendiente y sincronizala al volver la conexión.</span></div></li></ul></div>
-  );
-
-  const currentView = view === "sales" ? salesView : view === "pending" ? pendingView : view === "stock" ? stockView : view === "prices" ? pricesView : view === "help" ? helpView : saleView;
+  const currentView = view === "sales" ? salesView : view === "pending" ? pendingView : view === "stock" ? stockView : view === "prices" ? pricesView : saleView;
 
   return (
     <div className="fm-seller-shell">
       <SellerHeader profile={profile} location={selectedLocation} online={online} syncing={syncing} pendingCount={pendingData.length} view={view} setView={setView} canReturnAdmin={canReturnAdmin} onReturnAdmin={returnAdmin} onLogout={logout} />
       <main className="fm-seller-main" id="main-content">{currentView}</main>
+      <Modal open={paymentSummaryOpen} title="Monto activo por forma de pago" description={`${selectedLocation?.name || "Ubicación"} · Tus ventas de hoy, sin anuladas.`} onClose={() => setPaymentSummaryOpen(false)}>
+        {dailySales.status === "loading" ? <Skeleton lines={5} /> : dailySales.error ? <Toast tone="error">{sellerErrorMessage(dailySales.error)}</Toast> : <dl className="fm-seller-payment-breakdown">{todayPayments.payments.map(payment => <div key={payment.method}><dt>{friendlyPayment[payment.method] || payment.label}</dt><dd>{formatMoney(payment.total)}</dd></div>)}{todayPayments.difference !== 0 ? <div><dt>Diferencia del desglose · revisar</dt><dd>{formatMoney(todayPayments.difference)}</dd></div> : null}<div className="is-total"><dt>Total activo</dt><dd>{formatMoney(todayPayments.total)}</dd></div></dl>}
+      </Modal>
       {view !== "sale" && submitState.message ? <div className="fm-seller-global-feedback" role={submitState.tone === "error" ? "alert" : "status"}><Toast tone={submitState.tone}>{submitState.message}</Toast></div> : null}
 
       <DiscountDialog open={discountOpen} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} initialManualDiscounts={manualDiscounts} suggestedDiscountId={suggestedDiscountId} manualAllowed={manualDiscountAllowed} onClose={() => setDiscountOpen(false)} onApply={({ savedIds, manual }) => { setDiscountIds(savedIds); setManualDiscounts(manual); setDiscountOpen(false); setSuggestedDiscountId(""); setSubmitState({ busy: false, message: "", tone: "info" }); }} />

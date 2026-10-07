@@ -38,7 +38,7 @@ const descriptions = {
   get_today_sales:
     "Ventas de HOY del propio usuario en la ubicación, máximo 150; sin datos de otros vendedores ni historia.",
   navigate_to_module:
-    "Abrir pantalla permitida sin modificar datos. Vendedor sale/sales/pending/stock/prices/help; administrador IDs reales de módulos.",
+    "Abrir pantalla permitida sin modificar datos. Vendedor sale/sales/pending/stock/prices; administrador IDs reales de módulos. La ayuda del vendedor se explica en el chat con Olivia.",
   prepare_sale:
     "Preparar venta con precios vivos y reglas del Panel Vendedor. Requiere decisiones explícitas sobre promoción, factura y cliente. NO ejecuta. Para correcciones enviar propuesta completa nueva.",
   prepare_stock_load:
