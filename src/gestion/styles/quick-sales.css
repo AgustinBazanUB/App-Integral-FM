@@ -82,6 +82,7 @@
  .fm-quick-pos__actions .fm-button { min-height:48px; white-space:normal; padding-inline:8px; }
  .fm-quick-pos__context .fm-button { font-size:12px; padding:8px 10px; }
  .fm-quick-pos__billing-actions .fm-button { flex:1 1 100%; }
+ .fm-management-body:has(.fm-quick-pos) .fm-olivia-launcher { bottom:calc(120px + env(safe-area-inset-bottom,0px)); }
 }
 
 .fm-quick-pos__product-mark { position:relative; overflow:hidden; }
