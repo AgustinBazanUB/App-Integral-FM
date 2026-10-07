@@ -63,7 +63,7 @@
 .fm-seller-reference-subcategory h3 { margin:0 0 8px; font:650 13px var(--fm-font-ui); }
 .fm-seller-reference-subcategory .fm-seller-price-category { border:0; border-radius:0; padding:0; }
 /* Restore just vertical rails in the seller panel. Horizontal product rows stay discreet. */
-html:has(.fm-seller-shell), body:has(.fm-seller-shell) { background:#fff; color-scheme:light; }
+html:has(.fm-seller-shell), body:has(.fm-seller-shell) { min-width:0; background:#fff; color-scheme:light; }
 html:has(.fm-seller-shell), body:has(.fm-seller-shell), .fm-seller-shell * { scrollbar-width:thin !important; scrollbar-color:#d8c49b transparent; }
 html:has(.fm-seller-shell)::-webkit-scrollbar, body:has(.fm-seller-shell)::-webkit-scrollbar, .fm-seller-shell *::-webkit-scrollbar { display:block !important; width:8px; height:0; }
 html:has(.fm-seller-shell)::-webkit-scrollbar-track, body:has(.fm-seller-shell)::-webkit-scrollbar-track, .fm-seller-shell *::-webkit-scrollbar-track { background:transparent; }
