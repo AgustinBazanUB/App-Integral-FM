@@ -6,6 +6,8 @@
 .fm-quick-pos__catalog { padding:14px; }
 .fm-quick-pos__categories { max-height:calc(100dvh - 270px); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:none; }
 .fm-quick-pos__categories::-webkit-scrollbar { display:none; }
+html:has(.fm-quick-pos), body:has(.fm-quick-pos), body:has(.fm-quick-pos) .fm-sidebar__nav, body:has(.fm-quick-pos) .fm-mobile-sidebar, .fm-quick-pos * { scrollbar-width:none; }
+html:has(.fm-quick-pos)::-webkit-scrollbar, body:has(.fm-quick-pos)::-webkit-scrollbar, body:has(.fm-quick-pos) .fm-sidebar__nav::-webkit-scrollbar, body:has(.fm-quick-pos) .fm-mobile-sidebar::-webkit-scrollbar, .fm-quick-pos *::-webkit-scrollbar { display:none; }
 .fm-quick-pos__catalog input[type=search] { min-height:52px; font-size:16px; }
 .fm-quick-pos__category { border:1px solid var(--fm-border,#ddd3c4); border-radius:12px; margin-top:10px; overflow:hidden; }
 .fm-quick-pos__category-toggle { width:100%; border:0; background:transparent; color:inherit; padding:14px; cursor:pointer; font-weight:700; display:flex; align-items:center; gap:8px; text-align:left; }
