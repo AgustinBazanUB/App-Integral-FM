@@ -52,7 +52,7 @@ export function arcaEnvironment(env = process.env) {
 
 export function productionAutoAuthorizeSources(env = process.env) {
   const configured = String(
-    env.ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES ?? "admin_quick_sale",
+    env.ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES ?? "admin_quick_sale,seller_sale",
   )
     .split(",")
     .map((value) => value.trim().toLowerCase())

@@ -74,6 +74,7 @@ export default function QuickSalesPage() {
   const [priceDraft, setPriceDraft] = useState("");
   const zonesResult = useAsyncData(() => listActiveCustomerZones(), [profile.id]);
   const [search, setSearch] = useState("");
+  const [openCategoryId, setOpenCategoryId] = useState("");
   const [manualDiscount, setManualDiscount] = useState(restored?.discounts?.find(d => d.source === "manual") || { type: "percent", value: "" });
   const [channel, setChannel] = useState(restored?.channel || "");
   const [customerDni, setCustomerDni] = useState(restored?.customerDni || "");
@@ -264,8 +265,15 @@ export default function QuickSalesPage() {
     <div className="fm-page-enter fm-quick-pos">
       <PageHeader eyebrow="Administración" title="Venta rápida" description="Elegí productos, completá el pago y continuá." />
       <div className="fm-quick-pos__context">
-        <Button variant="secondary" disabled={locked} onClick={() => setDialog("origin")}>Canal: {SALES_CHANNELS.find(option => option.value === channel)?.label || "Elegir"}</Button>
-        <Button variant="secondary" disabled={locked} onClick={() => setDialog("origin")}>Stock: {selectedLocation?.name || "Elegir origen"}</Button>
+        <Button
+          variant="secondary"
+          disabled={locked}
+          onClick={() => setDialog("origin")}
+          title="Canal: indica por dónde llegó la venta. Stock: indica de qué ubicación o depósito sale físicamente la mercadería."
+          aria-label={`Elegir canal y stock. Canal actual: ${SALES_CHANNELS.find(option => option.value === channel)?.label || "sin elegir"}. Stock actual: ${selectedLocation?.name || "sin elegir"}.`}
+        >
+          Elegir canal y stock · {SALES_CHANNELS.find(option => option.value === channel)?.label || "Canal"} · {selectedLocation?.name || "Origen"}
+        </Button>
       </div>
       <div className="fm-quick-pos__layout">
         <section className="fm-quick-pos__catalog" aria-label="Catálogo de productos">
@@ -276,17 +284,29 @@ export default function QuickSalesPage() {
           {!locationId ? <EmptyState icon="Box" title="Elegí de dónde sale la mercadería" description="Seleccioná una ubicación o un depósito activo." /> : null}
           {stock.status === "ready" && !visibleProducts.length ? <EmptyState icon="Box" title="No hay productos disponibles" description="Revisá la búsqueda y los productos activos." /> : null}
           <div className="fm-quick-pos__categories">
-            {stock.status === "ready" && groups.map(group => <details key={group.id} open className="fm-quick-pos__category">
-              <summary>{group.name}<span>{group.items.length}</span></summary>
-              <div className="fm-quick-pos__carousel">{group.items.map(item => {
+            {stock.status === "ready" && groups.map(group => {
+              const open = openCategoryId === group.id;
+              const controlId = `quick-sale-category-${String(group.id).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+              return <section key={group.id} className={`fm-quick-pos__category ${open ? "is-open" : ""}`}>
+                <button
+                  type="button"
+                  className="fm-quick-pos__category-toggle"
+                  aria-expanded={open}
+                  aria-controls={controlId}
+                  onClick={() => setOpenCategoryId(current => current === group.id ? "" : group.id)}
+                >
+                  <strong>{group.name}</strong><span>{group.items.length}</span>
+                </button>
+                {open ? <div id={controlId} className="fm-quick-pos__carousel">{group.items.map(item => {
                 const qty = Number(quantities[item.id] || 0);
                 return <button key={item.id} type="button" className={`fm-quick-pos__tile ${qty ? "is-selected" : ""}`} aria-label={`Agregar ${item.productName}`} disabled={locked || !item.hasLocalRecord || item.active === false || (stockType === "warehouse" && qty >= Number(item.currentStock || 0))} onClick={() => changeQty(item, 1)}>
                   <span className="fm-quick-pos__product-mark" aria-hidden="true">{item.productName.slice(0, 2).toUpperCase()}{item.thumbUrl || item.imageUrl ? <img src={item.thumbUrl || item.imageUrl} alt="" loading="lazy" decoding="async" onError={event => { event.currentTarget.style.display = "none"; }} /> : null}</span>
                   <strong>{item.productName}</strong><span>{formatMoney(item.price)}</span><small>{item.currentStock > 0 ? `${item.currentStock} disponibles` : `Stock registrado: ${item.currentStock}`}</small>
                   {qty > 0 ? <b className="fm-quick-pos__count">{qty}</b> : null}
                 </button>;
-              })}</div>
-            </details>)}
+              })}</div> : null}
+              </section>;
+            })}
           </div>
         </section>
         <section className="fm-quick-pos__sale" aria-label="Venta actual">
@@ -301,7 +321,10 @@ export default function QuickSalesPage() {
           <SaleStockWarning discrepancies={stockDiscrepancies} />
           <div className="fm-quick-pos__extras">
             <Button variant="secondary" disabled={locked || discountsResult.status === "loading"} onClick={() => setDialog("discount")}>Agregar descuento</Button>
-            <Button variant="secondary" disabled={locked} onClick={() => setDialog("customer")}>{customer.phone ? customer.name || customer.phone : "Agregar cliente"}</Button>
+            <button type="button" className="fm-quick-pos__customer-action" disabled={locked} onClick={() => setDialog("customer")}>
+              <span><strong>{customer.phone ? customer.name || customer.phone : "Agregar cliente"}</strong><small>{customer.phone ? `${customer.phone}${customer.zoneName ? ` · ${customer.zoneName}` : ""}` : "Teléfono · zona · nombre opcional"}</small></span>
+              <span aria-hidden="true">›</span>
+            </button>
             <Button variant="secondary" disabled={locked} aria-pressed={deliveryMethod === "shipping"} onClick={() => setDeliveryMethod(deliveryMethod === "shipping" ? "pickup" : "shipping")}>{deliveryMethod === "shipping" ? "Con envío" : "Retiro"}</Button>
             {customer.phone ? <Button variant="ghost" disabled={locked} onClick={() => setCustomer({ phone: "", name: "", zoneName: "" })}>Quitar cliente</Button> : null}
           </div>
@@ -314,7 +337,7 @@ export default function QuickSalesPage() {
       {submitState.error ? <Toast tone="error">{submitState.error}</Toast> : null}
       {submitState.success ? <Toast tone="success">{submitState.success}</Toast> : null}
       {registeredInvoice ? <ArcaInvoicePrintAction {...registeredInvoice} /> : null}
-      <footer className="fm-quick-pos__actions"><div><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div><Button variant="secondary" icon="FileText" disabled={locked || !canConfirm} onClick={() => setDialog("billing")}>Cargar factura</Button><Button icon="Check" loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, false)}>{pendingIntent ? "Recuperar confirmación" : "Continuar"}</Button></footer>
+      <footer className="fm-quick-pos__actions"><div><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div><Button variant="secondary" icon="FileText" disabled={locked || !canConfirm} onClick={() => setDialog("billing")}>Generar factura</Button><Button icon="Check" loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, false)}>{pendingIntent ? "Recuperar confirmación" : "Continuar"}</Button></footer>
       <Modal open={dialog === "origin"} title="Canal y origen del stock" description="Elegí por dónde llegó la venta y de dónde sale la mercadería." onClose={() => setDialog("")} footer={<Button onClick={() => setDialog("")}>Listo</Button>}>
         <FormField label="Canal comercial" required><Select value={channel} onChange={event => setChannel(event.target.value)}><option value="">Elegir canal real</option>{SALES_CHANNELS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></FormField>
         <FormField label="Tipo de origen"><Select value={stockType} onChange={event => switchOrigin("", event.target.value)}><option value="location">Ubicación</option><option value="warehouse">Depósito</option></Select></FormField>
@@ -327,7 +350,7 @@ export default function QuickSalesPage() {
         {payments.map(part => <FormField key={part.method} label={friendlyPayments[part.method]}><div className="fm-quick-pos__payment-input"><input aria-label={friendlyPayments[part.method]} type="number" min="0" step="1" inputMode="numeric" value={part.amount} onChange={event => setPayments(current => current.map(entry => entry.method === part.method ? { ...entry, amount: event.target.value } : entry))} /><Button variant="ghost" disabled={allocation.invalid || allocation.difference <= 0} onClick={() => setPayments(current => completeRemainingPayment(current, part.method, saleSummary.total))}>Completar</Button></div></FormField>)}<p role="status">{paymentStatus}</p>
       </Modal>
       <Modal open={dialog === "price"} title="Editar precio" description={priceItem?.productName || "Precio unitario"} onClose={() => setDialog("")} footer={<Button disabled={!priceDraft.trim() || !Number.isInteger(Number(priceDraft)) || Number(priceDraft) < 0} onClick={() => { setPrices(current => ({ ...current, [priceItem.id]: Number(priceDraft) })); setDialog(""); }}>Aplicar precio</Button>}><FormField label="Precio unitario"><input type="number" min="0" step="1" inputMode="numeric" value={priceDraft} onChange={event => setPriceDraft(event.target.value)} /></FormField></Modal>
-      <Modal open={dialog === "billing"} title="Cargar factura" description="Confirmá la venta y prepará su comprobante fiscal." onClose={() => !submitState.busy && setDialog("")} footer={<div className="fm-quick-pos__billing-actions"><Button variant="secondary" disabled={submitState.busy} onClick={event => handleSubmit(event, false)}>Solo continuar</Button><Button loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, true)}>Generar factura y continuar</Button></div>}>
+      <Modal open={dialog === "billing"} title="Generar factura" description="Confirmá la venta y prepará su comprobante fiscal." onClose={() => !submitState.busy && setDialog("")} footer={<div className="fm-quick-pos__billing-actions"><Button variant="secondary" disabled={submitState.busy} onClick={event => handleSubmit(event, false)}>Solo continuar</Button><Button loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, true)}>Generar factura y continuar</Button></div>}>
         <p className="fm-quick-pos__billing-total">Total {formatMoney(saleSummary.total)}</p>
         <FormField label="Condición IVA receptor" required><Select disabled={locked} value={receiverVatConditionId} onChange={event => { setReceiverVatConditionId(event.target.value); setReceiverDocument(""); }}><option value="5">Consumidor Final</option><option value="1">IVA Responsable Inscripto</option><option value="6">Responsable Monotributo</option><option value="4">IVA Sujeto Exento</option></Select></FormField>
         <FormField label={receiverVatConditionId === "5" ? "DNI (opcional)" : "CUIT del receptor"} required={receiverVatConditionId !== "5"} hint={receiverVatConditionId === "5" ? "Podés dejarlo vacío para Consumidor Final sin identificar, sujeto a validación fiscal." : "CUIT de 11 dígitos."}><input disabled={locked} inputMode="numeric" value={receiverDocument} onChange={event => setReceiverDocument(event.target.value.replace(/\D/g, "").slice(0, 11))} /></FormField>

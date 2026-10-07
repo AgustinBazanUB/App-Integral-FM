@@ -81,6 +81,31 @@ const wholeNumber = (value, label, minimum = 0) => {
   return number;
 };
 
+function normalizeInvoiceReceiver(receiver) {
+  // Las ventas pendientes anteriores a este formulario no tienen receptor.
+  if (!receiver) return null;
+  const vatConditionId = wholeNumber(receiver.vatConditionId, "La condición IVA", 1);
+  const documentType = wholeNumber(receiver.documentType, "El tipo de documento", 1);
+  const documentNumber = requiredText(receiver.documentNumber, "el documento del receptor");
+  const anonymousConsumerFinal = receiver.anonymousConsumerFinal === true;
+  const consumerFinal = vatConditionId === 5;
+  if (![5, 1, 6, 4].includes(vatConditionId)
+    || !/^\d+$/.test(documentNumber)
+    || (!consumerFinal && (documentType !== 80 || documentNumber.length !== 11 || anonymousConsumerFinal))
+    || (consumerFinal && (anonymousConsumerFinal
+      ? documentType !== 99 || documentNumber !== "0"
+      : documentType !== 96))) {
+    throw new Error("Los datos fiscales del receptor pendiente no son válidos.");
+  }
+  return {
+    vatConditionId,
+    documentType,
+    documentNumber,
+    anonymousConsumerFinal,
+    concept: wholeNumber(receiver.concept, "El concepto fiscal", 1),
+  };
+}
+
 function normalizePendingSale(sale) {
   const items = (sale.items || []).map((item) => {
     const unitPrice = wholeNumber(
@@ -144,6 +169,7 @@ function normalizePendingSale(sale) {
     ...payment,
     customer,
     ticketRequested,
+    invoiceReceiver: ticketRequested ? normalizeInvoiceReceiver(sale.invoiceReceiver) : null,
     ticketStatus: ticketRequested ? "pending" : "not_requested",
     clientStatus: "offline_pending",
   };

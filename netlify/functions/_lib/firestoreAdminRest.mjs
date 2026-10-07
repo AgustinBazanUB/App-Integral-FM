@@ -1,4 +1,4 @@
-import { createSign } from "node:crypto";
+import { createPrivateKey, createSign } from "node:crypto";
 
 const PROJECT_ID = "app-integral-fm";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -31,10 +31,21 @@ function adminConfig(env = process.env) {
     error.code = "firebase-project-mismatch";
     throw error;
   }
+  const clientEmail = required("FIREBASE_ADMIN_CLIENT_EMAIL", env);
+  const privateKeyPem = required("FIREBASE_ADMIN_PRIVATE_KEY", env).replace(/\\n/g, "\n");
+  let privateKey;
+  try {
+    privateKey = createPrivateKey(privateKeyPem);
+  } catch {
+    const error = new Error("La clave privada administrativa de Firebase no tiene un formato válido.");
+    error.code = "firebase-admin-private-key-invalid";
+    error.status = 409;
+    throw error;
+  }
   return {
     projectId,
-    clientEmail: required("FIREBASE_ADMIN_CLIENT_EMAIL", env),
-    privateKey: required("FIREBASE_ADMIN_PRIVATE_KEY", env).replace(/\\n/g, "\n"),
+    clientEmail,
+    privateKey,
   };
 }
 

@@ -1,4 +1,31 @@
+import { request as httpsRequest } from "node:https";
+import { DEFAULT_CIPHERS } from "node:tls";
+
 const XML_ENTITIES = Object.freeze({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" });
+
+// WSFE offers finite-field DH parameters rejected by the hosted runtime.
+// Exclude DHE while preserving the default cipher list and certificate checks.
+function arcaHttpsFetch(url, { method, headers, body, signal }) {
+  return new Promise((resolve, reject) => {
+    const request = httpsRequest(url, {
+      method, headers, signal,
+      ciphers: `${DEFAULT_CIPHERS}:!DHE`,
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: true,
+    }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("error", reject);
+      response.on("end", () => resolve({
+        ok: response.statusCode >= 200 && response.statusCode < 300,
+        status: response.statusCode,
+        text: async () => Buffer.concat(chunks).toString("utf8"),
+      }));
+    });
+    request.on("error", reject);
+    request.end(body);
+  });
+}
 
 export function escapeXml(value) {
   return String(value ?? "")
@@ -58,7 +85,8 @@ export async function soapRequest({ url, action = "", body, timeoutMs = 20000, f
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetchImpl(url, {
+    const transport = fetchImpl === globalThis.fetch ? arcaHttpsFetch : fetchImpl;
+    const response = await transport(url, {
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",

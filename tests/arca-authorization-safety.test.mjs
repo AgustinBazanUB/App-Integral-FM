@@ -78,6 +78,29 @@ const invoice = {
   }],
 };
 
+test("fecha fiscal respeta el cambio de día argentino en servidores UTC", () => {
+  const previousTimezone = process.env.TZ;
+  try {
+    for (const timezone of ["UTC", "America/Argentina/Buenos_Aires", "Pacific/Honolulu"]) {
+      process.env.TZ = timezone;
+      for (const [instant, expectedDate] of [
+        ["2026-10-05T02:59:59.000Z", "20261004"],
+        ["2026-10-05T03:00:00.000Z", "20261005"],
+        ["2027-01-01T02:30:00.000Z", "20261231"],
+      ]) {
+        const plan = buildAuthorizationPlan({
+          invoice, issuerVatCondition: "responsable_inscripto", receiverVatConditionId: 1,
+          documentType: 80, documentNumber: "20164755100", voucherDate: new Date(instant),
+        });
+        assert.equal(plan.detailBase.voucherDate, expectedDate, `${timezone}: ${instant}`);
+      }
+    }
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimezone;
+  }
+});
+
 test("emisor RI genera factura A para RI y monotributo", () => {
   assert.equal(resolveVoucherType({
     issuerVatCondition: "responsable_inscripto",

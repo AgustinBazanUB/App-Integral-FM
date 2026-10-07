@@ -116,11 +116,11 @@ function vatRateMap(productFiscalSnapshot = []) {
 function dateKey(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
   if (Number.isNaN(d.valueOf())) throw new Error("Fecha fiscal inválida.");
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, "0"),
-    String(d.getDate()).padStart(2, "0"),
-  ].join("");
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(d);
+  return ["year", "month", "day"].map(type => parts.find(part => part.type === type).value).join("");
 }
 
 export function buildAuthorizationPlan({

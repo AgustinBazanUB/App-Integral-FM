@@ -17,8 +17,10 @@ import {
   ConfirmationDialog,
   Dropdown,
   EmptyState,
+  FormField,
   Modal,
   Panel,
+  Select,
   Skeleton,
   Toast,
 } from "../../design-system";
@@ -205,7 +207,9 @@ export default function SellerPanel() {
   const [discountOpen, setDiscountOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [payments, setPayments] = useState([]);
-  const [ticketRequested, setTicketRequested] = useState(false);
+  const [billingOpen, setBillingOpen] = useState(false);
+  const [receiverVatConditionId, setReceiverVatConditionId] = useState("5");
+  const [receiverDocument, setReceiverDocument] = useState("");
   const [keyboardActive, setKeyboardActive] = useState(true);
   const [openCategoryId, setOpenCategoryId] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -360,7 +364,9 @@ export default function SellerPanel() {
     setDiscountOpen(false);
     setPaymentMethod("");
     setPayments([]);
-    setTicketRequested(false);
+    setBillingOpen(false);
+    setReceiverVatConditionId("5");
+    setReceiverDocument("");
     setSelectedCustomer(null);
     setCustomerOpen(false);
     setLastProductId("");
@@ -415,7 +421,7 @@ export default function SellerPanel() {
     setDiscountIds((current) => current.filter((id) => id !== discount.discountId));
   };
 
-  const savePending = useCallback(async () => {
+  const savePending = useCallback(async ({ requestInvoice = false, invoiceReceiver = null } = {}) => {
     const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const localId = `local_${random.replace(/[^A-Za-z0-9_-]/g, "")}`;
     await saveSellerPendingSale({
@@ -435,14 +441,26 @@ export default function SellerPanel() {
       paymentMethodLabel: PAYMENT_LABELS[paymentMethod],
       payments,
       customer: selectedCustomer,
-      ticketRequested,
+      ticketRequested: requestInvoice,
+      invoiceReceiver,
     });
     await pendingSales.refresh();
     resetSale();
     setSubmitState({ busy: false, tone: "success", message: "Venta guardada en este dispositivo. Todavía no está confirmada en Firestore." });
-  }, [selectedLocation, profile, currentItems, appliedDiscounts, summary.total, paymentMethod, payments, selectedCustomer, ticketRequested, pendingSales, resetSale]);
+  }, [selectedLocation, profile, currentItems, appliedDiscounts, summary.total, paymentMethod, payments, selectedCustomer, pendingSales, resetSale]);
 
-  const submitSale = useCallback(async () => {
+  const submitSale = useCallback(async (options = {}) => {
+    const requestInvoice = options?.requestInvoice === true;
+    const receiverCondition = Number(receiverVatConditionId || 0);
+    const receiverDigits = String(receiverDocument || "").replace(/\D/g, "");
+    const invoiceReceiver = requestInvoice ? {
+      vatConditionId: receiverCondition,
+      documentType: receiverCondition === 5 ? (receiverDigits ? 96 : 99) : 80,
+      documentNumber: receiverCondition === 5 ? (receiverDigits || "0") : receiverDigits,
+      anonymousConsumerFinal: receiverCondition === 5 && !receiverDigits,
+      concept: 1,
+    } : null;
+
     if (submitRef.current || submitState.busy) return;
     if (!selectedLocation) {
       setSubmitState({ busy: false, tone: "error", message: "Elegí una ubicación activa." });
@@ -463,8 +481,12 @@ export default function SellerPanel() {
         return;
       }
     }
-    if (ticketRequested && !ticketAllowed) {
-      setSubmitState({ busy: false, tone: "error", message: "Tu perfil no puede solicitar ticket." });
+    if (requestInvoice && !ticketAllowed) {
+      setSubmitState({ busy: false, tone: "error", message: "Tu perfil no puede generar factura." });
+      return;
+    }
+    if (requestInvoice && [1, 4, 6].includes(receiverCondition) && receiverDigits.length !== 11) {
+      setSubmitState({ busy: false, tone: "error", message: "Para Responsable Inscripto, Monotributo o Exento ingresá la CUIT de 11 dígitos." });
       return;
     }
     if (!online && editSale) {
@@ -475,7 +497,7 @@ export default function SellerPanel() {
     setSubmitState({ busy: true, tone: "info", message: online ? "Registrando venta…" : "Guardando pendiente…" });
     try {
       if (!online) {
-        await savePending();
+        await savePending({ requestInvoice, invoiceReceiver });
         return;
       }
       const common = {
@@ -486,7 +508,8 @@ export default function SellerPanel() {
         paymentMethodLabel: PAYMENT_LABELS[paymentMethod],
         payments,
         customer: selectedCustomer,
-        ticketRequested,
+        ticketRequested: editSale ? undefined : requestInvoice,
+        invoiceReceiver: editSale ? null : invoiceReceiver,
       };
       const result = editSale
         ? await updateSellerSale({ ...common, saleId: editSale.id })
@@ -500,7 +523,7 @@ export default function SellerPanel() {
     } finally {
       submitRef.current = false;
     }
-  }, [submitState.busy, selectedLocation, currentItems, paymentMethod, payments, summary.total, selectedCustomer, ticketRequested, ticketAllowed, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales]);
+  }, [submitState.busy, selectedLocation, currentItems, paymentMethod, payments, summary.total, selectedCustomer, ticketAllowed, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales, receiverVatConditionId, receiverDocument]);
 
   const actionShortcuts = useMemo(() => SELLER_ACTION_SHORTCUTS.map((action) => ({
     ...action,
@@ -554,6 +577,7 @@ export default function SellerPanel() {
           payments: sale.payments,
           customer: sale.customer || null,
           ticketRequested: sale.ticketRequested === true,
+          invoiceReceiver: sale.invoiceReceiver || null,
           offlineSale: { localId: sale.localId, createdLocallyAt: sale.createdLocallyAt },
         });
         await markSellerPendingSynced(sale.localId, result.id);
@@ -610,7 +634,6 @@ export default function SellerPanel() {
     setManualDiscounts(saleDiscounts.filter((discount) => discount.source === "manual" || discount.discountId === "manual").map((discount) => ({ ...discount, source: "manual", discountId: "manual" })));
     setPaymentMethod(sale.paymentMethod || "");
     setPayments(salePaymentParts(sale));
-    setTicketRequested(sale.ticketRequested === true);
     setSelectedCustomer(sale.customerId && sale.customerPhoneSnapshot ? {
       id: sale.customerId,
       phone: sale.customerPhoneSnapshot,
@@ -772,14 +795,12 @@ export default function SellerPanel() {
             )}
           </div>
 
-          <label className={`fm-seller-ticket-option ${ticketRequested ? "is-selected" : ""}`}>
-            <input type="checkbox" checked={ticketRequested} disabled={!ticketAllowed} onChange={(event) => setTicketRequested(event.target.checked)} />
-            <Icon name="ReceiptText" />
-            <span><strong>Agregar ticket</strong><small>{ticketRequested ? "Solicitud pendiente al registrar" : "Preparar solicitud fiscal ARCA después de guardar la venta"}</small></span>
-          </label>
-
-          {submitState.message ? <Toast tone={submitState.tone}>{submitState.message}</Toast> : null}
-          <div className="fm-seller-sticky-action"><div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div><Button icon="Check" loading={submitState.busy} disabled={!currentItems.length || !paymentMethod || !selectedLocation} onClick={submitSale} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Continuar" : "Guardar pendiente"}</Button></div>
+          {submitState.message && !billingOpen ? <Toast tone={submitState.tone}>{submitState.message}</Toast> : null}
+          <div className="fm-seller-sticky-action">
+            <div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div>
+            {!editSale ? <Button variant="secondary" icon="FileText" disabled={!ticketAllowed || submitState.busy || !currentItems.length || !paymentMethod || !selectedLocation} onClick={() => setBillingOpen(true)}>Generar factura</Button> : null}
+            <Button icon="Check" loading={submitState.busy} disabled={!currentItems.length || !paymentMethod || !selectedLocation} onClick={submitSale} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Continuar" : "Guardar pendiente"}</Button>
+          </div>
         </Panel>
       </aside>
     </div>
@@ -882,6 +903,12 @@ export default function SellerPanel() {
             </div>
           </div>
         ) : null}
+      </Modal>
+      <Modal open={billingOpen} title="Generar factura" description="Confirmá la venta y prepará su comprobante fiscal." onClose={() => !submitState.busy && setBillingOpen(false)} footer={<div className="fm-dialog-actions"><Button variant="secondary" disabled={submitState.busy} onClick={() => setBillingOpen(false)}>Cancelar</Button><Button loading={submitState.busy} disabled={!currentItems.length || !paymentMethod || !selectedLocation} onClick={() => submitSale({ requestInvoice: true })}>Generar factura y continuar</Button></div>}>
+        {submitState.message && submitState.tone === "error" ? <div role="alert"><Toast tone="error">{submitState.message}</Toast></div> : null}
+        <p className="fm-seller-billing-total">Total {formatMoney(summary.total)}</p>
+        <FormField label="Condición IVA receptor" required><Select disabled={submitState.busy} value={receiverVatConditionId} onChange={(event) => { setReceiverVatConditionId(event.target.value); setReceiverDocument(""); }}><option value="5">Consumidor Final</option><option value="1">IVA Responsable Inscripto</option><option value="6">Responsable Monotributo</option><option value="4">IVA Sujeto Exento</option></Select></FormField>
+        <FormField label={receiverVatConditionId === "5" ? "DNI (opcional)" : "CUIT del receptor"} required={receiverVatConditionId !== "5"} hint={receiverVatConditionId === "5" ? "Podés dejarlo vacío para Consumidor Final sin identificar, sujeto a validación fiscal." : "CUIT de 11 dígitos."}><input disabled={submitState.busy} inputMode="numeric" value={receiverDocument} onChange={(event) => setReceiverDocument(event.target.value.replace(/\D/g, "").slice(0, 11))} /></FormField>
       </Modal>
       <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Venta registrada" description={receipt?.saleCode || ""} footer={null}>
         {receipt ? (

@@ -392,6 +392,7 @@ async function createSale({
   paymentMethodLabel,
   payments = [],
   ticketRequested = false,
+  invoiceReceiver = null,
   customer = null,
   offlineSale = null,
   administrative = false,
@@ -613,6 +614,7 @@ async function createSale({
     const invoice = await requestPendingArcaInvoice({
       sourceType: "seller_sale",
       sourceId: result.id,
+      receiver: invoiceReceiver,
     });
     return {
       ...result,
