@@ -1,5 +1,5 @@
 import { Badge, Button, DataTable, Modal, Skeleton } from "../../design-system";
-import { activityChangeRows, activityFieldRows, activityValueLabel } from "../activity/activityDetails";
+import { activityChangeRows, activityFieldRows, activityStockMovements, activityValueLabel } from "../activity/activityDetails";
 import { getActivityPresentation } from "../activity/activityPresentation";
 import { formatDateTime, formatMoney } from "../formatters";
 import { businessModules } from "../modules";
@@ -11,8 +11,8 @@ function Fields({ record }) {
 export default function ActivityDetail({ selected, state, onClose, onRetry }) {
   const detail = state.data, raw = detail?.raw || selected?.raw || {}, record = detail?.record || raw.detailSnapshot || {};
   const sale = String(selected?.action).startsWith("sale.");
-  const items = Array.isArray(record.items) ? record.items : Array.isArray(raw.items) ? raw.items : [], movements = detail?.movements || [];
-  const names = Object.fromEntries(items.map(item => [item.productId, item.name || item.productName]));
+  const items = Array.isArray(record.items) ? record.items : Array.isArray(raw.items) ? raw.items : [], movements = activityStockMovements(record, detail?.movements);
+  const names = Object.fromEntries([...items, ...(record.lines || [])].map(item => [item.productId, item.name || item.productName]));
   const changes = activityChangeRows(raw.before || raw.previous || raw.previousSettings, raw.after || raw.next || raw.newSettings, names);
   const fields = { ...raw, ...record };
   return <Modal open={Boolean(selected)} title={getActivityPresentation(selected).label} description={selected?.description} onClose={onClose}>
@@ -24,6 +24,7 @@ export default function ActivityDetail({ selected, state, onClose, onRetry }) {
         {detail.warning ? <p className="fm-activity-detail__notice" role="note">{detail.warning}</p> : null}
         {detail.recorded ? <p className="fm-activity-detail__recorded">Detalle guardado cuando se realizó la actividad.</p> : null}
         {sale && fields.total != null ? <p className="fm-activity-detail__total">Total de la venta: <strong>{formatMoney(fields.total)}</strong></p> : null}
+        {movements.length ? <section><h3>Movimientos de stock</h3><DataTable rows={movements} columns={[{ key: "productName", label: "Producto" }, { key: "qty", label: "Variación" }, { key: "previousStock", label: "Antes" }, { key: "newStock", label: "Después" }, { key: "reason", label: "Motivo" }]} /></section> : null}
         {items.length ? <section><h3>{sale ? "Productos de la venta" : "Productos de la operación"}</h3><DataTable rows={items} rowKey="productId" columns={[
           { key: "name", label: "Producto", render: item => item.name || item.productName || "Producto" },
           { key: "qty", label: "Cantidad", render: item => item.qty ?? item.quantity ?? item.receivedQuantity ?? "—" },
@@ -34,7 +35,6 @@ export default function ActivityDetail({ selected, state, onClose, onRetry }) {
         {Array.isArray(record.discounts) && record.discounts.length ? <section><h3>Descuentos aplicados</h3><ul>{record.discounts.map((discount, index) => <li key={index}>{discount.name || "Descuento"} · {discount.type === "percent" ? `${discount.value}%` : formatMoney(discount.value ?? discount.amount)}{discount.amount != null && discount.type === "percent" ? ` · ${formatMoney(discount.amount)}` : ""}</li>)}</ul></section> : null}
         {Array.isArray(record.payments) && record.payments.some(payment => Number(payment.amount) > 0) ? <section><h3>Desglose del pago</h3><dl className="fm-activity-detail__fields">{record.payments.filter(payment => Number(payment.amount) > 0).map((payment, index) => <div key={index}><dt>{activityValueLabel(payment.method || payment.label)}</dt><dd>{formatMoney(payment.amount)}</dd></div>)}</dl></section> : null}
         <Fields record={fields} />
-        {movements.length ? <section><h3>Movimientos de stock</h3><DataTable rows={movements} columns={[{ key: "productName", label: "Producto" }, { key: "qty", label: "Variación" }, { key: "previousStock", label: "Antes" }, { key: "newStock", label: "Después" }, { key: "reason", label: "Motivo" }]} /></section> : null}
         {changes.length ? <section><h3>Qué cambió</h3><DataTable rows={changes} rowKey="key" columns={[{ key: "label", label: "Dato" }, { key: "before", label: "Antes" }, { key: "after", label: "Después" }]} /></section> : null}
         {raw.after && !changes.length ? <Fields record={Array.isArray(raw.after) ? {} : raw.after} /> : null}
         {!activityFieldRows(fields).length && !items.length && !movements.length && !changes.length ? <p>Esta actividad conserva la descripción y las referencias, pero no guardó un desglose adicional.</p> : null}

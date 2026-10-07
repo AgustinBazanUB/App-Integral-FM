@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { saleActivitySnapshot } from "../src/shared/activitySnapshots.mjs";
-import { activityChangeRows, activityFieldRows, activityUserOptions } from "../src/gestion/activity/activityDetails.js";
+import { activityChangeRows, activityFieldRows, activityStockMovements, activityUserOptions } from "../src/gestion/activity/activityDetails.js";
 
 test("sale audit snapshots keep products, amounts and split payments without credentials or customer contact data", () => {
   const sale = { saleCode: "FM-1", total: 15000, cashRoundingDiscountTotal: 300, paymentMethod: "multiple", customerPhoneSnapshot: "PRIVATE", authorization: { token: "PRIVATE" }, items: [{ productId: "jam", name: "Mermelada", qty: 2, unitPrice: 8000, subtotal: 16000, secret: "PRIVATE" }], payments: [{ method: "cash", amount: 10000, providerPayload: "PRIVATE" }, { method: "alias", amount: 5000 }] };
@@ -30,4 +30,12 @@ test("technical and nested configuration secrets never become visible activity f
   assert.doesNotMatch(JSON.stringify(rows), /PRIVATE|apiKey|access_token/);
   assert.match(rows.find(row => row.key === "operatingCalendar").value, /Lunes · Martes · Apertura: 09:00 · Cierre: 18:00/);
   assert.equal(activityFieldRows(null).length, 0);
+});
+test("Olivia list loads display immutable product names, received units and stock changes", () => {
+  const result = { lines: [{ productId: "jam", name: "Mermelada", quantity: 10, previousStock: 3, newStock: 13 }] };
+  assert.deepEqual(activityStockMovements(result), [{ id: "jam", productName: "Mermelada", qty: 10, previousStock: 3, newStock: 13 }]);
+  const changes = activityChangeRows([{ productId: "jam", currentStock: 3 }], result, { jam: "Mermelada" });
+  assert.deepEqual(changes, [{ key: "jam:currentStock", label: "Mermelada · Stock actual", before: "3", after: "13" }]);
+  assert.deepEqual(activityChangeRows({ price: 19000, active: true }, { active: true }), []);
+  assert.equal(activityChangeRows({ items: [{ productId: "jam", qty: 2 }] }, { items: [] })[0].after, "—");
 });
