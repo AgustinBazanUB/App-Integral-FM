@@ -8,6 +8,6 @@
 .fm-quick-pos__carousel.fm-subcategory-strip { display:grid; grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:110px; overflow-x:auto; }
 .fm-subcategory-strip:focus-visible { outline:2px solid var(--fm-gold-primary); outline-offset:-2px; }
 @media(max-width:767px) {
- .fm-seller-category .fm-seller-products.fm-subcategory-strip { grid-auto-columns:calc((100% - 12px) / 3); }
+ .fm-seller-category .fm-seller-products.fm-subcategory-strip { grid-auto-columns:calc((100% - 12px) / 3); gap:6px; }
  .fm-quick-pos__carousel.fm-subcategory-strip { grid-auto-columns:calc((100% - 14px) / 3); }
 }
