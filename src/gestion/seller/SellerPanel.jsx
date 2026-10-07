@@ -114,6 +114,17 @@ function SellerHeader({
   onReturnAdmin,
   onLogout,
 }) {
+  const profileMenuRef = useRef(null);
+  useEffect(() => {
+    const dismiss = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) profileMenuRef.current.open = false;
+    };
+    const escape = (event) => { if (event.key === "Escape" && profileMenuRef.current) profileMenuRef.current.open = false; };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("focusin", dismiss);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("focusin", dismiss); document.removeEventListener("keydown", escape); };
+  }, []);
   return (
     <>
       <header className="fm-seller-header">
@@ -132,7 +143,7 @@ function SellerHeader({
           <button type="button" className={`fm-seller-pending-chip ${pendingCount ? "has-pending" : ""}`} onClick={() => setView("pending")}>
             Pendientes <strong>{pendingCount}</strong>
           </button>
-          <details className="fm-dropdown fm-seller-profile">
+          <details ref={profileMenuRef} className="fm-dropdown fm-seller-profile">
             <summary aria-label={`Perfil de ${profile.name || "usuario"}`} title="Abrir opciones del perfil"><SellerProfileAvatar profile={profile} /></summary>
             <div className="fm-profile-menu">
               {canReturnAdmin ? <button type="button" onClick={onReturnAdmin}><Icon name="LayoutDashboard" />Volver al Panel Administrador</button> : null}
@@ -796,7 +807,7 @@ export default function SellerPanel() {
       </section>
       <aside className="fm-seller-cart">
         <fieldset className="fm-seller-sale-controls" disabled={submitState.busy}>
-        <Panel title="Venta actual" description={`${cartQuantity(cart)} producto${cartQuantity(cart) === 1 ? "" : "s"}`} action={<button type="button" className="fm-text-button" onClick={() => currentItems.length ? setClearRequested(true) : setSubmitState({ busy: false, tone: "error", message: sellerProblem("VENTA-VACIA", "La venta ya está vacía. Agregá un producto para empezar.") })}>Vaciar</button>}>
+        <Panel title={<span className="fm-seller-cart-title">Venta actual <small>{cartQuantity(cart)} producto{cartQuantity(cart) === 1 ? "" : "s"}</small></span>} action={<button type="button" className="fm-text-button" onClick={() => currentItems.length ? setClearRequested(true) : setSubmitState({ busy: false, tone: "error", message: sellerProblem("VENTA-VACIA", "La venta ya está vacía. Agregá un producto para empezar.") })}>Vaciar</button>}>
           <div className="fm-seller-cart-lines">
             {currentItems.length ? currentItems.map((item) => (
               <article key={item.id} className={item.qty > item.stock ? "has-stock-warning" : ""}>
@@ -810,14 +821,17 @@ export default function SellerPanel() {
 
           <SaleStockWarning discrepancies={stockDiscrepancies} />
           <div className="fm-seller-discount-summary">
-            <div className="fm-seller-section-head"><strong>Descuentos</strong><button type="button" onClick={() => { if (!discountAllowed) { setSubmitState({ busy: false, tone: "error", message: sellerProblem("DESCUENTO-PERMISO", "Tu usuario no puede aplicar descuentos. Pedile permiso al administrador.") }); return; } setSuggestedDiscountId(""); setDiscountOpen(true); }}><Icon name="Percent" />Agregar descuento</button></div>
-            {summary.discounts.length ? summary.discounts.map((discount, index) => <div key={`${discount.discountId}-${discount.type}-${discount.value}-${index}`} className="fm-seller-applied-discount"><span><strong>{discount.name}</strong><small>{discount.type === "percent" ? `${discount.value} %` : "Monto fijo"}</small></span><strong>− {formatMoney(discount.amountApplied)}</strong><button type="button" aria-label={`Quitar ${discount.name}`} onClick={() => removeDiscount(discount)}><Icon name="X" /></button></div>) : <span className="fm-seller-no-discount">Sin descuentos aplicados</span>}
+            <div className="fm-seller-discount-strip">
+            <div className="fm-seller-section-head"><button type="button" onClick={() => { if (!discountAllowed) { setSubmitState({ busy: false, tone: "error", message: sellerProblem("DESCUENTO-PERMISO", "Tu usuario no puede aplicar descuentos. Pedile permiso al administrador.") }); return; } setSuggestedDiscountId(""); setDiscountOpen(true); }}><Icon name="Percent" />Agregar descuento</button></div>
+            <div className="fm-seller-discount-list" role="region" aria-label="Descuentos aplicados" tabIndex="0">
+            {summary.discounts.length ? summary.discounts.map((discount, index) => <div key={`${discount.discountId}-${discount.type}-${discount.value}-${index}`} className="fm-seller-applied-discount"><span><strong>{discount.name}</strong><small>{discount.type === "percent" ? `${discount.value} %` : "Monto fijo"}</small></span><strong>− {formatMoney(discount.amountApplied)}</strong><button type="button" aria-label={`Quitar ${discount.name}`} onClick={() => removeDiscount(discount)}><Icon name="X" /></button></div>) : null}
+            </div></div>
             {summary.discounts.length ? <div className="fm-seller-discount-total"><span>Total descuentos</span><strong>− {formatMoney(summary.discountTotal)}</strong></div> : null}
             {summary.cashRoundingDiscountTotal > 0 ? <div className="fm-seller-discount-total"><span>Incluye redondeo por efectivo</span><strong>− {formatMoney(summary.cashRoundingDiscountTotal)}</strong></div> : null}
           </div>
 
 
-          <fieldset className="fm-seller-payments"><legend>Forma de pago *</legend>{PAYMENT_OPTIONS.filter((option) => option.value !== "multiple" || multiplePaymentAllowed).map((option) => { const selected = paymentMethod === option.value; return <button key={option.value} type="button" className={selected ? "is-selected" : ""} aria-pressed={selected} onClick={() => option.value === "multiple" ? setMultipleOpen(true) : (setPaymentMethod(option.value), setPayments([]), setSubmitState({ busy: false, tone: "info", message: "" }))}>{selected ? <Icon name="Check" /> : null}<span>{friendlyPayment[option.value]}</span></button>; })}</fieldset>
+          <fieldset className={`fm-seller-payments${multiplePaymentAllowed ? " has-multiple" : ""}`}><legend>Forma de pago *</legend>{PAYMENT_OPTIONS.filter((option) => option.value !== "multiple" || multiplePaymentAllowed).map((option) => { const selected = paymentMethod === option.value; return <button key={option.value} type="button" className={`${selected ? "is-selected" : ""}${option.value === "multiple" ? " fm-seller-payments-multiple" : ""}`} aria-pressed={selected} onClick={() => option.value === "multiple" ? setMultipleOpen(true) : (setPaymentMethod(option.value), setPayments([]), setSubmitState({ busy: false, tone: "info", message: "" }))}>{selected ? <Icon name="Check" /> : null}<span>{friendlyPayment[option.value]}</span></button>; })}</fieldset>
           {paymentMethod === "multiple" ? <p className="fm-seller-payment-summary">{payments.map((payment) => `${friendlyPayment[payment.method]} ${formatMoney(payment.amount)}`).join(" · ")}</p> : null}
 
           <div className="fm-seller-customer-section">
@@ -838,19 +852,16 @@ export default function SellerPanel() {
             ) : (
               <button type="button" className="fm-seller-add-customer" onClick={() => setCustomerOpen(true)}>
                 <Icon name="UserPlus" />
-                <span><strong>Agregar cliente</strong><small>Teléfono · zona · nombre opcional</small></span>
+                <span><strong>Agregar cliente</strong></span>
                 <Icon name="ChevronRight" />
               </button>
             )}
           </div>
 
-          <label className={`fm-seller-ticket-option ${ticketRequested ? "is-selected" : ""}`}>
-            <input type="checkbox" checked={ticketRequested} onChange={(event) => { if (!ticketAllowed) { setSubmitState({ busy: false, tone: "error", message: sellerProblem("TICKET-PERMISO", "Tu usuario no puede solicitar un ticket. Pedile permiso al administrador.") }); return; } setTicketRequested(event.target.checked); }} />
-            <Icon name="ReceiptText" />
-            <span><strong>Agregar ticket</strong><small>{ticketRequested ? "Solicitud pendiente al registrar" : "Preparar solicitud fiscal ARCA después de guardar la venta"}</small></span>
-          </label>
-
-          <div className="fm-seller-sticky-action"><div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div><Button icon="Check" loading={submitState.busy} onClick={submitSale} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Continuar" : "Guardar pendiente"}</Button></div>
+          <div className="fm-seller-sticky-action"><div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div>
+            <button type="button" className={`fm-seller-invoice-toggle${ticketRequested ? " is-selected" : ""}`} aria-pressed={ticketRequested} title="Solicitar comprobante fiscal al guardar la venta" onClick={() => { if (!ticketAllowed) { setSubmitState({ busy: false, tone: "error", message: sellerProblem("TICKET-PERMISO", "Tu usuario no puede solicitar una factura. Pedile permiso al administrador.") }); return; } setTicketRequested(value => !value); }}><Icon name={ticketRequested ? "Check" : "ReceiptText"} /><span>Generar factura</span></button>
+            <Button icon="Check" loading={submitState.busy} onClick={submitSale} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Continuar" : "Guardar pendiente"}</Button>
+          </div>
           {submitState.message ? <div className="fm-seller-action-feedback" role={submitState.tone === "error" ? "alert" : "status"}>{submitState.tone === "error" ? <p className="fm-form-error">{submitState.message}</p> : <Toast tone={submitState.tone}>{submitState.message}</Toast>}</div> : null}
         </Panel>
         </fieldset>

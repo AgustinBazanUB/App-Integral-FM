@@ -200,3 +200,33 @@
 .fm-olivia-rich-text input[type="checkbox"] { margin-right: 7px; }
 .fm-olivia-confirmation .fm-olivia-rich-text { font-size: 13px; }
 .fm-olivia-confirmation .fm-olivia-rich-text h3 { font-size: 14px; }
+
+/* Olivia owns the viewport while open; only its conversation scrolls. */
+.fm-olivia-overlay { position:fixed; inset:0; z-index:1000; background:rgb(36 23 13 / 24%); overscroll-behavior:none; }
+.fm-olivia-drawer { bottom:18px; overflow:hidden; }
+.fm-olivia-header { padding:7px 10px; gap:5px; }
+.fm-olivia-header .fm-olivia-face { width:34px; height:34px; flex-basis:34px; }
+.fm-olivia-title-line { display:flex; align-items:baseline; gap:5px; white-space:nowrap; }
+.fm-olivia-header h2 { font-size:20px; }
+.fm-olivia-title-line > span { font-size:10px; }
+.fm-olivia-identity small { font-size:10px; margin-top:1px; }
+.fm-olivia-messages { flex:1 1 0; min-height:0; }
+.fm-olivia-drawer.is-compact { overflow:hidden; }
+.fm-olivia-composer { padding:7px 10px; }
+.fm-olivia-composer-bar { padding:3px; gap:2px; flex-wrap:nowrap; align-items:flex-end; }
+.fm-olivia-composer-bar textarea { order:0; flex:1 1 0; min-height:36px; max-height:90px; padding:8px 4px; border:0; border-radius:0; outline:none; box-shadow:none; }
+.fm-olivia-composer-bar textarea:focus, .fm-olivia-composer-bar textarea:focus-visible { border:0; outline:none; box-shadow:none; }
+.fm-olivia-composer-bar:focus-within { border-color:var(--fm-gold-primary); }
+.fm-olivia-composer-bar .fm-icon-button { width:34px; height:36px; min-width:34px; min-height:36px; padding:6px; }
+.fm-olivia-attach-menu summary { width:32px; height:36px; }
+@media(max-width:640px) {
+  .fm-olivia-drawer { top:var(--olivia-viewport-top, 0px); right:0; bottom:auto; width:100%; height:var(--olivia-viewport-height, 100dvh); max-height:none; border-radius:0; border:0; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); }
+  .fm-olivia-header .fm-olivia-face { display:none; }
+  .fm-olivia-header { padding:6px 8px; gap:3px; }
+  .fm-olivia-header h2 { font-size:18px; }
+  .fm-olivia-title-line { gap:3px; }
+  .fm-olivia-title-line > span { font-size:9px; }
+  .fm-olivia-header .fm-olivia-status-dot { font-size:0; gap:0; margin:0; }
+  .fm-olivia-drawer .fm-olivia-header .fm-icon-button { width:28px; min-width:28px; height:30px; min-height:30px; }
+  .fm-olivia-drawer:has(.fm-olivia-composer textarea:focus) .fm-olivia-usage, .fm-olivia-drawer.is-compact .fm-olivia-usage { display:none; }
+}

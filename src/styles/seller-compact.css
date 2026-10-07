@@ -34,3 +34,42 @@
  .fm-seller-keyboard-toggle strong { font-size:11px; }
 }
 @media(max-width:360px) { .fm-seller-brand strong { font-size:13px; } .fm-seller-brand { gap:5px; } }
+
+.fm-seller-profile > summary:focus { outline:none; box-shadow:none; background:transparent; }
+.fm-seller-profile > summary:focus-visible .fm-avatar { outline:2px solid var(--fm-gold-primary); outline-offset:2px; }
+.fm-seller-profile > summary { -webkit-tap-highlight-color:transparent; }
+.fm-seller-cart-title { display:flex; align-items:center; gap:8px; white-space:nowrap; }
+.fm-seller-cart-title small { font:500 11px var(--fm-font-ui); color:var(--fm-text-muted); }
+.fm-seller-cart .fm-panel__header { padding:10px 12px; gap:8px; }
+.fm-seller-cart .fm-panel__header h2 { margin:0; font-size:21px; }
+.fm-seller-discount-strip { display:flex; gap:6px; align-items:center; min-width:0; }
+.fm-seller-discount-strip .fm-seller-section-head { flex:none; }
+.fm-seller-discount-list { display:flex; gap:6px; overflow-x:auto; min-width:0; flex:1; }
+.fm-seller-discount-list .fm-seller-applied-discount { flex:none; }
+.fm-seller-payments { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.fm-seller-payments.has-multiple { grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,.86fr); }
+.fm-seller-payments .fm-seller-payments-multiple { grid-column:3; grid-row:1 / span 2; }
+.fm-seller-sticky-action { grid-template-columns:auto minmax(0,1fr) minmax(0,1fr); }
+.fm-seller-invoice-toggle { display:flex; gap:4px; align-items:center; justify-content:center; min-height:48px; border:1px solid var(--fm-border); border-radius:9px; padding:5px; font-size:11px; background:var(--fm-surface); color:var(--fm-text-accent); cursor:pointer; }
+.fm-seller-invoice-toggle svg { width:16px; height:16px; flex:none; }
+.fm-seller-invoice-toggle.is-selected { border-color:#b88a2d; background:#fbf2dc; }
+.fm-seller-sticky-action .fm-seller-confirm { min-width:0; padding-inline:6px; gap:4px; font-size:11px; }
+.fm-seller-sticky-action > div { display:grid; }
+@media(max-width:767px) {
+  .fm-seller-main:has(.fm-seller-sale-layout) { padding:10px 10px calc(10px + env(safe-area-inset-bottom)); }
+  .fm-seller-sale-layout { gap:12px; }
+  .fm-seller-catalog { display:flex; flex-direction:column; height:calc(100dvh - 130px); min-height:340px; }
+  .fm-seller-catalog-scroll { flex:1; min-height:0; max-height:none; overscroll-behavior-y:auto; }
+  .fm-seller-cart { margin-top:0; min-height:calc(100dvh - 130px); }
+  .fm-seller-cart .fm-seller-sale-controls, .fm-seller-cart .fm-panel { min-height:calc(100dvh - 130px); display:flex; flex-direction:column; }
+  .fm-seller-cart .fm-panel__body { flex:1; display:flex; flex-direction:column; min-height:0; padding:10px; }
+  .fm-seller-cart-lines { flex:1 1 160px; min-height:160px; max-height:calc(100dvh - 400px); }
+  .fm-seller-cart-title small { font-size:10px; }
+  .fm-seller-cart .fm-seller-discount-summary { margin-top:6px; padding-top:6px; }
+  .fm-seller-payments { margin-top:6px; }
+  .fm-seller-customer-section { margin-top:6px; }
+  .fm-seller-add-customer { min-height:44px; padding:5px 8px; }
+  .fm-seller-sticky-action { position:static; margin:6px 0 0; padding:6px 0 0; box-shadow:none; }
+  .fm-seller-sticky-action > div strong { font-size:20px; }
+  .fm-seller-action-feedback { max-height:110px; overflow-y:auto; margin-top:6px; }
+}

@@ -433,3 +433,5 @@ export const AppShell = ({ children }) => children;
 export const Sidebar = ({ children }) => <aside>{children}</aside>;
 export const Header = ({ children }) => <header>{children}</header>;
 export const ModuleNavigation = ({ children }) => <nav>{children}</nav>;
+
+export { useOverlay };

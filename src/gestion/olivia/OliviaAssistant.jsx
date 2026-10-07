@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, IconButton, Modal } from "../../design-system";
+import { createPortal } from "react-dom";
+import { Button, IconButton, Modal, useOverlay } from "../../design-system";
 import { useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
 import { canAccessAdministration } from "../permissions";
@@ -45,6 +46,8 @@ export default function OliviaAssistant() {
   const admin = canAccessAdministration(profile);
   const online = useOnlineStatus();
   const [open, setOpen] = useState(false);
+  const closeButtonRef = useRef(null);
+  const drawerRef = useOverlay(open, undefined, closeButtonRef);
   const [snapshot, setSnapshot] = useState({ messages: [], state: "information", pendingAction: null, usage: null });
   const [developer, setDeveloper] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(false);
@@ -117,6 +120,13 @@ export default function OliviaAssistant() {
     measure(); view.addEventListener("resize", measure); view.addEventListener("scroll", measure);
     return () => { view.removeEventListener("resize", measure); view.removeEventListener("scroll", measure); };
   }, []);
+  useEffect(() => {
+    if (!open) return;
+    const root = document.getElementById("root");
+    const previous = root?.inert;
+    if (root) root.inert = true;
+    return () => { if (root) root.inert = previous; };
+  }, [open]);
   useEffect(() => {
     if (!optimistic || !streamStart.current || streamStart.current.visibleMs != null) return;
     const frame = requestAnimationFrame(() => { if (streamStart.current) streamStart.current.visibleMs = performance.now() - streamStart.current.sentAt; });
@@ -267,13 +277,7 @@ export default function OliviaAssistant() {
 
   useEffect(() => {
     if (!open) return undefined;
-    textareaRef.current?.focus();
     if (!requestRef.current) { estimateContextRef.current = estimateContextKey; perform(conversationRef.current ? "resume" : "state").catch(() => {}); }
-    const onKey = (event) => {
-      if (event.key === "Escape") { stopRecording(true); stopVoice(); setOpen(false); launcherRef.current?.focus(); }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
   }, [open, perform, stopRecording, stopVoice]);
 
   useEffect(() => {
@@ -529,14 +533,15 @@ export default function OliviaAssistant() {
     <OliviaLauncherPortal><button ref={launcherRef} type="button" className="fm-olivia-launcher" aria-label={open ? "Cerrar Olivia" : "Abrir Olivia, asistente de Flor Mía"} aria-expanded={open} aria-controls="fm-olivia-drawer" onClick={() => open ? close() : setOpen(true)}>
       <OliviaFace active={busy || recording || voiceActive} /><span className="fm-olivia-launcher__label"><strong>Olivia</strong><small>Asistente de IA</small></span>
     </button></OliviaLauncherPortal>
-    {open ? <aside id="fm-olivia-drawer" className={`fm-olivia-drawer${viewport?.height < 500 ? " is-compact" : ""}`} style={viewport ? { "--olivia-viewport-height": `${viewport.height}px`, "--olivia-viewport-top": `${viewport.top}px` } : undefined} role="dialog" aria-modal="false" aria-labelledby="fm-olivia-title">
+    {createPortal(<>
+    {open ? <div className="fm-olivia-overlay" role="presentation"><aside ref={drawerRef} id="fm-olivia-drawer" className={`fm-olivia-drawer${viewport?.height < 500 ? " is-compact" : ""}`} style={viewport ? { "--olivia-viewport-height": `${viewport.height}px`, "--olivia-viewport-top": `${viewport.top}px` } : undefined} role="dialog" aria-modal="true" aria-labelledby="fm-olivia-title">
       <header className="fm-olivia-header">
-        <OliviaFace active={busy || recording || voiceActive}/><div className="fm-olivia-identity"><h2 id="fm-olivia-title">Olivia</h2><span>Asistente de Flor Mía</span><small>{context.module === "seller" ? "Panel Vendedor" : "Panel Administrador"}</small></div>
+        <OliviaFace active={busy || recording || voiceActive}/><div className="fm-olivia-identity"><div className="fm-olivia-title-line"><h2 id="fm-olivia-title">Olivia</h2><span>— Asistente Flor Mía —</span></div><small>Olivia · {context.module === "seller" ? "Panel Vendedor" : "Panel Administrador"}</small></div>
         <span className={`fm-olivia-status-dot ${failed ? "is-error" : busy || pending ? "is-pending" : "is-ready"}`} role="status" title={label}><i aria-hidden="true" />{label}</span>
         {admin ? <IconButton label="Modo desarrollador" icon="Settings2" aria-pressed={developer} onClick={toggleDeveloper} /> : null}
         <IconButton label="Mis chats" icon="ScrollText" disabled={busy || recording || voiceActive || historyBusy} onClick={() => { setChatsOpen(!chatsOpen); if (!chatsOpen) loadHistory("chats"); }}/>
         <IconButton label="Nueva conversación" icon="Plus" disabled={busy || recording || voiceActive} onClick={newConversation}/>
-        <IconButton label="Cerrar Olivia" icon="X" onClick={close}/>
+        <IconButton ref={closeButtonRef} label="Cerrar Olivia" icon="X" onClick={close}/>
       </header>
       {chatsOpen ? <section className="fm-olivia-chats" aria-label="Mis chats"><h3>Mis chats</h3><p>Retomá una conversación o creá una nueva. El historial se guarda en tu cuenta durante el período de retención.</p>{chats.map((chat) => <button type="button" key={chat.id} disabled={busy || historyBusy} aria-current={chat.id === snapshot.conversationId ? "true" : undefined} onClick={() => reopen(chat.id)}><strong>{chat.title}</strong><small>{formatDateTime(chat.updatedAt)}</small></button>)}{!chats.length && !historyBusy ? <p>Todavía no hay chats guardados.</p> : null}{chatsCursor ? <Button variant="secondary" disabled={historyBusy} onClick={() => loadHistory("chats", true)}>Ver más chats</Button> : null}{historyBusy ? <p role="status">Cargando chats…</p> : null}</section> : null}
       {historyError ? <p className="fm-olivia-error" role="alert">{historyError}</p> : null}
@@ -556,7 +561,8 @@ export default function OliviaAssistant() {
       <OliviaUsage quota={quota} estimate={estimate} money={money} voiceCosts={voiceCosts} voiceMode={voiceMode} compact={viewport?.height < 500} exhausted={exhausted} />
       {admin && developer ? <OliviaDeveloperPanel estimate={estimate} quota={quota} latency={latency} voiceMetrics={voiceMetrics} voiceCosts={voiceCosts} telemetry={snapshot.telemetry} money={money} /> : null}
       {!admin && exhausted ? <div className="fm-olivia-quota-request"><Button variant="secondary" disabled={busy || !online || quotaRequested} onClick={() => setQuotaRequestOpen(true)}>{quotaRequested ? "Ampliación solicitada" : "Solicitar ampliación"}</Button>{quotaNotice ? <p role="status">{quotaNotice}</p> : null}</div> : null}
-    </aside> : null}
+    </aside></div> : null}
     <Modal open={quotaRequestOpen} title="Solicitar ampliación de Olivia" description="Enviaremos al Administrador una solicitud de ampliación para tu cupo del período actual." onClose={() => { if (!busy) setQuotaRequestOpen(false); }} footer={<div className="fm-dialog-actions"><Button variant="secondary" disabled={busy} onClick={() => setQuotaRequestOpen(false)}>No</Button><Button loading={busy} onClick={requestQuotaExtension}>Sí, solicitar</Button></div>}><p>La solicitud no cambia tu cupo. El Administrador puede conceder una ampliación temporal desde Configuración de IA.</p>{error ? <p className="fm-form-error" role="alert">{error}</p> : null}</Modal>
+    </>, document.body)}
   </>;
 }
