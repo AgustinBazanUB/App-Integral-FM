@@ -23,6 +23,16 @@ export default function ActivityDetail({ selected, state, onClose, onRetry }) {
       {state.status === "ready" ? <>
         {detail.warning ? <p className="fm-activity-detail__notice" role="note">{detail.warning}</p> : null}
         {detail.recorded ? <p className="fm-activity-detail__recorded">Detalle guardado cuando se realizó la actividad.</p> : null}
+        {record.kind === "product_merge" && Array.isArray(record.inventories) ? <section>
+          <h3>Unificación de productos</h3>
+          <dl className="fm-activity-detail__fields"><div><dt>Producto retirado</dt><dd>{record.source?.name || "Producto"}</dd></div><div><dt>Producto que recibió el stock</dt><dd>{record.target?.name || "Producto"}</dd></div></dl>
+          <DataTable rows={record.inventories.map(row => ({ ...row, inventoryKey: `${row.type}:${row.id}` }))} rowKey="inventoryKey" columns={[
+            { key: "name", label: "Inventario", render: row => `${row.type === "warehouse" ? "Depósito" : "Ubicación"} · ${row.name}` },
+            { key: "quantity", label: "Unidades trasladadas" },
+            { key: "targetBefore", label: "Destino antes" },
+            { key: "targetAfter", label: "Destino después" },
+          ]} />
+        </section> : null}
         {sale && fields.total != null ? <p className="fm-activity-detail__total">Total de la venta: <strong>{formatMoney(fields.total)}</strong></p> : null}
         {movements.length ? <section><h3>Movimientos de stock</h3><DataTable rows={movements} columns={[{ key: "productName", label: "Producto" }, { key: "qty", label: "Variación" }, { key: "previousStock", label: "Antes" }, { key: "newStock", label: "Después" }, { key: "reason", label: "Motivo" }]} /></section> : null}
         {items.length ? <section><h3>{sale ? "Productos de la venta" : "Productos de la operación"}</h3><DataTable rows={items} rowKey="productId" columns={[
