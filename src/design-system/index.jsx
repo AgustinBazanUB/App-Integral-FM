@@ -354,7 +354,7 @@ export function ConfirmationDialog({ open, title = "Confirmar", description, onC
   );
 }
 
-export function DataTable({ columns, rows, rowKey = "id", empty = null }) {
+export function DataTable({ columns, rows, rowKey = "id", empty = null, onRowClick }) {
   if (!rows?.length) return empty || null;
   return (
     <div className="fm-data-table-wrap">
@@ -362,7 +362,7 @@ export function DataTable({ columns, rows, rowKey = "id", empty = null }) {
         <thead><tr>{columns.map((column) => <th key={column.key} scope="col">{column.label}</th>)}</tr></thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={row[rowKey] || index}>
+            <tr key={row[rowKey] || index} onClick={onRowClick ? () => onRowClick(row) : undefined}>
               {columns.map((column) => <td key={column.key} data-label={column.label}>{column.render ? column.render(row) : row[column.key] ?? "—"}</td>)}
             </tr>
           ))}

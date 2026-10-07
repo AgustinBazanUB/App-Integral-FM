@@ -394,12 +394,16 @@ test("shared sale plan preserves administrative, offline and warehouse behavior"
   assert.equal(admin.saleData.sourceChannel, "whatsapp");
   assert.equal(admin.saleData.invoiceStatus, "pending");
   assert.equal(admin.saleData.requestFingerprint, "same");
+  assert.deepEqual(admin.auditData.detailSnapshot.items, admin.saleData.items.map(({ productId, name, qty, unitPrice, subtotal }) => ({ productId, name, qty, unitPrice, subtotal })));
+  assert.equal(admin.auditData.detailSnapshot.total, admin.saleData.total);
+  assert.equal(admin.auditData.detailSnapshot.sourceChannel, "whatsapp");
   const offline = buildOperationalSalePlan({
     ...base,
     offlineSale: { localId: "local_a", createdLocallyAt: now },
   });
   assert.equal(offline.saleData.createdOffline, true);
   assert.equal(offline.saleData.offlineLocalId, "local_a");
+  assert.equal(offline.auditData.detailSnapshot.total, offline.saleData.total);
   assert.throws(
     () =>
       buildOperationalSalePlan({

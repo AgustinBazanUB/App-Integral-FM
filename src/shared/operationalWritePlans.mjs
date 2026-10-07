@@ -1,5 +1,6 @@
 import { effectiveLocationPrice, wholeInventoryQuantity } from "../modules/inventory/domain/inventory.js";
 import { saleStockDiscrepancies } from "../modules/locations/domain/saleStock.js";
+import { saleActivitySnapshot } from "./activitySnapshots.mjs";
 
 const userName = profile => profile.name || profile.email || "Usuario";
 const validationError = message => Object.assign(new Error(message), { code: "sale/validation" });
@@ -85,6 +86,7 @@ export function buildOperationalSalePlan({ profile, location, items, stocks, cou
     createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
   const auditData = { action: "sale.created", title: offlineSale ? "Venta pendiente sincronizada" : "Venta registrada", description: `${saleCode} · ${location.name}`, moduleId: "quick-sales", entityType: "sale", entityId: saleId, locationId: origin.locationId, locationName: origin.locationName, stockOriginType: stockType, stockOriginId: location.id, sourceChannel: saleData.sourceChannel, userId: profile.id, userName: userName(profile), status: "completed", amount: discountSummary.total, ...(priceOverrides.length ? { priceOverrides } : {}), ...(stockDiscrepancies.length ? { stockDiscrepancies } : {}), ticketRequested: Boolean(ticketRequested), ...(customer ? { customerId: customer.id } : {}), createdAt: stamp };
+  auditData.detailSnapshot = saleActivitySnapshot(saleData);
   return { saleData, auditData, stockWrites, counterData: { locationId: origin.locationId, stockOriginType: stockType, stockOriginId: location.id, date: dateKey, lastNumber: next }, result: { id: saleId, saleCode, total: discountSummary.total, ...payment, stockDiscrepancies, customerId: customer?.id || null, ticketRequested: Boolean(ticketRequested), ticketStatus } };
 }
 

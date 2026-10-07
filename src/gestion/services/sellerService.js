@@ -1,4 +1,5 @@
 import { buildOperationalSalePlan, cleanOperationalSaleItems, customerSaleSnapshot, customerSaleWrite, resolveOperationalCustomer } from "../../shared/operationalWritePlans.mjs";
+import { saleActivitySnapshot } from "../../shared/activitySnapshots.mjs";
 import { effectiveLocationPrice } from "../../modules/inventory/domain/inventory";
 import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
 import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
@@ -549,7 +550,7 @@ export async function updateSellerSale({
     const ticketStatus = nextTicketRequested
       ? (sale.ticketRequested ? sale.ticketStatus || "pending" : "pending")
       : "not_requested";
-    transaction.update(saleReference, {
+    const nextSaleData = {
       items: newItems,
       stockDiscrepancies,
       discounts: discountSummary.discounts,
@@ -571,7 +572,8 @@ export async function updateSellerSale({
       editedBy: profile.id,
       editedByName: userName(profile),
       updatedAt: serverTimestamp(),
-    });
+    };
+    transaction.update(saleReference, nextSaleData);
     transaction.set(doc(collection(db, "auditLogs")), {
       action: "sale.updated",
       title: "Venta editada",
@@ -585,6 +587,9 @@ export async function updateSellerSale({
       userName: userName(profile),
       status: "completed",
       amount: discountSummary.total,
+      before: saleActivitySnapshot(sale),
+      after: saleActivitySnapshot({ ...sale, ...nextSaleData }),
+      detailSnapshot: saleActivitySnapshot({ ...sale, ...nextSaleData }),
       ...(stockDiscrepancies.length ? { stockDiscrepancies } : {}),
       ...(resolvedCustomer ? { customerId: resolvedCustomer.id } : {}),
       createdAt: serverTimestamp(),
@@ -676,6 +681,7 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
       userName: userName(profile),
       status: "cancelled",
       amount: Number(sale.total || 0),
+      detailSnapshot: saleActivitySnapshot({ ...sale, status: "cancelled", cancelReason: safeReason }),
       createdAt: serverTimestamp(),
     });
     return { id: saleId, saleCode: sale.saleCode };
