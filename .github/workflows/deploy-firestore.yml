@@ -1,0 +1,65 @@
+name: Deploy Firestore — main
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - "firebase.json"
+      - ".firebaserc"
+      - ".github/workflows/deploy-firestore.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firestore-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Verify Firestore permissions in the emulator
+        run: npx firebase-tools@14.12.0 emulators:exec --only firestore --project demo-flor-mia-integral "npm run test:rules"
+      - name: Select Firebase service account
+        env:
+          FIREBASE_SERVICE_ACCOUNT_STANDARD: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM }}
+          FIREBASE_SERVICE_ACCOUNT_LEGACY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INTEGRAL_FLOR_MIA }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT_STANDARD" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_STANDARD" > "$RUNNER_TEMP/firebase-sa.json"
+          elif [ -n "$FIREBASE_SERVICE_ACCOUNT_LEGACY" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_LEGACY" > "$RUNNER_TEMP/firebase-sa.json"
+          else
+            echo "::error::No Firebase service-account credential is configured."
+            exit 1
+          fi
+          chmod 600 "$RUNNER_TEMP/firebase-sa.json"
+      - name: Deploy rules and indexes from main
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$current_main" != "$GITHUB_SHA" ]; then
+            echo "::notice::Skipping stale revision; main has advanced."
+            exit 0
+          fi
+          npx firebase-tools@14.12.0 deploy --only firestore:rules,firestore:indexes --project app-integral-fm --non-interactive
+      - name: Remove temporary credential
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-sa.json"

@@ -5,6 +5,9 @@
 # Esta configuración también se aplica a los Deploy Previews para probar la app completa.
 [build.environment]
   NODE_VERSION = "20"
+  # Configuración pública de ARCA: sus valores aparecen intencionalmente en código y docs.
+  # Mantener el escaneo de credenciales y claves privadas activo.
+  SECRETS_SCAN_OMIT_KEYS = "ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES,ARCA_ISSUER_VAT_CONDITION,ARCA_CONSUMER_FINAL_ID_THRESHOLD"
   VITE_FIREBASE_API_KEY = "AIzaSyCBVuIt36d_0DbDdEkGwRy85hmpZEjbrVg"
   VITE_FIREBASE_AUTH_DOMAIN = "app-integral-fm.firebaseapp.com"
   VITE_FIREBASE_PROJECT_ID = "app-integral-fm"
