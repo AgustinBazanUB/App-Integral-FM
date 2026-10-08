@@ -288,6 +288,7 @@ export async function adminPatchDocument(path, data, {
 
 export async function adminListDocuments(collectionPath, {
   pageSize = 500,
+  maxDocuments = Infinity,
   env = process.env,
   fetchImpl = fetch,
   transaction,
@@ -307,6 +308,9 @@ export async function adminListDocuments(collectionPath, {
     error.code = "firebase-admin-read-error";
     error.status = response.status;
     throw error;
+  }
+  if (documents.length + (payload?.documents || []).length > maxDocuments) {
+    throw Object.assign(new Error("El catálogo supera el tamaño permitido para esta carga. Dividí la revisión o usá el módulo de Productos."), { code: "catalog-too-large", status: 409 });
   }
   documents.push(...(payload?.documents || []).map((document) => {
     const parsed = documentFromResponse(document, collectionPath);
@@ -336,6 +340,9 @@ function commitWriteForOperation(operation, projectId) {
     throw error;
   }
   const name = qualifiedDocumentName(projectId, path);
+  if (type === "delete") {
+    return { delete: name, ...(operation.currentUpdateTime ? { currentDocument: { updateTime: operation.currentUpdateTime } } : {}) };
+  }
   if (type === "create") {
     return {
       update: {
@@ -447,9 +454,9 @@ async function runTransactionAttempt(work, { env = process.env, fetchImpl = fetc
         if (committed) throw new Error("Transaction reads must precede writes.");
         return adminGetDocument(path, options);
       },
-      listDocuments: (path) => {
+      listDocuments: (path, { maxDocuments = Infinity } = {}) => {
         if (committed) throw new Error("Transaction reads must precede writes.");
-        return adminListDocuments(path, options);
+        return adminListDocuments(path, { ...options, maxDocuments });
       },
       commitDocuments: async (operations) => {
         if (committed) throw new Error("Transaction already committed.");

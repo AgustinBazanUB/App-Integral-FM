@@ -63,6 +63,26 @@ for(const type of ["location","warehouse"]) test(`venta simple desde ${type}: st
 
 test("pagos combinados exactos y descuento manual con precio administrativo editable",async()=>{seed();const result=await service.createQuickSale(args("warehouse",{items:[{id:"oil",name:"Aceite",qty:2,unitPrice:3000}],discounts:[{discountId:"manual",source:"manual",type:"percent",value:10}],paymentMethod:"multiple",paymentMethodLabel:"+2 pagos",payments:[{method:"cash",amount:2000},{method:"alias",amount:3400}]}));assert.equal(result.total,5400);const sale=sales()[0];assert.equal(sale.items[0].unitPrice,3000);assert.equal(sale.discountTotal,600);assert.deepEqual(sale.priceOverrides,[{productId:"oil",suggestedPrice:2500,unitPrice:3000}]);assert.ok([...mock.data.values()].some(v=>v.action==="sale.created"&&v.priceOverrides?.length===1));assert.equal(sale.payments.reduce((n,p)=>n+p.amount,0),5400);});
 
+for (const type of ["location", "warehouse"]) test(`cash discount from ${type} records rounded income and stays idempotent`, async () => {
+  seed();
+  const input = args(type, { items: [{ id: "oil", name: "Aceite", qty: 1, unitPrice: 17000 }], discounts: [{ discountId: "manual", source: "manual", type: "percent", value: 10 }] });
+  const first = await service.createQuickSale(input), retry = await service.createQuickSale(input);
+  assert.equal(first.total, 15000); assert.equal(first.id, retry.id); assert.equal(sales().length, 1);
+  const sale = sales()[0];
+  assert.equal(sale.cashRoundingDiscountTotal, 300); assert.equal(sale.percentageDiscountTotal, 1700); assert.equal(sale.discountTotal, 2000);
+  assert.equal(calculateMetrics(sales(), range).total, 15000); assert.equal(financeSummary(sales(), [], {}, range).saleIncome, 15000);
+  assert.ok([...mock.data.values()].some(row => row.action === "sale.created" && row.amount === 15000));
+});
+
+test("editing an administrative cash sale recomputes rounding and clears it on a transfer", async () => {
+  seed(); const discounts = [{ discountId: "manual", source: "manual", type: "fixed", value: 100 }];
+  const created = await service.createQuickSale(args("location", { items: [{ id: "oil", name: "Aceite", qty: 1, unitPrice: 2600 }], discounts }));
+  const edited = { profile: admin, saleId: created.id, items: [{ id: "oil", name: "Aceite", qty: 1, unitPrice: 2600 }], discounts, paymentMethod: "cash" };
+  await service.updateSellerSale(edited); assert.equal(sales()[0].total, 2000); assert.equal(sales()[0].cashRoundingDiscountTotal, 500);
+  await service.updateSellerSale({ ...edited, paymentMethod: "alias" });
+  assert.equal(sales()[0].total, 2500); assert.equal(sales()[0].cashRoundingDiscountTotal, 0); assert.equal(sales()[0].discountTotal, 100);
+});
+
 test("pagos con diferencia, canal manual, duplicados y catálogo inactivo no escriben nada",async()=>{for(const extra of [{paymentMethod:"multiple",paymentMethodLabel:"+2 pagos",payments:[{method:"cash",amount:1000},{method:"alias",amount:2000}]},{channel:"manual"},{items:[{id:"oil",qty:2,unitPrice:2500},{id:"oil",qty:2,unitPrice:2500}]}]){seed();await assert.rejects(service.createQuickSale(args("location",extra)));assert.equal(mock.writes.length,0);}seed();mock.data.get("products/oil").active=false;await assert.rejects(service.createQuickSale(args()));assert.equal(mock.writes.length,0);});
 
 test("ubicación permite stock cero, insuficiente y negativo; registra saldo, aviso y actividad sin duplicar", async () => {

@@ -10,6 +10,12 @@ export function dateFromLocationValue(value, boundary = "start") {
   }
   const text = String(value).trim();
   if (!text) return null;
+  // Firestore REST serializes timestamps with an explicit offset. Preserve that
+  // instant across browser and UTC server hosts before handling local inputs.
+  if (/(?:Z|[+-]\d{2}:?\d{2})$/i.test(text)) {
+    const date = new Date(text);
+    return Number.isNaN(date.valueOf()) ? null : date;
+  }
   const datetime = text.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   if (datetime) {
     const [, year, month, day, hour, minute] = datetime.map(Number);

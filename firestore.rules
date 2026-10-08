@@ -10,28 +10,33 @@ service cloud.firestore {
       return signedIn() && user.active == true;
     }
     function normalizedRoleValue(role) {
-      return role in ["administrator", "administrador"] ? "admin"
-        : role == "administrador_general" ? "general_admin"
-        : role == "administrador_operativo" ? "operational_admin"
-        : role == "encargado_ubicacion" ? "location_manager"
-        : role == "responsable_deposito" ? "warehouse_manager"
-        : role == "responsable_marketing" ? "marketing_manager"
-        : role == "responsable_ecommerce" ? "ecommerce_manager"
-        : role == "responsable_envios" ? "shipping_manager"
-        : role == "responsable_proveedores" ? "supplier_manager"
-        : role == "responsable_financiero" ? "financial_manager"
-        : role == "analista_metricas" ? "analyst"
-        : role;
+      // Un lookup evita repetir una cadena de condiciones en cada comprobación.
+      // Mantiene exactamente los mismos alias y el rol original como fallback.
+      return {
+        "administrator": "admin", "administrador": "admin",
+        "administrador_general": "general_admin",
+        "administrador_operativo": "operational_admin",
+        "encargado_ubicacion": "location_manager",
+        "responsable_deposito": "warehouse_manager",
+        "responsable_marketing": "marketing_manager",
+        "responsable_ecommerce": "ecommerce_manager",
+        "responsable_envios": "shipping_manager",
+        "responsable_proveedores": "supplier_manager",
+        "responsable_financiero": "financial_manager",
+        "analista_metricas": "analyst"
+      }.get(role, role);
     }
-    function adminRole() {
-      let user = profile();
-      let role = normalizedRoleValue(user.role);
+    function adminRoleFor(user, role) {
       return (
         role in ["admin", "general_admin"]
         || (("canAccessAdmin" in user) && user.canAccessAdmin == true)
         || (("isAdmin" in user) && user.isAdmin == true)
         || (("roles" in user) && ("admin" in user.roles))
       );
+    }
+    function adminRole() {
+      let user = profile();
+      return adminRoleFor(user, normalizedRoleValue(user.role));
     }
     function isAdmin() { return activeUser() && adminRole(); }
     function explicitPermissionFor(user, moduleId, action) {
@@ -51,8 +56,7 @@ service cloud.firestore {
       let user = profile();
       return explicitPermissionFor(user, moduleId, action);
     }
-    function roleModule(moduleId) {
-      let role = normalizedRoleValue(profile().role);
+    function roleModule(role, moduleId) {
       return (
         (role == "seller" && moduleId in ["locations", "quick-sales", "alerts"])
         || (role == "location_manager" && moduleId in ["locations", "quick-sales", "metrics", "alerts"])
@@ -66,11 +70,11 @@ service cloud.firestore {
         || (role == "operational_admin" && moduleId != "finance")
       );
     }
-    function rolePermission(moduleId, action) {
-      let role = normalizedRoleValue(profile().role);
-      return (
-        (action == "view" && roleModule(moduleId))
-        || (role == "seller"
+    function rolePermission(role, moduleId, action) {
+      // Ninguna de las ramas de escritura concede "view". Resolver esa acción
+      // por separado evita evaluar todas esas ramas cuando un módulo se deniega.
+      return action == "view" ? roleModule(role, moduleId) : (
+        (role == "seller"
           && ((moduleId == "quick-sales" && action in ["create", "edit"])
             || (moduleId == "alerts" && action == "edit")))
         || (role == "location_manager"
@@ -119,8 +123,10 @@ service cloud.firestore {
       );
     }
     function canModule(moduleId, action) {
-      return activeUser()
-        && (adminRole() || explicitPermission(moduleId, action) || rolePermission(moduleId, action));
+      let user = profile();
+      let role = normalizedRoleValue(user.role);
+      return signedIn() && user.active == true
+        && (adminRoleFor(user, role) || explicitPermissionFor(user, moduleId, action) || rolePermission(role, moduleId, action));
     }
     function allowedLocation(locationId) {
       let user = profile();
@@ -1343,6 +1349,26 @@ service cloud.firestore {
             && allowedLocation(request.resource.data.locationId)));
       allow update, delete: if false;
     }
+    // Olivia is accessed through authenticated backend endpoints only.
+    match /oliviaAttachments/{document=**} { allow read, write: if false; }
+    match /oliviaUploadBudgets/{document=**} { allow read, write: if false; }
+    match /oliviaKnowledgeDocuments/{document=**} { allow read, write: if false; }
+    match /oliviaKnowledgeSettings/{document=**} { allow read, write: if false; }
+    match /oliviaToolEvents/{document=**} { allow read, write: if false; }
+    match /oliviaRealtimeToolCalls/{document=**} { allow read, write: if false; }
+    match /oliviaRealtimeTurns/{document=**} { allow read, write: if false; }
+    match /oliviaConfiguration/{document=**} { allow read, write: if false; }
+    match /oliviaChatJobs/{document=**} { allow read, write: if false; }
+    match /oliviaErrorReports/{document=**} { allow read, write: if false; }
+    match /oliviaConversations/{document=**} { allow read, write: if false; }
+    match /oliviaConfirmations/{document=**} { allow read, write: if false; }
+    match /oliviaBudgets/{document=**} { allow read, write: if false; }
+    match /oliviaRequests/{document=**} { allow read, write: if false; }
+    match /oliviaUsage/{document=**} { allow read, write: if false; }
+    match /oliviaRealtime/{document=**} { allow read, write: if false; }
+    match /oliviaLiveDelegations/{document=**} { allow read, write: if false; }
+    match /oliviaAnonymousUsage/{document=**} { allow read, write: if false; }
+    match /oliviaQuotaRequests/{document=**} { allow read, write: if false; }
     match /{document=**} {
       allow read, write: if false;
     }

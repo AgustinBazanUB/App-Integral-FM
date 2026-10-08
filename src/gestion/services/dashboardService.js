@@ -93,17 +93,18 @@ function activityFromDocument(source, item) {
     sourceId: item.id,
     createdAt: data.createdAt,
     locationId: data.locationId || "",
-    locationName: data.locationName || "",
+    locationName: data.locationName || data.warehouseName || data.stockOriginName || "",
     userId: data.userId || data.sellerId || data.createdBy || "",
     userName: data.userName || data.sellerName || data.createdByName || "Sistema",
     moduleId: data.moduleId || (source === "sales" ? "quick-sales" : source === "stockMovements" ? (data.inventoryType === "warehouse" ? "warehouse" : "locations") : "system"),
     entityId: data.entityId || data.saleId || item.id,
+    ...(data.amount != null || data.total != null ? { amount: Number(data.amount ?? data.total) } : {}),
     raw: data,
   };
   if (source === "auditLogs") {
     const entityType = String(data.entityType || "").toLowerCase();
-    const saleKey = entityType === "sale" && data.entityId
-      ? `sale:${data.entityId}:${String(data.action).includes("cancel") ? "cancelled" : "active"}`
+    const saleKey = (entityType === "sale" || String(data.action).startsWith("sale.")) && data.entityId && data.action === "sale.created"
+      ? `sale:${data.entityId}:created`
       : null;
     return {
       ...base,
@@ -115,14 +116,15 @@ function activityFromDocument(source, item) {
     };
   }
   if (source === "sales") {
-    const cancelled = String(data.status || "active").toLowerCase() !== "active";
     return {
       ...base,
-      key: `sale:${item.id}:${cancelled ? "cancelled" : "active"}`,
-      action: cancelled ? "sale.cancelled" : "sale.created",
-      title: cancelled ? "Venta anulada" : "Venta registrada",
+      key: `sale:${item.id}:created`,
+      action: "sale.created",
+      title: "Venta registrada",
       description: [data.saleCode, data.locationName].filter(Boolean).join(" · "),
-      status: cancelled ? "cancelled" : "completed",
+      // Cancellation/editing has its own immutable audit event and date. The
+      // mutable sale document is only a fallback for the original creation.
+      status: "completed",
       amount: Number(data.total || 0),
     };
   }
@@ -164,44 +166,52 @@ export async function listActivityPage({
   const groups = activityGroups(profile, locationIds);
   if (!groups.length) return { items: [], cursor, hasMore: false };
   const sources = activitySourcesFor(profile);
-  const hasPostFilter = Boolean(filters.userId || filters.moduleId || filters.action);
-  const sourceLimit = hasPostFilter ? Math.min(100, Math.max(pageSize * 5, pageSize + 1)) : pageSize + 1;
-  const tasks = sources.flatMap((source) => groups.map(async (group) => {
-    const key = `${source}:${group.suffix}`;
+  const size = Math.floor(Math.min(50, Math.max(1, Number(pageSize) || 20)));
+  const sourceLimit = size + 1;
+  // Freeze the upper bound across pages so a new record in another stream
+  // cannot be appended below older activity. Refresh starts a new timeline.
+  const asOf = cursor.__asOf || new Date();
+  const upperBound = to && to < asOf ? to : asOf;
+  const streams = sources.flatMap(source => groups.map(group => ({ source, group, key: `${source}:${group.suffix}`, buffer: [], exhausted: false, position: cursor[`${source}:${group.suffix}`] })));
+  const fetchStream = async stream => {
     const constraints = [];
-    if (group.ids) constraints.push(where("locationId", "in", group.ids));
+    if (stream.group.ids) constraints.push(where("locationId", "in", stream.group.ids));
     if (from) constraints.push(where("createdAt", ">=", Timestamp.fromDate(from)));
-    if (to) constraints.push(where("createdAt", "<", Timestamp.fromDate(to)));
+    constraints.push(where("createdAt", "<", Timestamp.fromDate(upperBound)));
     constraints.push(orderBy("createdAt", "desc"));
-    if (cursor[key]) constraints.push(startAfter(cursor[key]));
+    if (stream.position) constraints.push(startAfter(stream.position));
     constraints.push(limit(sourceLimit));
-    const snapshot = await getDocs(query(collection(db, source), ...constraints));
-    return snapshot.docs.map((item) => ({ key, source, item }));
-  }));
-  const fetchedGroups = await Promise.all(tasks);
-  const raw = fetchedGroups.flat().sort((a, b) => {
-    const difference = snapshotDate(b.item) - snapshotDate(a.item);
-    return difference || b.item.id.localeCompare(a.item.id);
-  });
+    const snapshot = await getDocs(query(collection(db, stream.source), ...constraints));
+    stream.buffer = snapshot.docs;
+    stream.exhausted = snapshot.docs.length < sourceLimit;
+  };
   const items = [];
-  const seen = new Set();
-  const processed = [];
-  for (const entry of raw) {
-    processed.push(entry);
-    const activity = activityFromDocument(entry.source, entry.item);
+  const seen = new Set(cursor.__seen || []);
+  const nextCursor = { ...cursor, __asOf: asOf };
+  let scanned = 0;
+  // Merge the head of every stream, refilling before choosing an older record.
+  // A sparse filter must not return old matches ahead of unseen newer matches.
+  // The scan is bounded; the UI can continue even when a page has no matches.
+  while (items.length < size && scanned < 600) {
+    await Promise.all(streams.filter(stream => !stream.buffer.length && !stream.exhausted).map(fetchStream));
+    const candidates = streams.filter(stream => stream.buffer.length).sort((a, b) => snapshotDate(b.buffer[0]) - snapshotDate(a.buffer[0]) || a.source.localeCompare(b.source) || b.buffer[0].id.localeCompare(a.buffer[0].id));
+    if (!candidates.length) break;
+    const stream = candidates[0], document = stream.buffer.shift();
+    stream.position = document;
+    nextCursor[stream.key] = document;
+    scanned++;
+    const activity = activityFromDocument(stream.source, document);
     if (!activity || !matchesActivityFilters(activity, filters)) continue;
     const uniqueKey = activity.key || activity.id;
     if (seen.has(uniqueKey)) continue;
     seen.add(uniqueKey);
     items.push(activity);
-    if (items.length >= pageSize) break;
   }
-  const nextCursor = { ...cursor };
-  processed.forEach((entry) => { nextCursor[entry.key] = entry.item; });
+  nextCursor.__seen = [...seen];
   return {
     items,
     cursor: nextCursor,
-    hasMore: processed.length < raw.length || fetchedGroups.some((entries) => entries.length >= sourceLimit),
+    hasMore: streams.some(stream => stream.buffer.length || !stream.exhausted),
   };
 }
 

@@ -1,5 +1,5 @@
 import SalesIncomePanel from "../components/SalesIncomePanel";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Button,
@@ -14,6 +14,7 @@ import {
 } from "../../design-system";
 import { Link } from "../../router";
 import { useAuth } from "../AuthContext";
+import { useOliviaVisibility } from "../olivia/ScreenContext";
 import {
   formatDateTime,
   humanizeStatus,
@@ -21,10 +22,12 @@ import {
 } from "../formatters";
 import { useAsyncData } from "../hooks";
 import { moduleById } from "../modules";
-import { can } from "../permissions";
+import { can, canAccessAdministration } from "../permissions";
+import { subscribeActiveAlerts } from "../services/alertsService";
 import {
   createModuleRecord,
   listModuleRecords,
+  getModuleRecord,
 } from "../services/managementService";
 
 const fieldLabels = {
@@ -64,15 +67,27 @@ function recordTitle(record) {
 }
 
 export default function GenericModulePage({ moduleId }) {
+  const { review } = useOliviaVisibility();
   const { profile } = useAuth();
   const module = moduleById[moduleId];
   const result = useAsyncData(() => listModuleRecords(moduleId), [moduleId]);
+  useEffect(() => moduleId === "alerts" ? subscribeActiveAlerts(profile, () => result.refresh().catch(() => {})) : undefined, [moduleId, profile, result.refresh]);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ name: "", notes: "" });
   const [saveState, setSaveState] = useState({ busy: false, error: "" });
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [errorReport, setErrorReport] = useState(null);
+  const [copyNotice, setCopyNotice] = useState("");
+  useEffect(() => {
+    setSelectedRecord(null);
+    if (review?.toolName !== "prepare_ecommerce_order_review" || moduleId !== "ecommerce") return;
+    let active = true;
+    getModuleRecord(moduleId, review.entityId, profile).then((record) => { if (active) { setSelectedRecord(record); setSearch(""); } }).catch((error) => { if (active) setSaveState({ busy: false, error: error.message }); });
+    return () => { active = false; };
+  }, [review, moduleId, profile]);
   const rows = useMemo(() => {
-    const records = result.data || [];
+    const records = review?.toolName === "prepare_ecommerce_order_review" && moduleId === "ecommerce" ? selectedRecord ? [selectedRecord] : [] : result.data || [];
     const term = search.trim().toLocaleLowerCase("es");
     return term
       ? records.filter((record) =>
@@ -81,7 +96,7 @@ export default function GenericModulePage({ moduleId }) {
             .includes(term),
         )
       : records;
-  }, [result.data, search]);
+  }, [result.data, search, review, moduleId, selectedRecord]);
 
   const handleCreate = async (event) => {
     event.preventDefault();
@@ -132,6 +147,7 @@ export default function GenericModulePage({ moduleId }) {
         </Panel>
       ) : null}
       {moduleId === "finance" ? <SalesIncomePanel /> : null}
+      {saveState.error && !modalOpen ? <p className="fm-form-error" role="alert">{saveState.error}</p> : null}
       <Panel
         title="Registros recientes"
         description="Consulta paginada de los registros autorizados en Firestore."
@@ -154,12 +170,20 @@ export default function GenericModulePage({ moduleId }) {
               { key: "status", label: "Estado", render: (record) => <Badge tone={statusTone(record.status)}>{humanizeStatus(record.status)}</Badge> },
               { key: "updatedAt", label: "Actualización", render: (record) => formatDateTime(record.updatedAt || record.createdAt) },
               { key: "responsible", label: "Responsable", render: (record) => record.responsibleName || record.assignedToName || record.createdByName || "Pendiente" },
+              ...(moduleId === "alerts" && canAccessAdministration(profile) ? [{ key: "errorDetail", label: "Detalle", render: record => record.source === "olivia_error_report" ? <Button variant="secondary" onClick={() => { setErrorReport(record); setCopyNotice(""); }}>Ver error</Button> : null }] : []),
             ]}
             empty={<EmptyState icon={module.icon} title="Todavía no hay registros" description="Cuando se cargue información real en este módulo aparecerá aquí; no se generaron datos ficticios." />}
           />
         ) : null}
       </Panel>
 
+      <Modal open={Boolean(errorReport)} onClose={() => setErrorReport(null)} title={errorReport?.name || "Error de Olivia"} description="Detalle técnico para revisar la función que falló.">
+        <p>{errorReport?.notes}</p>
+        {errorReport?.reporterName ? <p>Usuario que intentó la acción: <strong>{errorReport.reporterName}</strong>. Fecha: {formatDateTime(errorReport.createdAt)}</p> : null}
+        <Button variant="secondary" onClick={async () => { try { await navigator.clipboard.writeText(errorReport.codexDescription); setCopyNotice("Copiado para Codex."); } catch { setCopyNotice("No pude copiar automáticamente. Seleccioná el texto de abajo."); } }}>Copiar para Codex</Button>
+        {copyNotice ? <p role="status">{copyNotice}</p> : null}
+        <pre className="fm-olivia-diagnostic">{errorReport?.codexDescription}</pre>
+      </Modal>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={module.primaryAction || "Nuevo registro"} description="Carga inicial editable; las integraciones externas permanecen pendientes hasta recibir credenciales reales.">
         <form className="fm-form-grid" onSubmit={handleCreate}>
           <FormField label={fieldLabels[moduleId] || "Nombre"} required className="fm-form-grid__full"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></FormField>

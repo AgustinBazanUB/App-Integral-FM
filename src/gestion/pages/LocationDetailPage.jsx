@@ -18,6 +18,7 @@ import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
 import { locationActivity, locationSchedule } from "../../modules/locations/domain/locations";
 import { Link, useLocation, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
+import { useOliviaRefresh, useOliviaScreenContext } from "../olivia/ScreenContext";
 import InventoryAdjustmentModal from "../components/InventoryAdjustmentModal";
 import InventoryTransferModal from "../components/InventoryTransferModal";
 import { listWarehouses } from "../services/inventoryService";
@@ -429,6 +430,9 @@ export default function LocationDetailPage({ locationId }) {
   const [sellerState, setSellerState] = useState({ busy: false, error: "", success: "" });
   const [discountIds, setDiscountIds] = useState([]);
   const [discountState, setDiscountState] = useState({ busy: false, error: "", success: "" });
+  const oliviaProduct = stockProduct || adjustProduct || settingsProduct || movementProduct;
+  useOliviaScreenContext({ locationId, view: activeTab, entityType: oliviaProduct ? "product" : "location", entityId: oliviaProduct?.productId || oliviaProduct?.id || locationId, productId: oliviaProduct?.productId || oliviaProduct?.id, filters: { search, categoryId: categoryFilter } });
+  useOliviaRefresh(result.refresh);
 
   const location = result.data?.location;
   const inventory = result.data?.inventory || [];

@@ -35,7 +35,7 @@ export async function memoryServices(exports) {
     builder.onResolve({ filter: /^firebase\/firestore$/ }, () => ({ path: "firestore", namespace: "qa" }));
     builder.onResolve({ filter: /(^|\/)firebase(\.js)?$/ }, () => ({ path: "db", namespace: "qa" }));
     builder.onResolve({ filter: /sharedResources(\.js)?$/ }, () => ({ path: "resources", namespace: "qa" }));
-    builder.onLoad({ filter: /.*/, namespace: "qa" }, ({ path }) => ({ contents: path === "db" ? "export const db={};" : path === "resources" ? `export const listMasterProductsShared=async()=>[...globalThis[${JSON.stringify(key)}].data].filter(([path])=>path.startsWith('products/')).map(([path,data])=>({id:path.split('/').at(-1),...data}));` : firestore }));
+    builder.onLoad({ filter: /.*/, namespace: "qa" }, ({ path }) => ({ contents: path === "db" ? "export const db={}; export const auth={currentUser:null};" : path === "resources" ? `export const listMasterProductsShared=async()=>[...globalThis[${JSON.stringify(key)}].data].filter(([path])=>path.startsWith('products/')).map(([path,data])=>({id:path.split('/').at(-1),...data}));` : firestore }));
   } }] });
   const service = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
   return { state, service };

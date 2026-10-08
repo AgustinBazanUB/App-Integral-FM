@@ -19,6 +19,7 @@ import {
   groupSellerProducts,
   keyMatchesEvent,
   pendingReservedQuantities,
+  sellerPaymentSummary,
   visibleSellerProducts,
 } from "../src/gestion/seller/sellerDomain.js";
 
@@ -51,6 +52,37 @@ const locations = [
   { id: "loc-3", name: "Pausada", active: false, deleted: false },
   { id: "loc-4", name: "Eliminada", active: true, deleted: true },
 ];
+
+test("monto activo reparte pagos combinados y excluye ventas anuladas", () => {
+  const result = sellerPaymentSummary([
+    { status: "active", total: 12000, paymentMethod: "cash" },
+    { status: "active", total: 20000, paymentMethod: "multiple", payments: [{ method: "cash", amount: 5000 }, { method: "alias", amount: "15000" }] },
+    { status: "active", total: 7000, paymentMethod: "debit" },
+    { status: "cancelled", total: 30000, paymentMethod: "credit" },
+  ]);
+  assert.equal(result.total, 39000);
+  assert.equal(result.count, 3);
+  assert.equal(result.difference, 0);
+  assert.deepEqual(result.payments.map(row => [row.method, row.total, row.salesCount]), [
+    ["credit", 0, 0], ["debit", 7000, 1], ["alias", 15000, 1], ["cash", 17000, 2],
+  ]);
+});
+
+test("desglose conserva medios históricos y expone importes faltantes sin inventar cobros", () => {
+  const result = sellerPaymentSummary([
+    { status: "active", total: 4000, paymentMethod: "legacy", paymentMethodLabel: "Medio anterior" },
+    { status: "active", total: 3000 },
+    { status: "active", total: 6000, paymentMethod: "multiple", payments: [{ method: "cash", amount: 1000 }, { method: "cash", amount: 2000 }, { method: "debit", amount: "inválido" }, { method: "alias", amount: -50 }] },
+  ]);
+  assert.equal(result.total, 13000);
+  assert.equal(result.difference, 6000);
+  assert.equal(result.payments.reduce((sum, row) => sum + row.total, 0) + result.difference, result.total);
+  assert.deepEqual(result.payments.find(row => row.method === "legacy"), { method: "legacy", label: "Medio anterior", total: 4000, salesCount: 1 });
+  assert.equal(result.payments.find(row => row.method === "cash").salesCount, 1);
+  const over = sellerPaymentSummary([{ status: "active", total: 1000, paymentMethod: "multiple", payments: [{ method: "cash", amount: 1500 }] }]);
+  assert.equal(over.difference, -500);
+  assert.equal(sellerPaymentSummary([]).total, 0);
+});
 
 test("un vendedor puro accede al Panel Vendedor y no al administrativo", () => {
   assert.equal(canAccessSellerPanel(seller), true);
@@ -182,7 +214,7 @@ test("la interfaz compacta descuentos y prepara ticket sin simular ARCA", async 
   const dialog = await read("../src/gestion/seller/DiscountDialog.jsx");
   const service = await read("../src/gestion/services/sellerService.js");
   assert.match(panel, />Agregar descuento</);
-  assert.match(panel, />Agregar ticket</);
+  assert.match(panel, />Generar factura</);
   assert.match(panel, /"Continuar"/);
   assert.match(panel, /ticketRequested/);
   assert.match(dialog, />Descuentos disponibles</);
@@ -196,6 +228,7 @@ test("la interfaz compacta descuentos y prepara ticket sin simular ARCA", async 
 
 test("la venta guarda creador, fecha local, descuentos desglosados y ticket", async () => {
   const service = await read("../src/gestion/services/sellerService.js");
+  const writePlan = await read("../src/shared/operationalWritePlans.mjs");
   for (const field of [
     "createdBy",
     "createdByName",
@@ -206,9 +239,10 @@ test("la venta guarda creador, fecha local, descuentos desglosados y ticket", as
     "discountTotal",
     "ticketRequested",
     "ticketStatus",
-  ]) assert.match(service, new RegExp(field));
+  ]) assert.match(`${service}\n${writePlan}`, new RegExp(field));
   assert.match(service, /runTransaction\(db/);
-  assert.match(service, /previousStock < item\.qty/);
+  assert.match(service, /buildOperationalSalePlan/);
+  assert.match(writePlan, /previousStock < item\.qty/);
   assert.match(service, /lastMovementId/);
   assert.match(service, /sale\.cancelled/);
   assert.match(service, /sale\.updated/);

@@ -47,13 +47,12 @@ test("la ubicación separa el catálogo global y conserva el orden operativo", a
   assert.match(source, /Agrega a .* un producto que ya existe en el catálogo de Flor Mía/);
 });
 
-test("las consultas de ventas usan rango y la actividad usa cursor", async () => {
+test("las consultas de ventas usan rango", async () => {
   const source = await read("../src/gestion/services/dashboardService.js");
   assert.match(source, /where\("createdAt", ">=", Timestamp\.fromDate\(start\)\)/);
   assert.match(source, /where\("createdAt", "<", Timestamp\.fromDate\(end\)\)/);
-  assert.match(source, /startAfter\(cursor\[key\]\)/);
-  assert.match(source, /const sourceLimit = hasPostFilter/);
-  assert.match(source, /limit\(sourceLimit\)/);
+  // Cursor, bounded reads and sparse activity filters are exercised with the
+  // real service and query adapter in activity-services.test.mjs.
 });
 
 test("Ubicaciones comienza con ubicaciones y eventos, sin tarjetas de métricas", async () => {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Button,
@@ -12,8 +12,13 @@ import {
   Toast,
 } from "../../design-system";
 import { useAuth } from "../AuthContext";
+import { useOliviaRefresh, useOliviaScreenContext, useOliviaVisibility } from "../olivia/ScreenContext";
 import HelpTooltip from "../components/HelpTooltip";
 import ProductForm from "../components/ProductForm";
+import SubcategoriesDialog from "../components/SubcategoriesDialog";
+import ProductMergeDialog from "../components/ProductMergeDialog";
+import { normalizedRole } from "../permissions";
+import { productSubcategory } from "../../shared/productSubcategories.mjs";
 import { formatMoney } from "../formatters";
 import { useAsyncData } from "../hooks";
 import { can } from "../permissions";
@@ -42,8 +47,18 @@ export default function ProductsPage() {
   const [categoryId, setCategoryId] = useState("");
   const [status, setStatus] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
+  const [subcategoriesOpen, setSubcategoriesOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [message, setMessage] = useState("");
+  const { review, setReview } = useOliviaVisibility();
+  useEffect(() => {
+    if (review?.toolName !== "prepare_product_create" || !can(profile, "products", "create")) return;
+    setEditingProduct({ ...review.draft, categoryId: review.draft.categoryId || "" });
+    setFormOpen(true); setReview(null);
+  }, [review, profile, setReview]);
+  useOliviaScreenContext({ entityType: editingProduct?.id && formOpen ? "product" : undefined, entityId: formOpen ? editingProduct?.id : undefined, productId: formOpen ? editingProduct?.id : undefined, filters: { search, categoryId, status } });
+  useOliviaRefresh(result.refresh);
 
   const products = result.data?.products || [];
   const categories = result.data?.categories || [];
@@ -67,7 +82,7 @@ export default function ProductsPage() {
     setFormOpen(true);
   };
 
-  if (result.status === "loading") return <div className="fm-page-enter"><Skeleton lines={8} /></div>;
+  if (result.status === "loading" && !result.data) return <div className="fm-page-enter"><Skeleton lines={8} /></div>;
   if (result.status === "error") return <div className="fm-page-enter"><Panel><EmptyState icon="AlertTriangle" title="No se pudo abrir Productos" description={result.error.message} /></Panel></div>;
 
   const canCreate = can(profile, "products", "create");
@@ -79,11 +94,15 @@ export default function ProductsPage() {
         eyebrow="Catálogo general"
         title="Productos"
         description="Acá administrás el catálogo general de Flor Mía. El stock de cada lugar se carga después desde Ubicaciones o Depósitos."
-        actions={canCreate ? (
+        actions={<>
+          {canEdit ? <Button variant="secondary" icon="Layers" onClick={() => setSubcategoriesOpen(true)}>Subcategorías</Button> : null}
+          {["admin", "general_admin"].includes(normalizedRole(profile)) ? <Button variant="secondary" onClick={() => setMergeOpen(true)}>Unificar producto</Button> : null}
+          {canCreate ? (
           <HelpTooltip label="Crea un producto nuevo en el catálogo general de Flor Mía.">
             <Button icon="Plus" onClick={openNew}>Nuevo producto</Button>
           </HelpTooltip>
         ) : null}
+        </>}
       />
 
       <Panel title="Catálogo maestro" description="Cada producto existe una sola vez. Buscar o editar acá no modifica el stock de ningún lugar.">
@@ -108,7 +127,7 @@ export default function ProductsPage() {
                   <ProductImage product={product} />
                   <div>
                     <h3>{product.name}</h3>
-                    <p>{product.categoryName || "Sin categoría"}{product.abbreviation ? ` · ${product.abbreviation}` : ""}</p>
+                    <p>{product.categoryName || "Sin categoría"}{productSubcategory(product, categories.find(row => row.id === product.categoryId) || { name: product.categoryName }) ? ` · ${productSubcategory(product, categories.find(row => row.id === product.categoryId) || { name: product.categoryName }).name}` : ""}{product.abbreviation ? ` · ${product.abbreviation}` : ""}</p>
                   </div>
                   <Badge tone={product.active === false ? "neutral" : "success"}>{product.active === false ? "Inactivo" : "Activo"}</Badge>
                 </header>
@@ -150,9 +169,11 @@ export default function ProductsPage() {
         onClose={() => setFormOpen(false)}
         onSaved={async () => {
           await result.refresh();
-          setMessage(editingProduct ? "Producto actualizado." : "Producto creado en el catálogo general.");
+          setMessage(editingProduct?.id ? "Producto actualizado." : "Producto creado en el catálogo general.");
         }}
       />
+      <SubcategoriesDialog open={subcategoriesOpen} categories={categories} profile={profile} onClose={() => setSubcategoriesOpen(false)} onSaved={result.refresh} />
+      <ProductMergeDialog open={mergeOpen} products={products} onClose={() => setMergeOpen(false)} onSaved={result.refresh} />
     </div>
   );
 }

@@ -1,11 +1,37 @@
+import { salePaymentParts, SINGLE_PAYMENT_METHODS, PAYMENT_LABELS } from "../../modules/locations/domain/payments.js";
+
 export const SELLER_VIEWS = [
   { id: "sale", label: "Nueva venta", icon: "ShoppingCart" },
   { id: "sales", label: "Mis ventas", icon: "ReceiptText" },
   { id: "pending", label: "Pendientes", icon: "RefreshCw" },
   { id: "stock", label: "Stock", icon: "Boxes" },
   { id: "prices", label: "Precios", icon: "BadgeDollarSign" },
-  { id: "help", label: "Ayuda", icon: "CircleHelp" },
 ];
+
+export function sellerPaymentSummary(sales = []) {
+  const active = sales.filter(sale => sale.status === "active");
+  const byMethod = new Map(SINGLE_PAYMENT_METHODS.map(method => [method, { method, label: PAYMENT_LABELS[method], total: 0, salesCount: 0 }]));
+  let total = 0, difference = 0;
+  for (const sale of active) {
+    const saleTotal = Number(sale.total || 0);
+    total += saleTotal;
+    const parts = salePaymentParts(sale);
+    const methods = new Set();
+    let allocated = 0;
+    for (const part of parts) {
+      const amount = Number(part.amount);
+      if (!Number.isFinite(amount) || amount < 0) continue;
+      const row = byMethod.get(part.method) || { method: part.method, label: part.label, total: 0, salesCount: 0 };
+      row.total += amount;
+      if (!methods.has(part.method)) row.salesCount++;
+      methods.add(part.method);
+      byMethod.set(part.method, row);
+      allocated += amount;
+    }
+    difference += saleTotal - allocated;
+  }
+  return { total, count: active.length, payments: [...byMethod.values()], difference };
+}
 
 export const SELLER_ACTION_SHORTCUTS = [
   { id: "paymentCredit", label: "Pago crédito", paymentMethod: "credit" },

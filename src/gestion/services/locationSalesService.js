@@ -1,6 +1,8 @@
 import {
   collection,
   getDocs,
+  getDoc,
+  doc,
   limit,
   orderBy,
   query,
@@ -12,6 +14,13 @@ import { db } from "./firebase";
 
 const docsToArray = (snapshot) =>
   snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+
+export async function getLocationSale({ profile, locationId, saleId }) {
+  if (!can(profile, "locations", "view")) throw new Error("No tenés permiso para consultar esta venta.");
+  const snapshot = await getDoc(doc(db, "sales", saleId));
+  if (!snapshot.exists() || snapshot.data().deleted || snapshot.data().locationId !== locationId) throw new Error("La venta no pertenece a esta ubicación o ya no está disponible.");
+  return { id: snapshot.id, ...snapshot.data() };
+}
 
 export async function listLocationSalesPage({
   profile,

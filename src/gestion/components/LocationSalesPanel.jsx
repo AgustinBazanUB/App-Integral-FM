@@ -27,7 +27,8 @@ import {
   fetchArcaInvoicePdf,
   getArcaInvoiceForSale,
 } from "../services/arcaService";
-import { listLocationSalesPage } from "../services/locationSalesService";
+import { getLocationSale, listLocationSalesPage } from "../services/locationSalesService";
+import { useOliviaVisibility } from "../olivia/ScreenContext";
 import { Icon } from "./icons";
 import { fiscalPresentation } from "../../shared/fiscalRecovery.mjs";
 
@@ -66,6 +67,7 @@ function productImage(item, productMap) {
 }
 
 export default function LocationSalesPanel({ profile, location, products = [] }) {
+  const { review, setReview } = useOliviaVisibility();
   const [state, setState] = useState({ status: "loading", items: [], cursor: null, hasMore: false, error: null });
   const [loadingMore, setLoadingMore] = useState(false);
   const [filters, setFilters] = useState({ date: "", sellerId: "", status: "", paymentMethod: "" });
@@ -75,6 +77,18 @@ export default function LocationSalesPanel({ profile, location, products = [] })
   const [actionState, setActionState] = useState({ busy: false, error: "", success: "" });
   const [fiscalState, setFiscalState] = useState({ status: "idle", invoice: null, error: "" });
   const [documentState, setDocumentState] = useState({ busy: false, error: "", success: "" });
+
+  useEffect(() => {
+    if (review?.toolName !== "prepare_sale_cancellation_review" || review.path !== `/gestion/locations/${location.id}/sales`) return;
+    let active = true;
+    getLocationSale({ profile, locationId: location.id, saleId: review.entityId }).then((sale) => {
+      if (!active) return;
+      setDetail(sale);
+      setCancelReason(review.draft?.reason || "");
+      setReview(null);
+    }).catch((error) => { if (active) setActionState({ busy: false, error: error.message, success: "" }); });
+    return () => { active = false; };
+  }, [review, profile, location.id, setReview]);
 
   const loadFirstPage = useCallback(async () => {
     setState({ status: "loading", items: [], cursor: null, hasMore: false, error: null });
@@ -386,6 +400,7 @@ export default function LocationSalesPanel({ profile, location, products = [] })
               <div><span>Subtotal</span><strong>{formatMoney(detail.subtotal ?? detail.totalBeforeDiscounts ?? detail.total)}</strong></div>
               <div><span>Descuentos fijos</span><strong>− {formatMoney(detailDiscountTotals.fixedDiscountTotal)}</strong></div>
               <div><span>Descuentos porcentuales</span><strong>− {formatMoney(detailDiscountTotals.percentageDiscountTotal)}</strong></div>
+              {detailDiscountTotals.cashRoundingDiscountTotal > 0 ? <div><span>Redondeo por efectivo</span><strong>− {formatMoney(detailDiscountTotals.cashRoundingDiscountTotal)}</strong></div> : null}
               <div><span>Total descuentos</span><strong>− {formatMoney(detailDiscountTotals.discountTotal)}</strong></div>
               <div className="is-grand"><span>Total final</span><strong>{formatMoney(detail.total)}</strong></div>
             </section>

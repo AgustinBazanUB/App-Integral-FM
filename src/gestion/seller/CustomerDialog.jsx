@@ -29,6 +29,7 @@ export default function CustomerDialog({
   initialCustomer = null,
   onClose,
   onSelect,
+  onClear,
 }) {
   const lookupSequence = useRef(0);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -143,6 +144,7 @@ export default function CustomerDialog({
       footer={
         <div className="fm-dialog-actions fm-customer-dialog__actions">
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          {initialCustomer && onClear ? <Button variant="ghost" onClick={onClear}>Quitar cliente de la venta</Button> : null}
           <Button icon="UserPlus" loading={lookupState.busy} onClick={confirm}>
             {foundCustomer ? "Usar cliente" : "Agregar"}
           </Button>

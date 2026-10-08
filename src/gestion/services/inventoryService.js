@@ -1,3 +1,7 @@
+import { buildMasterProductPayload } from "../../shared/productWritePlans.mjs";
+import { categorySubcategories } from "../../shared/productSubcategories.mjs";
+import { invalidateRuntimeCache } from "./runtimeCache";
+import { buildStockTransferWrites } from "../../shared/stockTransferWritePlans.mjs";
 import {
   collection,
   doc,
@@ -99,51 +103,7 @@ export async function listProductCategoriesForInventory(profile) {
       || String(a.name || "").localeCompare(String(b.name || ""), "es"));
 }
 
-function productPayload(values, categoryName, profile, editing) {
-  const name = String(values.name || "").trim();
-  const abbreviation = String(values.abbreviation || "").trim().toUpperCase();
-  const defaultPrice = wholeInventoryQuantity(values.defaultPrice || 0, "El precio predeterminado");
-  const yellowAlertQty = wholeInventoryQuantity(values.yellowAlertQty || 0, "La alerta amarilla");
-  const redAlertQty = wholeInventoryQuantity(values.redAlertQty || 0, "La alerta roja");
-  const arcaVatRate = values.arcaVatRate === "" || values.arcaVatRate == null ? null : Number(values.arcaVatRate);
-  if (arcaVatRate != null && ![0, 10.5, 21, 27].includes(arcaVatRate)) throw new Error("La alícuota IVA ARCA no es válida.");
-  if (!name) throw new Error("Ingresá el nombre del producto.");
-  if (!abbreviation) throw new Error("Ingresá una abreviación.");
-  if (abbreviation.length > 8) throw new Error("La abreviación admite hasta 8 caracteres.");
-  if (yellowAlertQty < redAlertQty) throw new Error("La alerta amarilla debe ser mayor o igual a la roja.");
-  return {
-    name,
-    nameKey: normalizedText(name),
-    abbreviation,
-    abbreviationKey: normalizedText(abbreviation),
-    description: String(values.description || "").trim(),
-    defaultPrice,
-    arcaVatRate,
-    yellowAlertQty,
-    redAlertQty,
-    categoryId: String(values.categoryId || "").trim(),
-    categoryName,
-    imageUrl: String(values.imageUrl || "").trim(),
-    thumbUrl: String(values.thumbUrl || values.imageUrl || "").trim(),
-    imageAlt: String(values.imageAlt || name).trim(),
-    imageStatus: values.imageStatus || "available",
-    originalImageFileName: String(values.originalImageFileName || "").trim(),
-    buttonKey: String(values.buttonKey || "").trim(),
-    buttonCode: String(values.buttonCode || "").trim(),
-    buttonLocation: Number(values.buttonLocation || 0),
-    buttonLabel: String(values.buttonLabel || values.buttonKey || "").trim(),
-    active: values.active !== false,
-    deleted: false,
-    updatedAt: serverTimestamp(),
-    updatedBy: profile.id,
-    updatedByName: userName(profile),
-    ...(editing ? {} : {
-      createdAt: serverTimestamp(),
-      createdBy: profile.id,
-      createdByName: userName(profile),
-    }),
-  };
-}
+const productPayload = (values, categoryName, profile, editing) => buildMasterProductPayload(values, categoryName, profile, editing, serverTimestamp());
 
 export async function saveMasterProduct({ productId = "", values, profile }) {
   assertPermission(
@@ -153,6 +113,7 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
     productId ? "No tenés permiso para editar productos." : "No tenés permiso para crear productos.",
   );
   let categoryName = "Sin categoría";
+  let subcategoryName = "";
   const categoryId = String(values.categoryId || "").trim();
   if (categoryId) {
     const categorySnapshot = await getDoc(doc(db, "productCategories", categoryId));
@@ -160,7 +121,13 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
       throw new Error("La categoría seleccionada ya no está disponible.");
     }
     categoryName = categorySnapshot.data().name || "Sin categoría";
+    if (values.subcategoryId) {
+      const subcategory = categorySubcategories(categorySnapshot.data()).find(row => row.id === values.subcategoryId);
+      if (!subcategory) throw new Error("La subcategoría no pertenece a la categoría elegida.");
+      subcategoryName = subcategory.name;
+    }
   }
+  if (!categoryId && values.subcategoryId) throw new Error("Elegí la categoría de esta subcategoría.");
 
   // Crear/editar productos es una acción infrecuente. Esta lectura acotada prioriza
   // no generar duplicados incluso con productos legacy que todavía no tienen nameKey.
@@ -174,7 +141,7 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
   if (duplicate) throw new Error("Ya existe un producto con ese nombre o abreviación.");
 
   const productRef = productId ? doc(db, "products", productId) : doc(collection(db, "products"));
-  const payload = productPayload(values, categoryName, profile, Boolean(productId));
+  const payload = productPayload({ ...values, subcategoryName }, categoryName, profile, Boolean(productId));
   const auditRef = doc(collection(db, "auditLogs"));
   const batch = writeBatch(db);
   batch.set(productRef, payload, { merge: true });
@@ -192,6 +159,8 @@ export async function saveMasterProduct({ productId = "", values, profile }) {
     createdAt: serverTimestamp(),
   });
   await batch.commit();
+  invalidateRuntimeCache("products:");
+  invalidateRuntimeCache("seller-resources:");
   return productRef.id;
 }
 
@@ -742,190 +711,13 @@ export async function transferStock({ origin: requestedOrigin, originWarehouse, 
       });
     }
 
-    const originName = originSnapshot.data().name;
-    const destinationName = destinationSnapshot.data().name;
-    prepared.forEach((item) => {
-      const originPrevious = Number(item.originStock.currentStock || 0);
-      const originNew = originPrevious - item.quantity;
-      const destinationPrevious = Number(item.destinationStock?.currentStock || 0);
-      const destinationNew = destinationPrevious + item.receivedQuantity;
-      const outMovementRef = doc(db, "stockMovements", `${safeId}_${item.productId}_out`);
-      const inMovementRef = doc(db, "stockMovements", `${safeId}_${item.productId}_in`);
-
-      transaction.update(item.originStockRef, {
-        currentStock: originNew,
-        lastMovementId: outMovementRef.id,
-        updatedAt: serverTimestamp(),
-        updatedBy: profile.id,
-      });
-
-      if (item.destinationStock) {
-        // Si ya existía en el destino se modifica únicamente el stock: precio,
-        // alertas y demás configuración local quedan exactamente como estaban.
-        transaction.update(item.destinationStockRef, {
-          currentStock: destinationNew,
-          lastMovementId: inMovementRef.id,
-          updatedAt: serverTimestamp(),
-          updatedBy: profile.id,
-        });
-      } else if (destination.type === INVENTORY_TYPES.LOCATION) {
-        const wantsCustomPrice = item.line.destinationUseDefaultPrice === false;
-        const priceOverride = wantsCustomPrice
-          ? wholeInventoryQuantity(item.line.destinationPriceOverride, `El precio especial de ${item.product.name}`)
-          : null;
-        transaction.set(item.destinationStockRef, {
-          productId: item.productId,
-          productName: item.product.name,
-          abbreviation: item.product.abbreviation || "",
-          categoryId: item.product.categoryId || "",
-          categoryName: item.product.categoryName || "Sin categoría",
-          imageUrl: item.product.imageUrl || "",
-          thumbUrl: item.product.thumbUrl || "",
-          priceMode: wantsCustomPrice ? PRICE_MODES.CUSTOM : PRICE_MODES.DEFAULT,
-          priceOverride,
-          price: wantsCustomPrice ? priceOverride : Number(item.product.defaultPrice || 0),
-          masterDefaultPrice: Number(item.product.defaultPrice || 0),
-          initialStock: item.receivedQuantity,
-          currentStock: item.receivedQuantity,
-          yellowAlertQty: 0,
-          redAlertQty: 0,
-          active: true,
-          deleted: false,
-          productDeleted: false,
-          assignedAt: serverTimestamp(),
-          assignedBy: profile.id,
-          updatedAt: serverTimestamp(),
-          updatedBy: profile.id,
-          lastMovementId: inMovementRef.id,
-        });
-      } else {
-        transaction.set(item.destinationStockRef, {
-          productId: item.productId,
-          productName: item.product.name,
-          abbreviation: item.product.abbreviation || "",
-          categoryId: item.product.categoryId || "",
-          categoryName: item.product.categoryName || "Sin categoría",
-          imageUrl: item.product.imageUrl || "",
-          thumbUrl: item.product.thumbUrl || "",
-          initialStock: item.receivedQuantity,
-          currentStock: item.receivedQuantity,
-          active: true,
-          deleted: false,
-          productDeleted: false,
-          assignedAt: serverTimestamp(),
-          assignedBy: profile.id,
-          updatedAt: serverTimestamp(),
-          updatedBy: profile.id,
-          lastMovementId: inMovementRef.id,
-        });
-      }
-
-      transaction.set(outMovementRef, {
-        operationId: safeId,
-        transferId: safeId,
-        inventoryType: origin.type,
-        inventoryId: origin.id,
-        ...(origin.type === INVENTORY_TYPES.LOCATION ? { locationId: origin.id, locationName: originName } : { warehouseId: origin.id, warehouseName: originName }),
-        productId: item.productId,
-        productName: item.product.name,
-        type: "transfer_out",
-        qty: -item.quantity,
-        requestedQty: item.quantity,
-        preparedQty: item.preparedQuantity, receivedQty: item.receivedQuantity,
-        missingQty: item.missingQuantity, lostQty: item.lostQuantity,
-        previousStock: originPrevious,
-        newStock: originNew,
-        reason: `Transferencia a ${destinationName}: previstas ${item.quantity}, preparadas ${item.preparedQuantity}, recibidas ${item.receivedQuantity}${destination.note ? ` · ${destination.note}` : ""}`,
-        originType: origin.type,
-        originId: origin.id,
-        originName,
-        destinationType: destination.type,
-        destinationId: destination.id,
-        destinationName,
-        userId: profile.id,
-        userName: userName(profile),
-        saleId: "",
-        createdAt: serverTimestamp(),
-      });
-      transaction.set(inMovementRef, {
-        operationId: safeId,
-        transferId: safeId,
-        inventoryType: destination.type,
-        inventoryId: destination.id,
-        ...(destination.type === INVENTORY_TYPES.LOCATION
-          ? { locationId: destination.id, locationName: destinationName }
-          : { warehouseId: destination.id, warehouseName: destinationName }),
-        productId: item.productId,
-        productName: item.product.name,
-        type: "transfer_in",
-        qty: item.receivedQuantity,
-        requestedQty: item.quantity,
-        preparedQty: item.preparedQuantity, receivedQty: item.receivedQuantity,
-        missingQty: item.missingQuantity, lostQty: item.lostQuantity,
-        previousStock: destinationPrevious,
-        newStock: destinationNew,
-        reason: `Transferencia desde ${originName}: recibidas ${item.receivedQuantity} de ${item.quantity}${destination.note ? ` · ${destination.note}` : ""}`,
-        originType: origin.type,
-        originId: origin.id,
-        originName,
-        destinationType: destination.type,
-        destinationId: destination.id,
-        destinationName,
-        userId: profile.id,
-        userName: userName(profile),
-        saleId: "",
-        createdAt: serverTimestamp(),
-      });
-    });
-
-    const totalQuantity = prepared.reduce((sum, item) => sum + item.quantity, 0);
-    const payload = {
-      createdBy: profile.id,
-      createdByName: userName(profile),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      status: "completed",
-      sourceType: origin.type,
-      sourceId: origin.id,
-      sourceName: originName,
-      destinationType: destination.type,
-      destinationId: destination.id,
-      destinationName,
-      itemCount: prepared.length,
-      totalQuantity,
-      preparedQuantity: prepared.reduce((sum, item) => sum + item.preparedQuantity, 0),
-      receivedQuantity: prepared.reduce((sum, item) => sum + item.receivedQuantity, 0),
-      missingQuantity: prepared.reduce((sum, item) => sum + item.missingQuantity, 0),
-      lostQuantity: prepared.reduce((sum, item) => sum + item.lostQuantity, 0),
-      preparedBy: profile.id, preparedByName: userName(profile),
-      receivedBy: profile.id, receivedByName: userName(profile), receivedAt: serverTimestamp(),
-      carrierName: String(carrierName || userName(profile)).trim(),
-      items: prepared.map((item) => ({
-        productId: item.productId,
-        productName: item.product.name,
-        quantity: item.quantity, preparedQuantity: item.preparedQuantity, receivedQuantity: item.receivedQuantity, missingQuantity: item.missingQuantity, lostQuantity: item.lostQuantity,
-      })),
-      note: String(destination.note || "").trim(),
-    };
-    transaction.set(transferRef, payload);
-    transaction.set(auditRef, {
-      action: "stock.transfer",
-      title: "Transferencia de stock",
-      description: `${originName} → ${destinationName} · ${prepared.length} producto${prepared.length === 1 ? "" : "s"}`,
-      moduleId: "warehouse",
-      entityType: "stockTransfer",
-      entityId: safeId,
-      sourceType: origin.type, sourceId: origin.id,
-      ...(origin.type === INVENTORY_TYPES.LOCATION ? { locationId: origin.id, locationName: originName } : { warehouseId: origin.id, warehouseName: originName, sourceWarehouseId: origin.id }),
-      receivedQuantity: payload.receivedQuantity, missingQuantity: payload.missingQuantity, lostQuantity: payload.lostQuantity, carrierName: payload.carrierName,
-      destinationType: destination.type,
-      destinationId: destination.id,
-      userId: profile.id,
-      userName: userName(profile),
-      status: "completed",
-      createdAt: serverTimestamp(),
-    });
-    return { id: safeId, ...payload };
+    const plan = buildStockTransferWrites({ prepared, origin: { ...origin, name: originSnapshot.data().name }, destination: { ...destination, name: destinationSnapshot.data().name }, profile, carrierName, transferId: safeId, stamp: serverTimestamp() });
+    for (const write of plan.writes) {
+      const reference = doc(db, write.path);
+      if (write.type === "update") transaction.update(reference, write.data);
+      else transaction.set(reference, write.data);
+    }
+    return plan.result;
   });
 }
 

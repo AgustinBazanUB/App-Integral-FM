@@ -1,6 +1,12 @@
 import { effectiveLocationPrice } from "../../modules/inventory/domain/inventory";
 import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
 import SaleStockWarning from "../components/SaleStockWarning";
+import ProductImage from "../components/ProductImage";
+import ProductSubcategoryRows from "../components/ProductSubcategoryRows";
+import SellerCatalogList from "./SellerCatalogList";
+import PanelLoading from "../../components/PanelLoading";
+import { OliviaLauncherSlot } from "../olivia/LauncherHost";
+import { resolveProductImages } from "../../shared/productImages.mjs";
 import { getArcaInvoiceForSale, arcaSourceTypeForSale } from "../services/arcaService";
 import { fiscalPresentation } from "../../shared/fiscalRecovery.mjs";
 import ArcaInvoicePrintAction from "../components/ArcaInvoicePrintAction";
@@ -15,7 +21,6 @@ import {
   Badge,
   Button,
   ConfirmationDialog,
-  Dropdown,
   EmptyState,
   Modal,
   Panel,
@@ -26,14 +31,16 @@ import { calculateDiscountSummary } from "../../modules/locations/domain/discoun
 import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
 import {
   completeRemainingPayment,
+  normalizePayment,
   PAYMENT_LABELS,
   PAYMENT_OPTIONS,
   paymentAllocationSummary,
   salePaymentParts,
   SINGLE_PAYMENT_METHODS,
 } from "../../modules/locations/domain/payments";
-import { useNavigate } from "../../router";
+import { useLocation, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
+import { useOliviaRefresh, useOliviaScreenContext, useOliviaVisibility } from "../olivia/ScreenContext";
 import { Icon } from "../components/icons";
 import {
   formatDateTime,
@@ -52,6 +59,7 @@ import {
 } from "../services/sellerService";
 import CustomerDialog from "./CustomerDialog";
 import DiscountDialog from "./DiscountDialog";
+import { sellerErrorMessage, sellerProblem, sellerProductProblem, sellerSaleProblem } from "./sellerValidation";
 import {
   deleteSellerPendingSale,
   markSellerPendingError,
@@ -74,8 +82,7 @@ import {
   pendingReservedQuantities,
   SELLER_ACTION_SHORTCUTS,
   SELLER_VIEWS,
-  sellerImage,
-  sellerStockStatus,
+  sellerPaymentSummary,
 } from "./sellerDomain";
 
 const friendlyPayment = {
@@ -89,6 +96,13 @@ const friendlyPayment = {
 const customerZone = (customer = {}) => customer.zoneName || customer.customZone || customer.zone || "";
 const asArray = (value) => Array.isArray(value) ? value : [];
 
+function SellerProfileAvatar({ profile }) {
+  const source = profile.photoUrl || profile.avatarUrl || profile.photoURL;
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [source]);
+  return <span className="fm-avatar">{source && !failed ? <img src={source} alt="" onError={() => setFailed(true)} /> : String(profile.name || profile.email || "V").slice(0, 1).toUpperCase()}</span>;
+}
+
 function SellerHeader({
   profile,
   location,
@@ -101,6 +115,17 @@ function SellerHeader({
   onReturnAdmin,
   onLogout,
 }) {
+  const profileMenuRef = useRef(null);
+  useEffect(() => {
+    const dismiss = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) profileMenuRef.current.open = false;
+    };
+    const escape = (event) => { if (event.key === "Escape" && profileMenuRef.current) profileMenuRef.current.open = false; };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("focusin", dismiss);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("focusin", dismiss); document.removeEventListener("keydown", escape); };
+  }, []);
   return (
     <>
       <header className="fm-seller-header">
@@ -112,18 +137,20 @@ function SellerHeader({
           </div>
         </div>
         <div className="fm-seller-header__status">
+          <OliviaLauncherSlot />
           <Badge tone={syncing ? "warning" : online ? "success" : "warning"} icon={syncing ? "RefreshCw" : online ? "Wifi" : "WifiOff"}>
             {syncing ? "Sincronizando" : online ? "Online" : "Sin conexión"}
           </Badge>
           <button type="button" className={`fm-seller-pending-chip ${pendingCount ? "has-pending" : ""}`} onClick={() => setView("pending")}>
             Pendientes <strong>{pendingCount}</strong>
           </button>
-          <Dropdown label={<span className="fm-profile-trigger"><span className="fm-avatar">{String(profile.name || profile.email || "V").slice(0, 1).toUpperCase()}</span><span><strong>{profile.name || "Usuario"}</strong><small>Panel Vendedor</small></span><Icon name="ChevronDown" /></span>}>
+          <details ref={profileMenuRef} className="fm-dropdown fm-seller-profile">
+            <summary aria-label={`Perfil de ${profile.name || "usuario"}`} title="Abrir opciones del perfil"><SellerProfileAvatar profile={profile} /></summary>
             <div className="fm-profile-menu">
               {canReturnAdmin ? <button type="button" onClick={onReturnAdmin}><Icon name="LayoutDashboard" />Volver al Panel Administrador</button> : null}
               <button type="button" onClick={onLogout}><Icon name="LogOut" />Cerrar sesión</button>
             </div>
-          </Dropdown>
+          </details>
         </div>
       </header>
       <nav className="fm-seller-nav" aria-label="Secciones del Panel Vendedor">
@@ -140,8 +167,10 @@ function SellerHeader({
 
 function MultiplePaymentDialog({ open, total, initialPayments, onClose, onConfirm }) {
   const [values, setValues] = useState({});
+  const [error, setError] = useState("");
   useEffect(() => {
     if (!open) return;
+    setError("");
     setValues(Object.fromEntries(
       SINGLE_PAYMENT_METHODS.map((method) => [
         method,
@@ -162,7 +191,10 @@ function MultiplePaymentDialog({ open, total, initialPayments, onClose, onConfir
       onClose={onClose}
       title="+2 pagos"
       description="Distribuí el total entre dos o más medios."
-      footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button disabled={!valid} onClick={() => onConfirm(entries)}>Confirmar</Button></div>}
+      footer={<div><div className="fm-dialog-actions"><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button onClick={() => {
+        try { normalizePayment("multiple", PAYMENT_LABELS.multiple, entries, total); onConfirm(entries); }
+        catch (problem) { setError(sellerProblem("PAGO-DESGLOSE", problem.message)); }
+      }}>Confirmar</Button></div>{error ? <p className="fm-form-error" role="alert">{error}</p> : null}</div>}
     >
       <div className="fm-seller-multiple-total"><span>Total de la venta</span><strong>{formatMoney(total)}</strong></div>
       <div className="fm-seller-payment-rows">
@@ -170,11 +202,13 @@ function MultiplePaymentDialog({ open, total, initialPayments, onClose, onConfir
           <label key={method}>
             <span>{friendlyPayment[method]}</span>
             <div>
-              <input type="number" min="0" step="1" inputMode="numeric" value={values[method] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [method]: event.target.value }))} />
+              <input aria-label={`Monto en ${friendlyPayment[method]}`} type="number" min="0" step="1" inputMode="numeric" value={values[method] ?? ""} onChange={(event) => { setError(""); setValues((current) => ({ ...current, [method]: event.target.value })); }} />
               <button type="button" onClick={() => {
+                if (summary.invalid || summary.difference <= 0) { setError(sellerProblem("PAGO-SALDO", summary.invalid ? "Corregí los importes inválidos antes de completar el saldo." : "No queda saldo para completar. Revisá los importes cargados.")); return; }
                 const completed = completeRemainingPayment(entries, method, total);
+                setError("");
                 setValues(Object.fromEntries(completed.map((entry) => [entry.method, entry.amount || ""])));
-              }} disabled={summary.invalid || summary.difference <= 0}>Completar saldo</button>
+              }}>Completar saldo</button>
             </div>
           </label>
         ))}
@@ -193,16 +227,28 @@ function sameManualDiscount(a, b) {
 
 export default function SellerPanel() {
   const { profile, logout } = useAuth();
+  const { assistantOpen } = useOliviaVisibility();
   const navigate = useNavigate();
+  const routeLocation = useLocation();
   const online = useOnlineStatus();
   const locationsResult = useSellerLocations(profile);
   const resourcesResult = useSellerResources(profile);
   const [locationId, setLocationId] = useState("");
-  const [view, setView] = useState("sale");
+  const requestedView = new URLSearchParams(routeLocation.search).get("view");
+  const [view, setViewState] = useState(SELLER_VIEWS.some((item) => item.id === requestedView) ? requestedView : "sale");
+  const setView = useCallback((next) => {
+    if (!SELLER_VIEWS.some((item) => item.id === next)) return;
+    setViewState(next);
+    navigate(`/vendedor?view=${encodeURIComponent(next)}`, { replace: true });
+  }, [navigate]);
+  useEffect(() => {
+    setViewState(SELLER_VIEWS.some((item) => item.id === requestedView) ? requestedView : "sale");
+  }, [requestedView]);
   const [cart, setCart] = useState({});
   const [discountIds, setDiscountIds] = useState([]);
   const [manualDiscounts, setManualDiscounts] = useState([]);
   const [discountOpen, setDiscountOpen] = useState(false);
+  const [suggestedDiscountId, setSuggestedDiscountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [payments, setPayments] = useState([]);
   const [ticketRequested, setTicketRequested] = useState(false);
@@ -217,6 +263,7 @@ export default function SellerPanel() {
   const [multipleOpen, setMultipleOpen] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [detailSale, setDetailSale] = useState(null);
+  const [paymentSummaryOpen, setPaymentSummaryOpen] = useState(false);
   const [fiscalDetail, setFiscalDetail] = useState({ ready: false, invoice: null, error: "" });
   useEffect(() => {
     if (!detailSale?.id) return;
@@ -235,6 +282,7 @@ export default function SellerPanel() {
   const [deletePendingTarget, setDeletePendingTarget] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const autoSyncAttempted = useRef(false);
+  const syncRef = useRef(false);
 
   const closeCancelDialog = useCallback(() => {
     setCancelTarget(null);
@@ -246,6 +294,8 @@ export default function SellerPanel() {
   const stockResult = useSellerLocationStock(profile, locationId);
   const dailySales = useSellerDailySales(profile, locationId);
   const pendingSales = useSellerPendingSales(profile);
+  useOliviaScreenContext({ module: "seller", locationId: locationId || undefined, view, productId: view === "sale" ? lastProductId || undefined : undefined, customerId: view === "sale" ? selectedCustomer?.id : undefined, saleId: detailSale?.id || editSale?.id, entityType: detailSale?.id || editSale?.id ? "sale" : view === "sale" && lastProductId ? "product" : locationId ? "location" : undefined, entityId: detailSale?.id || editSale?.id || (view === "sale" ? lastProductId : "") || locationId || undefined });
+  useOliviaRefresh(dailySales.refresh);
   const resources = resourcesResult.data && typeof resourcesResult.data === "object"
     ? resourcesResult.data
     : {};
@@ -295,6 +345,9 @@ export default function SellerPanel() {
   const masterById = useMemo(() => new Map((resourcesResult.data?.products || []).map((product) => [product.id, product])), [resourcesResult.data?.products]);
   const products = useMemo(() => stockData.map((item) => ({
     ...item,
+    subcategoryId: masterById.get(item.productId || item.id)?.subcategoryId ?? item.subcategoryId,
+    subcategoryName: masterById.get(item.productId || item.id)?.subcategoryName ?? item.subcategoryName,
+    ...resolveProductImages(masterById.get(item.productId || item.id), item),
     price: effectiveLocationPrice(masterById.get(item.productId || item.id) || { defaultPrice: item.masterDefaultPrice ?? item.price ?? 0 }, item),
     availableStock: Number(item.currentStock || 0) - Number(reserved[item.id] || 0) +
       Number(editSale?.items?.find((old) => old.productId === item.id)?.qty || 0),
@@ -311,11 +364,12 @@ export default function SellerPanel() {
   }, [openCategoryId, productGroups]);
 
   useEffect(() => {
+    if (stockResult.status !== "ready") return;
     setCart((current) => Object.fromEntries(Object.entries(current).map(([id, item]) => {
       const product = products.find((entry) => entry.id === id);
-      return [id, product ? { ...item, stock: product.availableStock, imageUrl: sellerImage(product) } : item];
+      return [id, product ? { ...item, categoryId: product.categoryId || null, stock: product.availableStock, ...resolveProductImages(product), unavailable: false } : { ...item, unavailable: true }];
     })));
-  }, [products]);
+  }, [products, stockResult.status]);
 
   const currentItems = useMemo(() => cartItems(cart), [cart]);
   const subtotal = useMemo(() => cartSubtotal(cart), [cart]);
@@ -333,23 +387,28 @@ export default function SellerPanel() {
     .map((discount) => ({ ...discount, discountId: discount.id, source: "saved" }));
   const appliedDiscounts = [...savedDiscounts, ...manualDiscounts];
   const summary = useMemo(
-    () => calculateDiscountSummary(appliedDiscounts, subtotal),
-    [appliedDiscounts, subtotal],
+    () => calculateDiscountSummary(appliedDiscounts, subtotal, { paymentMethod, roundCashTotal: editSale?.sourceType === "admin_quick_sale" || editSale?.cashRoundingEnabled === true }),
+    [appliedDiscounts, subtotal, paymentMethod, editSale?.sourceType, editSale?.cashRoundingEnabled],
   );
   const stockDiscrepancies = saleStockDiscrepancies(currentItems);
-  const manualDiscountAllowed = can(profile, "quick-sales", "useManualDiscounts");
+  const discountAllowed = can(profile, "quick-sales", "useDiscounts");
+  const manualDiscountAllowed = discountAllowed && can(profile, "quick-sales", "useManualDiscounts");
   const multiplePaymentAllowed = can(profile, "quick-sales", "useMultiplePayments");
   const ticketAllowed = can(profile, "quick-sales", "requestTicket");
 
   useEffect(() => {
+    const removed = discountIds.filter(id => !availableDiscounts.some(discount => discount.id === id));
+    if (removed.length && !submitRef.current) {
+      const names = removed.map(id => discounts.find(discount => discount.id === id)?.name || id).join(", ");
+      setSubmitState({ busy: false, tone: "error", message: sellerProblem("DESCUENTO-NO-DISPONIBLE", `${names} dejó de estar disponible para esta venta y se quitó del total. Revisá los descuentos antes de continuar.`) });
+    }
     setDiscountIds((current) => current.filter((id) => availableDiscounts.some((discount) => discount.id === id)));
   }, [availableDiscounts]);
 
   useEffect(() => {
     if (paymentMethod === "multiple" && payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0) !== summary.total) {
-      setPaymentMethod("");
-      setPayments([]);
-      setSubmitState({ busy: false, tone: "error", message: "El total cambió. Volvé a cargar +2 pagos." });
+      if (submitRef.current) return;
+      setSubmitState({ busy: false, tone: "error", message: sellerProblem("PAGO-TOTAL-CAMBIO", "El total cambió. Tocá +2 pagos para ajustar los importes; conservamos lo que ya cargaste.") });
     }
   }, [summary.total, paymentMethod, payments]);
 
@@ -358,6 +417,7 @@ export default function SellerPanel() {
     setDiscountIds([]);
     setManualDiscounts([]);
     setDiscountOpen(false);
+    setSuggestedDiscountId("");
     setPaymentMethod("");
     setPayments([]);
     setTicketRequested(false);
@@ -365,9 +425,18 @@ export default function SellerPanel() {
     setCustomerOpen(false);
     setLastProductId("");
     setEditSale(null);
+    setSubmitState({ busy: false, message: "", tone: "info" });
   }, []);
 
   const changeQuantity = useCallback((product, amount) => {
+    if (submitRef.current) return;
+    if (amount > 0) {
+      const problem = stockResult.status !== "ready"
+        ? sellerProblem("VENTA-CARGANDO", "Todavía estamos cargando los productos de esta ubicación. Esperá un momento.")
+        : sellerProductProblem(product);
+      if (problem) { setSubmitState({ busy: false, tone: "error", message: problem }); return; }
+    }
+    setSubmitState({ busy: false, message: "", tone: "info" });
     setCart((current) => {
       const existing = current[product.id];
       const nextQty = Number(existing?.qty || 0) + amount;
@@ -383,16 +452,18 @@ export default function SellerPanel() {
           productId: product.id,
           name: product.productName || product.name,
           abbreviation: product.abbreviation || "",
+          categoryId: product.categoryId || null,
           price: Number(product.price || 0),
           unitPrice: Number(product.price || 0),
           qty: nextQty,
           stock: Number(product.availableStock ?? product.stock ?? 0),
-          imageUrl: product.imageUrl || sellerImage(product),
+          ...resolveProductImages(product),
+          unavailable: product.unavailable === true,
         },
       };
     });
     setLastProductId(product.id);
-  }, []);
+  }, [stockResult.status]);
 
   const addProduct = useCallback((product) => changeQuantity(product, 1), [changeQuantity]);
   const subtractLast = useCallback(() => {
@@ -437,38 +508,16 @@ export default function SellerPanel() {
       customer: selectedCustomer,
       ticketRequested,
     });
-    await pendingSales.refresh();
     resetSale();
     setSubmitState({ busy: false, tone: "success", message: "Venta guardada en este dispositivo. Todavía no está confirmada en Firestore." });
+    await pendingSales.refresh().catch((error) => setSubmitState({ busy: false, tone: "warning", message: `La venta quedó guardada en este dispositivo, pero no pudimos actualizar la lista. No la cargues de nuevo. ${sellerErrorMessage(error)}` }));
   }, [selectedLocation, profile, currentItems, appliedDiscounts, summary.total, paymentMethod, payments, selectedCustomer, ticketRequested, pendingSales, resetSale]);
 
   const submitSale = useCallback(async () => {
     if (submitRef.current || submitState.busy) return;
-    if (!selectedLocation) {
-      setSubmitState({ busy: false, tone: "error", message: "Elegí una ubicación activa." });
-      return;
-    }
-    if (!currentItems.length) {
-      setSubmitState({ busy: false, tone: "error", message: "La venta está vacía." });
-      return;
-    }
-    if (!paymentMethod) {
-      setSubmitState({ busy: false, tone: "error", message: "Elegí una forma de pago." });
-      return;
-    }
-    if (paymentMethod === "multiple") {
-      const paymentSummary = paymentAllocationSummary(payments, summary.total);
-      if (paymentSummary.invalid || paymentSummary.difference !== 0 || paymentSummary.positiveCount < 2) {
-        setSubmitState({ busy: false, tone: "error", message: "Revisá +2 pagos: la suma debe coincidir exactamente con el total." });
-        return;
-      }
-    }
-    if (ticketRequested && !ticketAllowed) {
-      setSubmitState({ busy: false, tone: "error", message: "Tu perfil no puede solicitar ticket." });
-      return;
-    }
-    if (!online && editSale) {
-      setSubmitState({ busy: false, tone: "error", message: "Necesitás conexión para editar una venta confirmada." });
+    const problem = sellerSaleProblem({ profile, location: selectedLocation, items: currentItems, paymentMethod, payments, total: summary.total, discounts: appliedDiscounts, online, editing: Boolean(editSale), stockStatus: stockResult.status, stockError: stockResult.error, pendingStatus: pendingSales.status, pendingError: pendingSales.error, ticketRequested });
+    if (problem) {
+      setSubmitState({ busy: false, tone: "error", message: problem });
       return;
     }
     submitRef.current = true;
@@ -492,15 +541,15 @@ export default function SellerPanel() {
         ? await updateSellerSale({ ...common, saleId: editSale.id })
         : await createSellerSale({ ...common, location: selectedLocation });
       resetSale();
-      await dailySales.refresh();
       setReceipt(result);
       setSubmitState({ busy: false, tone: result.stockDiscrepancies?.length ? "warning" : "success", message: `${result.saleCode} registrada correctamente.${result.stockDiscrepancies?.length ? " Stock negativo pendiente de revisión." : ""}` });
+      dailySales.refresh().catch((error) => setSubmitState({ busy: false, tone: "warning", message: `${result.saleCode} quedó registrada, pero no pudimos actualizar Mis ventas. No la cargues de nuevo. ${sellerErrorMessage(error)}` }));
     } catch (error) {
-      setSubmitState({ busy: false, tone: "error", message: error.message });
+      setSubmitState({ busy: false, tone: "error", message: sellerErrorMessage(error) });
     } finally {
       submitRef.current = false;
     }
-  }, [submitState.busy, selectedLocation, currentItems, paymentMethod, payments, summary.total, selectedCustomer, ticketRequested, ticketAllowed, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales]);
+  }, [submitState.busy, selectedLocation, currentItems, paymentMethod, payments, summary.total, selectedCustomer, ticketRequested, online, editSale, savePending, profile, appliedDiscounts, resetSale, dailySales, stockResult.status, stockResult.error, pendingSales.status, pendingSales.error]);
 
   const actionShortcuts = useMemo(() => SELLER_ACTION_SHORTCUTS.map((action) => ({
     ...action,
@@ -508,17 +557,26 @@ export default function SellerPanel() {
   })), [resources.shortcuts]);
 
   useSellerKeyboard({
-    enabled: keyboardActive && view === "sale",
+    enabled: keyboardActive && view === "sale" && !submitState.busy && !assistantOpen,
     products,
     discounts: availableDiscounts,
     actionShortcuts,
     onProduct: addProduct,
-    onDiscount: (discount) => setDiscountIds((current) => current.includes(discount.id) ? current : [...current, discount.id]),
+    onDiscount: (discount) => {
+      if (!discountAllowed) { setSubmitState({ busy: false, tone: "error", message: sellerProblem("DESCUENTO-PERMISO", "Tu usuario no puede aplicar descuentos. Pedile permiso al administrador.") }); return; }
+      setSuggestedDiscountId(discount.id);
+      setDiscountOpen(true);
+    },
     onShortcut: (shortcut) => {
       if (shortcut.paymentMethod) {
-        if (shortcut.paymentMethod === "multiple" && !multiplePaymentAllowed) return;
+        if (shortcut.paymentMethod === "multiple") {
+          if (!multiplePaymentAllowed) { setSubmitState({ busy: false, tone: "error", message: sellerProblem("PAGO-PERMISO", "Tu usuario no puede combinar pagos. Elegí un solo medio o pedí permiso al administrador.") }); return; }
+          setMultipleOpen(true);
+          return;
+        }
         setPaymentMethod(shortcut.paymentMethod);
         setPayments([]);
+        setSubmitState({ busy: false, tone: "info", message: "" });
       }
     },
     onContinue: submitSale,
@@ -530,44 +588,51 @@ export default function SellerPanel() {
   });
 
   const syncPending = useCallback(async ({ manual = false } = {}) => {
-    if (syncing || !online) {
-      if (manual && !online) setSubmitState({ busy: false, tone: "error", message: "No hay conexión para sincronizar." });
+    if (syncRef.current || syncing || !online) {
+      if (manual && !online) setSubmitState({ busy: false, tone: "error", message: sellerProblem("PENDIENTES-SIN-CONEXION", "No hay conexión para sincronizar. Las ventas siguen guardadas en este dispositivo.") });
       return;
     }
-    const queue = await pendingSales.refresh();
-    if (!queue.length) {
-      if (manual) setSubmitState({ busy: false, tone: "success", message: "No hay ventas pendientes." });
-      return;
-    }
+    syncRef.current = true;
     setSyncing(true);
-    let synced = 0;
-    let failed = 0;
-    for (const sale of queue) {
-      try {
-        const result = await createSellerSale({
-          profile,
-          location: { id: sale.locationId, name: sale.locationName, codePrefix: sale.locationPrefix },
-          items: sale.items,
-          discounts: sale.discounts,
-          paymentMethod: sale.paymentMethod,
-          paymentMethodLabel: sale.paymentMethodLabel,
-          payments: sale.payments,
-          customer: sale.customer || null,
-          ticketRequested: sale.ticketRequested === true,
-          offlineSale: { localId: sale.localId, createdLocallyAt: sale.createdLocallyAt },
-        });
-        await markSellerPendingSynced(sale.localId, result.id);
-        await deleteSellerPendingSale(sale.localId);
-        synced += 1;
-      } catch (error) {
-        await markSellerPendingError(sale.localId, error.message).catch(() => {});
-        failed += 1;
+    try {
+      const queue = await pendingSales.refresh();
+      if (!queue.length) {
+        if (manual) setSubmitState({ busy: false, tone: "success", message: "No hay ventas pendientes." });
+        return;
       }
+      let synced = 0;
+      let failed = 0;
+      for (const sale of queue) {
+        try {
+          const result = await createSellerSale({
+            profile,
+            location: { id: sale.locationId, name: sale.locationName, codePrefix: sale.locationPrefix },
+            items: sale.items,
+            discounts: sale.discounts,
+            paymentMethod: sale.paymentMethod,
+            paymentMethodLabel: sale.paymentMethodLabel,
+            payments: sale.payments,
+            customer: sale.customer || null,
+            ticketRequested: sale.ticketRequested === true,
+            offlineSale: { localId: sale.localId, createdLocallyAt: sale.createdLocallyAt },
+          });
+          await markSellerPendingSynced(sale.localId, result.id);
+          await deleteSellerPendingSale(sale.localId);
+          synced += 1;
+        } catch (error) {
+          await markSellerPendingError(sale.localId, sellerErrorMessage(error)).catch(() => {});
+          failed += 1;
+        }
+      }
+      await pendingSales.refresh();
+      await dailySales.refresh().catch(() => {});
+      setSubmitState({ busy: false, tone: failed ? "error" : "success", message: failed ? sellerProblem("PENDIENTES-REVISAR", `${synced} sincronizadas y ${failed} pendientes de revisar. Mirá el motivo en cada venta antes de reintentar.`) : `${synced} venta${synced === 1 ? "" : "s"} sincronizada${synced === 1 ? "" : "s"}.` });
+    } catch (error) {
+      setSubmitState({ busy: false, tone: "error", message: sellerErrorMessage(error) });
+    } finally {
+      syncRef.current = false;
+      setSyncing(false);
     }
-    setSyncing(false);
-    await pendingSales.refresh();
-    await dailySales.refresh().catch(() => {});
-    setSubmitState({ busy: false, tone: failed ? "error" : "success", message: failed ? `${synced} sincronizadas y ${failed} pendientes con error. El stock no se modificó para las fallidas.` : `${synced} venta${synced === 1 ? "" : "s"} sincronizada${synced === 1 ? "" : "s"}.` });
   }, [syncing, online, pendingSales, profile, dailySales]);
 
   useEffect(() => {
@@ -587,6 +652,7 @@ export default function SellerPanel() {
   };
 
   const requestLocation = (nextId) => {
+    if (submitRef.current) return;
     if (nextId === locationId) return;
     if (currentItems.length) setLocationToApply(nextId);
     else applyLocation(nextId);
@@ -625,16 +691,36 @@ export default function SellerPanel() {
   };
 
   const confirmCancelSale = async () => {
-    if (!cancelTarget) return;
+    if (!cancelTarget || submitRef.current) return;
+    submitRef.current = true;
     setSubmitState({ busy: true, tone: "info", message: "Anulando venta…" });
     try {
       await cancelSellerSale({ profile, saleId: cancelTarget.id, reason: cancelReason });
       closeCancelDialog();
       setDetailSale(null);
-      await dailySales.refresh();
       setSubmitState({ busy: false, tone: "success", message: "Venta anulada y stock restituido." });
+      await dailySales.refresh().catch(error => setSubmitState({ busy: false, tone: "warning", message: `La venta quedó anulada, pero no pudimos actualizar la lista. ${sellerErrorMessage(error)}` }));
     } catch (error) {
-      setSubmitState({ busy: false, tone: "error", message: error.message });
+      setSubmitState({ busy: false, tone: "error", message: sellerErrorMessage(error) });
+    } finally {
+      submitRef.current = false;
+    }
+  };
+
+  const confirmDeletePending = async () => {
+    if (!deletePendingTarget || submitRef.current) return;
+    submitRef.current = true;
+    const target = deletePendingTarget;
+    setDeletePendingTarget(null);
+    setSubmitState({ busy: true, tone: "info", message: "Descartando venta pendiente…" });
+    try {
+      await deleteSellerPendingSale(target.localId);
+      setSubmitState({ busy: false, tone: "success", message: "Venta pendiente descartada de este dispositivo." });
+      await pendingSales.refresh().catch(error => setSubmitState({ busy: false, tone: "warning", message: `La venta pendiente se descartó, pero no pudimos actualizar la lista. ${sellerErrorMessage(error)}` }));
+    } catch (error) {
+      setSubmitState({ busy: false, tone: "error", message: sellerErrorMessage(error) });
+    } finally {
+      submitRef.current = false;
     }
   };
 
@@ -649,7 +735,7 @@ export default function SellerPanel() {
   };
 
   if (locationsResult.status === "loading") {
-    return <main className="fm-seller-loading" id="main-content"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><Skeleton lines={4} /></main>;
+    return <PanelLoading panel="vendedor" />;
   }
 
   if (!locations.length) {
@@ -658,8 +744,8 @@ export default function SellerPanel() {
         <section>
           <img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" />
           <Icon name="MapPin" />
-          <h1>No tenés ubicaciones asignadas para vender</h1>
-          <p>Solicitá al administrador que te asigne una ubicación activa.</p>
+          <h1>{locationsResult.error ? "No pudimos cargar tus ubicaciones" : "No tenés ubicaciones asignadas para vender"}</h1>
+          {locationsResult.error ? <><p className="fm-form-error" role="alert">{sellerErrorMessage(locationsResult.error)}</p><Button onClick={() => locationsResult.refresh().catch(() => {})}>Reintentar</Button></> : <p>Solicitá al administrador que te asigne una ubicación activa.</p>}
           {canReturnAdmin ? <Button icon="LayoutDashboard" onClick={returnAdmin}>Volver al Panel Administrador</Button> : null}
           <Button variant="secondary" icon="LogOut" onClick={logout}>Cerrar sesión</Button>
         </section>
@@ -685,10 +771,10 @@ export default function SellerPanel() {
         </div>
         {!online ? <div className="fm-seller-offline-note"><Icon name="WifiOff" /><span>Sin conexión. La venta quedará pendiente en este dispositivo y no se mostrará como confirmada.</span></div> : null}
         {editSale ? <div className="fm-seller-edit-note"><span>Editando <strong>{editSale.saleCode}</strong></span><button type="button" onClick={resetSale}>Cancelar edición</button></div> : null}
-        {resourcesResult.error ? <Toast tone="error">No se pudieron actualizar algunos recursos: {resourcesResult.error.message}</Toast> : null}
+        {resourcesResult.error ? <Toast tone="error">No se pudieron actualizar algunos recursos. {sellerErrorMessage(resourcesResult.error)}</Toast> : null}
         <div className="fm-seller-catalog-scroll" aria-label="Catálogo de productos por categoría">
           {stockResult.status === "loading" || resourcesResult.status === "loading" ? <Skeleton lines={6} /> : null}
-          {stockResult.status === "error" ? <EmptyState icon="AlertTriangle" title="No se pudo leer el stock" description={stockResult.error.message} /> : null}
+          {stockResult.error ? <EmptyState icon="AlertTriangle" title="No se pudo actualizar el stock" description={sellerErrorMessage(stockResult.error)} /> : null}
           {stockResult.status === "ready" && !productGroups.length ? <EmptyState icon="Boxes" title="No hay productos habilitados" description="La ubicación no tiene productos disponibles para vender." /> : null}
           {productGroups.map((group) => {
             const open = openCategoryId === group.id;
@@ -702,20 +788,17 @@ export default function SellerPanel() {
                   </button>
                 </h2>
                 {open ? (
-                  <div className="fm-seller-products" id={controlId}>
-                    {group.items.map((product) => {
+                  <div id={controlId}>
+                    <ProductSubcategoryRows items={group.items} category={categories.find(category => category.id === group.id) || { name: group.name }} className="fm-seller-products" renderProduct={(product) => {
                       const qty = Number(cart[product.id]?.qty || 0);
                       return (
-                        <button key={product.id} type="button" className={qty ? "is-selected" : ""} onClick={() => addProduct(product)}>
-                          {product.buttonKey || product.buttonLabel ? <span className="fm-seller-key">{product.buttonLabel || product.buttonKey}</span> : null}
-                          <img src={sellerImage(product)} alt="" loading="lazy" decoding="async" />
-                          <strong>{product.abbreviation || product.productName}</strong>
-                          <span>{product.productName}</span>
-                          <small>{formatMoney(product.price)} · Stock {product.availableStock}</small>
+                        <button key={product.id} type="button" className={qty ? "is-selected" : ""} aria-label={`Agregar ${product.productName}, stock ${product.currentStock}`} title={product.productName} onClick={() => addProduct(product)}>
+                          <ProductImage product={product} eager />
+                          <span className="fm-seller-product-meta"><strong>{product.abbreviation || product.productName}</strong><small>Stock {product.currentStock}</small></span>
                           {qty ? <b>{qty}</b> : null}
                         </button>
                       );
-                    })}
+                    }} />
                   </div>
                 ) : null}
               </section>
@@ -724,11 +807,12 @@ export default function SellerPanel() {
         </div>
       </section>
       <aside className="fm-seller-cart">
-        <Panel title="Venta actual" description={`${cartQuantity(cart)} producto${cartQuantity(cart) === 1 ? "" : "s"}`} action={<button type="button" className="fm-text-button" disabled={!currentItems.length} onClick={() => setClearRequested(true)}>Vaciar</button>}>
+        <fieldset className="fm-seller-sale-controls" disabled={submitState.busy}>
+        <Panel title={<span className="fm-seller-cart-title">Venta actual <small>{cartQuantity(cart)} producto{cartQuantity(cart) === 1 ? "" : "s"}</small></span>} action={<button type="button" className="fm-text-button" onClick={() => currentItems.length ? setClearRequested(true) : setSubmitState({ busy: false, tone: "error", message: sellerProblem("VENTA-VACIA", "La venta ya está vacía. Agregá un producto para empezar.") })}>Vaciar</button>}>
           <div className="fm-seller-cart-lines">
             {currentItems.length ? currentItems.map((item) => (
               <article key={item.id} className={item.qty > item.stock ? "has-stock-warning" : ""}>
-                <img src={item.imageUrl} alt="" loading="lazy" decoding="async" />
+                <ProductImage product={item} />
                 <div><strong>{item.abbreviation || item.name}</strong><small>{formatMoney(item.price)} c/u · {formatMoney(item.qty * item.price)}</small></div>
                 <div className="fm-quantity-control"><button type="button" aria-label={`Quitar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, -1)}><Icon name="Minus" /></button><output aria-label={`Cantidad de ${item.name}`}>{item.qty}</output><button type="button" aria-label={`Agregar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, 1)}><Icon name="Plus" /></button></div>
                 <button type="button" className="fm-seller-line-remove" aria-label={`Eliminar ${item.name} del carrito`} onClick={() => setCart((current) => { const next = { ...current }; delete next[item.id]; return next; })}><Icon name="X" /></button>
@@ -738,14 +822,17 @@ export default function SellerPanel() {
 
           <SaleStockWarning discrepancies={stockDiscrepancies} />
           <div className="fm-seller-discount-summary">
-            <div className="fm-seller-section-head"><strong>Descuentos</strong><button type="button" onClick={() => setDiscountOpen(true)}><Icon name="Percent" />Agregar descuento</button></div>
-            {summary.discounts.length ? summary.discounts.map((discount, index) => <div key={`${discount.discountId}-${discount.type}-${discount.value}-${index}`} className="fm-seller-applied-discount"><span><strong>{discount.name}</strong><small>{discount.type === "percent" ? `${discount.value} %` : "Monto fijo"}</small></span><strong>− {formatMoney(discount.amountApplied)}</strong><button type="button" aria-label={`Quitar ${discount.name}`} onClick={() => removeDiscount(discount)}><Icon name="X" /></button></div>) : <span className="fm-seller-no-discount">Sin descuentos aplicados</span>}
+            <div className="fm-seller-discount-strip">
+            <div className="fm-seller-section-head"><button type="button" onClick={() => { if (!discountAllowed) { setSubmitState({ busy: false, tone: "error", message: sellerProblem("DESCUENTO-PERMISO", "Tu usuario no puede aplicar descuentos. Pedile permiso al administrador.") }); return; } setSuggestedDiscountId(""); setDiscountOpen(true); }}><Icon name="Percent" />Agregar descuento</button></div>
+            <div className="fm-seller-discount-list" role="region" aria-label="Descuentos aplicados" tabIndex="0">
+            {summary.discounts.length ? summary.discounts.map((discount, index) => <div key={`${discount.discountId}-${discount.type}-${discount.value}-${index}`} className="fm-seller-applied-discount"><span><strong>{discount.name}</strong><small>{discount.type === "percent" ? `${discount.value} %` : "Monto fijo"}</small></span><strong>− {formatMoney(discount.amountApplied)}</strong><button type="button" aria-label={`Quitar ${discount.name}`} onClick={() => removeDiscount(discount)}><Icon name="X" /></button></div>) : null}
+            </div></div>
             {summary.discounts.length ? <div className="fm-seller-discount-total"><span>Total descuentos</span><strong>− {formatMoney(summary.discountTotal)}</strong></div> : null}
+            {summary.cashRoundingDiscountTotal > 0 ? <div className="fm-seller-discount-total"><span>Incluye redondeo por efectivo</span><strong>− {formatMoney(summary.cashRoundingDiscountTotal)}</strong></div> : null}
           </div>
 
-          <div className="fm-seller-totals"><div><span>Subtotal</span><strong>{formatMoney(subtotal)}</strong></div><div className="is-grand"><span>Total final</span><strong>{formatMoney(summary.total)}</strong></div></div>
 
-          <fieldset className="fm-seller-payments"><legend>Forma de pago *</legend>{PAYMENT_OPTIONS.filter((option) => option.value !== "multiple" || multiplePaymentAllowed).map((option) => { const selected = paymentMethod === option.value; return <button key={option.value} type="button" className={selected ? "is-selected" : ""} aria-pressed={selected} onClick={() => option.value === "multiple" ? setMultipleOpen(true) : (setPaymentMethod(option.value), setPayments([]))}>{selected ? <Icon name="Check" /> : null}<span>{friendlyPayment[option.value]}</span></button>; })}</fieldset>
+          <fieldset className={`fm-seller-payments${multiplePaymentAllowed ? " has-multiple" : ""}`}><legend>Forma de pago *</legend>{PAYMENT_OPTIONS.filter((option) => option.value !== "multiple" || multiplePaymentAllowed).map((option) => { const selected = paymentMethod === option.value; return <button key={option.value} type="button" className={`${selected ? "is-selected" : ""}${option.value === "multiple" ? " fm-seller-payments-multiple" : ""}`} aria-pressed={selected} onClick={() => option.value === "multiple" ? setMultipleOpen(true) : (setPaymentMethod(option.value), setPayments([]), setSubmitState({ busy: false, tone: "info", message: "" }))}>{selected ? <Icon name="Check" /> : null}<span>{friendlyPayment[option.value]}</span></button>; })}</fieldset>
           {paymentMethod === "multiple" ? <p className="fm-seller-payment-summary">{payments.map((payment) => `${friendlyPayment[payment.method]} ${formatMoney(payment.amount)}`).join(" · ")}</p> : null}
 
           <div className="fm-seller-customer-section">
@@ -766,76 +853,75 @@ export default function SellerPanel() {
             ) : (
               <button type="button" className="fm-seller-add-customer" onClick={() => setCustomerOpen(true)}>
                 <Icon name="UserPlus" />
-                <span><strong>Agregar cliente</strong><small>Teléfono · zona · nombre opcional</small></span>
+                <span><strong>Agregar cliente</strong></span>
                 <Icon name="ChevronRight" />
               </button>
             )}
           </div>
 
-          <label className={`fm-seller-ticket-option ${ticketRequested ? "is-selected" : ""}`}>
-            <input type="checkbox" checked={ticketRequested} disabled={!ticketAllowed} onChange={(event) => setTicketRequested(event.target.checked)} />
-            <Icon name="ReceiptText" />
-            <span><strong>Agregar ticket</strong><small>{ticketRequested ? "Solicitud pendiente al registrar" : "Preparar solicitud fiscal ARCA después de guardar la venta"}</small></span>
-          </label>
-
-          {submitState.message ? <Toast tone={submitState.tone}>{submitState.message}</Toast> : null}
-          <div className="fm-seller-sticky-action"><div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div><Button icon="Check" loading={submitState.busy} disabled={!currentItems.length || !paymentMethod || !selectedLocation} onClick={submitSale} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Continuar" : "Guardar pendiente"}</Button></div>
+          <div className="fm-seller-sticky-action"><div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div>
+            <button type="button" className={`fm-seller-invoice-toggle${ticketRequested ? " is-selected" : ""}`} aria-pressed={ticketRequested} title="Solicitar comprobante fiscal al guardar la venta" onClick={() => { if (!ticketAllowed) { setSubmitState({ busy: false, tone: "error", message: sellerProblem("TICKET-PERMISO", "Tu usuario no puede solicitar una factura. Pedile permiso al administrador.") }); return; } setTicketRequested(value => !value); }}><Icon name={ticketRequested ? "Check" : "ReceiptText"} /><span>Generar factura</span></button>
+            <Button icon="Check" loading={submitState.busy} onClick={submitSale} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Continuar" : "Guardar pendiente"}</Button>
+          </div>
+          {submitState.message ? <div className="fm-seller-action-feedback" role={submitState.tone === "error" ? "alert" : "status"}>{submitState.tone === "error" ? <p className="fm-form-error">{submitState.message}</p> : <Toast tone={submitState.tone}>{submitState.message}</Toast>}</div> : null}
         </Panel>
+        </fieldset>
       </aside>
     </div>
   );
 
   const salesData = asArray(dailySales.data);
+  const todayPayments = sellerPaymentSummary(salesData);
   const salesView = (
     <div className="fm-seller-view">
       <div className="fm-seller-view-head"><div><h1>Mis ventas de hoy</h1><p>{selectedLocation?.name || "Ubicación"}</p></div><Button icon="ShoppingCart" onClick={() => setView("sale")}>Nueva venta</Button></div>
       {dailySales.status === "loading" ? <Skeleton lines={5} /> : null}
-      {dailySales.status === "error" ? <Toast tone="error">{dailySales.error.message}</Toast> : null}
-      <div className="fm-seller-sales-summary"><span>Monto activo</span><strong>{formatMoney(salesData.filter((sale) => sale.status === "active").reduce((sum, sale) => sum + Number(sale.total || 0), 0))}</strong><small>{salesData.filter((sale) => sale.status === "active").length} ventas activas</small></div>
+      {dailySales.error ? <Toast tone="error">{sellerErrorMessage(dailySales.error)}</Toast> : null}
+      <button type="button" className="fm-seller-sales-summary" aria-label="Ver desglose del monto activo por forma de pago" onClick={() => setPaymentSummaryOpen(true)}><span>Monto activo <Icon name="ChevronDown" /></span><strong>{formatMoney(todayPayments.total)}</strong><small>{todayPayments.count} ventas activas</small></button>
       <div className="fm-seller-sale-list">{salesData.length ? salesData.map((sale) => <button key={sale.id} type="button" onClick={() => setDetailSale(sale)}><div><strong>{sale.saleCode}</strong><Badge tone={statusTone(sale.status)}>{sale.status === "cancelled" ? "Anulada" : "Activa"}</Badge></div><span>{formatMoney(sale.total)}</span><small>{formatDateTime(sale.createdAt)}</small></button>) : <EmptyState icon="ReceiptText" title="Todavía no registraste ventas" description="Las ventas confirmadas de esta ubicación aparecerán aquí." />}</div>
     </div>
   );
 
   const pendingView = (
     <div className="fm-seller-view">
-      <div className="fm-seller-view-head"><div><h1>Ventas pendientes</h1><p>Se guardan sólo en este dispositivo hasta sincronizar.</p></div><Button icon="RefreshCw" loading={syncing} disabled={!online || !pendingData.length} onClick={() => syncPending({ manual: true })}>Sincronizar ahora</Button></div>
-      {pendingSales.error ? <Toast tone="error">{pendingSales.error.message}</Toast> : null}
+      <div className="fm-seller-view-head"><div><h1>Ventas pendientes</h1><p>Se guardan sólo en este dispositivo hasta sincronizar.</p></div><Button icon="RefreshCw" loading={syncing} onClick={() => syncPending({ manual: true })}>Sincronizar ahora</Button></div>
+      {pendingSales.error ? <Toast tone="error">{sellerErrorMessage(pendingSales.error)}</Toast> : null}
       <div className="fm-seller-pending-list">{pendingData.length ? pendingData.map((sale) => <article key={sale.localId}><header><strong>{sale.localCode}</strong><Badge tone={sale.status === "sync_error" ? "error" : "warning"}>{sale.status === "sync_error" ? "Error" : "Pendiente"}</Badge></header><div><span>{sale.locationName}</span><strong>{formatMoney(sale.total)}</strong></div><small>{formatDateTime(sale.createdLocallyAt)}</small>{sale.syncError ? <p>{sale.syncError}</p> : null}<button type="button" onClick={() => setDeletePendingTarget(sale)}><Icon name="Trash2" />Descartar</button></article>) : <EmptyState icon="RefreshCw" title="No hay ventas pendientes" description="Si se corta internet, las ventas guardadas aparecerán aquí." />}</div>
     </div>
   );
 
   const stockView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Stock restante</h1><p>{selectedLocation?.name || "Ubicación"}</p></div></div><div className="fm-seller-stock-grid">{products.map((product) => { const status = sellerStockStatus({ ...product, currentStock: product.availableStock }); return <article key={product.id}><img src={sellerImage(product)} alt="" loading="lazy" decoding="async" /><div><strong>{product.productName}</strong><span>{product.abbreviation}</span><Badge tone={status.tone}>{status.label}</Badge></div><b>{product.availableStock}</b></article>; })}</div></div>
+    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Stock restante</h1><p>{selectedLocation?.name || "Ubicación"}</p></div></div><SellerCatalogList key="stock" groups={productGroups} categories={categories} mode="stock" /></div>
   );
 
   const pricesView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Lista de precios</h1><p>Consulta rápida por categorías</p></div></div>{productGroups.map((group) => <section key={group.id} className="fm-seller-price-category"><h2>{group.name}</h2>{group.items.map((product) => <article key={product.id}><div><strong>{product.productName}</strong><span>{product.abbreviation}</span></div><div><strong>{formatMoney(product.price)}</strong><small>Stock {product.availableStock}</small></div></article>)}</section>)}</div>
+    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Lista de precios</h1><p>{selectedLocation?.name || "Ubicación"}</p></div></div><SellerCatalogList key="prices" groups={productGroups} categories={categories} mode="prices" /></div>
   );
 
-  const helpView = (
-    <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Ayuda</h1><p>Atajos rápidos de operación</p></div></div><ul className="fm-seller-help"><li><Icon name="Keyboard" /><div><strong>Botonera</strong><span>Los códigos configurados agregan productos y aplican pagos.</span></div></li><li><Icon name="Plus" /><div><strong>+</strong><span>Agrega otra unidad del último producto.</span></div></li><li><Icon name="Minus" /><div><strong>−</strong><span>Quita una unidad del último producto.</span></div></li><li><Icon name="WifiOff" /><div><strong>Sin internet</strong><span>Guardá la venta pendiente y sincronizala al volver la conexión.</span></div></li></ul></div>
-  );
-
-  const currentView = view === "sales" ? salesView : view === "pending" ? pendingView : view === "stock" ? stockView : view === "prices" ? pricesView : view === "help" ? helpView : saleView;
+  const currentView = view === "sales" ? salesView : view === "pending" ? pendingView : view === "stock" ? stockView : view === "prices" ? pricesView : saleView;
 
   return (
     <div className="fm-seller-shell">
       <SellerHeader profile={profile} location={selectedLocation} online={online} syncing={syncing} pendingCount={pendingData.length} view={view} setView={setView} canReturnAdmin={canReturnAdmin} onReturnAdmin={returnAdmin} onLogout={logout} />
       <main className="fm-seller-main" id="main-content">{currentView}</main>
+      <Modal open={paymentSummaryOpen} title="Monto activo por forma de pago" description={`${selectedLocation?.name || "Ubicación"} · Tus ventas de hoy, sin anuladas.`} onClose={() => setPaymentSummaryOpen(false)}>
+        {dailySales.status === "loading" ? <Skeleton lines={5} /> : dailySales.error ? <Toast tone="error">{sellerErrorMessage(dailySales.error)}</Toast> : <dl className="fm-seller-payment-breakdown">{todayPayments.payments.map(payment => <div key={payment.method}><dt>{friendlyPayment[payment.method] || payment.label}</dt><dd>{formatMoney(payment.total)}</dd></div>)}{todayPayments.difference !== 0 ? <div><dt>Diferencia del desglose · revisar</dt><dd>{formatMoney(todayPayments.difference)}</dd></div> : null}<div className="is-total"><dt>Total activo</dt><dd>{formatMoney(todayPayments.total)}</dd></div></dl>}
+      </Modal>
+      {view !== "sale" && submitState.message ? <div className="fm-seller-global-feedback" role={submitState.tone === "error" ? "alert" : "status"}><Toast tone={submitState.tone}>{submitState.message}</Toast></div> : null}
 
-      <DiscountDialog open={discountOpen} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} manualAllowed={manualDiscountAllowed} onClose={() => setDiscountOpen(false)} onSelectSaved={discount => setDiscountIds(ids => ids.includes(discount.id) ? ids.filter(id => id !== discount.id) : [...ids, discount.id])} onAddManual={discount => { setManualDiscounts(current => [...current, discount]); setDiscountOpen(false); }} />
+      <DiscountDialog open={discountOpen} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} initialManualDiscounts={manualDiscounts} suggestedDiscountId={suggestedDiscountId} manualAllowed={manualDiscountAllowed} onClose={() => setDiscountOpen(false)} onApply={({ savedIds, manual }) => { setDiscountIds(savedIds); setManualDiscounts(manual); setDiscountOpen(false); setSuggestedDiscountId(""); setSubmitState({ busy: false, message: "", tone: "info" }); }} />
       <CustomerDialog open={customerOpen} zones={customerZones} initialCustomer={selectedCustomer} online={online} onClose={() => setCustomerOpen(false)} onSelect={(customer) => { setSelectedCustomer(customer); setCustomerOpen(false); }} />
-      <MultiplePaymentDialog open={multipleOpen} total={summary.total} initialPayments={payments} onClose={() => setMultipleOpen(false)} onConfirm={(entries) => { setPayments(entries.filter((entry) => entry.amount > 0)); setPaymentMethod("multiple"); setMultipleOpen(false); }} />
+      <MultiplePaymentDialog open={multipleOpen} total={summary.total} initialPayments={payments} onClose={() => setMultipleOpen(false)} onConfirm={(entries) => { setPayments(entries.filter((entry) => entry.amount > 0)); setPaymentMethod("multiple"); setMultipleOpen(false); setSubmitState({ busy: false, tone: "info", message: "" }); }} />
       <ConfirmationDialog open={Boolean(locationToApply)} title="Cambiar ubicación" description="El carrito actual se vaciará al cambiar de ubicación." busy={submitState.busy} onClose={() => setLocationToApply("")} onConfirm={() => { const next = locationToApply; setLocationToApply(""); applyLocation(next); }} />
       <ConfirmationDialog open={clearRequested} title="Vaciar venta" description="Se quitarán todos los productos, descuentos, cliente y forma de pago de la venta actual." busy={submitState.busy} onClose={() => setClearRequested(false)} onConfirm={() => { setClearRequested(false); resetSale(); }} />
-      <ConfirmationDialog open={Boolean(deletePendingTarget)} title="Descartar venta pendiente" description="Esta venta todavía no llegó a Firestore. Si la descartás se elimina sólo de este dispositivo." busy={submitState.busy} onClose={() => setDeletePendingTarget(null)} onConfirm={async () => { const target = deletePendingTarget; setDeletePendingTarget(null); await deleteSellerPendingSale(target.localId); await pendingSales.refresh(); }} />
+      <ConfirmationDialog open={Boolean(deletePendingTarget)} title="Descartar venta pendiente" description="Esta venta todavía no llegó a Firestore. Si la descartás se elimina sólo de este dispositivo." busy={submitState.busy} onClose={() => setDeletePendingTarget(null)} onConfirm={confirmDeletePending} />
       <ConfirmationDialog open={Boolean(editRequested)} title="Editar venta confirmada" description="El stock se recalculará en una transacción segura y quedará registro en auditoría." busy={submitState.busy} onClose={() => setEditRequested(null)} onConfirm={() => { const sale = editRequested; setEditRequested(null); startEdit(sale); }} />
       <Modal
   open={Boolean(cancelTarget)}
   onClose={closeCancelDialog}
   title="Anular venta"
   description="Las unidades volverán al stock y la venta conservará su historial."
-  footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={closeCancelDialog}>Cancelar</Button><Button variant="destructive" icon="Trash2" loading={submitState.busy} onClick={confirmCancelSale}>Anular venta</Button></div>}
+  footer={<div><div className="fm-dialog-actions"><Button variant="secondary" onClick={closeCancelDialog}>Cancelar</Button><Button variant="destructive" icon="Trash2" loading={submitState.busy} onClick={confirmCancelSale}>Anular venta</Button></div>{submitState.tone === "error" ? <p className="fm-form-error" role="alert">{submitState.message}</p> : null}</div>}
 >
   <label className="fm-field">
     <span>Motivo de anulación (opcional)</span>
@@ -877,7 +963,7 @@ export default function SellerPanel() {
             <div className="fm-seller-detail__actions">
               {detailSale.status !== "cancelled" && fiscalDetail.ready && !fiscalDetail.invoice && !detailSale.fiscalInvoiceId && !detailSale.fiscalInvoice ? <>
                 <Button variant="secondary" icon="Pencil" onClick={() => setEditRequested(detailSale)}>Editar</Button>
-                <Button variant="danger" icon="Ban" onClick={() => setCancelTarget(detailSale)}>Anular</Button>
+                <Button variant="danger" icon="Ban" onClick={() => { setSubmitState({ busy: false, tone: "info", message: "" }); setCancelTarget(detailSale); }}>Anular</Button>
               </> : null}
             </div>
           </div>

@@ -9,7 +9,7 @@ function harness(overrides = {}) {
     pendingIntent: null, stockOrigin: { type: 'location', id: 'local' }, customer: { phone: '' }, payments: [], prices: {},
     SALES_CHANNELS: [{ value: 'whatsapp' }], normalizePayment: noop, findCustomerByPhone: async () => null, buildCustomerDraft: value => value,
     saveQuickSaleIntent: (_id, sale) => ({ requestId: 'attempt-1', sale }), clearQuickSaleIntent: noop, setPendingIntent: noop,
-    setDialog: noop, setPrices: noop, setPayments: noop, setCustomer: noop, setCustomerState: noop, setManualDiscount: noop, SINGLE_PAYMENT_METHODS: ['cash'], refreshStock: async () => {},
+    setDialog: noop, setPrices: noop, setPayments: noop, setCustomer: noop, setCustomerState: noop, setManualDiscounts: noop, SINGLE_PAYMENT_METHODS: ['cash'], refreshStock: async () => {},
     setSubmitState: (s) => states.push(s), setRegisteredInvoice: noop, setQuantities: noop, setCustomerDni: noop, setPaymentMethod: noop, setInvoiceRequested: noop, setReceiverVatConditionId: noop, setReceiverDocument: noop, setDiscountIds: noop, setStock: noop,
     createQuickSale: async () => ({ id: 's1', saleCode: 'QA-1', total: 1210 }), listLocationInventory: async () => [], requestPendingArcaInvoice: async () => ({ id: 'invoice-s1' }), dryRunArcaInvoice: async () => ({ blocked: false }), ...overrides };
   const submit = Function(...Object.keys(context), `${handlerSource}; return handleSubmit;`)(...Object.values(context));

@@ -2,6 +2,10 @@ import { Component, lazy, Suspense, useEffect } from "react";
 import { Skeleton } from "../design-system";
 import { useLocation, useNavigate } from "../router";
 import { AuthProvider, useAuth } from "./AuthContext";
+import OliviaMount from "./olivia/OliviaMount";
+import { OliviaLauncherProvider } from "./olivia/LauncherHost";
+import { OliviaScreenProvider } from "./olivia/ScreenContext";
+import OliviaReviewPanel from "./olivia/OliviaReviewPanel";
 import ManagementShell from "./ManagementShell";
 import { moduleById, SALES_METRICS_PATH } from "./modules";
 import { managementPageLoaders } from "./routePreload";
@@ -16,6 +20,7 @@ import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import NotAuthorizedPage from "./pages/NotAuthorizedPage";
 import SellerPanel from "./seller/SellerPanel";
+import PanelLoading from "../components/PanelLoading";
 import WhatsAppExtensionSync from "./marketing/whatsapp/WhatsAppExtensionSync";
 import {
   listLocationsShared,
@@ -138,7 +143,7 @@ function ManagementRouter() {
   }, [routeId, sellerPath, metaAdsPath]);
 
   if (status === "loading") {
-    return <main className="fm-auth-loading" id="main-content"><img src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /><Skeleton lines={3} /></main>;
+    return <PanelLoading panel={sellerPath ? "vendedor" : "administrador"} />;
   }
   if (status === "signed-out" || status === "error") {
     return <LoginPage sessionError={status === "error" ? error : null} />;
@@ -194,6 +199,7 @@ function ManagementRouter() {
   return (
     <ManagementShell>
       <WhatsAppExtensionSync />
+      <OliviaReviewPanel />
       <Suspense fallback={<ModuleFallback />}>{page}</Suspense>
     </ManagementShell>
   );
@@ -202,9 +208,14 @@ function ManagementRouter() {
 export default function ManagementApp() {
   return (
     <AuthProvider>
-      <ManagementErrorBoundary>
-        <ManagementRouter />
-      </ManagementErrorBoundary>
+      <OliviaScreenProvider>
+        <OliviaLauncherProvider>
+          <ManagementErrorBoundary>
+            <ManagementRouter />
+          </ManagementErrorBoundary>
+          <OliviaMount />
+        </OliviaLauncherProvider>
+      </OliviaScreenProvider>
     </AuthProvider>
   );
 }

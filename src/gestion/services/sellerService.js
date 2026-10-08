@@ -1,3 +1,5 @@
+import { buildOperationalSalePlan, cleanOperationalSaleItems, customerSaleSnapshot, customerSaleWrite, resolveOperationalCustomer } from "../../shared/operationalWritePlans.mjs";
+import { saleActivitySnapshot } from "../../shared/activitySnapshots.mjs";
 import { effectiveLocationPrice } from "../../modules/inventory/domain/inventory";
 import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
 import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
@@ -88,38 +90,7 @@ function saleLocalFields(date = new Date()) {
   };
 }
 
-function cleanSaleItems(items = []) {
-  const cleaned = items
-    .map((item) => {
-      const qty = wholeNumber(
-        item.qty,
-        `La cantidad de ${item.name || item.productName || "un producto"}`,
-        0,
-      );
-      if (!qty) return null;
-      const unitPrice = wholeNumber(
-        item.unitPrice ?? item.price ?? 0,
-        `El precio de ${item.name || item.productName || "un producto"}`,
-        0,
-      );
-      return {
-        productId: item.productId || item.id,
-        name: item.name || item.productName,
-        abbreviation: item.abbreviation || "",
-        categoryId: item.categoryId || null,
-        unitPrice,
-        qty,
-        subtotal: unitPrice * qty,
-      };
-    })
-    .filter(Boolean);
-  if (!cleaned.length) throw saleValidationError("La venta está vacía.");
-  const ids = cleaned.map(item => item.productId);
-  if (ids.some(id => !id || String(id).includes("/")) || new Set(ids).size !== ids.length) {
-    throw saleValidationError("Cada producto debe aparecer una sola vez con su cantidad total.");
-  }
-  return cleaned;
-}
+const cleanSaleItems = cleanOperationalSaleItems;
 
 function insufficientStockError(item, available) {
   const error = /** @type {Error & {code?: string, productId?: string, availableStock?: number}} */ (new Error(
@@ -163,71 +134,15 @@ async function prepareSaleCustomer(customer) {
   };
 }
 
-function customerSnapshotFields(customer) {
-  if (!customer) {
-    return {
-      customerId: null,
-      customerPhoneSnapshot: null,
-      customerNameSnapshot: null,
-      customerZoneSnapshot: null,
-    };
-  }
-  return {
-    customerId: customer.id,
-    customerPhoneSnapshot: customer.phone || customer.phoneNormalized,
-    customerNameSnapshot: customer.name || null,
-    customerZoneSnapshot: customer.zoneName || customer.customZone || null,
-  };
-}
-
+const customerSnapshotFields = customerSaleSnapshot;
 function resolvedCustomerFromSnapshot(snapshot, prepared) {
-  if (!prepared) return null;
-  if (!snapshot?.exists()) return prepared;
-  const stored = snapshot.data();
-  if (stored.deleted === true || stored.active === false) {
-    throw saleValidationError("Este teléfono fue reemplazado en Clientes Fidelizados. Usá el número actualizado.");
-  }
-  return {
-    id: snapshot.id,
-    phone: stored.phone || prepared.phone,
-    phoneNormalized: stored.phoneNormalized || prepared.phoneNormalized,
-    name: stored.name || prepared.name || "",
-    zoneId: stored.zoneId || prepared.zoneId || "",
-    zoneName: stored.zoneName || stored.customZone || prepared.zoneName,
-    customZone: stored.customZone || prepared.customZone || "",
-  };
+  return resolveOperationalCustomer(snapshot?.exists() ? snapshot.data() : null, prepared);
 }
-
 function writeCustomerForSale(transaction, customerRef, customerSnapshot, customer, profile, saleId, source = "seller_sale") {
   if (!customerRef || !customer) return;
-  if (customerSnapshot.exists()) {
-    transaction.update(customerRef, {
-      ...(!customerSnapshot.data().name && customer.name ? { name: customer.name } : {}),
-      ...(!customerSnapshot.data().zoneName && customer.zoneName ? { zoneId: customer.zoneId || null, zoneName: customer.zoneName, customZone: customer.customZone || null } : {}),
-      lastSaleId: saleId,
-      lastPurchaseAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return;
-  }
-  transaction.set(customerRef, {
-    customerKey: customer.id,
-    phone: customer.phone,
-    phoneNormalized: customer.phoneNormalized,
-    name: customer.name || null,
-    zoneId: customer.zoneId || null,
-    zoneName: customer.zoneName,
-    customZone: customer.customZone || null,
-    active: true,
-    deleted: false,
-    source,
-    createdBy: profile.id,
-    createdByName: userName(profile),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    lastSaleId: saleId,
-    lastPurchaseAt: serverTimestamp(),
-  });
+  const fields = customerSaleWrite({ existing: customerSnapshot.exists() ? customerSnapshot.data() : null, customer, profile, saleId, stamp: serverTimestamp(), source });
+  if (customerSnapshot.exists()) transaction.update(customerRef, fields);
+  else transaction.set(customerRef, fields);
 }
 
 export async function listSellerLocations(profile) {
@@ -426,7 +341,7 @@ async function createSale({
   const saleItems = cleanSaleItems(items);
   const safeDiscounts = await verifiedDiscounts({ profile, location: stockType === "warehouse" ? {} : permittedLocation, discounts, items: saleItems });
   const subtotal = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal);
+  const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal, { paymentMethod, roundCashTotal: administrative });
   const payment = normalizePayment(paymentMethod, paymentMethodLabel, payments, discountSummary.total);
   if (paymentMethod === "multiple" && !can(profile, "quick-sales", "useMultiplePayments")) throw saleValidationError("No tenés permiso para combinar pagos.");
   const preparedCustomer = await prepareSaleCustomer(customer);
@@ -483,127 +398,26 @@ async function createSale({
       }
     }
     const resolvedCustomer = resolvedCustomerFromSnapshot(customerSnapshot, preparedCustomer);
-    const stockDiscrepancies = stockType === "location" ? saleStockDiscrepancies(saleItems, item => {
-      const index = saleItems.indexOf(item);
-      return Number(stockSnapshots[index].data()?.currentStock || 0);
-    }) : [];
-    const next = Number(counterSnapshot.data()?.lastNumber || 0) + 1;
-    const saleCode = `FM-${refs.prefix}-${refs.dateKey}-${String(next).padStart(4, "0")}`;
-    transaction.set(refs.counterRef, { locationId: stockType === "location" ? permittedLocation.id : null, stockOriginType: stockType, stockOriginId: permittedLocation.id, date: refs.dateKey, lastNumber: next }, { merge: true });
-
-    stockSnapshots.forEach((snapshot, index) => {
-      const item = saleItems[index];
-      if (!snapshot.exists() || snapshot.data().active === false || snapshot.data().deleted === true || snapshot.data().productDeleted === true) {
-        throw saleValidationError(`${item.name} ya no está habilitado en esta ubicación.`);
-      }
-      const previousStock = Number(snapshot.data().currentStock || 0);
-      if (!Number.isInteger(previousStock)) throw saleValidationError(`El stock registrado de ${item.name} no es válido.`);
-      if (stockType === "warehouse" && previousStock < item.qty) throw insufficientStockError(item, previousStock);
-      const newStock = previousStock - item.qty;
-      transaction.update(refs.stockRefs[index], stockMutationFields({
-        currentStock: newStock,
-        lastSaleId: refs.saleRef.id,
-        lastMovementId: refs.movementRefs[index].id,
-        legacy: legacyStockMutation,
-      }));
-      transaction.set(refs.movementRefs[index], {
-        inventoryType: stockType,
-        ...(stockType === "warehouse" ? { warehouseId: permittedLocation.id, warehouseName: permittedLocation.name } : { locationId: permittedLocation.id, locationName: permittedLocation.name }),
-        productId: item.productId,
-        productName: item.name,
-        type: "sale",
-        qty: -item.qty,
-        previousStock,
-        newStock,
-        reason: `Venta ${saleCode}`,
-        userId: profile.id,
-        userName: userName(profile),
-        saleId: refs.saleRef.id,
-        saleItemIndex: index,
-        previousSaleItemIndex: -1,
-        createdAt: serverTimestamp(),
-      });
+    const plan = buildOperationalSalePlan({
+      profile, location: permittedLocation, items: saleItems,
+      stocks: stockSnapshots.map(snapshot => snapshot.exists() ? snapshot.data() : null),
+      counter: counterSnapshot.data() || {}, saleId: refs.saleRef.id,
+      movementIds: refs.movementRefs.map(reference => reference.id),
+      dateKey: refs.dateKey, prefix: refs.prefix, stamp: serverTimestamp(),
+      localFields: saleLocalFields(), discountSummary, payment, customer: resolvedCustomer,
+      stockType, administrative, requestId, requestFingerprint: fingerprint,
+      priceOverrides, offlineSale: refs.localId ? { localId: refs.localId, createdLocallyAt } : null,
+      ticketRequested, customerDni, invoiceRequested, deliveryMethod, channel, legacyStockMutation,
     });
-
+    transaction.set(refs.counterRef, plan.counterData, { merge: true });
+    plan.stockWrites.forEach((write, index) => {
+      transaction.update(refs.stockRefs[index], write.stockData);
+      transaction.set(refs.movementRefs[index], write.movementData);
+    });
     writeCustomerForSale(transaction, customerRef, customerSnapshot, resolvedCustomer, profile, refs.saleRef.id, administrative ? "admin_quick_sale" : "seller_sale");
-
-    const localFields = saleLocalFields();
-    const ticketStatus = ticketRequested ? "pending" : "not_requested";
-    transaction.set(refs.saleRef, {
-      saleCode,
-      locationId: stockType === "location" ? permittedLocation.id : null,
-      locationName: stockType === "location" ? permittedLocation.name : null,
-      stockOriginType: stockType,
-      stockOriginId: permittedLocation.id,
-      stockOriginName: permittedLocation.name,
-      ...(stockType === "warehouse" ? { warehouseId: permittedLocation.id, warehouseName: permittedLocation.name } : {}),
-      ...(administrative ? { sourceType: "admin_quick_sale", requestId, requestFingerprint: fingerprint, priceOverrides, customerDni: String(customerDni).trim() || null, invoiceStatus: invoiceRequested ? "pending" : "not_requested", deliveryMethod } : {}),
-      locationPrefix: refs.prefix,
-      sellerId: profile.id,
-      sellerName: userName(profile),
-      createdBy: profile.id,
-      createdByName: userName(profile),
-      items: saleItems,
-      ...(stockDiscrepancies.length ? { stockDiscrepancies } : {}),
-      discounts: discountSummary.discounts,
-      discount: null,
-      fixedDiscountTotal: discountSummary.fixedDiscountTotal,
-      percentageDiscountTotal: discountSummary.percentageDiscountTotal,
-      discountTotal: discountSummary.discountTotal,
-      totalBeforeDiscounts: discountSummary.totalBeforeDiscounts,
-      ...payment,
-      ...customerSnapshotFields(resolvedCustomer),
-      subtotal,
-      totalItems: saleItems.reduce((sum, item) => sum + item.qty, 0),
-      total: discountSummary.total,
-      status: "active",
-      sourceChannel: administrative ? channel : "in_person",
-      ticketRequested: Boolean(ticketRequested),
-      ticketStatus,
-      ...localFields,
-      ...(refs.localId ? {
-        offlineLocalId: refs.localId,
-        createdOffline: true,
-        createdLocallyAt: createdLocallyAt.toISOString(),
-        syncedAt: serverTimestamp(),
-      } : {}),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      deletedAt: null,
-    });
-    transaction.set(refs.auditRef, {
-      action: "sale.created",
-      title: refs.localId ? "Venta pendiente sincronizada" : "Venta registrada",
-      description: `${saleCode} · ${permittedLocation.name}`,
-      moduleId: "quick-sales",
-      entityType: "sale",
-      entityId: refs.saleRef.id,
-      locationId: stockType === "location" ? permittedLocation.id : null,
-      locationName: stockType === "location" ? permittedLocation.name : null,
-      stockOriginType: stockType,
-      stockOriginId: permittedLocation.id,
-      sourceChannel: administrative ? channel : "in_person",
-      userId: profile.id,
-      userName: userName(profile),
-      status: "completed",
-      amount: discountSummary.total,
-      ...(priceOverrides.length ? { priceOverrides } : {}),
-      ...(stockDiscrepancies.length ? { stockDiscrepancies } : {}),
-      ticketRequested: Boolean(ticketRequested),
-      ...(resolvedCustomer ? { customerId: resolvedCustomer.id } : {}),
-      createdAt: serverTimestamp(),
-    });
-    return {
-      id: refs.saleRef.id,
-      saleCode,
-      total: discountSummary.total,
-      ...payment,
-      stockDiscrepancies,
-      customerId: resolvedCustomer?.id || null,
-      ticketRequested: Boolean(ticketRequested),
-      ticketStatus,
-      createdAt: new Date(),
-    };
+    transaction.set(refs.saleRef, plan.saleData);
+    transaction.set(refs.auditRef, plan.auditData);
+    return { ...plan.result, createdAt: new Date() };
   }));
 
   invalidateDashboardSales();
@@ -655,7 +469,7 @@ export async function updateSellerSale({
   const newItems = cleanSaleItems(items);
   const safeDiscounts = await verifiedDiscounts({ profile, location, discounts, items: newItems });
   const subtotal = newItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal);
+  const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal, { paymentMethod, roundCashTotal: original.sourceType === "admin_quick_sale" || original.cashRoundingEnabled === true });
   const payment = normalizePayment(paymentMethod, paymentMethodLabel, payments, discountSummary.total);
   const nextTicketRequested = ticketRequested == null ? original.ticketRequested === true : Boolean(ticketRequested);
   if (nextTicketRequested && !can(profile, "quick-sales", "requestTicket")) {
@@ -736,13 +550,15 @@ export async function updateSellerSale({
     const ticketStatus = nextTicketRequested
       ? (sale.ticketRequested ? sale.ticketStatus || "pending" : "pending")
       : "not_requested";
-    transaction.update(saleReference, {
+    const nextSaleData = {
       items: newItems,
       stockDiscrepancies,
       discounts: discountSummary.discounts,
       discount: null,
       fixedDiscountTotal: discountSummary.fixedDiscountTotal,
       percentageDiscountTotal: discountSummary.percentageDiscountTotal,
+      cashRoundingDiscountTotal: discountSummary.cashRoundingDiscountTotal,
+      ...(discountSummary.cashRoundingEnabled ? { cashRoundingEnabled: true } : {}),
       discountTotal: discountSummary.discountTotal,
       totalBeforeDiscounts: discountSummary.totalBeforeDiscounts,
       ...payment,
@@ -756,7 +572,8 @@ export async function updateSellerSale({
       editedBy: profile.id,
       editedByName: userName(profile),
       updatedAt: serverTimestamp(),
-    });
+    };
+    transaction.update(saleReference, nextSaleData);
     transaction.set(doc(collection(db, "auditLogs")), {
       action: "sale.updated",
       title: "Venta editada",
@@ -770,6 +587,9 @@ export async function updateSellerSale({
       userName: userName(profile),
       status: "completed",
       amount: discountSummary.total,
+      before: saleActivitySnapshot(sale),
+      after: saleActivitySnapshot({ ...sale, ...nextSaleData }),
+      detailSnapshot: saleActivitySnapshot({ ...sale, ...nextSaleData }),
       ...(stockDiscrepancies.length ? { stockDiscrepancies } : {}),
       ...(resolvedCustomer ? { customerId: resolvedCustomer.id } : {}),
       createdAt: serverTimestamp(),
@@ -861,6 +681,7 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
       userName: userName(profile),
       status: "cancelled",
       amount: Number(sale.total || 0),
+      detailSnapshot: saleActivitySnapshot({ ...sale, status: "cancelled", cancelReason: safeReason }),
       createdAt: serverTimestamp(),
     });
     return { id: saleId, saleCode: sale.saleCode };

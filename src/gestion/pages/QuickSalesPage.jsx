@@ -22,11 +22,13 @@ import { calculateDiscountSummary } from "../../modules/locations/domain/discoun
 import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
 import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
 import SaleStockWarning from "../components/SaleStockWarning";
+import ProductImage from "../components/ProductImage";
+import ProductSubcategoryRows from "../components/ProductSubcategoryRows";
 import { can, effectiveSellerLocations } from "../permissions";
 import { joinMasterProducts } from "../../modules/locations/domain/dashboard";
 import { findCustomerByPhone, listActiveCustomerZones } from "../services/customerService";
 import { buildCustomerDraft } from "../customers/customerDomain";
-import { listLocationsShared, listMasterProductsShared, listDiscountsShared } from "../services/sharedResources";
+import { listLocationsShared, listMasterProductsShared, listDiscountsShared, listProductCategoriesShared } from "../services/sharedResources";
 import { readQuickSaleIntent, saveQuickSaleIntent, clearQuickSaleIntent } from "../seller/quickSaleIntent";
 import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
 import { useAuth } from "../AuthContext";
@@ -59,6 +61,7 @@ export default function QuickSalesPage() {
   const locationsResult = useAsyncData(() => listLocationsShared(profile), [profile.id]);
   const warehousesResult = useAsyncData(() => listWarehouses(profile), [profile.id]);
   const productsResult = useAsyncData(() => listMasterProductsShared(profile), [profile.id]);
+  const categoriesResult = useAsyncData(() => listProductCategoriesShared(profile), [profile.id]);
   const discountsResult = useAsyncData(() => listDiscountsShared(profile), [profile.id]);
   const [stockType, setStockType] = useState(restored?.stockOrigin?.type || "location");
   const [locationId, setLocationId] = useState(restored?.stockOrigin?.id || "");
@@ -74,14 +77,17 @@ export default function QuickSalesPage() {
   const [priceDraft, setPriceDraft] = useState("");
   const zonesResult = useAsyncData(() => listActiveCustomerZones(), [profile.id]);
   const [search, setSearch] = useState("");
-  const [manualDiscount, setManualDiscount] = useState(restored?.discounts?.find(d => d.source === "manual") || { type: "percent", value: "" });
+  const [openCategoryId, setOpenCategoryId] = useState(null);
+  const [originDraft, setOriginDraft] = useState(null);
+  const [originError, setOriginError] = useState("");
+  const [manualDiscounts, setManualDiscounts] = useState((restored?.discounts || []).filter(d => d.source === "manual" || d.discountId === "manual"));
   const [channel, setChannel] = useState(restored?.channel || "");
   const [customerDni, setCustomerDni] = useState(restored?.customerDni || "");
   const [invoiceRequested, setInvoiceRequested] = useState(restored?.invoiceRequested || false);
   const [receiverVatConditionId, setReceiverVatConditionId] = useState(restored?.receiverVatConditionId || "5");
   const [receiverDocument, setReceiverDocument] = useState(restored?.receiverDocument || "");
   const [deliveryMethod, setDeliveryMethod] = useState(restored?.deliveryMethod || "pickup");
-  const [discountIds, setDiscountIds] = useState((restored?.discounts || []).map(d => d.id).filter(Boolean));
+  const [discountIds, setDiscountIds] = useState((restored?.discounts || []).filter(d => d.source !== "manual" && d.discountId !== "manual").map(d => d.discountId || d.id).filter(Boolean));
   const submitRef = useRef(false);
   const [submitState, setSubmitState] = useState({ busy: false, error: "", success: "" });
   const [registeredInvoice, setRegisteredInvoice] = useState(null);
@@ -127,8 +133,8 @@ export default function QuickSalesPage() {
   );
   const selectedLocation = origins.find((item) => item.id === locationId);
   const availableDiscounts = (discountsResult.data || []).filter((discount) => isDiscountAvailable(discount, stockType === "warehouse" ? {} : selectedLocation, new Date(), { profile, items: cart }));
-  const appliedDiscounts = pendingIntent ? pendingIntent.sale.discounts : [...availableDiscounts.filter((discount) => discountIds.includes(discount.id)), ...(Number(manualDiscount.value) > 0 ? [{ discountId: "manual", name: "Descuento manual", source: "manual", ...manualDiscount, value: Number(manualDiscount.value) }] : [])];
-  const saleSummary = useMemo(() => calculateDiscountSummary(appliedDiscounts, subtotal), [appliedDiscounts, subtotal]);
+  const appliedDiscounts = pendingIntent ? pendingIntent.sale.discounts : [...availableDiscounts.filter((discount) => discountIds.includes(discount.id)), ...manualDiscounts];
+  const saleSummary = useMemo(() => calculateDiscountSummary(appliedDiscounts, subtotal, { paymentMethod, roundCashTotal: true }), [appliedDiscounts, subtotal, paymentMethod]);
 
   const allocation = paymentAllocationSummary(payments, saleSummary.total);
   const stockDiscrepancies = stockType === "location" && !pendingIntent ? saleStockDiscrepancies(cart) : [];
@@ -152,6 +158,15 @@ export default function QuickSalesPage() {
   const switchOrigin = (id, type = stockType) => {
     setStockType(type); setLocationId(id); setQuantities({}); setPrices({}); setDiscountIds([]);
     setStock({ status: "idle", data: [] });
+    setOpenCategoryId(null);
+  };
+  const openOriginDialog = () => { setOriginDraft({ channel, stockType, locationId }); setOriginError(""); setDialog("origin"); };
+  const draftOrigins = originDraft?.stockType === "warehouse" ? (warehousesResult.data || []) : locations;
+  const confirmOrigin = () => {
+    if (!SALES_CHANNELS.some(option => option.value === originDraft?.channel) || !["location", "warehouse"].includes(originDraft?.stockType) || !draftOrigins.some(origin => origin.id === originDraft.locationId)) { setOriginError("Elegí el canal, el tipo de origen y la ubicación antes de confirmar."); return; }
+    setChannel(originDraft.channel);
+    if (originDraft.stockType !== stockType || originDraft.locationId !== locationId) switchOrigin(originDraft.locationId, originDraft.stockType);
+    setDialog(""); setOriginError("");
   };
   const paymentStatus = allocation.invalid ? "Revisá los montos" : allocation.difference === 0 ? "Pagos completos" : allocation.difference > 0 ? `Falta ${formatMoney(allocation.difference)}` : `Excede ${formatMoney(-allocation.difference)}`;
 
@@ -237,7 +252,7 @@ export default function QuickSalesPage() {
       setPayments(SINGLE_PAYMENT_METHODS.map(method => ({ method, amount: "" })));
       setCustomer({ phone: "", name: "", zoneName: "" });
       setCustomerState({ status: "idle" });
-      setManualDiscount({ type: "percent", value: "" });
+      setManualDiscounts([]);
       setCustomerDni("");
       setPaymentMethod("");
       setInvoiceRequested(false);
@@ -262,33 +277,33 @@ export default function QuickSalesPage() {
 
   return (
     <div className="fm-page-enter fm-quick-pos">
-      <PageHeader eyebrow="Administración" title="Venta rápida" description="Elegí productos, completá el pago y continuá." />
-      <div className="fm-quick-pos__context">
-        <Button variant="secondary" disabled={locked} onClick={() => setDialog("origin")}>Canal: {SALES_CHANNELS.find(option => option.value === channel)?.label || "Elegir"}</Button>
-        <Button variant="secondary" disabled={locked} onClick={() => setDialog("origin")}>Stock: {selectedLocation?.name || "Elegir origen"}</Button>
-      </div>
       <div className="fm-quick-pos__layout">
+        <div className="fm-quick-pos__catalog-column">
+        <PageHeader eyebrow="Administración" title="Venta rápida" />
         <section className="fm-quick-pos__catalog" aria-label="Catálogo de productos">
-          <FormField label="Buscar producto"><input type="search" disabled={locked} value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar en el catálogo" /></FormField>
+          <FormField label="Buscar producto o catálogo"><input type="search" disabled={locked} value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar en catálogo" /></FormField>
           {[locationsResult, warehousesResult, productsResult].some(result => result.status === "error") ? <EmptyState icon="AlertTriangle" title="No se pudieron leer los recursos" description="Revisá conexión y permisos." /> : null}
           {productsResult.status === "loading" || stock.status === "loading" ? <Skeleton lines={4} /> : null}
           {stock.status === "error" ? <EmptyState icon="AlertTriangle" title="No se pudo leer el stock" description={stock.error.message} /> : null}
           {!locationId ? <EmptyState icon="Box" title="Elegí de dónde sale la mercadería" description="Seleccioná una ubicación o un depósito activo." /> : null}
           {stock.status === "ready" && !visibleProducts.length ? <EmptyState icon="Box" title="No hay productos disponibles" description="Revisá la búsqueda y los productos activos." /> : null}
           <div className="fm-quick-pos__categories">
-            {stock.status === "ready" && groups.map(group => <details key={group.id} open className="fm-quick-pos__category">
-              <summary>{group.name}<span>{group.items.length}</span></summary>
-              <div className="fm-quick-pos__carousel">{group.items.map(item => {
+            {stock.status === "ready" && groups.map(group => <section key={group.id} className={`fm-quick-pos__category ${openCategoryId === group.id ? "is-open" : ""}`}>
+              <button type="button" className="fm-quick-pos__category-toggle" aria-expanded={openCategoryId === group.id} aria-controls={`quick-category-${group.id}`} onClick={() => setOpenCategoryId(current => current === group.id ? null : group.id)}>{group.name}<span>{group.items.length}</span></button>
+              {openCategoryId === group.id ? <div id={`quick-category-${group.id}`}>
+              <ProductSubcategoryRows items={group.items} category={(categoriesResult.data || []).find(category => category.id === group.id) || { name: group.name }} className="fm-quick-pos__carousel" renderProduct={item => {
                 const qty = Number(quantities[item.id] || 0);
                 return <button key={item.id} type="button" className={`fm-quick-pos__tile ${qty ? "is-selected" : ""}`} aria-label={`Agregar ${item.productName}`} disabled={locked || !item.hasLocalRecord || item.active === false || (stockType === "warehouse" && qty >= Number(item.currentStock || 0))} onClick={() => changeQty(item, 1)}>
-                  <span className="fm-quick-pos__product-mark" aria-hidden="true">{item.productName.slice(0, 2).toUpperCase()}{item.thumbUrl || item.imageUrl ? <img src={item.thumbUrl || item.imageUrl} alt="" loading="lazy" decoding="async" onError={event => { event.currentTarget.style.display = "none"; }} /> : null}</span>
+                  <ProductImage className="fm-quick-pos__product-mark" product={item} eager />
                   <strong>{item.productName}</strong><span>{formatMoney(item.price)}</span><small>{item.currentStock > 0 ? `${item.currentStock} disponibles` : `Stock registrado: ${item.currentStock}`}</small>
                   {qty > 0 ? <b className="fm-quick-pos__count">{qty}</b> : null}
                 </button>;
-              })}</div>
-            </details>)}
+              }} />
+              </div> : null}
+            </section>)}
           </div>
         </section>
+        </div>
         <section className="fm-quick-pos__sale" aria-label="Venta actual">
           <div className="fm-quick-pos__cart-head"><h2>Venta actual</h2><Button variant="ghost" disabled={locked || !cart.length} onClick={() => { setQuantities({}); setPrices({}); }}>Vaciar</Button></div>
           <div className="fm-quick-pos__cart">
@@ -300,13 +315,12 @@ export default function QuickSalesPage() {
           </div>
           <SaleStockWarning discrepancies={stockDiscrepancies} />
           <div className="fm-quick-pos__extras">
-            <Button variant="secondary" disabled={locked || discountsResult.status === "loading"} onClick={() => setDialog("discount")}>Agregar descuento</Button>
-            <Button variant="secondary" disabled={locked} onClick={() => setDialog("customer")}>{customer.phone ? customer.name || customer.phone : "Agregar cliente"}</Button>
+            <Button variant="secondary" disabled={locked || discountsResult.status === "loading"} onClick={() => setDialog("discount")}>Descuento</Button>
+            <Button variant="secondary" disabled={locked} title={customer.phone ? customer.name || customer.phone : undefined} onClick={() => setDialog("customer")}>Cliente</Button>
             <Button variant="secondary" disabled={locked} aria-pressed={deliveryMethod === "shipping"} onClick={() => setDeliveryMethod(deliveryMethod === "shipping" ? "pickup" : "shipping")}>{deliveryMethod === "shipping" ? "Con envío" : "Retiro"}</Button>
-            {customer.phone ? <Button variant="ghost" disabled={locked} onClick={() => setCustomer({ phone: "", name: "", zoneName: "" })}>Quitar cliente</Button> : null}
+            <Button variant="secondary" disabled={locked} onClick={openOriginDialog}>Canal</Button>
           </div>
-          {appliedDiscounts.length ? <div className="fm-quick-pos__discounts">{appliedDiscounts.map(discount => <button type="button" disabled={locked} key={discount.id || discount.discountId} aria-label={`Quitar ${discount.name}`} onClick={() => discount.source === "manual" ? setManualDiscount({ type: "percent", value: "" }) : setDiscountIds(ids => ids.filter(id => id !== discount.id))}>{discount.name} ×</button>)}</div> : null}
-          <div className="fm-quick-pos__totals"><span>{cart.reduce((count, item) => count + item.qty, 0)} productos · Subtotal</span><strong>{formatMoney(subtotal)}</strong>{saleSummary.discountTotal > 0 ? <><span>Descuentos</span><strong>− {formatMoney(saleSummary.discountTotal)}</strong></> : null}<span>Total</span><strong className="fm-quick-pos__total">{formatMoney(saleSummary.total)}</strong></div>
+          {appliedDiscounts.length ? <div className="fm-quick-pos__discounts">{appliedDiscounts.map((discount, index) => <button type="button" disabled={locked} key={`${discount.id || discount.discountId}-${index}`} aria-label={`Quitar ${discount.name}`} onClick={() => discount.source === "manual" ? setManualDiscounts(manual => manual.filter(entry => entry !== discount)) : setDiscountIds(ids => ids.filter(id => id !== (discount.discountId || discount.id)))}>{discount.name} ×</button>)}</div> : null}
           <div className="fm-quick-pos__payments" role="group" aria-label="Forma de pago">{PAYMENT_OPTIONS.map(option => <button type="button" key={option.value} disabled={locked || (option.value === "multiple" && !can(profile, "quick-sales", "useMultiplePayments"))} aria-pressed={paymentMethod === option.value} className={paymentMethod === option.value ? "is-selected" : ""} onClick={() => { setPaymentMethod(option.value); if (option.value === "multiple") setDialog("payments"); }}>{friendlyPayments[option.value] || option.label}{option.value === "multiple" && paymentMethod === "multiple" ? <small>{paymentStatus}</small> : null}</button>)}</div>
         </section>
       </div>
@@ -315,14 +329,15 @@ export default function QuickSalesPage() {
       {submitState.success ? <Toast tone="success">{submitState.success}</Toast> : null}
       {registeredInvoice ? <ArcaInvoicePrintAction {...registeredInvoice} /> : null}
       <footer className="fm-quick-pos__actions"><div><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div><Button variant="secondary" icon="FileText" disabled={locked || !canConfirm} onClick={() => setDialog("billing")}>Cargar factura</Button><Button icon="Check" loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, false)}>{pendingIntent ? "Recuperar confirmación" : "Continuar"}</Button></footer>
-      <Modal open={dialog === "origin"} title="Canal y origen del stock" description="Elegí por dónde llegó la venta y de dónde sale la mercadería." onClose={() => setDialog("")} footer={<Button onClick={() => setDialog("")}>Listo</Button>}>
-        <FormField label="Canal comercial" required><Select value={channel} onChange={event => setChannel(event.target.value)}><option value="">Elegir canal real</option>{SALES_CHANNELS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></FormField>
-        <FormField label="Tipo de origen"><Select value={stockType} onChange={event => switchOrigin("", event.target.value)}><option value="location">Ubicación</option><option value="warehouse">Depósito</option></Select></FormField>
-        <FormField label="Origen físico del stock" required><Select value={locationId} onChange={event => switchOrigin(event.target.value)}><option value="">Elegir origen</option>{origins.map(origin => <option key={origin.id} value={origin.id}>{origin.name}</option>)}</Select></FormField>
+      <Modal open={dialog === "origin"} title="Canal y origen del stock" description="Elegí por dónde llegó la venta y de dónde sale la mercadería." onClose={() => setDialog("")} footer={<><Button variant="secondary" onClick={() => setDialog("")}>Cancelar</Button><Button onClick={confirmOrigin}>Confirmar canal y origen</Button></>}>
+        <FormField label="Canal comercial" required><Select value={originDraft?.channel || ""} onChange={event => setOriginDraft(current => ({ ...current, channel: event.target.value }))}><option value="">Elegir canal real</option>{SALES_CHANNELS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></FormField>
+        <FormField label="Tipo de origen"><Select value={originDraft?.stockType || "location"} onChange={event => setOriginDraft(current => ({ ...current, stockType: event.target.value, locationId: "" }))}><option value="location">Ubicación</option><option value="warehouse">Depósito</option></Select></FormField>
+        <FormField label="Origen físico del stock" required><Select value={originDraft?.locationId || ""} onChange={event => setOriginDraft(current => ({ ...current, locationId: event.target.value }))}><option value="">Elegir origen</option>{draftOrigins.map(origin => <option key={origin.id} value={origin.id}>{origin.name}</option>)}</Select></FormField>
+        {originError ? <p className="fm-form-error" role="alert">{originError}</p> : null}
         {cart.length ? <p>Cambiar el origen vacía los productos seleccionados.</p> : null}
       </Modal>
-      <DiscountDialog open={dialog === "discount"} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} manualAllowed={can(profile, "quick-sales", "useManualDiscounts")} onClose={() => setDialog("")} onSelectSaved={discount => setDiscountIds(ids => ids.includes(discount.id) ? ids.filter(id => id !== discount.id) : [...ids, discount.id])} onAddManual={discount => { setManualDiscount(discount); setDialog(""); }} />
-      <CustomerDialog open={dialog === "customer"} zones={zonesResult.data || []} initialCustomer={customer.phone ? customer : null} onClose={() => setDialog("")} onSelect={setCustomer} />
+      <DiscountDialog open={dialog === "discount"} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} initialManualDiscounts={manualDiscounts} manualAllowed={can(profile, "quick-sales", "useManualDiscounts")} onClose={() => setDialog("")} onApply={({ savedIds, manual }) => { setDiscountIds(savedIds); setManualDiscounts(manual); setDialog(""); }} />
+      <CustomerDialog open={dialog === "customer"} zones={zonesResult.data || []} initialCustomer={customer.phone ? customer : null} onClose={() => setDialog("")} onSelect={setCustomer} onClear={() => { setCustomer({ phone: "", name: "", zoneName: "" }); setDialog(""); }} />
       <Modal open={dialog === "payments"} title="Combinar pagos" description={`Total de la venta: ${formatMoney(saleSummary.total)}`} onClose={() => setDialog("")} footer={<Button disabled={allocation.invalid || allocation.difference !== 0 || allocation.positiveCount < 2} onClick={() => setDialog("")}>Listo</Button>}>
         {payments.map(part => <FormField key={part.method} label={friendlyPayments[part.method]}><div className="fm-quick-pos__payment-input"><input aria-label={friendlyPayments[part.method]} type="number" min="0" step="1" inputMode="numeric" value={part.amount} onChange={event => setPayments(current => current.map(entry => entry.method === part.method ? { ...entry, amount: event.target.value } : entry))} /><Button variant="ghost" disabled={allocation.invalid || allocation.difference <= 0} onClick={() => setPayments(current => completeRemainingPayment(current, part.method, saleSummary.total))}>Completar</Button></div></FormField>)}<p role="status">{paymentStatus}</p>
       </Modal>
