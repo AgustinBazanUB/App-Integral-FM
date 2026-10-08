@@ -82,10 +82,38 @@ function extractTextOperators(content) {
   return fragments;
 }
 
-async function inflateFlate(binaryText) {
+function decodeAscii85(value) {
+  const bytes = [];
+  let group = [];
+  const flush = (final = false) => {
+    if (!group.length) return;
+    const length = group.length;
+    while (group.length < 5) group.push(84);
+    let number = 0;
+    for (const digit of group) number = (number * 85) + digit;
+    const decoded = [(number >>> 24) & 0xff, (number >>> 16) & 0xff, (number >>> 8) & 0xff, number & 0xff];
+    bytes.push(...decoded.slice(0, final ? length - 1 : 4));
+    group = [];
+  };
+  const source = String(value || "").replace(/^\s*<~/, "");
+  for (let index = 0; index < source.length; index += 1) {
+    const code = source.charCodeAt(index);
+    if (/\s/.test(source[index])) continue;
+    if (source[index] === "~") break;
+    if (source[index] === "z" && !group.length) { bytes.push(0, 0, 0, 0); continue; }
+    if (code < 33 || code > 117) return null;
+    group.push(code - 33);
+    if (group.length === 5) flush();
+  }
+  flush(true);
+  return new Uint8Array(bytes);
+}
+
+async function inflateFlate(binary) {
   if (typeof DecompressionStream !== "function") return null;
   try {
-    const stream = new Blob([latin1ToBytes(binaryText)]).stream().pipeThrough(new DecompressionStream("deflate"));
+    const bytes = binary instanceof Uint8Array ? binary : latin1ToBytes(binary);
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate"));
     const buffer = await new Response(stream).arrayBuffer();
     return bytesToLatin1(new Uint8Array(buffer));
   } catch { return null; }
@@ -93,14 +121,19 @@ async function inflateFlate(binaryText) {
 
 async function contentStreams(raw) {
   const results = [raw];
-  const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+  // Algunos generadores válidos (por ejemplo, ReportLab) cierran el stream con
+  // `~>endstream` sin insertar un salto de línea antes de `endstream`.
+  const streamRegex = /stream\r?\n([\s\S]*?)\r?\n?endstream/g;
   for (const match of raw.matchAll(streamRegex)) {
     const before = raw.slice(Math.max(0, match.index - 800), match.index);
     const stream = match[1];
+    const ascii85 = /\/ASCII85Decode\b/.test(before) ? decodeAscii85(stream) : null;
+    if (/\/ASCII85Decode\b/.test(before) && !ascii85) continue;
+    const encoded = ascii85 || stream;
     if (/\/FlateDecode\b/.test(before)) {
-      const inflated = await inflateFlate(stream);
+      const inflated = await inflateFlate(encoded);
       if (inflated) results.push(inflated);
-    } else results.push(stream);
+    } else results.push(ascii85 ? bytesToLatin1(ascii85) : stream);
     if (results.length > 500) break;
   }
   return results;
