@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "generatedFor": "FM Master Product & Architecture Map v0.2",
+  "figjam": "https://www.figma.com/board/m7s3CTQ4mbiFF5fcCwpRP8",
+  "figma": "https://www.figma.com/design/k5ElHZsMZVwtF3J6KxS61S",
+  "modules": [
+    {"id":"FM-MOD-01","name":"Ubicaciones","route":"/gestion/locations","ui":"src/gestion/pages/LocationsPage.jsx","status":"custom","designStatus":"proposed-v0.2"},
+    {"id":"FM-MOD-02","name":"Productos","route":"/gestion/products","ui":"src/gestion/pages/ProductsPage.jsx","status":"custom","designStatus":"current"},
+    {"id":"FM-MOD-03","name":"Ventas rápidas","route":"/gestion/quick-sales","ui":"src/gestion/pages/QuickSalesPage.jsx","status":"custom","designStatus":"proposed-v0.2"},
+    {"id":"FM-MOD-04","name":"Clientes","route":"/gestion/loyal-customers","ui":"src/gestion/pages/LoyalCustomersPage.jsx","status":"custom","designStatus":"proposed-v0.2"},
+    {"id":"FM-MOD-05","name":"Métricas","route":"/gestion/metrics/sales","ui":"src/gestion/pages/SalesMetricsPage.jsx","status":"custom","designStatus":"current"},
+    {"id":"FM-MOD-06","name":"Finanzas","route":"/gestion/finance","ui":"src/gestion/pages/GenericModulePage.jsx","status":"generic","designStatus":"pending"},
+    {"id":"FM-MOD-07","name":"Depósitos","route":"/gestion/warehouse","ui":"src/gestion/pages/WarehousePage.jsx","status":"custom","designStatus":"proposed-v0.2"},
+    {"id":"FM-MOD-08","name":"Ecommerce","route":"/gestion/ecommerce","ui":"src/gestion/pages/GenericModulePage.jsx","status":"hybrid","designStatus":"pending-detail"},
+    {"id":"FM-MOD-09","name":"Redes sociales","route":"/gestion/social","ui":"src/gestion/pages/GenericModulePage.jsx","status":"generic","designStatus":"whatsapp-inbox-proposed"},
+    {"id":"FM-MOD-10-WA","name":"Marketing · WhatsApp","route":"/gestion/marketing/whatsapp","ui":"src/gestion/pages/WhatsAppCampaignsPage.jsx","status":"custom","designStatus":"current-plus-evolution"},
+    {"id":"FM-MOD-10-META","name":"Marketing · Meta Ads","route":"/gestion/marketing/meta-ads","ui":"src/gestion/pages/MetaAdsPage.jsx","status":"custom","designStatus":"current-plus-roadmap"},
+    {"id":"FM-MOD-11","name":"Envíos","route":"/gestion/shipping","ui":"src/gestion/pages/GenericModulePage.jsx","status":"generic","designStatus":"pending"},
+    {"id":"FM-MOD-12","name":"Alertas","route":"/gestion/alerts","ui":"src/gestion/pages/GenericModulePage.jsx","status":"generic","designStatus":"pending"},
+    {"id":"FM-MOD-13","name":"Proveedores","route":"/gestion/suppliers","ui":"src/gestion/pages/GenericModulePage.jsx","status":"generic","designStatus":"pending"}
+  ]
+}
