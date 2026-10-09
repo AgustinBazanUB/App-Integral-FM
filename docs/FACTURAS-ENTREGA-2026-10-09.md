@@ -38,6 +38,13 @@ locales o variables `VITE_*`. Luego actualizar exclusivamente el preview fiscal
 manteniendo bloqueada la publicación principal. No ejecutar `--prod` ni hacer
 merge a `main` sin una nueva autorización.
 
+El remitente, host y puerto ya están configurados. `INVOICE_SMTP_PASSWORD` existe
+como secreto sin valor; el titular debe pegar su contraseña de aplicación en el
+campo Production y guardar. El modo `email-connection` del endpoint del documento
+permite a administración verificar SMTP sin enviar correos; no expone respuestas
+de autenticación ni credenciales. Se normalizan los espacios de las contraseñas
+de aplicación agrupadas de Gmail.
+
 Mientras falta la contraseña de aplicación, el modal informa que falta conectar la cuenta
 y deshabilita el envío. Descargar e imprimir funcionan independientemente.
 
@@ -50,7 +57,7 @@ y deshabilita el envío. Descargar e imprimir funcionan independientemente.
   `Content-Disposition: attachment`, verificación fiscal vigente y bytes idénticos
   a los PDFs originales. No se emitieron nuevas facturas ni se enviaron correos reales.
 - Preview fiscal actualizado (URL inmutable):
-  https://6ac90bcb9a12b05c701029a3--appintegralflormia.netlify.app/vendedor
+  https://6ac90f972f49de57798392b9--appintegralflormia.netlify.app/vendedor
   El alias `main--` seguía apuntando a una versión anterior durante la revisión;
   usar el enlace inmutable para esta entrega.
 - Producción mantiene su publicación anterior bloqueada. El deploy tiene contexto
