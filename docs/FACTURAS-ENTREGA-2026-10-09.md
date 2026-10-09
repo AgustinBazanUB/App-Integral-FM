@@ -38,14 +38,15 @@ locales o variables `VITE_*`. Luego actualizar exclusivamente el preview fiscal
 manteniendo bloqueada la publicación principal. No ejecutar `--prod` ni hacer
 merge a `main` sin una nueva autorización.
 
-El remitente, host y puerto ya están configurados. `INVOICE_SMTP_PASSWORD` existe
-como secreto sin valor; el titular debe pegar su contraseña de aplicación en el
-campo Production y guardar. El modo `email-connection` del endpoint del documento
+El remitente, host, puerto y contraseña de aplicación ya están configurados.
+`INVOICE_SMTP_PASSWORD` está guardada como secreto únicamente en Production.
+La conexión real con Gmail fue verificada correctamente, sin enviar mensajes.
+El modo `email-connection` del endpoint del documento
 permite a administración verificar SMTP sin enviar correos; no expone respuestas
 de autenticación ni credenciales. Se normalizan los espacios de las contraseñas
 de aplicación agrupadas de Gmail.
 
-Mientras falta la contraseña de aplicación, el modal informa que falta conectar la cuenta
+Si falta la contraseña de aplicación, el modal informa que falta conectar la cuenta
 y deshabilita el envío. Descargar e imprimir funcionan independientemente.
 
 ## Validación y preview
@@ -56,8 +57,10 @@ y deshabilita el envío. Descargar e imprimir funcionan independientemente.
 - PDF de las dos facturas reales existentes: descarga autenticada con
   `Content-Disposition: attachment`, verificación fiscal vigente y bytes idénticos
   a los PDFs originales. No se emitieron nuevas facturas ni se enviaron correos reales.
+- Conexión SMTP real con Gmail verificada desde el preview mediante administración;
+  el servicio devuelve `ready: true` y `verified: true`, sin enviar un correo.
 - Preview fiscal actualizado (URL inmutable):
-  https://6ac90f972f49de57798392b9--appintegralflormia.netlify.app/vendedor
+  https://6ac9398db65498cb0833c73a--appintegralflormia.netlify.app/vendedor
   El alias `main--` seguía apuntando a una versión anterior durante la revisión;
   usar el enlace inmutable para esta entrega.
 - Producción mantiene su publicación anterior bloqueada. El deploy tiene contexto
