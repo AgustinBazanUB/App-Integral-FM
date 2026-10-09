@@ -5,6 +5,7 @@ import { invoiceIdForEnvironment } from "./_lib/arca/billing.mjs";
 import { arcaEnvironment } from "./_lib/arca/config.mjs";
 import { syncInvoiceToSale } from "./_lib/arca/invoicePersistence.mjs";
 import { buildInvoicePdf, inspectInvoicePdfReadiness } from "./_lib/arca/invoicePdf.mjs";
+import { invoiceEmailConfiguration, sendInvoiceEmail } from "./_lib/arca/invoiceEmail.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -16,6 +17,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 function safeError(error) {
+  if (/^arca-email-/.test(error?.code || "")) return { code: error.code, message: error.message };
   return { ...safeFiscalError(error), ...(Array.isArray(error?.missing) ? { missing: error.missing } : {}) };
 }
 
@@ -33,18 +35,18 @@ function isAdmin(session) {
     || roles.includes("admin");
 }
 
-function canReadInvoice({ session, sale, invoice }) {
+export function canReadInvoice({ session, sale, invoice }) {
   if (isAdmin(session)) return true;
   if (invoice?.sourceType === "seller_sale" && sale?.sellerId === session?.uid) return true;
   return false;
 }
 
-async function resolveInvoice({ invoiceId, sourceType, sourceId, env }) {
+export async function resolveInvoice({ invoiceId, sourceType, sourceId, env, getDocument = adminGetDocument }) {
   let resolvedInvoiceId = String(invoiceId || "").trim();
   let saleDocument = null;
 
   if (sourceId) {
-    saleDocument = await adminGetDocument(`sales/${sourceId}`, { env });
+    saleDocument = await getDocument(`sales/${sourceId}`, { env });
     if (!saleDocument?.data) {
       const error = new Error("La venta asociada no existe.");
       error.code = "arca-sale-not-found";
@@ -70,7 +72,7 @@ async function resolveInvoice({ invoiceId, sourceType, sourceId, env }) {
     );
   }
 
-  const invoiceDocument = await adminGetDocument(`invoices/${resolvedInvoiceId}`, { env });
+  const invoiceDocument = await getDocument(`invoices/${resolvedInvoiceId}`, { env });
   if (!invoiceDocument?.data) {
     const error = new Error("Todavía no existe una factura fiscal para esta venta.");
     error.code = "arca-invoice-not-found";
@@ -79,9 +81,13 @@ async function resolveInvoice({ invoiceId, sourceType, sourceId, env }) {
   }
 
   const invoice = invoiceDocument.data;
+  if ((sourceId && String(sourceId) !== String(invoice.sourceId))
+    || (sourceType && String(sourceType) !== String(invoice.sourceType))) {
+    throw Object.assign(new Error("La factura no corresponde a la venta indicada."), { code: "arca-document-source-mismatch", status: 409 });
+  }
   if (!saleDocument) {
     const invoiceSourceId = String(invoice.sourceId || "").trim();
-    if (invoiceSourceId) saleDocument = await adminGetDocument(`sales/${invoiceSourceId}`, { env });
+    if (invoiceSourceId) saleDocument = await getDocument(`sales/${invoiceSourceId}`, { env });
   }
 
   return {
@@ -117,6 +123,7 @@ function compactMetadata(invoiceId, invoice, env) {
       checkedAt: verification.checkedAt || null,
     },
     receiver: invoice.receiverSnapshot || null,
+    email: invoiceEmailConfiguration(env),
     pdf: {
       ready: readiness.ready
         && invoice.status === "authorized"
@@ -136,7 +143,7 @@ export default async function handler(request) {
     const session = await requireFirebaseActiveProfile(request);
     const body = await request.json().catch(() => ({}));
     const mode = String(body.mode || "metadata").trim().toLowerCase();
-    if (!["metadata", "pdf"].includes(mode)) {
+    if (!["metadata", "pdf", "email"].includes(mode)) {
       return json({ ok: false, code: "invalid-mode", message: "Modo de comprobante inválido." }, 400);
     }
 
@@ -174,6 +181,13 @@ export default async function handler(request) {
       invoice,
       env: process.env,
     });
+    if (mode === "email") {
+      const delivery = await sendInvoiceEmail({
+        invoiceId: resolved.invoiceId, invoice, pdf, filename,
+        to: body.to, requestId: body.requestId, uid: session.uid, env: process.env,
+      });
+      return json({ ok: true, delivery });
+    }
     const disposition = String(body.disposition || "inline").toLowerCase() === "attachment"
       ? "attachment"
       : "inline";

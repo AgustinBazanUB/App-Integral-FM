@@ -257,3 +257,8 @@ export async function fetchArcaInvoicePdf({
     disposition,
   }, { expectPdf: true });
 }
+
+export async function sendArcaInvoiceEmail({ saleId, sourceType, invoiceId, to, requestId }) {
+  const data = await arcaDocumentPost({ mode: "email", invoiceId, sourceType, sourceId: saleId, to, requestId });
+  return data.delivery;
+}
