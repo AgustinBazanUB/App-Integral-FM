@@ -11,20 +11,32 @@ export function invoiceEmailConfiguration(env = process.env) {
   const host = String(env.INVOICE_SMTP_HOST || "").trim();
   const port = Number(env.INVOICE_SMTP_PORT || 465);
   const ready = Boolean(from && host && [465, 587].includes(port)
-    && env.INVOICE_SMTP_USER && env.INVOICE_SMTP_PASSWORD);
+    && String(env.INVOICE_SMTP_USER || "").trim() && String(env.INVOICE_SMTP_PASSWORD || "").trim());
   return { ready, from: ready ? from : null };
 }
 
 export function invoiceSmtpOptions(env = process.env) {
   if (!invoiceEmailConfiguration(env).ready) throw emailError("arca-email-not-configured", "Falta conectar la cuenta de correo de Flor Mía. Podés descargar o imprimir la factura mientras tanto.", 503);
   const port = Number(env.INVOICE_SMTP_PORT || 465);
+  const host = String(env.INVOICE_SMTP_HOST).trim();
+  const password = String(env.INVOICE_SMTP_PASSWORD).trim();
   return {
-    host: String(env.INVOICE_SMTP_HOST).trim(), port, secure: port === 465,
+    host, port, secure: port === 465,
     requireTLS: true, tls: { rejectUnauthorized: true, minVersion: "TLSv1.2" },
-    auth: { user: env.INVOICE_SMTP_USER, pass: env.INVOICE_SMTP_PASSWORD },
+    auth: { user: String(env.INVOICE_SMTP_USER).trim(), pass: host.toLowerCase() === "smtp.gmail.com" ? password.replace(/\s/g, "") : password },
     connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 15000,
     disableFileAccess: true, disableUrlAccess: true,
   };
+}
+
+export async function verifyInvoiceEmailConnection({ env = process.env, createTransport = nodemailer.createTransport } = {}) {
+  const transport = createTransport(invoiceSmtpOptions(env));
+  try {
+    await transport.verify();
+    return { ...invoiceEmailConfiguration(env), verified: true };
+  } catch {
+    throw emailError("arca-email-connection-failed", "Gmail no confirmó la conexión. Revisá la dirección y la contraseña de aplicación guardadas.", 502);
+  } finally { transport.close(); }
 }
 
 // Claim before SMTP; a repeated request never submits a second message, even

@@ -18,15 +18,18 @@ repetido no se envía de nuevo y existe una pausa de un minuto por factura.
 
 ## Conectar Gmail
 
-Configurar estas variables en Netlify, sitio `appintegralflormia`, scope Functions,
-contexto **Production**, que utiliza el preview fiscal sin publicar:
+Configurar estas variables en Netlify, sitio `appintegralflormia`, contexto
+**Production**, que utiliza el preview fiscal sin publicar. El plan actual no
+permite elegir exclusivamente Functions; usar todos los scopes disponibles
+(para secretos: Builds, Functions y Runtime), manteniendo las claves fuera de
+variables `VITE_*`, código y otros contextos.
 
 | Variable | Valor |
 | --- | --- |
 | `INVOICE_SMTP_HOST` | `smtp.gmail.com` |
 | `INVOICE_SMTP_PORT` | `465` |
-| `INVOICE_SMTP_USER` | La dirección Gmail que indique el titular |
-| `INVOICE_SMTP_FROM` | La misma dirección Gmail |
+| `INVOICE_SMTP_USER` | Cuenta Gmail indicada por el titular (ya configurada) |
+| `INVOICE_SMTP_FROM` | La misma dirección Gmail (ya configurada) |
 | `INVOICE_SMTP_PASSWORD` | Contraseña de aplicación de Google; marcar como secreta |
 
 El titular crea la contraseña de aplicación con verificación en dos pasos.
@@ -35,12 +38,12 @@ locales o variables `VITE_*`. Luego actualizar exclusivamente el preview fiscal
 manteniendo bloqueada la publicación principal. No ejecutar `--prod` ni hacer
 merge a `main` sin una nueva autorización.
 
-Mientras faltan los datos de Gmail, el modal informa que falta conectar la cuenta
+Mientras falta la contraseña de aplicación, el modal informa que falta conectar la cuenta
 y deshabilita el envío. Descargar e imprimir funcionan independientemente.
 
 ## Validación y preview
 
-- 924 pruebas aprobadas y compilación Vite correcta.
+- 925 pruebas aprobadas y compilación Vite correcta.
 - QA local con datos ficticios: modal desde el comprobante del vendedor,
   destinatario y aceptación SMTP simulada; pantalla de 390 px mediante iframe.
 - PDF de las dos facturas reales existentes: descarga autenticada con

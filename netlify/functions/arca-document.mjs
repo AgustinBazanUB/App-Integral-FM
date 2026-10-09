@@ -5,7 +5,7 @@ import { invoiceIdForEnvironment } from "./_lib/arca/billing.mjs";
 import { arcaEnvironment } from "./_lib/arca/config.mjs";
 import { syncInvoiceToSale } from "./_lib/arca/invoicePersistence.mjs";
 import { buildInvoicePdf, inspectInvoicePdfReadiness } from "./_lib/arca/invoicePdf.mjs";
-import { invoiceEmailConfiguration, sendInvoiceEmail } from "./_lib/arca/invoiceEmail.mjs";
+import { invoiceEmailConfiguration, sendInvoiceEmail, verifyInvoiceEmailConnection } from "./_lib/arca/invoiceEmail.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -143,8 +143,13 @@ export default async function handler(request) {
     const session = await requireFirebaseActiveProfile(request);
     const body = await request.json().catch(() => ({}));
     const mode = String(body.mode || "metadata").trim().toLowerCase();
-    if (!["metadata", "pdf", "email"].includes(mode)) {
+    if (!["metadata", "pdf", "email", "email-connection"].includes(mode)) {
       return json({ ok: false, code: "invalid-mode", message: "Modo de comprobante inválido." }, 400);
+    }
+
+    if (mode === "email-connection") {
+      if (!isAdmin(session)) return json({ ok: false, code: "permission-denied", message: "Sólo administración puede verificar la conexión de correo." }, 403);
+      return json({ ok: true, email: await verifyInvoiceEmailConnection() });
     }
 
     const resolved = await resolveInvoice({

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { invoiceDeliveryLabel, normalizeInvoiceEmail } from "../src/shared/invoiceDelivery.mjs";
-import { invoiceEmailConfiguration, invoiceSmtpOptions, sendInvoiceEmail } from "../netlify/functions/_lib/arca/invoiceEmail.mjs";
+import { invoiceEmailConfiguration, invoiceSmtpOptions, sendInvoiceEmail, verifyInvoiceEmailConnection } from "../netlify/functions/_lib/arca/invoiceEmail.mjs";
 import { canReadInvoice, resolveInvoice } from "../netlify/functions/arca-document.mjs";
 
 const env = { INVOICE_SMTP_HOST: "smtp.gmail.com", INVOICE_SMTP_PORT: "465", INVOICE_SMTP_USER: "flormia@example.com", INVOICE_SMTP_PASSWORD: "test-only" };
@@ -42,6 +42,16 @@ test("correo: configuración no expone credenciales y exige TLS y datos completo
   assert.equal(options.disableUrlAccess, true);
   assert.equal(options.tls.rejectUnauthorized, true);
   assert.equal(invoiceSmtpOptions({ ...env, INVOICE_SMTP_PORT: "587" }).secure, false);
+  assert.equal(invoiceSmtpOptions({ ...env, INVOICE_SMTP_PASSWORD: "abcd efgh ijkl mnop" }).auth.pass, "abcdefghijklmnop");
+  assert.equal(invoiceEmailConfiguration({ ...env, INVOICE_SMTP_PASSWORD: "   " }).ready, false);
+});
+
+test("correo: verifica autenticación SMTP sin enviar mensajes ni exponer el fallo original", async () => {
+  let verified = 0;
+  const createTransport = () => ({ verify: async () => { verified += 1; }, close: () => {} });
+  assert.deepEqual(await verifyInvoiceEmailConnection({ env, createTransport }), { ready: true, from: "flormia@example.com", verified: true });
+  assert.equal(verified, 1);
+  await assert.rejects(verifyInvoiceEmailConnection({ env, createTransport: () => ({ verify: async () => { throw new Error("secret SMTP response"); }, close: () => {} }) }), (error) => error.code === "arca-email-connection-failed" && !error.message.includes("secret"));
 });
 
 test("correo: adjunta el PDF del servidor y el mismo intento no vuelve a enviarse", async () => {
