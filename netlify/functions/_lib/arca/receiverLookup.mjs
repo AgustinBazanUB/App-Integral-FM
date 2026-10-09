@@ -20,12 +20,14 @@ export async function lookupBillingReceiver(cuit, { env = process.env, lookup = 
     error.status = 422;
     throw error;
   }
+  const name = taxpayer.businessName || [taxpayer.firstName, taxpayer.lastName].filter(Boolean).join(" ");
   return {
-    name: taxpayer.businessName || [taxpayer.firstName, taxpayer.lastName].filter(Boolean).join(" "),
+    name,
     condition: inferred.condition,
     receiver: {
+      name,
       vatConditionId: inferred.condition.id,
-      documentType: 80,
+      documentType: String(taxpayer.keyType || "").toUpperCase() === "CUIL" ? 86 : 80,
       documentNumber,
       anonymousConsumerFinal: false,
       concept: 1,

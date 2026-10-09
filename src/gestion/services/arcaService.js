@@ -91,7 +91,7 @@ export async function requestPendingArcaInvoice({ sourceType, sourceId, receiver
     error.status = response.status;
     throw error;
   }
-  return { ...data.invoice, autoAuthorization: data.autoAuthorization || null };
+  return { ...data.invoice, autoAuthorization: data.invoice?.autoAuthorization || data.autoAuthorization || null };
 }
 
 

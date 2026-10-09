@@ -80,7 +80,7 @@ export default async function handler(request) {
       : null;
 
     // Resolve again server-side: the browser cannot choose a tax condition for a CUIT.
-    if (receiver?.documentType === 80 && (environment === "production" || body.receiver.resolveFromRegistry === true)) {
+    if ([80, 86].includes(receiver?.documentType) && (environment === "production" || body.receiver.resolveFromRegistry === true)) {
       receiver = (await lookupBillingReceiver(receiver.documentNumber)).receiver;
     }
 

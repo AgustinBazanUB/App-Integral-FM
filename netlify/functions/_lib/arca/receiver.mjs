@@ -87,6 +87,16 @@ export function inferReceiverVatCondition(person = {}) {
     };
   }
 
+  // An active CUIL without tax registrations identifies a natural person,
+  // rather than an unresolved CUIT taxpayer. Incomplete/error responses remain
+  // blocked; do not turn an unknown taxpayer into consumidor final.
+  if (normalized(person.keyType) === "CUIL" && normalized(person.keyStatus) === "ACTIVO"
+    && Array.isArray(person.taxes) && person.taxes.length === 0
+    && person.monotributo === false && !person.errorConstancia
+    && !person.errorRegimenGeneral && !person.errorMonotributo) {
+    return { resolved: true, condition: ARCA_RECEIVER_VAT_CONDITIONS.CONSUMIDOR_FINAL, reason: "active-cuil-without-tax-registration" };
+  }
+
   return {
     resolved: false,
     condition: null,

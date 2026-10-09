@@ -314,6 +314,7 @@ export async function ensurePendingInvoice({
     },
     productFiscalSnapshot: fiscalProducts,
     receiverSnapshot: receiver ? {
+      ...(receiver.name ? { name: String(receiver.name).trim().slice(0, 200) } : {}),
       vatConditionId: Number(receiver.vatConditionId || 0) || null,
       documentType: Number(receiver.documentType || 0) || null,
       documentNumber: String(receiver.documentNumber || "").replace(/\D/g, "") || null,

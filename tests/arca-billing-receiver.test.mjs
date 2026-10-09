@@ -4,7 +4,7 @@ import { lookupBillingReceiver } from "../netlify/functions/_lib/arca/receiverLo
 import { buildAuthorizationPlan } from "../netlify/functions/_lib/arca/authorizationPlan.mjs";
 import { can } from "../src/gestion/permissions.js";
 
-const cuit = "20433005563";
+const cuit = "20123456786";
 const env = { ARCA_ENVIRONMENT: "production", ARCA_ALLOW_PRODUCTION_TAXPAYER_LOOKUP: "true" };
 const invoice = {
   status: "pending", fiscalReadiness: { ready: true },
@@ -33,11 +33,21 @@ test("consulta bloqueada o CUIT inválido no contacta ARCA", async () => {
   let calls = 0;
   const lookup = async () => { calls++; };
   await assert.rejects(lookupBillingReceiver(cuit, { env: { ARCA_ENVIRONMENT: "production" }, lookup }), { code: "arca-production-taxpayer-lookup-disabled" });
-  await assert.rejects(lookupBillingReceiver("20433005564", { env, lookup }), { code: "arca-cuit-invalid" });
+  await assert.rejects(lookupBillingReceiver("20123456787", { env, lookup }), { code: "arca-cuit-invalid" });
   assert.equal(calls, 0);
 });
 test("una condición desconocida no se convierte silenciosamente en consumidor final", async () => {
   await assert.rejects(lookupBillingReceiver(cuit, { env, lookup: async () => ({ found: true, keyStatus: "ACTIVO", taxes: [] }) }), { code: "arca-receiver-condition-unresolved" });
+});
+test("CUIL activo sin inscripciones permite factura B identificada sin inventar un CUIT RI", async () => {
+  const taxpayer = { found: true, keyType: "CUIL", keyStatus: "ACTIVO", taxes: [], monotributo: false };
+  const result = await lookupBillingReceiver(cuit, { env, lookup: async () => taxpayer });
+  assert.equal(result.receiver.vatConditionId, 5);
+  assert.equal(result.receiver.documentType, 86);
+  assert.equal(result.receiver.anonymousConsumerFinal, false);
+  assert.equal(buildAuthorizationPlan({ invoice, issuerVatCondition: "responsable_inscripto", receiverVatConditionId: 5, ...result.receiver }).voucherClass, "B");
+  await assert.rejects(lookupBillingReceiver(cuit, { env, lookup: async () => ({ ...taxpayer, errorRegimenGeneral: { message: "Incomplete" } }) }), { code: "arca-receiver-condition-unresolved" });
+  await assert.rejects(lookupBillingReceiver(cuit, { env, lookup: async () => ({ ...taxpayer, keyType: "CUIT" }) }), { code: "arca-receiver-condition-unresolved" });
 });
 test("una inscripción explícita IVA exento selecciona factura B", async () => {
   const result = await lookupBillingReceiver(cuit, { env, lookup: async () => ({ found: true, keyStatus: "ACTIVO", taxes: [{ description: "IVA EXENTO", status: "ACTIVO" }] }) });

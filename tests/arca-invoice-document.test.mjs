@@ -75,6 +75,18 @@ test("QR fiscal genera payload y matriz", () => {
   assert.ok(matrix.flat().some(Boolean));
 });
 
+test("PDF identificado conserva el nombre fiscal y rotula CUIL correctamente", () => {
+  const identified = { ...invoice,
+    receiverSnapshot: { name: "Cliente identificado", vatConditionId: 5, documentType: 86, documentNumber: "20123456786", anonymousConsumerFinal: false },
+    authorization: { ...invoice.authorization, receiverDocument: { documentType: 86, documentNumber: "20123456786" } },
+  };
+  const result = buildInvoicePdf({ invoice: identified, env: issuerEnv });
+  const pdf = result.pdf.toString("latin1");
+  assert.match(pdf, /Cliente identificado/);
+  assert.match(pdf, /CUIL/);
+  assert.match(pdf, /20123456786/);
+});
+
 test("PDF fiscal exige datos del emisor y factura verificada", () => {
   const readiness = inspectInvoicePdfReadiness({ ARCA_ISSUER_VAT_CONDITION: "responsable_inscripto" });
   assert.equal(readiness.ready, false);

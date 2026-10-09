@@ -52,9 +52,32 @@ El modo manual conserva su código de venta exacto. No deben modificarse ni
 regenerarse certificado, clave privada o clave de cifrado del TA. Los secretos
 permanecen en el servidor y no en variables `VITE_*` ni en el repositorio.
 
-Los valores actuales de ARCA en Netlify están limitados a `production`; un
-Deploy Preview necesita su propia configuración server-side. No alcanza con
-publicar el frontend para habilitar CAE.
+Los secretos de ARCA en Netlify están limitados a `production`. Para probar
+sin copiar ni exponer las claves, se fijó la publicación existente y se creó
+un deploy de contexto productivo que quedó **sin publicar**. Su URL de revisión
+es `https://main--appintegralflormia.netlify.app/vendedor`.
+Este deploy sí factura contra ARCA de producción. El dominio principal conserva
+la versión anterior hasta una publicación autorizada.
+
+La autorización del usuario habilitó los gates de preparación, padrón, CAE y
+emisión automática, con fuentes `admin_quick_sale,seller_sale`. Se conservaron
+el certificado, su clave privada y la clave de cifrado del TA ya configurados.
+
+## Correcciones encontradas durante la prueba productiva
+
+- WSFE negociaba un grupo DHE demasiado pequeño para Node/OpenSSL. El transporte
+  exclusivo de ese endpoint excluye DHE, mantiene los cifrados admitidos por
+  Node, exige TLS 1.2 o superior y verifica certificado y nombre del servidor.
+  No desactiva TLS ni baja el nivel de seguridad de OpenSSL. No reintenta
+  automáticamente una solicitud SOAP de autorización.
+- El estado previo de ARCA tenía indicadores de CAE fijados a `false`; ahora
+  muestra la configuración real del servidor.
+- La respuesta del servicio frontend conserva `invoice.autoAuthorization`,
+  donde el endpoint devuelve la autorización y su verificación.
+- Un CUIL activo que el padrón devuelve sin inscripciones tributarias y sin
+  errores permite consumidor final identificado, documento 86 y factura B.
+  Una respuesta incompleta o un CUIT sin condición suficiente sigue bloqueada.
+- El PDF identificado conserva el nombre recuperado del padrón y rotula CUIL.
 
 ## Verificación
 
@@ -67,16 +90,21 @@ publicar el frontend para habilitar CAE.
   carrito, descuento, total y formulario por CUIT.
 
 La QA visual usa archivos temporales ignorados por Git y bloquea las escrituras
-comerciales. No demuestra emisión real. La prueba productiva solicitada consiste
-en dos ventas de $100 (consumidor final y CUIT entregado por el usuario), con CAE,
-`FECompConsultar` coincidente y PDF oficial; no debe informarse como completada
-hasta obtener esos resultados.
+comerciales. Se completó por separado la prueba productiva autorizada: dos ventas
+de sal a $5.000, descuento de $4.900 y total $100, con CAE autorizado,
+`FECompConsultar` coincidente y PDF descargable, revisado visualmente.
+El padrón devolvió al receptor indicado como CUIL activo sin inscripción en IVA
+ni monotributo; el comprobante correspondiente fue B, sin forzar factura A.
+Los comprobantes reales y la evidencia con datos personales permanecen fuera
+del repositorio. Las pruebas automatizadas usan identificadores ficticios.
 
 ## Preview y costos
 
 La documentación actual de Netlify indica 0 créditos por publicaciones preview
-y 15 por publicación de producción en planes con créditos. Tráfico, solicitudes
-y cómputo siguen sujetos al plan. Se debe publicar un preview, sin `--prod` ni
-merge a `main`, para revisar estos cambios.
+y 15 por publicación de producción en planes con créditos. Un deploy productivo
+sin publicar, mientras se mantiene fijada la publicación anterior, no consume
+los 15 créditos de publicación. Tráfico, solicitudes y cómputo siguen sujetos
+al plan. El deploy de revisión no publicó el dominio principal ni hizo merge
+a `main`. Se dejó fijada su publicación para conservar esta condición.
 
 Fuente: https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/how-credits-work/
