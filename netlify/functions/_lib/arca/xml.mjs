@@ -1,3 +1,5 @@
+import { arcaSoapFetch } from "./soapTransport.mjs";
+
 const XML_ENTITIES = Object.freeze({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" });
 
 export function escapeXml(value) {
@@ -58,7 +60,8 @@ export async function soapRequest({ url, action = "", body, timeoutMs = 20000, f
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetchImpl(url, {
+    const transport = fetchImpl === fetch ? arcaSoapFetch : fetchImpl;
+    const response = await transport(url, {
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",

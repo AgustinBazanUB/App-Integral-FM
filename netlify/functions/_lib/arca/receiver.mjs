@@ -56,6 +56,14 @@ export function inferReceiverVatCondition(person = {}) {
     };
   }
 
+  const activeDescriptions = (person.taxes || []).filter(tax => activeStatus(tax.status)).map(tax => normalized(tax.description));
+  if (activeDescriptions.some(description => description === "IVA EXENTO")) {
+    return { resolved: true, condition: ARCA_RECEIVER_VAT_CONDITIONS.EXENTO, reason: "active-vat-exempt-tax" };
+  }
+  if (activeDescriptions.some(description => description === "IVA NO ALCANZADO")) {
+    return { resolved: true, condition: ARCA_RECEIVER_VAT_CONDITIONS.IVA_NO_ALCANZADO, reason: "active-vat-not-subject-tax" };
+  }
+
   if (person.monotributo && hasActiveMonotributo(person)) {
     const description = normalized(person.monotributoData?.category?.description);
     if (description.includes("MONOTRIBUTO SOCIAL")) {
@@ -77,6 +85,16 @@ export function inferReceiverVatCondition(person = {}) {
       condition: ARCA_RECEIVER_VAT_CONDITIONS.MONOTRIBUTO,
       reason: "active-monotributo-tax",
     };
+  }
+
+  // An active CUIL without tax registrations identifies a natural person,
+  // rather than an unresolved CUIT taxpayer. Incomplete/error responses remain
+  // blocked; do not turn an unknown taxpayer into consumidor final.
+  if (normalized(person.keyType) === "CUIL" && normalized(person.keyStatus) === "ACTIVO"
+    && Array.isArray(person.taxes) && person.taxes.length === 0
+    && person.monotributo === false && !person.errorConstancia
+    && !person.errorRegimenGeneral && !person.errorMonotributo) {
+    return { resolved: true, condition: ARCA_RECEIVER_VAT_CONDITIONS.CONSUMIDOR_FINAL, reason: "active-cuil-without-tax-registration" };
   }
 
   return {

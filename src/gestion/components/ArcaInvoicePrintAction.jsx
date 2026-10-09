@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "../../design-system";
+import ArcaInvoiceEmailDialog from "./ArcaInvoiceEmailDialog";
 import {
   arcaInvoicePrintStatus,
   isArcaInvoicePrintable,
@@ -21,6 +22,8 @@ export default function ArcaInvoicePrintAction({
     error: "",
   });
   const [printing, setPrinting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
   const [printError, setPrintError] = useState("");
   const resolvedInvoiceId = invoiceId || initialInvoice?.id || null;
 
@@ -52,7 +55,7 @@ export default function ArcaInvoicePrintAction({
   }, [saleId, sourceType, resolvedInvoiceId, initialInvoice?.id, initialInvoice?.pdf?.ready]);
 
   const openPdf = async () => {
-    if (printing || !isArcaInvoicePrintable(invoiceState.invoice)) return;
+    if (printing || downloading || !isArcaInvoicePrintable(invoiceState.invoice)) return;
     setPrinting(true);
     setPrintError("");
     const printWindow = window.open("about:blank", "_blank");
@@ -91,6 +94,25 @@ export default function ArcaInvoicePrintAction({
     }
   };
 
+  const downloadPdf = async () => {
+    if (printing || downloading || !isArcaInvoicePrintable(invoiceState.invoice)) return;
+    setDownloading(true);
+    setPrintError("");
+    try {
+      const { blob, filename } = await fetchArcaInvoicePdf({
+        saleId, sourceType, invoiceId: resolvedInvoiceId || invoiceState.invoice?.id,
+        disposition: "attachment",
+      });
+      const pdfUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = pdfUrl; link.download = filename || "Factura_ARCA.pdf";
+      document.body.append(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
+    } catch (error) {
+      setPrintError(error?.message || "No se pudo descargar el PDF de la factura.");
+    } finally { setDownloading(false); }
+  };
+
   if (invoiceState.busy) {
     return <p className="fm-arca-print-note" role="status">Consultando si la factura está lista para imprimir…</p>;
   }
@@ -104,10 +126,14 @@ export default function ArcaInvoicePrintAction({
     <div className="fm-arca-print-action" aria-live="polite">
       {printable ? (
         <>
-          <Button variant="secondary" icon="Printer" loading={printing} onClick={openPdf}>
-            Imprimir factura
-          </Button>
-          <small>Se abrirá el PDF seguro en una pestaña nueva para imprimirlo o guardarlo.</small>
+          <div className="fm-arca-delivery-buttons">
+            <Button variant="secondary" icon="Download" loading={downloading} disabled={printing} onClick={downloadPdf}>Descargar PDF</Button>
+            <Button variant="secondary" icon="Printer" loading={printing} disabled={downloading} onClick={openPdf}>Imprimir factura</Button>
+            <Button variant="secondary" icon="Mail" onClick={() => setEmailOpen(true)}>Enviar por mail</Button>
+          </div>
+          <small>PDF con CAE y código QR. Para imprimir, abrí el PDF y usá el ícono de la impresora o Ctrl+P.</small>
+          <ArcaInvoiceEmailDialog open={emailOpen} onClose={() => setEmailOpen(false)}
+            saleId={saleId} sourceType={sourceType} invoiceId={resolvedInvoiceId || invoiceState.invoice?.id} invoice={invoiceState.invoice} />
         </>
       ) : (
         <p className="fm-arca-print-note" role="status">{arcaInvoicePrintStatus(invoiceState.invoice)}</p>

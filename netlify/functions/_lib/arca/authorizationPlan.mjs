@@ -101,7 +101,7 @@ function resolveReceiverDocument({
     throw error;
   }
 
-  if (docType === 80) assertValidCuit(docNumber, "CUIT del receptor");
+  if ([80, 86].includes(docType)) assertValidCuit(docNumber, "CUIT/CUIL del receptor");
   return { documentType: docType, documentNumber: docNumber };
 }
 

@@ -130,6 +130,7 @@ function receiverDocumentLabel(type, number) {
   const docType = Number(type || 0);
   const docNumber = String(number || "").replace(/\D/g, "");
   if (docType === 80) return `CUIT · ${docNumber || "-"}`;
+  if (docType === 86) return `CUIL · ${docNumber || "-"}`;
   if (docType === 96) return `DNI · ${docNumber || "-"}`;
   if (docType === 99) return "Consumidor Final";
   return `${docType || "Documento"} · ${docNumber || "-"}`;
@@ -245,7 +246,7 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
   stream += commandText(394, 723, 8, `Ingresos Brutos: ${issuer.grossIncome}`, true);
   stream += commandText(394, 706, 8, `Inicio de Actividades: ${issuer.activityStart}`, true);
 
-  const customerName = sale.customer?.name || (Number(receiver.vatConditionId) === 5 ? "A CONSUMIDOR FINAL" : "NR");
+  const customerName = receiver.name || sale.customer?.name || (Number(receiver.vatConditionId) === 5 ? "A CONSUMIDOR FINAL" : "NR");
   const docType = auth.receiverDocument?.documentType ?? receiver.documentType;
   const docNumber = auth.receiverDocument?.documentNumber ?? receiver.documentNumber;
   stream += commandText(39, 673, 8, "Razón social:", true);

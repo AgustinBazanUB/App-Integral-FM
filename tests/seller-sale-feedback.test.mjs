@@ -69,7 +69,7 @@ function submission(overrides = {}) {
     useCallback: fn => fn, submitRef: { current: false }, submitState: { busy: false },
     selectedLocation: valid.location, currentItems: valid.items, profile: valid.profile,
     paymentMethod: "cash", payments: [], summary: { total: 1000 }, selectedCustomer: null,
-    ticketRequested: false, online: true, editSale: null, appliedDiscounts: [],
+    ticketRequested: false, fiscalReceiver: null, online: true, editSale: null, appliedDiscounts: [],
     stockResult: { status: "ready" }, pendingSales: { status: "ready" }, PAYMENT_LABELS,
     sellerSaleProblem, sellerErrorMessage, setSubmitState: state => states.push(state),
     resetSale: () => resets.push(true), setReceipt: value => receipts.push(value),
@@ -146,7 +146,7 @@ test("guardar pendiente y fallar su listado conserva la confirmación local", as
   const context = {
     useCallback: fn => fn, selectedLocation: { ...valid.location, name: "Local" }, profile: { ...valid.profile, name: "QA" },
     currentItems: valid.items, appliedDiscounts: [], summary: { total: 1000 }, paymentMethod: "cash", payments: [],
-    selectedCustomer: null, ticketRequested: false, PAYMENT_LABELS, sellerErrorMessage,
+    selectedCustomer: null, ticketRequested: false, fiscalReceiver: null, PAYMENT_LABELS, sellerErrorMessage,
     pendingSales: { refresh: async () => { throw { name: "QuotaExceededError" }; } },
     resetSale: () => resets.push(true), setSubmitState: value => states.push(value),
     saveSellerPendingSale: async value => saved.push(value),
