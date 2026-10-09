@@ -32,6 +32,7 @@ import "./styles/whatsapp-marketing.css";
 import "./styles/inventory.css";
 import "./styles/scrollbars.css";
 import "./styles/seller-compact.css";
+import "./styles/seller-pos.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

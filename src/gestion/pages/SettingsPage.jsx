@@ -440,7 +440,9 @@ export default function SettingsPage() {
           ? "Diagnóstico parcial disponible"
           : arcaState.error
             ? "La última verificación falló"
-            : "Backend de homologación en configuración",
+            : fiscalConfig.environment === "production"
+              ? fiscalConfig.productionCaeEnabled && productionAutoAuthorizeEnabled ? "Producción · CAE automático habilitado" : "Producción · emisión bloqueada por configuración"
+              : "Backend de homologación en configuración",
       arcaOperational ? "Operativo" : arcaState.error ? "Error" : "En progreso",
     ],
     ["Canales sociales", "Carga manual y enlaces directos", "Primera versión"],
@@ -817,7 +819,7 @@ export default function SettingsPage() {
       {isAdmin && productionEnvironment ? (
         <Panel
           title="Preflight ARCA producción"
-          description="Sólo lectura: valida WSFE, punto de venta, Padrón del propio emisor y TA compartidos. La emisión de CAE en producción sigue bloqueada por código."
+          description="Sólo lectura: valida WSFE, punto de venta, Padrón del propio emisor y TA compartidos. La emisión depende de los permisos de producción indicados abajo."
           action={(
             <Button
               variant="secondary"
@@ -905,7 +907,7 @@ export default function SettingsPage() {
                 <span>
                   {productionAutoAuthorizeEnabled
                     ? `Habilitada para: ${productionAutoAuthorizeSources.length ? productionAutoAuthorizeSources.join(", ") : "ningún origen"}.`
-                    : "Bloqueada por configuración. La etapa inicial debe limitarse a Venta Rápida."}
+                    : "Bloqueada por configuración. Los orígenes habilitados se definen en el servidor."}
                 </span>
               </div>
               <Badge tone={productionAutoAuthorizeEnabled ? "warning" : "success"}>

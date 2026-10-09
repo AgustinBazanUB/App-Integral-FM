@@ -1,4 +1,6 @@
 import { safeFiscalError } from "../../src/shared/fiscalRecovery.mjs";
+import { can } from "../../src/gestion/permissions.js";
+import { lookupBillingReceiver } from "./_lib/arca/receiverLookup.mjs";
 import { requireFirebaseActiveProfile } from "./_lib/firebaseAuth.mjs";
 import { adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
 import { arcaEnvironment, productionAutoAuthorizeSources } from "./_lib/arca/config.mjs";
@@ -59,7 +61,7 @@ export default async function handler(request) {
       return json({ ok: false, code: "arca-sale-not-found", message: "La venta no existe." }, 404);
     }
 
-    if (!canRequestInvoiceForSale({ sourceType, sale, session })) {
+    if (!canRequestInvoiceForSale({ sourceType, sale, session }) || !can(session.profile, "quick-sales", "requestTicket")) {
       return json({
         ok: false,
         code: "permission-denied",
@@ -67,7 +69,7 @@ export default async function handler(request) {
       }, 403);
     }
 
-    const receiver = body?.receiver && typeof body.receiver === "object"
+    let receiver = body?.receiver && typeof body.receiver === "object"
       ? {
           vatConditionId: Number(body.receiver.vatConditionId || 0),
           documentType: Number(body.receiver.documentType || 0),
@@ -76,6 +78,11 @@ export default async function handler(request) {
           concept: Number(body.receiver.concept || 1),
         }
       : null;
+
+    // Resolve again server-side: the browser cannot choose a tax condition for a CUIT.
+    if (receiver?.documentType === 80 && (environment === "production" || body.receiver.resolveFromRegistry === true)) {
+      receiver = (await lookupBillingReceiver(receiver.documentNumber)).receiver;
+    }
 
     const result = await ensurePendingInvoice({
       sourceType,

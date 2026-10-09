@@ -22,6 +22,7 @@ import { calculateDiscountSummary } from "../../modules/locations/domain/discoun
 import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
 import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
 import SaleStockWarning from "../components/SaleStockWarning";
+import ArcaBillingDialog from "../components/ArcaBillingDialog";
 import ProductImage from "../components/ProductImage";
 import ProductSubcategoryRows from "../components/ProductSubcategoryRows";
 import { can, effectiveSellerLocations } from "../permissions";
@@ -171,8 +172,8 @@ export default function QuickSalesPage() {
   const paymentStatus = allocation.invalid ? "Revisá los montos" : allocation.difference === 0 ? "Pagos completos" : allocation.difference > 0 ? `Falta ${formatMoney(allocation.difference)}` : `Excede ${formatMoney(-allocation.difference)}`;
 
 
-  const handleSubmit = async (event, requestInvoice = invoiceRequested) => {
-    event.preventDefault();
+  const handleSubmit = async (event, requestInvoice = invoiceRequested, receiverOverride = null) => {
+    event?.preventDefault();
     if (submitRef.current) return;
     submitRef.current = true;
     let sent = false;
@@ -180,18 +181,18 @@ export default function QuickSalesPage() {
     setSubmitState({ busy: true, error: "", success: "" });
     try {
       const fiscalRequested = pendingIntent?.sale.invoiceRequested ?? requestInvoice;
-      const receiverCondition = Number((pendingIntent?.sale.receiverVatConditionId ?? receiverVatConditionId) || 0);
-      const receiverDigits = String(pendingIntent ? (pendingIntent.sale.receiverDocument || pendingIntent.sale.customerDni || "") : (receiverDocument || customerDni || "")).replace(/\D/g, "");
+      const receiverCondition = Number((pendingIntent?.sale.fiscalReceiver?.vatConditionId ?? pendingIntent?.sale.receiverVatConditionId ?? receiverOverride?.vatConditionId ?? receiverVatConditionId) || 0);
+      const receiverDigits = String(pendingIntent ? (pendingIntent.sale.fiscalReceiver?.documentNumber || pendingIntent.sale.receiverDocument || pendingIntent.sale.customerDni || "") : (receiverOverride?.documentNumber || receiverDocument || customerDni || "")).replace(/\D/g, "");
       if (fiscalRequested && [1, 4, 6].includes(receiverCondition) && receiverDigits.length !== 11) {
         throw new Error("Para Responsable Inscripto, Monotributo o Exento ingresá la CUIT de 11 dígitos.");
       }
-      const receiver = fiscalRequested ? {
+      const receiver = fiscalRequested ? (pendingIntent?.sale.fiscalReceiver || receiverOverride || {
         vatConditionId: receiverCondition,
         documentType: receiverCondition === 5 ? (receiverDigits ? 96 : 99) : 80,
         documentNumber: receiverCondition === 5 ? (receiverDigits || "0") : receiverDigits,
         anonymousConsumerFinal: receiverCondition === 5 && !receiverDigits,
         concept: 1,
-      } : null;
+      }) : null;
       let intent = pendingIntent;
       if (!intent) {
         if (!SALES_CHANNELS.some(option => option.value === channel)) throw new Error("Elegí el canal comercial real.");
@@ -202,7 +203,7 @@ export default function QuickSalesPage() {
         const sale = {
           stockOrigin, items: cart.map(item => ({ id: item.id, productId: item.id, name: item.productName, categoryId: item.categoryId || null, unitPrice: Number(item.price), qty: item.qty })),
           discounts: appliedDiscounts, paymentMethod, paymentMethodLabel: PAYMENT_LABELS[paymentMethod], payments,
-          channel, customer: saleCustomer, customerDni, invoiceRequested: fiscalRequested, deliveryMethod, receiverVatConditionId, receiverDocument,
+          channel, customer: saleCustomer, customerDni, invoiceRequested: fiscalRequested, deliveryMethod, receiverVatConditionId: receiverCondition, receiverDocument: receiverDigits, fiscalReceiver: receiver,
         };
         intent = saveQuickSaleIntent(profile.id, sale);
         setPendingIntent(intent);
@@ -342,12 +343,7 @@ export default function QuickSalesPage() {
         {payments.map(part => <FormField key={part.method} label={friendlyPayments[part.method]}><div className="fm-quick-pos__payment-input"><input aria-label={friendlyPayments[part.method]} type="number" min="0" step="1" inputMode="numeric" value={part.amount} onChange={event => setPayments(current => current.map(entry => entry.method === part.method ? { ...entry, amount: event.target.value } : entry))} /><Button variant="ghost" disabled={allocation.invalid || allocation.difference <= 0} onClick={() => setPayments(current => completeRemainingPayment(current, part.method, saleSummary.total))}>Completar</Button></div></FormField>)}<p role="status">{paymentStatus}</p>
       </Modal>
       <Modal open={dialog === "price"} title="Editar precio" description={priceItem?.productName || "Precio unitario"} onClose={() => setDialog("")} footer={<Button disabled={!priceDraft.trim() || !Number.isInteger(Number(priceDraft)) || Number(priceDraft) < 0} onClick={() => { setPrices(current => ({ ...current, [priceItem.id]: Number(priceDraft) })); setDialog(""); }}>Aplicar precio</Button>}><FormField label="Precio unitario"><input type="number" min="0" step="1" inputMode="numeric" value={priceDraft} onChange={event => setPriceDraft(event.target.value)} /></FormField></Modal>
-      <Modal open={dialog === "billing"} title="Cargar factura" description="Confirmá la venta y prepará su comprobante fiscal." onClose={() => !submitState.busy && setDialog("")} footer={<div className="fm-quick-pos__billing-actions"><Button variant="secondary" disabled={submitState.busy} onClick={event => handleSubmit(event, false)}>Solo continuar</Button><Button loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, true)}>Generar factura y continuar</Button></div>}>
-        <p className="fm-quick-pos__billing-total">Total {formatMoney(saleSummary.total)}</p>
-        <FormField label="Condición IVA receptor" required><Select disabled={locked} value={receiverVatConditionId} onChange={event => { setReceiverVatConditionId(event.target.value); setReceiverDocument(""); }}><option value="5">Consumidor Final</option><option value="1">IVA Responsable Inscripto</option><option value="6">Responsable Monotributo</option><option value="4">IVA Sujeto Exento</option></Select></FormField>
-        <FormField label={receiverVatConditionId === "5" ? "DNI (opcional)" : "CUIT del receptor"} required={receiverVatConditionId !== "5"} hint={receiverVatConditionId === "5" ? "Podés dejarlo vacío para Consumidor Final sin identificar, sujeto a validación fiscal." : "CUIT de 11 dígitos."}><input disabled={locked} inputMode="numeric" value={receiverDocument} onChange={event => setReceiverDocument(event.target.value.replace(/\D/g, "").slice(0, 11))} /></FormField>
-        {submitState.error ? <Toast tone="error">{submitState.error}</Toast> : null}
-      </Modal>
+      <ArcaBillingDialog open={dialog === "billing"} total={saleSummary.total} busy={submitState.busy} onClose={() => setDialog("")} onContinue={() => { setDialog(""); handleSubmit(null, false); }} onConfirm={receiver => { setDialog(""); handleSubmit(null, true, receiver); }} />
     </div>
   );
 }

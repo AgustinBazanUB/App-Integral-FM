@@ -56,6 +56,14 @@ export function inferReceiverVatCondition(person = {}) {
     };
   }
 
+  const activeDescriptions = (person.taxes || []).filter(tax => activeStatus(tax.status)).map(tax => normalized(tax.description));
+  if (activeDescriptions.some(description => description === "IVA EXENTO")) {
+    return { resolved: true, condition: ARCA_RECEIVER_VAT_CONDITIONS.EXENTO, reason: "active-vat-exempt-tax" };
+  }
+  if (activeDescriptions.some(description => description === "IVA NO ALCANZADO")) {
+    return { resolved: true, condition: ARCA_RECEIVER_VAT_CONDITIONS.IVA_NO_ALCANZADO, reason: "active-vat-not-subject-tax" };
+  }
+
   if (person.monotributo && hasActiveMonotributo(person)) {
     const description = normalized(person.monotributoData?.category?.description);
     if (description.includes("MONOTRIBUTO SOCIAL")) {

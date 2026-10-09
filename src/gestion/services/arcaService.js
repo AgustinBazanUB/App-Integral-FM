@@ -58,6 +58,19 @@ export async function lookupArcaTaxpayer(cuit) {
   return data;
 }
 
+export async function lookupArcaBillingReceiver(cuit) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Iniciá sesión para consultar el receptor.");
+  const response = await fetch("/.netlify/functions/arca-receiver", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await user.getIdToken()}` },
+    body: JSON.stringify({ cuit }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw Object.assign(new Error(data.message || "No se pudo consultar el CUIT."), { code: data.code });
+  return data;
+}
+
 
 export async function requestPendingArcaInvoice({ sourceType, sourceId, receiver = null }) {
   const user = auth.currentUser;
@@ -78,7 +91,7 @@ export async function requestPendingArcaInvoice({ sourceType, sourceId, receiver
     error.status = response.status;
     throw error;
   }
-  return data.invoice;
+  return { ...data.invoice, autoAuthorization: data.autoAuthorization || null };
 }
 
 
