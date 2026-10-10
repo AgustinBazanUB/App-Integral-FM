@@ -26,6 +26,7 @@ import {
 } from "../../modules/locations/domain/time";
 import { useAuth } from "../AuthContext";
 import MetricsFiltersPanel from "../components/MetricsFiltersPanel";
+import BusinessMetricsCards from "../components/BusinessMetricsCards";
 import { PaymentDonut, SalesLineChart } from "../components/MetricsVisuals";
 import { formatMoney } from "../formatters";
 import { useAsyncData } from "../hooks";
@@ -98,22 +99,25 @@ export default function SalesMetricsPage() {
   const locations = locationsResult.data || [];
   const locationIdsKey = locations.map((location) => location.id).sort().join(",");
   const selectedLocationKey = filters.locationIds.slice().sort().join(",");
+  const salesQueryKey = `${profile.id}|${locationIdsKey}|${selectedLocationKey}|${rangeState.range?.start.toISOString()}|${rangeState.range?.end.toISOString()}`;
   const salesResult = useAsyncData(async () => {
-    if (!locationsResult.data) return [];
+    if (!locationsResult.data) return { queryKey: salesQueryKey, sales: [] };
     if (!rangeState.range) throw rangeState.error;
-    const selected = filters.locationIds.length ? filters.locationIds : null;
+    const selected = filters.locationIds.length ? locations.filter(location => filters.locationIds.includes(location.id)).map(location => location.id) : null;
     const locationIds = selected || (can(profile, "locations", "viewAllLocations") ? undefined : locations.map((location) => location.id));
-    return listSalesByRange({
+    const sales = await listSalesByRange({
       profile,
       includeCancelled: true,
       locationIds,
       start: rangeState.range.start,
       end: rangeState.range.end,
     });
-  }, [profile.id, locationIdsKey, selectedLocationKey, filters.periodType, filters.day, filters.month, filters.year, filters.from, filters.to]);
+    return { queryKey: salesQueryKey, sales };
+  }, [profile, locationsResult.data, salesQueryKey]);
+  const sales = useMemo(() => salesResult.data?.queryKey === salesQueryKey ? salesResult.data.sales : [], [salesResult.data, salesQueryKey]);
 
   const dimensions = dimensionsResult.data || { products: [], categories: [], discounts: [] };
-  const sellers = useMemo(() => sellerOptions(salesResult.data), [salesResult.data]);
+  const sellers = useMemo(() => sellerOptions(sales), [sales]);
   const categoryProductIds = useMemo(() => {
     if (!filters.categoryIds.length) return [];
     const categories = new Set(filters.categoryIds);
@@ -122,7 +126,7 @@ export default function SalesMetricsPage() {
 
   const filteredSales = useMemo(() => {
     if (!rangeState.range) return [];
-    return applyMetricsFilters(salesResult.data || [], {
+    return applyMetricsFilters(sales, {
       channelIds: filters.channelIds,
       locationIds: filters.locationIds,
       sellerIds: filters.sellerIds,
@@ -132,7 +136,7 @@ export default function SalesMetricsPage() {
       discountIds: filters.discountIds,
       paymentMethods: filters.paymentMethods,
     }, rangeState.range);
-  }, [salesResult.data, rangeState.range, filters.locationIds, filters.sellerIds, filters.productIds, categoryProductIds, filters.categoryIds, filters.discountIds, filters.paymentMethods, filters.channelIds]);
+  }, [sales, rangeState.range, filters.locationIds, filters.sellerIds, filters.productIds, categoryProductIds, filters.categoryIds, filters.discountIds, filters.paymentMethods, filters.channelIds]);
 
   const metrics = useMemo(
     () => rangeState.range ? calculateMetrics(filteredSales, rangeState.range) : null,
@@ -141,7 +145,7 @@ export default function SalesMetricsPage() {
   const locationRows = useMemo(() => metrics ? sortableRows(metrics.byLocation, locationSort) : [], [metrics, locationSort]);
   const productRows = metrics?.byProduct || [];
   const rankingRows = productRows.slice(0, 10).map((row, index) => ({ ...row, rank: index + 1 }));
-  const loading = locationsResult.status === "loading" || dimensionsResult.status === "loading" || salesResult.status === "loading";
+  const loading = locationsResult.status === "loading" || dimensionsResult.status === "loading" || salesResult.status === "loading" || (salesResult.status === "ready" && salesResult.data?.queryKey !== salesQueryKey);
   const error = rangeState.error || locationsResult.error || dimensionsResult.error || salesResult.error;
 
   return (
@@ -149,11 +153,11 @@ export default function SalesMetricsPage() {
       <PageHeader
         eyebrow="Métricas generales"
         title="Historial y análisis de ventas"
-        description="Todos los paneles reaccionan al mismo conjunto de filtros y se calculan desde una única consulta de ventas acotada por período."
+        description="Las ventas comparten los filtros del período. Stock restante muestra el saldo actual de los inventarios permitidos."
       />
 
       <Panel title="Filtros" description="Combiná período, ubicaciones, vendedores, productos, descuentos y formas de pago.">
-        <FormField label="Canal comercial"><Select value={filters.channelIds[0] || ""} onChange={event => setFilters(current => ({ ...current, channelIds: event.target.value ? [event.target.value] : [] }))}><option value="">Todos los canales</option>{[...new Set((salesResult.data || []).map(sale => sale.sourceChannel || "__unknown"))].map(channel => <option key={channel} value={channel}>{saleChannelLabel(channel === "__unknown" ? "" : channel)}</option>)}</Select></FormField>
+        <FormField label="Canal comercial"><Select value={filters.channelIds[0] || ""} onChange={event => setFilters(current => ({ ...current, channelIds: event.target.value ? [event.target.value] : [] }))}><option value="">Todos los canales</option>{[...new Set(sales.map(sale => sale.sourceChannel || "__unknown"))].map(channel => <option key={channel} value={channel}>{saleChannelLabel(channel === "__unknown" ? "" : channel)}</option>)}</Select></FormField>
         <MetricsFiltersPanel
           state={filters}
           onChange={setFilters}
@@ -181,6 +185,7 @@ export default function SalesMetricsPage() {
           </section>
 
           <OperatingMetricsPanel profile={profile} sales={filteredSales} range={rangeState.range} locations={filters.locationIds.length ? locations.filter(location => filters.locationIds.includes(location.id)) : locations} />
+          <BusinessMetricsCards metrics={metrics} profile={profile} locations={filters.locationIds.length ? locations.filter(location => filters.locationIds.includes(location.id)) : locations} includeWarehouses={!filters.locationIds.length && can(profile, "locations", "viewAllLocations")} stockFilters={{ productIds: filters.productIds, categoryIds: filters.categoryIds, categoryProductIds }} />
           <Panel title="Categorías" description="Unidades y subtotal de productos, antes de descuentos generales."><DataTable rows={metricsByCategory(filteredSales, dimensions.products, dimensions.categories)} columns={[{ key: "name", label: "Categoría" }, { key: "items", label: "Unidades" }, { key: "sales", label: "Ventas" }, { key: "total", label: "Subtotal", render: row => formatMoney(row.total) }]} empty={<EmptyState title="Sin categorías vendidas" />} /></Panel>
           <section className="fm-analysis-grid fm-metrics-analysis-grid">
             <Panel title="Canales comerciales" description="Origen de la operación; Venta Rápida es la herramienta de registro."><DataTable rows={metrics.byChannel} columns={[{ key: "name", label: "Canal" }, { key: "sales", label: "Ventas" }, { key: "total", label: "Monto", render: row => formatMoney(row.total) }]} empty={<EmptyState title="Sin ventas por canal" />} /></Panel>

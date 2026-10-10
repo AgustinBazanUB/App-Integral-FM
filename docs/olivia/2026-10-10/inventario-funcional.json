@@ -1,0 +1,4429 @@
+{
+  "auditDate": "2026-10-10",
+  "commit": "9b412b3643a65f7889db483e3e09aa6980e5af35",
+  "productionURL": "https://appintegralflormia.netlify.app",
+  "scope": "Funcionalidad actual de rutas montadas y handlers efectivos; excluye solución propuesta. Auditoría de código, permisos, CI y lecturas selectivas en producción; no prueba mutaciones completas en producción. Actualización documental de ARCA solicitada por el Administrador el 10/10; métricas nuevas se publican inicialmente en preview.",
+  "counts": {
+    "currentActions": 523,
+    "sections": 30,
+    "registeredOliviaTools": 67,
+    "conditionalCapabilities": 15
+  },
+  "sections": [
+    {
+      "module": "core",
+      "title": "Acceso y navegación",
+      "route": "/gestion · /vendedor",
+      "permissions": "Cuenta activa. Menús, rutas y acciones según perfil y permisos.",
+      "files": [
+        "src/gestion/pages/LoginPage.jsx",
+        "src/gestion/AuthContext.jsx",
+        "src/gestion/ManagementShell.jsx",
+        "src/gestion/permissions.js",
+        "src/gestion/components/ConnectionIndicator.jsx"
+      ],
+      "limits": "No hay autorregistro público, recuperación de contraseña ni editor general de perfil en estas pantallas. Los permisos no conceden acceso a acciones ausentes de la interfaz.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Iniciar sesión con correo y contraseña.",
+          "tools": [],
+          "note": "",
+          "id": "F001"
+        },
+        {
+          "channel": "UI",
+          "action": "Mantener la sesión en el dispositivo hasta cerrarla.",
+          "tools": [],
+          "note": "",
+          "id": "F002"
+        },
+        {
+          "channel": "UI",
+          "action": "Cerrar sesión desde el panel de gestión o el panel vendedor.",
+          "tools": [],
+          "note": "",
+          "id": "F003"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar el nombre y rol del usuario conectado.",
+          "tools": [],
+          "note": "",
+          "id": "F004"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar módulos por nombre o descripción en el buscador de navegación.",
+          "tools": [],
+          "note": "Busca accesos; no es un buscador global de documentos o ventas.",
+          "id": "F005"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir los módulos habilitados para el perfil.",
+          "tools": [],
+          "note": "",
+          "id": "F006"
+        },
+        {
+          "channel": "UI",
+          "action": "Usar la navegación lateral en computadora y el menú adaptado a móvil.",
+          "tools": [],
+          "note": "",
+          "id": "F007"
+        },
+        {
+          "channel": "UI",
+          "action": "Contraer o expandir la barra lateral.",
+          "tools": [],
+          "note": "",
+          "id": "F008"
+        },
+        {
+          "channel": "UI",
+          "action": "Pasar al Panel Vendedor cuando el usuario tiene acceso.",
+          "tools": [],
+          "note": "",
+          "id": "F009"
+        },
+        {
+          "channel": "UI",
+          "action": "Volver del Panel Vendedor a gestión cuando el perfil lo permite.",
+          "tools": [],
+          "note": "",
+          "id": "F010"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar si la conexión está en línea, desconectada o reconectando.",
+          "tools": [],
+          "note": "",
+          "id": "F011"
+        },
+        {
+          "channel": "UI",
+          "action": "Reintentar la conexión con Firestore desde el indicador.",
+          "tools": [],
+          "note": "",
+          "id": "F012"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Consultar el contexto propio: rol, permisos y ubicaciones autorizadas.",
+          "tools": [
+            "get_current_user_context"
+          ],
+          "note": "",
+          "id": "F013"
+        },
+        {
+          "channel": "O-NAV",
+          "action": "Pedir a Olivia que abra una pantalla autorizada.",
+          "tools": [
+            "navigate_to_module"
+          ],
+          "note": "",
+          "id": "F014"
+        }
+      ]
+    },
+    {
+      "module": "dashboard",
+      "title": "Panel general",
+      "route": "/gestion",
+      "permissions": "Acceso al panel de gestión. Métricas, alertas y accesos según permisos del módulo.",
+      "files": [
+        "src/gestion/pages/DashboardPage.jsx",
+        "src/gestion/components/DashboardFilters.jsx",
+        "src/gestion/components/DashboardPayments.jsx",
+        "src/gestion/components/DashboardAlerts.jsx"
+      ],
+      "limits": "El período de ventas no filtra las alertas activas. Los totales reflejan el alcance autorizado y las ventas válidas; no equivalen a dinero acreditado en el banco.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Consultar cantidad de ventas activas del período.",
+          "tools": [],
+          "note": "",
+          "id": "F015"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar monto vendido con descuentos del período.",
+          "tools": [],
+          "note": "",
+          "id": "F016"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar ticket promedio del período.",
+          "tools": [],
+          "note": "",
+          "id": "F017"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar cuántas ubicaciones autorizadas están incluidas.",
+          "tools": [],
+          "note": "",
+          "id": "F018"
+        },
+        {
+          "channel": "UI",
+          "action": "Cambiar el período del resumen y sus ubicaciones.",
+          "tools": [],
+          "note": "",
+          "id": "F019"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar la evolución del ritmo de ventas en el gráfico.",
+          "tools": [],
+          "note": "",
+          "id": "F020"
+        },
+        {
+          "channel": "UI",
+          "action": "Cambiar el formato temporal del panel entre año, mes, semana o día.",
+          "tools": [],
+          "note": "",
+          "id": "F021"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar la distribución del dinero vendido por forma de pago.",
+          "tools": [],
+          "note": "",
+          "id": "F022"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir los accesos rápidos a módulos autorizados.",
+          "tools": [],
+          "note": "",
+          "id": "F023"
+        },
+        {
+          "channel": "UI",
+          "action": "Elegir una ubicación activa desde el acceso Cargar Stock y abrir su inventario.",
+          "tools": [],
+          "note": "",
+          "id": "F024"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir la campana de alertas activas y verlas por prioridad.",
+          "tools": [],
+          "note": "",
+          "id": "F025"
+        },
+        {
+          "channel": "UI",
+          "action": "Ir desde una alerta al registro o módulo relacionado.",
+          "tools": [],
+          "note": "",
+          "id": "F026"
+        },
+        {
+          "channel": "UI",
+          "action": "Reintentar la actualización del panel si falla una lectura.",
+          "tools": [],
+          "note": "",
+          "id": "F027"
+        }
+      ]
+    },
+    {
+      "module": "products",
+      "title": "Catálogo maestro de productos",
+      "route": "/gestion/products",
+      "permissions": "products.view/create/edit; unificación reservada a admin/general_admin.",
+      "files": [
+        "src/gestion/pages/ProductsPage.jsx",
+        "src/gestion/components/ProductForm.jsx",
+        "src/gestion/components/SubcategoriesDialog.jsx",
+        "src/gestion/components/ProductMergeDialog.jsx",
+        "src/gestion/services/catalogOrganizationService.js",
+        "netlify/functions/_lib/olivia/extendedOperations.mjs"
+      ],
+      "limits": "Desactivar no borra historia ni significa retirar físicamente unidades. Crear un producto maestro no agrega stock. No se detectó borrado físico de productos, edición/eliminación autónoma de categorías ni edición autónoma de productos mediante Olivia.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Listar y buscar productos del catálogo.",
+          "tools": [
+            "search_products"
+          ],
+          "note": "La búsqueda de Olivia es acotada; no garantiza explorar todo el catálogo de una vez.",
+          "id": "F028"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar productos por categoría.",
+          "tools": [],
+          "note": "",
+          "id": "F029"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar productos activos, inactivos o todos.",
+          "tools": [],
+          "note": "",
+          "id": "F030"
+        },
+        {
+          "channel": "UI/O-REV",
+          "action": "Crear un producto maestro desde el formulario.",
+          "tools": [
+            "prepare_product_create"
+          ],
+          "note": "La herramienta de Olivia sólo valida un borrador y abre Productos; el alta se completa manualmente.",
+          "id": "F031"
+        },
+        {
+          "channel": "UI",
+          "action": "Editar el nombre de un producto.",
+          "tools": [],
+          "note": "",
+          "id": "F032"
+        },
+        {
+          "channel": "UI",
+          "action": "Editar su abreviación única, de hasta ocho caracteres.",
+          "tools": [],
+          "note": "",
+          "id": "F033"
+        },
+        {
+          "channel": "UI",
+          "action": "Asignar o cambiar su categoría principal.",
+          "tools": [],
+          "note": "",
+          "id": "F034"
+        },
+        {
+          "channel": "UI",
+          "action": "Asignar, cambiar o quitar su subcategoría.",
+          "tools": [],
+          "note": "",
+          "id": "F035"
+        },
+        {
+          "channel": "UI",
+          "action": "Definir o cambiar el precio predeterminado del producto.",
+          "tools": [],
+          "note": "",
+          "id": "F036"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Propagar el cambio de precio maestro a ubicaciones que usan precio predeterminado.",
+          "tools": [],
+          "note": "Conserva los precios especiales de ubicación.",
+          "id": "F037"
+        },
+        {
+          "channel": "UI",
+          "action": "Definir o corregir la alícuota de IVA explícita del producto para ARCA.",
+          "tools": [],
+          "note": "",
+          "id": "F038"
+        },
+        {
+          "channel": "UI",
+          "action": "Editar la descripción del producto.",
+          "tools": [],
+          "note": "",
+          "id": "F039"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar los umbrales amarillo y rojo de stock del producto maestro.",
+          "tools": [],
+          "note": "",
+          "id": "F040"
+        },
+        {
+          "channel": "UI",
+          "action": "Elegir una imagen de la galería existente y buscar entre esas imágenes.",
+          "tools": [],
+          "note": "No hay carga libre de una foto nueva al catálogo.",
+          "id": "F041"
+        },
+        {
+          "channel": "UI",
+          "action": "Grabar o quitar el atajo de teclado del producto.",
+          "tools": [],
+          "note": "",
+          "id": "F042"
+        },
+        {
+          "channel": "UI",
+          "action": "Desactivar un producto maestro.",
+          "tools": [],
+          "note": "",
+          "id": "F043"
+        },
+        {
+          "channel": "UI",
+          "action": "Reactivar un producto maestro inactivo que no esté bloqueado por una unificación.",
+          "tools": [],
+          "note": "",
+          "id": "F044"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar las subcategorías de una categoría.",
+          "tools": [],
+          "note": "",
+          "id": "F045"
+        },
+        {
+          "channel": "UI",
+          "action": "Crear una subcategoría dentro de una categoría existente.",
+          "tools": [],
+          "note": "",
+          "id": "F046"
+        },
+        {
+          "channel": "UI",
+          "action": "Aplicar la organización sugerida de productos en subcategorías.",
+          "tools": [],
+          "note": "Preserva asignaciones manuales, precios y cantidades.",
+          "id": "F047"
+        },
+        {
+          "channel": "UI",
+          "action": "Elegir un producto duplicado y un producto de destino de la misma categoría.",
+          "tools": [],
+          "note": "",
+          "id": "F048"
+        },
+        {
+          "channel": "UI",
+          "action": "Previsualizar cuánto stock se trasladaría al unificar productos, por ubicación y depósito.",
+          "tools": [],
+          "note": "",
+          "id": "F049"
+        },
+        {
+          "channel": "UI",
+          "action": "Confirmar la unificación de productos duplicados.",
+          "tools": [],
+          "note": "Suma el stock al destino en cada inventario y archiva el origen conservando historia; el backend revalida el plan.",
+          "id": "F050"
+        },
+        {
+          "channel": "O-CONF",
+          "action": "Crear productos faltantes como parte de una lista de mercadería y cargar su stock.",
+          "tools": [
+            "prepare_catalog_stock_load"
+          ],
+          "note": "Sólo en una ubicación activa; exige precio real para cada producto nuevo.",
+          "id": "F051"
+        },
+        {
+          "channel": "O-CONF",
+          "action": "Crear categorías faltantes dentro de esa carga de mercadería autorizada.",
+          "tools": [
+            "prepare_catalog_stock_load"
+          ],
+          "note": "No hay un CRUD independiente de categorías en la interfaz auditada.",
+          "id": "F052"
+        }
+      ]
+    },
+    {
+      "module": "locations",
+      "title": "Ubicaciones, locales, ferias y eventos",
+      "route": "/gestion/locations",
+      "permissions": "locations.view/create/edit/archive/restore/pin; alcance de ubicaciones según permisos.",
+      "files": [
+        "src/gestion/pages/LocationsPage.jsx",
+        "src/modules/locations/domain/locations.js",
+        "src/shared/managementWritePlans.mjs"
+      ],
+      "limits": "Las fechas y el estado condicionan cuándo se puede vender o cargar stock. Olivia no tiene herramientas específicas para pausar, eliminar, restaurar, fijar ubicaciones ni editar su calendario operativo.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar las ubicaciones disponibles.",
+          "tools": [
+            "list_locations"
+          ],
+          "note": "Olivia lista ubicaciones activas permitidas; la pantalla puede incluir otros estados.",
+          "id": "F053"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar ubicaciones por nombre.",
+          "tools": [],
+          "note": "",
+          "id": "F054"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar ubicaciones por tipo.",
+          "tools": [],
+          "note": "",
+          "id": "F055"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar ubicaciones activas, próximas, pausadas, finalizadas, inactivas o eliminadas.",
+          "tools": [],
+          "note": "",
+          "id": "F056"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Crear un local, feria o evento.",
+          "tools": [
+            "prepare_create_location"
+          ],
+          "note": "",
+          "id": "F057"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Editar el nombre de una ubicación.",
+          "tools": [
+            "prepare_update_location"
+          ],
+          "note": "",
+          "id": "F058"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Editar el tipo de ubicación.",
+          "tools": [
+            "prepare_update_location"
+          ],
+          "note": "",
+          "id": "F059"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Definir o cambiar el prefijo de sus códigos de venta.",
+          "tools": [
+            "prepare_update_location"
+          ],
+          "note": "Prefijo de hasta ocho caracteres.",
+          "id": "F060"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Definir o cambiar fechas de inicio y fin.",
+          "tools": [
+            "prepare_update_location"
+          ],
+          "note": "Olivia trabaja con fechas; la pantalla permite fecha y hora.",
+          "id": "F061"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Configurar si la identificación por DNI es opcional, recomendada, obligatoria o deshabilitada.",
+          "tools": [
+            "prepare_update_location"
+          ],
+          "note": "",
+          "id": "F062"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar los días de apertura semanal.",
+          "tools": [],
+          "note": "",
+          "id": "F063"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar horario de apertura y cierre, incluso jornadas que cruzan medianoche.",
+          "tools": [],
+          "note": "",
+          "id": "F064"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar fechas específicas de funcionamiento.",
+          "tools": [],
+          "note": "",
+          "id": "F065"
+        },
+        {
+          "channel": "UI",
+          "action": "Activar una ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F066"
+        },
+        {
+          "channel": "UI",
+          "action": "Pausar una ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F067"
+        },
+        {
+          "channel": "UI",
+          "action": "Eliminar lógicamente una ubicación conservando registros históricos.",
+          "tools": [],
+          "note": "",
+          "id": "F068"
+        },
+        {
+          "channel": "UI",
+          "action": "Restaurar una ubicación eliminada lógicamente.",
+          "tools": [],
+          "note": "",
+          "id": "F069"
+        },
+        {
+          "channel": "UI",
+          "action": "Fijar una ubicación como acceso preferido del usuario.",
+          "tools": [],
+          "note": "Hasta cuatro ubicaciones fijadas por usuario.",
+          "id": "F070"
+        },
+        {
+          "channel": "UI",
+          "action": "Desfijar una ubicación preferida.",
+          "tools": [],
+          "note": "",
+          "id": "F071"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar la cantidad de productos configurados y vendedores asignados.",
+          "tools": [],
+          "note": "",
+          "id": "F072"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir el detalle de stock, vendedores, descuentos o ventas de la ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F073"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Buscar ferias y eventos anteriores o futuros para analizar sus fechas.",
+          "tools": [
+            "list_fair_events"
+          ],
+          "note": "",
+          "id": "F074"
+        }
+      ]
+    },
+    {
+      "module": "locations",
+      "title": "Productos, stock y asignaciones de una ubicación",
+      "route": "/gestion/locations/:id",
+      "permissions": "locations.viewLocationProducts/viewStock/configureLocationProducts/loadStock/adjustStock/assignSellers/assignDiscounts.",
+      "files": [
+        "src/gestion/pages/LocationDetailPage.jsx",
+        "src/gestion/components/InventoryAdjustmentModal.jsx",
+        "src/gestion/services/locationManagementService.js"
+      ],
+      "limits": "La pantalla activa agrega productos existentes. LocationProductForm es un componente no montado en esta ruta: no se cuenta como alta de producto desde aquí ni asignación masiva a todos los locales. Quitar unidades se hace mediante ajuste, transferencia o venta, según el hecho real.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar el inventario de una ubicación y su stock actual.",
+          "tools": [
+            "get_stock",
+            "get_inventory_summary"
+          ],
+          "note": "",
+          "id": "F075"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar productos dentro del inventario de una ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F076"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar el inventario de ubicación por categoría.",
+          "tools": [],
+          "note": "",
+          "id": "F077"
+        },
+        {
+          "channel": "UI",
+          "action": "Seleccionar un producto existente del catálogo para incorporarlo a una ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F078"
+        },
+        {
+          "channel": "UI",
+          "action": "Asignarle stock inicial al incorporarlo a la ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F079"
+        },
+        {
+          "channel": "UI",
+          "action": "Elegir precio predeterminado o precio especial al incorporarlo.",
+          "tools": [],
+          "note": "",
+          "id": "F080"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Agregar unidades a un producto existente de una ubicación.",
+          "tools": [
+            "prepare_stock_load"
+          ],
+          "note": "Suma positiva, con observación; no reemplaza el stock.",
+          "id": "F081"
+        },
+        {
+          "channel": "UI",
+          "action": "Registrar una observación para el ingreso de stock.",
+          "tools": [],
+          "note": "",
+          "id": "F082"
+        },
+        {
+          "channel": "UI",
+          "action": "Ajustar el inventario según un conteo físico real.",
+          "tools": [],
+          "note": "Permite corregir hacia arriba o abajo, exige motivo y registra la diferencia.",
+          "id": "F083"
+        },
+        {
+          "channel": "UI",
+          "action": "Cambiar el precio especial de un producto sólo en esa ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F084"
+        },
+        {
+          "channel": "UI",
+          "action": "Volver a usar el precio predeterminado del catálogo en esa ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F085"
+        },
+        {
+          "channel": "UI",
+          "action": "Cambiar los umbrales amarillo y rojo de un producto sólo en esa ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F086"
+        },
+        {
+          "channel": "UI",
+          "action": "Habilitar o deshabilitar un producto para esa ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F087"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar movimientos de stock de un producto de la ubicación.",
+          "tools": [
+            "get_stock_movements"
+          ],
+          "note": "",
+          "id": "F088"
+        },
+        {
+          "channel": "UI",
+          "action": "Cargar movimientos anteriores de ese producto.",
+          "tools": [],
+          "note": "La ventana amplía la consulta hasta su límite; no es una exportación de toda la historia.",
+          "id": "F089"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar los vendedores asignados y su estado activo o inactivo.",
+          "tools": [],
+          "note": "",
+          "id": "F090"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar vendedores existentes que se pueden asignar.",
+          "tools": [],
+          "note": "",
+          "id": "F091"
+        },
+        {
+          "channel": "UI",
+          "action": "Asignar uno o varios vendedores activos a una ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F092"
+        },
+        {
+          "channel": "UI",
+          "action": "Quitar la asignación de un vendedor conservando su cuenta.",
+          "tools": [],
+          "note": "",
+          "id": "F093"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar los descuentos existentes disponibles para la ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F094"
+        },
+        {
+          "channel": "UI",
+          "action": "Habilitar descuentos existentes para una ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F095"
+        },
+        {
+          "channel": "UI",
+          "action": "Quitar descuentos habilitados de una ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F096"
+        },
+        {
+          "channel": "O-CONF",
+          "action": "Procesar una lista de mercadería recibida de hasta cuarenta renglones.",
+          "tools": [
+            "prepare_catalog_stock_load"
+          ],
+          "note": "Una tarjeta; reutiliza catálogo y categorías, propone los faltantes y suma stock atómicamente tras confirmar.",
+          "id": "F097"
+        }
+      ]
+    },
+    {
+      "module": "warehouse",
+      "title": "Depósitos e inventario",
+      "route": "/gestion/warehouse · /gestion/warehouse/:id",
+      "permissions": "warehouse.view/create/edit/transferStock y permisos adicionales de stock cuando intervienen ubicaciones.",
+      "files": [
+        "src/gestion/pages/WarehousePage.jsx",
+        "src/gestion/components/InventoryAdjustmentModal.jsx",
+        "src/modules/inventory/domain/inventory.js"
+      ],
+      "limits": "No se detectó una pantalla para editar o eliminar depósitos existentes. prepare_stock_load es para ubicaciones, no para depósitos. La cantidad de stock no representa automáticamente un costo contable.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar los depósitos registrados.",
+          "tools": [
+            "list_warehouses"
+          ],
+          "note": "",
+          "id": "F098"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Crear un depósito vacío.",
+          "tools": [
+            "prepare_warehouse_create"
+          ],
+          "note": "En la pantalla se cargan nombre, descripción y referencia de dirección; Olivia ofrece nombre y notas.",
+          "id": "F099"
+        },
+        {
+          "channel": "UI",
+          "action": "Definir si el depósito nace activo al crearlo.",
+          "tools": [],
+          "note": "",
+          "id": "F100"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir el inventario de un depósito.",
+          "tools": [],
+          "note": "",
+          "id": "F101"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar productos, cantidades y total de unidades de un depósito.",
+          "tools": [
+            "get_inventory_summary"
+          ],
+          "note": "",
+          "id": "F102"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar productos en el depósito.",
+          "tools": [],
+          "note": "",
+          "id": "F103"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar productos del depósito por categoría.",
+          "tools": [],
+          "note": "",
+          "id": "F104"
+        },
+        {
+          "channel": "UI",
+          "action": "Incorporar un producto maestro existente al inventario de un depósito.",
+          "tools": [],
+          "note": "",
+          "id": "F105"
+        },
+        {
+          "channel": "UI",
+          "action": "Cargar el stock inicial de un producto del depósito.",
+          "tools": [],
+          "note": "",
+          "id": "F106"
+        },
+        {
+          "channel": "UI",
+          "action": "Agregar unidades al stock de un producto del depósito.",
+          "tools": [],
+          "note": "",
+          "id": "F107"
+        },
+        {
+          "channel": "UI",
+          "action": "Registrar el motivo de un ingreso en depósito.",
+          "tools": [],
+          "note": "",
+          "id": "F108"
+        },
+        {
+          "channel": "UI",
+          "action": "Ajustar stock de depósito con conteo físico y motivo obligatorio.",
+          "tools": [],
+          "note": "",
+          "id": "F109"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar movimientos de stock de un producto del depósito.",
+          "tools": [
+            "get_stock_movements"
+          ],
+          "note": "",
+          "id": "F110"
+        },
+        {
+          "channel": "UI",
+          "action": "Cargar movimientos anteriores del depósito dentro del límite de la consulta.",
+          "tools": [],
+          "note": "",
+          "id": "F111"
+        }
+      ]
+    },
+    {
+      "module": "warehouse",
+      "title": "Transferencias físicas de mercadería",
+      "route": "Diálogo Transferir stock en depósitos o ubicaciones",
+      "permissions": "warehouse.transferStock; acceso a inventarios y stock de ubicación según permisos.",
+      "files": [
+        "src/gestion/components/InventoryTransferModal.jsx",
+        "src/gestion/services/inventoryService.js",
+        "src/shared/stockTransferWritePlans.mjs",
+        "netlify/functions/_lib/olivia/extendedOperations.mjs"
+      ],
+      "limits": "Este flujo registra salida y recepción juntas. No es seguimiento de un camión en tiempo real ni un circuito diferido de despacho y recepción.",
+      "rows": [
+        {
+          "channel": "UI/O-CONF",
+          "action": "Transferir mercadería de un depósito a una ubicación.",
+          "tools": [
+            "prepare_stock_transfer"
+          ],
+          "note": "",
+          "id": "F112"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Transferir mercadería de una ubicación a un depósito.",
+          "tools": [
+            "prepare_stock_transfer"
+          ],
+          "note": "",
+          "id": "F113"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Transferir mercadería entre dos depósitos.",
+          "tools": [
+            "prepare_stock_transfer"
+          ],
+          "note": "",
+          "id": "F114"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Transferir mercadería entre dos ubicaciones.",
+          "tools": [
+            "prepare_stock_transfer"
+          ],
+          "note": "",
+          "id": "F115"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Incluir varios productos en una transferencia.",
+          "tools": [
+            "prepare_stock_transfer"
+          ],
+          "note": "Olivia admite hasta cuarenta renglones.",
+          "id": "F116"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Registrar la cantidad prevista por producto.",
+          "tools": [
+            "prepare_stock_transfer"
+          ],
+          "note": "",
+          "id": "F117"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Registrar la cantidad realmente preparada por producto.",
+          "tools": [
+            "prepare_stock_transfer"
+          ],
+          "note": "",
+          "id": "F118"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Registrar la cantidad realmente recibida en destino por producto.",
+          "tools": [
+            "prepare_stock_transfer"
+          ],
+          "note": "Olivia exige dato explícito; la interfaz permite revisar los valores sugeridos.",
+          "id": "F119"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Calcular faltantes y pérdidas según lo previsto, preparado y recibido.",
+          "tools": [],
+          "note": "",
+          "id": "F120"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Registrar responsable físico del traslado y observación o motivo.",
+          "tools": [
+            "prepare_stock_transfer"
+          ],
+          "note": "Olivia exige motivo no vacío.",
+          "id": "F121"
+        },
+        {
+          "channel": "UI",
+          "action": "Elegir precio predeterminado o especial cuando el producto se incorpora a una ubicación de destino.",
+          "tools": [],
+          "note": "",
+          "id": "F122"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Revisar y confirmar la salida y entrada de stock en una operación.",
+          "tools": [
+            "prepare_stock_transfer"
+          ],
+          "note": "Actualiza ambos inventarios y deja trazabilidad; no permite transferir más del stock disponible.",
+          "id": "F123"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Consultar transferencias recientes y sus diferencias.",
+          "tools": [
+            "get_transfer_history"
+          ],
+          "note": "",
+          "id": "F124"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Buscar un origen con stock suficiente para un traslado solicitado.",
+          "tools": [
+            "resolve_transfer_origin"
+          ],
+          "note": "Sólo recomienda automáticamente si hay un único origen y la búsqueda fue completa.",
+          "id": "F125"
+        }
+      ]
+    },
+    {
+      "module": "quick-sales",
+      "title": "Venta rápida administrativa",
+      "route": "/gestion/quick-sales",
+      "permissions": "quick-sales.view/create; descuentos manuales, pagos múltiples y depósito según permisos.",
+      "files": [
+        "src/gestion/pages/QuickSalesPage.jsx",
+        "src/gestion/services/managementService.js",
+        "src/gestion/seller/DiscountDialog.jsx",
+        "src/gestion/seller/CustomerDialog.jsx",
+        "src/gestion/seller/quickSaleIntent.js"
+      ],
+      "limits": "Seleccionar un medio de pago registra cómo se cobró; no procesa un cobro bancario. Cambiar el origen vacía los productos de la venta. El botón Continuar registra la venta; el flujo fiscal se trata por separado.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Elegir el canal comercial real: WhatsApp, Instagram, teléfono o presencial.",
+          "tools": [],
+          "note": "",
+          "id": "F126"
+        },
+        {
+          "channel": "UI",
+          "action": "Elegir una ubicación activa como origen físico de la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F127"
+        },
+        {
+          "channel": "UI",
+          "action": "Elegir un depósito activo como origen físico de la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F128"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar productos del inventario de origen.",
+          "tools": [],
+          "note": "",
+          "id": "F129"
+        },
+        {
+          "channel": "UI",
+          "action": "Navegar categorías y subcategorías del catálogo de venta.",
+          "tools": [],
+          "note": "",
+          "id": "F130"
+        },
+        {
+          "channel": "UI",
+          "action": "Agregar un producto a la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F131"
+        },
+        {
+          "channel": "UI",
+          "action": "Aumentar la cantidad de un producto en la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F132"
+        },
+        {
+          "channel": "UI",
+          "action": "Disminuir la cantidad o quitar un producto de la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F133"
+        },
+        {
+          "channel": "UI",
+          "action": "Vaciar la venta en preparación.",
+          "tools": [],
+          "note": "",
+          "id": "F134"
+        },
+        {
+          "channel": "UI",
+          "action": "Cambiar el precio unitario sólo para esa venta.",
+          "tools": [],
+          "note": "No modifica el precio del catálogo ni el de la ubicación.",
+          "id": "F135"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar descuentos guardados válidos para la venta.",
+          "tools": [
+            "get_promotions"
+          ],
+          "note": "",
+          "id": "F136"
+        },
+        {
+          "channel": "UI",
+          "action": "Aplicar uno o varios descuentos guardados.",
+          "tools": [],
+          "note": "",
+          "id": "F137"
+        },
+        {
+          "channel": "UI",
+          "action": "Aplicar uno o varios descuentos manuales por porcentaje.",
+          "tools": [],
+          "note": "",
+          "id": "F138"
+        },
+        {
+          "channel": "UI",
+          "action": "Aplicar uno o varios descuentos manuales por monto fijo.",
+          "tools": [],
+          "note": "",
+          "id": "F139"
+        },
+        {
+          "channel": "UI",
+          "action": "Quitar un descuento aplicado.",
+          "tools": [],
+          "note": "",
+          "id": "F140"
+        },
+        {
+          "channel": "UI",
+          "action": "Revisar y aplicar el borrador de descuentos antes de usarlo en la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F141"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Calcular subtotal, descuentos y total de la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F142"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Aplicar la regla de redondeo por efectivo cuando corresponde a una venta con descuento.",
+          "tools": [],
+          "note": "Regla implementada compartida; no todos los pagos se redondean.",
+          "id": "F143"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar un cliente por teléfono y asociarlo a la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F144"
+        },
+        {
+          "channel": "UI",
+          "action": "Crear o completar un cliente por teléfono al asociarlo a la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F145"
+        },
+        {
+          "channel": "UI",
+          "action": "Registrar nombre y zona opcionales del cliente en esa asociación.",
+          "tools": [],
+          "note": "",
+          "id": "F146"
+        },
+        {
+          "channel": "UI",
+          "action": "Quitar la asociación de cliente de la venta en preparación.",
+          "tools": [],
+          "note": "",
+          "id": "F147"
+        },
+        {
+          "channel": "UI",
+          "action": "Marcar la modalidad de entrega como retiro o con envío.",
+          "tools": [],
+          "note": "Es una marca de la venta; esta pantalla no captura un domicilio ni cotiza un flete.",
+          "id": "F148"
+        },
+        {
+          "channel": "UI",
+          "action": "Registrar el pago como efectivo.",
+          "tools": [],
+          "note": "",
+          "id": "F149"
+        },
+        {
+          "channel": "UI",
+          "action": "Registrar el pago como débito.",
+          "tools": [],
+          "note": "",
+          "id": "F150"
+        },
+        {
+          "channel": "UI",
+          "action": "Registrar el pago como crédito.",
+          "tools": [],
+          "note": "",
+          "id": "F151"
+        },
+        {
+          "channel": "UI",
+          "action": "Registrar el pago como alias o transferencia.",
+          "tools": [],
+          "note": "",
+          "id": "F152"
+        },
+        {
+          "channel": "UI",
+          "action": "Dividir el total entre dos o más formas de pago.",
+          "tools": [],
+          "note": "",
+          "id": "F153"
+        },
+        {
+          "channel": "UI",
+          "action": "Completar automáticamente el importe restante de una parte del pago.",
+          "tools": [],
+          "note": "",
+          "id": "F154"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar diferencias o errores del desglose antes de guardar.",
+          "tools": [],
+          "note": "",
+          "id": "F155"
+        },
+        {
+          "channel": "UI",
+          "action": "Registrar la venta con código, usuario, canal, cliente, pagos y salida de stock.",
+          "tools": [],
+          "note": "",
+          "id": "F156"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Conservar la intención de venta pendiente para recuperar una confirmación ambigua sin duplicarla.",
+          "tools": [],
+          "note": "",
+          "id": "F157"
+        },
+        {
+          "channel": "UI",
+          "action": "Recuperar el resultado de esa misma confirmación tras un error de conexión.",
+          "tools": [],
+          "note": "",
+          "id": "F158"
+        },
+        {
+          "channel": "UI",
+          "action": "Ver el aviso de stock negativo cuando una venta de ubicación supera las existencias registradas.",
+          "tools": [],
+          "note": "Las ubicaciones permiten la venta con discrepancia; las ventas de depósito limitan por stock.",
+          "id": "F159"
+        },
+        {
+          "channel": "O-CONF",
+          "action": "Registrar juntas hasta veinte ventas independientes de una lista.",
+          "tools": [
+            "prepare_batch_sales"
+          ],
+          "note": "Hasta cien renglones totales; requiere canal, origen, pagos y decisiones explícitas por venta. Una tarjeta y confirmación atómica; no emite facturas.",
+          "id": "F160"
+        }
+      ]
+    },
+    {
+      "module": "quick-sales",
+      "title": "Panel Vendedor y ventas sin conexión",
+      "route": "/vendedor",
+      "permissions": "quick-sales.create/viewOwn/edit/cancelOwn y flags useDiscounts/useManualDiscounts/useMultiplePayments/useOfflineSales/useKeyboard/requestTicket; ubicaciones asignadas activas.",
+      "files": [
+        "src/gestion/seller/SellerPanel.jsx",
+        "src/gestion/seller/SellerCatalogList.jsx",
+        "src/gestion/seller/offlineSales.js",
+        "src/gestion/seller/sellerValidation.js",
+        "src/gestion/services/sellerService.js"
+      ],
+      "limits": "Sin conexión no funcionan las herramientas de Olivia ni la edición remota. La cola local es por cuenta y dispositivo; no es una venta ya confirmada. La solicitud fiscal y los PDF tienen condiciones propias descritas en Facturación.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Elegir entre las ubicaciones activas autorizadas del vendedor.",
+          "tools": [],
+          "note": "",
+          "id": "F161"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar nombre de ubicación, usuario y estado de conexión del panel.",
+          "tools": [],
+          "note": "",
+          "id": "F162"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar productos habilitados para vender en la ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F163"
+        },
+        {
+          "channel": "UI",
+          "action": "Navegar productos por categoría y subcategoría.",
+          "tools": [],
+          "note": "",
+          "id": "F164"
+        },
+        {
+          "channel": "UI",
+          "action": "Agregar productos mediante las tarjetas del catálogo.",
+          "tools": [],
+          "note": "",
+          "id": "F165"
+        },
+        {
+          "channel": "UI",
+          "action": "Cambiar a la botonera de productos.",
+          "tools": [],
+          "note": "",
+          "id": "F166"
+        },
+        {
+          "channel": "UI",
+          "action": "Agregar productos con los atajos de teclado configurados y autorizados.",
+          "tools": [],
+          "note": "",
+          "id": "F167"
+        },
+        {
+          "channel": "UI",
+          "action": "Aumentar o disminuir cantidades del carrito.",
+          "tools": [],
+          "note": "",
+          "id": "F168"
+        },
+        {
+          "channel": "UI",
+          "action": "Quitar un producto completo del carrito.",
+          "tools": [],
+          "note": "",
+          "id": "F169"
+        },
+        {
+          "channel": "UI",
+          "action": "Iniciar una venta nueva limpiando la venta en preparación.",
+          "tools": [],
+          "note": "",
+          "id": "F170"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar precios y stock disponible para cada producto.",
+          "tools": [],
+          "note": "",
+          "id": "F171"
+        },
+        {
+          "channel": "UI",
+          "action": "Aplicar descuentos guardados habilitados para la ubicación y el carrito.",
+          "tools": [],
+          "note": "",
+          "id": "F172"
+        },
+        {
+          "channel": "UI",
+          "action": "Aplicar descuentos manuales por monto o porcentaje con permiso.",
+          "tools": [],
+          "note": "",
+          "id": "F173"
+        },
+        {
+          "channel": "UI",
+          "action": "Combinar varios descuentos y quitar uno aplicado.",
+          "tools": [],
+          "note": "",
+          "id": "F174"
+        },
+        {
+          "channel": "UI",
+          "action": "Confirmar el borrador de descuentos antes de aplicarlo.",
+          "tools": [],
+          "note": "",
+          "id": "F175"
+        },
+        {
+          "channel": "UI",
+          "action": "Asociar un cliente existente por teléfono.",
+          "tools": [],
+          "note": "",
+          "id": "F176"
+        },
+        {
+          "channel": "UI",
+          "action": "Dar de alta o completar un cliente por teléfono con nombre y zona opcionales.",
+          "tools": [],
+          "note": "",
+          "id": "F177"
+        },
+        {
+          "channel": "UI",
+          "action": "Elegir otra zona escrita por el vendedor cuando corresponde.",
+          "tools": [],
+          "note": "",
+          "id": "F178"
+        },
+        {
+          "channel": "UI",
+          "action": "Quitar la asociación de cliente de la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F179"
+        },
+        {
+          "channel": "UI",
+          "action": "Cobrar mediante efectivo, débito, crédito o alias como registro del medio de pago.",
+          "tools": [],
+          "note": "",
+          "id": "F180"
+        },
+        {
+          "channel": "UI",
+          "action": "Registrar pago dividido entre dos o más medios y completar el saldo restante.",
+          "tools": [],
+          "note": "",
+          "id": "F181"
+        },
+        {
+          "channel": "UI",
+          "action": "Revisar subtotal, descuentos, redondeo cuando corresponde y total.",
+          "tools": [],
+          "note": "",
+          "id": "F182"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Registrar una venta presencial de la ubicación con sus decisiones comerciales.",
+          "tools": [
+            "prepare_sale"
+          ],
+          "note": "Olivia necesita productos, pago, cliente, descuentos y comprobante explícitos; luego presenta tarjeta Sí/No.",
+          "id": "F183"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar el comprobante visual de una venta guardada y sus datos de resultado.",
+          "tools": [],
+          "note": "",
+          "id": "F184"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar las ventas propias del día y abrir el detalle de una venta.",
+          "tools": [],
+          "note": "",
+          "id": "F185"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar el total activo vendido hoy por el vendedor.",
+          "tools": [
+            "get_today_sales"
+          ],
+          "note": "Olivia consulta la ubicación indicada; usa límite y puede declarar resultados parciales.",
+          "id": "F186"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir el desglose del total diario por forma de pago, con las partes reales de pagos múltiples.",
+          "tools": [],
+          "note": "",
+          "id": "F187"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar el aviso de diferencias de desglose cuando hay registros que necesitan revisión.",
+          "tools": [],
+          "note": "",
+          "id": "F188"
+        },
+        {
+          "channel": "UI",
+          "action": "Editar una venta propia confirmada que siga siendo elegible.",
+          "tools": [],
+          "note": "Recalcula stock y pagos con trazabilidad; requiere conexión y no admite venta vinculada a factura fiscal.",
+          "id": "F189"
+        },
+        {
+          "channel": "UI",
+          "action": "Anular una venta propia elegible y devolver sus unidades al stock.",
+          "tools": [],
+          "note": "Conserva venta y auditoría; no admite vínculo fiscal. No es borrar la venta.",
+          "id": "F190"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar el stock restante de la ubicación desde la sección Stock.",
+          "tools": [],
+          "note": "",
+          "id": "F191"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar la lista de precios de la ubicación desde la sección Precios.",
+          "tools": [],
+          "note": "",
+          "id": "F192"
+        },
+        {
+          "channel": "UI",
+          "action": "Guardar una venta nueva sin conexión en el dispositivo autorizado.",
+          "tools": [],
+          "note": "Requiere recursos previamente cargados y permiso; la venta todavía no llegó a Firestore.",
+          "id": "F193"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar cuántas ventas quedan pendientes de sincronizar.",
+          "tools": [],
+          "note": "",
+          "id": "F194"
+        },
+        {
+          "channel": "UI",
+          "action": "Ver las ventas pendientes, fecha local y el error de cada intento fallido.",
+          "tools": [],
+          "note": "",
+          "id": "F195"
+        },
+        {
+          "channel": "UI",
+          "action": "Sincronizar ahora las ventas pendientes al recuperar conexión.",
+          "tools": [],
+          "note": "",
+          "id": "F196"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Reintentar la sincronización automática cuando vuelve la conexión y corresponde.",
+          "tools": [],
+          "note": "",
+          "id": "F197"
+        },
+        {
+          "channel": "UI",
+          "action": "Descartar una venta pendiente local tras confirmación.",
+          "tools": [],
+          "note": "Elimina sólo el registro que aún no llegó a Firestore en ese dispositivo.",
+          "id": "F198"
+        },
+        {
+          "channel": "O-CONF",
+          "action": "Registrar una lista de ventas presenciales de ubicaciones asignadas.",
+          "tools": [
+            "prepare_batch_sales"
+          ],
+          "note": "Hasta veinte ventas y cien renglones; requiere conexión con Olivia. El vendedor no puede usar depósitos ni otros canales.",
+          "id": "F199"
+        }
+      ]
+    },
+    {
+      "module": "quick-sales",
+      "title": "Historial de ventas por ubicación",
+      "route": "/gestion/locations/:id/sales",
+      "permissions": "locations.view y acceso de lectura de ventas; anulación según cancelOwn o administración.",
+      "files": [
+        "src/gestion/components/LocationSalesPanel.jsx",
+        "src/gestion/services/locationSalesService.js",
+        "src/gestion/services/sellerService.js",
+        "src/gestion/components/ArcaInvoicePrintAction.jsx"
+      ],
+      "limits": "Los filtros de la pantalla trabajan sobre los bloques cargados: cargar más amplía el conjunto. No se encontró exportación de todas las ventas ni un editor administrativo universal de ventas.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Consultar ventas de una ubicación en páginas y cargar más registros.",
+          "tools": [],
+          "note": "",
+          "id": "F200"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar las ventas cargadas por fecha.",
+          "tools": [],
+          "note": "",
+          "id": "F201"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar las ventas cargadas por vendedor.",
+          "tools": [],
+          "note": "",
+          "id": "F202"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar las ventas cargadas por estado activo o anulado.",
+          "tools": [],
+          "note": "",
+          "id": "F203"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar las ventas cargadas por forma de pago.",
+          "tools": [],
+          "note": "",
+          "id": "F204"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir el detalle de una venta por su código.",
+          "tools": [],
+          "note": "",
+          "id": "F205"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar productos, cantidades, precios y total de la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F206"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar los descuentos guardados y manuales aplicados.",
+          "tools": [],
+          "note": "",
+          "id": "F207"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar cada parte real del pago dividido.",
+          "tools": [],
+          "note": "",
+          "id": "F208"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar cliente, canal, origen, vendedor y fechas conservados en la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F209"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar la solicitud y estado del comprobante fiscal asociado.",
+          "tools": [],
+          "note": "",
+          "id": "F210"
+        },
+        {
+          "channel": "UI/O-REV",
+          "action": "Revisar una venta elegible para anularla en el flujo manual.",
+          "tools": [
+            "prepare_sale_cancellation_review"
+          ],
+          "note": "Olivia abre el detalle; no anula la venta al confirmar su tarjeta.",
+          "id": "F211"
+        },
+        {
+          "channel": "UI",
+          "action": "Confirmar la anulación de una venta elegible con motivo y restitución de stock.",
+          "tools": [],
+          "note": "Rechaza ventas con vínculo fiscal; conserva el historial.",
+          "id": "F212"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Consultar el historial de ventas activas de un período autorizado.",
+          "tools": [
+            "get_sales_history"
+          ],
+          "note": "Consulta de Olivia acotada, con parcialidad explícita; no equivale a descargar toda la base.",
+          "id": "F213"
+        }
+      ]
+    },
+    {
+      "module": "loyal-customers",
+      "title": "Clientes y zonas",
+      "route": "/gestion/loyal-customers",
+      "permissions": "loyal-customers.view/create/edit/viewSensitive y administración de zonas según permisos.",
+      "files": [
+        "src/gestion/pages/LoyalCustomersPage.jsx",
+        "src/gestion/seller/CustomerDialog.jsx",
+        "src/gestion/services/customerService.js",
+        "src/gestion/customers/customerDomain.js"
+      ],
+      "limits": "No se detectaron acciones de borrar clientes ni un formulario para gestionar su consentimiento de marketing. No inferir permiso para enviar mensajes a partir de que un teléfono esté registrado.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Listar clientes y cargar más bloques.",
+          "tools": [
+            "search_customers"
+          ],
+          "note": "La búsqueda de Olivia es acotada.",
+          "id": "F214"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar clientes cargados por nombre, teléfono o zona.",
+          "tools": [],
+          "note": "",
+          "id": "F215"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar un teléfono normalizado en toda la base de clientes.",
+          "tools": [],
+          "note": "",
+          "id": "F216"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Abrir la ficha de un cliente con teléfono, nombre, zona y fechas.",
+          "tools": [
+            "get_customer"
+          ],
+          "note": "",
+          "id": "F217"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Crear un cliente con teléfono obligatorio y nombre/zona opcionales.",
+          "tools": [
+            "prepare_customer_create"
+          ],
+          "note": "",
+          "id": "F218"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Unificar formatos del mismo teléfono para reutilizar la identidad y evitar duplicados.",
+          "tools": [],
+          "note": "",
+          "id": "F219"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Completar campos vacíos de un cliente existente durante el alta.",
+          "tools": [
+            "prepare_customer_create"
+          ],
+          "note": "Conserva los valores existentes en conflicto y los informa.",
+          "id": "F220"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Editar el nombre de un cliente.",
+          "tools": [
+            "prepare_customer_update"
+          ],
+          "note": "",
+          "id": "F221"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Editar o cambiar la zona de un cliente.",
+          "tools": [
+            "prepare_customer_update"
+          ],
+          "note": "",
+          "id": "F222"
+        },
+        {
+          "channel": "UI",
+          "action": "Editar el teléfono de un cliente mediante la revisión de identidad de CRM.",
+          "tools": [],
+          "note": "Olivia no ejecuta el cambio de teléfono.",
+          "id": "F223"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Conservar referencias e historial al resolver una identidad de cliente por cambio de teléfono.",
+          "tools": [],
+          "note": "",
+          "id": "F224"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir WhatsApp con el teléfono del cliente desde su ficha.",
+          "tools": [],
+          "note": "Abre un enlace; no envía automáticamente un mensaje.",
+          "id": "F225"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar las zonas registradas y su orden.",
+          "tools": [],
+          "note": "",
+          "id": "F226"
+        },
+        {
+          "channel": "UI",
+          "action": "Crear una zona de clientes.",
+          "tools": [],
+          "note": "",
+          "id": "F227"
+        },
+        {
+          "channel": "UI",
+          "action": "Editar el nombre y orden de una zona.",
+          "tools": [],
+          "note": "",
+          "id": "F228"
+        },
+        {
+          "channel": "UI",
+          "action": "Desactivar una zona para dejar de ofrecerla en nuevas ventas.",
+          "tools": [],
+          "note": "",
+          "id": "F229"
+        },
+        {
+          "channel": "UI",
+          "action": "Reactivar una zona.",
+          "tools": [],
+          "note": "",
+          "id": "F230"
+        },
+        {
+          "channel": "UI",
+          "action": "Conservar y mostrar la zona histórica de un cliente aunque esté inactiva.",
+          "tools": [],
+          "note": "",
+          "id": "F231"
+        }
+      ]
+    },
+    {
+      "module": "loyal-customers",
+      "title": "Importación, historial y fidelización",
+      "route": "/gestion/loyal-customers",
+      "permissions": "Permisos CRM; configuración de fidelización validada por el servicio.",
+      "files": [
+        "src/gestion/customers/CustomerImportModal.jsx",
+        "src/gestion/customers/customerImport.js",
+        "src/gestion/customers/CustomerInsights.jsx",
+        "src/gestion/customers/crmService.js"
+      ],
+      "limits": "La segmentación parte del conjunto de clientes cargado y las compras válidas de su período; no atribuir alcance ilimitado. Fidelización clasifica, no acredita puntos, cupones ni dinero.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Seleccionar un Excel de contactos para importación de clientes.",
+          "tools": [],
+          "note": "",
+          "id": "F232"
+        },
+        {
+          "channel": "UI",
+          "action": "Reconocer teléfono, nombre y zona del archivo de contactos.",
+          "tools": [],
+          "note": "",
+          "id": "F233"
+        },
+        {
+          "channel": "UI",
+          "action": "Previsualizar filas válidas, inválidas, duplicadas y existentes antes de importar.",
+          "tools": [],
+          "note": "",
+          "id": "F234"
+        },
+        {
+          "channel": "UI",
+          "action": "Confirmar la importación de los clientes válidos.",
+          "tools": [],
+          "note": "",
+          "id": "F235"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Crear clientes nuevos o completar campos vacíos sin sobrescribir conflictos existentes.",
+          "tools": [],
+          "note": "",
+          "id": "F236"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar progreso y resultado: creados, completados, omitidos, conflictos y errores.",
+          "tools": [],
+          "note": "",
+          "id": "F237"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar el historial de compras de un cliente y cargar compras anteriores.",
+          "tools": [
+            "get_customer_history"
+          ],
+          "note": "",
+          "id": "F238"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar la última compra válida de un cliente.",
+          "tools": [],
+          "note": "",
+          "id": "F239"
+        },
+        {
+          "channel": "UI",
+          "action": "Ver compras anuladas conservadas en el historial sin contarlas como válidas.",
+          "tools": [],
+          "note": "",
+          "id": "F240"
+        },
+        {
+          "channel": "UI",
+          "action": "Elegir la ventana de días para el análisis cuando no hay política de fidelización activa.",
+          "tools": [],
+          "note": "",
+          "id": "F241"
+        },
+        {
+          "channel": "UI",
+          "action": "Segmentar clientes por fidelizado o no fidelizado.",
+          "tools": [],
+          "note": "",
+          "id": "F242"
+        },
+        {
+          "channel": "UI",
+          "action": "Segmentar clientes por zona.",
+          "tools": [],
+          "note": "",
+          "id": "F243"
+        },
+        {
+          "channel": "UI",
+          "action": "Segmentar clientes por categoría comprada.",
+          "tools": [],
+          "note": "",
+          "id": "F244"
+        },
+        {
+          "channel": "UI",
+          "action": "Segmentar clientes por producto comprado.",
+          "tools": [],
+          "note": "",
+          "id": "F245"
+        },
+        {
+          "channel": "UI",
+          "action": "Segmentar clientes por cantidad mínima de compras.",
+          "tools": [],
+          "note": "",
+          "id": "F246"
+        },
+        {
+          "channel": "UI",
+          "action": "Segmentar clientes por frecuencia máxima entre compras.",
+          "tools": [],
+          "note": "",
+          "id": "F247"
+        },
+        {
+          "channel": "UI",
+          "action": "Segmentar clientes por fecha de última compra.",
+          "tools": [],
+          "note": "",
+          "id": "F248"
+        },
+        {
+          "channel": "UI",
+          "action": "Activar o desactivar la clasificación automática de fidelización.",
+          "tools": [],
+          "note": "",
+          "id": "F249"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar cantidad mínima de compras y ventana de días para fidelización.",
+          "tools": [],
+          "note": "",
+          "id": "F250"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar mínimo de categorías y frecuencia máxima opcionales de fidelización.",
+          "tools": [],
+          "note": "",
+          "id": "F251"
+        }
+      ]
+    },
+    {
+      "module": "metrics",
+      "title": "Métricas y análisis comercial",
+      "route": "/gestion/metrics/sales",
+      "permissions": "metrics.view; fuentes autorizadas y permisos de ubicaciones/productos/usuarios para dimensiones.",
+      "files": [
+        "src/gestion/pages/SalesMetricsPage.jsx",
+        "src/gestion/components/MetricsFiltersPanel.jsx",
+        "src/gestion/components/OperatingMetricsPanel.jsx",
+        "src/modules/locations/domain/metrics.js",
+        "netlify/functions/_lib/olivia/extendedTools.mjs"
+      ],
+      "limits": "“Facturación” en métricas significa monto comercial vendido, no CAE emitido ni acreditación bancaria. No se encontró una descarga CSV/XLSX del análisis. Las consultas de Olivia tienen límites y deben declarar parcialidad.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Analizar ventas de un día, mes, año o rango de fechas.",
+          "tools": [],
+          "note": "",
+          "id": "F252"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar por una o varias ubicaciones, incluso históricas cuando están disponibles.",
+          "tools": [],
+          "note": "",
+          "id": "F253"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar por uno o varios vendedores.",
+          "tools": [],
+          "note": "",
+          "id": "F254"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar por categorías o productos.",
+          "tools": [],
+          "note": "",
+          "id": "F255"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar por descuentos aplicados o ventas sin descuento.",
+          "tools": [],
+          "note": "",
+          "id": "F256"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar por formas de pago.",
+          "tools": [],
+          "note": "",
+          "id": "F257"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar por canal comercial real registrado.",
+          "tools": [],
+          "note": "",
+          "id": "F258"
+        },
+        {
+          "channel": "UI",
+          "action": "Combinar filtros y aplicar o cancelar la selección de cada dimensión.",
+          "tools": [],
+          "note": "",
+          "id": "F259"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar total vendido, cantidad de ventas y ticket promedio.",
+          "tools": [
+            "get_sales_metrics"
+          ],
+          "note": "",
+          "id": "F260"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar unidades vendidas y descuentos totales.",
+          "tools": [
+            "get_sales_metrics"
+          ],
+          "note": "",
+          "id": "F261"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar categorías vendidas con unidades, operaciones y subtotal antes de descuentos generales.",
+          "tools": [],
+          "note": "",
+          "id": "F262"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar ventas por canal comercial.",
+          "tools": [
+            "get_sales_metrics"
+          ],
+          "note": "",
+          "id": "F263"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar ventas por origen físico del stock: ubicación o depósito.",
+          "tools": [],
+          "note": "",
+          "id": "F264"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar la evolución temporal por hora, día, semana o mes según el período.",
+          "tools": [],
+          "note": "",
+          "id": "F265"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar rendimiento y ranking de productos.",
+          "tools": [
+            "get_product_performance"
+          ],
+          "note": "",
+          "id": "F266"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar cantidades e importes vendidos de un producto en un período.",
+          "tools": [
+            "get_product_sales_history"
+          ],
+          "note": "",
+          "id": "F267"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar distribución por forma de pago usando las partes reales de pagos múltiples.",
+          "tools": [],
+          "note": "",
+          "id": "F268"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar ventas, unidades e importes por ubicación.",
+          "tools": [
+            "get_location_metrics"
+          ],
+          "note": "",
+          "id": "F269"
+        },
+        {
+          "channel": "UI",
+          "action": "Ordenar las ubicaciones por monto, ventas o unidades.",
+          "tools": [],
+          "note": "",
+          "id": "F270"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar rendimiento por vendedor.",
+          "tools": [
+            "get_seller_performance"
+          ],
+          "note": "",
+          "id": "F271"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar descuentos aplicados distinguiendo guardados y manuales cuando existe ese dato.",
+          "tools": [],
+          "note": "",
+          "id": "F272"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar promedios operativos de una ubicación según su calendario.",
+          "tools": [],
+          "note": "La fórmula conjunta de múltiples calendarios se declara pendiente.",
+          "id": "F273"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar el calendario anual de feriados del negocio.",
+          "tools": [],
+          "note": "Administrador: fechas explícitas; no consulta automáticamente un proveedor de feriados.",
+          "id": "F274"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Comparar ubicaciones con datos reales del período.",
+          "tools": [
+            "compare_locations"
+          ],
+          "note": "",
+          "id": "F275"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Comparar las métricas del período con el período anterior cuando corresponde.",
+          "tools": [
+            "get_sales_metrics"
+          ],
+          "note": "",
+          "id": "F276"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Consultar métricas de todo el historial registrado cuando el usuario lo pide explícitamente.",
+          "tools": [
+            "get_all_time_sales_metrics"
+          ],
+          "note": "Declara fechas y si alcanzó un límite; no inventa un período anterior.",
+          "id": "F277"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Investigar fuentes públicas sobre una fórmula o métrica comercial.",
+          "tools": [
+            "research_web_metric"
+          ],
+          "note": "Administrador; consulta genérica sin enviar datos privados del negocio.",
+          "id": "F278"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Pronosticar una feria con escenarios y recomendación de mercadería.",
+          "tools": [
+            "forecast_fair"
+          ],
+          "note": "Heurística con datos vivos, hasta catorce días y cinco comparables; depende de historia suficiente y declara incertidumbre.",
+          "id": "F279"
+        }
+      ]
+    },
+    {
+      "module": "finance",
+      "title": "Finanzas, ingresos y gastos",
+      "route": "/gestion/finance",
+      "permissions": "finance.view/create/edit; parámetros financieros reservados según canConfigure del módulo.",
+      "files": [
+        "src/gestion/pages/FinancePage.jsx",
+        "src/gestion/finance/financeDomain.js",
+        "src/gestion/finance/financeService.js"
+      ],
+      "limits": "No es una contabilidad completa ni un balance bancario. Sin costos y parámetros suficientes se muestra resultado desconocido. La valoración definitiva de inventario y su imputación contable sigue pendiente; no presentar cero como dato faltante.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Seleccionar mes de análisis financiero.",
+          "tools": [],
+          "note": "",
+          "id": "F280"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar el análisis por ubicación o todo el negocio.",
+          "tools": [],
+          "note": "",
+          "id": "F281"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar ingresos derivados de ventas válidas sin duplicarlos por facturación fiscal.",
+          "tools": [
+            "get_financial_summary"
+          ],
+          "note": "",
+          "id": "F282"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar otros ingresos, gastos devengados y resultado cuando los datos permiten calcularlo.",
+          "tools": [
+            "get_financial_summary"
+          ],
+          "note": "",
+          "id": "F283"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar costos conocidos y cuántas unidades carecen de costo histórico.",
+          "tools": [],
+          "note": "",
+          "id": "F284"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar comisiones e impuestos internos estimados según parámetros vigentes.",
+          "tools": [],
+          "note": "",
+          "id": "F285"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar el estado fiscal de las ventas incluidas en ingresos.",
+          "tools": [],
+          "note": "",
+          "id": "F286"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar registros financieros anteriores que aún requieren clasificación.",
+          "tools": [],
+          "note": "",
+          "id": "F287"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Registrar un gasto con concepto e importe.",
+          "tools": [
+            "prepare_expense_create"
+          ],
+          "note": "La herramienta recibe amountCents en centavos y lo convierte al monto monetario del dominio.",
+          "id": "F288"
+        },
+        {
+          "channel": "UI",
+          "action": "Registrar un ingreso externo ajeno a ventas con referencia obligatoria.",
+          "tools": [],
+          "note": "",
+          "id": "F289"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Clasificar un gasto por categoría y naturaleza fija, variable o extraordinaria.",
+          "tools": [
+            "prepare_expense_create"
+          ],
+          "note": "",
+          "id": "F290"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Asignar un gasto a todo el negocio o una ubicación concreta.",
+          "tools": [
+            "prepare_expense_create"
+          ],
+          "note": "",
+          "id": "F291"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Registrar fecha de devengamiento, vencimiento y pago efectivo del gasto.",
+          "tools": [
+            "prepare_expense_create"
+          ],
+          "note": "",
+          "id": "F292"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Registrar si el gasto pagado salió de efectivo o cuenta bancaria.",
+          "tools": [
+            "prepare_expense_create"
+          ],
+          "note": "No consulta ni mueve dinero en el banco.",
+          "id": "F293"
+        },
+        {
+          "channel": "UI",
+          "action": "Vincular un movimiento financiero con proveedor, pedido o envío mediante su referencia.",
+          "tools": [],
+          "note": "",
+          "id": "F294"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Agregar observaciones al gasto.",
+          "tools": [
+            "prepare_expense_create"
+          ],
+          "note": "",
+          "id": "F295"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar gastos del período y su estado.",
+          "tools": [
+            "get_expenses"
+          ],
+          "note": "",
+          "id": "F296"
+        },
+        {
+          "channel": "UI",
+          "action": "Anular un gasto con motivo conservando su historial y excluyéndolo del resultado.",
+          "tools": [],
+          "note": "",
+          "id": "F297"
+        },
+        {
+          "channel": "UI",
+          "action": "Actualizar datos financieros y evaluar controles/alertas con permiso de edición.",
+          "tools": [],
+          "note": "",
+          "id": "F298"
+        }
+      ]
+    },
+    {
+      "module": "finance",
+      "title": "Caja, acreditaciones, presupuestos y parámetros",
+      "route": "/gestion/finance",
+      "permissions": "finance.view/edit; cambios de configuración según permiso financiero.",
+      "files": [
+        "src/gestion/pages/FinancePage.jsx",
+        "src/gestion/finance/financeDomain.js",
+        "src/gestion/finance/financeService.js"
+      ],
+      "limits": "No hay conexión bancaria, conciliación automática con extractos, transferencias de dinero ni proyecciones estadísticas de caja. Registrar evidencia no implica que el sistema haya verificado el banco.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Consultar movimientos efectivos separados entre caja y banco.",
+          "tools": [],
+          "note": "",
+          "id": "F299"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar neto esperado de cada pago electrónico según comisión configurada.",
+          "tools": [],
+          "note": "",
+          "id": "F300"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar fecha prevista de acreditación según plazo configurado.",
+          "tools": [],
+          "note": "",
+          "id": "F301"
+        },
+        {
+          "channel": "UI",
+          "action": "Registrar manualmente evidencia de acreditación: importe, fecha y referencia.",
+          "tools": [],
+          "note": "",
+          "id": "F302"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar diferencias entre lo esperado y lo acreditado.",
+          "tools": [],
+          "note": "",
+          "id": "F303"
+        },
+        {
+          "channel": "UI",
+          "action": "Resolver una discrepancia financiera con motivo registrado.",
+          "tools": [],
+          "note": "",
+          "id": "F304"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar flujo futuro respaldado por vencimientos y acreditaciones configuradas.",
+          "tools": [],
+          "note": "",
+          "id": "F305"
+        },
+        {
+          "channel": "UI",
+          "action": "Guardar o actualizar un presupuesto mensual por categoría y alcance.",
+          "tools": [],
+          "note": "",
+          "id": "F306"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar porcentaje de aviso de consumo de un presupuesto.",
+          "tools": [],
+          "note": "",
+          "id": "F307"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar presupuesto, gasto, disponible y porcentaje consumido.",
+          "tools": [],
+          "note": "",
+          "id": "F308"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Generar o actualizar alertas de controles financieros y presupuestos al evaluar controles.",
+          "tools": [],
+          "note": "",
+          "id": "F309"
+        },
+        {
+          "channel": "UI",
+          "action": "Crear una nueva versión de parámetros financieros con fecha de vigencia.",
+          "tools": [],
+          "note": "",
+          "id": "F310"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar el porcentaje interno estimado de impuesto directo.",
+          "tools": [],
+          "note": "",
+          "id": "F311"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar la comisión de cada forma de pago.",
+          "tools": [],
+          "note": "",
+          "id": "F312"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar días corridos de acreditación de medios electrónicos.",
+          "tools": [],
+          "note": "",
+          "id": "F313"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar las categorías de gasto disponibles.",
+          "tools": [],
+          "note": "",
+          "id": "F314"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Conservar versiones anteriores y aplicar parámetros vigentes a la fecha de la venta.",
+          "tools": [],
+          "note": "",
+          "id": "F315"
+        }
+      ]
+    },
+    {
+      "module": "marketing",
+      "title": "Registro básico de marketing",
+      "route": "/gestion/marketing",
+      "permissions": "marketing.view/create; submódulos WhatsApp y Meta Ads con permisos específicos.",
+      "files": [
+        "src/gestion/pages/GenericModulePage.jsx",
+        "src/gestion/modules.js",
+        "src/shared/managementWritePlans.mjs"
+      ],
+      "limits": "El alta genérica no crea una campaña de WhatsApp ni publica un anuncio de Meta. No hay un editor general ni un botón de envío en esta tabla genérica. La tabla genérica carga hasta cuarenta registros recientes y no ofrece Cargar más, aunque su descripción diga paginada.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar campañas genéricas registradas y su estado.",
+          "tools": [
+            "get_marketing_campaigns"
+          ],
+          "note": "",
+          "id": "F316"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar campañas genéricas por nombre o estado en los registros cargados.",
+          "tools": [],
+          "note": "",
+          "id": "F317"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Crear un registro básico de campaña en borrador con nombre y notas.",
+          "tools": [
+            "prepare_marketing_campaign"
+          ],
+          "note": "",
+          "id": "F318"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir el submódulo de campañas de WhatsApp.",
+          "tools": [],
+          "note": "",
+          "id": "F319"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir el submódulo de proyectos Meta Ads.",
+          "tools": [],
+          "note": "",
+          "id": "F320"
+        }
+      ]
+    },
+    {
+      "module": "marketing",
+      "title": "Campañas y emisor de WhatsApp",
+      "route": "/gestion/marketing/whatsapp",
+      "permissions": "whatsappView/CreateCampaign/SendToExtension/CancelCampaign/ViewHistory/ImportExcel. Envío condicionado a extensión compatible y WhatsApp conectado.",
+      "files": [
+        "src/gestion/pages/WhatsAppCampaignsPage.jsx",
+        "src/gestion/marketing/whatsapp/extensionBridge.js",
+        "src/gestion/marketing/whatsapp/campaignService.js"
+      ],
+      "limits": "Integración por extensión del navegador, no WhatsApp Business Cloud API. El texto es común a todos: los placeholders personalizados se describen como futuros. Las imágenes permanecen en memoria hasta transferirse; pueden requerir nueva selección al retomar. Olivia no inicia, pausa ni reanuda campañas por herramientas de negocio actuales.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Consultar si la extensión y WhatsApp están conectados.",
+          "tools": [],
+          "note": "",
+          "id": "F321"
+        },
+        {
+          "channel": "UI",
+          "action": "Revisar o reintentar la conexión con el emisor.",
+          "tools": [],
+          "note": "",
+          "id": "F322"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar límite de envío configurado, envíos de hoy y disponibilidad informada por el emisor.",
+          "tools": [],
+          "note": "",
+          "id": "F323"
+        },
+        {
+          "channel": "UI",
+          "action": "Crear un borrador de campaña de WhatsApp con nombre administrativo.",
+          "tools": [],
+          "note": "",
+          "id": "F324"
+        },
+        {
+          "channel": "UI",
+          "action": "Retomar un borrador de campaña guardado.",
+          "tools": [],
+          "note": "",
+          "id": "F325"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar clientes activos elegibles por nombre o teléfono.",
+          "tools": [],
+          "note": "",
+          "id": "F326"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar destinatarios de CRM por zona o categoría.",
+          "tools": [],
+          "note": "",
+          "id": "F327"
+        },
+        {
+          "channel": "UI",
+          "action": "Seleccionar clientes individuales para la campaña.",
+          "tools": [],
+          "note": "",
+          "id": "F328"
+        },
+        {
+          "channel": "UI",
+          "action": "Seleccionar todos los resultados de clientes y cargar bloques adicionales.",
+          "tools": [],
+          "note": "",
+          "id": "F329"
+        },
+        {
+          "channel": "UI",
+          "action": "Importar destinatarios desde un Excel procesado localmente.",
+          "tools": [],
+          "note": "",
+          "id": "F330"
+        },
+        {
+          "channel": "UI",
+          "action": "Mapear columnas de teléfono, nombre, zona, categoría y observaciones del Excel.",
+          "tools": [],
+          "note": "",
+          "id": "F331"
+        },
+        {
+          "channel": "UI",
+          "action": "Previsualizar filas del Excel antes de confirmar su uso.",
+          "tools": [],
+          "note": "",
+          "id": "F332"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Normalizar teléfonos y deduplicar destinatarios entre CRM y Excel.",
+          "tools": [],
+          "note": "El registro CRM tiene prioridad; no se importa automáticamente ese Excel a la base de clientes.",
+          "id": "F333"
+        },
+        {
+          "channel": "UI",
+          "action": "Revisar destinatarios válidos y problemas de la selección.",
+          "tools": [],
+          "note": "",
+          "id": "F334"
+        },
+        {
+          "channel": "UI",
+          "action": "Escribir el mensaje y ver una vista previa.",
+          "tools": [],
+          "note": "",
+          "id": "F335"
+        },
+        {
+          "channel": "UI",
+          "action": "Adjuntar de cero a tres imágenes a la campaña.",
+          "tools": [],
+          "note": "",
+          "id": "F336"
+        },
+        {
+          "channel": "UI",
+          "action": "Cambiar el orden de imágenes o quitar una imagen seleccionada.",
+          "tools": [],
+          "note": "",
+          "id": "F337"
+        },
+        {
+          "channel": "UI",
+          "action": "Revisar nombre, destinatarios, segmentación, texto, imágenes y conexión antes de iniciar.",
+          "tools": [],
+          "note": "",
+          "id": "F338"
+        },
+        {
+          "channel": "UI",
+          "action": "Guardar un borrador de la campaña sin iniciar envíos.",
+          "tools": [],
+          "note": "",
+          "id": "F339"
+        },
+        {
+          "channel": "EXT",
+          "action": "Preparar e iniciar la campaña mediante la extensión conectada.",
+          "tools": [],
+          "note": "La pantalla mostró Conectado en esta auditoría; el envío depende de la sesión y controles del emisor. No se enviaron mensajes de prueba.",
+          "id": "F340"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar campañas de WhatsApp y sus estados.",
+          "tools": [
+            "get_whatsapp_campaigns"
+          ],
+          "note": "Olivia consulta metadata; no accede a teléfonos de destinatarios ni envía mensajes.",
+          "id": "F341"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar el progreso, procesados, envíos confirmados, no verificados y errores.",
+          "tools": [],
+          "note": "",
+          "id": "F342"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir el detalle de una campaña y su actividad.",
+          "tools": [],
+          "note": "",
+          "id": "F343"
+        },
+        {
+          "channel": "UI",
+          "action": "Cargar campañas anteriores del historial paginado.",
+          "tools": [],
+          "note": "",
+          "id": "F344"
+        },
+        {
+          "channel": "EXT",
+          "action": "Pausar una campaña cuando su estado lo permite.",
+          "tools": [],
+          "note": "",
+          "id": "F345"
+        },
+        {
+          "channel": "EXT",
+          "action": "Reanudar una campaña pausada elegible.",
+          "tools": [],
+          "note": "",
+          "id": "F346"
+        },
+        {
+          "channel": "EXT",
+          "action": "Reintentar una campaña elegible continuando sólo pasos pendientes.",
+          "tools": [],
+          "note": "",
+          "id": "F347"
+        },
+        {
+          "channel": "EXT",
+          "action": "Reintentar destinatarios fallidos cuando el emisor lo permite.",
+          "tools": [],
+          "note": "",
+          "id": "F348"
+        },
+        {
+          "channel": "EXT",
+          "action": "Detener una campaña elegible.",
+          "tools": [],
+          "note": "",
+          "id": "F349"
+        },
+        {
+          "channel": "UI",
+          "action": "Cancelar un borrador de campaña.",
+          "tools": [],
+          "note": "",
+          "id": "F350"
+        },
+        {
+          "channel": "EXT",
+          "action": "Cancelar la ejecución de una campaña elegible.",
+          "tools": [],
+          "note": "",
+          "id": "F351"
+        },
+        {
+          "channel": "EXT",
+          "action": "Quitar una campaña del emisor cuando ese control está permitido.",
+          "tools": [],
+          "note": "No equivale a borrar todo su historial en Firestore.",
+          "id": "F352"
+        },
+        {
+          "channel": "UI",
+          "action": "Generar un reporte de situación de una campaña.",
+          "tools": [],
+          "note": "",
+          "id": "F353"
+        },
+        {
+          "channel": "UI",
+          "action": "Copiar el reporte legible o su JSON técnico para diagnóstico.",
+          "tools": [],
+          "note": "",
+          "id": "F354"
+        }
+      ]
+    },
+    {
+      "module": "marketing",
+      "title": "Meta Ads: proyectos, conocimiento y metodologías",
+      "route": "/gestion/marketing/meta-ads",
+      "permissions": "metaAdsView/CreateProject/EditProject/ArchiveProject/ManageKnowledge/ManageTheory; la IA requiere proveedor configurado.",
+      "files": [
+        "src/gestion/pages/MetaAdsPage.jsx",
+        "src/gestion/pages/MetaAdsKnowledgeView.jsx",
+        "src/gestion/pages/MetaAdsTheoriesView.jsx",
+        "src/gestion/marketing/metaAds/theoryService.js"
+      ],
+      "limits": "La IA compila; la aprobación y activación son humanas. Meta Marketing API no está conectada: estos proyectos no equivalen a anuncios publicados.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Listar proyectos Meta Ads y cargar más proyectos.",
+          "tools": [
+            "get_meta_ads_campaigns"
+          ],
+          "note": "",
+          "id": "F355"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir el detalle de un proyecto Meta Ads.",
+          "tools": [],
+          "note": "",
+          "id": "F356"
+        },
+        {
+          "channel": "UI",
+          "action": "Crear un proyecto Meta Ads con nombre y producto real del catálogo.",
+          "tools": [],
+          "note": "",
+          "id": "F357"
+        },
+        {
+          "channel": "UI",
+          "action": "Editar nombre y producto del proyecto mientras está en borrador.",
+          "tools": [],
+          "note": "",
+          "id": "F358"
+        },
+        {
+          "channel": "UI",
+          "action": "Archivar un proyecto elegible conservando su historial.",
+          "tools": [],
+          "note": "",
+          "id": "F359"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar la etapa y el estado de planificación del proyecto.",
+          "tools": [],
+          "note": "",
+          "id": "F360"
+        },
+        {
+          "channel": "UI",
+          "action": "Guardar o editar el contexto del negocio para marketing: marca, historia y posicionamiento.",
+          "tools": [],
+          "note": "",
+          "id": "F361"
+        },
+        {
+          "channel": "UI",
+          "action": "Guardar diferenciales, canales, características, políticas, promociones y argumentos del negocio.",
+          "tools": [],
+          "note": "",
+          "id": "F362"
+        },
+        {
+          "channel": "UI",
+          "action": "Guardar metadata comercial de un producto: beneficios, objeciones y diferenciales.",
+          "tools": [],
+          "note": "",
+          "id": "F363"
+        },
+        {
+          "channel": "UI",
+          "action": "Guardar origen, usos, argumentos y notas de marketing de un producto.",
+          "tools": [],
+          "note": "No modifica nombre, precio ni stock canónicos del producto.",
+          "id": "F364"
+        },
+        {
+          "channel": "UI",
+          "action": "Listar metodologías y consultar sus versiones activa y más reciente.",
+          "tools": [],
+          "note": "",
+          "id": "F365"
+        },
+        {
+          "channel": "UI",
+          "action": "Crear una metodología desde texto, Markdown o editor interno.",
+          "tools": [],
+          "note": "",
+          "id": "F366"
+        },
+        {
+          "channel": "UI",
+          "action": "Extraer texto de un PDF textual para crear la fuente de una metodología.",
+          "tools": [],
+          "note": "El binario se procesa en el navegador; no es OCR de un documento escaneado.",
+          "id": "F367"
+        },
+        {
+          "channel": "UI",
+          "action": "Editar el texto fuente de una versión en borrador, revisión o error.",
+          "tools": [],
+          "note": "",
+          "id": "F368"
+        },
+        {
+          "channel": "UI",
+          "action": "Guardar el borrador de una versión de metodología.",
+          "tools": [],
+          "note": "",
+          "id": "F369"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar estimación de tokens y costo de compilar la metodología.",
+          "tools": [],
+          "note": "",
+          "id": "F370"
+        },
+        {
+          "channel": "UI-IA",
+          "action": "Procesar la metodología con IA y obtener una configuración estructurada para revisión.",
+          "tools": [],
+          "note": "OPENAI_API_KEY presente en producción; la respuesta efectiva depende del proveedor y modelo configurado.",
+          "id": "F371"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar la vista estructurada de requisitos creativos y reglas de la metodología.",
+          "tools": [],
+          "note": "",
+          "id": "F372"
+        },
+        {
+          "channel": "UI",
+          "action": "Editar manualmente el JSON de configuración de una versión editable.",
+          "tools": [],
+          "note": "",
+          "id": "F373"
+        },
+        {
+          "channel": "UI",
+          "action": "Validar el esquema de configuración antes de guardar.",
+          "tools": [],
+          "note": "",
+          "id": "F374"
+        },
+        {
+          "channel": "UI",
+          "action": "Aprobar una versión válida que está en revisión.",
+          "tools": [],
+          "note": "",
+          "id": "F375"
+        },
+        {
+          "channel": "UI",
+          "action": "Activar una versión aprobada de metodología.",
+          "tools": [],
+          "note": "",
+          "id": "F376"
+        },
+        {
+          "channel": "UI",
+          "action": "Reactivar una versión histórica elegible.",
+          "tools": [],
+          "note": "",
+          "id": "F377"
+        },
+        {
+          "channel": "UI",
+          "action": "Crear una nueva versión borrador a partir de una versión conservada.",
+          "tools": [],
+          "note": "",
+          "id": "F378"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar versiones históricas sin modificar las activas o archivadas.",
+          "tools": [],
+          "note": "",
+          "id": "F379"
+        }
+      ]
+    },
+    {
+      "module": "marketing",
+      "title": "Meta Ads: planificación y organización creativa",
+      "route": "/gestion/marketing/meta-ads/:id",
+      "permissions": "metaAdsPlanCampaign/ApprovePlan/ViewCreativeWorkspace/UploadCreative; producto real y metodología activa.",
+      "files": [
+        "src/gestion/pages/MetaAdsCampaignPlanningWorkspace.jsx",
+        "src/gestion/pages/MetaAdsCreativeWorkspace.jsx",
+        "src/gestion/marketing/metaAds/campaignPlanningService.js",
+        "src/gestion/marketing/metaAds/googleDriveService.js"
+      ],
+      "limits": "Subir tomas y elegir archivos de Drive está implementado pero bloqueado hoy por falta de configuración de Google Drive: ver capacidades condicionadas. Validación técnica, renderizado y publicación de anuncios son etapas futuras. La planificación de esta pantalla no es una herramienta autónoma de Olivia.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Elegir la metodología activa para planificar una campaña.",
+          "tools": [],
+          "note": "",
+          "id": "F380"
+        },
+        {
+          "channel": "UI",
+          "action": "Iniciar la planificación y fijar la versión exacta de metodología.",
+          "tools": [],
+          "note": "",
+          "id": "F381"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar el contexto conocido del producto y del negocio usado por la planificación.",
+          "tools": [],
+          "note": "",
+          "id": "F382"
+        },
+        {
+          "channel": "UI-IA",
+          "action": "Generar preguntas sobre la información que falta para la campaña.",
+          "tools": [],
+          "note": "",
+          "id": "F383"
+        },
+        {
+          "channel": "UI",
+          "action": "Responder preguntas de planificación y guardar las respuestas.",
+          "tools": [],
+          "note": "",
+          "id": "F384"
+        },
+        {
+          "channel": "UI-IA",
+          "action": "Generar una estrategia de campaña como borrador estructurado.",
+          "tools": [],
+          "note": "",
+          "id": "F385"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar resumen, estrategia, concepto, objetivo, público, mensaje, oferta y llamada a la acción del plan.",
+          "tools": [],
+          "note": "",
+          "id": "F386"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar dirección creativa y plan de pruebas propuestos.",
+          "tools": [],
+          "note": "",
+          "id": "F387"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar piezas a grabar con propósito, guion, instrucciones y duración objetivo.",
+          "tools": [],
+          "note": "",
+          "id": "F388"
+        },
+        {
+          "channel": "UI",
+          "action": "Editar manualmente un plan borrador y guardar sus cambios.",
+          "tools": [],
+          "note": "",
+          "id": "F389"
+        },
+        {
+          "channel": "UI",
+          "action": "Editar guion, instrucciones y duración objetivo de las piezas en el plan borrador.",
+          "tools": [],
+          "note": "",
+          "id": "F390"
+        },
+        {
+          "channel": "UI",
+          "action": "Aprobar una revisión del plan y pasar la campaña a etapa creativa.",
+          "tools": [],
+          "note": "",
+          "id": "F391"
+        },
+        {
+          "channel": "UI-IA",
+          "action": "Regenerar el plan en una nueva revisión conservando la anterior.",
+          "tools": [],
+          "note": "",
+          "id": "F392"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar el historial de revisiones del plan.",
+          "tools": [],
+          "note": "",
+          "id": "F393"
+        },
+        {
+          "channel": "UI",
+          "action": "Preparar tareas de grabación a partir del plan aprobado sin volver a usar IA.",
+          "tools": [],
+          "note": "",
+          "id": "F394"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar las tareas agrupadas según los requisitos de la metodología.",
+          "tools": [],
+          "note": "",
+          "id": "F395"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar cuántos materiales obligatorios están completos y cuáles faltan.",
+          "tools": [],
+          "note": "",
+          "id": "F396"
+        }
+      ]
+    },
+    {
+      "module": "social",
+      "title": "Registro de consultas de redes sociales",
+      "route": "/gestion/social",
+      "permissions": "social.view/create.",
+      "files": [
+        "src/gestion/pages/GenericModulePage.jsx",
+        "src/gestion/modules.js",
+        "netlify/functions/_lib/olivia/extendedOperations.mjs"
+      ],
+      "limits": "No hay lectura de bandeja de Instagram/Facebook, respuestas automáticas, integración de chats ni publicación automática de contenido. La tabla genérica carga hasta cuarenta registros recientes y no ofrece Cargar más, aunque su descripción diga paginada.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar las consultas u oportunidades de redes registradas.",
+          "tools": [
+            "get_social_leads"
+          ],
+          "note": "",
+          "id": "F397"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar consultas registradas por nombre o estado dentro del bloque cargado.",
+          "tools": [],
+          "note": "",
+          "id": "F398"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Registrar una consulta de redes con nombre y notas.",
+          "tools": [
+            "prepare_social_lead_create"
+          ],
+          "note": "Se crea en estado nuevo.",
+          "id": "F399"
+        }
+      ]
+    },
+    {
+      "module": "shipping",
+      "title": "Registro de envíos",
+      "route": "/gestion/shipping",
+      "permissions": "shipping.view/create/edit según acción.",
+      "files": [
+        "src/gestion/pages/GenericModulePage.jsx",
+        "src/gestion/modules.js",
+        "netlify/functions/_lib/olivia/extendedOperations.mjs"
+      ],
+      "limits": "No hay tracking de transportista, cálculo de tarifas, impresión de etiquetas, planificación de rutas ni cambios completos del ciclo de entrega desde esta tabla. La tabla genérica carga hasta cuarenta registros recientes y no ofrece Cargar más, aunque su descripción diga paginada.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar envíos registrados y su estado.",
+          "tools": [
+            "get_shipments"
+          ],
+          "note": "",
+          "id": "F400"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar registros de envío por nombre o estado dentro del bloque cargado.",
+          "tools": [],
+          "note": "",
+          "id": "F401"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Crear un registro básico de envío con nombre y notas.",
+          "tools": [
+            "prepare_shipment_create"
+          ],
+          "note": "Se crea pendiente; no contrata un transporte.",
+          "id": "F402"
+        },
+        {
+          "channel": "O-CONF",
+          "action": "Editar el nombre y las notas de un envío existente.",
+          "tools": [
+            "prepare_shipment_update"
+          ],
+          "note": "Conserva su estado logístico; no marca una entrega.",
+          "id": "F403"
+        }
+      ]
+    },
+    {
+      "module": "suppliers",
+      "title": "Registro de proveedores",
+      "route": "/gestion/suppliers",
+      "permissions": "suppliers.view/create.",
+      "files": [
+        "src/gestion/pages/GenericModulePage.jsx",
+        "src/gestion/modules.js",
+        "netlify/functions/_lib/olivia/extendedOperations.mjs"
+      ],
+      "limits": "No hay órdenes de compra, cuentas corrientes de proveedor, recepción automática de compras ni actualización automática de costos desde este módulo. La tabla genérica carga hasta cuarenta registros recientes y no ofrece Cargar más, aunque su descripción diga paginada.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar proveedores registrados y su estado.",
+          "tools": [
+            "get_suppliers"
+          ],
+          "note": "",
+          "id": "F404"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar proveedores por nombre o estado dentro del bloque cargado.",
+          "tools": [],
+          "note": "",
+          "id": "F405"
+        },
+        {
+          "channel": "UI/O-CONF",
+          "action": "Crear un registro básico de proveedor con nombre y notas.",
+          "tools": [
+            "prepare_supplier_create"
+          ],
+          "note": "Se crea activo.",
+          "id": "F406"
+        }
+      ]
+    },
+    {
+      "module": "ecommerce",
+      "title": "Gestión actual de pedidos ecommerce",
+      "route": "/gestion/ecommerce",
+      "permissions": "ecommerce.view; revisión mediante Olivia requiere ecommerce.edit.",
+      "files": [
+        "src/gestion/pages/GenericModulePage.jsx",
+        "src/gestion/modules.js",
+        "src/Storefront.jsx",
+        "src/gestion/StorePreviewGate.jsx",
+        "netlify/functions/_lib/ecommerce/commerceService.mjs"
+      ],
+      "limits": "La API publicada respondió ready:false, pickupEnabled:false, deliveryEnabled:false y paymentProvider:pending_payway. No se cuenta el flujo de compra como venta online operativa hoy. La tienda sigue una puerta de acceso administrativo salvo activación pública explícita; el texto Ver tienda pública no prueba acceso público. La puerta de vista previa exige normalizedRole(profile) igual a admin; general_admin sin alias o flag admin no basta. La tabla genérica carga hasta cuarenta registros recientes y no ofrece Cargar más, aunque su descripción diga paginada.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar pedidos ecommerce que ya estén registrados y su estado.",
+          "tools": [
+            "get_orders"
+          ],
+          "note": "",
+          "id": "F407"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar pedidos en el bloque cargado por nombre o estado.",
+          "tools": [],
+          "note": "",
+          "id": "F408"
+        },
+        {
+          "channel": "UI/O-REV",
+          "action": "Revisar un pedido seleccionado desde Olivia en el módulo ecommerce.",
+          "tools": [
+            "prepare_ecommerce_order_review"
+          ],
+          "note": "Sólo abre la revisión; no cobra, cancela, despacha ni reembolsa el pedido.",
+          "id": "F409"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir la vista previa de la tienda desde una cuenta administradora autorizada.",
+          "tools": [],
+          "note": "La vista previa no demuestra que el checkout esté habilitado.",
+          "id": "F410"
+        }
+      ]
+    },
+    {
+      "module": "alerts",
+      "title": "Alertas del negocio y diagnóstico de Olivia",
+      "route": "/gestion/alerts",
+      "permissions": "alerts.view; reportes técnicos de Olivia sólo para administración.",
+      "files": [
+        "src/gestion/pages/GenericModulePage.jsx",
+        "src/gestion/components/DashboardAlerts.jsx",
+        "src/modules/alerts/domain/alerts.js",
+        "src/gestion/olivia/OliviaAssistant.jsx"
+      ],
+      "limits": "No se detectó un CRUD general de alertas ni una acción universal de cerrarlas o reasignarlas. Resolver una discrepancia financiera usa el flujo financiero correspondiente.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar alertas activas, su prioridad y contexto autorizado.",
+          "tools": [
+            "get_alerts"
+          ],
+          "note": "",
+          "id": "F411"
+        },
+        {
+          "channel": "UI",
+          "action": "Buscar registros de alertas por nombre o estado dentro del conjunto cargado.",
+          "tools": [],
+          "note": "",
+          "id": "F412"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar alertas registradas que referencian una ubicación o producto y abrir su contexto de stock.",
+          "tools": [],
+          "note": "No se presupone un generador automático de alertas persistidas por stock bajo.",
+          "id": "F413"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar alertas financieras generadas por controles, acreditaciones o presupuestos.",
+          "tools": [],
+          "note": "",
+          "id": "F414"
+        },
+        {
+          "channel": "O-CONF",
+          "action": "Crear una alerta manual con nombre y notas.",
+          "tools": [
+            "prepare_alert_create"
+          ],
+          "note": "La asigna al usuario actual como responsable, con severidad amarilla; no edita una alerta automática.",
+          "id": "F415"
+        },
+        {
+          "channel": "UI",
+          "action": "Reportar un error de Olivia al administrador desde la conversación.",
+          "tools": [],
+          "note": "",
+          "id": "F416"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar un reporte de error de Olivia en Alertas con permiso administrativo.",
+          "tools": [],
+          "note": "",
+          "id": "F417"
+        },
+        {
+          "channel": "UI",
+          "action": "Copiar los datos técnicos JSON del reporte de error.",
+          "tools": [],
+          "note": "",
+          "id": "F418"
+        },
+        {
+          "channel": "UI",
+          "action": "Copiar la descripción del error preparada para Codex.",
+          "tools": [],
+          "note": "",
+          "id": "F419"
+        }
+      ]
+    },
+    {
+      "module": "actividad",
+      "title": "Actividad y auditoría",
+      "route": "/gestion/actividad · /gestion/audit",
+      "permissions": "Actividad: acceso al panel y locations.view. Auditoría: admin/general_admin.",
+      "files": [
+        "src/gestion/pages/ActivityPage.jsx",
+        "src/gestion/components/ActivityDetail.jsx",
+        "src/gestion/pages/AuditPage.jsx",
+        "src/gestion/services/activityService.js"
+      ],
+      "limits": "No se encontró exportación de auditoría, edición del historial ni garantía de que cada interacción visual genere un evento. Actividad paginada y Auditoría reciente son vistas distintas.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Consultar la actividad operativa cronológicamente, de más reciente a más antigua.",
+          "tools": [],
+          "note": "",
+          "id": "F420"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar actividad por fecha desde y hasta.",
+          "tools": [],
+          "note": "",
+          "id": "F421"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar actividad por ubicación.",
+          "tools": [],
+          "note": "",
+          "id": "F422"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar actividad por módulo.",
+          "tools": [],
+          "note": "",
+          "id": "F423"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar actividad por usuario.",
+          "tools": [],
+          "note": "",
+          "id": "F424"
+        },
+        {
+          "channel": "UI",
+          "action": "Filtrar actividad por tipo de operación.",
+          "tools": [],
+          "note": "",
+          "id": "F425"
+        },
+        {
+          "channel": "UI",
+          "action": "Limpiar los filtros de actividad.",
+          "tools": [],
+          "note": "",
+          "id": "F426"
+        },
+        {
+          "channel": "UI",
+          "action": "Cargar más actividad o buscar registros anteriores.",
+          "tools": [],
+          "note": "",
+          "id": "F427"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir el detalle de una actividad y la entidad relacionada.",
+          "tools": [],
+          "note": "",
+          "id": "F428"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar qué campos cambiaron, con valores anteriores y posteriores cuando están registrados.",
+          "tools": [],
+          "note": "",
+          "id": "F429"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar movimientos de stock, productos, descuentos y pagos relacionados con la operación.",
+          "tools": [],
+          "note": "",
+          "id": "F430"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar el detalle de una unificación de productos en la actividad.",
+          "tools": [],
+          "note": "",
+          "id": "F431"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar eventos recientes de auditoría con usuario, fecha, operación y entidad.",
+          "tools": [
+            "get_audit_activity"
+          ],
+          "note": "La pantalla de Auditoría muestra hasta cincuenta eventos; Olivia tiene su propio límite.",
+          "id": "F432"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Registrar trazabilidad de las operaciones sensibles implementadas sin borrar su historia.",
+          "tools": [],
+          "note": "",
+          "id": "F433"
+        }
+      ]
+    },
+    {
+      "module": "administration",
+      "title": "Administración de usuarios",
+      "route": "/gestion/administration",
+      "permissions": "admin/general_admin.",
+      "files": [
+        "src/gestion/pages/AdministrationPage.jsx",
+        "src/gestion/services/managementService.js",
+        "src/gestion/permissions.js"
+      ],
+      "limits": "El alta ofrece once roles: administrador general (admin), administrador operativo, encargado de ubicación, vendedor, depósito, marketing, ecommerce, envíos, proveedores, finanzas y analista. El código también reconoce general_admin para perfiles existentes. La pantalla no tiene edición general del rol o permisos de un usuario existente ni restablecimiento de contraseña. Los roles administrativos de Olivia se limitan a admin/general_admin salvo habilitación explícita permitida por código.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar usuarios, nombre, correo, rol y estado activo.",
+          "tools": [
+            "get_users"
+          ],
+          "note": "La lectura de Olivia excluye credenciales.",
+          "id": "F434"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar cuántas ubicaciones tiene autorizadas cada usuario.",
+          "tools": [],
+          "note": "",
+          "id": "F435"
+        },
+        {
+          "channel": "UI",
+          "action": "Crear una cuenta con nombre, correo y contraseña temporal.",
+          "tools": [],
+          "note": "",
+          "id": "F436"
+        },
+        {
+          "channel": "UI",
+          "action": "Elegir la plantilla de rol al crear la cuenta.",
+          "tools": [],
+          "note": "",
+          "id": "F437"
+        },
+        {
+          "channel": "UI",
+          "action": "Elegir una o varias ubicaciones autorizadas al crear la cuenta.",
+          "tools": [],
+          "note": "",
+          "id": "F438"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Crear la cuenta de Firebase Auth y su perfil operativo al completar el alta.",
+          "tools": [],
+          "note": "",
+          "id": "F439"
+        },
+        {
+          "channel": "UI",
+          "action": "Desactivar el perfil operativo de un usuario.",
+          "tools": [],
+          "note": "No borra la cuenta Auth; el usuario no puede desactivarse a sí mismo en este flujo.",
+          "id": "F440"
+        },
+        {
+          "channel": "UI",
+          "action": "Reactivar un perfil operativo inactivo.",
+          "tools": [],
+          "note": "",
+          "id": "F441"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar las plantillas de permisos de los roles existentes.",
+          "tools": [],
+          "note": "",
+          "id": "F442"
+        },
+        {
+          "channel": "O-REV",
+          "action": "Preparar la revisión de un usuario y abrir Administración.",
+          "tools": [
+            "prepare_user_role_review"
+          ],
+          "note": "No modifica rol, contraseña ni permisos.",
+          "id": "F443"
+        }
+      ]
+    },
+    {
+      "module": "settings",
+      "title": "Facturación ARCA y comprobantes existentes",
+      "route": "/gestion/settings · venta/detalle",
+      "permissions": "Administración para diagnóstico y recuperación. Consulta/PDF de ventas propias o autorizadas. Emisión y preparación nuevas sujetas a interruptores del servidor.",
+      "files": [
+        "src/gestion/pages/SettingsPage.jsx",
+        "src/gestion/services/arcaService.js",
+        "src/gestion/components/ArcaInvoicePrintAction.jsx",
+        "netlify/functions/arca-invoice.mjs",
+        "netlify/functions/arca-document.mjs",
+        "src/shared/fiscalRecovery.mjs"
+      ],
+      "limits": "La autorización automática ARCA está disponible, según actualización explícita del Administrador del 10/10/2026. Se valida en cada operación el entorno, los orígenes habilitados, el receptor y la elegibilidad fiscal. Olivia no emite autónomamente con prepare_invoice_review: abre la revisión manual. No hay nota de crédito ni anulación fiscal autónoma. La pantalla de Configuración consultada el 10/10 todavía informa gates bloqueados, aunque hay comprobantes autorizados; consultar el estado vigente del backend antes de operar, sin presentar el bloqueo histórico como una limitación permanente del sistema.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Consultar el estado seguro de configuración fiscal sin mostrar claves privadas.",
+          "tools": [],
+          "note": "",
+          "id": "F444"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar si los certificados, punto de venta y caché compartida están preparados.",
+          "tools": [],
+          "note": "",
+          "id": "F445"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar el estado de las habilitaciones de homologación y producción.",
+          "tools": [],
+          "note": "",
+          "id": "F446"
+        },
+        {
+          "channel": "UI",
+          "action": "Ejecutar el diagnóstico de conexión ARCA sin solicitar un CAE.",
+          "tools": [],
+          "note": "",
+          "id": "F447"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar el estado de los tickets de acceso compartidos de WSFE y Padrón.",
+          "tools": [],
+          "note": "",
+          "id": "F448"
+        },
+        {
+          "channel": "UI",
+          "action": "Ejecutar el preflight de producción de sólo lectura cuando su configuración está lista.",
+          "tools": [],
+          "note": "No emite un comprobante; disponibilidad puntual de ARCA no verificada mediante una emisión de prueba.",
+          "id": "F449"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar las solicitudes fiscales recientes y actualizar la lista.",
+          "tools": [],
+          "note": "",
+          "id": "F450"
+        },
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar el estado fiscal de una venta y su vínculo con una factura.",
+          "tools": [
+            "get_invoice_status"
+          ],
+          "note": "",
+          "id": "F451"
+        },
+        {
+          "channel": "O-REV",
+          "action": "Seleccionar una venta con Olivia y abrir su revisión fiscal en Configuración.",
+          "tools": [
+            "prepare_invoice_review"
+          ],
+          "note": "No solicita CAE ni emite al confirmar la tarjeta de Olivia.",
+          "id": "F452"
+        },
+        {
+          "channel": "UI",
+          "action": "Completar datos fiscales de receptor faltantes en una solicitud elegible para revisión.",
+          "tools": [],
+          "note": "No altera una factura ya autorizada.",
+          "id": "F453"
+        },
+        {
+          "channel": "UI",
+          "action": "Revisar la clasificación de recuperación de una solicitud fiscal existente.",
+          "tools": [],
+          "note": "",
+          "id": "F454"
+        },
+        {
+          "channel": "UI",
+          "action": "Ejecutar un dry-run fiscal sobre una solicitud elegible.",
+          "tools": [],
+          "note": "Valida y muestra un plan sin solicitar CAE; sujeto a los controles del backend.",
+          "id": "F455"
+        },
+        {
+          "channel": "UI",
+          "action": "Recuperar una solicitud pre-CAE elegible cuando se comprueba que no reservó número ni obtuvo CAE.",
+          "tools": [],
+          "note": "",
+          "id": "F456"
+        },
+        {
+          "channel": "UI",
+          "action": "Reconciliar una solicitud fiscal existente cuando el estado exige consultar el resultado real.",
+          "tools": [],
+          "note": "",
+          "id": "F457"
+        },
+        {
+          "channel": "UI",
+          "action": "Verificar en ARCA una factura autorizada mediante FECompConsultar.",
+          "tools": [],
+          "note": "",
+          "id": "F458"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar número, punto de venta, tipo de comprobante, CAE, vencimiento y verificación registrados.",
+          "tools": [],
+          "note": "",
+          "id": "F459"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir un PDF fiscal de factura autorizada, verificada y con PDF listo.",
+          "tools": [],
+          "note": "",
+          "id": "F460"
+        },
+        {
+          "channel": "UI",
+          "action": "Descargar el PDF fiscal elegible.",
+          "tools": [],
+          "note": "",
+          "id": "F461"
+        },
+        {
+          "channel": "UI",
+          "action": "Imprimir el comprobante fiscal elegible.",
+          "tools": [],
+          "note": "",
+          "id": "F462"
+        },
+        {
+          "channel": "UI",
+          "action": "Compartir el PDF fiscal elegible cuando el navegador admite compartir archivos.",
+          "tools": [],
+          "note": "",
+          "id": "F463"
+        },
+        {
+          "id": "F523",
+          "channel": "AUTO",
+          "action": "Autorizar automáticamente una factura ARCA de un origen habilitado.",
+          "tools": [],
+          "note": "Disponible según actualización del Administrador; sujeto a validaciones y configuración fiscal del backend."
+        }
+      ]
+    },
+    {
+      "module": "ai",
+      "title": "Olivia: conversación y asistencia",
+      "route": "Lanzador Olivia en gestión y Panel Vendedor",
+      "permissions": "Cuenta activa; admin/general_admin o seller con quick-sales.view; otros roles requieren habilitación ai.view y conservan límites de herramientas.",
+      "files": [
+        "src/gestion/olivia/OliviaAssistant.jsx",
+        "src/gestion/olivia/OliviaComposer.jsx",
+        "src/gestion/olivia/OliviaReviewPanel.jsx",
+        "src/shared/oliviaAttachmentPolicy.mjs",
+        "netlify/functions/_lib/olivia/guards.mjs",
+        "src/shared/oliviaVoiceAvailability.mjs"
+      ],
+      "limits": "La conversación por voz en tiempo real está deshabilitada en main; dictado sí existe. Un archivo de conocimiento no añade herramientas ni permisos. No hay botones de renombrar o eliminar chats propios en la interfaz actual. La existencia de OPENAI_API_KEY no sustituye una prueba completa de cada modelo u operación.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Abrir o cerrar el asistente Olivia desde la aplicación.",
+          "tools": [],
+          "note": "",
+          "id": "F464"
+        },
+        {
+          "channel": "UI",
+          "action": "Escribir una consulta o solicitud de operación en lenguaje natural.",
+          "tools": [],
+          "note": "",
+          "id": "F465"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar respuestas y tablas formateadas dentro de la conversación.",
+          "tools": [],
+          "note": "",
+          "id": "F466"
+        },
+        {
+          "channel": "UI",
+          "action": "Detener una respuesta en curso.",
+          "tools": [],
+          "note": "",
+          "id": "F467"
+        },
+        {
+          "channel": "UI",
+          "action": "Reintentar o recuperar el estado de una consulta tras un error.",
+          "tools": [],
+          "note": "",
+          "id": "F468"
+        },
+        {
+          "channel": "UI",
+          "action": "Dictar un mensaje mediante el micrófono.",
+          "tools": [],
+          "note": "",
+          "id": "F469"
+        },
+        {
+          "channel": "UI",
+          "action": "Terminar el dictado y revisar su transcripción antes de enviar.",
+          "tools": [],
+          "note": "",
+          "id": "F470"
+        },
+        {
+          "channel": "UI",
+          "action": "Terminar el dictado, transcribirlo y enviarlo.",
+          "tools": [],
+          "note": "",
+          "id": "F471"
+        },
+        {
+          "channel": "UI",
+          "action": "Cancelar un dictado en curso.",
+          "tools": [],
+          "note": "",
+          "id": "F472"
+        },
+        {
+          "channel": "UI",
+          "action": "Adjuntar PDF, DOCX, XLSX, CSV, TXT, JPG, JPEG, PNG o WEBP a un mensaje.",
+          "tools": [],
+          "note": "Hasta cuatro archivos y cuatro MB por archivo; adjuntos temporales de conversación.",
+          "id": "F473"
+        },
+        {
+          "channel": "UI",
+          "action": "Tomar una foto con la cámara del dispositivo compatible para adjuntarla.",
+          "tools": [],
+          "note": "Requiere permisos del navegador/dispositivo.",
+          "id": "F474"
+        },
+        {
+          "channel": "UI",
+          "action": "Quitar un adjunto de un mensaje en preparación.",
+          "tools": [],
+          "note": "",
+          "id": "F475"
+        },
+        {
+          "channel": "UI",
+          "action": "Iniciar una nueva conversación propia.",
+          "tools": [],
+          "note": "",
+          "id": "F476"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar Mis chats y cargar conversaciones anteriores.",
+          "tools": [],
+          "note": "",
+          "id": "F477"
+        },
+        {
+          "channel": "UI",
+          "action": "Retomar una conversación propia conservada.",
+          "tools": [],
+          "note": "",
+          "id": "F478"
+        },
+        {
+          "channel": "UI",
+          "action": "Cargar mensajes anteriores de una conversación.",
+          "tools": [],
+          "note": "",
+          "id": "F479"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Usar el contexto visible de pantalla como referencia de la conversación.",
+          "tools": [],
+          "note": "No reemplaza la lectura autorizada de datos ni da permisos nuevos.",
+          "id": "F480"
+        },
+        {
+          "channel": "UI",
+          "action": "Revisar la tarjeta de una operación preparada, con su resumen y efectos.",
+          "tools": [],
+          "note": "",
+          "id": "F481"
+        },
+        {
+          "channel": "UI",
+          "action": "Confirmar Sí una propuesta que realmente escribe datos.",
+          "tools": [],
+          "note": "",
+          "id": "F482"
+        },
+        {
+          "channel": "UI",
+          "action": "Cancelar No una propuesta sin ejecutar sus cambios.",
+          "tools": [],
+          "note": "",
+          "id": "F483"
+        },
+        {
+          "channel": "AUTO",
+          "action": "Revalidar permisos y datos al confirmar; pedir nueva propuesta si el contexto cambió.",
+          "tools": [],
+          "note": "",
+          "id": "F484"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir el flujo manual cuando la tarjeta preparada es sólo una revisión.",
+          "tools": [],
+          "note": "",
+          "id": "F485"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar porcentaje de cupo disponible y costos medidos cuando hay información suficiente.",
+          "tools": [],
+          "note": "",
+          "id": "F486"
+        },
+        {
+          "channel": "UI",
+          "action": "Solicitar al administrador una ampliación de cupo al agotarlo.",
+          "tools": [],
+          "note": "La solicitud no concede tokens por sí sola.",
+          "id": "F487"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir métricas de desarrollo de Olivia con permiso administrativo.",
+          "tools": [],
+          "note": "",
+          "id": "F488"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Descubrir las herramientas permitidas para una intención o módulo.",
+          "tools": [
+            "search_tools"
+          ],
+          "note": "",
+          "id": "F489"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Descubrir los procedimientos versionados habilitados para el usuario.",
+          "tools": [
+            "discover_skills"
+          ],
+          "note": "",
+          "id": "F490"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Cargar un procedimiento permitido: analizar ventas, operar Panel Vendedor o pronosticar feria.",
+          "tools": [
+            "load_skill"
+          ],
+          "note": "El nombre exacto y la disponibilidad se resuelven por descubrimiento.",
+          "id": "F491"
+        },
+        {
+          "channel": "O-LECT",
+          "action": "Buscar conocimiento permanente publicado para la audiencia y módulo autorizados.",
+          "tools": [
+            "search_knowledge"
+          ],
+          "note": "La biblioteca se encontró vacía en esta revisión; no atribuirle documentos inexistentes.",
+          "id": "F492"
+        }
+      ]
+    },
+    {
+      "module": "ai",
+      "title": "Administración de Olivia y biblioteca",
+      "route": "/gestion/settings",
+      "permissions": "Administración; guardar configuración requiere confirmación y autenticación reciente.",
+      "files": [
+        "src/gestion/olivia/OliviaSettings.jsx",
+        "src/gestion/olivia/OliviaKnowledgeManager.jsx",
+        "src/shared/oliviaContracts.mjs",
+        "netlify/functions/olivia-knowledge.mjs"
+      ],
+      "limits": "Los campos de configuración de voz se conservan pero no habilitan la conversación en tiempo real. La biblioteca no tiene audiencia administrativa global: se publica por módulo. No publicar el inventario administrativo completo como ayuda de vendedor.",
+      "rows": [
+        {
+          "channel": "UI/O-LECT",
+          "action": "Consultar un resumen seguro de configuración de Olivia.",
+          "tools": [
+            "get_configuration_summary"
+          ],
+          "note": "Sin secretos.",
+          "id": "F493"
+        },
+        {
+          "channel": "O-REV",
+          "action": "Abrir Configuración desde una revisión preparada por Olivia.",
+          "tools": [
+            "prepare_configuration_review"
+          ],
+          "note": "No cambia configuración por sí sola.",
+          "id": "F494"
+        },
+        {
+          "channel": "UI",
+          "action": "Habilitar o deshabilitar Olivia.",
+          "tools": [],
+          "note": "",
+          "id": "F495"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar retención del historial de uno a doce meses.",
+          "tools": [],
+          "note": "",
+          "id": "F496"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar cupo predeterminado de tokens y frecuencia diaria, semanal o mensual.",
+          "tools": [],
+          "note": "",
+          "id": "F497"
+        },
+        {
+          "channel": "UI",
+          "action": "Asignar un cupo y frecuencia personalizados a un usuario elegible.",
+          "tools": [],
+          "note": "",
+          "id": "F498"
+        },
+        {
+          "channel": "UI",
+          "action": "Conceder una ampliación temporal de tokens para el período actual.",
+          "tools": [],
+          "note": "",
+          "id": "F499"
+        },
+        {
+          "channel": "UI",
+          "action": "Volver un usuario al cupo predeterminado.",
+          "tools": [],
+          "note": "",
+          "id": "F500"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar solicitudes pendientes de ampliación y preparar una respuesta de cupo.",
+          "tools": [],
+          "note": "",
+          "id": "F501"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar modelos y niveles de razonamiento de los perfiles de uso.",
+          "tools": [],
+          "note": "",
+          "id": "F502"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar umbrales de enrutamiento y límites de respuesta, herramientas, rondas y tiempos.",
+          "tools": [],
+          "note": "",
+          "id": "F503"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar o editar la configuración avanzada validada en JSON.",
+          "tools": [],
+          "note": "",
+          "id": "F504"
+        },
+        {
+          "channel": "UI",
+          "action": "Configurar precios de modelos y referencia cambiaria manual cuando se utiliza.",
+          "tools": [],
+          "note": "",
+          "id": "F505"
+        },
+        {
+          "channel": "UI",
+          "action": "Revisar los cambios antes de guardar la configuración de Olivia.",
+          "tools": [],
+          "note": "",
+          "id": "F506"
+        },
+        {
+          "channel": "UI",
+          "action": "Verificar nuevamente la identidad con Firebase cuando el guardado lo requiere.",
+          "tools": [],
+          "note": "",
+          "id": "F507"
+        },
+        {
+          "channel": "UI",
+          "action": "Confirmar el cambio de configuración y conservar auditoría.",
+          "tools": [],
+          "note": "",
+          "id": "F508"
+        },
+        {
+          "channel": "UI",
+          "action": "Restablecer el borrador a la configuración guardada.",
+          "tools": [],
+          "note": "",
+          "id": "F509"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar consumo e historial conservado de un usuario para supervisión administrativa.",
+          "tools": [],
+          "note": "",
+          "id": "F510"
+        },
+        {
+          "channel": "UI",
+          "action": "Abrir una conversación supervisada y cargar mensajes anteriores.",
+          "tools": [],
+          "note": "",
+          "id": "F511"
+        },
+        {
+          "channel": "UI",
+          "action": "Seleccionar un documento PDF, DOCX o TXT como conocimiento permanente.",
+          "tools": [],
+          "note": "",
+          "id": "F512"
+        },
+        {
+          "channel": "UI",
+          "action": "Asignar audiencia administrativa por módulo o ayuda del Panel Vendedor al documento.",
+          "tools": [],
+          "note": "",
+          "id": "F513"
+        },
+        {
+          "channel": "UI",
+          "action": "Revisar y confirmar la publicación de un documento en la biblioteca.",
+          "tools": [],
+          "note": "",
+          "id": "F514"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar documentos disponibles, indexándose, fallidos o retirados.",
+          "tools": [],
+          "note": "",
+          "id": "F515"
+        },
+        {
+          "channel": "UI",
+          "action": "Actualizar la biblioteca y cargar más documentos.",
+          "tools": [],
+          "note": "",
+          "id": "F516"
+        },
+        {
+          "channel": "UI",
+          "action": "Retirar un documento de la recuperación de conocimiento tras confirmación.",
+          "tools": [],
+          "note": "",
+          "id": "F517"
+        },
+        {
+          "channel": "UI",
+          "action": "Reintentar la limpieza de un documento con eliminación pendiente.",
+          "tools": [],
+          "note": "",
+          "id": "F518"
+        }
+      ]
+    },
+    {
+      "module": "ecommerce",
+      "title": "Vista previa editorial de la tienda",
+      "route": "/tienda · /nosotros",
+      "permissions": "Acceso administrativo al storefront mientras no está habilitado públicamente.",
+      "files": [
+        "src/Storefront.jsx",
+        "src/gestion/StorePreviewGate.jsx",
+        "src/pages/HomePage.jsx",
+        "src/pages/AboutPage.jsx",
+        "src/components/Footer.jsx"
+      ],
+      "limits": "La vista previa editorial funciona como contenido de marca. Sus fotos y recomendaciones no prueban stock ni precios comerciales actuales. El catálogo transaccional y checkout no están listos en producción.",
+      "rows": [
+        {
+          "channel": "UI",
+          "action": "Consultar la portada editorial de la marca desde la vista previa autorizada.",
+          "tools": [],
+          "note": "",
+          "id": "F519"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar la página Nosotros y la historia de la marca.",
+          "tools": [],
+          "note": "",
+          "id": "F520"
+        },
+        {
+          "channel": "UI",
+          "action": "Explorar la guía editorial de aceites seleccionando intensidad suave, media o intensa.",
+          "tools": [],
+          "note": "Es orientación de contenido editorial; agregar al carrito depende de vinculación comercial y disponibilidad real.",
+          "id": "F521"
+        },
+        {
+          "channel": "UI",
+          "action": "Consultar la información de contacto publicada o su aviso de información pendiente.",
+          "tools": [],
+          "note": "No equivale a chat integrado ni a una configuración operativa del local.",
+          "id": "F522"
+        }
+      ]
+    }
+  ],
+  "conditionalCapabilities": [
+    {
+      "area": "ARCA homologación",
+      "action": "Ejecutar pruebas compartidas de lectura WSFE/Padrón en el entorno de homologación.",
+      "reason": "El flujo existe, pero la producción auditada usa environment:production; su equivalente operativo es el preflight productivo de sólo lectura.",
+      "source": "src/gestion/pages/SettingsPage.jsx"
+    },
+    {
+      "area": "Facturación",
+      "action": "Preparar una solicitud fiscal nueva desde Venta Rápida.",
+      "reason": "Bloqueada por configuración de producción; la venta comercial puede guardarse aunque falle la preparación fiscal.",
+      "source": "src/gestion/pages/QuickSalesPage.jsx"
+    },
+    {
+      "area": "Facturación",
+      "action": "Solicitar comprobante desde Generar factura del Panel Vendedor.",
+      "reason": "El control existe; no garantiza emisión. La preparación nueva y CAE están bloqueados actualmente en producción.",
+      "source": "src/gestion/seller/SellerPanel.jsx"
+    },
+    {
+      "area": "Facturación",
+      "action": "Autorizar un comprobante en homologación.",
+      "reason": "Requiere entorno de homologación y habilitación específica; no se verificó como habilitado en la producción auditada.",
+      "source": "src/gestion/pages/SettingsPage.jsx"
+    },
+    {
+      "area": "Facturación",
+      "action": "Autorizar una factura productiva mediante el flujo controlado por código exacto de venta.",
+      "reason": "CAE productivo bloqueado por configuración al auditar.",
+      "source": "src/gestion/pages/SettingsPage.jsx"
+    },
+    {
+      "area": "Facturación",
+      "action": "Consultar Padrón productivo de un cliente para preparar el receptor.",
+      "reason": "Consulta de clientes bloqueada por configuración; el preflight de lectura del emisor es un flujo distinto.",
+      "source": "src/gestion/pages/SettingsPage.jsx"
+    },
+    {
+      "area": "Google Drive",
+      "action": "Conectar administrativamente una cuenta Drive mediante OAuth.",
+      "reason": "Pantalla y endpoints existen; faltan variables GOOGLE_* en producción y la pantalla informa No configurado.",
+      "source": "src/gestion/pages/SettingsPage.jsx"
+    },
+    {
+      "area": "Google Drive",
+      "action": "Probar o desconectar una conexión Drive existente.",
+      "reason": "Requiere configuración y conexión real; actualmente no configurado.",
+      "source": "src/gestion/pages/SettingsPage.jsx"
+    },
+    {
+      "area": "Meta Ads",
+      "action": "Subir una toma de video a una tarea creativa y ver progreso de carga.",
+      "reason": "Implementado, bloqueado hoy por falta de Drive configurado y conectado.",
+      "source": "src/gestion/pages/MetaAdsCreativeWorkspace.jsx"
+    },
+    {
+      "area": "Meta Ads",
+      "action": "Subir varias tomas, consultar sus referencias y elegir la preferida.",
+      "reason": "Implementado, requiere archivos en Drive y conexión operativa.",
+      "source": "src/gestion/pages/MetaAdsCreativeWorkspace.jsx"
+    },
+    {
+      "area": "Tienda",
+      "action": "Navegar catálogo comercial, buscar/filtrar productos y abrir su detalle.",
+      "reason": "Interfaz implementada, pero el catálogo productivo respondió ready:false; no se afirma catálogo comercial operativo.",
+      "source": "src/pages/CatalogPage.jsx"
+    },
+    {
+      "area": "Tienda",
+      "action": "Agregar, quitar y cambiar cantidades del carrito de compra.",
+      "reason": "Implementado para un catálogo comercial configurado; la tienda no está lista para compras productivas.",
+      "source": "src/components/CartDrawer.jsx"
+    },
+    {
+      "area": "Tienda",
+      "action": "Completar contacto y elegir retiro o envío en checkout.",
+      "reason": "La API devolvió retiro y entrega deshabilitados por configuración.",
+      "source": "src/pages/CheckoutPage.jsx"
+    },
+    {
+      "area": "Tienda",
+      "action": "Crear un pedido ecommerce con precios/stock validados por el servidor.",
+      "reason": "Flujo implementado, condicionado a configuración comercial que hoy no está lista.",
+      "source": "netlify/functions/_lib/ecommerce/commerceService.mjs"
+    },
+    {
+      "area": "Tienda",
+      "action": "Simular localmente un pago aprobado con cuenta administradora.",
+      "reason": "Es una capacidad de entorno local autorizada; no es un pago productivo ni una función disponible en el deploy main.",
+      "source": "src/services/ecommerceService.js"
+    }
+  ],
+  "notAvailable": [
+    "Ventas online cobradas con Payway u otra pasarela real: proveedor pendiente.",
+    "Conversación de voz en tiempo real con Olivia: bandera de main deshabilitada; no confundir con dictado.",
+    "Publicación de anuncios, autenticación Meta Marketing API, métricas reales de Meta, render y validación técnica de videos: etapas pendientes.",
+    "Responder automáticamente mensajes de Instagram/Facebook o importar sus bandejas de entrada.",
+    "Enviar campañas de WhatsApp desde una herramienta de Olivia: sólo tiene lectura de campañas y creación de registro genérico de marketing.",
+    "Personalizar automáticamente el texto de WhatsApp por placeholders de nombre: anunciado como futuro.",
+    "Órdenes de compra, cuenta corriente de proveedor, compra automática y costeo completo de mercadería.",
+    "Tracking de transporte, etiquetas de envío, cotización de flete o optimización de rutas.",
+    "Integración bancaria, conciliación con extractos o transferencias de dinero.",
+    "Borrado físico de productos, ventas, usuarios, ubicaciones o auditoría desde los flujos operativos descritos.",
+    "Editar roles/permisos de usuarios existentes desde Administración u Olivia: hay revisión y plantillas, pero no editor implementado en esa pantalla.",
+    "Crear un producto maestro autónomamente mediante prepare_product_create: el handler sólo prepara revisión. prepare_catalog_stock_load sí puede crear faltantes dentro de una carga confirmada.",
+    "Crear descuentos guardados desde un CRUD: se utilizan descuentos existentes y descuentos manuales por venta; no se encontró el CRUD de definición.",
+    "Notas de crédito o anulación fiscal automática de una factura autorizada.",
+    "Exportación universal a Excel/CSV de cualquier módulo por tener una bandera de permiso export.",
+    "Alta de producto desde LocationProductForm o asignación simultánea a todos los locales: componente no montado en la ruta activa.",
+    "Sistema de puntos, recompensas o saldo a favor de fidelización: la función actual clasifica clientes."
+  ],
+  "arcaUpdate": "La autorización automática ARCA está disponible, según actualización explícita del Administrador del 10/10/2026. Se valida en cada operación el entorno, los orígenes habilitados, el receptor y la elegibilidad fiscal. Olivia no emite autónomamente con prepare_invoice_review: abre la revisión manual. No hay nota de crédito ni anulación fiscal autónoma. La pantalla de Configuración consultada el 10/10 todavía informa gates bloqueados, aunque hay comprobantes autorizados; consultar el estado vigente del backend antes de operar, sin presentar el bloqueo histórico como una limitación permanente del sistema."
+}

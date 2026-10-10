@@ -22,6 +22,8 @@ import {
 import { Link, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
 import DashboardFilters from "../components/DashboardFilters";
+import BusinessMetricsCards from "../components/BusinessMetricsCards";
+import { calculateMetrics } from "../../modules/locations/domain/metrics";
 import DashboardPayments from "../components/DashboardPayments";
 import DashboardAlerts, { DashboardAlertsBell } from "../components/DashboardAlerts";
 import { dashboardGreeting, summarizeDashboardPayments } from "../dashboardPresentation";
@@ -137,6 +139,8 @@ export default function DashboardPage() {
   const summary = useMemo(() => summarizeSales(periodSales), [periodSales]);
   const chart = useMemo(() => buildPeriodSalesSeries(periodSales, range, format), [periodSales, range, format]);
   const payments = useMemo(() => summarizeDashboardPayments(periodSales), [periodSales]);
+  const businessMetrics = useMemo(() => calculateMetrics(periodSales, range), [periodSales, range]);
+  const stockLocations = useMemo(() => locations.filter(location => effectiveLocationIds.includes(location.id)), [locations, selectedLocationIdsKey]);
   const metricsReady = locationsResult.status === "ready" && salesResult.status === "ready" && salesResult.data?.queryKey === salesQueryKey;
   const metricsLoading = locationsResult.status === "loading" || salesResult.status === "loading" || (salesResult.status === "ready" && !metricsReady && locationsResult.status !== "error");
   const hasError = locationsResult.status === "error" || salesResult.status === "error";
@@ -231,6 +235,7 @@ export default function DashboardPage() {
 
       {metricsReady ? (
         <>
+          <BusinessMetricsCards metrics={businessMetrics} profile={profile} locations={stockLocations} includeWarehouses={allStockOrigins} />
           <section className="fm-two-column-grid">
             <Panel
               title="Ritmo de ventas"

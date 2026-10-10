@@ -1,0 +1,8 @@
+MÉTRICAS NUEVAS — DISPONIBLES EN DEPLOY PREVIEW
+Fecha: 2026-10-10. No afirmar disponibilidad en main hasta integrar esta rama.
+Consultar Productos más vendidos en el Panel general y Métricas: ranking por unidades y subtotal.
+Consultar Ventas por vendedor en ambas pantallas: total, cantidad de ventas y unidades; desplegar todos los vendedores.
+Consultar Ventas por hora en ambas pantallas: 24 horas de Argentina acumuladas en el período, con detalle de montos y operaciones.
+Consultar Stock restante actual en ambas pantallas: productos únicos, abreviación, nombre y unidades, ordenados por menor saldo.
+Desplegar Ver todo el stock y consultar el saldo por origen; las ubicaciones seleccionadas limitan el inventario y los depósitos se incluyen en la vista global si hay permisos.
+Las ventas excluyen anuladas/eliminadas y conservan los mismos filtros comerciales. Stock es saldo actual, independiente del período y de vendedor/pago/canal/descuento; en Métricas respeta producto/categoría. No se utiliza el inventario de ejemplo de la captura.
