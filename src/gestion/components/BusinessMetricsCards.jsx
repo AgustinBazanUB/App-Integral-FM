@@ -63,11 +63,12 @@ function RemainingStock({ profile, locations, includeWarehouses, filters }) {
   </Panel>;
 }
 
-export default function BusinessMetricsCards({ metrics, profile, locations, includeWarehouses = false, stockFilters }) {
-  return <section className="fm-business-metrics" aria-label="Productos, vendedores, horarios y stock">
+export default function BusinessMetricsCards({ metrics, profile, locations, includeWarehouses = false, stockFilters, showHourly = true, showStock = true }) {
+  const columns = 2 + Number(showHourly) + Number(showStock);
+  return <section className="fm-business-metrics" style={{ "--fm-business-columns": columns }} aria-label={`Productos y vendedores${showHourly ? ", horarios" : ""}${showStock ? " y stock" : ""}`}>
     <Panel title="Productos más vendidos" description="Ordenados por unidades de las ventas filtradas. Importes antes de descuentos generales." className="fm-business-card"><Ranking rows={metrics.byProduct} products /></Panel>
     <Panel title="Ventas por vendedor" description="Ordenadas por el total vendido con los filtros elegidos." className="fm-business-card"><Ranking rows={metrics.bySeller} /></Panel>
-    <Panel title="Ventas por hora" description="Total por hora del día, acumulado en el período. Hora de Argentina." className="fm-business-card"><HourlySales rows={metrics.byHour} /></Panel>
-    <RemainingStock profile={profile} locations={locations} includeWarehouses={includeWarehouses} filters={stockFilters} />
+    {showHourly ? <Panel title="Ventas por hora" description="Total por hora del día, acumulado en el período. Hora de Argentina." className="fm-business-card"><HourlySales rows={metrics.byHour} /></Panel> : null}
+    {showStock ? <RemainingStock profile={profile} locations={locations} includeWarehouses={includeWarehouses} filters={stockFilters} /> : null}
   </section>;
 }

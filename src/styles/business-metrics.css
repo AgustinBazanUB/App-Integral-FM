@@ -1,4 +1,4 @@
-.fm-business-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.fm-business-metrics { display: grid; grid-template-columns: repeat(var(--fm-business-columns, 4), minmax(0, 1fr)); gap: 18px; align-items: start; }
 .fm-business-card { min-width: 0; height: 100%; }
 .fm-business-card .fm-panel__header { align-items: flex-start; flex-wrap: wrap; }
 .fm-business-card .fm-panel__body { display: grid; gap: 16px; }

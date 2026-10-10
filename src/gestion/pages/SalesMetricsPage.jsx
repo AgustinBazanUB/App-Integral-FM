@@ -1,4 +1,3 @@
-import OperatingMetricsPanel from "../components/OperatingMetricsPanel";
 import { metricsByCategory } from "../../modules/locations/domain/operatingMetrics";
 import { saleChannelLabel } from "../../modules/locations/domain/channels";
 import { useMemo, useState } from "react";
@@ -97,6 +96,8 @@ export default function SalesMetricsPage() {
   }, [profile.id]);
 
   const locations = locationsResult.data || [];
+  const selectedLocations = locations.filter(location => filters.locationIds.includes(location.id));
+  const showRemainingStock = filters.locationIds.length === 1 && selectedLocations.length === 1;
   const locationIdsKey = locations.map((location) => location.id).sort().join(",");
   const selectedLocationKey = filters.locationIds.slice().sort().join(",");
   const salesQueryKey = `${profile.id}|${locationIdsKey}|${selectedLocationKey}|${rangeState.range?.start.toISOString()}|${rangeState.range?.end.toISOString()}`;
@@ -153,7 +154,7 @@ export default function SalesMetricsPage() {
       <PageHeader
         eyebrow="Métricas generales"
         title="Historial y análisis de ventas"
-        description="Las ventas comparten los filtros del período. Stock restante muestra el saldo actual de los inventarios permitidos."
+        description="Las ventas comparten los filtros del período. Seleccioná una sola ubicación para consultar su stock actual."
       />
 
       <Panel title="Filtros" description="Combiná período, ubicaciones, vendedores, productos, descuentos y formas de pago.">
@@ -184,29 +185,36 @@ export default function SalesMetricsPage() {
             <StatCard label="Total descuentos" value={formatMoney(metrics.discountTotal)} hint={`${metrics.discountedSales} ventas con descuento`} icon="Percent" tone="gold" />
           </section>
 
-          <OperatingMetricsPanel profile={profile} sales={filteredSales} range={rangeState.range} locations={filters.locationIds.length ? locations.filter(location => filters.locationIds.includes(location.id)) : locations} />
-          <BusinessMetricsCards metrics={metrics} profile={profile} locations={filters.locationIds.length ? locations.filter(location => filters.locationIds.includes(location.id)) : locations} includeWarehouses={!filters.locationIds.length && can(profile, "locations", "viewAllLocations")} stockFilters={{ productIds: filters.productIds, categoryIds: filters.categoryIds, categoryProductIds }} />
-          <Panel title="Categorías" description="Unidades y subtotal de productos, antes de descuentos generales."><DataTable rows={metricsByCategory(filteredSales, dimensions.products, dimensions.categories)} columns={[{ key: "name", label: "Categoría" }, { key: "items", label: "Unidades" }, { key: "sales", label: "Ventas" }, { key: "total", label: "Subtotal", render: row => formatMoney(row.total) }]} empty={<EmptyState title="Sin categorías vendidas" />} /></Panel>
-          <section className="fm-analysis-grid fm-metrics-analysis-grid">
-            <Panel title="Canales comerciales" description="Origen de la operación; Venta Rápida es la herramienta de registro."><DataTable rows={metrics.byChannel} columns={[{ key: "name", label: "Canal" }, { key: "sales", label: "Ventas" }, { key: "total", label: "Monto", render: row => formatMoney(row.total) }]} empty={<EmptyState title="Sin ventas por canal" />} /></Panel>
-            <Panel title="Origen físico del stock" description="Ubicaciones y depósitos desde los cuales salió la mercadería."><DataTable rows={metrics.byStockOrigin} columns={[{ key: "name", label: "Origen" }, { key: "type", label: "Tipo", render: row => row.type === "warehouse" ? "Depósito" : "Ubicación" }, { key: "total", label: "Monto asociado", render: row => formatMoney(row.total) }]} empty={<EmptyState title="Sin salidas por ventas" />} /></Panel>
-          </section>
           <Panel title="Evolución de ventas" description={`Granularidad automática: ${metrics.timelineMode === "hour" ? "hora" : metrics.timelineMode === "day" ? "día" : metrics.timelineMode === "week" ? "semana" : "mes"}.`}>
             {metrics.timeline.length ? <SalesLineChart points={metrics.timeline} label="Evolución de ventas según los filtros seleccionados" /> : <EmptyState icon="ChartNoAxesCombined" title="Sin puntos para graficar" />}
           </Panel>
 
-          <section className="fm-analysis-grid fm-metrics-analysis-grid">
-            <Panel title="Productos" description="Unidades y subtotal antes de descuentos generales según los filtros.">
-              <DataTable rows={productRows} columns={[
-                { key: "name", label: "Producto" },
-                { key: "items", label: "Unidades" },
-                { key: "total", label: "Monto", render: (row) => formatMoney(row.total) },
-              ]} empty={<EmptyState icon="Boxes" title="Sin productos vendidos" />} />
-            </Panel>
+          <Panel title="Formas de pago" description="Distribución por monto cobrado; +2 pagos se reparte entre sus partes reales.">
+            {metrics.byPayment.length ? <PaymentDonut rows={metrics.byPayment} total={metrics.total} /> : <EmptyState icon="CircleDollarSign" title="Sin pagos para mostrar" />}
+          </Panel>
 
-            <Panel title="Formas de pago" description="Distribución por monto cobrado; +2 pagos se reparte entre sus partes reales.">
-              {metrics.byPayment.length ? <PaymentDonut rows={metrics.byPayment} total={metrics.total} /> : <EmptyState icon="CircleDollarSign" title="Sin pagos para mostrar" />}
-            </Panel>
+          <BusinessMetricsCards
+            metrics={metrics}
+            profile={profile}
+            locations={selectedLocations}
+            showHourly={false}
+            showStock={showRemainingStock}
+            stockFilters={{ productIds: filters.productIds, categoryIds: filters.categoryIds, categoryProductIds }}
+          />
+
+          <Panel title="Categorías" description="Unidades y subtotal de productos, antes de descuentos generales."><DataTable rows={metricsByCategory(filteredSales, dimensions.products, dimensions.categories)} columns={[{ key: "name", label: "Categoría" }, { key: "items", label: "Unidades" }, { key: "sales", label: "Ventas" }, { key: "total", label: "Subtotal", render: row => formatMoney(row.total) }]} empty={<EmptyState title="Sin categorías vendidas" />} /></Panel>
+
+          <Panel title="Productos" description="Unidades y subtotal antes de descuentos generales según los filtros.">
+            <DataTable rows={productRows} columns={[
+              { key: "name", label: "Producto" },
+              { key: "items", label: "Unidades" },
+              { key: "total", label: "Monto", render: (row) => formatMoney(row.total) },
+            ]} empty={<EmptyState icon="Boxes" title="Sin productos vendidos" />} />
+          </Panel>
+
+          <section className="fm-analysis-grid fm-metrics-analysis-grid">
+            <Panel title="Canales comerciales" description="Origen de la operación; Venta Rápida es la herramienta de registro."><DataTable rows={metrics.byChannel} columns={[{ key: "name", label: "Canal" }, { key: "sales", label: "Ventas" }, { key: "total", label: "Monto", render: row => formatMoney(row.total) }]} empty={<EmptyState title="Sin ventas por canal" />} /></Panel>
+            <Panel title="Origen físico del stock" description="Ubicaciones y depósitos desde los cuales salió la mercadería."><DataTable rows={metrics.byStockOrigin} columns={[{ key: "name", label: "Origen" }, { key: "type", label: "Tipo", render: row => row.type === "warehouse" ? "Depósito" : "Ubicación" }, { key: "total", label: "Monto asociado", render: row => formatMoney(row.total) }]} empty={<EmptyState title="Sin salidas por ventas" />} /></Panel>
           </section>
 
           <section className="fm-analysis-grid fm-metrics-analysis-grid">
