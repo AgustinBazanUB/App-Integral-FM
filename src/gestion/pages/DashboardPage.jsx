@@ -39,7 +39,6 @@ import {
 import { invalidateSharedLocations, listLocationsShared } from "../services/sharedResources";
 import { listActiveAlerts, subscribeActiveAlerts } from "../services/alertsService";
 
-const SESSION_FORMAT_KEY = "fm-dashboard-period-format";
 const VALID_FORMATS = new Set(["year", "month", "week", "day"]);
 
 function SalesBars({ data }) {
@@ -80,19 +79,12 @@ function DashboardMetricsSkeleton() {
 export default function DashboardPage() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const [format, setFormat] = useState(() => {
-    try {
-      const saved = window.sessionStorage.getItem(SESSION_FORMAT_KEY);
-      return VALID_FORMATS.has(saved) ? saved : "month";
-    } catch { return "month"; }
-  });
+  const [format, setFormat] = useState("day");
   const [referenceKey, setReferenceKey] = useState(() => argentinaDateKey());
-  const [selectedLocationIds, setSelectedLocationIds] = useState(null);
+  // Undefined follows active locations on first load; null means the user chose all.
+  // An empty array is an explicit selection of no locations.
+  const [selectedLocationIds, setSelectedLocationIds] = useState(undefined);
   const [stockPickerOpen, setStockPickerOpen] = useState(false);
-
-  useEffect(() => {
-    try { window.sessionStorage.setItem(SESSION_FORMAT_KEY, format); } catch { /* Preferencia opcional. */ }
-  }, [format]);
 
   const locationsResult = useAsyncData(() => listLocationsShared(profile), [profile]);
   const alertsResult = useAsyncData(() => listActiveAlerts(profile), [profile]);
@@ -114,15 +106,16 @@ export default function DashboardPage() {
   }, [allowedLocationIds, selectedLocationIds]);
 
   const effectiveLocationIds = useMemo(() => {
-    if (selectedLocationIds == null) return allowedLocationIds;
+    if (selectedLocationIds === undefined) return activeLocations.map(location => location.id);
+    if (selectedLocationIds === null) return allowedLocationIds;
     const allowed = new Set(allowedLocationIds);
     return selectedLocationIds.filter((id) => allowed.has(id));
-  }, [allowedLocationIds, selectedLocationIds]);
+  }, [allowedLocationIds, activeLocations, selectedLocationIds]);
   const selectedLocationIdsKey = effectiveLocationIds.slice().sort().join(",");
   const range = useMemo(() => argentinaPeriodRange(format, referenceKey), [format, referenceKey]);
   const periodLabel = useMemo(() => argentinaPeriodLabel(format, referenceKey), [format, referenceKey]);
 
-  const allStockOrigins = canAccessAdministration(profile) && selectedLocationIds == null;
+  const allStockOrigins = canAccessAdministration(profile) && selectedLocationIds === null;
   const salesQueryKey = `${profile.id}|${allStockOrigins ? "all-origins" : selectedLocationIdsKey}|${range.start.toISOString()}|${range.end.toISOString()}`;
   const salesResult = useAsyncData(async () => {
     const sales = locationsResult.data && (allStockOrigins || effectiveLocationIds.length) ? await listSalesByRange({
@@ -201,7 +194,7 @@ export default function DashboardPage() {
           format={format}
           referenceKey={referenceKey}
           locations={locations}
-          selectedLocationIds={selectedLocationIds}
+          selectedLocationIds={selectedLocationIds === undefined ? effectiveLocationIds : selectedLocationIds}
           onFormatChange={handleFormatChange}
           onReferenceChange={setReferenceKey}
           onLocationsChange={setSelectedLocationIds}
