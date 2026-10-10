@@ -10,7 +10,7 @@ const record = closedSchema({ entityId: id, name: str(150), notes: str(1000) });
 const definitions = {};
 const add = (name, module, description, parameters, action = "view") => { definitions[name] = { name, module, description, parameters, action, kind: name.startsWith("prepare_") ? "prepare" : "read" }; };
 for (const [name, description] of [
-  ["get_sales_metrics", "Ventas, operaciones, ticket promedio, mix, pagos y promociones del período con los cálculos compartidos del Panel de Métricas generales; compara con período anterior y declara alcance/parcialidad."],
+  ["get_sales_metrics", "Ventas, operaciones, ticket promedio, mix, pagos, promociones y ventas por hora de Argentina del período con los cálculos compartidos del Panel de Métricas generales; compara con período anterior y declara alcance/parcialidad."],
   ["get_sales_history", "Historial de ventas activas del período autorizado, con límite y parcialidad explícitos."],
   ["get_location_metrics", "Métricas por ubicación del período autorizado."],
   ["compare_locations", "Comparar ubicaciones con datos operativos vivos del período."],

@@ -1,0 +1,26 @@
+.fm-business-metrics { display: grid; grid-template-columns: repeat(var(--fm-business-columns, 4), minmax(0, 1fr)); gap: 18px; align-items: start; }
+.fm-business-card { min-width: 0; height: 100%; }
+.fm-business-card .fm-panel__header { align-items: flex-start; flex-wrap: wrap; }
+.fm-business-card .fm-panel__body { display: grid; gap: 16px; }
+.fm-business-count { display: inline-block; background: var(--fm-surface-soft, #edf1ed); border-radius: 24px; padding: 6px 10px; font-size: 12px; white-space: nowrap; }
+.fm-business-ranking, .fm-business-stock { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; }
+.fm-business-ranking__line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.fm-business-ranking__line span { min-width: 0; overflow-wrap: anywhere; }
+.fm-business-ranking__line strong { white-space: nowrap; }
+.fm-business-ranking small, .fm-business-stock small { color: var(--fm-text-muted); font-size: 11px; }
+.fm-business-ranking__track { margin: 8px 0 4px; height: 5px; border-radius: 4px; background: #edf1ed; overflow: hidden; }
+.fm-business-ranking__track span { display: block; height: 100%; background: var(--fm-text-accent, #546647); border-radius: 4px; }
+.fm-business-hours { height: 180px; display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 3px; padding-bottom: 24px; margin-top: 12px; }
+.fm-business-hours__column { position: relative; height: 100%; display: flex; align-items: flex-end; }
+.fm-business-hours__bar { width: 100%; background: var(--fm-text-accent, #546647); border-radius: 3px 3px 0 0; }
+.fm-business-hours__column small { position: absolute; top: calc(100% + 6px); font-size: 10px; }
+.fm-business-scroll { max-height: 360px; overflow-y: auto; overscroll-behavior: contain; }
+.fm-business-hour-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.fm-business-hour-table th, .fm-business-hour-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--fm-border-subtle); }
+.fm-business-stock li { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid var(--fm-border-subtle); }
+.fm-business-stock li > div { min-width: 0; overflow-wrap: anywhere; }
+.fm-business-stock small { display: block; margin-top: 4px; }
+.fm-business-stock li > strong { white-space: nowrap; }
+.fm-business-stock__negative { color: var(--fm-danger, #a74337); }
+@media (max-width: 1500px) { .fm-business-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 650px) { .fm-business-metrics { grid-template-columns: minmax(0, 1fr); } }

@@ -22,6 +22,8 @@ import {
 import { Link, useNavigate } from "../../router";
 import { useAuth } from "../AuthContext";
 import DashboardFilters from "../components/DashboardFilters";
+import BusinessMetricsCards from "../components/BusinessMetricsCards";
+import { calculateMetrics } from "../../modules/locations/domain/metrics";
 import DashboardPayments from "../components/DashboardPayments";
 import DashboardAlerts, { DashboardAlertsBell } from "../components/DashboardAlerts";
 import { dashboardGreeting, summarizeDashboardPayments } from "../dashboardPresentation";
@@ -37,7 +39,6 @@ import {
 import { invalidateSharedLocations, listLocationsShared } from "../services/sharedResources";
 import { listActiveAlerts, subscribeActiveAlerts } from "../services/alertsService";
 
-const SESSION_FORMAT_KEY = "fm-dashboard-period-format";
 const VALID_FORMATS = new Set(["year", "month", "week", "day"]);
 
 function SalesBars({ data }) {
@@ -78,19 +79,12 @@ function DashboardMetricsSkeleton() {
 export default function DashboardPage() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const [format, setFormat] = useState(() => {
-    try {
-      const saved = window.sessionStorage.getItem(SESSION_FORMAT_KEY);
-      return VALID_FORMATS.has(saved) ? saved : "month";
-    } catch { return "month"; }
-  });
+  const [format, setFormat] = useState("day");
   const [referenceKey, setReferenceKey] = useState(() => argentinaDateKey());
-  const [selectedLocationIds, setSelectedLocationIds] = useState(null);
+  // Undefined follows active locations on first load; null means the user chose all.
+  // An empty array is an explicit selection of no locations.
+  const [selectedLocationIds, setSelectedLocationIds] = useState(undefined);
   const [stockPickerOpen, setStockPickerOpen] = useState(false);
-
-  useEffect(() => {
-    try { window.sessionStorage.setItem(SESSION_FORMAT_KEY, format); } catch { /* Preferencia opcional. */ }
-  }, [format]);
 
   const locationsResult = useAsyncData(() => listLocationsShared(profile), [profile]);
   const alertsResult = useAsyncData(() => listActiveAlerts(profile), [profile]);
@@ -112,15 +106,16 @@ export default function DashboardPage() {
   }, [allowedLocationIds, selectedLocationIds]);
 
   const effectiveLocationIds = useMemo(() => {
-    if (selectedLocationIds == null) return allowedLocationIds;
+    if (selectedLocationIds === undefined) return activeLocations.map(location => location.id);
+    if (selectedLocationIds === null) return allowedLocationIds;
     const allowed = new Set(allowedLocationIds);
     return selectedLocationIds.filter((id) => allowed.has(id));
-  }, [allowedLocationIds, selectedLocationIds]);
+  }, [allowedLocationIds, activeLocations, selectedLocationIds]);
   const selectedLocationIdsKey = effectiveLocationIds.slice().sort().join(",");
   const range = useMemo(() => argentinaPeriodRange(format, referenceKey), [format, referenceKey]);
   const periodLabel = useMemo(() => argentinaPeriodLabel(format, referenceKey), [format, referenceKey]);
 
-  const allStockOrigins = canAccessAdministration(profile) && selectedLocationIds == null;
+  const allStockOrigins = canAccessAdministration(profile) && selectedLocationIds === null;
   const salesQueryKey = `${profile.id}|${allStockOrigins ? "all-origins" : selectedLocationIdsKey}|${range.start.toISOString()}|${range.end.toISOString()}`;
   const salesResult = useAsyncData(async () => {
     const sales = locationsResult.data && (allStockOrigins || effectiveLocationIds.length) ? await listSalesByRange({
@@ -137,6 +132,8 @@ export default function DashboardPage() {
   const summary = useMemo(() => summarizeSales(periodSales), [periodSales]);
   const chart = useMemo(() => buildPeriodSalesSeries(periodSales, range, format), [periodSales, range, format]);
   const payments = useMemo(() => summarizeDashboardPayments(periodSales), [periodSales]);
+  const businessMetrics = useMemo(() => calculateMetrics(periodSales, range), [periodSales, range]);
+  const stockLocations = useMemo(() => locations.filter(location => effectiveLocationIds.includes(location.id)), [locations, selectedLocationIdsKey]);
   const metricsReady = locationsResult.status === "ready" && salesResult.status === "ready" && salesResult.data?.queryKey === salesQueryKey;
   const metricsLoading = locationsResult.status === "loading" || salesResult.status === "loading" || (salesResult.status === "ready" && !metricsReady && locationsResult.status !== "error");
   const hasError = locationsResult.status === "error" || salesResult.status === "error";
@@ -197,7 +194,7 @@ export default function DashboardPage() {
           format={format}
           referenceKey={referenceKey}
           locations={locations}
-          selectedLocationIds={selectedLocationIds}
+          selectedLocationIds={selectedLocationIds === undefined ? effectiveLocationIds : selectedLocationIds}
           onFormatChange={handleFormatChange}
           onReferenceChange={setReferenceKey}
           onLocationsChange={setSelectedLocationIds}
@@ -231,6 +228,7 @@ export default function DashboardPage() {
 
       {metricsReady ? (
         <>
+          <BusinessMetricsCards metrics={businessMetrics} profile={profile} locations={stockLocations} includeWarehouses={allStockOrigins} />
           <section className="fm-two-column-grid">
             <Panel
               title="Ritmo de ventas"

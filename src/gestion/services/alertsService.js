@@ -5,13 +5,15 @@ import { prioritizeAlerts } from "../../modules/alerts/domain/alerts.js";
 import { db } from "./firebase";
 import { primeRuntimeCache, withRuntimeCache } from "./runtimeCache";
 
+const notificationAlerts = (rows, profile) => rows.filter(row => row.source !== "olivia_suggestion" || row.responsibleId === profile.id);
+
 export function subscribeActiveAlerts(profile, notify) {
   if (!can(profile, "alerts", "view")) return () => {};
   const admin = ["admin", "general_admin"].includes(normalizedRole(profile));
   const constraints = [where("active", "==", true)];
   if (!admin) constraints.push(where("responsibleId", "==", profile.id));
   return onSnapshot(query(collection(db, moduleById.alerts.collection), ...constraints), snapshot => {
-    primeRuntimeCache(`active-alerts:${profile.id}:${admin}`, prioritizeAlerts(snapshot.docs.map(item => ({ ...item.data(), id: item.id }))), 30_000);
+    primeRuntimeCache(`active-alerts:${profile.id}:${admin}`, prioritizeAlerts(notificationAlerts(snapshot.docs.map(item => ({ ...item.data(), id: item.id })), profile)), 30_000);
     notify();
   }, () => { /* The authorized initial load remains the fallback on connection loss. */ });
 }
@@ -25,6 +27,6 @@ export function listActiveAlerts(profile) {
     if (!admin) constraints.push(where("responsibleId", "==", profile.id));
     const snapshot = await getDocs(query(collection(db, moduleById.alerts.collection), ...constraints));
     // No limitar antes de ordenar: una crítica antigua debe superar a un aviso reciente.
-    return prioritizeAlerts(snapshot.docs.map((item) => ({ ...item.data(), id: item.id })));
+    return prioritizeAlerts(notificationAlerts(snapshot.docs.map((item) => ({ ...item.data(), id: item.id })), profile));
   }, 30_000);
 }
