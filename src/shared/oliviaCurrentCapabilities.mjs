@@ -2677,19 +2677,19 @@ export const CURRENT_CAPABILITIES = [
     "id": "current-F273",
     "module": "metrics",
     "audience": "admin",
-    "title": "Métricas y análisis comercial: Consultar promedios operativos de una ubicación según su calendario.",
-    "text": "Consultar promedios operativos de una ubicación según su calendario. Canal: UI. La fórmula conjunta de múltiples calendarios se declara pendiente. Pantalla: /gestion/metrics/sales. Permisos: metrics.view; fuentes autorizadas y permisos de ubicaciones/productos/usuarios para dimensiones.",
+    "title": "Métricas: Promedio operativo oculto temporalmente",
+    "text": "Promedio operativo está oculto por solicitud del Administrador en esta versión. No ofrecerlo como una función visible de Métricas; se conservan las métricas de ventas, pagos, productos, vendedores y categorías.",
     "sourceUrl": "https://appintegralflormia.netlify.app/gestion/metrics/sales",
-    "status": "implemented"
+    "status": "hidden"
   },
   {
     "id": "current-F274",
     "module": "metrics",
     "audience": "admin",
-    "title": "Métricas y análisis comercial: Configurar el calendario anual de feriados del negocio.",
-    "text": "Configurar el calendario anual de feriados del negocio. Canal: UI. Administrador: fechas explícitas; no consulta automáticamente un proveedor de feriados. Pantalla: /gestion/metrics/sales. Permisos: metrics.view; fuentes autorizadas y permisos de ubicaciones/productos/usuarios para dimensiones.",
+    "title": "Métricas: Calendario anual de feriados del promedio operativo oculto",
+    "text": "El editor de feriados que pertenecía al bloque Promedio operativo está oculto junto con ese bloque por el momento. No ofrecer su configuración desde Métricas en esta versión.",
     "sourceUrl": "https://appintegralflormia.netlify.app/gestion/metrics/sales",
-    "status": "implemented"
+    "status": "hidden"
   },
   {
     "id": "current-F275",
