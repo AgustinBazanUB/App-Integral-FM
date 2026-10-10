@@ -1,6 +1,7 @@
-export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceCosts, telemetry, money }) {
+export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceCosts, voiceConfiguration, telemetry, money }) {
   const ms = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
   const rows = [
+    ...(voiceConfiguration ? [["Modelo de conversación", voiceConfiguration.model], ["Cerebro y acciones de voz", `${voiceConfiguration.backendModel} / ${voiceConfiguration.reasoningEffort}`], ["Voz fija de Olivia", voiceConfiguration.voice]] : []),
     ["Modelo / razonamiento", `${telemetry?.model || estimate?.model || "—"} / ${telemetry?.reasoningEffort || estimate?.reasoningEffort || "—"}`],
     ["Ruta / motivo", `${telemetry?.route || estimate?.route || "—"} / ${telemetry?.routingReason || estimate?.routingReason || "—"}`],
     ["Tarea", telemetry?.taskId || "—"],

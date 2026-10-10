@@ -1,5 +1,5 @@
-MÉTRICAS NUEVAS — DISPONIBLES EN DEPLOY PREVIEW
-Fecha: 2026-10-10. No afirmar disponibilidad en main hasta integrar esta rama.
+MÉTRICAS NUEVAS — VERSIÓN INTEGRADA
+Fecha: 2026-10-10. Disponibilidad: versión integrada a main.
 Consultar Productos más vendidos en el Panel general y Métricas: ranking por unidades y subtotal.
 Consultar Ventas por vendedor en ambas pantallas: total, cantidad de ventas y unidades; desplegar todos los vendedores.
 Consultar Ventas por hora en el Panel general: 24 horas de Argentina acumuladas en el período, con detalle de montos y operaciones. En Métricas se utiliza Evolución de ventas, por hora al elegir Día; no hay una segunda tarjeta horaria.

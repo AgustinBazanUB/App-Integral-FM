@@ -6,6 +6,7 @@ import { createOliviaEngine } from "./engine.mjs";
 import { settleUsage } from "./usage.mjs";
 import { hangupCall } from "./voice.mjs";
 import { resolveOliviaPricing } from "./pricing.mjs";
+import { canUseOliviaVoice } from "../../../../src/shared/oliviaVoiceAvailability.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 export function liveUsage(event) {
@@ -23,6 +24,7 @@ export function liveSummary(result) {
 /** Trusted sideband owns delegation, transcript correlation and duration billing.
  * The untrusted browser can only mute or close the media session. */
 export async function monitorLive({ session, realtimeSessionId, store, env = process.env, WebSocketImpl = WebSocket, engine, clock = () => new Date(), fetchImpl = fetch, pollMs = 1000, closeTimeoutMs = 15000 }) {
+  if (!canUseOliviaVoice(session)) throw oliviaError("voice-not-enabled", "La conversación por voz no está habilitada para esta cuenta.", 409);
   const id = safeId(realtimeSessionId), path = `oliviaRealtime/${id}`, lease = randomUUID();
   const live = await store.get(path);
   if (!live || live.protocol !== "live" || live.userId !== session.uid || live.sessionBinding !== sessionBinding(session) || !/^live_[A-Za-z0-9_-]{1,120}$/.test(live.callId || "")) throw oliviaError("permission-denied", "No tenés acceso a esta sesión de voz.", 403);

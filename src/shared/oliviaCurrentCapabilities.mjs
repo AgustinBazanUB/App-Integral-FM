@@ -4937,7 +4937,7 @@ export const CURRENT_CAPABILITIES = [
     "module": "ai",
     "audience": "admin",
     "title": "Límites actuales de Olivia: conversación y asistencia",
-    "text": "La conversación por voz en tiempo real está deshabilitada en main; dictado sí existe. Un archivo de conocimiento no añade herramientas ni permisos. No hay botones de renombrar o eliminar chats propios en la interfaz actual. La existencia de OPENAI_API_KEY no sustituye una prueba completa de cada modelo u operación.",
+    "text": "La conversación fluida está habilitada exclusivamente para la cuenta autenticada agsreserva@gmail.com. El resto conserva texto y dictado. Un archivo de conocimiento no añade herramientas ni permisos. No hay botones de renombrar o eliminar chats propios en la interfaz actual. La existencia de OPENAI_API_KEY no sustituye una prueba completa de cada modelo u operación.",
     "sourceUrl": "https://appintegralflormia.netlify.appLanzador Olivia en gestión y Panel Vendedor",
     "status": "implemented"
   },
@@ -5189,7 +5189,7 @@ export const CURRENT_CAPABILITIES = [
     "module": "ai",
     "audience": "admin",
     "title": "Límites actuales de Administración de Olivia y biblioteca",
-    "text": "Los campos de configuración de voz se conservan pero no habilitan la conversación en tiempo real. La biblioteca no tiene audiencia administrativa global: se publica por módulo. No publicar el inventario administrativo completo como ayuda de vendedor.",
+    "text": "La conversación fluida de Agustín utiliza un perfil fijo; los detalles aparecen en modo desarrollador de Olivia. La biblioteca no tiene audiencia administrativa global: se publica por módulo. No publicar el inventario administrativo completo como ayuda de vendedor.",
     "sourceUrl": "https://appintegralflormia.netlify.app/gestion/settings",
     "status": "implemented"
   },
@@ -5270,9 +5270,9 @@ export const CURRENT_CAPABILITIES = [
     "module": "metrics",
     "audience": "admin",
     "title": "Panel general métricas productos más vendidos ventas vendedor hora stock restante",
-    "text": "Disponible en preview 39, pendiente de integrar a main. Métricas muestra resumen, Evolución de ventas, Formas de pago, Productos más vendidos y Ventas por vendedor, seguidos de Categorías y tablas detalladas. Promedio operativo está oculto por el momento. Evolución muestra horas al elegir Día y adapta su granularidad al período; no se duplica con una tarjeta Ventas por hora. Stock restante solo aparece al seleccionar explícitamente una única ubicación autorizada; con todas o varias ubicaciones se oculta. Muestra saldo actual independiente del período, respeta producto/categoría y permite Ver todo el stock. El Panel general conserva Ventas por hora y stock de los orígenes seleccionados.",
+    "text": "Disponible en esta versión. Métricas muestra resumen, Evolución de ventas, Formas de pago, Productos más vendidos y Ventas por vendedor, seguidos de Categorías y tablas detalladas. Promedio operativo está oculto por el momento. Evolución muestra horas al elegir Día y adapta su granularidad al período; no se duplica con una tarjeta Ventas por hora. Stock restante solo aparece al seleccionar explícitamente una única ubicación autorizada; con todas o varias ubicaciones se oculta. Muestra saldo actual independiente del período, respeta producto/categoría y permite Ver todo el stock. El Panel general conserva Ventas por hora y stock de los orígenes seleccionados.",
     "sourceUrl": "https://appintegralflormia.netlify.app/gestion/metrics/sales",
-    "status": "preview"
+    "status": "implemented"
   },
   {
     "id": "seller-current-F161",
@@ -5622,6 +5622,24 @@ export const CURRENT_CAPABILITIES = [
     "audience": "seller",
     "title": "Registrar una lista de ventas presenciales de ubicaciones asignadas.",
     "text": "Registrar una lista de ventas presenciales de ubicaciones asignadas. Hasta veinte ventas y cien renglones; requiere conexión con Olivia. El vendedor no puede usar depósitos ni otros canales. Solo ubicaciones asignadas y herramientas disponibles para el Vendedor; nunca concede acceso administrativo.",
+    "sourceUrl": "https://appintegralflormia.netlify.app/vendedor",
+    "status": "implemented"
+  },
+  {
+    "id": "current-suggestions-admin",
+    "module": "ai",
+    "audience": "admin",
+    "title": "Enviar sugerencias e ideas de mejora de la aplicación a Agustín mediante Olivia",
+    "text": "Podés escribirle a Olivia: Comunicale a Agustín que acá quiero ver el stock, Decile a Agustín esta mejora, o Pasale esta idea a Agustín. Luna reformula la idea conservando intención y pantalla, y envía una notificación dentro de la aplicación a Agustín. La propuesta conserva autor y texto original, con botón Copiar para Codex en Alertas. Si falta la idea concreta, pregunta antes de enviarla. El envío no modifica la aplicación ni ejecuta operaciones comerciales.",
+    "sourceUrl": "https://appintegralflormia.netlify.app/gestion",
+    "status": "implemented"
+  },
+  {
+    "id": "current-suggestions-seller",
+    "module": "seller",
+    "audience": "seller",
+    "title": "Enviar sugerencias e ideas de mejora de la aplicación a Agustín mediante Olivia",
+    "text": "Podés escribirle a Olivia: Comunicale a Agustín que acá quiero ver el stock, Decile a Agustín esta mejora, o Pasale esta idea a Agustín. Luna reformula la idea conservando intención y pantalla, y envía una notificación dentro de la aplicación a Agustín. La propuesta conserva autor y texto original, con botón Copiar para Codex en Alertas. Si falta la idea concreta, pregunta antes de enviarla. El envío no modifica la aplicación ni ejecuta operaciones comerciales.",
     "sourceUrl": "https://appintegralflormia.netlify.app/vendedor",
     "status": "implemented"
   }

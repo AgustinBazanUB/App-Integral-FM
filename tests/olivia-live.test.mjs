@@ -5,11 +5,16 @@ import { createLive, interruptLive } from "../netlify/functions/_lib/olivia/live
 import { monitorLive, liveUsage, liveSummary } from "../netlify/functions/_lib/olivia/liveMonitor.mjs";
 import { reserveUsage } from "../netlify/functions/_lib/olivia/usage.mjs";
 import { OliviaLive } from "../src/gestion/olivia/live.mjs";
-import { fixture, start, functionResponse } from "./helpers/olivia-fixture.mjs";
+import { oliviaVoiceConfiguration } from "../src/shared/oliviaVoiceAvailability.mjs";
+import { routeModel } from "../netlify/functions/_lib/olivia/modelRouter.mjs";
+import { fixture as baseFixture, start, functionResponse } from "./helpers/olivia-fixture.mjs";
+const fixture = options => { const f = baseFixture(options); f.session.email = "agsreserva@gmail.com"; return f; };
 const pause = (ms = 5) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test("creación GPT-Live: delegación cliente, credencial privada y canal sin autoridad", async () => {
   const f = fixture({ role: "admin" }), { conversationId } = await start(f);
+  f.documents.get("oliviaConfiguration/global").voiceProtocol = "realtime";
+  f.documents.get("oliviaConfiguration/global").profiles.live.voice = "cedar";
   let providerBody;
   const result = await createLive({ session: f.session, body: { conversationId, requestId: "live_a", sdp: "v=0\nfull-offer", screenContext: { module: "locations" } }, engine: f.engine, store: f.store, env: { OPENAI_API_KEY: "private-test-key" }, now: f.clock(), applicationOrigin: "https://preview.example", fetchImpl: async (url, options) => {
     if (url.includes("api.openai.com")) {
@@ -25,10 +30,25 @@ test("creación GPT-Live: delegación cliente, credencial privada y canal sin au
     return new Response(null, { status: 202 });
   } });
   assert.equal(providerBody.session.model, "gpt-live-1");
+  assert.equal(providerBody.session.audio.output.voice, "marin");
   assert.deepEqual(providerBody.session.delegation, { type: "client" });
   assert.ok(!providerBody.session.client.data_channel.allowed_client_events.includes("session.instructions.append"));
   assert.ok(!JSON.stringify(result).includes("private-test-key"));
   assert.equal(f.documents.get(`oliviaRealtime/${result.realtimeSessionId}`).protocol, "live");
+});
+
+test("Live queda reservado a Agustín y usa Luna incluso para pedidos creativos", async () => {
+  const f = fixture({ role: "admin" });
+  const { conversationId } = await start(f);
+  const other = { ...f.session, email: "other@gmail.com", profile: { ...f.session.profile, email: "agsreserva@gmail.com" } };
+  await assert.rejects(createLive({ session: other, body: { conversationId, requestId: "denied", sdp: "v=0" }, store: f.store, engine: f.engine }), { code: "voice-not-enabled" });
+  assert.equal([...f.documents].filter(([path]) => path.startsWith("oliviaRealtime/")).length, 0);
+  const route = routeModel(oliviaVoiceConfiguration(f.config), f.session, { message: "Diseñame un concepto creativo para Instagram", context: { module: "marketing" } });
+  assert.equal(route.model, "gpt-6-luna");
+  assert.equal(route.reasoningEffort, "low");
+  assert.equal(route.route, "luna-voice");
+  assert.equal((await f.engine.state(other, conversationId)).voiceConversationAvailable, false);
+  assert.equal((await f.engine.state(f.session, conversationId)).voiceConversationAvailable, true);
 });
 test("creación fallida registra costo desconocido y libera la reserva", async () => {
   const f = fixture({ role: "admin" }), { conversationId } = await start(f);
