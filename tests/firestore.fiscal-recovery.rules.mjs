@@ -17,6 +17,7 @@ before(async () => {
       await setDoc(doc(db, "invoices", `invoice_homologation_${sourceType}_stale_${sourceType}`), { sourceType, sourceId: `stale_${sourceType}`, status: "pending" });
     }
     await setDoc(doc(db, "sales", "unbilled"), { sellerId: "seller", locationId: "loc1", status: "active", total: 1210 });
+    await setDoc(doc(db, "sales", "cancelling"), { sellerId: "seller", locationId: "loc1", status: "active", total: 1210, fiscalCancellation:{status:"pending",creditNoteId:null} });
     await setDoc(doc(db, "invoices", "invoice1"), { status: "authorized", authorization: { cae: "12345678901234", voucherNumber: 8 } });
     await setDoc(doc(db, "arcaWsaaTickets", "ticket1"), { encryptedTicket: "fake", lease: { holder: "backend" } });
     await setDoc(doc(db, "arcaSequenceLocks", "lock1"), { holder: "backend", reservation: { invoiceId: "invoice1" } });
@@ -57,6 +58,13 @@ for (const role of ["admin", "seller"]) {
     await assertFails(updateDoc(ref, { fiscalInvoiceId: "invoice1" }));
     await assertFails(updateDoc(ref, { invoiceStatus: "authorized" }));
     await assertFails(updateDoc(ref, { "authorization.cae": "12345678901234" }));
+    await assertFails(updateDoc(ref, { fiscalCancellation:{status:"completed"} }));
+  });
+  test(`${role}: no puede alterar una venta con anulación reservada en backend`,async()=>{
+    const ref=doc(environment.authenticatedContext(role).firestore(),"sales","cancelling");
+    await assertFails(updateDoc(ref,{total:10,status:"cancelled"}));
+    await assertFails(updateDoc(ref,{fiscalCancellation:deleteField()}));
+    await assertFails(setDoc(doc(environment.authenticatedContext(role).firestore(),"sales",`forged_cancel_${role}`),{sellerId:role,locationId:"loc1",status:"active",fiscalCancellation:{status:"completed"}}));
   });
   test(`${role}: no puede leer WSAA ni locks`, async () => {
     const db = environment.authenticatedContext(role).firestore();

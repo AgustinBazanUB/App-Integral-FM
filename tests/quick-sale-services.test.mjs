@@ -5,10 +5,12 @@ import { buildMetricsDateRange, calculateMetrics, applyMetricsFilters } from "..
 import { customerDocumentId } from "../src/gestion/customers/customerDomain.js";
 import { customerPurchaseIndex } from "../src/gestion/customers/customerPurchases.js";
 import { financeSummary } from "../src/gestion/finance/financeDomain.js";
+import {cancelSaleAndInvoice} from '../netlify/functions/_lib/arca/saleCancellation.mjs';
 
 // Adaptador transaccional local: lecturas antes de escrituras, commit atómico y cola
 // para verificar reintentos/concurrencia sin escribir Firebase real.
 const mock = { data: new Map(), writes: [], queries: [], sequence: 0, queue: Promise.resolve() };
+mock.cancel=async payload=>cancelSaleAndInvoice({...payload,session:{uid:mock.sessionProfile.id,profile:mock.sessionProfile},env:{ARCA_ENVIRONMENT:'production'},now:new Date('2026-10-02T15:00:00Z'),getDocument:async path=>mock.data.has(path)?{data:structuredClone(mock.data.get(path)),updateTime:'test-version'}:null,runTransaction:async work=>work({getDocument:async path=>mock.data.has(path)?{data:structuredClone(mock.data.get(path)),updateTime:'test-version'}:null,commitDocuments:async operations=>{for(const operation of operations)mock.data.set(operation.path,operation.type==='create'?structuredClone(operation.data):{...mock.data.get(operation.path),...structuredClone(operation.data)});}})});
 globalThis.__quickSaleTest = mock;
 const bundle = await build({stdin:{contents:'export { createQuickSale } from "./src/gestion/services/managementService.js"; export { createSellerSale, updateSellerSale, cancelSellerSale } from "./src/gestion/services/sellerService.js";',resolveDir:process.cwd()},bundle:true,write:false,platform:"node",format:"esm",plugins:[{name:"operations-transaction-adapter",setup(builder){
   builder.onResolve({filter:/^firebase\/firestore$/},()=>({path:"firestore",namespace:"qa"}));
@@ -16,7 +18,7 @@ const bundle = await build({stdin:{contents:'export { createQuickSale } from "./
   builder.onResolve({filter:/arcaService$/},()=>({path:"fiscal",namespace:"qa"}));
   builder.onResolve({filter:/sharedResources$/},()=>({path:"shared",namespace:"qa"}));
   builder.onResolve({filter:/^firebase\/(app|auth)$/},()=>({path:"auth",namespace:"qa"}));
-  builder.onLoad({filter:/.*/,namespace:"qa"},({path})=>({contents:path==="firebase"?'export const db = {}; export const auth={}; export const firebaseConfig={};':path==="fiscal"?'export async function requestPendingArcaInvoice(){ throw Error("Fiscal real prohibido en QA"); }':path==="shared"?'export async function listLocationsShared(){return []}; export async function loadSellerResourcesShared(){return {}};':path==="auth"?'export const deleteApp=()=>{};export const initializeApp=()=>{};export const createUserWithEmailAndPassword=()=>{};export const getAuth=()=>{};export const onAuthStateChanged=()=>{};export const signOut=()=>{};':`
+  builder.onLoad({filter:/.*/,namespace:"qa"},({path})=>({contents:path==="firebase"?'export const db = {}; export const auth={}; export const firebaseConfig={};':path==="fiscal"?'export const cancelSaleWithInvoice=payload=>globalThis.__quickSaleTest.cancel(payload); export async function requestPendingArcaInvoice(){ throw Error("Fiscal real prohibido en QA"); }':path==="shared"?'export async function listLocationsShared(){return []}; export async function loadSellerResourcesShared(){return {}};':path==="auth"?'export const deleteApp=()=>{};export const initializeApp=()=>{};export const createUserWithEmailAndPassword=()=>{};export const getAuth=()=>{};export const onAuthStateChanged=()=>{};export const signOut=()=>{};':`
     const mock = globalThis.__quickSaleTest;
     export const collection = (_db,...parts) => ({path:parts.join('/')});
     export const doc = (base,...parts) => { const path=base.path ? base.path+'/'+(parts.join('/') || 'auto-'+(++mock.sequence)) : parts.join('/'); return {path,id:path.split('/').at(-1)}; };
@@ -105,6 +107,7 @@ test("ubicación permite stock cero, insuficiente y negativo; registra saldo, av
 test("vendedor registra 0 → -1 → -2; edición y anulación restituyen sólo sus unidades", async () => {
   seed(); mock.data.get("locationStock/origin/items/oil").currentStock = 0;
   const seller = { id: "seller", name: "Vendedor QA", role: "seller", active: true, allowedLocationIds: ["origin"] };
+  mock.sessionProfile=seller;
   const input = { profile: seller, location: { id: "origin" }, items: [{ id: "oil", name: "Aceite", qty: 1, unitPrice: 2500 }], paymentMethod: "cash", paymentMethodLabel: "Efectivo" };
   const first = await service.createSellerSale(input);
   assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, -1);
@@ -114,7 +117,7 @@ test("vendedor registra 0 → -1 → -2; edición y anulación restituyen sólo 
   assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, -3);
   await service.cancelSellerSale({ profile: seller, saleId: second.id });
   assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, -2);
-  await assert.rejects(service.cancelSellerSale({ profile: seller, saleId: second.id }), /anulada/);
+  assert.equal((await service.cancelSellerSale({ profile: seller, saleId: second.id })).alreadyCancelled,true);
   await service.cancelSellerSale({ profile: seller, saleId: first.id });
   assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, 0);
 });
@@ -135,6 +138,7 @@ test("Instagram y WhatsApp se filtran por canal sin convertir el depósito en ca
 test("Panel Vendedor conserva ubicación y canal presencial; retry offline no duplica",async()=>{seed();const input={profile:admin,location:{id:"origin"},items:args().items,paymentMethod:"cash",offlineSale:{localId:"local_qa",createdLocallyAt:"2026-10-02T15:00:00Z"}};await service.createSellerSale(input);await service.createSellerSale(input);assert.equal(sales().length,1);assert.equal(sales()[0].sourceChannel,"in_person");assert.equal(sales()[0].createdOffline,true);assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock,18);});
 
 test("Venta Rápida asociada con pago combinado integra CRM, Métricas y Finanzas; anulación conserva venta y actividad", async () => {
+  mock.sessionProfile=admin;
   seed(); const customer = { phone: "11 1234-5678" };
   const created = await service.createQuickSale(args("location", { customer, paymentMethod: "multiple", paymentMethodLabel: "+2 pagos", payments: [{ method: "cash", amount: 2000 }, { method: "debit", amount: 3000 }] }));
   const id = await customerDocumentId(customer.phone), customers = [{ id, ...mock.data.get(`customers/${id}`) }];
@@ -145,7 +149,7 @@ test("Venta Rápida asociada con pago combinado integra CRM, Métricas y Finanza
   mock.data.set("invoices/qa-linked-invoice", { saleId: created.id, total: 5000, status: "authorized" });
   assert.equal(customerPurchaseIndex(customers, sales(), [], {}, new Date("2026-10-03T15:00:00Z")).get(id).count, 1);
   assert.equal(calculateMetrics(sales(), range).total, 5000); assert.equal(financeSummary(sales(), [], {}, range).saleIncome, 5000);
-  await assert.rejects(service.cancelSellerSale({ profile: admin, saleId: created.id, reason: "QA" }), /revisión administrativa/);
+  await assert.rejects(service.cancelSellerSale({ profile: admin, saleId: created.id, reason: "QA" }), /vínculo fiscal/);
   // Otra venta sin comprobante usa la anulación comercial existente.
   seed(); const cancellable = await service.createQuickSale(args("location", { customer }));
   await service.cancelSellerSale({ profile: admin, saleId: cancellable.id, reason: "Corrección de prueba" });

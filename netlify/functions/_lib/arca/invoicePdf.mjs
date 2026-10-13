@@ -202,6 +202,7 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
   });
   const matrix = qrMatrix(qr.url);
   const voucherClass = String(auth.voucherClass || "").toUpperCase();
+  const documentTitle = invoice.documentKind === "credit_note" ? "Nota de crédito" : "Factura";
   const voucherCode = String(auth.voucherType || "").padStart(2, "0");
   const issuerCuit = String(invoice.issuerCuit || env.ARCA_ISSUER_CUIT || "").replace(/\D/g, "");
   const displayedCuit = issuerCuit.length === 11
@@ -239,7 +240,7 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
   });
   stream += commandText(39, 705, 8, "Condición de IVA:", true);
   stream += commandText(117, 705, 8, issuerVatLabel(issuer.vatCondition));
-  stream += commandText(394, 790, 12, "FACTURA", true);
+  stream += commandText(394, 790, invoice.documentKind === "credit_note" ? 10 : 12, documentTitle.toUpperCase(), true);
   stream += commandText(394, 774, 8, `PV: ${String(auth.pointOfSale || "").padStart(5, "0")} - N° ${String(auth.voucherNumber || "").padStart(8, "0")}`, true);
   stream += commandText(394, 757, 8, `Fecha Emisión: ${dmy(issueDate)}`, true);
   stream += commandText(394, 740, 8, `CUIT: ${displayedCuit}`, true);
@@ -266,6 +267,11 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
     stream += commandText(361, 637, 8, sale.locationName);
   }
 
+  if (invoice.documentKind === "credit_note") {
+    const original=invoice.associatedInvoice?.authorization || {};
+    stream += commandText(39, 609, 9, `Factura asociada: ${original.voucherClass || ""} ${String(original.pointOfSale || "").padStart(5,"0")}-${String(original.voucherNumber || "").padStart(8,"0")}`, true);
+    stream += commandText(39, 593, 8, "Anulación total de la venta original.");
+  }
   stream += commandText(39, 500, 9, "Cantidad", true);
   stream += commandText(100, 500, 9, "Detalle", true);
   stream += commandText(362, 500, 9, "P. Unitario", true);
@@ -374,6 +380,6 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
 
   pushPage();
   const output = assemblePdf(pages);
-  const filename = `Factura_${voucherClass || "ARCA"}_${String(auth.pointOfSale || "").padStart(5, "0")}-${String(auth.voucherNumber || "").padStart(8, "0")}.pdf`;
+  const filename = `${invoice.documentKind === "credit_note" ? "Nota_de_credito" : "Factura"}_${voucherClass || "ARCA"}_${String(auth.pointOfSale || "").padStart(5, "0")}-${String(auth.voucherNumber || "").padStart(8, "0")}.pdf`;
   return { pdf: output, filename, qrUrl: qr.url };
 }

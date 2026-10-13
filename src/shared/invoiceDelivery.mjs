@@ -13,5 +13,5 @@ export function invoiceDeliveryLabel(invoice = {}) {
   const fiscal = invoice.authorization || {};
   const point = String(fiscal.pointOfSale || 0).padStart(5, "0");
   const number = String(fiscal.voucherNumber || 0).padStart(8, "0");
-  return `Factura ${fiscal.voucherClass || ""} ${point}-${number}`.replace(/\s+/g, " ").trim();
+  return `${invoice.documentKind === "credit_note" ? "Nota de crédito" : "Factura"} ${fiscal.voucherClass || ""} ${point}-${number}`.replace(/\s+/g, " ").trim();
 }

@@ -44,7 +44,7 @@ test("offline y permisos específicos se validan antes de guardar", () => {
   assert.match(sellerSaleProblem({ ...valid, profile: deny("create") }), /VENTA-PERMISO/);
   assert.match(sellerSaleProblem({ ...valid, online: false, editing: true }), /VENTA-EDICION-OFFLINE/);
   assert.match(sellerSaleProblem({ ...valid, online: false, profile: deny("useOfflineSales") }), /VENTA-OFFLINE-PERMISO/);
-  assert.match(sellerSaleProblem({ ...valid, ticketRequested: true, profile: deny("requestTicket") }), /TICKET-PERMISO/);
+  assert.match(sellerSaleProblem({ ...valid, ticketRequested: true, profile: deny("requestTicket") }), /FACTURA-PERMISO/);
   assert.match(sellerSaleProblem({ ...valid, discounts: [{ source: "manual" }], profile: deny("useManualDiscounts") }), /DESCUENTO-MANUAL-PERMISO/);
   assert.equal(sellerSaleProblem({ ...valid, pendingStatus: "error", pendingError: { name: "SecurityError" } }), "");
   assert.match(sellerSaleProblem({ ...valid, online: false, pendingStatus: "error", pendingError: { name: "SecurityError" } }), /SecurityError/);

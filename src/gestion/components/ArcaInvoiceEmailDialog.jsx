@@ -46,11 +46,11 @@ export default function ArcaInvoiceEmailDialog({ open, onClose, saleId, sourceTy
   // The invoice actions can live inside the seller receipt modal. Mount this
   // dialog beside that overlay so the parent's inert state cannot block it.
   return createPortal(<div className="fm-management-body fm-arca-email-host">
-    <Modal open={open} onClose={sending ? undefined : onClose} title="Enviar factura por mail"
+    <Modal open={open} onClose={sending ? undefined : onClose} title={invoice?.documentKind === "credit_note" ? "Enviar nota de crédito por mail" : "Enviar factura por mail"}
       description={`${invoiceDeliveryLabel(invoice)} · PDF adjunto con CAE y código QR`}
       footer={<div className="fm-dialog-actions">
         <Button variant="secondary" disabled={sending} onClick={onClose}>{receipt ? "Cerrar" : "Cancelar"}</Button>
-        {!receipt ? <Button type="submit" form={formId} icon="Mail" loading={sending} disabled={configuration.busy || !configuration.ready}>Enviar factura</Button> : null}
+        {!receipt ? <Button type="submit" form={formId} icon="Mail" loading={sending} disabled={configuration.busy || !configuration.ready}>Enviar {invoice?.documentKind === "credit_note" ? "nota de crédito" : "factura"}</Button> : null}
       </div>}
     >
       <form id={formId} onSubmit={send} className="fm-arca-email-form">
@@ -59,7 +59,7 @@ export default function ArcaInvoiceEmailDialog({ open, onClose, saleId, sourceTy
             maxLength={254} required disabled={sending || Boolean(receipt)} onChange={(event) => setTo(event.target.value)} />
         </FormField>
         {configuration.busy ? <p role="status">Consultando la conexión de correo…</p> : configuration.ready
-          ? <p>La factura se enviará desde <strong>{configuration.from}</strong>.</p>
+          ? <p>El comprobante se enviará desde <strong>{configuration.from}</strong>.</p>
           : <p role="status">Falta conectar la cuenta de correo de Flor Mía. Podés descargar o imprimir la factura mientras tanto.</p>}
         {receipt ? <p className="fm-arca-email-success" role="status">El servicio de correo aceptó el envío a <strong>{receipt.to}</strong>. Si no aparece, revisá también la carpeta de spam.</p> : null}
         {error ? <p className="fm-arca-print-error" role="alert">{error}</p> : null}

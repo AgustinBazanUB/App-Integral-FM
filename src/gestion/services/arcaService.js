@@ -94,6 +94,24 @@ export async function requestPendingArcaInvoice({ sourceType, sourceId, receiver
   return { ...data.invoice, autoAuthorization: data.invoice?.autoAuthorization || data.autoAuthorization || null };
 }
 
+export async function validateArcaInvoiceDraft({ sourceType, items, total, discountTotal, receiver }) {
+  const user=auth.currentUser;
+  if(!user) throw new Error("Iniciá sesión para generar la factura.");
+  const response=await fetch("/.netlify/functions/arca-invoice",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${await user.getIdToken()}`},body:JSON.stringify({mode:"validate-draft",sourceType,items,total,discountTotal,receiver})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok || !data.ok) throw Object.assign(new Error(data.message || "No se pudo validar la factura antes de guardar la venta."),{code:data.code});
+  return data.draft;
+}
+
+export async function cancelSaleWithInvoice({ saleId, reason }) {
+  const user=auth.currentUser;
+  if(!user) throw new Error("Iniciá sesión para anular la venta.");
+  const response=await fetch("/.netlify/functions/sale-cancel",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${await user.getIdToken()}`},body:JSON.stringify({saleId,reason})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok || !data.ok) throw Object.assign(new Error(data.message || "No se pudo completar la anulación. La venta conserva su estado."),{code:data.code});
+  return data.result;
+}
+
 
 export async function dryRunArcaInvoice({ invoiceId, receiver = null }) {
   const user = auth.currentUser;

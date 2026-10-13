@@ -122,13 +122,14 @@ export default function ArcaInvoicePrintAction({
   if (!invoiceState.invoice) return null;
 
   const printable = isArcaInvoicePrintable(invoiceState.invoice);
+  const creditNote = invoiceState.invoice.documentKind === "credit_note";
   return (
     <div className="fm-arca-print-action" aria-live="polite">
       {printable ? (
         <>
           <div className="fm-arca-delivery-buttons">
             <Button variant="secondary" icon="Download" loading={downloading} disabled={printing} onClick={downloadPdf}>Descargar PDF</Button>
-            <Button variant="secondary" icon="Printer" loading={printing} disabled={downloading} onClick={openPdf}>Imprimir factura</Button>
+            <Button variant="secondary" icon="Printer" loading={printing} disabled={downloading} onClick={openPdf}>{creditNote ? "Imprimir nota de crédito" : "Imprimir factura"}</Button>
             <Button variant="secondary" icon="Mail" onClick={() => setEmailOpen(true)}>Enviar por mail</Button>
           </div>
           <small>PDF con CAE y código QR. Para imprimir, abrí el PDF y usá el ícono de la impresora o Ctrl+P.</small>

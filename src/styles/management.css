@@ -172,6 +172,10 @@
 .fm-safe-note { display: flex; align-items: center; gap: 7px; margin: 12px 0 0; color: var(--fm-text-muted); font-size: 10px; }
 .fm-arca-print-action { display: grid; justify-items: start; gap: 6px; margin: 12px 0; }
 .fm-arca-delivery-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.fm-sale-invoice-panel { display:grid; gap:12px; width:100%; padding:18px; border:1px solid var(--fm-border); border-radius:14px; background:var(--fm-surface); text-align:left; }
+.fm-sale-invoice-panel h3 { margin:0; font-size:16px; }
+.fm-sale-invoice-panel p { margin:0; line-height:1.6; }
+.fm-sale-credit-note { display:grid; gap:12px; padding-top:16px; border-top:1px solid var(--fm-border); }
 .fm-arca-delivery-buttons .fm-button { min-height: 44px; }
 .fm-arca-email-form { display: grid; gap: 16px; text-align: left; }
 .fm-arca-email-form p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }

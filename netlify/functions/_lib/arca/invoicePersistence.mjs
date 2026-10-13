@@ -135,6 +135,7 @@ function assertDeclaredSaleSource(sourceType, sale) {
 }
 
 function validateSaleForInvoice(sourceType, sourceId, sale, { existingInvoice = false } = {}) {
+  if (sale?.fiscalCancellation) throw Object.assign(new Error("La venta tiene una anulación en curso."),{code:"arca-sale-not-active",status:409});
   assertDeclaredSaleSource(sourceType, sale);
   if (!BILLING_SOURCE_TYPES.includes(sourceType)) {
     const error = new Error("Origen de facturación inválido.");
@@ -232,6 +233,7 @@ export async function ensurePendingInvoice({
     assertDeclaredSaleSource(sourceType, currentSale?.data);
     if (sourceType === "ecommerce") validateSaleForInvoice(sourceType, sourceId, currentSale?.data || null, { existingInvoice: Boolean(candidate) });
     const sale = currentSale?.data || {};
+    if (sale.fiscalCancellation) throw Object.assign(new Error("La venta tiene una anulación en curso."),{code:"arca-sale-not-active",status:409});
     const links = [{id:sale.fiscalInvoiceId, environment:sale.fiscalEnvironment}, {id:sale.fiscalInvoice?.id, environment:sale.fiscalInvoice?.environment}];
     if (links.some((link) => link.id && link.id !== candidateId && (!link.environment || link.environment === scope.environment)) || (candidate && (candidate.sourceType !== sourceType || candidate.sourceId !== sourceId || (candidate.fiscalEnvironment && candidate.fiscalEnvironment !== scope.environment)))) {
       const error = new Error("La asociación fiscal de la venta no coincide.");
@@ -751,6 +753,10 @@ export async function syncInvoiceToSale({
   }
 
   const authorization = invoice.authorization || {};
+  if (invoice.documentKind === "credit_note") {
+    if (saleDocument.data.fiscalCancellation?.creditNoteId !== invoiceId || saleDocument.data.fiscalCancellation?.originalInvoiceId !== invoice.originalInvoiceId) throw Object.assign(new Error("La nota de crédito no corresponde a la anulación de la venta."),{code:"arca-invoice-association-conflict",status:409});
+    return {invoiceId,sourceId,creditNote:true};
+  }
   const existingId = saleDocument.data.fiscalInvoiceId || saleDocument.data.fiscalInvoice?.id;
   if (existingId && existingId !== invoiceId && saleDocument.data.fiscalEnvironment === invoice.fiscalEnvironment) {
     const error = new Error("La venta ya está vinculada a otro comprobante fiscal.");
