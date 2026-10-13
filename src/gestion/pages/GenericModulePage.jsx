@@ -170,16 +170,16 @@ export default function GenericModulePage({ moduleId }) {
               { key: "status", label: "Estado", render: (record) => <Badge tone={statusTone(record.status)}>{humanizeStatus(record.status)}</Badge> },
               { key: "updatedAt", label: "Actualización", render: (record) => formatDateTime(record.updatedAt || record.createdAt) },
               { key: "responsible", label: "Responsable", render: (record) => record.responsibleName || record.assignedToName || record.createdByName || "Pendiente" },
-              ...(moduleId === "alerts" && canAccessAdministration(profile) ? [{ key: "errorDetail", label: "Detalle", render: record => record.source === "olivia_error_report" ? <Button variant="secondary" onClick={() => { setErrorReport(record); setCopyNotice(""); }}>Ver error</Button> : null }] : []),
+              ...(moduleId === "alerts" && canAccessAdministration(profile) ? [{ key: "errorDetail", label: "Detalle", render: record => ["olivia_error_report", "olivia_suggestion"].includes(record.source) ? <Button variant="secondary" onClick={() => { setErrorReport(record); setCopyNotice(""); }}>{record.source === "olivia_suggestion" ? "Ver propuesta" : "Ver error"}</Button> : null }] : []),
             ]}
             empty={<EmptyState icon={module.icon} title="Todavía no hay registros" description="Cuando se cargue información real en este módulo aparecerá aquí; no se generaron datos ficticios." />}
           />
         ) : null}
       </Panel>
 
-      <Modal open={Boolean(errorReport)} onClose={() => setErrorReport(null)} title={errorReport?.name || "Error de Olivia"} description="Detalle técnico para revisar la función que falló.">
+      <Modal open={Boolean(errorReport)} onClose={() => setErrorReport(null)} title={errorReport?.name || "Detalle de Olivia"} description={errorReport?.source === "olivia_suggestion" ? "Idea del usuario reformulada para mejorar la aplicación." : "Detalle técnico para revisar la función que falló."}>
         <p>{errorReport?.notes}</p>
-        {errorReport?.reporterName ? <p>Usuario que intentó la acción: <strong>{errorReport.reporterName}</strong>. Fecha: {formatDateTime(errorReport.createdAt)}</p> : null}
+        {errorReport?.reporterName ? <p>{errorReport.source === "olivia_suggestion" ? "Propuesta de" : "Usuario que intentó la acción"}: <strong>{errorReport.reporterName}</strong>. Fecha: {formatDateTime(errorReport.createdAt)}</p> : null}
         <Button variant="secondary" onClick={async () => { try { await navigator.clipboard.writeText(errorReport.codexDescription); setCopyNotice("Copiado para Codex."); } catch { setCopyNotice("No pude copiar automáticamente. Seleccioná el texto de abajo."); } }}>Copiar para Codex</Button>
         {copyNotice ? <p role="status">{copyNotice}</p> : null}
         <pre className="fm-olivia-diagnostic">{errorReport?.codexDescription}</pre>

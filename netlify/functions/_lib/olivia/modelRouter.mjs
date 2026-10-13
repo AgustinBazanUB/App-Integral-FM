@@ -20,6 +20,7 @@ const complex = /pronostic|forecast|prevision|proyect|optimiza|compara|comparaci
 
 /** Deterministic server policy. Neither model output nor browser flags select a model. */
 export function routeModel(configuration, session, { message = "", context = {}, task = null, skills = [], attachments = [], signals = {} } = {}) {
+  if (configuration.voiceBackend) return { ...configuration.voiceBackend, intent: classifyIntent(message, context.module), route: "luna-voice", routingReason: "live-delegation", policyVersion: MODEL_POLICY_VERSION };
   const text = normalize(message);
   const module = context.module || "";
   const seller = normalizedRole(session.profile) === "seller";

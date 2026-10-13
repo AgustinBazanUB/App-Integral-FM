@@ -20,6 +20,10 @@ test("Olivia yesterday metrics match the panel across Argentina day boundaries a
   const range = buildMetricsDateRange("day", "2026-10-03");
   const panel = calculateMetrics(rows.filter((row) => row.createdAt >= range.start && row.createdAt < range.end), range);
   assert.equal(result.total, panel.total);
+  assert.equal(result.hours.length, 24);
+  assert.equal(result.hours[23].amount, panel.byHour[23].total);
+  assert.equal(result.hours.reduce((sum, hour) => sum + hour.amount, 0), result.total);
+  assert.equal(result.timeZone, "America/Argentina/Buenos_Aires");
   assert.equal(result.count, panel.salesCount);
   assert.equal(result.averageTicket, panel.ticket);
   assert.equal(result.units, panel.totalItems);

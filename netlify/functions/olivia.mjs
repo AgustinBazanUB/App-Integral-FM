@@ -1,12 +1,12 @@
 import { createOliviaStore } from "./_lib/olivia/store.mjs";
 import { resolveOliviaPricing } from "./_lib/olivia/pricing.mjs";
 import { createOliviaEngine } from "./_lib/olivia/engine.mjs";
-import { createRealtime, stopRealtime } from "./_lib/olivia/voice.mjs";
+import { stopRealtime } from "./_lib/olivia/voice.mjs";
 import { oliviaSession, json, errorResponse } from "./_lib/olivia/http.mjs";
 import { oliviaError } from "../../src/shared/oliviaContracts.mjs";
 import { chatStream } from "./_lib/olivia/stream.mjs";
 import { createLive, interruptLive } from "./_lib/olivia/live.mjs";
-import { OLIVIA_VOICE_CONVERSATION_ENABLED, OLIVIA_VOICE_UNAVAILABLE_CODE, OLIVIA_VOICE_UNAVAILABLE_MESSAGE } from "../../src/shared/oliviaVoiceAvailability.mjs";
+import { canUseOliviaVoice, OLIVIA_VOICE_UNAVAILABLE_CODE, OLIVIA_VOICE_UNAVAILABLE_MESSAGE } from "../../src/shared/oliviaVoiceAvailability.mjs";
 import { startChatJob, chatJobStatus, activeChatJob, cancelChatJob } from "./_lib/olivia/chatJobs.mjs";
 import { captureOliviaFailure, sendOliviaErrorReport } from "./_lib/olivia/errorReports.mjs";
 export default async function handler(request) {
@@ -30,7 +30,7 @@ export default async function handler(request) {
     } catch {
       throw oliviaError("invalid-json", "Solicitud inválida.");
     }
-    if (body.operation === "realtime" && !OLIVIA_VOICE_CONVERSATION_ENABLED)
+    if (["realtime", "realtimeTool", "realtimeTranscript", "interruptVoice"].includes(body.operation) && !canUseOliviaVoice(session))
       throw oliviaError(OLIVIA_VOICE_UNAVAILABLE_CODE, OLIVIA_VOICE_UNAVAILABLE_MESSAGE, 409);
     store = createOliviaStore();
     const engine = createOliviaEngine({ store, pricingResolver: resolveOliviaPricing });
@@ -77,7 +77,7 @@ export default async function handler(request) {
     else if (body.operation === "saveConfiguration")
       result = await engine.saveConfiguration(session, body);
     else if (body.operation === "realtime")
-      result = await (body.voiceMode === "realtime-mini" ? createRealtime : (await engine.configuration()).voiceProtocol === "live" ? createLive : createRealtime)({
+      result = await createLive({
         session,
         body,
         store,

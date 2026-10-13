@@ -3,6 +3,8 @@ import { metricsForModel } from "./analytics.mjs";
 import { aggregateVoiceCosts } from "../../../../src/shared/oliviaVoicePricing.mjs";
 import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, taskSlotSchema, requiredFields, isCorrection, operationalIntent, shortVoiceQuestion } from "./tasks.mjs";
 import { aggregateRoutes } from "./modelRouter.mjs";
+import { isSuggestionRequest, processSuggestion } from "./suggestions.mjs";
+import { canUseOliviaVoice, oliviaVoiceConfiguration, OLIVIA_VOICE_POLICY } from "../../../../src/shared/oliviaVoiceAvailability.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { captureOliviaFailure, publicOliviaFailure } from "./errorReports.mjs";
 import { randomUUID, createHash, timingSafeEqual } from "node:crypto";
@@ -159,8 +161,10 @@ export function createOliviaEngine({
       providerConfigured: Boolean(env.OPENAI_API_KEY),
       enabled: config.enabled,
       audioLimits: config.audioLimits,
-      voiceProtocol: config.voiceProtocol,
-      voiceTrialAvailable: canAccessAdministration(session.profile),
+      voiceProtocol: "live",
+      voiceConversationAvailable: canUseOliviaVoice(session),
+      voiceTrialAvailable: false,
+      ...(canAccessAdministration(session.profile) && canUseOliviaVoice(session) ? { voiceConfiguration: OLIVIA_VOICE_POLICY } : {}),
       policyVersion: OLIVIA_POLICY_VERSION,
       ...(estimate ? { estimate } : {}),
     };
@@ -375,6 +379,10 @@ export function createOliviaEngine({
           "La conversación de voz terminó. Podés continuar escribiendo.",
           409,
         );
+      if (live.protocol === "live") {
+        if (!canUseOliviaVoice(session)) throw oliviaError("voice-not-enabled", "La conversación por voz no está habilitada para esta cuenta.", 409);
+        Object.assign(config, oliviaVoiceConfiguration(config));
+      }
     }
     const reservation = await reserveUsage({
       store,
@@ -420,6 +428,19 @@ export function createOliviaEngine({
         return result;
       };
       const control = !attachments.length ? taskControl(userMessage) : null;
+      if (!control && (isSuggestionRequest(userMessage) || conversation.draft?.kind === "app-suggestion")) {
+        const suggestion = await processSuggestion({ session, store, provider, env, conversation, conversationId: id, requestId, message: userMessage, context, now: clock(), signal,
+          beforeProvider: request => increaseReservation({ store, reservation, amount: Math.ceil(Buffer.byteLength(JSON.stringify(request), "utf8") / 4) + request.max_output_tokens }),
+          onUsage: measured => { Object.assign(event, measured, { conversationId: id, route: "luna-suggestion", reasoningEffort: "low", routingReason: "user-requested-message-to-agustin", module: context.module }); },
+        });
+        signal?.throwIfAborted();
+        const result = await saveTurn(session, id, requestId, { ...suggestion, taskState: null }, config);
+        await settleUsage({ store, session, reservation, event, configuration: config, result: { conversationId: id, ...(suggestion.alertId ? { alertId: suggestion.alertId } : {}) }, now: clock() });
+        settled = true;
+        result.usage = await usage(session, config, event);
+        if (canAccessAdministration(session.profile)) result.telemetry = { requestId, model: event.model, reasoningEffort: "low", route: event.route, modelCalls: 1, toolCalls: 0, totalMs: Date.now() - startedAt };
+        return result;
+      }
       const progressive = !control && !attachments.length ? await progressiveStock({ previous: conversation.taskState, initialId: deterministicTaskId, message: userMessage, context, run, check: () => assertCapability(session, "prepare_stock_load"), now: clock() }) : null;
       if (control || progressive) {
         const task = progressive?.task || (conversation.taskState ? { ...conversation.taskState, revision: conversation.taskState.revision + 1, status: control === "cancel" ? "cancelled" : conversation.taskState.status, updatedAt: clock() } : null);

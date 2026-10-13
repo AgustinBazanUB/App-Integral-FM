@@ -42,6 +42,8 @@ export function panelMetricsSummary(rows, period, args = {}) {
     products: panel.byProduct.map((item) => ({ productId: item.key, name: item.name, units: item.items, revenue: item.total, mix: panel.totalItems ? item.items / panel.totalItems : 0 })),
     topProductsByUnits: [...panel.byProduct].sort((a, b) => b.items - a.items || a.name.localeCompare(b.name)).slice(0, 20).map((item) => ({ productId: item.key, name: item.name, units: item.items, revenue: item.total })),
     locations: groups(panel.byLocation), sellers: groups(panel.bySeller), payments: groups(panel.byPayment),
+    hours: panel.byHour.map(item => ({ hour: item.name, amount: item.total, sales: item.sales, units: item.items })),
+    timeZone: "America/Argentina/Buenos_Aires",
     channels: groups(panel.byChannel), stockOrigins: groups(panel.byStockOrigin),
     promotions: panel.byDiscount.map((item) => ({ id: item.key, name: item.name, amount: item.salesTotal, discount: item.total })),
     daily: [...daily].map(([id, amount]) => ({ id, amount })),

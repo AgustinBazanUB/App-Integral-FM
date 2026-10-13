@@ -5,20 +5,20 @@ import vm from "node:vm";
 import { build } from "esbuild";
 import { oliviaError } from "../src/shared/oliviaContracts.mjs";
 import { json, errorResponse } from "../netlify/functions/_lib/olivia/http.mjs";
-import { OLIVIA_VOICE_CONVERSATION_ENABLED, OLIVIA_VOICE_UNAVAILABLE_CODE, OLIVIA_VOICE_UNAVAILABLE_MESSAGE } from "../src/shared/oliviaVoiceAvailability.mjs";
+import { canUseOliviaVoice, OLIVIA_VOICE_UNAVAILABLE_CODE, OLIVIA_VOICE_UNAVAILABLE_MESSAGE } from "../src/shared/oliviaVoiceAvailability.mjs";
 
 const source = await readFile(new URL("../netlify/functions/olivia.mjs", import.meta.url), "utf8");
-function endpoint(authenticated = true) {
+function endpoint(authenticated = true, identity = {}) {
   const calls = [];
   const context = vm.createContext({
     Buffer, Response, URL, console: { error() {} }, json, errorResponse, oliviaError,
-    OLIVIA_VOICE_CONVERSATION_ENABLED, OLIVIA_VOICE_UNAVAILABLE_CODE, OLIVIA_VOICE_UNAVAILABLE_MESSAGE,
-    oliviaSession: async () => { if (!authenticated) throw oliviaError("unauthenticated", "Iniciá sesión.", 401); return { uid: "fixture-admin" }; },
+    canUseOliviaVoice, OLIVIA_VOICE_UNAVAILABLE_CODE, OLIVIA_VOICE_UNAVAILABLE_MESSAGE,
+    oliviaSession: async () => { if (!authenticated) throw oliviaError("unauthenticated", "Iniciá sesión.", 401); return { uid: "fixture-admin", ...identity }; },
     createOliviaStore: () => { calls.push("store"); return {}; },
     resolveOliviaPricing: () => ({}),
     createOliviaEngine: () => new Proxy({}, { get: (_, operation) => async () => { calls.push(operation); return { operation }; } }),
     createRealtime: () => { calls.push("realtime"); throw new Error("No debe iniciar voz"); },
-    createLive: () => { calls.push("live"); throw new Error("No debe iniciar voz"); },
+    createLive: async () => { calls.push("live"); return { voiceProtocol: "live" }; },
     stopRealtime: async () => { calls.push("stopRealtime"); return { stopped: true }; },
   });
   vm.runInContext(source.replace(/^import .*;\r?\n/gm, "").replace("export default async function handler", "globalThis.handler = async function handler"), context);
@@ -47,13 +47,28 @@ test("deshabilitar voz conserva la autenticación y las rutas de chat, historial
   }
 });
 
+test("solo el correo autenticado de Agustín habilita Live; Mini y configuración cliente no cambian el transporte", async () => {
+  for (const fields of [{}, { voiceMode: "realtime-mini", voiceProtocol: "realtime", voice: "cedar" }]) {
+    const h = endpoint(true, { email: "AGSRESERVA@gmail.com" });
+    assert.equal((await h.request({ operation: "realtime", ...fields })).status, 200);
+    assert.deepEqual(h.calls, ["store", "live"]);
+  }
+  for (const identity of [{ email: "other@gmail.com", profile: { email: "agsreserva@gmail.com", role: "admin" } }, { profile: { email: "agsreserva@gmail.com" } }]) {
+    for (const operation of ["realtime", "realtimeTool", "realtimeTranscript", "interruptVoice"]) {
+      const h = endpoint(true, identity);
+      assert.equal((await h.request({ operation, email: "agsreserva@gmail.com" })).status, 409);
+      assert.deepEqual(h.calls, []);
+    }
+  }
+});
+
 test("el handler real de la interfaz anuncia la pausa sin pedir micrófono ni crear una conexión", async () => {
   const assistant = await readFile(new URL("../src/gestion/olivia/OliviaAssistant.jsx", import.meta.url), "utf8");
   const handler = assistant.match(/const startVoice = \(mode = "default"\) => \{[\s\S]*?\n  \};/)[0];
   let notice = "", elapsed = 0, sequence = 0;
   const timers = new Map();
   const advance = duration => { elapsed += duration; for (const [id, timer] of timers) if (timer.at <= elapsed) { timers.delete(id); timer.callback(); } };
-  const context = vm.createContext({ OLIVIA_VOICE_CONVERSATION_ENABLED, OLIVIA_VOICE_UNAVAILABLE_MESSAGE, voiceNoticeTimer: { current: null }, clearTimeout: id => timers.delete(id), setTimeout: (callback, duration) => { const id = ++sequence; timers.set(id, { callback, at: elapsed + duration }); return id; }, setVoiceNotice: value => { notice = value; } });
+  const context = vm.createContext({ snapshot: { voiceConversationAvailable: false }, OLIVIA_VOICE_UNAVAILABLE_MESSAGE, voiceNoticeTimer: { current: null }, clearTimeout: id => timers.delete(id), setTimeout: (callback, duration) => { const id = ++sequence; timers.set(id, { callback, at: elapsed + duration }); return id; }, setVoiceNotice: value => { notice = value; } });
   vm.runInContext(`${handler}\nstartVoice();`, context);
   assert.equal(notice, OLIVIA_VOICE_UNAVAILABLE_MESSAGE);
   advance(2999); assert.equal(notice, OLIVIA_VOICE_UNAVAILABLE_MESSAGE);
@@ -71,13 +86,17 @@ const composerBundle = await build({ entryPoints: ["src/gestion/olivia/OliviaCom
 const { default: Composer } = await import(`data:text/javascript;base64,${Buffer.from(composerBundle.outputFiles[0].text).toString("base64")}`);
 const elements = node => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(elements) : [node, ...elements(node.props?.children)];
 
-test("el botón de voz muestra el aviso incluso sin servicio o mientras responde; no ofrece el selector Mini", () => {
+test("la conversación se oculta para otras cuentas y no ofrece un selector de modelos", () => {
   let clicks = 0;
   const tree = Composer({ textareaRef: { current: null }, draft: "", attachments: [], busy: true, disabled: true, startVoice: () => clicks++, voiceTrialAvailable: true });
   const nodes = elements(tree);
   const voice = nodes.find(n => n.props?.label === "Conversar con Olivia por voz");
-  assert.equal(voice.props.disabled, false);
-  voice.props.onClick();
+  assert.equal(voice, undefined);
+  assert.equal(clicks, 0);
+  const enabled = elements(Composer({ textareaRef: { current: null }, draft: "", attachments: [], busy: false, disabled: false, voiceAvailable: true, startVoice: () => clicks++ }));
+  const available = enabled.find(n => n.props?.label === "Conversar con Olivia por voz");
+  assert.equal(available.props.disabled, false);
+  available.props.onClick();
   assert.equal(clicks, 1);
   assert.equal(nodes.some(n => n.props?.["aria-label"] === "Modo de conversación por voz"), false);
 });

@@ -15,6 +15,7 @@ import {
 const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const DAY_MS = 86_400_000;
 const pad = (value) => String(value).padStart(2, "0");
+const hourFormatter = new Intl.DateTimeFormat("en-US", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", hourCycle: "h23" });
 
 export const currentMetricsValue = (period, date = new Date()) => {
   const parts = argentinaParts(date);
@@ -200,6 +201,7 @@ export function calculateMetrics(sales, range, filters = {}) {
   const byProduct = new Map();
   const byDiscount = new Map();
   const byPayment = new Map();
+  const byHour = Array.from({ length: 24 }, (_, hour) => ({ key: String(hour), name: `${pad(hour)}:00`, total: 0, sales: 0, items: 0 }));
   let discountTotal = 0;
   let discountedSales = 0;
   let selectedProductAmount = 0;
@@ -209,6 +211,11 @@ export function calculateMetrics(sales, range, filters = {}) {
     const saleTotal = Number(sale.total || 0);
     const items = sale.items || [];
     const itemCount = items.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+    const date = saleDate(sale);
+    if (date) {
+      const hour = byHour[Number(hourFormatter.format(date))];
+      hour.total += saleTotal; hour.sales += 1; hour.items += itemCount;
+    }
     const channel = row(byChannel, sale.sourceChannel || "__unknown", saleChannelLabel(sale.sourceChannel));
     channel.total += saleTotal; channel.sales += 1; channel.items += itemCount;
     const originType = sale.stockOriginType || (sale.warehouseId ? "warehouse" : "location");
@@ -280,6 +287,7 @@ export function calculateMetrics(sales, range, filters = {}) {
     byStockOrigin: withAverage(sorted(byStockOrigin)),
     byLocation: withAverage(sorted(byLocation)),
     bySeller: withAverage(sorted(bySeller)),
+    byHour,
     byProduct: sorted(byProduct, "items"),
     byDiscount: sorted(byDiscount, "sales"),
     byPayment: sorted(byPayment),

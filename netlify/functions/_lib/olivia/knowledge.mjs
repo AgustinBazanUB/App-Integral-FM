@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { can, canAccessAdministration, normalizedRole } from "../../../../src/gestion/permissions.js";
 import { retrieveOliviaKnowledge } from "../../../../src/shared/oliviaKnowledge.mjs";
+import { retrieveCurrentOliviaKnowledge } from "../../../../src/shared/oliviaCurrentKnowledge.mjs";
 import { safeId, oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
 import { validateAttachment } from "./attachments.mjs";
 import { openaiRequest } from "./provider.mjs";
@@ -108,7 +109,10 @@ export async function removeKnowledge({ session, body, store, provider = openaiR
   } catch { return { retired: true, deletionPending: true }; }
 }
 export async function retrieveKnowledge({ session, query, context = {}, store, provider = openaiRequest, env = process.env }) {
-  const fallback = retrieveOliviaKnowledge(query, { role: normalizedRole(session.profile), module: context.module, limit: 4 });
+  const proposed = /soluci[oó]n propuesta|diseñad[oa]|idea futura|requisito propuesto/i.test(query);
+  const fallback = proposed
+    ? retrieveOliviaKnowledge(query, { role: normalizedRole(session.profile), module: context.module, limit: 4 })
+    : retrieveCurrentOliviaKnowledge(query, { role: normalizedRole(session.profile), module: context.module, allowedModules: MODULES.filter(module => can(session.profile, module, "view")), limit: 4 });
   const settings = await store.get("oliviaKnowledgeSettings/global");
   if (!settings?.vectorStoreId) return { documents: fallback, retrieval: "curated", storageCostUsd: null };
   const seller = normalizedRole(session.profile) === "seller";

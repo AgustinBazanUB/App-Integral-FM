@@ -179,6 +179,7 @@ test("ubicaciones: alias único se resuelve, coincidencias se aclaran y nombres 
 
 test("voz y texto continúan exactamente la misma tarea y permisos", async () => {
   const f = stockFixture(), { conversationId: id } = await start(f);
+  f.session.email = "agsreserva@gmail.com";
   await turn(f, id, "Cargame 12 botellas de Original", "a");
   f.documents.set("oliviaRealtime/live_a", { userId: f.session.uid, sessionBinding: String(f.session.authTime), conversationId: id, protocol: "live", status: "active", expiresAt: new Date(f.clock().getTime() + 60000) });
   await turn(f, id, "Tribunales", "b", { inputMode: "realtime", realtimeSessionId: "live_a" });
