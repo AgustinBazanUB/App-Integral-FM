@@ -326,6 +326,11 @@ test("Solicitud sin CAE se cancela; solicitud incierta bloquea la anulación", a
   assert.equal(h.data.get(`invoices/${h.originalId}`).status, "cancelled");
   assert.equal(h.requests(), 0);
 });
+test('Una nota de crédito previa diferente impide duplicar la reversión',async()=>{
+  const h=cancellationHarness();h.data.get(`invoices/${h.originalId}`).creditNoteId='another-credit';
+  await assert.rejects(h.cancel(),{code:'arca-credit-already-associated'});assert.equal(h.requests(),0);
+});
+
 test("Leer una NC no reemplaza el vínculo de la factura original", async () => {
   const h = cancellationHarness();
   const result = await h.cancel();

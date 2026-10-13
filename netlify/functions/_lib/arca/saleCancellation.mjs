@@ -243,6 +243,7 @@ export async function cancelSaleAndInvoice({
             "arca-credit-original-invalid",
           );
         creditNoteId = `${resolvedOriginalId}_credit_full`;
+      if (original.creditNoteId && original.creditNoteId !== creditNoteId) throw fail('La factura ya tiene otra nota de crédito asociada. Requiere revisión antes de anular.','arca-credit-already-associated');
         const existing = await transaction.getDocument(
           `invoices/${creditNoteId}`,
           { env },
