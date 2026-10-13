@@ -169,6 +169,14 @@ export function buildCaeDetail(detail) {
     `<ar:CondicionIVAReceptorId>${receiverVatConditionId}</ar:CondicionIVAReceptorId>`,
   ];
 
+  if (Array.isArray(detail.associatedVouchers) && detail.associatedVouchers.length) {
+    fields.push('<ar:CbtesAsoc>'+detail.associatedVouchers.map(item=>{
+      const cuit=String(item.cuit || '').replace(/\D/g,'');
+      const date=String(item.date || '');
+      if(!/^\d{11}$/.test(cuit) || !/^\d{8}$/.test(date)) throw new Error('Comprobante asociado inválido.');
+      return `<ar:CbteAsoc><ar:Tipo>${requiredInteger(item.type,'Tipo asociado',{min:1})}</ar:Tipo><ar:PtoVta>${requiredInteger(item.pointOfSale,'PV asociado',{min:1})}</ar:PtoVta><ar:Nro>${requiredInteger(item.number,'Número asociado',{min:1})}</ar:Nro><ar:Cuit>${cuit}</ar:Cuit><ar:CbteFch>${date}</ar:CbteFch></ar:CbteAsoc>`;
+    }).join('')+'</ar:CbtesAsoc>');
+  }
   if (Array.isArray(detail.vatBreakdown) && detail.vatBreakdown.length) {
     fields.push("<ar:Iva>" + detail.vatBreakdown.map((item) => [
       "<ar:AlicIva>",

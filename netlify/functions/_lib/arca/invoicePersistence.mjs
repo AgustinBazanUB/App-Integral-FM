@@ -13,6 +13,29 @@ import {
 } from "./billing.mjs";
 import { arcaEnvironment } from "./config.mjs";
 import { ARCA_BILLING_VERSION } from "./billingVersion.mjs";
+import {buildAuthorizationPlan} from './authorizationPlan.mjs';
+
+export async function completePendingInvoice({invoiceId,receiver=null,env=process.env,now=new Date(),runTransaction=adminRunTransaction}) {
+  await runTransaction(async transaction=>{
+    const path=`invoices/${invoiceId}`,document=await transaction.getDocument(path,{env}),invoice=document?.data;
+    if(!invoice || invoice.status!=='pending' || invoice.authorization?.voucherNumber || invoice.authorization?.cae || invoice.authorization?.plannedAt || invoice.documentKind==='credit_note')return;
+    const fields={};
+    const stored=invoice.receiverSnapshot;
+    if(receiver && (!stored?.vatConditionId || !stored?.documentType || stored.documentNumber==null || stored.documentNumber==='')) fields.receiverSnapshot={...(receiver.name?{name:String(receiver.name).trim().slice(0,200)}:{}),vatConditionId:Number(receiver.vatConditionId),documentType:Number(receiver.documentType),documentNumber:String(receiver.documentNumber || '').replace(/\D/g,''),anonymousConsumerFinal:receiver.anonymousConsumerFinal===true,concept:Number(receiver.concept || 1)};
+    if(invoice.fiscalReadiness?.ready!==true) {
+      fields.productFiscalSnapshot=await loadFiscalProducts(invoice.saleSnapshot?.items || [],{getDocument:transaction.getDocument,env});
+      fields.fiscalReadiness=fiscalReadiness(fields.productFiscalSnapshot);
+    }
+    if(!Object.keys(fields).length)return;
+    const candidate={...invoice,...fields};
+    if(fields.receiverSnapshot && candidate.fiscalReadiness?.ready) {
+      const resolved=fields.receiverSnapshot;
+      const plan=buildAuthorizationPlan({invoice:candidate,issuerVatCondition:env.ARCA_ISSUER_VAT_CONDITION,receiverVatConditionId:resolved.vatConditionId,documentType:resolved.documentType,documentNumber:resolved.documentNumber,anonymousConsumerFinal:resolved.anonymousConsumerFinal,consumerFinalIdThreshold:Number(env.ARCA_CONSUMER_FINAL_ID_THRESHOLD)});
+      if(plan.blockers.length)throw Object.assign(new Error('Identificá al consumidor final antes de completar la factura.'),{code:'arca-consumer-final-identification-required',status:409,publicMessage:true});
+    }
+    await transaction.commitDocuments([{type:'update',path,currentUpdateTime:document.updateTime,data:{...fields,updatedAt:nowIso(now)}}]);
+  },{env});
+}
 
 function nowIso(now = new Date()) {
   return now instanceof Date ? now.toISOString() : new Date(now).toISOString();
@@ -135,6 +158,7 @@ function assertDeclaredSaleSource(sourceType, sale) {
 }
 
 function validateSaleForInvoice(sourceType, sourceId, sale, { existingInvoice = false } = {}) {
+  if (sale?.fiscalCancellation) throw Object.assign(new Error("La venta tiene una anulación en curso."),{code:"arca-sale-not-active",status:409});
   assertDeclaredSaleSource(sourceType, sale);
   if (!BILLING_SOURCE_TYPES.includes(sourceType)) {
     const error = new Error("Origen de facturación inválido.");
@@ -232,6 +256,7 @@ export async function ensurePendingInvoice({
     assertDeclaredSaleSource(sourceType, currentSale?.data);
     if (sourceType === "ecommerce") validateSaleForInvoice(sourceType, sourceId, currentSale?.data || null, { existingInvoice: Boolean(candidate) });
     const sale = currentSale?.data || {};
+    if (sale.fiscalCancellation) throw Object.assign(new Error("La venta tiene una anulación en curso."),{code:"arca-sale-not-active",status:409});
     const links = [{id:sale.fiscalInvoiceId, environment:sale.fiscalEnvironment}, {id:sale.fiscalInvoice?.id, environment:sale.fiscalInvoice?.environment}];
     if (links.some((link) => link.id && link.id !== candidateId && (!link.environment || link.environment === scope.environment)) || (candidate && (candidate.sourceType !== sourceType || candidate.sourceId !== sourceId || (candidate.fiscalEnvironment && candidate.fiscalEnvironment !== scope.environment)))) {
       const error = new Error("La asociación fiscal de la venta no coincide.");
@@ -314,6 +339,7 @@ export async function ensurePendingInvoice({
     },
     productFiscalSnapshot: fiscalProducts,
     receiverSnapshot: receiver ? {
+      ...(receiver.name ? { name: String(receiver.name).trim().slice(0, 200) } : {}),
       vatConditionId: Number(receiver.vatConditionId || 0) || null,
       documentType: Number(receiver.documentType || 0) || null,
       documentNumber: String(receiver.documentNumber || "").replace(/\D/g, "") || null,
@@ -750,6 +776,10 @@ export async function syncInvoiceToSale({
   }
 
   const authorization = invoice.authorization || {};
+  if (invoice.documentKind === "credit_note") {
+    if (saleDocument.data.fiscalCancellation?.creditNoteId !== invoiceId || saleDocument.data.fiscalCancellation?.originalInvoiceId !== invoice.originalInvoiceId) throw Object.assign(new Error("La nota de crédito no corresponde a la anulación de la venta."),{code:"arca-invoice-association-conflict",status:409});
+    return {invoiceId,sourceId,creditNote:true};
+  }
   const existingId = saleDocument.data.fiscalInvoiceId || saleDocument.data.fiscalInvoice?.id;
   if (existingId && existingId !== invoiceId && saleDocument.data.fiscalEnvironment === invoice.fiscalEnvironment) {
     const error = new Error("La venta ya está vinculada a otro comprobante fiscal.");

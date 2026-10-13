@@ -244,7 +244,7 @@ test("la venta guarda creador, fecha local, descuentos desglosados y ticket", as
   assert.match(service, /buildOperationalSalePlan/);
   assert.match(writePlan, /previousStock < item\.qty/);
   assert.match(service, /lastMovementId/);
-  assert.match(service, /sale\.cancelled/);
+  assert.match(await read("../netlify/functions/_lib/arca/saleCancellation.mjs"), /sale\.cancelled/);
   assert.match(service, /sale\.updated/);
 });
 

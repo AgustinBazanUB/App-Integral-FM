@@ -144,6 +144,7 @@ function normalizePendingSale(sale) {
     ...payment,
     customer,
     ticketRequested,
+    fiscalReceiver: sale.fiscalReceiver || null,
     ticketStatus: ticketRequested ? "pending" : "not_requested",
     clientStatus: "offline_pending",
   };

@@ -53,7 +53,7 @@ export function sellerSaleProblem({ profile, location, items, paymentMethod, pay
   if (paymentMethod === "multiple" && !can(profile, "quick-sales", "useMultiplePayments")) return sellerProblem("PAGO-PERMISO", "Tu usuario no puede combinar pagos. Elegí un solo medio o pedí permiso al administrador.");
   try { normalizePayment(paymentMethod, PAYMENT_LABELS[paymentMethod], payments, total); }
   catch (error) { return sellerProblem(paymentMethod === "multiple" ? "PAGO-DESGLOSE" : "PAGO-FALTANTE", error.message); }
-  if (ticketRequested && !can(profile, "quick-sales", "requestTicket")) return sellerProblem("TICKET-PERMISO", "Tu usuario no puede solicitar un ticket. Desmarcá Agregar ticket para continuar.");
+  if (ticketRequested && !can(profile, "quick-sales", "requestTicket")) return sellerProblem("FACTURA-PERMISO", "Tu usuario no tiene permiso para generar facturas.");
   if (!online && editing) return sellerProblem("VENTA-EDICION-OFFLINE", "Necesitás conexión para editar una venta confirmada. El carrito sigue acá.");
   if (!online && !can(profile, "quick-sales", "useOfflineSales")) return sellerProblem("VENTA-OFFLINE-PERMISO", "No hay conexión y tu usuario no puede guardar ventas pendientes. Reconectate para continuar.");
   return "";
