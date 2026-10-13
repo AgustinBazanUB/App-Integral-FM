@@ -11,6 +11,7 @@ import {
 } from "../firestoreAdminRest.mjs";
 import { arcaEnvironment, loadArcaPublicConfig } from "./config.mjs";
 import { invoiceIdForEnvironment, invoiceIdFor } from "./billing.mjs";
+import { buildAuthorizationPlan } from "./authorizationPlan.mjs";
 import {
   authorizeInvoice,
   reconcileInvoice,
@@ -19,6 +20,74 @@ import {
 
 const fail = (message, code = "arca-sale-cancel-blocked", status = 409) =>
   Object.assign(new Error(message), { code, status, publicMessage: true });
+export async function inspectSaleCancellation({
+  saleId,
+  session,
+  env = process.env,
+  getDocument = adminGetDocument,
+  now = new Date(),
+}) {
+  if (!/^[A-Za-z0-9_-]{1,180}$/.test(saleId || ""))
+    throw fail("Identificador de venta inválido.", "invalid-argument", 400);
+  const document = await getDocument(`sales/${saleId}`, { env }),
+    sale = document?.data;
+  checkSale(sale, session);
+  const sourceType = sale.sourceType || "seller_sale";
+  const originalId =
+    sale.fiscalInvoiceId ||
+    sale.fiscalInvoice?.id ||
+    invoiceIdForEnvironment(arcaEnvironment(env).id, sourceType, saleId);
+  const original = (await getDocument(`invoices/${originalId}`, { env }))?.data;
+  if ((sale.fiscalInvoiceId || sale.fiscalInvoice) && !original)
+    throw fail("No se pudo localizar la factura asociada.");
+  if (
+    original &&
+    (original.sourceId !== saleId ||
+      original.sourceType !== sourceType ||
+      (original.fiscalEnvironment || "homologation") !==
+        arcaEnvironment(env).id)
+  )
+    throw fail("El vínculo fiscal requiere revisión.");
+  if (original?.status === "authorized") {
+    const plan = buildAuthorizationPlan({
+      invoice: {
+        ...original,
+        status: "pending",
+        documentKind: "credit_note",
+        fiscalReadiness: { ready: true },
+        associatedInvoice: {
+          id: originalId,
+          issuerCuit: original.issuerCuit,
+          authorization: original.authorization,
+          verification: original.verification,
+        },
+      },
+      voucherDate: now,
+    });
+    return {
+      canCancel: sale.status === "active",
+      willCreateCreditNote: true,
+      creditNote: {
+        voucherType: plan.voucherType,
+        voucherClass: plan.voucherClass,
+        total: plan.fiscal.total,
+      },
+      readOnly: true,
+    };
+  }
+  return {
+    canCancel:
+      sale.status === "active" &&
+      (!original ||
+        (["pending", "rejected", "cancelled", "error"].includes(
+          original.status,
+        ) &&
+          !original.authorization?.voucherNumber)),
+    willCreateCreditNote: false,
+    readOnly: true,
+  };
+}
+
 function checkSale(sale, session) {
   if (!sale) throw fail("La venta no existe.", "arca-sale-not-found", 404);
   if (sale.sourceType === "ecommerce")
@@ -288,7 +357,7 @@ export async function cancelSaleAndInvoice({
       env,
       now,
     });
-    if (checked.matched !== true && checked.verified !== true)
+    if (checked.matched !== true)
       throw fail(
         "La nota de crédito espera verificación en ARCA. La venta sigue activa.",
         "arca-credit-not-verified",

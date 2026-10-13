@@ -15,6 +15,7 @@ export default function ArcaInvoicePrintAction({
   sourceType,
   invoiceId = null,
   invoice: initialInvoice = null,
+  showHint = true,
 }) {
   const [invoiceState, setInvoiceState] = useState({
     busy: Boolean(saleId && sourceType && !initialInvoice?.pdf),
@@ -132,7 +133,7 @@ export default function ArcaInvoicePrintAction({
             <Button variant="secondary" icon="Printer" loading={printing} disabled={downloading} onClick={openPdf}>{creditNote ? "Imprimir nota de crédito" : "Imprimir factura"}</Button>
             <Button variant="secondary" icon="Mail" onClick={() => setEmailOpen(true)}>Enviar por mail</Button>
           </div>
-          <small>PDF con CAE y código QR. Para imprimir, abrí el PDF y usá el ícono de la impresora o Ctrl+P.</small>
+          {showHint ? <small>PDF con CAE y código QR. Para imprimir, abrí el PDF y usá el ícono de la impresora o Ctrl+P.</small> : null}
           <ArcaInvoiceEmailDialog open={emailOpen} onClose={() => setEmailOpen(false)}
             saleId={saleId} sourceType={sourceType} invoiceId={resolvedInvoiceId || invoiceState.invoice?.id} invoice={invoiceState.invoice} />
         </>

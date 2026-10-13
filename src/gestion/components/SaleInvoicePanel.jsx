@@ -14,6 +14,7 @@ export default function SaleInvoicePanel({
   sale,
   allowGenerate = false,
   invoiceState = null,
+  showDelivery = true,
 }) {
   const [state, setState] = useState({
     loading: true,
@@ -102,12 +103,14 @@ export default function SaleInvoicePanel({
                   ? "Solicitud cancelada sin emitir una factura."
                   : "La venta está guardada; el comprobante todavía necesita autorización o verificación."}
           </p>
-          <ArcaInvoicePrintAction
-            saleId={sale.id}
-            sourceType={sourceType}
-            invoiceId={invoice.id}
-            invoice={invoice}
-          />
+          {showDelivery ? (
+            <ArcaInvoicePrintAction
+              saleId={sale.id}
+              sourceType={sourceType}
+              invoiceId={invoice.id}
+              invoice={invoice}
+            />
+          ) : null}
         </>
       ) : !state.error ? (
         <p>Esta venta no tiene factura emitida.</p>

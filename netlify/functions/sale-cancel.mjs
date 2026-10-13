@@ -1,6 +1,9 @@
 import { requireFirebaseActiveProfile } from "./_lib/firebaseAuth.mjs";
 import { safeFiscalError } from "../../src/shared/fiscalRecovery.mjs";
-import { cancelSaleAndInvoice } from "./_lib/arca/saleCancellation.mjs";
+import {
+  cancelSaleAndInvoice,
+  inspectSaleCancellation,
+} from "./_lib/arca/saleCancellation.mjs";
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -16,6 +19,20 @@ export default async function handler(request) {
   try {
     const session = await requireFirebaseActiveProfile(request);
     const body = await request.json().catch(() => ({}));
+    if (body.mode === "preview")
+      return json({
+        ok: true,
+        result: await inspectSaleCancellation({ saleId: body.saleId, session }),
+      });
+    if (body.mode && body.mode !== "cancel")
+      return json(
+        {
+          ok: false,
+          code: "invalid-mode",
+          message: "Modo de anulación inválido.",
+        },
+        400,
+      );
     return json({
       ok: true,
       result: await cancelSaleAndInvoice({

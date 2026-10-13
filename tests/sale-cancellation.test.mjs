@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cancelSaleAndInvoice } from "../netlify/functions/_lib/arca/saleCancellation.mjs";
+import {
+  cancelSaleAndInvoice,
+  inspectSaleCancellation,
+} from "../netlify/functions/_lib/arca/saleCancellation.mjs";
 import { buildAuthorizationPlan } from "../netlify/functions/_lib/arca/authorizationPlan.mjs";
 import { buildCaeDetail } from "../netlify/functions/_lib/arca/wsfe.mjs";
 import { syncInvoiceToSale } from "../netlify/functions/_lib/arca/invoicePersistence.mjs";
@@ -197,6 +200,17 @@ export function cancellationHarness({ billed = true, voucherType = 6 } = {}) {
     cancel: (overrides) => cancelSaleAndInvoice({ ...options, ...overrides }),
   };
 }
+
+test("Vista previa de anulación calcula NC sin escrituras ni emisión", async () => {
+  const h = cancellationHarness();
+  const before = structuredClone([...h.data]);
+  const result = await inspectSaleCancellation(h.options);
+  assert.equal(result.readOnly, true);
+  assert.equal(result.creditNote.voucherType, 8);
+  assert.equal(result.creditNote.total, 1210);
+  assert.deepEqual([...h.data], before);
+  assert.equal(h.requests(), 0);
+});
 
 test("Anulación sin factura admite motivo vacío y restituye stock una sola vez", async () => {
   const h = cancellationHarness({ billed: false });

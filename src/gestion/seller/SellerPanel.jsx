@@ -952,7 +952,13 @@ export default function SellerPanel() {
     <small className="fm-field__hint">Si es posible, indicá brevemente por qué se anula la venta.</small>
   </label>
 </Modal>
-      <Modal open={Boolean(detailSale)} onClose={() => setDetailSale(null)} title={detailSale?.saleCode || "Detalle de venta"} description={detailSale ? `${formatDateTime(detailSale.createdAt)} · ${detailSale.locationName}` : ""} footer={null}>
+      <Modal open={Boolean(detailSale)} onClose={() => setDetailSale(null)} title={detailSale?.saleCode || "Detalle de venta"} description={detailSale ? `${formatDateTime(detailSale.createdAt)} · ${detailSale.locationName}` : ""} footer={detailSale ? <div className="fm-seller-detail__footer">
+        {fiscalDetail.invoice?.pdf?.ready ? <ArcaInvoicePrintAction saleId={detailSale.id} sourceType={arcaSourceTypeForSale(detailSale)} invoiceId={fiscalDetail.invoice.id} invoice={fiscalDetail.invoice} showHint={false}/> : null}
+        <div className="fm-seller-detail__actions">
+          {detailSale.status !== "cancelled" && !detailSale.fiscalCancellation && fiscalDetail.ready && !fiscalDetail.invoice && !detailSale.fiscalInvoiceId && !detailSale.fiscalInvoice ? <Button variant="secondary" icon="Pencil" onClick={()=>{setEditRequested(detailSale);setDetailSale(null);}}>Editar venta</Button> : null}
+          {detailSale.status !== "cancelled" && (can(profile,"quick-sales","cancelOwn") || canReturnAdmin)?<Button variant="destructive" icon="Ban" disabled={!online || submitState.busy} onClick={()=>{setSubmitState({busy:false,tone:"info",message:""});setCancelTarget(detailSale);setDetailSale(null);}}>{detailSale.fiscalCancellation?"Continuar anulación":"Anular venta"}</Button>:null}
+        </div>
+      </div> : null}>
         {detailSale ? (
           <div className="fm-seller-detail">
             <div className="fm-seller-detail__summary">
@@ -971,14 +977,8 @@ export default function SellerPanel() {
                 {detailSale.customerZoneSnapshot ? <span>{detailSale.customerZoneSnapshot}</span> : null}
               </div>
             ) : <section className="fm-seller-detail__section"><h3>Cliente asociado</h3><p>Sin cliente asociado.</p></section>}
-            <SaleInvoicePanel sale={detailSale} allowGenerate={ticketAllowed && online} invoiceState={fiscalDetail}/>
+            <SaleInvoicePanel sale={detailSale} allowGenerate={ticketAllowed && online} invoiceState={fiscalDetail} showDelivery={!fiscalDetail.invoice?.pdf?.ready}/>
             {detailSale.status === "cancelled"?<section className="fm-seller-detail__section"><h3>Anulación</h3><p>{formatDateTime(detailSale.cancelledAt)} · {detailSale.cancelledByName || "Usuario"}</p>{detailSale.cancelReason?<p>{detailSale.cancelReason}</p>:null}</section>:detailSale.fiscalCancellation?<Toast tone="warning">Anulación pendiente de confirmación fiscal. Continuá la anulación para consultar el resultado sin duplicar la nota de crédito.</Toast>:null}
-            <div className="fm-seller-detail__actions">
-              {detailSale.status !== "cancelled" && fiscalDetail.ready && !fiscalDetail.invoice && !detailSale.fiscalInvoiceId && !detailSale.fiscalInvoice ? <>
-                <Button variant="secondary" icon="Pencil" onClick={() => setEditRequested(detailSale)}>Editar</Button>
-              </> : null}
-              {detailSale.status !== "cancelled" && (can(profile,"quick-sales","cancelOwn") || canReturnAdmin)?<Button variant="destructive" icon="Ban" disabled={!online || submitState.busy} onClick={()=>{setSubmitState({busy:false,tone:"info",message:""});setCancelTarget(detailSale);setDetailSale(null);}}>{detailSale.fiscalCancellation?"Continuar anulación":"Anular venta"}</Button>:null}
-            </div>
           </div>
         ) : null}
       </Modal>

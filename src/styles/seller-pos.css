@@ -41,6 +41,12 @@
 .fm-seller-detail__rows dd { margin:0; font-weight:700; white-space:nowrap; }
 .fm-seller-detail__rows .is-total { border-top:1px solid var(--fm-border); padding-top:12px; font-weight:700; }
 .fm-seller-detail__actions { display:flex; flex-wrap:wrap; gap:10px; border-top:1px solid var(--fm-border); padding-top:16px; }
+.fm-seller-detail__footer { display:grid; gap:12px; width:100%; }
+.fm-seller-detail__footer .fm-seller-detail__actions { border:0; padding:0; }
+.fm-modal:has(.fm-seller-detail) { display:flex; flex-direction:column; overflow:hidden; }
+.fm-modal:has(.fm-seller-detail) > header, .fm-modal:has(.fm-seller-detail) > footer { flex-shrink:0; }
+.fm-modal:has(.fm-seller-detail) > .fm-modal__body { min-height:0; overflow-y:auto; }
+.fm-modal:has(.fm-seller-detail) > footer { border-top:1px solid var(--fm-border); background:var(--fm-surface); }
 @media(max-width:540px) { .fm-seller-detail__actions .fm-button { width:100%; } .fm-sale-invoice-panel,.fm-seller-detail__section,.fm-seller-detail__customer { padding:14px; } }
 @media(max-width:1023px) {
   .fm-seller-sale-layout { grid-template-columns:minmax(0,1fr); }
