@@ -55,6 +55,15 @@ const invoice = {
   verification: { checkedAt: "2026-09-29T12:01:05.000Z", matched: true },
 };
 
+for (const [voucherClass,voucherType] of [['A',3],['B',8]]) test(`PDF de nota de crédito ${voucherClass} identifica el documento y factura asociada`,()=>{
+  const receiver={vatConditionId:voucherClass==='A'?1:5,documentType:voucherClass==='A'?80:99,documentNumber:voucherClass==='A'?'20123456786':'0'};
+  const credit={...invoice,documentKind:'credit_note',receiverSnapshot:receiver,authorization:{...invoice.authorization,voucherClass,voucherType,receiverVatConditionId:receiver.vatConditionId,receiverDocument:{documentType:receiver.documentType,documentNumber:receiver.documentNumber}},associatedInvoice:{authorization:{voucherClass,pointOfSale:8,voucherNumber:12}}};
+  const result=buildInvoicePdf({invoice:credit,env:issuerEnv});
+  assert.equal(result.filename,`Nota_de_credito_${voucherClass}_00008-00000320.pdf`);
+  const pdf=result.pdf.toString('latin1');
+  assert.match(pdf,/NOTA DE CRÉDITO/);assert.match(pdf,new RegExp(`Factura asociada: ${voucherClass} 00008-00000012`));
+});
+
 test("QR fiscal genera payload y matriz", () => {
   const qr = buildArcaQrPayload({
     issueDate: "2026-09-29",

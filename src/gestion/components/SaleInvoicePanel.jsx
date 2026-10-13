@@ -9,6 +9,7 @@ import {
   requestPendingArcaInvoice,
 } from "../services/arcaService";
 import { invoiceDeliveryLabel } from "../../shared/invoiceDelivery.mjs";
+import { fiscalPresentation } from "../../shared/fiscalRecovery.mjs";
 
 export default function SaleInvoicePanel({
   sale,
@@ -92,7 +93,7 @@ export default function SaleInvoicePanel({
             <strong>
               {invoice.status === "authorized"
                 ? invoiceDeliveryLabel(invoice)
-                : "Factura pendiente"}
+                : fiscalPresentation(invoice).label}
             </strong>
             <br />
             {invoice.creditedAt
@@ -101,7 +102,8 @@ export default function SaleInvoicePanel({
                 ? "Autorizada y verificada en ARCA."
                 : invoice.status === "cancelled"
                   ? "Solicitud cancelada sin emitir una factura."
-                  : "La venta está guardada; el comprobante todavía necesita autorización o verificación."}
+                  : invoice.recovery?.lastError?.message ||
+                    "La venta está guardada; el comprobante todavía necesita autorización o verificación."}
           </p>
           {showDelivery ? (
             <ArcaInvoicePrintAction
@@ -127,7 +129,6 @@ export default function SaleInvoicePanel({
           variant="secondary"
           icon="FileText"
           loading={busy}
-          disabled={Boolean(state.error && !invoice)}
           onClick={() =>
             invoice?.receiver ? generate(invoice.receiver) : setOpen(true)
           }

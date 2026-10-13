@@ -8,6 +8,7 @@ import { arcaEnvironment, productionAutoAuthorizeSources } from "./_lib/arca/con
 import { authorizeInvoice, reconcileInvoice, verifyAuthorizedInvoice } from "./_lib/arca/authorizer.mjs";
 import {
   canRequestInvoiceForSale,
+  completePendingInvoice,
   ensurePendingInvoice,
   syncInvoiceToSale,
 } from "./_lib/arca/invoicePersistence.mjs";
@@ -105,6 +106,10 @@ export default async function handler(request) {
       receiver,
       env: process.env,
     });
+    if(!result.created && result.invoice?.status==='pending') {
+      await completePendingInvoice({invoiceId:result.invoiceId,receiver,env:process.env});
+      result.invoice=(await adminGetDocument(`invoices/${result.invoiceId}`)).data;
+    }
 
     if (["reconciling","authorizing"].includes(result.invoice?.status) && result.invoice?.authorization?.voucherNumber) {
       await reconcileInvoice({invoiceId:result.invoiceId,env:process.env});

@@ -13,6 +13,29 @@ import {
 } from "./billing.mjs";
 import { arcaEnvironment } from "./config.mjs";
 import { ARCA_BILLING_VERSION } from "./billingVersion.mjs";
+import {buildAuthorizationPlan} from './authorizationPlan.mjs';
+
+export async function completePendingInvoice({invoiceId,receiver=null,env=process.env,now=new Date(),runTransaction=adminRunTransaction}) {
+  await runTransaction(async transaction=>{
+    const path=`invoices/${invoiceId}`,document=await transaction.getDocument(path,{env}),invoice=document?.data;
+    if(!invoice || invoice.status!=='pending' || invoice.authorization?.voucherNumber || invoice.authorization?.cae || invoice.authorization?.plannedAt || invoice.documentKind==='credit_note')return;
+    const fields={};
+    const stored=invoice.receiverSnapshot;
+    if(receiver && (!stored?.vatConditionId || !stored?.documentType || stored.documentNumber==null || stored.documentNumber==='')) fields.receiverSnapshot={...(receiver.name?{name:String(receiver.name).trim().slice(0,200)}:{}),vatConditionId:Number(receiver.vatConditionId),documentType:Number(receiver.documentType),documentNumber:String(receiver.documentNumber || '').replace(/\D/g,''),anonymousConsumerFinal:receiver.anonymousConsumerFinal===true,concept:Number(receiver.concept || 1)};
+    if(invoice.fiscalReadiness?.ready!==true) {
+      fields.productFiscalSnapshot=await loadFiscalProducts(invoice.saleSnapshot?.items || [],{getDocument:transaction.getDocument,env});
+      fields.fiscalReadiness=fiscalReadiness(fields.productFiscalSnapshot);
+    }
+    if(!Object.keys(fields).length)return;
+    const candidate={...invoice,...fields};
+    if(fields.receiverSnapshot && candidate.fiscalReadiness?.ready) {
+      const resolved=fields.receiverSnapshot;
+      const plan=buildAuthorizationPlan({invoice:candidate,issuerVatCondition:env.ARCA_ISSUER_VAT_CONDITION,receiverVatConditionId:resolved.vatConditionId,documentType:resolved.documentType,documentNumber:resolved.documentNumber,anonymousConsumerFinal:resolved.anonymousConsumerFinal,consumerFinalIdThreshold:Number(env.ARCA_CONSUMER_FINAL_ID_THRESHOLD)});
+      if(plan.blockers.length)throw Object.assign(new Error('Identificá al consumidor final antes de completar la factura.'),{code:'arca-consumer-final-identification-required',status:409,publicMessage:true});
+    }
+    await transaction.commitDocuments([{type:'update',path,currentUpdateTime:document.updateTime,data:{...fields,updatedAt:nowIso(now)}}]);
+  },{env});
+}
 
 function nowIso(now = new Date()) {
   return now instanceof Date ? now.toISOString() : new Date(now).toISOString();

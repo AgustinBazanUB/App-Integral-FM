@@ -200,7 +200,7 @@ export default function QuickSalesPage() {
         if (!selectedLocation || !cart.length) throw new Error("Elegí un origen y agregá productos.");
         normalizePayment(paymentMethod, PAYMENT_LABELS[paymentMethod], payments, saleSummary.total);
         if(fiscalRequested) {
-          const draft=await validateArcaInvoiceDraft({sourceType:"admin_quick_sale",items:cart,total:saleSummary.total,discountTotal:saleSummary.discountTotal,receiver});
+          const draft=await validateArcaInvoiceDraft({sourceType:"admin_quick_sale",items:cart.map(item=>({productId:item.productId || item.id,qty:item.qty,unitPrice:Number(item.price)})),total:saleSummary.total,discountTotal:saleSummary.discountTotal,receiver});
           receiver=draft.receiver;
         }
         const existing = customer.phone.trim() ? await findCustomerByPhone(customer.phone) : null;

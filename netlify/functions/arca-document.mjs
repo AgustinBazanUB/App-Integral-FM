@@ -107,6 +107,7 @@ function compactMetadata(invoiceId, invoice, env) {
     documentKind: invoice.documentKind || "invoice",
     creditNoteId: invoice.creditNoteId || null,
     creditedAt: invoice.creditedAt || null,
+    recovery: invoice.recovery || null,
     fiscalEnvironment: invoice.fiscalEnvironment || "homologation",
     sourceType: invoice.sourceType || null,
     sourceId: invoice.sourceId || null,

@@ -291,7 +291,7 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
     if (y - (descriptionLines.length - 1) * 12 < 320) {
       stream += commandText(39, 275, 8, "Continúa en la página siguiente.");
       pushPage();
-      stream += commandText(39, 790, 10, `${issuer.legalName} · Factura ${voucherClass} ${auth.pointOfSale}-${auth.voucherNumber}`, true);
+      stream += commandText(39, 790, 10, `${issuer.legalName} · ${documentTitle} ${voucherClass} ${auth.pointOfSale}-${auth.voucherNumber}`, true);
       stream += commandLine(35, 776, 560, 776);
       stream += commandText(39, 755, 9, "Cantidad", true);
       stream += commandText(100, 755, 9, "Detalle", true);
@@ -316,7 +316,7 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
     const labelLines = wrap(`Descuento: ${discount.name || "Descuento aplicado"}`, 43);
     if (y - (labelLines.length - 1) * 12 < 320) {
       pushPage();
-      stream += commandText(39, 790, 10, `${issuer.legalName} · Factura ${voucherClass} ${auth.pointOfSale}-${auth.voucherNumber}`, true);
+      stream += commandText(39, 790, 10, `${issuer.legalName} · ${documentTitle} ${voucherClass} ${auth.pointOfSale}-${auth.voucherNumber}`, true);
       stream += commandLine(35, 776, 560, 776);
       y = 725;
     }
@@ -329,7 +329,7 @@ export function buildInvoicePdf({ invoice, env = {} } = {}) {
 
   if (y < 320) {
     pushPage();
-    stream += commandText(39, 790, 10, `${issuer.legalName} · Factura ${voucherClass} ${auth.pointOfSale}-${auth.voucherNumber}`, true);
+    stream += commandText(39, 790, 10, `${issuer.legalName} · ${documentTitle} ${voucherClass} ${auth.pointOfSale}-${auth.voucherNumber}`, true);
     stream += commandLine(35, 776, 560, 776);
     y = 700;
   }

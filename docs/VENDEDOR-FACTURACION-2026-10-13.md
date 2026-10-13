@@ -19,6 +19,9 @@ solicita su CAE en el mismo flujo. Si ARCA falla después del registro comercial
 la venta permanece guardada y su factura puede completarse desde esa misma
 venta; no se pide al vendedor que vuelva a cargarla. Los resultados inciertos
 se consultan antes de cualquier nueva emisión.
+Las solicitudes antiguas pendientes pueden completar su receptor y los datos
+fiscales faltantes en el mismo identificador. Este ajuste nunca modifica un
+comprobante autorizado ni una solicitud que ya reservó numeración fiscal.
 
 El comprobante registrado y Mis ventas reúnen descargar PDF, imprimir y enviar
 por mail. El detalle muestra productos, precio unitario, subtotal, descuentos,
