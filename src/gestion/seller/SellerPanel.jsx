@@ -962,7 +962,7 @@ export default function SellerPanel() {
             <section className="fm-seller-detail__section"><h3>Productos</h3><div>{asArray(detailSale.items).map((item) => <p key={item.productId}><span>{item.qty} × {item.name}<small>{formatMoney(item.unitPrice)} por unidad</small></span><strong>{formatMoney(item.subtotal)}</strong></p>)}</div>
               <dl className="fm-seller-detail__rows"><div><dt>Subtotal</dt><dd>{formatMoney(detailSale.subtotal)}</dd></div>{Number(detailSale.discountTotal)>0?<div><dt>Descuentos</dt><dd>− {formatMoney(detailSale.discountTotal)}</dd></div>:null}<div className="is-total"><dt>Total</dt><dd>{formatMoney(detailSale.total)}</dd></div></dl>
             </section>
-            <section className="fm-seller-detail__section"><h3>Forma de pago</h3><dl className="fm-seller-detail__rows">{salePaymentParts(detailSale).length?salePaymentParts(detailSale).map((payment,index)=><div key={`${payment.method}-${index}`}><dt>{payment.label}</dt><dd>{formatMoney(payment.amount)}</dd></div>):<div><dt>Sin información de pago</dt><dd>—</dd></div>}</dl></section>
+                <section className="fm-seller-detail__section"><h3>Forma de pago</h3><dl className="fm-seller-detail__rows">{salePaymentParts(detailSale).length?salePaymentParts(detailSale).map((payment,index)=><div key={`${payment.method}-${index}`}><dt>{friendlyPayment[payment.method] || payment.label}</dt><dd>{formatMoney(payment.amount)}</dd></div>):<div><dt>Sin información de pago</dt><dd>—</dd></div>}</dl></section>
             {detailSale.customerPhoneSnapshot || detailSale.customerNameSnapshot || detailSale.customerId ? (
               <div className="fm-seller-detail__customer">
                 <h3>Cliente asociado</h3>

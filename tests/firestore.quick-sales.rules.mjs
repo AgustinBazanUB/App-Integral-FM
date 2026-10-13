@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { initializeTestEnvironment, assertFails } from "@firebase/rules-unit-testing";
-import { doc, setDoc, getDoc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, writeBatch, serverTimestamp, runTransaction } from "firebase/firestore";
+import {cancelSaleAndInvoice} from '../netlify/functions/_lib/arca/saleCancellation.mjs';
 import { build } from "esbuild";
 
 let environment;
@@ -31,11 +32,16 @@ before(async () => {
     ]);
   });
   globalThis.__quickSalesRulesDb = environment.authenticatedContext(admin.id).firestore();
+  globalThis.__quickSalesRulesCancel = payload => environment.withSecurityRulesDisabled(async context => {
+    const database=context.firestore();
+    const snapshot=document=>document.exists()?{data:document.data(),updateTime:'emulator-version'}:null;
+    return cancelSaleAndInvoice({...payload,session:{uid:seller.id,profile:seller},env:{ARCA_ENVIRONMENT:'production'},getDocument:async path=>snapshot(await getDoc(doc(database,path))),runTransaction:work=>runTransaction(database,transaction=>work({getDocument:async path=>snapshot(await transaction.get(doc(database,path))),commitDocuments:async operations=>{for(const operation of operations) {const ref=doc(database,operation.path);if(operation.type==='create')transaction.set(ref,operation.data);else transaction.update(ref,operation.data);}}}))});
+  });
   const bundle = await build({ stdin: { contents: 'export { createAdministrativeSale, createSellerSale, updateSellerSale, cancelSellerSale } from "./src/gestion/services/sellerService.js"; export { addStockToInventory, adjustInventoryStock } from "./src/gestion/services/inventoryService.js";', resolveDir: process.cwd() }, bundle: true, write: false, platform: "node", format: "esm", plugins: [{ name: "operations-rules-db", setup(builder) {
     builder.onResolve({ filter: /^firebase\/firestore$/ }, () => ({ path: import.meta.resolve("firebase/firestore"), external: true }));
     builder.onResolve({ filter: /arcaService$/ }, () => ({ path: "fiscal", namespace: "qa" }));
     builder.onResolve({ filter: /sharedResources$/ }, () => ({ path: "shared", namespace: "qa" }));
-    builder.onResolve({ filter: /^\.\/firebase$/ }, () => ({ path: "db", namespace: "qa" })); builder.onLoad({ filter: /.*/, namespace: "qa" }, ({path}) => ({ contents: path === "fiscal" ? "export async function requestPendingArcaInvoice(){throw Error(\"ARCA real prohibida\")}" : path === "shared" ? "export const listLocationsShared=async()=>[];export const loadSellerResourcesShared=async()=>({});" : "export const db = globalThis.__quickSalesRulesDb;" }));
+    builder.onResolve({ filter: /^\.\/firebase$/ }, () => ({ path: "db", namespace: "qa" })); builder.onLoad({ filter: /.*/, namespace: "qa" }, ({path}) => ({ contents: path === "fiscal" ? "export const cancelSaleWithInvoice=payload=>globalThis.__quickSalesRulesCancel(payload); export async function requestPendingArcaInvoice(){throw Error(\"ARCA real prohibida\")}" : path === "shared" ? "export const listLocationsShared=async()=>[];export const loadSellerResourcesShared=async()=>({});" : "export const db = globalThis.__quickSalesRulesDb;" }));
   } }] });
   temporaryDirectory = await mkdtemp(path.join(tmpdir(), "flormia-quick-sales-rules-"));
   const output = pathToFileURL(path.join(temporaryDirectory, "service.mjs"));
@@ -107,7 +113,7 @@ test("reglas: edición recalcula faltante y respeta el bloqueo de comprobantes f
   const database = environment.authenticatedContext(seller.id).firestore();
   assert.equal((await getDoc(stockReference(database, id))).data().currentStock, -2);
   await environment.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), "sales", sale.id), { fiscalInvoiceId: "protected-qa" }, { merge: true }));
-  await assert.rejects(sellerService.cancelSellerSale({ profile: seller, saleId: sale.id }), /fiscal/);
+  await assert.rejects(sellerService.cancelSellerSale({ profile: seller, saleId: sale.id }), /factura|fiscal/);
   await assert.rejects(sellerService.updateSellerSale({ ...input, saleId: sale.id }), /fiscal/);
 });
 
