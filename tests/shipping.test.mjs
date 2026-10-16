@@ -21,12 +21,14 @@ test("seller: atomic sale/request, no deduction; approval deducts only actual or
   assert.equal(s.documents.get("locationStock/valle/items/oil").currentStock, 10);
   assert.equal(s.shipment().stockCommitState, "pending");
   assert.equal(s.documents.get(`sales/${s.result.id}`).stockOriginId, null);
+  await s.op("review", { reason: "Verificación antes de aprobar" });
   const first = await s.op("approve", approval);
   assert.equal(first.id, s.result.shipmentId);
   assert.equal(s.documents.get("warehouseStock/infal/items/oil").currentStock, 18);
   assert.equal(s.documents.get("locationStock/valle/items/oil").currentStock, 10);
   assert.equal(s.documents.get(`sales/${s.result.id}`).locationId, "valle");
   assert.equal(s.documents.get(`sales/${s.result.id}`).stockOriginId, "infal");
+  assert.equal(s.shipment().approvalReview, null);
   await assert.rejects(s.op("approve", approval), /ya se aprobó/);
 });
 test("administrative sale commits stock once across concurrent retries, lookup stable", async () => {

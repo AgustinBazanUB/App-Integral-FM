@@ -123,6 +123,18 @@ export default function QuickSalesPage() {
       active = false;
     };
   }, [locationId, stockType, profile.id]);
+  useEffect(() => {
+    let active = true, refreshing = false;
+    const refresh = async event => {
+      if (!locationId || refreshing || submitRef.current || event.type === "shipping-changed" && !event.detail?.inventoryChanged) return;
+      refreshing = true;
+      try { const data = await listQuickSaleStock({ type: stockType, id: locationId }, profile); if (active) setStock({ status: "ready", data }); }
+      catch (error) { if (active) setStock({ status: "error", data: [], error }); }
+      finally { refreshing = false; }
+    };
+    window.addEventListener("shipping-changed", refresh); window.addEventListener("focus", refresh);
+    return () => { active = false; window.removeEventListener("shipping-changed", refresh); window.removeEventListener("focus", refresh); };
+  }, [locationId, stockType, profile.id]);
 
   const catalog = useMemo(() => joinMasterProducts(productsResult.data || [], stock.data).filter(item => item.masterActive), [productsResult.data, stock.data]);
   const visibleProducts = catalog.filter(item => item.productName.toLocaleLowerCase("es").includes(search.toLocaleLowerCase("es")));

@@ -240,7 +240,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
       const sale = (await transaction.getDocument(`sales/${shipment.saleId}`))?.data;
       assert(sale?.status === "active" && sale.stockCommitState === "pending", "La venta no está pendiente de stock.");
       operations.push(update(`sales/${shipment.saleId}`, { stockCommitState: "committed", stockOriginType: type, stockOriginId: originId, stockOriginName: origin.name, updatedAt: now }));
-      Object.assign(changes, { status: "aprobado", stockCommitState: "committed", stockOriginType: type, stockOriginId: originId, stockOriginName: origin.name, stockMovementIds: movements, deliveryType: draft.deliveryType, assignedPreparerIds: assigned.map(user => user.id), preparerNames: assigned.map(user => user.name), repository: repo, approvedBy: actor, approvedAt: now });
+      Object.assign(changes, { status: "aprobado", approvalReview: null, stockCommitState: "committed", stockOriginType: type, stockOriginId: originId, stockOriginName: origin.name, stockMovementIds: movements, deliveryType: draft.deliveryType, assignedPreparerIds: assigned.map(user => user.id), preparerNames: assigned.map(user => user.name), repository: repo, approvedBy: actor, approvedAt: now });
       if (draft.displayAddress !== shipment.destination.displayAddress || draft.notes !== shipment.destination.notes) {
         changes.destination = { displayAddress: draft.displayAddress, notes: draft.notes, verified: false };
         changes.destinationRevision = (shipment.destinationRevision || 0) + 1;
