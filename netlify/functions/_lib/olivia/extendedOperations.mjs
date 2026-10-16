@@ -21,6 +21,7 @@ const generic = { prepare_shipment_create: ["shipping", "shipments", "pending"],
   prepare_alert_create: ["alerts", "alerts", "new"], prepare_supplier_create: ["suppliers", "suppliers", "active"],
   prepare_social_lead_create: ["social", "socialLeads", "new"], prepare_marketing_campaign: ["marketing", "campaigns", "draft"], prepare_warehouse_create: ["warehouse", "warehouses", "active"] };
 export async function extendedOperationPlan({ session, toolName, args, store, now = new Date(), entityId = "preview", correlation = {} }) {
+  if (["prepare_shipment_create", "prepare_shipment_update"].includes(toolName)) throw oliviaError("shipping-sales-only", "Los envíos se crean exclusivamente desde Venta Rápida o Panel Vendedor. Las acciones logísticas se realizan desde Gestión de envíos.", 409);
   assertExtendedCapability(session, toolName);
   validateSchema(args, OLIVIA_CAPABILITIES[toolName]?.parameters);
   if (toolName === "prepare_catalog_stock_load") return catalogStockPlan({ session, args, store, now, entityId, correlation });

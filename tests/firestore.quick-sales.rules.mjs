@@ -41,7 +41,7 @@ before(async () => {
     builder.onResolve({ filter: /^firebase\/firestore$/ }, () => ({ path: import.meta.resolve("firebase/firestore"), external: true }));
     builder.onResolve({ filter: /arcaService$/ }, () => ({ path: "fiscal", namespace: "qa" }));
     builder.onResolve({ filter: /sharedResources$/ }, () => ({ path: "shared", namespace: "qa" }));
-    builder.onResolve({ filter: /^\.\/firebase$/ }, () => ({ path: "db", namespace: "qa" })); builder.onLoad({ filter: /.*/, namespace: "qa" }, ({path}) => ({ contents: path === "fiscal" ? "export const cancelSaleWithInvoice=payload=>globalThis.__quickSalesRulesCancel(payload); export async function requestPendingArcaInvoice(){throw Error(\"ARCA real prohibida\")}" : path === "shared" ? "export const listLocationsShared=async()=>[];export const loadSellerResourcesShared=async()=>({});" : "export const db = globalThis.__quickSalesRulesDb;" }));
+    builder.onResolve({ filter: /^\.\/firebase$/ }, () => ({ path: "db", namespace: "qa" })); builder.onLoad({ filter: /.*/, namespace: "qa" }, ({path}) => ({ contents: path === "fiscal" ? "export const cancelSaleWithInvoice=payload=>globalThis.__quickSalesRulesCancel(payload); export async function requestPendingArcaInvoice(){throw Error(\"ARCA real prohibida\")}" : path === "shared" ? "export const listLocationsShared=async()=>[];export const loadSellerResourcesShared=async()=>({});" : "export const auth={currentUser:null};export const db = globalThis.__quickSalesRulesDb;" }));
   } }] });
   temporaryDirectory = await mkdtemp(path.join(tmpdir(), "flormia-quick-sales-rules-"));
   const output = pathToFileURL(path.join(temporaryDirectory, "service.mjs"));

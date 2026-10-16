@@ -44,6 +44,8 @@ import SaleInvoicePanel from "../components/SaleInvoicePanel";
 import ArcaInvoicePrintAction from "../components/ArcaInvoicePrintAction";
 
 import CustomerDialog from "../seller/CustomerDialog";
+import ShippingDialog from "../shipping/ShippingFields";
+import { Link } from "../../router";
 import DiscountDialog from "../seller/DiscountDialog";
 import "../../styles/seller-customers.css";
 import "../../styles/seller-stage2.css";
@@ -89,10 +91,12 @@ export default function QuickSalesPage() {
   const [receiverVatConditionId, setReceiverVatConditionId] = useState(restored?.receiverVatConditionId || "5");
   const [receiverDocument, setReceiverDocument] = useState(restored?.receiverDocument || "");
   const [deliveryMethod, setDeliveryMethod] = useState(restored?.deliveryMethod || "pickup");
+  const [shipping, setShipping] = useState(restored?.shipping || {});
   const [discountIds, setDiscountIds] = useState((restored?.discounts || []).filter(d => d.source !== "manual" && d.discountId !== "manual").map(d => d.discountId || d.id).filter(Boolean));
   const submitRef = useRef(false);
   const [submitState, setSubmitState] = useState({ busy: false, error: "", success: "" });
   const [registeredInvoice, setRegisteredInvoice] = useState(null);
+  const [lastShipmentId, setLastShipmentId] = useState(null);
 
   const locations = effectiveSellerLocations(profile, locationsResult.data || []);
   const origins = stockType === "warehouse" ? (warehousesResult.data || []) : locations;
@@ -179,6 +183,7 @@ export default function QuickSalesPage() {
     submitRef.current = true;
     let sent = false;
     setRegisteredInvoice(null);
+    setLastShipmentId(null);
     setSubmitState({ busy: true, error: "", success: "" });
     try {
       const fiscalRequested = pendingIntent?.sale.invoiceRequested ?? requestInvoice;
@@ -196,6 +201,7 @@ export default function QuickSalesPage() {
       }) : null;
       let intent = pendingIntent;
       if (!intent) {
+        if (deliveryMethod === "shipping" && (!customer.name?.trim() || !customer.phone?.trim())) throw new Error("Para el envío, completá nombre y teléfono en Cliente.");
         if (!SALES_CHANNELS.some(option => option.value === channel)) throw new Error("Elegí el canal comercial real.");
         if (!selectedLocation || !cart.length) throw new Error("Elegí un origen y agregá productos.");
         normalizePayment(paymentMethod, PAYMENT_LABELS[paymentMethod], payments, saleSummary.total);
@@ -208,13 +214,14 @@ export default function QuickSalesPage() {
         const sale = {
           stockOrigin, items: cart.map(item => ({ id: item.id, productId: item.id, name: item.productName, categoryId: item.categoryId || null, unitPrice: Number(item.price), qty: item.qty })),
           discounts: appliedDiscounts, paymentMethod, paymentMethodLabel: PAYMENT_LABELS[paymentMethod], payments,
-          channel, customer: saleCustomer, customerDni, invoiceRequested: fiscalRequested, deliveryMethod, receiverVatConditionId: receiverCondition, receiverDocument: receiverDigits, fiscalReceiver: receiver,
+          channel, customer: saleCustomer, customerDni, invoiceRequested: fiscalRequested, deliveryMethod, shipping: deliveryMethod === "shipping" ? shipping : null, receiverVatConditionId: receiverCondition, receiverDocument: receiverDigits, fiscalReceiver: receiver,
         };
         intent = saveQuickSaleIntent(profile.id, sale);
         setPendingIntent(intent);
       }
       sent = true;
       const result = await createQuickSale({ ...intent.sale, seller: profile, requestId: intent.requestId });
+      setLastShipmentId(result.shipmentId || null);
       let invoiceNotice = "";
       let invoiceId = null;
       if (fiscalRequested) {
@@ -248,6 +255,8 @@ export default function QuickSalesPage() {
       setPayments(SINGLE_PAYMENT_METHODS.map(method => ({ method, amount: "" })));
       setCustomer({ phone: "", name: "", zoneName: "" });
       setCustomerState({ status: "idle" });
+      setShipping({});
+      setDeliveryMethod("pickup");
       setManualDiscounts([]);
       setCustomerDni("");
       setPaymentMethod("");
@@ -256,11 +265,11 @@ export default function QuickSalesPage() {
       setReceiverDocument("");
       setDiscountIds([]);
       setDialog("");
-      setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.${result.stockDiscrepancies?.length ? " Stock negativo pendiente de revisión." : ""}${invoiceNotice}` });
+      setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.${result.shipmentId ? " Envío generado y stock imputado al origen elegido." : ""}${result.shippingLegacyReviewRequired ? " Se recuperó una venta anterior: gestión debe revisar y vincular su envío sin volver a descontar stock." : ""}${result.stockDiscrepancies?.length ? " Stock negativo pendiente de revisión." : ""}${invoiceNotice}` });
       // Refresh failure must never turn a committed sale into a retryable commercial failure.
       await refreshStock().catch(error => setStock({ status: "error", data: [], error }));
     } catch (error) {
-      if (!sent || ["sale/validation", "permission-denied", "seller/insufficient-stock", "invalid-argument", "failed-precondition"].includes(error.code)) {
+      if (!sent || [400, 403].includes(error.status) || error.status === 409 && error.code === "shipping/blocked" || ["sale/validation", "permission-denied", "seller/insufficient-stock", "invalid-argument", "failed-precondition"].includes(error.code)) {
         clearQuickSaleIntent(profile.id);
         setPendingIntent(null);
       }
@@ -313,7 +322,7 @@ export default function QuickSalesPage() {
           <div className="fm-quick-pos__extras">
             <Button variant="secondary" disabled={locked || discountsResult.status === "loading"} onClick={() => setDialog("discount")}>Descuento</Button>
             <Button variant="secondary" disabled={locked} title={customer.phone ? customer.name || customer.phone : undefined} onClick={() => setDialog("customer")}>Cliente</Button>
-            <Button variant="secondary" disabled={locked} aria-pressed={deliveryMethod === "shipping"} onClick={() => setDeliveryMethod(deliveryMethod === "shipping" ? "pickup" : "shipping")}>{deliveryMethod === "shipping" ? "Con envío" : "Retiro"}</Button>
+            <Button variant="secondary" disabled={locked} aria-pressed={deliveryMethod === "shipping"} onClick={() => setDialog("shipping")}>{deliveryMethod === "shipping" ? "Con envío · editar" : "Con envío"}</Button>
             <Button variant="secondary" disabled={locked} onClick={openOriginDialog}>Canal</Button>
           </div>
           {appliedDiscounts.length ? <div className="fm-quick-pos__discounts">{appliedDiscounts.map((discount, index) => <button type="button" disabled={locked} key={`${discount.id || discount.discountId}-${index}`} aria-label={`Quitar ${discount.name}`} onClick={() => discount.source === "manual" ? setManualDiscounts(manual => manual.filter(entry => entry !== discount)) : setDiscountIds(ids => ids.filter(id => id !== (discount.discountId || discount.id)))}>{discount.name} ×</button>)}</div> : null}
@@ -321,6 +330,8 @@ export default function QuickSalesPage() {
         </section>
       </div>
       {pendingIntent ? <Toast tone="warning">Confirmación pendiente. Recuperá el resultado de esta misma venta.</Toast> : null}
+      {lastShipmentId && <Link className="fm-button fm-button--secondary" to={`/gestion/shipping?shipment=${encodeURIComponent(lastShipmentId)}`}>Ver ficha del envío generado</Link>}
+      <ShippingDialog open={dialog === "shipping"} value={shipping} administrative onClose={() => setDialog("")} onConfirm={draft => { setShipping(draft); setDeliveryMethod("shipping"); setDialog(""); }} onRemove={() => { setShipping({}); setDeliveryMethod("pickup"); setDialog(""); }} />
       {submitState.error ? <Toast tone="error">{submitState.error}</Toast> : null}
       {submitState.success ? <Toast tone="success">{submitState.success}</Toast> : null}
       {registeredInvoice ? <SaleInvoicePanel sale={registeredInvoice} allowGenerate={can(profile,"quick-sales","requestTicket")}/> : null}

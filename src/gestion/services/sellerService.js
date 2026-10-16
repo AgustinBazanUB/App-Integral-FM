@@ -1,5 +1,6 @@
 import { buildOperationalSalePlan, cleanOperationalSaleItems, customerSaleSnapshot, customerSaleWrite, resolveOperationalCustomer } from "../../shared/operationalWritePlans.mjs";
 import { saleActivitySnapshot } from "../../shared/activitySnapshots.mjs";
+import { createShippingSaleRequest } from "./shippingService";
 import { effectiveLocationPrice } from "../../modules/inventory/domain/inventory";
 import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
 import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
@@ -265,6 +266,11 @@ export async function createAdministrativeSale(sale) {
   if (!canAccessAdministration(sale.profile) || !sale.profile?.active) {
     throw saleValidationError("Venta Rápida administrativa requiere un Administrador.");
   }
+  if (sale.deliveryMethod === "shipping") {
+    const result = await createShippingSaleRequest(sale, true);
+    invalidateDashboardSales();
+    return result;
+  }
   const requestId = sale.requestId || crypto.randomUUID();
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(requestId)) throw saleValidationError("Identificador de venta inválido.");
   if (!SALES_CHANNELS.some(option => option.value === sale.channel)) throw saleValidationError("Elegí el canal comercial real.");
@@ -318,7 +324,17 @@ async function createSale({
   customerDni = "",
   invoiceRequested = false,
   deliveryMethod = "pickup",
+  shipping = null,
 }) {
+  if (deliveryMethod === "shipping") {
+    const result = await createShippingSaleRequest({ profile, location, items, discounts, paymentMethod, paymentMethodLabel, payments, ticketRequested, fiscalReceiver, customer, offlineSale, deliveryMethod, shipping });
+    invalidateDashboardSales();
+    if (!ticketRequested) return result;
+    try {
+      const invoice = await requestPendingArcaInvoice({ sourceType: "seller_sale", sourceId: result.id, receiver: fiscalReceiver });
+      return { ...result, fiscalPreparationStatus: invoice?.autoAuthorization?.status === "authorized" ? "authorized" : "pending", fiscalInvoiceId: invoice?.id || null };
+    } catch (error) { return { ...result, fiscalPreparationStatus: "error", fiscalPreparationError: error.message }; }
+  }
   if (!can(profile, "quick-sales", "create")) {
     throw saleValidationError("No tenés permiso para registrar ventas.");
   }
@@ -491,6 +507,7 @@ export async function updateSellerSale({
     const saleSnapshot = await transaction.get(saleReference);
     if (!saleSnapshot.exists()) throw new Error("La venta ya no existe.");
     const sale = saleSnapshot.data();
+    if (sale.shipmentId) throw new Error("Esta venta tiene un envío vinculado. Solicitá revisión de logística antes de modificar productos o pagos.");
     if (sale.fiscalInvoiceId || sale.fiscalInvoice) throw new Error("La venta tiene una solicitud fiscal asociada. Requiere revisión administrativa.");
     if (sale.status !== "active") throw new Error("La venta está anulada.");
     if (!canAccessAdministration(profile) && sale.sellerId !== profile.id) {

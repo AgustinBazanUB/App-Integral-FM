@@ -47,12 +47,12 @@ export function customerSaleWrite({ existing, customer, profile, saleId, stamp, 
   return { customerKey: customer.id, phone: customer.phone, phoneNormalized: customer.phoneNormalized, name: customer.name || null, zoneId: customer.zoneId || null, zoneName: customer.zoneName, customZone: customer.customZone || null, active: true, deleted: false, source, createdBy: profile.id, createdByName: userName(profile), createdAt: stamp, updatedAt: stamp, lastSaleId: saleId, lastPurchaseAt: stamp };
 }
 
-export function buildOperationalSalePlan({ profile, location, items, stocks, counter = {}, saleId, movementIds, dateKey, prefix, stamp, localFields, discountSummary, payment, customer = null, stockType = "location", administrative = false, requestId = null, requestFingerprint = null, priceOverrides = [], offlineSale = null, ticketRequested = false, customerDni = "", invoiceRequested = false, deliveryMethod = "pickup", channel = "in_person", legacyStockMutation = false }) {
+export function buildOperationalSalePlan({ profile, location, items, stocks, counter = {}, saleId, movementIds, dateKey, prefix, stamp, localFields, discountSummary, payment, customer = null, stockType = "location", administrative = false, requestId = null, requestFingerprint = null, priceOverrides = [], offlineSale = null, ticketRequested = false, customerDni = "", invoiceRequested = false, deliveryMethod = "pickup", channel = "in_person", legacyStockMutation = false, deferredStock = false }) {
   if (stocks.length !== items.length || movementIds.length !== items.length) throw validationError("La lectura de stock está incompleta.");
   const next = Number(counter.lastNumber || 0) + 1;
   if (!Number.isSafeInteger(next) || next <= 0) throw validationError("El contador de ventas no es válido.");
   const saleCode = `FM-${prefix}-${dateKey}-${String(next).padStart(4, "0")}`;
-  const stockWrites = stocks.map((stock, index) => {
+  const stockWrites = deferredStock ? [] : stocks.map((stock, index) => {
     const item = items[index];
     if (!stock || stock.active === false || stock.deleted === true || stock.productDeleted === true) throw validationError(`${item.name} ya no está habilitado en esta ubicación.`);
     const previousStock = Number(stock.currentStock || 0);
@@ -66,7 +66,7 @@ export function buildOperationalSalePlan({ profile, location, items, stocks, cou
       movementData: { inventoryType: stockType, ...(stockType === "warehouse" ? { warehouseId: location.id, warehouseName: location.name } : { locationId: location.id, locationName: location.name }), productId: item.productId, productName: item.name, type: "sale", qty: -item.qty, previousStock, newStock: currentStock, reason: `Venta ${saleCode}`, userId: profile.id, userName: userName(profile), saleId, saleItemIndex: index, previousSaleItemIndex: -1, createdAt: stamp },
     };
   });
-  const stockDiscrepancies = stockType === "location" ? saleStockDiscrepancies(items, item => Number(stocks[items.indexOf(item)]?.currentStock || 0)) : [];
+  const stockDiscrepancies = !deferredStock && stockType === "location" ? saleStockDiscrepancies(items, item => Number(stocks[items.indexOf(item)]?.currentStock || 0)) : [];
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
   if (!Number.isSafeInteger(subtotal) || !Number.isSafeInteger(discountSummary.total)) throw validationError("El total de la venta supera el límite permitido.");
   const ticketStatus = ticketRequested ? "pending" : "not_requested";

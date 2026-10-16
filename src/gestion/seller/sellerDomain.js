@@ -6,6 +6,7 @@ export const SELLER_VIEWS = [
   { id: "pending", label: "Pendientes", icon: "RefreshCw" },
   { id: "stock", label: "Stock", icon: "Boxes" },
   { id: "prices", label: "Precios", icon: "BadgeDollarSign" },
+  { id: "shipping-tasks", label: "Mis preparaciones y etiquetas", icon: "PackageCheck" },
 ];
 
 export function sellerPaymentSummary(sales = []) {

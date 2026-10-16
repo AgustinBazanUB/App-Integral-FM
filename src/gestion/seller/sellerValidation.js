@@ -20,7 +20,7 @@ export function sellerErrorMessage(error) {
   };
   if (messages[code]) return sellerProblem(code, messages[code]);
   // Los errores de validación del negocio ya explican el motivo en castellano.
-  if (error?.message && (code === "Error" || code === "sale/validation" || code.startsWith("seller/"))) {
+    if (error?.message && (code === "Error" || code === "sale/validation" || code.startsWith("seller/") || code.startsWith("shipping/"))) {
     return sellerProblem(code === "Error" ? "VENTA-VALIDACION" : code, error.message);
   }
   return sellerProblem(code, "No pudimos completar la acción. Conservá este código y contanos qué estabas intentando hacer.");

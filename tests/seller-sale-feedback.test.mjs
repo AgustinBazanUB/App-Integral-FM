@@ -69,7 +69,7 @@ function submission(overrides = {}) {
     useCallback: fn => fn, submitRef: { current: false }, submitState: { busy: false },
     selectedLocation: valid.location, currentItems: valid.items, profile: valid.profile,
     paymentMethod: "cash", payments: [], summary: { total: 1000 }, selectedCustomer: null,
-    ticketRequested: false, fiscalReceiver: null, online: true, editSale: null, appliedDiscounts: [],
+    ticketRequested: false, fiscalReceiver: null, online: true, editSale: null, appliedDiscounts: [], shipping: null,
     stockResult: { status: "ready" }, pendingSales: { status: "ready" }, PAYMENT_LABELS,
     sellerSaleProblem, sellerErrorMessage, setSubmitState: state => states.push(state),
     resetSale: () => resets.push(true), setReceipt: value => receipts.push(value),
@@ -90,6 +90,13 @@ test("dos clicks antes del render registran una sola venta", async () => {
   await Promise.all([first, second]);
   assert.equal(h.receipts.length, 1);
   assert.equal(h.context.submitRef.current, false);
+});
+
+test("seller shipping blocks offline before queueing and preserves presencial behavior", async () => {
+  let queued = false;
+  const h = submission({ shipping: { displayAddress: "Calle de prueba 123" }, online: false, savePending: async () => { queued = true; } });
+  await h.submit(); assert.equal(queued, false); assert.equal(h.resets.length, 0);
+  assert.match(h.states.at(-1).message, /requieren conexión/);
 });
 
 test("fallar la consulta después de guardar mantiene recibo y explica que ya se registró", async () => {

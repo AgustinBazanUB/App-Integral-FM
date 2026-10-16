@@ -90,6 +90,7 @@ export async function inspectSaleCancellation({
 
 function checkSale(sale, session) {
   if (!sale) throw fail("La venta no existe.", "arca-sale-not-found", 404);
+  if (sale.shipmentId) throw fail("Esta venta tiene un envío vinculado. Resolvé la logística y registrá por separado los movimientos de stock y la anulación financiera supervisada.", "shipping-cancellation-review");
   if (sale.sourceType === "ecommerce")
     throw fail("Esta venta se anula desde el módulo de pedidos.");
   const admin = canAccessAdministration(session.profile);

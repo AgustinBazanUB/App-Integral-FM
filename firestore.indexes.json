@@ -1,5 +1,12 @@
 {
   "indexes": [
+    {"collectionGroup":"alerts","queryScope":"COLLECTION","fields":[{"fieldPath":"source","order":"ASCENDING"},{"fieldPath":"responsibleId","order":"ASCENDING"},{"fieldPath":"active","order":"ASCENDING"}]},
+    {"collectionGroup":"shipments","queryScope":"COLLECTION","fields":[{"fieldPath":"shippingSchemaVersion","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
+    {"collectionGroup":"shipments","queryScope":"COLLECTION","fields":[{"fieldPath":"shippingSchemaVersion","order":"ASCENDING"},{"fieldPath":"assignedPreparerIds","arrayConfig":"CONTAINS"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
+    {"collectionGroup":"shipments","queryScope":"COLLECTION","fields":[{"fieldPath":"shippingSchemaVersion","order":"ASCENDING"},{"fieldPath":"createdBy","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
+    {"collectionGroup":"shipments","queryScope":"COLLECTION","fields":[{"fieldPath":"assignedPreparerIds","arrayConfig":"CONTAINS"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
+    {"collectionGroup":"shipments","queryScope":"COLLECTION","fields":[{"fieldPath":"createdBy","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
+    {"collectionGroup":"alerts","queryScope":"COLLECTION","fields":[{"fieldPath":"responsibleId","order":"ASCENDING"},{"fieldPath":"active","order":"ASCENDING"}]},
     {"collectionGroup":"discounts","queryScope":"COLLECTION","fields":[{"fieldPath":"active","order":"ASCENDING"},{"fieldPath":"name","order":"ASCENDING"}]},
     {"collectionGroup":"locations","queryScope":"COLLECTION","fields":[{"fieldPath":"active","order":"ASCENDING"},{"fieldPath":"name","order":"ASCENDING"}]},
     {"collectionGroup":"products","queryScope":"COLLECTION","fields":[{"fieldPath":"active","order":"ASCENDING"},{"fieldPath":"name","order":"ASCENDING"}]},
@@ -30,5 +37,8 @@
     {"collectionGroup":"oliviaConversations","queryScope":"COLLECTION","fields":[{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"updatedAt","order":"DESCENDING"}]},
     {"collectionGroup":"oliviaUsage","queryScope":"COLLECTION","fields":[{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]}
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {"collectionGroup":"shipmentAccess","fieldPath":"expiresAt","ttl":true,"indexes":[]},
+    {"collectionGroup":"shippingRateLimits","fieldPath":"expiresAt","ttl":true,"indexes":[]}
+  ]
 }

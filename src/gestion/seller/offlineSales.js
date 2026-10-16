@@ -151,6 +151,7 @@ function normalizePendingSale(sale) {
 }
 
 export async function saveSellerPendingSale(sale) {
+  if (sale.deliveryMethod === "shipping" || sale.shipping) throw new Error("Los envíos requieren conexión y no se guardan en la cola de ventas presenciales.");
   const normalized = normalizePendingSale(sale);
   await requestStore("readwrite", (store) => store.put(normalized));
   return normalized;

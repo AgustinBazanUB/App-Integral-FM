@@ -117,7 +117,7 @@ export const businessModules = [
     collection: "shipments",
     icon: "Truck",
     accent: "olive",
-    primaryAction: "Nuevo envío",
+    primaryAction: "Cargar un envío · Venta Rápida",
   },
   {
     id: "alerts",

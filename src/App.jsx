@@ -4,6 +4,7 @@ import PanelLoading from "./components/PanelLoading";
 
 const ManagementApp = lazy(() => import("./gestion/ManagementApp"));
 const Storefront = lazy(() => import("./Storefront"));
+const ShippingPublicApp = lazy(() => import("./gestion/shipping/ShippingPublicApp"));
 
 function AppShellFallback() {
   const { pathname } = useLocation();
@@ -13,6 +14,7 @@ function AppShellFallback() {
 export default function App() {
   const location = useLocation();
   const surface = import.meta.env.VITE_APP_SURFACE || "unified";
+  if (/^\/(e\/[^/]+|reparto|seguimiento)\/?$/.test(location.pathname)) return <Suspense fallback={<AppShellFallback />}><ShippingPublicApp /></Suspense>;
   const isPrivatePath =
     location.pathname === "/" ||
     location.pathname === "/gestion" ||

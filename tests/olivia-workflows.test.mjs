@@ -60,7 +60,6 @@ const location = { locationId: null, name: "Feria QA", type: "fair", codePrefix:
 const expense = { name: "Alquiler QA", amountCents: 12345, category: "Alquiler local", nature: "fixed", locationId: null, accruedOn: "2026-10-04", dueOn: "2026-10-10", paidOn: null, cashAccount: "", notes: "Solo fixture" };
 for (const [tool, args, collection] of [
   ["prepare_create_location", location, "locations"], ["prepare_expense_create", expense, "financialEntries"],
-  ["prepare_shipment_create", { entityId: null, name: "Envío QA", notes: "Fixture" }, "shipments"],
   ["prepare_alert_create", { entityId: null, name: "Alerta QA", notes: "Fixture" }, "alerts"],
   ["prepare_supplier_create", { entityId: null, name: "Proveedor QA", notes: "Fixture" }, "suppliers"],
   ["prepare_social_lead_create", { entityId: null, name: "Consulta QA", notes: "Fixture" }, "socialLeads"],
@@ -74,6 +73,14 @@ for (const [tool, args, collection] of [
   assert.equal(records.length, 1);
   if (tool === "prepare_expense_create") assert.equal(records[0][1].amount, 123.45);
   if (tool === "prepare_marketing_campaign") assert.equal(records[0][1].status, "draft");
+});
+
+test("Olivia cannot create or mutate shipments outside the shipping sale workflow", async () => {
+  const f = fixture({ role: "admin" });
+  for (const toolName of ["prepare_shipment_create", "prepare_shipment_update"]) {
+    await assert.rejects(prepareExtendedOperation({ ...f, toolName, args: { entityId: "shipping", name: "Pedido QA", notes: "Fixture" }, now: f.clock() }), { code: "shipping-sales-only" });
+  }
+  assert.equal([...f.documents.keys()].filter(path => path.startsWith("shipments/")).length, 0);
 });
 test("location edits retain assignments; customer phone identity is deterministic and enriches only blanks", async () => {
   const f = fixture({ role: "admin" });
