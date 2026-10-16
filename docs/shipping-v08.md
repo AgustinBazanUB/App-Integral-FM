@@ -94,7 +94,7 @@ Los índices nuevos cubren `shippingSchemaVersion + updatedAt`, asignación/crea
 ## Pruebas y evidencias
 
 - `npm test`: **978 pruebas** de regresión (incluye envíos y lectura autenticada de respaldo; última salida en `tmp/shipping-preview-tests.log`).
-- `npm run test:shipping`: **22 pruebas** focalizadas, todas correctas.
+- `npm run test:shipping`: **25 pruebas** focalizadas, todas correctas.
 - `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm run test:rules`: **138 pruebas** correctas. Nueva suite shipping: **5**, incluida concurrencia real de venta/aprobación. Tras los últimos cambios del backend se volvió a ejecutar la suite shipping con resultado correcto.
 - `npm run build:surfaces`: compilación correcta de gestión y ecommerce. Se volvió a compilar gestión tras cambios de UI. Vite conserva advertencia de chunks grandes; no es un error de compilación.
 - Empaquetado esbuild de ambas funciones con objetivo Node 20: correcto.
@@ -103,6 +103,8 @@ Los índices nuevos cubren `shippingSchemaVersion + updatedAt`, asignación/crea
 - `npm audit`: **0 vulnerabilidades** después de la actualización puntual de `source-map-js`. `git diff --check`: correcto.
 
 Evidencia sintética conservada en `docs/shipping-evidence/`: vistas de escritorio/móvil, modal del POS, selector QR, PDF y resultados. No demuestra GPS en un dispositivo físico ni acceso productivo. Las pruebas de reglas emiten denegaciones esperadas al probar ataques; la salida final tiene cero fallos.
+
+Prueba manual remota del 16/10/2026: [informe del Preview 40](shipping-manual-preview-40.md). Ambos recorridos ficticios se completaron en el Firebase original con consentimiento del usuario, conservando un único descuento por pedido. El GPS real no obtuvo posición en este equipo; el cierre se verificó mediante excepción supervisada. El informe identifica ventas, movimientos, hallazgos corregidos y pendientes externos.
 
 ## Históricos y pendientes de activación
 
