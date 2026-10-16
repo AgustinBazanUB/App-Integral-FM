@@ -1,16 +1,20 @@
 import { collection, onSnapshot, query, where, orderBy, limit } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { can } from "../permissions";
+const mutationModes = new Set(["create_sale", "approve", "start_preparing", "ready", "incident", "resolve", "reject", "review", "retry", "cancel", "return", "undelivered", "address", "assign", "issue_access", "revoke_access", "delivery_exception", "courier_action", "read_notification"]);
+const changesChannel = typeof window !== "undefined" && typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("flor-mia-shipping-changes") : null;
+if (changesChannel) changesChannel.onmessage = () => window.dispatchEvent(new Event("shipping-changed"));
+const changed = () => { window.dispatchEvent(new Event("shipping-changed")); changesChannel?.postMessage("changed"); };
 
 export async function shippingRequest(body, { publicAccess = false } = {}) {
   const token = !publicAccess && auth.currentUser ? await auth.currentUser.getIdToken() : null;
   const response = await fetch("/.netlify/functions/shipping", { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.ok !== true) throw Object.assign(new Error(payload.message || "No se pudo consultar el módulo de envíos."), { code: payload.code, status: response.status });
+  if (mutationModes.has(body.mode)) changed();
   return payload.result;
 }
-const changed = () => window.dispatchEvent(new Event("shipping-changed"));
-export const shippingAction = async (shipmentId, mode, data = {}) => { const result = await shippingRequest({ shipmentId, mode, requestId: crypto.randomUUID(), ...data }); changed(); return result; };
+export const shippingAction = (shipmentId, mode, data = {}) => shippingRequest({ shipmentId, mode, requestId: crypto.randomUUID(), ...data });
 function subscribeWithFallback(reference, body, notify, onError) {
   let stopped = false, timer, loading = false;
   const refresh = async () => {
@@ -34,7 +38,7 @@ export function subscribeShipments(profile, notify, onError, assigned = false) {
   return subscribeWithFallback(query(collection(db, "shipments"), where("shippingSchemaVersion", "==", 1), ...constraints, orderBy("updatedAt", "desc"), limit(250)), { mode: "feed", assigned }, notify, onError);
 }
 export const subscribeShippingNotifications = (profile, notify, onError) => subscribeWithFallback(query(collection(db, "alerts"), where("source", "==", "shipping"), where("responsibleId", "==", profile.id), where("active", "==", true)), { mode: "notifications" }, notify, onError);
-export const readShippingNotification = async alertId => { const result = await shippingRequest({ mode: "read_notification", alertId }); changed(); return result; };
+export const readShippingNotification = alertId => shippingRequest({ mode: "read_notification", alertId });
 const pendingKey = uid => `flor-mia-shipping-sale-pending:${uid}`;
 export function readPendingShippingSale(uid) { try { return JSON.parse(sessionStorage.getItem(pendingKey(uid)) || "null"); } catch { return null; } }
 export async function createShippingSaleRequest(sale, administrative = false) {
@@ -50,7 +54,6 @@ export async function createShippingSaleRequest(sale, administrative = false) {
   }
   try {
     const result = await shippingRequest({ mode: "create_sale", administrative, requestId, sale: payload });
-    changed();
     if (!administrative) { sessionStorage.removeItem(pendingKey(profile.id)); window.dispatchEvent(new Event("shipping-intent")); }
     return result;
   } catch (error) {

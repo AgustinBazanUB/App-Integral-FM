@@ -20,7 +20,7 @@
 | F4 GPS, mapa y cliente | PARCIAL | Código de GPS voluntario en última milla, precisión/antigüedad, revocación, geocerca configurable y excepción supervisada, seguimiento sólo lectura y limpieza de puntos vencidos. El mapa integrado y autocompletado dependen de elegir/configurar proveedor. Hay verificación manual del marcador y enlaces a Google Maps. No se probó GPS físico ni seguimiento en segundo plano. |
 | F5 Contratos futuros | HECHO | Contratos y adaptadores de Ecommerce, Uber API y WhatsApp deshabilitados; evento `shipping.tracking_ready` en outbox sin credenciales públicas en texto plano. |
 
-Los cambios están en el árbol local de `codex/modulo-envios-v08`. No se creó commit, PR, merge ni despliegue. No se emitieron CAE ni se operaron ventas, clientes o pedidos productivos.
+Los cambios están guardados en `codex/modulo-envios-v08` y el PR borrador #40. El Deploy Preview está disponible en https://deploy-preview-40--appintegralflormia.netlify.app/gestion/shipping. El usuario autorizó usar Firebase original y realizar pruebas manuales. Las ventas ficticias identificadas `PRUEBA QA ENVÍOS 40` son registros reales y deben conciliarse al terminar; no se emitieron CAE ni se enviaron mensajes a clientes.
 
 ## Rutas y uso
 
@@ -28,8 +28,8 @@ Los cambios están en el árbol local de `codex/modulo-envios-v08`. No se creó 
 - `/gestion/shipping?shipment=…`: ficha accesible desde tablero y notificaciones. Incluye productos, cliente, origen comercial/físico, eventos, impresión y acciones autorizadas.
 - `/vendedor?view=shipping-tasks`: mismo componente de tareas, después de Precios. `Pendientes` mantiene su significado offline. La venta y el recibo permiten abrir el estado del envío aunque el vendedor no esté asignado como preparador.
 - `/e/:publicLookupId`: QR estable que sólo identifica el envío. Elegir personal requiere Firebase y asignación; elegir repartidor requiere credencial temporal adicional.
-- `/reparto#credencial`: portal del repartidor. Una acción principal por estado y tramo. En repositorio el primer repartidor recibe sólo la dirección del repositorio, sin teléfono del cliente.
-- `/seguimiento#credencial`: enlace distinto, revocable y de sólo lectura. En repositorio sólo puede generarse al salir a reparto final. Nunca muestra el recorrido previo ni datos de pagos, stock, CRM o repartidor.
+- `/reparto#credencial`: portal del repartidor. Una acción principal por estado y tramo. En el primer tramo el destino es Repositorio de Flor Mía, sin teléfono/domicilio del cliente y sin GPS; su dirección es opcional.
+- `/seguimiento#credencial`: enlace distinto, revocable y de sólo lectura. Puede mostrar preparación y En repositorio sin ubicación; sólo al salir a reparto final aparece En camino a tu domicilio y se permite compartir el último punto GPS. Nunca muestra el recorrido previo ni datos de pagos, stock, CRM o repartidor. Aclaración expresa del usuario durante las pruebas manuales del 16/10/2026.
 
 Los tokens viajan en fragmentos de URL y cuerpos POST, con respuestas sin caché y política sin referente. No son credenciales de Firebase. No se guardan tokens en claro en Firestore, eventos ni outbox; sólo SHA-256, ámbito, versión y vencimiento. Cada nueva emisión revoca el enlace previo del mismo tipo/tramo; también se pueden revocar todos los accesos.
 
@@ -69,7 +69,7 @@ Las reglas e índices de esta rama todavía no se publicaron en Firebase. El usu
 
 Si faltan reglas o índices de esta versión, las suscripciones de envíos y avisos pasan a una lectura autenticada de backend, limitada por creador/asignación/rol y destinatario. Se actualiza al operar, recuperar el foco o cada minuto con la pestaña visible. Esto permite probar el preview sin publicar reglas globales que podrían afectar la aplicación anterior. El backend vuelve a validar el usuario y sólo permite marcar como leídos sus propios avisos. Las lecturas de respaldo invocan funciones y pueden consumir cómputo/tráfico; un Deploy Preview no implica consumo total cero.
 
-Las ventas vinculadas a envíos tienen bloqueada la anulación fiscal habitual para evitar devolver stock a un origen incorrecto. Cancelar un envío no repone inventario ni revierte dinero. Anotar ventas y movimientos de cualquier prueba real para su conciliación/compensación administrativa posterior. El transporte Repositorio requiere su dirección configurada; sin geocerca, la entrega requiere una excepción supervisada con motivo.
+Las ventas vinculadas a envíos tienen bloqueada la anulación fiscal habitual para evitar devolver stock a un origen incorrecto. Cancelar un envío no repone inventario ni revierte dinero. Anotar ventas y movimientos de cualquier prueba real para su conciliación/compensación administrativa posterior. El transporte Repositorio opera por estados sin dirección obligatoria; sin geocerca, la entrega requiere una excepción supervisada con motivo.
 
 El adaptador Firebase heredado fija el proyecto actual. Las pruebas de esta entrega usan fakes y emuladores de proyectos `demo-*`, sin autenticación contra producción. Para conectar un proyecto remoto de staging distinto hay que ampliar primero la lista de proyectos permitidos del adaptador común mediante una configuración explícita; no se debilitó esa protección durante este trabajo.
 
@@ -78,7 +78,7 @@ El adaptador Firebase heredado fija el proyecto actual. Las pruebas de esta entr
 | `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY` | Credenciales del backend existente; nunca exponerlas en variables `VITE_*`. Se conserva la validación del proyecto Firebase actual. |
 | `SHIPPING_ENABLED=false` | Deshabilita las operaciones y limpieza del módulo. Sin esta bandera, el código queda disponible al desplegar. |
 | `VITE_PUBLIC_APP_BASE_URL` | URL HTTPS pública de gestión para etiquetas. Si falta, se usa el origen actual. Localhost está permitido únicamente para pruebas. |
-| `SHIPPING_REPOSITORY_ADDRESS` | Dirección real obligatoria para crear/aprobar transporte Repositorio; se guarda snapshot. Sin configuración ese transporte se bloquea. |
+| `SHIPPING_REPOSITORY_ADDRESS` | Dirección opcional del repositorio. Sin ella se muestra Repositorio de Flor Mía y se permite operar sus dos tramos. Nunca se usa como domicilio del cliente. |
 | `SHIPPING_GEOFENCE_RADIUS_METERS` | Sin valor predeterminado; rango aceptado 10–1000 m. Definir con el responsable operativo. |
 | `SHIPPING_GPS_MAX_ACCURACY_METERS` | Sin valor predeterminado; rango 5–200 m. Precisión peor que este valor exige excepción. |
 | `SHIPPING_GPS_MAX_AGE_SECONDS` | Sin valor predeterminado; rango 10–300 s. Los tres valores deben configurarse para habilitar geocerca. |

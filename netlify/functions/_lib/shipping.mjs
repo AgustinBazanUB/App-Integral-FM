@@ -29,8 +29,7 @@ function config(env) {
 }
 function repository(env) {
   const address = String(env.SHIPPING_REPOSITORY_ADDRESS || "").trim();
-  assert(address.length >= 6, "Configurá la dirección real del repositorio antes de usar este transporte.");
-  return { displayAddress: address };
+  return { displayName: "Repositorio de Flor Mía", ...(address.length >= 6 ? { displayAddress: address } : {}) };
 }
 async function preparers(transaction, ids) {
   assert(ids.length > 0 && ids.length <= 12, "Asigná entre uno y doce preparadores.");
@@ -305,7 +304,6 @@ export async function shippingOperation({ body, session = null, runTransaction =
     } else if (body.mode === "issue_access") {
       requireEdit();
       assert(body.kind === "courier" || body.kind === "tracking", "Tipo de acceso inválido.");
-      if (body.kind === "tracking" && shipment.deliveryType === "repository") assert(shipment.status === "reparto_final", "El enlace del cliente se habilita al salir del repositorio.");
       if (body.kind === "courier") assert(shipment.stockCommitState === "committed", "Aprobá el origen antes de autorizar al repartidor.");
       const leg = body.kind === "tracking" ? "tracking" : shipment.deliveryType === "repository" ? body.leg : "direct";
       assert(["origin", "final", "direct", "tracking"].includes(leg) && (shipment.deliveryType === "repository" ? leg !== "direct" : !["origin", "final"].includes(leg)), "Tramo inválido.");
@@ -359,7 +357,8 @@ export async function shippingOperation({ body, session = null, runTransaction =
 export async function listShippingResources(session, options = {}) {
   if (!can(session.profile, "quick-sales", "create") && !management(session.profile)) forbidden();
   const users = await adminListDocuments("users", { ...options, maxDocuments: 180 });
-  return users.filter(user => user.active && (canAccessSellerPanel(user) || canAccessAdministration(user))).map(user => ({ id: user.id, name: name(user) }));
+  const people = users.filter(user => user.active && (canAccessSellerPanel(user) || canAccessAdministration(user)));
+  return people.map(user => ({ id: user.id, name: name(user), label: people.filter(person => name(person) === name(user)).length > 1 ? `${name(user)} · ${normalizedRole(user) === "admin" ? "Administrador" : normalizedRole(user) === "seller" ? "Vendedor" : normalizedRole(user)} · ${user.id.slice(-6)}` : name(user) }));
 }
 
 export async function limitShippingPublic(ip, { env = process.env, now = new Date(), runTransaction = adminRunTransaction } = {}) {

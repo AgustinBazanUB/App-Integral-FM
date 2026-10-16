@@ -145,7 +145,7 @@ try {
   record("reparto_manual_exige_prueba_y_cierra_con_excepcion_supervisada", { status: "entregado" });
 
   await detail(adminPage, request.id);
-  assert(await adminPage.getByRole("button", { name: "Crear enlace para cliente" }).isDisabled());
+  assert(await adminPage.getByRole("button", { name: "Crear enlace para cliente" }).isEnabled());
   const originUrl = await generateAccess(adminPage, "Acceso · origen a repositorio");
   const originCourier = await actor("courier-origin", 390); await originCourier.goto(originUrl);
   assert.equal(await originCourier.getByRole("link", { name: "11 0000-1002", exact: true }).count(), 0);
@@ -161,7 +161,7 @@ try {
   const trackingUrl = await generateAccess(adminPage, "Crear enlace para cliente");
   const tracking = await actor("customer", 390); await tracking.goto(trackingUrl);
   await tracking.getByRole("heading", { name: "Seguimiento de tu pedido" }).waitFor();
-  await tracking.getByText("En reparto", { exact: true }).waitFor();
+  await tracking.getByText("En camino a tu domicilio", { exact: true }).waitFor();
   assert.equal(await tracking.getByRole("button", { name: /Confirmar/ }).count(), 0);
   await tracking.screenshot({ path: path.join(directory, "07-tracking-cliente-solo-lectura.png"), fullPage: true });
   record("repositorio_separa_dos_tramos_y_activa_tracking_al_salir", { status: "reparto_final", customerWrites: 0 });

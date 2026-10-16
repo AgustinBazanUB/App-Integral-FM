@@ -11,7 +11,7 @@ async function setup(administrative = false, overrides = {}) {
   const store = memoryStore();
   const result = await createShippingSale({ sale: sale(overrides), session: session(administrative ? admin : seller), requestId: "sale-1", administrative, runTransaction: store.runTransaction, now });
   let sequence = 0;
-  const op = (mode, data = {}, profile = admin, at = now) => shippingOperation({ body: { mode, shipmentId: result.shipmentId, requestId: `op-${++sequence}`, ...data }, session: profile ? session(profile) : null, runTransaction: store.runTransaction, now: at, env: { SHIPPING_REPOSITORY_ADDRESS: "Repositorio de prueba 321, CABA" } });
+  const op = (mode, data = {}, profile = admin, at = now) => shippingOperation({ body: { mode, shipmentId: result.shipmentId, requestId: `op-${++sequence}`, ...data }, session: profile ? session(profile) : null, runTransaction: store.runTransaction, now: at, env: {} });
   return { ...store, result, op, shipment: () => store.documents.get(`shipments/${result.shipmentId}`) };
 }
 const approval = { originType: "warehouse", originId: "infal", assignedPreparerIds: [preparer.id], deliveryType: "manual" };
@@ -125,17 +125,22 @@ test("direct courier: scoped action, no internal data, one contextual delivery, 
 });
 test("repository has separate legs, hides customer from first courier and GPS until final departure", async () => {
   const s = await setup(); await s.op("approve", { ...approval, deliveryType: "repository" }); await s.op("ready", {}, preparer);
-  await assert.rejects(s.op("issue_access", { kind: "tracking", newToken: trackToken }), /salir del repositorio/);
+  await s.op("issue_access", { kind: "tracking", newToken: trackToken });
+  assert.equal((await s.op("tracking", { token: trackToken }, null)).position, null);
   await s.op("issue_access", { kind: "courier", leg: "origin", newToken: token });
   await s.op("issue_access", { kind: "courier", leg: "final", newToken: token2 });
-  const detail = await s.op("detail", { token }, null); assert.equal(detail.customerPhone, null); assert.match(detail.destination.displayAddress, /Repositorio/);
+  const detail = await s.op("detail", { token }, null); assert.equal(detail.customerPhone, null); assert.equal(detail.destination.displayName, "Repositorio de Flor Mía"); assert.equal(detail.destination.displayAddress, undefined);
   await assert.rejects(s.op("position", { token, point: {} }, null), /permiso/);
   await s.op("courier_action", { token, action: "pickup" }, null);
   await assert.rejects(s.op("courier_action", { token: token2, action: "repository_depart" }, null), /no corresponde/);
   await s.op("courier_action", { token, action: "repository_receive" }, null);
+  const received = await s.op("tracking", { token: trackToken }, null);
+  assert.equal(received.label, "En repositorio"); assert.equal(received.position, null); assert.equal(received.destination, undefined);
   await s.op("courier_action", { token: token2, action: "repository_depart" }, null);
   assert.equal(s.shipment().status, "reparto_final");
-  await s.op("issue_access", { kind: "tracking", newToken: trackToken });
+  assert.equal((await s.op("tracking", { token: trackToken }, null)).label, "En camino a tu domicilio");
+  await s.op("issue_access", { kind: "tracking", newToken: "d".repeat(43) });
+  await assert.rejects(s.op("tracking", { token: trackToken }, null), /permiso/);
   assert.equal(courierAction(s.shipment(), "origin"), null);
 });
 test("tracking is readonly, distinct, revocable, excludes PII and only exposes fresh final-mile GPS", async () => {

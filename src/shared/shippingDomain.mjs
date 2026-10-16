@@ -1,7 +1,7 @@
 export const SHIPPING_STATES = {
   solicitud_pendiente: "Solicitud pendiente", aprobado: "Por preparar", en_preparacion: "En preparación",
   listo_retirar: "Listo para retirar", retirado_origen: "Retirado del origen", hacia_repositorio: "Hacia repositorio",
-  recibido_repositorio: "Recibido en repositorio", reparto_final: "En reparto", entregado: "Entregado",
+  recibido_repositorio: "En repositorio", reparto_final: "En camino a domicilio", entregado: "Entregado",
   devuelto: "Devuelto", cancelado: "Cancelado", no_entregado: "No entregado", rechazado: "Solicitud rechazada",
 };
 export const TRANSPORTS = { uber: "Uber", repository: "Repositorio", manual: "Manual" };
@@ -57,6 +57,7 @@ export function deliveryProof(shipment, grant, now, config = {}) {
 }
 export function customerTrackingView(shipment, now = new Date(), maxAgeMs = 120000) {
   const final = shipment.status === "reparto_final";
-  if (shipment.deliveryType === "repository" && ["aprobado", "en_preparacion", "listo_retirar", "hacia_repositorio", "recibido_repositorio"].includes(shipment.status)) return { code: shipment.publicCode, status: "preparing", label: "Preparando tu pedido", updatedAt: shipment.updatedAt, position: null, locationMessage: "El seguimiento se activa cuando comienza el reparto final." };
-  return { code: shipment.publicCode, status: shipment.status, label: SHIPPING_STATES[shipment.status] || "En revisión", updatedAt: shipment.updatedAt, position: final && validatePoint(shipment.lastPosition, now, maxAgeMs) ? { lat: shipment.lastPosition.lat, lng: shipment.lastPosition.lng, accuracy: shipment.lastPosition.accuracy, observedAt: shipment.lastPosition.observedAt } : null, locationMessage: final ? "La ubicación se comparte mientras el repartidor mantiene esta página abierta y autoriza GPS." : "El seguimiento del recorrido está disponible únicamente durante el reparto final." };
+  if (shipment.deliveryType === "repository" && shipment.status === "recibido_repositorio") return { code: shipment.publicCode, status: shipment.status, label: "En repositorio", updatedAt: shipment.updatedAt, position: null, locationMessage: "El seguimiento de ubicación se activa cuando el pedido sale hacia tu domicilio." };
+  if (shipment.deliveryType === "repository" && ["aprobado", "en_preparacion", "listo_retirar", "hacia_repositorio"].includes(shipment.status)) return { code: shipment.publicCode, status: "preparing", label: "Preparando tu pedido", updatedAt: shipment.updatedAt, position: null, locationMessage: "El seguimiento se activa cuando comienza el reparto final." };
+  return { code: shipment.publicCode, status: shipment.status, label: final ? "En camino a tu domicilio" : SHIPPING_STATES[shipment.status] || "En revisión", updatedAt: shipment.updatedAt, position: final && validatePoint(shipment.lastPosition, now, maxAgeMs) ? { lat: shipment.lastPosition.lat, lng: shipment.lastPosition.lng, accuracy: shipment.lastPosition.accuracy, observedAt: shipment.lastPosition.observedAt } : null, locationMessage: final ? "La ubicación se comparte mientras el repartidor mantiene esta página abierta y autoriza GPS." : "El seguimiento del recorrido está disponible únicamente durante el reparto final." };
 }
