@@ -106,6 +106,8 @@ Evidencia sintética conservada en `docs/shipping-evidence/`: vistas de escritor
 
 Prueba manual remota del 16/10/2026: [informe del Preview 40](shipping-manual-preview-40.md). Ambos recorridos ficticios se completaron en el Firebase original con consentimiento del usuario, conservando un único descuento por pedido. El GPS real no obtuvo posición en este equipo; el cierre se verificó mediante excepción supervisada. El informe identifica ventas, movimientos, hallazgos corregidos y pendientes externos.
 
+Ampliación posterior: [panel del repartidor y guía para probar GPS desde el teléfono](shipping-courier-gps.md). La etiqueta abre el panel dedicado, Gestión genera un QR temporal autorizado por tramo y el estado GPS sólo confirma publicación tras recibir respuesta del servidor. Las sesiones de GPS evitan que solicitudes tardías publiquen después de detenerse o entregar.
+
 ## Históricos y pendientes de activación
 
 No hay migración automática. El tablero consulta sólo `shippingSchemaVersion=1` para no interpretar registros genéricos antiguos como pedidos operativos. Si se recupera una confirmación vieja de Venta Rápida se devuelve la venta existente y se exige revisión logística, sin segunda venta ni nuevo descuento.

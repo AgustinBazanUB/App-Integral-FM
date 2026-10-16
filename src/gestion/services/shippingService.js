@@ -6,9 +6,9 @@ const changesChannel = typeof window !== "undefined" && typeof BroadcastChannel 
 if (changesChannel) changesChannel.onmessage = event => window.dispatchEvent(new CustomEvent("shipping-changed", { detail: event.data }));
 const changed = inventoryChanged => { const detail = { inventoryChanged }; window.dispatchEvent(new CustomEvent("shipping-changed", { detail })); changesChannel?.postMessage(detail); };
 
-export async function shippingRequest(body, { publicAccess = false } = {}) {
+export async function shippingRequest(body, { publicAccess = false, signal, keepalive = false } = {}) {
   const token = !publicAccess && auth.currentUser ? await auth.currentUser.getIdToken() : null;
-  const response = await fetch("/.netlify/functions/shipping", { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
+  const response = await fetch("/.netlify/functions/shipping", { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body), signal, keepalive });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.ok !== true) throw Object.assign(new Error(payload.message || "No se pudo consultar el módulo de envíos."), { code: payload.code, status: response.status });
   if (mutationModes.has(body.mode)) changed(body.mode === "approve" || body.mode === "create_sale" && body.administrative === true);

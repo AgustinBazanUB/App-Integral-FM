@@ -41,6 +41,28 @@
 .fm-shipping-portal-actions{display:grid;gap:12px;margin-top:22px}
 .fm-shipping-public input,.fm-shipping-public textarea{width:100%;min-height:44px;border:1px solid var(--fm-border-strong);border-radius:var(--fm-radius-control);padding:10px;font:inherit}
 .fm-shipping-gps{margin-top:20px;padding:14px;background:var(--fm-bg-subtle);border-radius:var(--fm-radius-control)}
+.fm-courier-panel{display:grid;gap:20px;min-width:0}
+.fm-courier-eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:12px;font-weight:600;color:var(--fm-text-secondary)}
+.fm-courier-panel header p{line-height:1.6}
+.fm-courier-panel h2{font-size:23px;line-height:1.3}
+.fm-courier-panel .fm-panel,.fm-courier-panel .fm-panel__body{min-width:0}
+.fm-courier-panel .fm-panel__body>.fm-button{margin:6px 8px 6px 0}
+.fm-courier-panel .fm-shipping-portal-actions .fm-button{white-space:normal;min-height:54px;text-align:center}
+.fm-courier-address{font-size:19px;line-height:1.5;overflow-wrap:anywhere}
+.fm-courier-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:20px 0;list-style:none}
+.fm-courier-steps li{display:grid;align-content:start;justify-items:start;gap:9px;font-size:13px;line-height:1.5;color:var(--fm-text-secondary);border-top:3px solid var(--fm-border);padding-top:12px}
+.fm-courier-steps li span{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--fm-bg-subtle);font-weight:600}
+.fm-courier-steps li.is-reached{border-color:var(--fm-olive);color:var(--fm-text)}
+.fm-courier-steps li.is-reached span{background:var(--fm-olive);color:white}
+.fm-courier-gps{display:grid;gap:14px;border-left:4px solid var(--fm-warning);padding-left:14px}
+.fm-courier-gps.is-sharing{border-color:var(--fm-success)}
+.fm-courier-gps.is-error{border-color:var(--fm-error)}
+.fm-courier-gps details{font-size:14px;line-height:1.6}
+.fm-courier-gps summary{cursor:pointer;min-height:44px;display:flex;align-items:center;text-decoration:underline}
+.fm-courier-completed{padding:16px;background:var(--fm-success-bg);color:var(--fm-success);border-radius:var(--fm-radius-control);line-height:1.6}
+.fm-courier-access-qr{display:grid;gap:12px;margin-top:20px;max-width:100%;overflow-wrap:anywhere}
+.fm-courier-access-qr img{display:block;width:min(100%,280px);height:auto;background:white;border-radius:12px}
+@media(max-width:480px){.fm-shipping-public{padding:18px 12px}.fm-shipping-public h1{font-size:30px}.fm-courier-panel .fm-panel__body>.fm-button{width:100%;white-space:normal;text-align:center}.fm-courier-gps>.fm-button{white-space:normal;text-align:center;min-height:50px}}
 .fm-shipping-bell{position:relative}
 .fm-shipping-bell b{position:absolute;top:-4px;right:-6px;border-radius:99px;background:var(--fm-error);color:white;font-size:10px;padding:2px 5px;min-width:18px}
 .fm-shipping-notifications{width:min(390px,calc(100vw - 24px));max-height:70vh;overflow:auto;padding:16px;background:var(--fm-surface);border:1px solid var(--fm-border);border-radius:var(--fm-radius-card);box-shadow:var(--fm-shadow-card)}

@@ -8,6 +8,7 @@ import { listWarehouses } from "../services/inventoryService";
 import { formatDateTime } from "../formatters";
 import { ShippingFields } from "./ShippingFields";
 import LabelPreview from "./LabelPreview";
+import ShippingAccessQr from "./ShippingAccessQr";
 import "./shipping.css";
 
 export function ShipmentContent({ shipment, profile, reload, internal = false }) {
@@ -30,7 +31,11 @@ export function ShipmentContent({ shipment, profile, reload, internal = false })
   };
   const open = action => { setMode(action); setError(""); setForm({ ...shipment.destination, deliveryType: shipment.deliveryType || "manual", assignedPreparerIds: shipment.assignedPreparerIds, reason: "", origin: "", verified: shipment.destination.verified === true, lat: shipment.destination.lat ?? "", lng: shipment.destination.lng ?? "" }); };
   const set = (key, value) => setForm(current => ({ ...current, [key]: value }));
-  const generateAccess = async (kind, leg) => { if (busyRef.current) return; busyRef.current = true; setBusy(true); setError(""); try { setAccess(await issueShippingAccess(shipment.id, kind, leg)); await reload(); } catch (error) { setError(error.message); } finally { busyRef.current = false; setBusy(false); } };
+  const generateAccess = async (kind, leg) => { if (busyRef.current) return; busyRef.current = true; setBusy(true); setError(""); try {
+    const result = await issueShippingAccess(shipment.id, kind, leg);
+    const url = kind === "courier" ? `${window.location.origin}/e/${shipment.publicLookupId}?role=courier${new URL(result.url).hash}` : result.url;
+    setAccess({ ...result, kind, url }); await reload();
+  } catch (error) { setError(error.message); } finally { busyRef.current = false; setBusy(false); } };
   const print = async () => { if (busyRef.current) return; busyRef.current = true; setBusy(true); setError(""); try { const data = await shippingRequest({ mode: "labels", shipmentId: shipment.id, requestId: crypto.randomUUID() }); const { buildShippingLabelPdf } = await import("./shippingLabels.mjs"); const pdf = await buildShippingLabelPdf([data.shipment], import.meta.env.VITE_PUBLIC_APP_BASE_URL || window.location.origin); setPreview(URL.createObjectURL(pdf.output("blob"))); await reload(); } catch (error) { setError(error.message); } finally { busyRef.current = false; setBusy(false); } };
   const verify = () => {
     if (mode === "approve") { const origin = origins.find(row => `${row.type}:${row.id}` === form.origin); if (!origin) { setError("Elegí el origen real."); return; } execute("approve", { ...form, originType: origin.type, originId: origin.id }); }
@@ -57,7 +62,7 @@ export function ShipmentContent({ shipment, profile, reload, internal = false })
     </div>}
     {isEditor && !closed && !internal && <Panel title="Accesos limitados" description="Cada nuevo enlace revoca el anterior de ese tipo/tramo. Compartilos manualmente sólo con la persona correspondiente.">
       <div className="fm-shipping-actions">{shipment.stockCommitState === "committed" && (shipment.deliveryType === "repository" ? <><Button variant="secondary" loading={busy} onClick={() => generateAccess("courier", "origin")}>Acceso · origen a repositorio</Button><Button variant="secondary" loading={busy} onClick={() => generateAccess("courier", "final")}>Acceso · reparto final</Button></> : <Button variant="secondary" loading={busy} onClick={() => generateAccess("courier", "direct")}>Autorizar repartidor</Button>)}<Button variant="secondary" loading={busy} onClick={() => generateAccess("tracking")}>Crear enlace para cliente</Button><Button variant="secondary" loading={busy} onClick={() => execute("revoke_access")}>Revocar accesos</Button></div>
-      {access && <div role="status"><p>Vence: {formatDateTime(access.expiresAt)}. El enlace se muestra en esta sesión.</p><input readOnly aria-label="Enlace autorizado" value={access.url} /><Button variant="secondary" onClick={() => navigator.clipboard.writeText(access.url).catch(() => setError("Seleccioná y copiá el enlace manualmente."))}>Copiar enlace</Button></div>}
+      {access && <div><p role="status">Vence: {formatDateTime(access.expiresAt)}. El enlace se muestra en esta sesión.</p><input readOnly aria-label="Enlace autorizado" value={access.url} /><Button variant="secondary" onClick={() => navigator.clipboard.writeText(access.url).catch(() => setError("Seleccioná y copiá el enlace manualmente."))}>Copiar enlace</Button>{access.kind === "courier" && <ShippingAccessQr url={access.url} />}</div>}
     </Panel>}
     {mode && <Panel title={{ approve: "Origen real y preparación", address: "Corregir dirección", assign: "Preparadores", incident: "Informar problema", resolve: "Resolver incidencia", review: "Solicitud en revisión", retry: "Reintentar entrega", reject: "Rechazar solicitud", cancel: "Cancelar envío", return: "Registrar devolución", undelivered: "No entregado", delivery_exception: "Excepción supervisada" }[mode]}>
       {mode === "retry" && <><FormField label="Ubicación actual del pedido"><Select value={form.retryFrom || ""} onChange={event => set("retryFrom", event.target.value)}><option value="">Elegí su ubicación física</option><option value="origin">En origen, listo para retirar</option>{shipment.deliveryType === "repository" && <option value="repository">Recibido en repositorio</option>}<option value="final">Con el repartidor, durante reparto final</option></Select></FormField><label className="fm-shipping-check"><input type="checkbox" checked={form.physicalPositionConfirmed || false} onChange={event => set("physicalPositionConfirmed", event.target.checked)} />Confirmé físicamente dónde está el pedido</label><p>El stock ya está imputado. El reintento no genera otra venta ni otra salida de inventario.</p></>}

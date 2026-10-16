@@ -180,6 +180,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
     if (body.lookupId && profile) shipmentId = (await transaction.getDocument(`shipmentLookups/${id(body.lookupId)}`))?.data?.shipmentId;
     const shipment = { ...(await transaction.getDocument(`shipments/${id(shipmentId)}`))?.data, id: shipmentId };
     assert(shipment.saleId, "El envío no existe.");
+    if (!profile && body.lookupId && body.lookupId !== shipment.publicLookupId) forbidden();
     if (profile ? !readAllowed(profile, shipment) : grant.kind === "tracking" ? grant.version !== shipment.trackingVersion : grant.version !== shipment.courierVersions?.[grant.leg]) forbidden();
     if (!profile && grant.kind === "tracking") {
       if (body.mode !== "tracking") forbidden();
@@ -187,18 +188,30 @@ export async function shippingOperation({ body, session = null, runTransaction =
     }
     if (!profile && grant.kind !== "courier") forbidden();
     if (body.mode === "detail") {
-      if (!profile) return { id: shipment.id, publicCode: shipment.publicCode, status: shipment.status, destination: grant.leg === "origin" ? shipment.repository : shipment.destination, customerPhone: grant.leg === "origin" ? null : shipment.customerSnapshot.phone, action: courierAction(shipment, grant.leg), incident: shipment.incident ? { reason: shipment.incident.reason } : null, gpsAllowed: shipment.status === "reparto_final" && grant.leg !== "origin" };
+      if (!profile) return { id: shipment.id, publicCode: shipment.publicCode, status: shipment.status, leg: grant.leg, deliveryType: shipment.deliveryType, accessExpiresAt: grant.expiresAt, destination: grant.leg === "origin" ? shipment.repository : shipment.destination, customerPhone: grant.leg === "origin" ? null : shipment.customerSnapshot.phone, action: courierAction(shipment, grant.leg), incident: shipment.incident ? { reason: shipment.incident.reason } : null, gpsAllowed: shipment.status === "reparto_final" && grant.leg !== "origin" };
       const events = await transaction.listDocuments(`shipments/${shipment.id}/events`, { maxDocuments: 1000 });
       return { ...shipment, events: events.sort((a, b) => (a.sequence || 0) - (b.sequence || 0) || new Date(a.createdAt) - new Date(b.createdAt)), geofenceConfigured: Boolean(config(env).radiusMeters && config(env).maxAccuracyMeters && config(env).maxAgeMs) };
     }
+    if (["gps_start", "gps_stop"].includes(body.mode)) {
+      if (profile || grant.leg === "origin") forbidden();
+      const gpsSessionId = id(body.gpsSessionId);
+      if (body.mode === "gps_start") {
+        assert(shipment.status === "reparto_final", "La ubicación se comparte únicamente en camino al cliente.");
+        await transaction.commitDocuments([update(`shipments/${shipment.id}`, { activeGpsSession: { id: gpsSessionId, grantHash: grant.hash }, lastPosition: null })]);
+      } else if (shipment.activeGpsSession?.id === gpsSessionId && shipment.activeGpsSession.grantHash === grant.hash) {
+        await transaction.commitDocuments([update(`shipments/${shipment.id}`, { activeGpsSession: null, lastPosition: null })]);
+      }
+      return { started: body.mode === "gps_start", stopped: body.mode === "gps_stop" };
+    }
     if (body.mode === "position") {
       if (profile || grant.leg === "origin" || shipment.status !== "reparto_final" || CLOSED_SHIPPING_STATES.includes(shipment.status)) forbidden();
+      assert(shipment.activeGpsSession?.id === body.gpsSessionId && shipment.activeGpsSession?.grantHash === grant.hash, "La sesión GPS se detuvo. Volvé a compartir ubicación.");
       assert(validatePoint(body.point, now), "La ubicación es inválida o está vencida.");
       const previous = shipment.lastPosition;
       assert(!previous || now - new Date(previous.receivedAt) >= 5000, "Esperá unos segundos antes de actualizar la ubicación.");
       const point = { lat: body.point.lat, lng: body.point.lng, accuracy: body.point.accuracy, observedAt: body.point.observedAt, receivedAt: now, expiresAt: new Date(now.valueOf() + (config(env).maxAgeMs || 120000)), grantHash: grant.hash };
       await transaction.commitDocuments([update(`shipments/${shipment.id}`, { lastPosition: point })]);
-      return { saved: true };
+      return { saved: true, receivedAt: now, expiresAt: point.expiresAt };
     }
     const actor = profile?.id || grant.actorId;
     id(body.requestId);
@@ -342,6 +355,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
       result = { shipment: { ...shipment, events: undefined } };
     } else throw shippingError("Operación desconocida.", 400);
     Object.assign(changes, { updatedAt: now, revision: (shipment.revision || 0) + 1 });
+    if (changes.lastPosition === null) changes.activeGpsSession = null;
     const next = { ...shipment, ...changes };
     if (notice) {
       const notices = await notifications(transaction, next, notice.event, { ...notice, stamp: now, eventId: operationId });

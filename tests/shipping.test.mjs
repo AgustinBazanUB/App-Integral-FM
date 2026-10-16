@@ -153,13 +153,50 @@ test("tracking is readonly, distinct, revocable, excludes PII and only exposes f
   assert.equal(view.position, null); assert.equal(view.destination, undefined); assert.equal(view.customerSnapshot, undefined);
   await assert.rejects(s.op("courier_action", { token: trackToken, action: "pickup" }, null), /permiso/);
   await s.op("courier_action", { token, action: "pickup" }, null);
-  await s.op("position", { token, point: { lat: -34.6, lng: -58.4, accuracy: 10, observedAt: now.toISOString() } }, null);
+  await s.op("gps_start", { token, gpsSessionId: "gps-test" }, null);
+  await s.op("position", { token, gpsSessionId: "gps-test", point: { lat: -34.6, lng: -58.4, accuracy: 10, observedAt: now.toISOString() } }, null);
   assert((await s.op("tracking", { token: trackToken }, null)).position);
   assert.equal((await s.op("tracking", { token: trackToken }, null, new Date(now.valueOf() + 130000))).position, null);
   await assert.rejects(s.op("detail", { token }, null, new Date(now.valueOf() + 5 * 3600000)), /vencido/);
   await s.op("revoke_access");
   await assert.rejects(s.op("tracking", { token: trackToken }, null), /permiso/);
   await assert.rejects(s.op("detail", { token }, null), /permiso/);
+});
+
+test("QR courier authorization is bound to its printed shipment, not another valid credential", async () => {
+  const s = await setup(true); await s.op("ready", {}, preparer);
+  await s.op("issue_access", { kind: "courier", newToken: token });
+  const detail = await s.op("detail", { token, lookupId: s.shipment().publicLookupId }, null);
+  assert.equal(detail.leg, "direct"); assert.equal(detail.gpsAllowed, false); assert(detail.accessExpiresAt);
+  await assert.rejects(s.op("detail", { token, lookupId: "another_label_lookup" }, null), /permiso/);
+  await assert.rejects(s.op("courier_action", { token, lookupId: "another_label_lookup", action: "pickup" }, null), /permiso/);
+  assert.equal(s.shipment().status, "listo_retirar");
+  await assert.rejects(s.op("gps_start", { token, gpsSessionId: "early" }, null), /únicamente/);
+});
+
+test("GPS stop clears tracking immediately; late points and old sessions cannot restart publication", async () => {
+  const s = await setup(true); await s.op("ready", {}, preparer);
+  await s.op("issue_access", { kind: "courier", newToken: token });
+  await s.op("issue_access", { kind: "tracking", newToken: trackToken });
+  await s.op("courier_action", { token, action: "pickup" }, null);
+  const point = { lat: -34.6, lng: -58.4, accuracy: 10, observedAt: now.toISOString() };
+  await assert.rejects(s.op("position", { token, point }, null), /sesión GPS/);
+  await s.op("gps_start", { token, gpsSessionId: "first" }, null);
+  const saved = await s.op("position", { token, gpsSessionId: "first", point }, null);
+  assert(saved.saved); assert(saved.receivedAt); assert((await s.op("tracking", { token: trackToken }, null)).position);
+  await s.op("gps_stop", { token, gpsSessionId: "first" }, null);
+  assert.equal(s.shipment().lastPosition, null);
+  assert.equal((await s.op("tracking", { token: trackToken }, null)).position, null);
+  await assert.rejects(s.op("position", { token, gpsSessionId: "first", point }, null), /sesión GPS/);
+  await s.op("gps_start", { token, gpsSessionId: "second" }, null);
+  await s.op("position", { token, gpsSessionId: "second", point }, null);
+  await s.op("gps_stop", { token, gpsSessionId: "first" }, null);
+  assert(s.shipment().lastPosition);
+  assert.equal(s.shipment().activeGpsSession.id, "second");
+  await s.op("delivery_exception", { grantHash: sha(token), reason: "Cierre supervisado de prueba GPS" });
+  await s.op("courier_action", { token, action: "deliver" }, null);
+  assert.equal(s.shipment().activeGpsSession, null); assert.equal(s.shipment().lastPosition, null);
+  await assert.rejects(s.op("gps_start", { token, gpsSessionId: "after-delivery" }, null), /únicamente/);
 });
 test("geofence validates accuracy, age, current grant, verified marker and destination revision of exceptions", () => {
   const point = { lat: -34.6, lng: -58.4, accuracy: 10, observedAt: now.toISOString(), grantHash: "hash" };

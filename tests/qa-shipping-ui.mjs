@@ -62,9 +62,9 @@ try {
   await page.getByLabel("Dirección de entrega", { exact: false }).fill("Calle de prueba 123, CABA");
   await page.screenshot({ path: path.join(directory, "quick-sale-modal-mobile.png"), fullPage: true });
   await page.getByRole("button", { name: "Guardar envío" }).click(); await page.getByRole("button", { name: "Con envío · editar" }).waitFor(); checks.push("existing_quick_sale_shipping_modal");
-  await page.goto(`${base}/e/synthetic_lookup_1`); await page.getByRole("button", { name: "Soy personal de Flor Mía" }).waitFor();
+  await page.goto(`${base}/e/synthetic_lookup_1`); await page.getByRole("heading", { name: "Panel del repartidor" }).waitFor();
   await page.screenshot({ path: path.join(directory, "qr-mobile.png"), fullPage: true });
-  await page.getByRole("button", { name: "Soy repartidor" }).click(); await page.getByRole("heading", { name: "Acceso de repartidor" }).waitFor(); checks.push("qr_requires_courier_credential");
+  await page.getByRole("heading", { name: "Autorizar este reparto" }).waitFor(); checks.push("qr_requires_courier_credential");
   assert.deepEqual(errors, []);
   const result = { checks, browserErrors: errors, output: directory };
   await writeFile(path.join(directory, "results.json"), JSON.stringify(result, null, 2));
