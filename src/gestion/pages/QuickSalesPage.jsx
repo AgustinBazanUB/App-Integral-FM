@@ -22,6 +22,7 @@ import { calculateDiscountSummary } from "../../modules/locations/domain/discoun
 import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
 import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
 import SaleStockWarning from "../components/SaleStockWarning";
+import ArcaBillingDialog from "../components/ArcaBillingDialog";
 import ProductImage from "../components/ProductImage";
 import ProductSubcategoryRows from "../components/ProductSubcategoryRows";
 import { can, effectiveSellerLocations } from "../permissions";
@@ -38,10 +39,13 @@ import {
   createQuickSale,
 } from "../services/managementService";
 import { listQuickSaleStock, listWarehouses } from "../services/inventoryService";
-import { dryRunArcaInvoice, requestPendingArcaInvoice } from "../services/arcaService";
+import { requestPendingArcaInvoice, validateArcaInvoiceDraft } from "../services/arcaService";
+import SaleInvoicePanel from "../components/SaleInvoicePanel";
 import ArcaInvoicePrintAction from "../components/ArcaInvoicePrintAction";
 
 import CustomerDialog from "../seller/CustomerDialog";
+import ShippingDialog from "../shipping/ShippingFields";
+import { Link } from "../../router";
 import DiscountDialog from "../seller/DiscountDialog";
 import "../../styles/seller-customers.css";
 import "../../styles/seller-stage2.css";
@@ -87,10 +91,12 @@ export default function QuickSalesPage() {
   const [receiverVatConditionId, setReceiverVatConditionId] = useState(restored?.receiverVatConditionId || "5");
   const [receiverDocument, setReceiverDocument] = useState(restored?.receiverDocument || "");
   const [deliveryMethod, setDeliveryMethod] = useState(restored?.deliveryMethod || "pickup");
+  const [shipping, setShipping] = useState(restored?.shipping || {});
   const [discountIds, setDiscountIds] = useState((restored?.discounts || []).filter(d => d.source !== "manual" && d.discountId !== "manual").map(d => d.discountId || d.id).filter(Boolean));
   const submitRef = useRef(false);
   const [submitState, setSubmitState] = useState({ busy: false, error: "", success: "" });
   const [registeredInvoice, setRegisteredInvoice] = useState(null);
+  const [lastShipmentId, setLastShipmentId] = useState(null);
 
   const locations = effectiveSellerLocations(profile, locationsResult.data || []);
   const origins = stockType === "warehouse" ? (warehousesResult.data || []) : locations;
@@ -116,6 +122,18 @@ export default function QuickSalesPage() {
     return () => {
       active = false;
     };
+  }, [locationId, stockType, profile.id]);
+  useEffect(() => {
+    let active = true, refreshing = false;
+    const refresh = async event => {
+      if (!locationId || refreshing || submitRef.current || event.type === "shipping-changed" && !event.detail?.inventoryChanged) return;
+      refreshing = true;
+      try { const data = await listQuickSaleStock({ type: stockType, id: locationId }, profile); if (active) setStock({ status: "ready", data }); }
+      catch (error) { if (active) setStock({ status: "error", data: [], error }); }
+      finally { refreshing = false; }
+    };
+    window.addEventListener("shipping-changed", refresh); window.addEventListener("focus", refresh);
+    return () => { active = false; window.removeEventListener("shipping-changed", refresh); window.removeEventListener("focus", refresh); };
   }, [locationId, stockType, profile.id]);
 
   const catalog = useMemo(() => joinMasterProducts(productsResult.data || [], stock.data).filter(item => item.masterActive), [productsResult.data, stock.data]);
@@ -171,44 +189,51 @@ export default function QuickSalesPage() {
   const paymentStatus = allocation.invalid ? "Revisá los montos" : allocation.difference === 0 ? "Pagos completos" : allocation.difference > 0 ? `Falta ${formatMoney(allocation.difference)}` : `Excede ${formatMoney(-allocation.difference)}`;
 
 
-  const handleSubmit = async (event, requestInvoice = invoiceRequested) => {
-    event.preventDefault();
+  const handleSubmit = async (event, requestInvoice = invoiceRequested, receiverOverride = null) => {
+    event?.preventDefault();
     if (submitRef.current) return;
     submitRef.current = true;
     let sent = false;
     setRegisteredInvoice(null);
+    setLastShipmentId(null);
     setSubmitState({ busy: true, error: "", success: "" });
     try {
       const fiscalRequested = pendingIntent?.sale.invoiceRequested ?? requestInvoice;
-      const receiverCondition = Number((pendingIntent?.sale.receiverVatConditionId ?? receiverVatConditionId) || 0);
-      const receiverDigits = String(pendingIntent ? (pendingIntent.sale.receiverDocument || pendingIntent.sale.customerDni || "") : (receiverDocument || customerDni || "")).replace(/\D/g, "");
+      const receiverCondition = Number((pendingIntent?.sale.fiscalReceiver?.vatConditionId ?? pendingIntent?.sale.receiverVatConditionId ?? receiverOverride?.vatConditionId ?? receiverVatConditionId) || 0);
+      const receiverDigits = String(pendingIntent ? (pendingIntent.sale.fiscalReceiver?.documentNumber || pendingIntent.sale.receiverDocument || pendingIntent.sale.customerDni || "") : (receiverOverride?.documentNumber || receiverDocument || customerDni || "")).replace(/\D/g, "");
       if (fiscalRequested && [1, 4, 6].includes(receiverCondition) && receiverDigits.length !== 11) {
         throw new Error("Para Responsable Inscripto, Monotributo o Exento ingresá la CUIT de 11 dígitos.");
       }
-      const receiver = fiscalRequested ? {
+      let receiver = fiscalRequested ? (pendingIntent?.sale.fiscalReceiver || receiverOverride || {
         vatConditionId: receiverCondition,
         documentType: receiverCondition === 5 ? (receiverDigits ? 96 : 99) : 80,
         documentNumber: receiverCondition === 5 ? (receiverDigits || "0") : receiverDigits,
         anonymousConsumerFinal: receiverCondition === 5 && !receiverDigits,
         concept: 1,
-      } : null;
+      }) : null;
       let intent = pendingIntent;
       if (!intent) {
+        if (deliveryMethod === "shipping" && (!customer.name?.trim() || !customer.phone?.trim())) throw new Error("Para el envío, completá nombre y teléfono en Cliente.");
         if (!SALES_CHANNELS.some(option => option.value === channel)) throw new Error("Elegí el canal comercial real.");
         if (!selectedLocation || !cart.length) throw new Error("Elegí un origen y agregá productos.");
         normalizePayment(paymentMethod, PAYMENT_LABELS[paymentMethod], payments, saleSummary.total);
+        if(fiscalRequested) {
+          const draft=await validateArcaInvoiceDraft({sourceType:"admin_quick_sale",items:cart.map(item=>({productId:item.productId || item.id,qty:item.qty,unitPrice:Number(item.price)})),total:saleSummary.total,discountTotal:saleSummary.discountTotal,receiver});
+          receiver=draft.receiver;
+        }
         const existing = customer.phone.trim() ? await findCustomerByPhone(customer.phone) : null;
         const saleCustomer = customer.phone.trim() ? buildCustomerDraft({ ...customer, name: existing?.name || customer.name, zoneName: existing?.zoneName || existing?.customZone || customer.zoneName }) : null;
         const sale = {
           stockOrigin, items: cart.map(item => ({ id: item.id, productId: item.id, name: item.productName, categoryId: item.categoryId || null, unitPrice: Number(item.price), qty: item.qty })),
           discounts: appliedDiscounts, paymentMethod, paymentMethodLabel: PAYMENT_LABELS[paymentMethod], payments,
-          channel, customer: saleCustomer, customerDni, invoiceRequested: fiscalRequested, deliveryMethod, receiverVatConditionId, receiverDocument,
+          channel, customer: saleCustomer, customerDni, invoiceRequested: fiscalRequested, deliveryMethod, shipping: deliveryMethod === "shipping" ? shipping : null, receiverVatConditionId: receiverCondition, receiverDocument: receiverDigits, fiscalReceiver: receiver,
         };
         intent = saveQuickSaleIntent(profile.id, sale);
         setPendingIntent(intent);
       }
       sent = true;
       const result = await createQuickSale({ ...intent.sale, seller: profile, requestId: intent.requestId });
+      setLastShipmentId(result.shipmentId || null);
       let invoiceNotice = "";
       let invoiceId = null;
       if (fiscalRequested) {
@@ -228,23 +253,13 @@ export default function QuickSalesPage() {
           } else if (invoice?.autoAuthorization?.attempted) {
             invoiceNotice = ` Solicitud fiscal en estado ${invoice.autoAuthorization.status || invoice.status || "pendiente"}; revisar antes de continuar.`;
           } else {
-            const dryRun = await dryRunArcaInvoice({ invoiceId: invoice.id });
-            if (dryRun?.blocked) {
-              invoiceNotice = ` Solicitud fiscal creada, pero el dry-run requiere revisión: ${(dryRun.blockers || []).join(", ") || dryRun.reason || "bloqueada"}.`;
-            } else {
-              const plan = dryRun?.plan;
-              invoiceNotice = plan
-                ? ` Dry-run fiscal OK: Factura ${plan.voucherClass} · Neto ${formatMoney(plan.fiscal.net)} · IVA ${formatMoney(plan.fiscal.vat)} · Total ${formatMoney(plan.fiscal.total)}.`
-                : " Solicitud fiscal creada en estado pendiente.";
-            }
+            invoiceNotice = " La venta está guardada y la factura sigue pendiente. Completala desde esta venta sin volver a cargarla.";
           }
         } catch (invoiceError) {
           invoiceNotice = ` La venta quedó registrada, pero no se pudo preparar/validar la solicitud fiscal: ${invoiceError.message}`;
         }
       }
-      if (invoiceId) {
-        setRegisteredInvoice({ saleId: result.id, sourceType: "admin_quick_sale", invoiceId });
-      }
+      if (fiscalRequested) setRegisteredInvoice({id:result.id,saleCode:result.saleCode,total:result.total,status:"active",sourceType:"admin_quick_sale",fiscalInvoiceId:invoiceId});
       clearQuickSaleIntent(profile.id);
       setPendingIntent(null);
       setQuantities({});
@@ -252,6 +267,8 @@ export default function QuickSalesPage() {
       setPayments(SINGLE_PAYMENT_METHODS.map(method => ({ method, amount: "" })));
       setCustomer({ phone: "", name: "", zoneName: "" });
       setCustomerState({ status: "idle" });
+      setShipping({});
+      setDeliveryMethod("pickup");
       setManualDiscounts([]);
       setCustomerDni("");
       setPaymentMethod("");
@@ -260,11 +277,11 @@ export default function QuickSalesPage() {
       setReceiverDocument("");
       setDiscountIds([]);
       setDialog("");
-      setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.${result.stockDiscrepancies?.length ? " Stock negativo pendiente de revisión." : ""}${invoiceNotice}` });
+      setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.${result.shipmentId ? " Envío generado y stock imputado al origen elegido." : ""}${result.shippingLegacyReviewRequired ? " Se recuperó una venta anterior: gestión debe revisar y vincular su envío sin volver a descontar stock." : ""}${result.stockDiscrepancies?.length ? " Stock negativo pendiente de revisión." : ""}${invoiceNotice}` });
       // Refresh failure must never turn a committed sale into a retryable commercial failure.
       await refreshStock().catch(error => setStock({ status: "error", data: [], error }));
     } catch (error) {
-      if (!sent || ["sale/validation", "permission-denied", "seller/insufficient-stock", "invalid-argument", "failed-precondition"].includes(error.code)) {
+      if (!sent || [400, 403].includes(error.status) || error.status === 409 && error.code === "shipping/blocked" || ["sale/validation", "permission-denied", "seller/insufficient-stock", "invalid-argument", "failed-precondition"].includes(error.code)) {
         clearQuickSaleIntent(profile.id);
         setPendingIntent(null);
       }
@@ -317,7 +334,7 @@ export default function QuickSalesPage() {
           <div className="fm-quick-pos__extras">
             <Button variant="secondary" disabled={locked || discountsResult.status === "loading"} onClick={() => setDialog("discount")}>Descuento</Button>
             <Button variant="secondary" disabled={locked} title={customer.phone ? customer.name || customer.phone : undefined} onClick={() => setDialog("customer")}>Cliente</Button>
-            <Button variant="secondary" disabled={locked} aria-pressed={deliveryMethod === "shipping"} onClick={() => setDeliveryMethod(deliveryMethod === "shipping" ? "pickup" : "shipping")}>{deliveryMethod === "shipping" ? "Con envío" : "Retiro"}</Button>
+            <Button variant="secondary" disabled={locked} aria-pressed={deliveryMethod === "shipping"} onClick={() => setDialog("shipping")}>{deliveryMethod === "shipping" ? "Con envío · editar" : "Con envío"}</Button>
             <Button variant="secondary" disabled={locked} onClick={openOriginDialog}>Canal</Button>
           </div>
           {appliedDiscounts.length ? <div className="fm-quick-pos__discounts">{appliedDiscounts.map((discount, index) => <button type="button" disabled={locked} key={`${discount.id || discount.discountId}-${index}`} aria-label={`Quitar ${discount.name}`} onClick={() => discount.source === "manual" ? setManualDiscounts(manual => manual.filter(entry => entry !== discount)) : setDiscountIds(ids => ids.filter(id => id !== (discount.discountId || discount.id)))}>{discount.name} ×</button>)}</div> : null}
@@ -325,10 +342,12 @@ export default function QuickSalesPage() {
         </section>
       </div>
       {pendingIntent ? <Toast tone="warning">Confirmación pendiente. Recuperá el resultado de esta misma venta.</Toast> : null}
+      {lastShipmentId && <Link className="fm-button fm-button--secondary" to={`/gestion/shipping?shipment=${encodeURIComponent(lastShipmentId)}`}>Ver ficha del envío generado</Link>}
+      <ShippingDialog open={dialog === "shipping"} value={shipping} administrative onClose={() => setDialog("")} onConfirm={draft => { setShipping(draft); setDeliveryMethod("shipping"); setDialog(""); }} onRemove={() => { setShipping({}); setDeliveryMethod("pickup"); setDialog(""); }} />
       {submitState.error ? <Toast tone="error">{submitState.error}</Toast> : null}
       {submitState.success ? <Toast tone="success">{submitState.success}</Toast> : null}
-      {registeredInvoice ? <ArcaInvoicePrintAction {...registeredInvoice} /> : null}
-      <footer className="fm-quick-pos__actions"><div><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div><Button variant="secondary" icon="FileText" disabled={locked || !canConfirm} onClick={() => setDialog("billing")}>Cargar factura</Button><Button icon="Check" loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, false)}>{pendingIntent ? "Recuperar confirmación" : "Continuar"}</Button></footer>
+      {registeredInvoice ? <SaleInvoicePanel sale={registeredInvoice} allowGenerate={can(profile,"quick-sales","requestTicket")}/> : null}
+      <footer className="fm-quick-pos__actions"><div><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div><Button variant="secondary" icon="FileText" disabled={locked || !canConfirm} onClick={() => setDialog("billing")}>Generar factura</Button><Button icon="Check" loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, false)}>{pendingIntent ? "Recuperar confirmación" : "Continuar"}</Button></footer>
       <Modal open={dialog === "origin"} title="Canal y origen del stock" description="Elegí por dónde llegó la venta y de dónde sale la mercadería." onClose={() => setDialog("")} footer={<><Button variant="secondary" onClick={() => setDialog("")}>Cancelar</Button><Button onClick={confirmOrigin}>Confirmar canal y origen</Button></>}>
         <FormField label="Canal comercial" required><Select value={originDraft?.channel || ""} onChange={event => setOriginDraft(current => ({ ...current, channel: event.target.value }))}><option value="">Elegir canal real</option>{SALES_CHANNELS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></FormField>
         <FormField label="Tipo de origen"><Select value={originDraft?.stockType || "location"} onChange={event => setOriginDraft(current => ({ ...current, stockType: event.target.value, locationId: "" }))}><option value="location">Ubicación</option><option value="warehouse">Depósito</option></Select></FormField>
@@ -342,12 +361,7 @@ export default function QuickSalesPage() {
         {payments.map(part => <FormField key={part.method} label={friendlyPayments[part.method]}><div className="fm-quick-pos__payment-input"><input aria-label={friendlyPayments[part.method]} type="number" min="0" step="1" inputMode="numeric" value={part.amount} onChange={event => setPayments(current => current.map(entry => entry.method === part.method ? { ...entry, amount: event.target.value } : entry))} /><Button variant="ghost" disabled={allocation.invalid || allocation.difference <= 0} onClick={() => setPayments(current => completeRemainingPayment(current, part.method, saleSummary.total))}>Completar</Button></div></FormField>)}<p role="status">{paymentStatus}</p>
       </Modal>
       <Modal open={dialog === "price"} title="Editar precio" description={priceItem?.productName || "Precio unitario"} onClose={() => setDialog("")} footer={<Button disabled={!priceDraft.trim() || !Number.isInteger(Number(priceDraft)) || Number(priceDraft) < 0} onClick={() => { setPrices(current => ({ ...current, [priceItem.id]: Number(priceDraft) })); setDialog(""); }}>Aplicar precio</Button>}><FormField label="Precio unitario"><input type="number" min="0" step="1" inputMode="numeric" value={priceDraft} onChange={event => setPriceDraft(event.target.value)} /></FormField></Modal>
-      <Modal open={dialog === "billing"} title="Cargar factura" description="Confirmá la venta y prepará su comprobante fiscal." onClose={() => !submitState.busy && setDialog("")} footer={<div className="fm-quick-pos__billing-actions"><Button variant="secondary" disabled={submitState.busy} onClick={event => handleSubmit(event, false)}>Solo continuar</Button><Button loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, true)}>Generar factura y continuar</Button></div>}>
-        <p className="fm-quick-pos__billing-total">Total {formatMoney(saleSummary.total)}</p>
-        <FormField label="Condición IVA receptor" required><Select disabled={locked} value={receiverVatConditionId} onChange={event => { setReceiverVatConditionId(event.target.value); setReceiverDocument(""); }}><option value="5">Consumidor Final</option><option value="1">IVA Responsable Inscripto</option><option value="6">Responsable Monotributo</option><option value="4">IVA Sujeto Exento</option></Select></FormField>
-        <FormField label={receiverVatConditionId === "5" ? "DNI (opcional)" : "CUIT del receptor"} required={receiverVatConditionId !== "5"} hint={receiverVatConditionId === "5" ? "Podés dejarlo vacío para Consumidor Final sin identificar, sujeto a validación fiscal." : "CUIT de 11 dígitos."}><input disabled={locked} inputMode="numeric" value={receiverDocument} onChange={event => setReceiverDocument(event.target.value.replace(/\D/g, "").slice(0, 11))} /></FormField>
-        {submitState.error ? <Toast tone="error">{submitState.error}</Toast> : null}
-      </Modal>
+      <ArcaBillingDialog open={dialog === "billing"} total={saleSummary.total} busy={submitState.busy} error={submitState.error} onClose={() => setDialog("")} onContinue={() => { setDialog(""); handleSubmit(null, false); }} onConfirm={receiver => handleSubmit(null, true, receiver)} />
     </div>
   );
 }

@@ -131,5 +131,5 @@ test("las escrituras del vendedor toleran temporalmente reglas Firestore anterio
   assert.match(sellerService, /legacy \? \{\} : \{ lastMovementId \}/);
   assert.match(sellerService, /createSellerSale[\s\S]*runStockMutationWithRuleCompatibility/);
   assert.match(sellerService, /updateSellerSale[\s\S]*runStockMutationWithRuleCompatibility/);
-  assert.match(sellerService, /cancelSellerSale[\s\S]*runStockMutationWithRuleCompatibility/);
+  assert.match(sellerService, /cancelSellerSale[\s\S]*cancelSaleWithInvoice/);
 });

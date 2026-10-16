@@ -70,6 +70,7 @@ export async function getModuleRecord(moduleId, recordId, profile) {
 }
 
 export async function createModuleRecord(moduleId, data, profile) {
+  if (moduleId === "shipping") throw new Error("Los envíos se crean exclusivamente desde una venta con envío.");
   const definition = moduleById[moduleId];
   if (!definition?.collection) throw new Error("El módulo no tiene una colección configurada.");
   if (!can(profile, moduleId, "create")) throw new Error("No tenés permiso para crear registros en este módulo.");

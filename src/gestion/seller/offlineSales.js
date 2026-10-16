@@ -144,12 +144,14 @@ function normalizePendingSale(sale) {
     ...payment,
     customer,
     ticketRequested,
+    fiscalReceiver: sale.fiscalReceiver || null,
     ticketStatus: ticketRequested ? "pending" : "not_requested",
     clientStatus: "offline_pending",
   };
 }
 
 export async function saveSellerPendingSale(sale) {
+  if (sale.deliveryMethod === "shipping" || sale.shipping) throw new Error("Los envíos requieren conexión y no se guardan en la cola de ventas presenciales.");
   const normalized = normalizePendingSale(sale);
   await requestStore("readwrite", (store) => store.put(normalized));
   return normalized;

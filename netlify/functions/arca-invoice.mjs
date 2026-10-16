@@ -1,10 +1,14 @@
 import { safeFiscalError } from "../../src/shared/fiscalRecovery.mjs";
+import { can } from "../../src/gestion/permissions.js";
+import { lookupBillingReceiver } from "./_lib/arca/receiverLookup.mjs";
+import { validateInvoiceDraft } from "./_lib/arca/invoiceDraft.mjs";
 import { requireFirebaseActiveProfile } from "./_lib/firebaseAuth.mjs";
-import { adminGetDocument } from "./_lib/firestoreAdminRest.mjs";
+import { adminGetDocument, adminRunTransaction } from "./_lib/firestoreAdminRest.mjs";
 import { arcaEnvironment, productionAutoAuthorizeSources } from "./_lib/arca/config.mjs";
-import { authorizeInvoice, verifyAuthorizedInvoice } from "./_lib/arca/authorizer.mjs";
+import { authorizeInvoice, reconcileInvoice, verifyAuthorizedInvoice } from "./_lib/arca/authorizer.mjs";
 import {
   canRequestInvoiceForSale,
+  completePendingInvoice,
   ensurePendingInvoice,
   syncInvoiceToSale,
 } from "./_lib/arca/invoicePersistence.mjs";
@@ -19,7 +23,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 function safeError(error) {
-  return { ...safeFiscalError(error) };
+  return { ...safeFiscalError(error), ...(error.publicMessage ? {message:error.message} : {}) };
 }
 
 export default async function handler(request) {
@@ -44,6 +48,10 @@ export default async function handler(request) {
     const body = await request.json().catch(() => ({}));
     const sourceType = String(body?.sourceType || "").trim();
     const sourceId = String(body?.sourceId || "").trim();
+    if (body.mode === "validate-draft") {
+      if (!can(session.profile, "quick-sales", "requestTicket") || !can(session.profile, "quick-sales", "create")) return json({ok:false,code:"permission-denied",message:"No tenés permiso para generar facturas."},403);
+      return json({ok:true,draft:await validateInvoiceDraft({sourceType,items:body.items,total:body.total,discountTotal:body.discountTotal,receiver:body.receiver,env:process.env})});
+    }
 
     if (!sourceType || !sourceId) {
       return json({
@@ -58,16 +66,24 @@ export default async function handler(request) {
     if (!sale) {
       return json({ ok: false, code: "arca-sale-not-found", message: "La venta no existe." }, 404);
     }
+    if (sale.status !== "active" || sale.fiscalCancellation) return json({ok:false,code:"arca-sale-not-active",message:"La venta está anulada o tiene una anulación en curso."},409);
 
-    if (!canRequestInvoiceForSale({ sourceType, sale, session })) {
+    if (!canRequestInvoiceForSale({ sourceType, sale, session }) || !can(session.profile, "quick-sales", "requestTicket")) {
       return json({
         ok: false,
         code: "permission-denied",
         message: "No tenés permiso para preparar la factura de esta venta.",
       }, 403);
     }
+    // Allow issuing an invoice for an existing active sale, without recording it again.
+    await adminRunTransaction(async transaction=>{
+      const current=await transaction.getDocument(`sales/${sourceId}`);
+      if(!current?.data || current.data.status!=="active" || current.data.fiscalCancellation) throw Object.assign(new Error("La venta ya no está disponible para facturar."),{code:"arca-sale-not-active",status:409,publicMessage:true});
+      if(!canRequestInvoiceForSale({sourceType,sale:current.data,session})) throw Object.assign(new Error("No tenés permiso sobre esta venta."),{code:"auth-permission-denied",status:403,publicMessage:true});
+      if (!current.data.fiscalInvoiceId && !current.data.fiscalInvoice) await transaction.commitDocuments([{type:"update",path:`sales/${sourceId}`,currentUpdateTime:current.updateTime,data:sourceType==="seller_sale"?{ticketRequested:true,ticketStatus:"pending"}:{invoiceStatus:"pending"}}]);
+    });
 
-    const receiver = body?.receiver && typeof body.receiver === "object"
+    let receiver = body?.receiver && typeof body.receiver === "object"
       ? {
           vatConditionId: Number(body.receiver.vatConditionId || 0),
           documentType: Number(body.receiver.documentType || 0),
@@ -77,6 +93,11 @@ export default async function handler(request) {
         }
       : null;
 
+    // Resolve again server-side: the browser cannot choose a tax condition for a CUIT.
+    if ([80, 86].includes(receiver?.documentType) && (environment === "production" || body.receiver.resolveFromRegistry === true)) {
+      receiver = (await lookupBillingReceiver(receiver.documentNumber)).receiver;
+    }
+
     const result = await ensurePendingInvoice({
       sourceType,
       sourceId,
@@ -85,7 +106,15 @@ export default async function handler(request) {
       receiver,
       env: process.env,
     });
+    if(!result.created && result.invoice?.status==='pending') {
+      await completePendingInvoice({invoiceId:result.invoiceId,receiver,env:process.env});
+      result.invoice=(await adminGetDocument(`invoices/${result.invoiceId}`)).data;
+    }
 
+    if (["reconciling","authorizing"].includes(result.invoice?.status) && result.invoice?.authorization?.voucherNumber) {
+      await reconcileInvoice({invoiceId:result.invoiceId,env:process.env});
+      result.invoice=(await adminGetDocument(`invoices/${result.invoiceId}`)).data;
+    }
     await syncInvoiceToSale({
       invoiceId: result.invoiceId,
       env: process.env,
@@ -98,7 +127,7 @@ export default async function handler(request) {
       && String(process.env.ARCA_AUTO_AUTHORIZE_PRODUCTION || "").trim().toLowerCase() === "true"
       && String(process.env.ARCA_ALLOW_PRODUCTION_CAE || "").trim().toLowerCase() === "true"
       && autoSources.includes(sourceType)
-      && result.invoice?.status === "pending"
+      && ["pending", "authorized"].includes(result.invoice?.status)
       && result.invoice?.fiscalReadiness?.ready === true
     );
 
