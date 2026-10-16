@@ -69,9 +69,15 @@ function CustomerTracking() {
 export default function ShippingPublicApp() {
   const path = window.location.pathname, lookupId = path.startsWith("/e/") ? path.split("/")[2] || "" : null;
   const [role, setRole] = useState(new URLSearchParams(window.location.search).get("role") === "internal" ? "internal" : "");
+  const [accessHash, setAccessHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const changed = () => setAccessHash(window.location.hash);
+    window.addEventListener("hashchange", changed);
+    return () => window.removeEventListener("hashchange", changed);
+  }, []);
   useEffect(() => { document.body.classList.add("fm-management-body"); const meta = document.createElement("meta"); meta.name = "referrer"; meta.content = "no-referrer"; document.head.appendChild(meta); return () => { document.body.classList.remove("fm-management-body"); meta.remove(); }; }, []);
   if (lookupId !== null && !/^[A-Za-z0-9_-]{12,200}$/.test(lookupId)) return <main className="fm-shipping-public"><Panel title="QR inválido" description="Revisá el código de la etiqueta o pedí a gestión que vuelva a imprimirla." /></main>;
   return <main className="fm-shipping-public"><a href="/gestion" aria-label="Flor Mía"><img className="fm-shipping-logo" src="/images/flor-mia/logo-flor-mia.svg" alt="Flor Mía" /></a>
-    {lookupId ? role === "internal" ? <AuthProvider><InternalPreparation lookupId={lookupId} /></AuthProvider> : role === "courier" ? <CourierPortal /> : <Panel title="¿Cómo querés continuar?" description="El acceso al pedido requiere autorización."><div className="fm-shipping-portal-actions"><Button onClick={() => setRole("internal")}>Soy personal de Flor Mía</Button><Button variant="secondary" onClick={() => setRole("courier")}>Soy repartidor</Button></div></Panel> : path === "/reparto" ? <CourierPortal /> : <CustomerTracking />}
+    {lookupId ? role === "internal" ? <AuthProvider><InternalPreparation lookupId={lookupId} /></AuthProvider> : role === "courier" ? <CourierPortal key={accessHash} /> : <Panel title="¿Cómo querés continuar?" description="El acceso al pedido requiere autorización."><div className="fm-shipping-portal-actions"><Button onClick={() => setRole("internal")}>Soy personal de Flor Mía</Button><Button variant="secondary" onClick={() => setRole("courier")}>Soy repartidor</Button></div></Panel> : path === "/reparto" ? <CourierPortal key={accessHash} /> : <CustomerTracking key={accessHash} />}
   </main>;
 }
