@@ -944,7 +944,7 @@ export default function SellerPanel() {
     <div className="fm-seller-view"><div className="fm-seller-view-head"><div><h1>Lista de precios</h1><p>{selectedLocation?.name || "Ubicación"}</p></div></div><SellerCatalogList key="prices" groups={productGroups} categories={categories} mode="prices" /></div>
   );
 
-  const currentView = view === "shipping-tasks" ? <ShippingTasks profile={profile} onDetail={setShippingDetailId} /> : view === "sales" ? salesView : view === "pending" ? pendingView : view === "stock" ? stockView : view === "prices" ? pricesView : saleView;
+  const currentView = view === "shipping-tasks" ? <ShippingTasks profile={profile} onDetail={setShippingDetailId} context="seller" /> : view === "sales" ? salesView : view === "pending" ? pendingView : view === "stock" ? stockView : view === "prices" ? pricesView : saleView;
 
   return (
     <div className="fm-seller-shell">

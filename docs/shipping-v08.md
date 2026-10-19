@@ -108,6 +108,8 @@ Prueba manual remota del 16/10/2026: [informe del Preview 40](shipping-manual-pr
 
 Ampliación posterior: [panel del repartidor y guía para probar GPS desde el teléfono](shipping-courier-gps.md). La etiqueta abre el panel dedicado, Gestión genera un QR temporal autorizado por tramo y el estado GPS sólo confirma publicación tras recibir respuesta del servidor. Las sesiones de GPS evitan que solicitudes tardías publiquen después de detenerse o entregar.
 
+Adaptación visual del 19/10/2026: [continuidad desde otra PC](CONTINUAR-ENVIOS.md), [referencias originales v07](shipping-reference/v07/README.md) y [evidencia implementada](shipping-evidence/visual-v07/README.md). La etiqueta sin credencial muestra el selector de acceso interno/repartidor; los enlaces temporales autorizados conservan el ingreso directo al tramo. La nueva disposición mantiene endpoints, permisos y transacciones existentes.
+
 ## Históricos y pendientes de activación
 
 No hay migración automática. El tablero consulta sólo `shippingSchemaVersion=1` para no interpretar registros genéricos antiguos como pedidos operativos. Si se recupera una confirmación vieja de Venta Rápida se devuelve la venta existente y se exige revisión logística, sin segunda venta ni nuevo descuento.

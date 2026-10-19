@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-19",
+  "environment": "local-synthetic-adapters",
+  "productionWrites": 0,
+  "regression": { "passed": 986, "failed": 0 },
+  "builds": { "gestion": "passed", "ecommerce": "passed" },
+  "manualUi": [
+    "request_origin_preparer_approval",
+    "assigned_selection_and_label_sheet",
+    "batch_pdf_modal_open_close",
+    "individual_qr_modal",
+    "management_detail_page",
+    "printed_qr_role_choice",
+    "courier_temporary_authorization_form",
+    "internal_ready_confirmation",
+    "internal_incident_blocks_ready",
+    "readonly_customer_position_synthetic"
+  ],
+  "mobileWidthChecked": 390,
+  "noPageOverflow": ["board", "preparations", "detail", "qr_choice", "internal_preparation", "customer_tracking"],
+  "physicalGpsVerified": false,
+  "physicalPrintingVerified": false,
+  "limitedProductionRoleVerified": false
+}

@@ -1,0 +1,87 @@
+[
+  {
+    "file": "Cambios_Visuales_v07.md",
+    "bytes": 2850,
+    "sha256": "28d18d3bd857a42543f14de076e24cf2988b831b85867bb06dc063581126576f"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_cliente.png",
+    "bytes": 102023,
+    "sha256": "4b6bfa16cf3b15bba8c907bdfe5b51f65098fd6fc5efbc92073374073021624e"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_detalle.png",
+    "bytes": 239380,
+    "sha256": "e27faed3221b51320b856f673c03a3d424ea08b0cab9ef4ea3208bd170115a4f"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_movil_cliente.png",
+    "bytes": 83540,
+    "sha256": "be63a4bf15048d6bf61f79eeb430a519a41dfba7ab7604c8c1e48f2c64199788"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_movil_qr_inicio.png",
+    "bytes": 50385,
+    "sha256": "9859f1d39ab760e99df7b30a24120d65103eacaafc90a5df2b1978c8511a4c01"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_movil_qr_interno.png",
+    "bytes": 56820,
+    "sha256": "429085e712d634e62dbdc3398f9fd8642becef241016a7b7b23ee2f3f18be61a"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_movil_qr_repartidor.png",
+    "bytes": 73600,
+    "sha256": "c57f4f861b91c15c68333ff254456fc6ced1574209a0e56fe7aa64b26e86a78f"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_movil_tablero.png",
+    "bytes": 114140,
+    "sha256": "5adb0e56a812aaec8718daf151972e16529c55d5a00a5dc6d0c87b4d9939c6b2"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_movil_vendedor.png",
+    "bytes": 139587,
+    "sha256": "2a2de6187c2cdd32ad48f2d534d72408e3c053503f93026f4ba9346876295f4a"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_preparaciones.png",
+    "bytes": 209013,
+    "sha256": "cfd9e18f7538df3c0c17ef873572f9ceedb1489daca610e6a14e299da5c97573"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_qr_inicio.png",
+    "bytes": 61229,
+    "sha256": "9394047d66b64cf834fa3ee5faa2e913dcbeb826c9bada18c03ec2d1f2279715"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_qr_interno.png",
+    "bytes": 71045,
+    "sha256": "6c1d6a2a9026e53025e78117b1e8a49a8851328329fd241c6902d66d301f9dfd"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_qr_repartidor.png",
+    "bytes": 87944,
+    "sha256": "f29a420c00800367b993f79c648e8e1da018c11c9996e94d3b7524eb9fe2bd00"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_solicitudes.png",
+    "bytes": 175683,
+    "sha256": "8e693acfbe79978a68c5707de60a8fe388c7ffc23d3147707879f445fc3e0f95"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_tablero.png",
+    "bytes": 196045,
+    "sha256": "98018a92144803b2925db12885d56ef80ee628caa4cacc8b9b15c87686bd0944"
+  },
+  {
+    "file": "Flor_Mia_Envios_v07_vendedor.png",
+    "bytes": 155635,
+    "sha256": "008ca80887b737a0bae266ed243878f24067038aeb40dab615bb1d83f3fa66c8"
+  },
+  {
+    "file": "Prototipo_Visual_v07.html",
+    "bytes": 72894,
+    "sha256": "62aec6cb8fb1e393289206f4c43e39077e852c56a43da611a39e6331d10cc2b5"
+  }
+]

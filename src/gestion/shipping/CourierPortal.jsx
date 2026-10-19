@@ -57,27 +57,25 @@ export default function CourierPortal({ lookupId }) {
     setError(""); window.location.hash = value; setToken(value);
   };
   return <div className="fm-courier-panel">
-    <header><p className="fm-courier-eyebrow">Flor Mía · Reparto</p><h1>Panel del repartidor</h1><p>Recibí el pedido, confirmá cada tramo y compartí tu ubicación cuando vayas al cliente.</p></header>
+    <header><p className="fm-shipping-eyebrow">Portal de reparto · {shipment?.deliveryType === "repository" ? "Repositorio" : "Entrega al cliente"}</p><h1>{shipment ? `Envío ${shipment.publicCode}` : "Panel del repartidor"}</h1>{shipment ? <Badge tone={shipment.status === "entregado" ? "success" : shipment.incident ? "error" : "info"}>{SHIPPING_STATES[shipment.status]}</Badge> : <p>Recibí el pedido, confirmá cada tramo y compartí tu ubicación cuando vayas al cliente.</p>}</header>
     {error && <p role="alert" className="fm-shipping-error">{error}</p>}
     {!token ? <Panel title="Autorizar este reparto" description="Pedile a Flor Mía el enlace o código temporal de tu tramo. El QR de la etiqueta abre este panel; el código habilita las acciones del pedido.">
       <FormField label="Enlace o código temporal"><input autoComplete="off" autoCapitalize="none" spellCheck={false} value={input} onChange={event => setInput(event.target.value)} /></FormField>
       <Button onClick={authorize}>Abrir mi reparto</Button>
       <p className="fm-shipping-muted">Si recibiste un enlace autorizado o su QR, abrilo directamente desde este teléfono.</p>
     </Panel> : shipment ? <>
-      <Panel title={shipment.publicCode} description={shipment.leg === "origin" ? "Tramo 1 · Del origen al repositorio" : shipment.leg === "final" ? "Tramo 2 · Del repositorio al cliente" : "Del origen al cliente"}>
-        <Badge tone={shipment.status === "entregado" ? "success" : shipment.incident ? "error" : "warning"}>{SHIPPING_STATES[shipment.status]}</Badge>
-        {!CLOSED_SHIPPING_STATES.includes(shipment.status) && <Journey shipment={shipment} />}
-        <h2>{shipment.leg === "origin" ? "Destino: repositorio" : "Domicilio de entrega"}</h2>
+      <Panel className="fm-courier-destination-card" title={shipment.leg === "origin" ? "Destino: repositorio" : "Domicilio de entrega"} description={shipment.leg === "origin" ? "Tramo 1 · Del origen al repositorio" : shipment.leg === "final" ? "Tramo 2 · Del repositorio al cliente" : "Del origen al cliente"}>
         <p className="fm-courier-address">{shipment.destination?.displayAddress || shipment.destination?.displayName || "Flor Mía debe completar el destino."}</p>
         {shipment.destination?.notes && <p><strong>Para la entrega:</strong> {shipment.destination.notes}</p>}
         {shipment.customerPhone && <a className="fm-button fm-button--secondary" href={`tel:${shipment.customerPhone}`}>Llamar al cliente</a>}
         {shipment.destination?.displayAddress && <a className="fm-button fm-button--secondary" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shipment.destination.displayAddress)}`} target="_blank" rel="noreferrer">Cómo llegar con Google Maps</a>}
         {shipment.incident && <p className="fm-shipping-incident">Incidencia: {shipment.incident.reason}. Esperá la intervención de Flor Mía.</p>}
-        {shipment.action ? <div className="fm-shipping-portal-actions"><Button loading={busy} onClick={() => execute("courier_action", { action: shipment.action.action })}>{actionLabels[shipment.action.action] || shipment.action.label}</Button><Button variant="secondary" onClick={() => setIssue(!issue)}>Tengo un problema</Button></div>
-          : shipment.status === "entregado" ? <p className="fm-courier-completed" role="status">Entrega confirmada. Gracias por completar el reparto. El GPS se detuvo.</p>
-          : !CLOSED_SHIPPING_STATES.includes(shipment.status) && !shipment.incident && <p role="status">{shipment.leg === "origin" && shipment.status === "recibido_repositorio" ? "Paquete recibido en el repositorio. Este tramo terminó; el próximo repartidor usará su acceso de reparto final." : shipment.leg === "final" ? "Esperá a que el paquete quede recibido en el repositorio para iniciar tu tramo." : "Esperá a que Flor Mía marque el pedido listo para retirar."}</p>}
+        {!shipment.action && (shipment.status === "entregado" ? <p className="fm-courier-completed" role="status">Entrega confirmada. Gracias por completar el reparto. El GPS se detuvo.</p>
+          : !CLOSED_SHIPPING_STATES.includes(shipment.status) && !shipment.incident && <p role="status">{shipment.leg === "origin" && shipment.status === "recibido_repositorio" ? "Paquete recibido en el repositorio. Este tramo terminó; el próximo repartidor usará su acceso de reparto final." : shipment.leg === "final" ? "Esperá a que el paquete quede recibido en el repositorio para iniciar tu tramo." : "Esperá a que Flor Mía marque el pedido listo para retirar."}</p>
+        )}
         {issue && <div className="fm-shipping-form"><FormField label="Motivo"><Select value={reason} onChange={event => setReason(event.target.value)}><option value="">Elegí un motivo</option>{COURIER_PROBLEMS.map(reason => <option key={reason}>{reason}</option>)}</Select></FormField><FormField label="Detalle"><textarea maxLength={1000} value={note} onChange={event => setNote(event.target.value)} /></FormField><Button loading={busy} disabled={!reason} onClick={() => execute("incident", { reason, note })}>Informar problema a Flor Mía</Button></div>}
       </Panel>
+      {!CLOSED_SHIPPING_STATES.includes(shipment.status) && <div className="fm-shipping-public-card fm-courier-stage"><small className="fm-shipping-eyebrow">Etapa del envío</small><Journey shipment={shipment} /><strong>{shipment.action ? actionLabels[shipment.action.action] : "Esperando el siguiente tramo"}</strong><p>Sólo verás la próxima acción permitida para tu tramo.</p></div>}
       {!CLOSED_SHIPPING_STATES.includes(shipment.status) && <Panel title="Mi ubicación" description="Se comparte con Flor Mía y con el seguimiento de este pedido únicamente durante el camino al cliente.">
         {shipment.gpsAllowed ? <section className={`fm-courier-gps is-${gpsState.phase}`}>
           <div role="status" aria-live="polite"><Badge tone={gpsState.phase === "sharing" ? "success" : gpsState.phase === "error" ? "error" : "warning"}>{gpsState.phase === "sharing" ? "Ubicación compartida" : gpsState.phase === "error" ? "Ubicación sin confirmar" : gpsState.active ? "Esperando ubicación" : "GPS apagado"}</Badge><p>{gpsState.message}</p>
@@ -88,6 +86,7 @@ export default function CourierPortal({ lookupId }) {
           <details><summary>Ayuda con la ubicación</summary><p>Abrí el enlace en Chrome o Safari. Activá Ubicación en el teléfono y permití el acceso para este sitio desde los ajustes del navegador. Si no hay señal, probá al aire libre. Si persiste el problema, avisá a Flor Mía.</p></details>
         </section> : <p role="status">{shipment.leg === "origin" ? "En el tramo hacia el repositorio no se comparte ubicación con el cliente." : "El GPS se habilita cuando confirmes que saliste hacia el cliente."}</p>}
       </Panel>}
+      {shipment.action && <div className="fm-shipping-public-actions"><Button loading={busy} icon="Check" onClick={() => execute("courier_action", { action: shipment.action.action })}>{actionLabels[shipment.action.action] || shipment.action.label}</Button><Button variant="destructive" icon="CircleAlert" onClick={() => setIssue(!issue)}>Tengo un problema</Button></div>}
       <p className="fm-shipping-muted">Acceso válido hasta {formatDateTime(shipment.accessExpiresAt)}. Si necesitás otro tramo, pedile un nuevo acceso a Flor Mía.</p>
     </> : !error && <Skeleton />}
   </div>;

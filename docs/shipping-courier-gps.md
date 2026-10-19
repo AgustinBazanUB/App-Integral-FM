@@ -2,7 +2,7 @@
 
 Preview: https://deploy-preview-40--appintegralflormia.netlify.app/gestion/shipping
 
-El QR de una etiqueta abre directamente **Panel del repartidor** para ese pedido. El botón **Soy personal de Flor Mía · Preparar pedido** conserva el acceso interno con sesión y asignación. La etiqueta identifica el pedido; para operar se utiliza el código o enlace temporal que entrega Gestión. El backend comprueba que esa autorización corresponda a la misma etiqueta.
+El QR de una etiqueta abre **¿Cómo querés continuar?**, con acceso interno y de repartidor. Al elegir **Soy repartidor** se abre el panel de ese pedido. Los QR temporales autorizados de Gestión entran directamente al reparto. El botón **Soy personal de Flor Mía · Preparar pedido** conserva el acceso interno con sesión y asignación. La etiqueta identifica el pedido; para operar se utiliza el código o enlace temporal que entrega Gestión. El backend comprueba que esa autorización corresponda a la misma etiqueta.
 
 ## Preparar el acceso desde Gestión
 

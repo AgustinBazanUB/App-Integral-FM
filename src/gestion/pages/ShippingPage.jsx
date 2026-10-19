@@ -8,6 +8,7 @@ import { argentinaDateKey } from "../../modules/locations/domain/time.js";
 import { formatDateTime } from "../formatters";
 import ShippingTasks from "../shipping/ShippingTasks";
 import ShipmentDetail from "../shipping/ShipmentDetail";
+import ShippingRequests from "../shipping/ShippingRequests";
 import "../shipping/shipping.css";
 
 export default function ShippingPage() {
@@ -28,23 +29,26 @@ export default function ShippingPage() {
   });
   const origins = [...new Map((rows || []).filter(row => row.stockOriginId).map(row => [`${row.stockOriginType}:${row.stockOriginId}`, row.stockOriginName])).entries()];
   const people = [...new Map((rows || []).flatMap(row => row.assignedPreparerIds.map((id, index) => [id, row.preparerNames[index]]))).entries()];
+  const requests = (rows || []).filter(row => row.status === "solicitud_pendiente");
   const columns = [
-    { key: "issue", label: "Incidencia", render: row => row.incident ? <Badge tone="error" icon="CircleAlert">{row.incident.reason}</Badge> : "—" },
+    { key: "issue", label: "!", render: row => row.incident ? <span className="fm-shipping-issue-mark" title={row.incident.reason} aria-label={`Incidencia: ${row.incident.reason}`}>!</span> : <span className="fm-shipping-neutral-dot" aria-label="Sin incidencia" /> },
     { key: "code", label: "Envío y venta", render: row => <div><strong>{row.publicCode}</strong><small>{row.saleCode}</small></div> },
     { key: "customer", label: "Cliente", render: row => <div>{row.customerSnapshot.name}<small>{row.customerSnapshot.phone}</small></div> },
     { key: "destination", label: "Destino y zona", render: row => <div>{row.destination.displayAddress}<small>{row.destination.verified ? row.destination.neighborhoodOrLocality || "Marcador verificado" : "Zona por confirmar"}</small></div> },
     { key: "transport", label: "Transporte", render: row => TRANSPORTS[row.deliveryType] || "Por definir" },
-    { key: "status", label: "Estado", render: row => <Badge tone={row.incident ? "error" : row.status === "entregado" ? "success" : "warning"}>{SHIPPING_STATES[row.status]}</Badge> },
+    { key: "status", label: "Estado", render: row => <Badge tone={row.incident ? "error" : row.status === "entregado" ? "success" : ["reparto_final", "hacia_repositorio", "recibido_repositorio"].includes(row.status) ? "info" : "warning"}>{row.incident ? "Incidencia crítica" : SHIPPING_STATES[row.status]}</Badge> },
     { key: "people", label: "Preparadores", render: row => row.preparerNames.join(", ") || "Por asignar" },
     { key: "updatedAt", label: "Actualizado", render: row => formatDateTime(row.updatedAt) },
     { key: "action", label: "Acción", render: row => <Button variant="secondary" onClick={() => open(row.id)}>Ver detalle</Button> },
   ];
   return <div className="fm-shipping-page">
-    <PageHeader eyebrow="MÓDULO 11 · LOGÍSTICA" title="Gestión de envíos" description="Solicitudes, preparación y reparto de los pedidos de Flor Mía." actions={<Link className="fm-button fm-button--primary" to="/gestion/quick-sales">Cargar un envío · Venta Rápida</Link>} />
-    <div className="fm-shipping-stats"><StatCard label="Pendientes" value={counts.pending} icon="Package" /><StatCard label="En camino" value={counts.transit} icon="Truck" tone="olive" /><StatCard label="Realizados hoy" value={counts.today} icon="PackageCheck" tone="olive" /><StatCard label="Incidencias críticas" value={counts.critical} icon="CircleAlert" tone="error" /></div>
-    <Tabs tabs={[{ id: "board", label: "Tablero" }, { id: "requests", label: "Solicitudes del vendedor" }, { id: "tasks", label: "Mis preparaciones y etiquetas" }]} active={tab} onChange={setTab} />
+    <nav className="fm-shipping-module-nav" aria-label="Gestión de envíos"><Tabs tabs={[{ id: "board", label: "Tablero" }, { id: "requests", label: <>Solicitudes del vendedor {requests.length > 0 && <span className="fm-shipping-tab-count">{requests.length}</span>}</> }, { id: "tasks", label: "Mis preparaciones y etiquetas" }]} active={tab} onChange={id => { setTab(id); if (selected) open(null); }} /><Link className="fm-button fm-button--primary" to="/gestion/quick-sales">Cargar un envío · Venta Rápida</Link></nav>
     {error && <p role="alert" className="fm-shipping-error">No se pudieron cargar los envíos: {error}</p>}
-    {tab === "tasks" ? <ShippingTasks profile={profile} onDetail={open} /> : <Panel title={tab === "requests" ? "Solicitudes del vendedor" : "Pedidos y entregas"} description="Hasta 250 envíos actualizados recientemente. Las excepciones se consultan en Todos y nunca cuentan como entregados.">
+    {selected ? <ShipmentDetail shipmentId={selected} profile={profile} presentation="page" revision={(rows || []).find(row => row.id === selected)?.revision} onClose={() => open(null)} /> : tab === "tasks" ? <ShippingTasks profile={profile} onDetail={open} /> : <>
+    <PageHeader eyebrow={tab === "requests" ? "GESTIÓN DE ENVÍOS / AUTORIZACIÓN" : "MÓDULO 11 · LOGÍSTICA"} title={tab === "requests" ? "Solicitudes del vendedor" : "Gestión de envíos"} description={tab === "requests" ? "Aprobá las solicitudes y elegí el origen real antes de descontar stock." : "Supervisá pedidos pendientes, entregas en curso y el historial. Las alertas críticas llegan a Notificaciones."} />
+    {tab === "requests" ? rows === null ? <Skeleton /> : <ShippingRequests rows={requests} profile={profile} onDetail={open} /> : <>
+    <div className="fm-shipping-stats"><StatCard label="Pendientes" value={counts.pending} hint="En preparación, listos y por revisar" icon="Package" /><StatCard label="En camino" value={counts.transit} hint="Incluye los tramos por repositorio" icon="Truck" tone="olive" /><StatCard label="Realizados hoy" value={counts.today} hint="Entregas completadas" icon="PackageCheck" tone="olive" /></div>
+    <Panel title="Envíos registrados" description="Abrí un pedido para ver su detalle, estado y seguimiento.">
       {tab === "board" && <Tabs tabs={[{ id: "pending", label: "Pendientes" }, { id: "transit", label: "En camino" }, { id: "completed", label: "Realizados" }, { id: "all", label: "Todos" }]} active={bucket} onChange={setBucket} />}
       <FilterBar search={<SearchInput label="ID, venta, cliente, teléfono o dirección" value={filters.search || ""} onChange={event => set("search", event.target.value)} />}>
         <FormField label="Desde"><input type="date" value={filters.from || ""} onChange={event => set("from", event.target.value)} /></FormField><FormField label="Hasta"><input type="date" value={filters.to || ""} onChange={event => set("to", event.target.value)} /></FormField>
@@ -54,7 +58,7 @@ export default function ShippingPage() {
         <FormField label="Estado"><Select aria-label="Estado" value={filters.status || ""} onChange={event => set("status", event.target.value)}><option value="">Todos los estados</option>{Object.entries(SHIPPING_STATES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</Select></FormField>
       </FilterBar>
       {rows === null && !error ? <Skeleton lines={6} /> : <DataTable columns={columns} rows={visible} empty={<EmptyState icon="Truck" title="No hay envíos para estos filtros" description="Los envíos se generan al confirmar ventas con envío en Venta Rápida o en el Panel Vendedor." />} />}
-    </Panel>}
-    <ShipmentDetail shipmentId={selected} profile={profile} revision={(rows || []).find(row => row.id === selected)?.revision} onClose={() => open(null)} />
+    </Panel><p className="fm-shipping-muted">Las incidencias se marcan en rojo dentro del pedido. Las excepciones se consultan en Todos y no cuentan como entregados.</p></>}
+    </>}
   </div>;
 }
