@@ -5,6 +5,7 @@ import LabelPreview from "./LabelPreview";
 import ShippingLabelSheet, { ShipmentQrImage } from "./ShippingLabelSheet";
 import { SHIPPING_STATES, TRANSPORTS } from "../../shared/shippingDomain.mjs";
 import { subscribeShipments, shippingAction } from "../services/shippingService";
+import { normalizedRole } from "../permissions";
 import "./shipping.css";
 
 export default function ShippingTasks({ profile, onDetail, heading = true, context = "management" }) {
@@ -28,7 +29,7 @@ export default function ShippingTasks({ profile, onDetail, heading = true, conte
     } catch (error) { setError(error.message); } finally { busyRef.current = false; setBusy(false); }
   };
   return <section className="fm-shipping-tasks">
-    {heading && <header className="fm-shipping-view-heading"><div><p className="fm-shipping-eyebrow">{context === "seller" ? "Panel Vendedor" : "Gestión de envíos / Equipo interno"}</p><h1>Mis preparaciones y etiquetas</h1><p>Pedidos asignados a tu usuario. Seleccioná uno o varios para reunir sus etiquetas en una hoja A4.</p></div><Badge>{profile.name || profile.displayName || "Tu usuario"} · {profile.role === "admin" ? "Administrador" : "Preparación"}</Badge></header>}
+    {heading && <header className="fm-shipping-view-heading"><div><p className="fm-shipping-eyebrow">{context === "seller" ? "Panel Vendedor" : "Gestión de envíos / Equipo interno"}</p><h1>Mis preparaciones y etiquetas</h1><p>Pedidos asignados a tu usuario. Seleccioná uno o varios para reunir sus etiquetas en una hoja A4.</p></div><Badge>{profile.name || profile.displayName || "Tu usuario"} · {normalizedRole(profile) === "admin" ? "Administrador" : normalizedRole(profile) === "seller" ? "Vendedor" : "Preparación"}</Badge></header>}
     {error && <p role="alert" className="fm-shipping-error">{error}</p>}
     <div className="fm-shipping-tasks-layout">
       <Panel title="Envíos asignados" description="Preparación y etiquetas individuales o agrupadas." action={<Badge tone="warning">{eligible.length} asignados</Badge>}>
