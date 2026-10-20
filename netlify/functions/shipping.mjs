@@ -1,5 +1,5 @@
 import { requireFirebaseActiveProfile } from "./_lib/firebaseAuth.mjs";
-import { createShippingSale, createCourierSession, readCourierSession, shippingOperation, listShippingResources, limitShippingPublic } from "./_lib/shipping.mjs";
+import { createShippingSale, createCourierSession, activateCourierQr, readCourierSession, shippingOperation, listShippingResources, limitShippingPublic } from "./_lib/shipping.mjs";
 import { shippingFeed, markShippingNotificationRead } from "./_lib/shippingFeed.mjs";
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" } });
 export default async function handler(request, context = {}) {
@@ -21,6 +21,9 @@ export default async function handler(request, context = {}) {
     } else if (body.mode === "create_courier_session") {
       if (!session) return json({ ok: false }, 401);
       result = await createCourierSession({ body, session });
+    } else if (body.mode === "activate_courier_qr") {
+      if (session) return json({ ok: false }, 400);
+      result = await activateCourierQr({ body });
     } else if (body.mode === "courier_session_detail") {
       if (!session) return json({ ok: false }, 401);
       result = await readCourierSession({ sessionId: body.sessionId, session });

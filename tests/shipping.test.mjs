@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { createShippingSale, createCourierSession, readCourierSession, shippingOperation, limitShippingPublic } from "../netlify/functions/_lib/shipping.mjs";
+import { createShippingSale, createCourierSession, activateCourierQr, readCourierSession, shippingOperation, limitShippingPublic } from "../netlify/functions/_lib/shipping.mjs";
 import { cancelSaleAndInvoice } from "../netlify/functions/_lib/arca/saleCancellation.mjs";
 import { shippingBucket, courierAction, customerTrackingView, validatePoint, deliveryProof, distanceMeters } from "../src/shared/shippingDomain.mjs";
 import { admin, seller, preparer, manager, session, sale, now, memoryStore } from "./helpers/shippingFixtures.mjs";
@@ -125,6 +125,30 @@ test("direct courier: scoped action, no internal data, one contextual delivery, 
   assert.equal([...s.documents.values()].filter(row => row.event === "delivery_completed").length, 2);
   await assert.rejects(s.op("position", { token, point: { lat: 0, lng: 0, accuracy: 5, observedAt: now.toISOString() } }, null), /permiso/);
 });
+test("printed shipment QR opens one short-lived courier stage without a manually entered code", async () => {
+  const s = await setup(true);
+  await s.op("ready", {}, preparer);
+  const shipment = s.shipment(), newToken = "f".repeat(43);
+  const body = { lookupId: shipment.publicLookupId, sessionId: "qr-direct-session", requestId: "qr-direct-activation", newToken };
+  const result = await activateCourierQr({ body, runTransaction: s.runTransaction, now, env: {} });
+  const retried = await activateCourierQr({ body, runTransaction: s.runTransaction, now, env: {} });
+  assert.deepEqual(retried, result);
+  assert.equal(result.sessionId, body.sessionId);
+  assert.equal(s.documents.get(`deliverySessions/${body.sessionId}`).leg, "direct");
+  assert.equal(s.documents.get(`deliverySessions/${body.sessionId}`).source, "printed_shipment_qr");
+  assert.equal(s.documents.get(`deliverySessionAccess/${sha(newToken)}`).kind, "courier_route");
+  await assert.rejects(activateCourierQr({ body: { ...body, requestId: "another-scan", sessionId: "second-session", newToken: "g".repeat(43) }, runTransaction: s.runTransaction, now, env: {} }), /reparto activo/);
+});
+test("printed QR cannot activate an unapproved, incident-paused, or not-ready shipment", async () => {
+  const s = await setup();
+  const body = { lookupId: s.shipment().publicLookupId, sessionId: "qr-blocked", requestId: "qr-blocked-request", newToken: "j".repeat(43) };
+  await assert.rejects(activateCourierQr({ body, runTransaction: s.runTransaction, now, env: {} }), /disponible/);
+  assert.equal(s.documents.has(`deliverySessions/${body.sessionId}`), false);
+  await s.op("approve", approval);
+  await assert.rejects(activateCourierQr({ body: { ...body, sessionId: "qr-not-ready", requestId: "qr-not-ready-request" }, runTransaction: s.runTransaction, now, env: {} }), /siguiente tramo/);
+  await s.op("incident", { reason: "No hay bolsas/cajas", note: "Prueba" }, preparer);
+  await assert.rejects(activateCourierQr({ body: { ...body, sessionId: "qr-paused", requestId: "qr-paused-request" }, runTransaction: s.runTransaction, now, env: {} }), /disponible/);
+});
 test("repository has separate legs, hides customer from first courier and GPS until final departure", async () => {
   const s = await setup(); await s.op("approve", { ...approval, deliveryType: "repository" }); await s.op("ready", {}, preparer);
   await s.op("issue_access", { kind: "tracking", newToken: trackToken });
@@ -144,6 +168,20 @@ test("repository has separate legs, hides customer from first courier and GPS un
   await s.op("issue_access", { kind: "tracking", newToken: "d".repeat(43) });
   await assert.rejects(s.op("tracking", { token: trackToken }, null), /permiso/);
   assert.equal(courierAction(s.shipment(), "origin"), null);
+});
+test("the same printed repository label activates the next courier leg only after repository receipt", async () => {
+  const s = await setup(); await s.op("approve", { ...approval, deliveryType: "repository" }); await s.op("ready", {}, preparer);
+  const lookupId = s.shipment().publicLookupId;
+  const activate = (sessionId, requestId, newToken) => activateCourierQr({ body: { lookupId, sessionId, requestId, newToken }, runTransaction: s.runTransaction, now, env: {} });
+  const originToken = "h".repeat(43), origin = await activate("qr-origin", "qr-origin-request", originToken);
+  assert.equal(s.documents.get(`deliverySessions/${origin.sessionId}`).leg, "origin");
+  const courier = (token, action, requestId) => shippingOperation({ body: { mode: "courier_action", shipmentId: s.result.shipmentId, token, action, requestId }, runTransaction: s.runTransaction, now, env: {} });
+  await courier(originToken, "pickup", "qr-pickup");
+  await courier(originToken, "repository_receive", "qr-receive");
+  assert.equal(s.shipment().status, "recibido_repositorio");
+  assert.equal(s.shipment().courierSessionId, null);
+  const final = await activate("qr-final", "qr-final-request", "i".repeat(43));
+  assert.equal(s.documents.get(`deliverySessions/${final.sessionId}`).leg, "final");
 });
 test("tracking is readonly, distinct, revocable, excludes PII and only exposes fresh final-mile GPS", async () => {
   const s = await setup(true); await s.op("ready", {}, preparer);

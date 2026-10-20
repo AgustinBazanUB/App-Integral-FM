@@ -208,6 +208,51 @@ export async function createCourierSession({ body, session, runTransaction = adm
   }, { env });
 }
 
+// A printed shipment QR is itself the courier's short-lived, single-shipment
+// capability. It can activate only the next valid stage; no code is entered.
+export async function activateCourierQr({ body, runTransaction = adminRunTransaction, env = process.env, now = new Date() }) {
+  if (env.SHIPPING_ENABLED === "false") throw shippingError("El módulo de envíos está deshabilitado.", 503);
+  const lookupId = id(body.lookupId), sessionId = id(body.sessionId), requestId = id(body.requestId);
+  const token = String(body.newToken || "");
+  assert(/^[A-Za-z0-9_-]{43,128}$/.test(token), "No se pudo abrir el acceso temporal del QR.");
+  const credentialHash = hash(token), operationId = hash(`${lookupId}:${requestId}`).slice(0, 48);
+  const receiptPath = `shippingQrOperations/${operationId}`;
+  const fingerprint = hash(JSON.stringify({ lookupId, sessionId, credentialHash }));
+  return runTransaction(async transaction => {
+    const receipt = (await transaction.getDocument(receiptPath))?.data;
+    if (receipt) {
+      assert(receipt.fingerprint === fingerprint, "El intento ya se usó con otros datos. Volvé a escanear la etiqueta.");
+      return receipt.result;
+    }
+    const lookup = (await transaction.getDocument(`shipmentLookups/${lookupId}`))?.data;
+    assert(lookup?.shipmentId, "La etiqueta no corresponde a un envío disponible.");
+    const shipment = { ...(await transaction.getDocument(`shipments/${id(lookup.shipmentId)}`))?.data, id: lookup.shipmentId };
+    assert(shipment.saleId && shipment.publicLookupId === lookupId, "La etiqueta no corresponde a un envío disponible.");
+    assert(shipment.stockCommitState === "committed" && !shipment.incident && !CLOSED_SHIPPING_STATES.includes(shipment.status), "El envío todavía no está disponible para reparto.");
+    const leg = shipment.deliveryType === "repository"
+      ? ["listo_retirar", "hacia_repositorio"].includes(shipment.status) ? "origin" : ["recibido_repositorio", "reparto_final"].includes(shipment.status) ? "final" : null
+      : ["listo_retirar", "reparto_final"].includes(shipment.status) ? "direct" : null;
+    assert(leg, "El envío todavía no está listo para el siguiente tramo.");
+    if (shipment.courierSessionId) {
+      const previous = (await transaction.getDocument(`deliverySessions/${shipment.courierSessionId}`))?.data;
+      assert(previous?.status !== "active" || new Date(previous.expiresAt) <= now, "Este envío ya tiene un reparto activo. Usá el QR que abrió el repartidor.");
+    }
+    const hours = configNumber(env.SHIPPING_COURIER_TTL_HOURS, 1, 24) || 4;
+    const expiresAt = new Date(now.valueOf() + hours * 3600000);
+    const versions = { ...(shipment.courierVersions || {}), [leg]: (shipment.courierVersions?.[leg] || 0) + 1 };
+    const result = { sessionId, shipmentIds: [shipment.id], expiresAt };
+    const next = { ...shipment, courierSessionId: sessionId, courierSessionLeg: leg, courierVersions: versions, courierGrantHashes: { ...(shipment.courierGrantHashes || {}), [leg]: credentialHash }, lastPosition: null, gpsTrail: [], activeGpsSession: null, updatedAt: now, revision: (shipment.revision || 0) + 1 };
+    await transaction.commitDocuments([
+      update(`shipments/${shipment.id}`, { courierSessionId: sessionId, courierSessionLeg: leg, courierVersions: versions, courierGrantHashes: next.courierGrantHashes, lastPosition: null, gpsTrail: [], activeGpsSession: null, updatedAt: now, revision: next.revision }),
+      create(`deliverySessions/${sessionId}`, { shipmentIds: [shipment.id], leg, status: "active", version: 1, accessHash: credentialHash, createdBy: "label_qr", source: "printed_shipment_qr", createdAt: now, expiresAt, gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [] }),
+      create(`deliverySessionAccess/${credentialHash}`, { sessionId, kind: "courier_route", leg, version: 1, issuedBy: "printed_shipment_qr", createdAt: now, expiresAt }),
+      eventWrite(next, operationId, "issue_access", "external_courier_qr", shipment.status, now, { leg, actorRole: "external_courier" }),
+      create(receiptPath, { fingerprint, result, createdAt: now }),
+    ]);
+    return result;
+  }, { env });
+}
+
 export async function readCourierSession({ sessionId, session, runTransaction = adminRunTransaction, env = process.env, now = new Date() }) {
   if (env.SHIPPING_ENABLED === "false") throw shippingError("El módulo de envíos está deshabilitado.", 503);
   return runTransaction(async transaction => {

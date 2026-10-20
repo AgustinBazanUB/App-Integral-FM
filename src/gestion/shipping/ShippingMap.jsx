@@ -60,13 +60,14 @@ export default function ShippingMap({ position, destination, destinations = [], 
 
   useEffect(() => {
     if (!host.current || map.current) return;
-    const instance = L.map(host.current, { zoomControl: true, scrollWheelZoom: false, preferCanvas: true }).setView(DEFAULT_CENTER, 12);
+    const instance = L.map(host.current, { zoomControl: false, scrollWheelZoom: false, preferCanvas: true }).setView(DEFAULT_CENTER, 12);
     L.tileLayer(TILE_URL, {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>',
       updateWhenIdle: true,
       keepBuffer: 1,
     }).addTo(instance);
+    L.control.zoom({ position: "bottomright" }).addTo(instance);
     instance.on("dragstart", () => { autoFollow.current = false; });
     map.current = instance;
     const resize = window.requestAnimationFrame(() => instance.invalidateSize());
@@ -138,13 +139,22 @@ export default function ShippingMap({ position, destination, destinations = [], 
     else instance.setView(DEFAULT_CENTER, 12, { animate: true });
   };
 
+  const mapStatus = selectDestination
+    ? ["Punto de entrega", "Tocá el mapa para ubicar el domicilio y confirmá el marcador."]
+    : current
+      ? [active ? "Ubicación en vivo" : "Última ubicación recibida", `Precisión ±${Math.round(position.accuracy || 0)} m · ${verifiedDestination ? "Destino verificado" : "Destino por confirmar"}`]
+      : active
+        ? ["Esperando ubicación actual", "La última posición superó los 2 minutos y no se muestra como actual."]
+        : verifiedDestination
+          ? ["Punto de entrega verificado", "Las coordenadas confirmadas aparecen en el mapa."]
+          : ["Punto de entrega pendiente", "El domicilio todavía no tiene coordenadas verificadas."];
+
   return <section className={`fm-shipping-map-card ${active && current ? "is-live" : ""} ${className}`} aria-label="Mapa de seguimiento">
-    <div ref={host} className="fm-shipping-leaflet-map" role="application" aria-label="Mapa interactivo de la entrega" />
-    <div className="fm-shipping-map-status" role="status">
-      <strong>{current ? active ? "Ubicación en vivo" : "Última ubicación recibida" : active ? "Señal sin actualizar" : verifiedDestination ? "Destino de entrega" : "Mapa de referencia"}</strong>
-      <span>{selectDestination ? "Tocá el mapa para marcar el domicilio y luego confirmá el marcador." : current ? `Precisión ±${Math.round(position.accuracy || 0)} m` : active ? "La última posición superó los 2 minutos; no se muestra como actual." : destinationCoordinates.length ? `${destinationCoordinates.length} destino${destinationCoordinates.length === 1 ? "" : "s"} verificado${destinationCoordinates.length === 1 ? "" : "s"}.` : "El destino todavía no tiene coordenadas verificadas."}</span>
+    <div className="fm-shipping-map-frame">
+      <div ref={host} className="fm-shipping-leaflet-map" role="application" aria-label="Mapa interactivo de la entrega" />
+      <button type="button" className="fm-shipping-map-center" onClick={recenter}>Centrar mapa</button>
     </div>
-    <button type="button" className="fm-shipping-map-center" onClick={recenter}>Centrar mapa</button>
+    <p className="fm-shipping-map-info" role="status"><strong>{mapStatus[0]}</strong><span>{mapStatus[1]}</span></p>
     <small className="fm-shipping-map-attribution">Mapa © OpenStreetMap contributors · <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">Informar un problema</a></small>
   </section>;
 }

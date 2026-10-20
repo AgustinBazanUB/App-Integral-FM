@@ -1,7 +1,7 @@
 import { collection, doc, onSnapshot, query, where, orderBy, limit } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { can } from "../permissions";
-const mutationModes = new Set(["create_sale", "create_courier_session", "approve", "start_preparing", "ready", "incident", "resolve", "reject", "review", "retry", "cancel", "return", "undelivered", "address", "assign", "issue_access", "revoke_access", "delivery_exception", "courier_action", "read_notification"]);
+const mutationModes = new Set(["create_sale", "create_courier_session", "activate_courier_qr", "approve", "start_preparing", "ready", "incident", "resolve", "reject", "review", "retry", "cancel", "return", "undelivered", "address", "assign", "issue_access", "revoke_access", "delivery_exception", "courier_action", "read_notification"]);
 const changesChannel = typeof window !== "undefined" && typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("flor-mia-shipping-changes") : null;
 if (changesChannel) changesChannel.onmessage = event => window.dispatchEvent(new CustomEvent("shipping-changed", { detail: event.data }));
 const changed = inventoryChanged => { const detail = { inventoryChanged }; window.dispatchEvent(new CustomEvent("shipping-changed", { detail })); changesChannel?.postMessage(detail); };
@@ -109,6 +109,11 @@ export function subscribeCourierSession(sessionId, notify, onError) {
 export async function createCourierRouteAccess({ shipmentIds, leg, sessionId, token, requestId }) {
   const result = await shippingRequest({ mode: "create_courier_session", shipmentIds, leg, sessionId, newToken: token, requestId });
   return { ...result, kind: "courier_route", url: `${window.location.origin}/reparto#${token}` };
+}
+export async function createCourierQrAccess({ lookupId, sessionId, token, requestId }) {
+  const result = await shippingRequest({ mode: "activate_courier_qr", lookupId, sessionId, newToken: token, requestId }, { publicAccess: true });
+  const grantHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return { ...result, grantHash: [...new Uint8Array(grantHash)].map(n => n.toString(16).padStart(2, "0")).join(""), token };
 }
 export const subscribeShippingNotifications = (profile, notify, onError) => subscribeWithFallback(query(collection(db, "alerts"), where("source", "==", "shipping"), where("responsibleId", "==", profile.id), where("active", "==", true)), { mode: "notifications" }, notify, onError);
 export const readShippingNotification = alertId => shippingRequest({ mode: "read_notification", alertId });

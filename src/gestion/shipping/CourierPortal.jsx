@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, FormField, Panel, Select, Skeleton } from "../../design-system";
-import { shippingRequest } from "../services/shippingService";
+import { createCourierQrAccess, shippingRequest } from "../services/shippingService";
 import { COURIER_PROBLEMS, SHIPPING_STATES, CLOSED_SHIPPING_STATES } from "../../shared/shippingDomain.mjs";
 import { formatDateTime } from "../formatters";
 import { createCourierGps } from "./courierGps.mjs";
@@ -18,14 +18,32 @@ function Journey({ shipment }) {
   return <ol className="fm-courier-steps" aria-label="Etapas de tu reparto">{steps.map((step, index) => <li key={step} aria-current={index === current ? "step" : undefined} className={index <= current ? "is-reached" : ""}><span aria-hidden="true">{index + 1}</span>{step}</li>)}</ol>;
 }
 
+function randomCourierToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
 export default function CourierPortal({ lookupId }) {
   const [token, setToken] = useState(() => { const value = window.location.hash.slice(1); return validToken(value) ? value : ""; });
   const [input, setInput] = useState(""), [shipment, setShipment] = useState(null), [route, setRoute] = useState(null), [error, setError] = useState("");
   const [busy, setBusy] = useState(false), [issue, setIssue] = useState(false), [reason, setReason] = useState(""), [note, setNote] = useState("");
+  const [activationRetry, setActivationRetry] = useState(0);
   const [gpsState, setGpsState] = useState({ phase: "stopped", message: "No estás compartiendo tu ubicación.", active: false });
-  const mounted = useRef(true), operation = useRef(null), busyRef = useRef(false);
+  const mounted = useRef(true), operation = useRef(null), busyRef = useRef(false), activationAttempt = useRef(null);
   const request = useCallback((body, options) => shippingRequest({ ...body, token, ...(lookupId ? { lookupId } : {}) }, { publicAccess: true, ...options }), [token, lookupId]);
   const gps = useMemo(() => createCourierGps({ request, geolocation: navigator.geolocation, secure: window.isSecureContext, onChange: state => { if (mounted.current) setGpsState(state); } }), [request]);
+  useEffect(() => {
+    if (!lookupId || token) return undefined;
+    activationAttempt.current ||= { sessionId: crypto.randomUUID(), requestId: crypto.randomUUID(), token: randomCourierToken() };
+    let live = true;
+    setError("");
+    createCourierQrAccess({ lookupId, ...activationAttempt.current }).then(result => {
+      if (!live) return;
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${result.token}`);
+      setToken(result.token);
+    }).catch(error => { if (live) setError(error.message); });
+    return () => { live = false; };
+  }, [lookupId, token, activationRetry]);
   const refresh = useCallback(async () => {
     const result = await request({ mode: "detail" });
     if (mounted.current) {
@@ -67,10 +85,13 @@ export default function CourierPortal({ lookupId }) {
   return <div className="fm-courier-panel">
     <header><p className="fm-shipping-eyebrow">Portal de reparto · {route ? "Recorrido compartido" : shipment?.deliveryType === "repository" ? "Repositorio" : "Entrega al cliente"}</p><h1>{route ? `Recorrido · ${route.shipments.length} envíos` : shipment ? `Envío ${shipment.publicCode}` : "Panel del repartidor"}</h1>{route ? <Badge tone={route.status === "completed" ? "success" : "info"}>{route.status === "completed" ? "Recorrido completado" : `${route.shipments.filter(item => item.action).length} entregas con acción disponible`}</Badge> : shipment ? <Badge tone={shipment.status === "entregado" ? "success" : shipment.incident ? "error" : "info"}>{SHIPPING_STATES[shipment.status]}</Badge> : <p>Recibí el pedido, confirmá cada tramo y compartí tu ubicación cuando vayas al cliente.</p>}</header>
     {error && <p role="alert" className="fm-shipping-error">{error}</p>}
-    {!token ? <Panel title="Autorizar este reparto" description="Pedile a Flor Mía el enlace o código temporal de tu tramo. El QR de la etiqueta abre este panel; el código habilita las acciones del pedido.">
+    {!token && lookupId ? <Panel title="Abriendo el reparto" description="El QR de esta etiqueta habilita las acciones del próximo tramo sin ingresar códigos.">
+      <p>El acceso queda limitado a este envío, a la siguiente etapa permitida y vence automáticamente.</p>
+      {error && <Button variant="secondary" onClick={() => setActivationRetry(value => value + 1)}>Reintentar abrir el reparto</Button>}
+    </Panel> : !token ? <Panel title="Abrir un recorrido" description="Pegá el enlace temporal del recorrido que te compartió Flor Mía.">
       <FormField label="Enlace o código temporal"><input autoComplete="off" autoCapitalize="none" spellCheck={false} value={input} onChange={event => setInput(event.target.value)} /></FormField>
       <Button onClick={authorize}>Abrir mi reparto</Button>
-      <p className="fm-shipping-muted">Si recibiste un enlace autorizado o su QR, abrilo directamente desde este teléfono.</p>
+      <p className="fm-shipping-muted">Al escanear la etiqueta de un pedido no hace falta ingresar un código.</p>
     </Panel> : route ? <>
       <div className="fm-shipping-public-card"><strong>Una sesión para toda la ruta</strong><p>Tramo: {route.leg === "origin" ? "Origen → repositorio" : route.leg === "final" ? "Repositorio → clientes" : "Entrega directa → clientes"} · {route.shipments.length} pedidos asignados.</p><p>Acceso válido hasta {formatDateTime(route.accessExpiresAt)}.</p></div>
       {route.shipments.map(item => <Panel key={item.id} title={`Envío ${item.publicCode}`} description={item.customerName ? `Entrega para ${item.customerName}` : undefined} action={<Badge tone={item.status === "entregado" ? "success" : item.incident ? "error" : "info"}>{SHIPPING_STATES[item.status]}</Badge>}>

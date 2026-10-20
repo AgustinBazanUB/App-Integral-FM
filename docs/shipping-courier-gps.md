@@ -2,16 +2,15 @@
 
 Preview: https://deploy-preview-40--appintegralflormia.netlify.app/gestion/shipping
 
-El QR de una etiqueta abre **¿Cómo querés continuar?**, con acceso interno y de repartidor. Al elegir **Soy repartidor** se abre el panel de ese pedido. Los QR temporales autorizados de Gestión entran directamente al reparto. El botón **Soy personal de Flor Mía · Preparar pedido** conserva el acceso interno con sesión y asignación. La etiqueta identifica el pedido; para operar se utiliza el código o enlace temporal que entrega Gestión. El backend comprueba que esa autorización corresponda a la misma etiqueta.
+El QR de una etiqueta abre **¿Cómo querés continuar?**, con acceso interno y de repartidor. Al elegir **Soy repartidor**, el servidor activa una autorización temporal para el próximo tramo elegible de ese envío y abre el panel sin pedir código. La etiqueta debe estar disponible físicamente; el permiso queda limitado a un envío y vence a las cuatro horas por defecto (configurable entre 1 y 24). Los QR temporales de recorrido que Gestión genera para varios pedidos siguen entrando directamente con su propia sesión. El botón **Soy personal de Flor Mía · Preparar pedido** conserva el acceso interno con sesión y asignación.
 
 ## Preparar el acceso desde Gestión
 
-1. Abrí un envío aprobado y listo para retirar.
-2. En **Accesos limitados**, elegí **Autorizar repartidor** para Manual/Uber. Para Repositorio elegí **Acceso · origen a repositorio** o **Acceso · reparto final**, según el tramo.
+1. Para una etiqueta de un solo envío, basta con imprimir el QR desde Gestión y escanearlo. El backend habilita únicamente la acción siguiente que corresponda al estado; no se puede saltar la preparación, recepción en repositorio ni un bloqueo por incidencia.
+2. Para autorizar un recorrido con varios pedidos, abrí Gestión, elegí **Accesos limitados** y generá el acceso temporal para Manual/Uber o el tramo de Repositorio correspondiente.
 3. Mostrá el QR de **Abrir en el teléfono del repartidor**. Al escanearlo se abre el panel autorizado, sin copiar códigos. También podés usar **Copiar enlace** y abrirlo manualmente en el teléfono. No se envían mensajes automáticamente.
-4. Si escaneaste directamente la etiqueta impresa, ingresá el enlace o código temporal en **Autorizar este reparto**. Un código de otro pedido se rechaza.
 
-El QR temporal de Gestión y la etiqueta tienen propósitos distintos. La autorización temporal no se imprime en la etiqueta permanente. Un nuevo acceso del mismo tramo revoca el anterior; se muestra su vencimiento. El navegador no guarda el código en almacenamiento persistente.
+El QR temporal de Gestión y la etiqueta tienen propósitos distintos. El QR permanente sólo activa una sesión temporal y acotada cuando alguien lo presenta; no da acceso a Firebase ni permite administrar inventario, dirección o asignaciones. Una sesión activa impide activar otra para ese envío. La sesión vence automáticamente y Gestión puede revocarla. Para el personal sigue siendo obligatorio iniciar sesión; si falta una cuenta, Administración la crea y asigna el envío.
 
 ## Acciones del repartidor
 

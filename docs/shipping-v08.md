@@ -16,7 +16,7 @@
 | F0 Auditoría | HECHO | Base fiscal preservada; rama aislada y fuentes identificadas. |
 | F1 Ventas y stock | HECHO en local | Modal en el POS existente; vendedor online con stock diferido; aprobación atómica del origen real. Idempotencia de venta, movimientos y solicitud, recuperación de confirmación perdida y compatibilidad con intentos anteriores a esta versión. |
 | F2 Operación y etiquetas | HECHO en local | Tres pestañas, filtros, ficha, tareas compartidas, multi-asignación, campana persistente por destinatario y PDF A4 único con QR vectoriales independientes. |
-| F3 QR, reparto e incidencias | HECHO en local | Selector público sin datos personales; sesión y asignación para preparar; credenciales por envío/tramo para repartidor; transiciones contextuales; incidentes críticos, revisión, corrección, reasignación y reintentos auditados. |
+| F3 QR, reparto e incidencias | HECHO en local | Selector público sin datos personales; sesión y asignación para preparar; activación limitada por posesión del QR impreso para el próximo tramo de un solo pedido; transiciones contextuales; incidentes críticos, revisión, corrección, reasignación y reintentos auditados. |
 | F4 GPS, mapa y cliente | IMPLEMENTADO; prueba física prolongada pendiente | GPS voluntario de navegador, sesiones temporales de repartidor para hasta 25 envíos, posición compartida una vez por recorrido, continuidad tras la primera entrega, cierre tras la última, Leaflet 1.9.4, mapas de administración/repartidor/cliente y lectura autenticada de respaldo. No hay geocodificación/ETA. Los ensayos de segundo plano, otra app y pantalla bloqueada requieren teléfono físico. |
 | F5 Contratos futuros | HECHO | Contratos y adaptadores de Ecommerce, Uber API y WhatsApp deshabilitados; evento `shipping.tracking_ready` en outbox sin credenciales públicas en texto plano. |
 
@@ -27,7 +27,7 @@ Los cambios están guardados en `codex/modulo-envios-v08` y el PR borrador #40. 
 - `/gestion/shipping`: Tablero / Solicitudes del vendedor / Mis preparaciones y etiquetas. El alta conduce exclusivamente al POS `/gestion/quick-sales`.
 - `/gestion/shipping?shipment=…`: ficha accesible desde tablero y notificaciones. Incluye productos, cliente, origen comercial/físico, eventos, impresión y acciones autorizadas.
 - `/vendedor?view=shipping-tasks`: mismo componente de tareas, después de Precios. `Pendientes` mantiene su significado offline. La venta y el recibo permiten abrir el estado del envío aunque el vendedor no esté asignado como preparador.
-- `/e/:publicLookupId`: QR estable que sólo identifica el envío. Elegir personal requiere Firebase y asignación; elegir repartidor requiere credencial temporal adicional.
+- `/e/:publicLookupId`: QR impreso para el envío. Elegir personal requiere Firebase y asignación; elegir repartidor activa en el servidor una autorización temporal limitada al próximo tramo, sin ingresar un código. El QR de acceso multi-pedido generado por Gestión sigue usando su sesión temporal independiente.
 - `/reparto#credencial`: portal del repartidor. Una acción principal por estado y tramo. En el primer tramo el destino es Repositorio de Flor Mía, sin teléfono/domicilio del cliente y sin GPS; su dirección es opcional.
 - `/seguimiento#credencial`: enlace distinto, revocable y de sólo lectura. Puede mostrar preparación y En repositorio sin ubicación; sólo al salir a reparto final aparece En camino a tu domicilio y se permite compartir el último punto GPS. Nunca muestra el recorrido previo ni datos de pagos, stock, CRM o repartidor. Aclaración expresa del usuario durante las pruebas manuales del 16/10/2026.
 
@@ -93,9 +93,9 @@ Los índices nuevos cubren `shippingSchemaVersion + updatedAt`, asignación/crea
 
 ## Pruebas y evidencias
 
-- `npm test`: **995 pruebas** correctas en la última corrida completa.
-- `npm run test:shipping`: **37 pruebas** focalizadas correctas tras la ampliación GPS.
-- `npm run test:shipping:ui`: **8 verificaciones** headless con Playwright y datos sintéticos, incluida la vista del mapa cliente y la privacidad del `Referer`.
+- `npm test`: **998 pruebas** correctas en la última corrida completa.
+- `npm run test:shipping`: **40 pruebas** focalizadas correctas tras la ampliación visual y del QR.
+- `npm run test:shipping:ui`: **11 verificaciones** headless con Playwright y datos sintéticos, incluidas las nuevas vistas del tablero, filtros, acciones, controles del mapa y QR sin código.
 - `npm run test:rules`: debe ejecutarse con Firestore Emulator. La última invocación local no encontró `FIRESTORE_EMULATOR_HOST`; los casos terminaron antes de evaluar reglas. La regla de lecturas manager-only de `deliverySessions` tiene cobertura en `tests/firestore.shipping.rules.mjs`.
 - `npm run build:surfaces`: compilación correcta de gestión y ecommerce. Vite conserva advertencia de chunks grandes; no es un error de compilación.
 - Empaquetado esbuild de ambas funciones con objetivo Node 20: correcto.
@@ -108,7 +108,19 @@ Prueba manual remota del 16/10/2026: [informe del Preview 40](shipping-manual-pr
 
 Ampliación posterior: [panel del repartidor y guía para probar GPS desde el teléfono](shipping-courier-gps.md), [arquitectura de mapa y seguimiento GPS compartido](shipping-live-tracking.md). Gestión genera QR temporales de sesión por tramo; un recorrido puede reunir varios pedidos y transmitir una sola posición. El GPS sólo confirma publicación tras respuesta del servidor; al cerrar la última entrega se borra la ubicación y cesa el acceso en vivo.
 
-Adaptación visual del 19/10/2026: [continuidad desde otra PC](CONTINUAR-ENVIOS.md), [referencias originales v07](shipping-reference/v07/README.md) y [evidencia implementada](shipping-evidence/visual-v07/README.md). La etiqueta sin credencial muestra el selector de acceso interno/repartidor; los enlaces temporales autorizados conservan el ingreso directo al tramo. La nueva disposición mantiene endpoints, permisos y transacciones existentes.
+Adaptación visual del 19/10/2026: [continuidad desde otra PC](CONTINUAR-ENVIOS.md), [referencias originales v07](shipping-reference/v07/README.md) y [evidencia implementada](shipping-evidence/visual-v07/README.md). La etiqueta QR muestra el selector de acceso interno/repartidor; el personal conserva su autenticación y asignación.
+
+## Tablero, detalle y acceso desde el QR impreso (20/10/2026)
+
+El tablero abre en **Todos** y limita el período inicial a la semana actual de Argentina (lunes a domingo). El único botón **Filtrar envíos** despliega la búsqueda, domicilio, período, origen, transporte, preparador y estado; ofrece Hoy, Esta semana, Este mes, fechas manuales o todo el historial. La tabla abre el detalle al tocar una fila, admite teclado, muestra una mini ruta y ya no repite un botón por fila. El constructor de recorridos queda después de la tabla.
+
+En el detalle, **Acciones del envío** reúne las acciones permitidas al perfil y al estado. Cada opción explica el efecto antes de abrir su formulario; las acciones de preparación informan el cambio al Panel Vendedor. El mapa conserva el botón de centrar arriba a la izquierda, coloca zoom +/- abajo a la derecha, elimina la tarjeta interna sobrepuesta y presenta el estado debajo del mapa. Eventos siguen a la derecha en escritorio.
+
+El QR impreso es una capacidad temporal para el próximo tramo de un solo pedido: al elegir **Soy repartidor**, el servidor lo activa sin solicitar un código y devuelve una sesión de cuatro horas (configurable de 1 a 24). Sólo permite la siguiente acción logística, reportar una incidencia y, durante el tramo final, compartir GPS; no permite revisar existencias, cambiar domicilio, asignar personal ni modificar stock. La etiqueta es el secreto físico que inicia este permiso: si se pierde o comparte, Gestión puede revocar el acceso. Un envío sin stock aprobado, aún no listo, pausado por incidencia, cerrado o ya asignado a un recorrido activo no se puede activar desde la etiqueta. Las entregas por Repositorio vuelven a escanear la misma etiqueta para habilitar el segundo tramo después de confirmar la recepción.
+
+El acceso **Soy personal de Flor Mía** sigue requiriendo una cuenta activa. El backend comprueba que el pedido esté asignado a esa cuenta antes de permitir marcarlo listo. Si la persona aún no tiene usuario, Administración debe crear su cuenta y asignarle el pedido; escanear la etiqueta no crea permisos de personal.
+
+Verificación de esta ampliación: `npm run test:shipping` cubre activación, idempotencia, vencimiento y rechazo de estados no elegibles; `npm run test:shipping:ui` cubre período predeterminado, filtros plegables, fila clicable, menú de acciones, posición de controles del mapa y QR sin ingreso manual. Ambos recorridos usan datos sintéticos en el laboratorio UI.
 
 ## Históricos y pendientes de activación
 
