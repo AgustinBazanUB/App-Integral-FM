@@ -24,14 +24,15 @@ Cada repartidor ve únicamente el tramo autorizado. Al dejar el paquete en el re
 
 ## Comprobar GPS real desde el teléfono
 
-1. Abrí el enlace autorizado en Chrome o Safari del teléfono, con ubicación del equipo activa y conexión a Internet.
-2. Confirmá la recepción del paquete (directo) o la salida del repositorio (tramo final).
-3. En **Mi ubicación**, pulsá **Compartir mi ubicación** y aceptá el permiso del navegador.
-4. Comprobá la secuencia **Esperando ubicación** → **Enviando ubicación** → **Ubicación compartida**. El estado verde aparece solamente después de una posición real confirmada por el servidor. Muestra hora del envío y precisión.
-5. Desde otro dispositivo, abrí el enlace de cliente creado en Gestión. Durante el reparto final debe mostrar hora, precisión y **Ver ubicación real en Google Maps**. La ficha administrativa también muestra la última posición. La actualización de ambas vistas puede tardar hasta 20 segundos.
-6. Caminá unos metros manteniendo la página abierta y la pantalla encendida. Comprobá un nuevo envío confirmado. El panel solicita mediciones reales aproximadamente cada 15 segundos aunque el teléfono permanezca quieto; no inventa coordenadas ni marcas de tiempo.
-7. Pulsá **Dejar de compartir ubicación**. El GPS local se detiene y el servidor elimina la última posición. Al actualizar el seguimiento debe mostrar ubicación no disponible. Podés volver a compartir manualmente.
-8. Confirmá la entrega. El pedido queda entregado y cesa la publicación. Solicitudes que hayan quedado pendientes de una sesión detenida no pueden volver a publicar la posición.
+1. Abrí el enlace autorizado desde el QR en Chrome o Safari del teléfono, con Localización activa y conexión a Internet.
+2. Confirmá **Confirmar que recibí el paquete** en el envío directo o **Salir del repositorio hacia el cliente** en el segundo tramo de Repositorio. El primer viaje hacia el repositorio no solicita ni comparte GPS con el cliente.
+3. Al tocar la acción de salida, el navegador empieza a pedir permiso y ubicación inmediatamente. Aceptá el aviso de iOS/Chrome. No hace falta tocar un segundo botón para iniciar el seguimiento.
+4. Comprobá la secuencia **Esperando ubicación** → **Enviando ubicación** → **Ubicación compartida**. El estado verde y el ícono de la moto aparecen cuando una posición real se confirmó con el servidor; también se muestra la hora y precisión.
+5. Desde otro dispositivo, abrí el enlace de cliente creado en Gestión. Durante el reparto final debe mostrar la última posición permitida. La ficha administrativa también muestra el punto. La actualización de ambas vistas puede tardar hasta 20 segundos.
+6. Caminá unos metros manteniendo la página abierta y la pantalla encendida. Comprobá una nueva ubicación confirmada. El panel solicita mediciones reales aproximadamente cada 15 segundos aunque el teléfono permanezca quieto; no inventa coordenadas ni marcas de tiempo.
+7. La ubicación se detiene al completar la entrega. También está disponible **Dejar de compartir ubicación** si el repartidor necesita parar antes; el servidor elimina el punto. Para recuperar un permiso o señal fallidos, usá **Reintentar ubicación**.
+
+En iPhone, si Chrome no muestra el aviso o indica permiso denegado, revisá **Ajustes de iOS → Apps → Chrome → Ubicación**, habilitá el acceso y volvé al portal. El sitio debe abrirse por HTTPS y la autorización de iOS sigue siendo obligatoria.
 
 La entrega normal exige destino verificado y geocerca configurada. En el preview esos parámetros siguen pendientes: para cerrar una prueba, Administración debe usar **Autorizar excepción de entrega** con motivo, después de iniciar el reparto final. Esa excepción no es necesaria para probar que se comparte GPS. No cambies el domicilio real para simular una geocerca.
 
@@ -42,7 +43,7 @@ El GPS del navegador requiere HTTPS y permiso del usuario; la API permite detene
 ## Verificación de esta ampliación
 
 - Pruebas del motor: inicio únicamente durante reparto final, vínculo etiqueta/autorización, posición confirmada, parada que borra la ubicación, rechazo de puntos tardíos, aislamiento entre sesiones y cierre al entregar.
-- Pruebas del controlador: permiso denegado, falta de navegador compatible/HTTPS, fallo de red, ausencia de confirmación del servidor, medición periódica con equipo quieto, descarte de respuestas tardías y revocación.
+- Pruebas del controlador: llamada de geolocalización síncrona desde la acción de salida, posición retenida hasta que el servidor confirme el tramo final, permiso denegado, falta de navegador compatible/HTTPS, fallo de red, ausencia de confirmación del servidor, medición periódica con equipo quieto, descarte de respuestas tardías y revocación.
 - Prueba manual local de interfaz con el motor real y almacenamiento en memoria: recepción → repositorio → salida final → compartir → visualización por cliente → detener. Coordenadas **sintéticas**, con aviso visible de laboratorio. Se generó y decodificó el QR temporal; abre el pedido y tramo correctos. Vista móvil comprobada sin desborde horizontal.
 - Prueba manual en Deploy Preview 40 + Firebase staging (20/10/2026): un envío ficticio completó QR de origen y QR final, confirmó salida al cliente, compartió una ubicación real de este equipo y la mostró en los mapas administrativo y del cliente. Se detuvo el GPS y se comprobó que ambos dejaron de exponer el punto. Una excepción QA supervisada permitió completar el pedido ficticio y el recorrido se cerró automáticamente. El pedido quedó marcado como **Entregado** sólo en Firebase staging; no hubo entrega física ni cambios en Production.
 - Esta ampliación no creó nuevas ventas ni descontó inventario en el Firebase original. Los dos registros anteriores siguen documentados en [el informe de pruebas](shipping-manual-preview-40.md).

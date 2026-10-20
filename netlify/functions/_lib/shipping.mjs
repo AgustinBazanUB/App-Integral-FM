@@ -286,11 +286,11 @@ async function courierRouteView(transaction, routeSession, now, maxAgeMs) {
     const shipment = { ...(await transaction.getDocument(`shipments/${shipmentId}`))?.data, id: shipmentId };
     assert(shipment.saleId && shipment.courierSessionId === routeSession.id, "El reparto cambió. Pedí un nuevo QR a Flor Mía.");
     const destination = routeSession.leg === "origin" ? shipment.repository : shipment.destination;
-    rows.push(completed || CLOSED_SHIPPING_STATES.includes(shipment.status) ? { id: shipment.id, publicCode: shipment.publicCode, status: shipment.status, leg: routeSession.leg, deliveryType: shipment.deliveryType, action: null }
+    rows.push(completed || CLOSED_SHIPPING_STATES.includes(shipment.status) ? { id: shipment.id, publicCode: shipment.publicCode, customerName: routeSession.leg === "origin" ? null : shipment.customerSnapshot.name, status: shipment.status, leg: routeSession.leg, deliveryType: shipment.deliveryType, action: null }
       : {
       id: shipment.id, publicCode: shipment.publicCode, status: shipment.status, leg: routeSession.leg,
       deliveryType: shipment.deliveryType, destination: destination ? { displayAddress: destination.displayAddress || destination.displayName, verified: destination.verified === true, ...(destination.verified ? { lat: destination.lat, lng: destination.lng } : {}), notes: destination.notes || "" } : null,
-      customerName: shipment.customerSnapshot.name, customerPhone: routeSession.leg === "origin" ? null : shipment.customerSnapshot.phone,
+      customerName: routeSession.leg === "origin" ? null : shipment.customerSnapshot.name, customerPhone: routeSession.leg === "origin" ? null : shipment.customerSnapshot.phone,
       action: courierAction(shipment, routeSession.leg), incident: shipment.incident ? { reason: shipment.incident.reason } : null,
     });
   }
@@ -374,7 +374,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
     }
     if (!profile && grant.kind !== "courier") forbidden();
     if (body.mode === "detail") {
-      if (!profile) return { id: shipment.id, publicCode: shipment.publicCode, status: shipment.status, leg: grant.leg, deliveryType: shipment.deliveryType, accessExpiresAt: grant.expiresAt, destination: grant.leg === "origin" ? shipment.repository : shipment.destination, customerPhone: grant.leg === "origin" ? null : shipment.customerSnapshot.phone, action: courierAction(shipment, grant.leg), incident: shipment.incident ? { reason: shipment.incident.reason } : null, gpsAllowed: shipment.status === "reparto_final" && grant.leg !== "origin" };
+      if (!profile) return { id: shipment.id, publicCode: shipment.publicCode, customerName: grant.leg === "origin" ? null : shipment.customerSnapshot.name, status: shipment.status, leg: grant.leg, deliveryType: shipment.deliveryType, accessExpiresAt: grant.expiresAt, destination: grant.leg === "origin" ? shipment.repository : shipment.destination, customerPhone: grant.leg === "origin" ? null : shipment.customerSnapshot.phone, action: courierAction(shipment, grant.leg), incident: shipment.incident ? { reason: shipment.incident.reason } : null, gpsAllowed: shipment.status === "reparto_final" && grant.leg !== "origin" };
       const events = await transaction.listDocuments(`shipments/${shipment.id}/events`, { maxDocuments: 1000 });
       return { ...shipment, events: events.sort((a, b) => (a.sequence || 0) - (b.sequence || 0) || new Date(a.createdAt) - new Date(b.createdAt)), geofenceConfigured: Boolean(config(env).radiusMeters && config(env).maxAccuracyMeters && config(env).maxAgeMs) };
     }

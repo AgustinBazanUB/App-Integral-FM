@@ -76,8 +76,7 @@ export default function ShippingPage() {
   const columns = [
     ...(canManage ? [{ key: "route", label: "Ruta", render: row => <div className="fm-shipping-route-cell"><input type="checkbox" aria-label={`Incluir ${row.publicCode} en el recorrido`} onClick={event => event.stopPropagation()} disabled={!routeEligible(row)} checked={selectedRouteIds.includes(row.id)} onChange={event => setSelectedRouteIds(current => event.target.checked ? [...new Set([...current, row.id])] : current.filter(id => id !== row.id))} /><RoutePreview /></div> }] : []),
     { key: "issue", label: "!", render: row => row.incident ? <span className="fm-shipping-issue-mark" title={row.incident.reason} aria-label={`Incidencia: ${row.incident.reason}`}>!</span> : <span className="fm-shipping-neutral-dot" aria-label="Sin incidencia" /> },
-    { key: "code", label: "Envío y venta", render: row => <div><strong>{row.publicCode}</strong><small>{row.saleCode}</small></div> },
-    { key: "customer", label: "Cliente", render: row => <div>{row.customerSnapshot.name}<small>{row.customerSnapshot.phone}</small></div> },
+    { key: "code", label: "Envío", render: row => <div className="fm-shipping-row-title"><strong>Envío para {row.customerSnapshot.name}</strong><small>{row.publicCode} · {row.saleCode}</small></div> },
     { key: "destination", label: "Destino y zona", render: row => <div>{row.destination.displayAddress}<small>{row.destination.verified ? row.destination.neighborhoodOrLocality || "Marcador verificado" : "Zona por confirmar"}</small></div> },
     { key: "transport", label: "Transporte", render: row => TRANSPORTS[row.deliveryType] || "Por definir" },
     { key: "status", label: "Estado", render: row => <Badge tone={row.incident ? "error" : row.status === "entregado" ? "success" : ["reparto_final", "hacia_repositorio", "recibido_repositorio"].includes(row.status) ? "info" : "warning"}>{row.incident ? "Incidencia crítica" : SHIPPING_STATES[row.status]}</Badge> },

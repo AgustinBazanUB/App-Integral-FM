@@ -155,7 +155,7 @@ test("repository has separate legs, hides customer from first courier and GPS un
   assert.equal((await s.op("tracking", { token: trackToken }, null)).position, null);
   await s.op("issue_access", { kind: "courier", leg: "origin", newToken: token });
   await s.op("issue_access", { kind: "courier", leg: "final", newToken: token2 });
-  const detail = await s.op("detail", { token }, null); assert.equal(detail.customerPhone, null); assert.equal(detail.destination.displayName, "Repositorio de Flor Mía"); assert.equal(detail.destination.displayAddress, undefined);
+  const detail = await s.op("detail", { token }, null); assert.equal(detail.customerName, null); assert.equal(detail.customerPhone, null); assert.equal(detail.destination.displayName, "Repositorio de Flor Mía"); assert.equal(detail.destination.displayAddress, undefined);
   await assert.rejects(s.op("position", { token, point: {} }, null), /permiso/);
   await s.op("courier_action", { token, action: "pickup" }, null);
   await assert.rejects(s.op("courier_action", { token: token2, action: "repository_depart" }, null), /no corresponde/);
@@ -188,7 +188,7 @@ test("tracking is readonly, distinct, revocable, excludes PII and only exposes f
   await s.op("issue_access", { kind: "tracking", newToken: trackToken });
   await s.op("issue_access", { kind: "courier", newToken: token });
   const view = await s.op("tracking", { token: trackToken }, null);
-  assert.equal(view.position, null); assert.equal(view.destination, null); assert.equal(view.customerSnapshot, undefined);
+  assert.equal(view.position, null); assert.equal(view.destination, null); assert.equal(view.customerSnapshot, undefined); assert.equal(view.customerName, undefined);
   await assert.rejects(s.op("courier_action", { token: trackToken, action: "pickup" }, null), /permiso/);
   await s.op("courier_action", { token, action: "pickup" }, null);
   await s.op("gps_start", { token, gpsSessionId: "gps-test" }, null);
@@ -206,7 +206,7 @@ test("QR courier authorization is bound to its printed shipment, not another val
   const s = await setup(true); await s.op("ready", {}, preparer);
   await s.op("issue_access", { kind: "courier", newToken: token });
   const detail = await s.op("detail", { token, lookupId: s.shipment().publicLookupId }, null);
-  assert.equal(detail.leg, "direct"); assert.equal(detail.gpsAllowed, false); assert(detail.accessExpiresAt);
+  assert.equal(detail.leg, "direct"); assert.equal(detail.customerName, "Cliente de prueba"); assert.equal(detail.gpsAllowed, false); assert(detail.accessExpiresAt);
   await assert.rejects(s.op("detail", { token, lookupId: "another_label_lookup" }, null), /permiso/);
   await assert.rejects(s.op("courier_action", { token, lookupId: "another_label_lookup", action: "pickup" }, null), /permiso/);
   assert.equal(s.shipment().status, "listo_retirar");

@@ -70,12 +70,19 @@ export default function CourierPortal({ lookupId }) {
     return () => { live = false; clearInterval(timer); };
   }, [token, refresh, gps]);
   useEffect(() => { if (shipment && !shipment.gpsAllowed || route && !route.gpsAllowed) void gps.stop("", false); }, [shipment?.gpsAllowed, route?.gpsAllowed, gps]);
-  const execute = async (mode, data = {}) => {
+  const execute = async (mode, data = {}, onSuccess = null, onFailure = null) => {
     if (busyRef.current) return; busyRef.current = true; setBusy(true); setError("");
     const key = JSON.stringify({ mode, data });
     if (operation.current?.key !== key) operation.current = { key, requestId: crypto.randomUUID() };
-    try { await request({ mode, requestId: operation.current.requestId, ...data }); operation.current = null; setIssue(false); await refresh(); }
-    catch (error) { setError(error.message); } finally { busyRef.current = false; if (mounted.current) setBusy(false); }
+    try { await request({ mode, requestId: operation.current.requestId, ...data }); operation.current = null; setIssue(false); await refresh(); if (onSuccess) void onSuccess(); return true; }
+    catch (error) { if (onFailure) onFailure(); setError(error.message); return false; } finally { busyRef.current = false; if (mounted.current) setBusy(false); }
+  };
+  const runCourierAction = (action, leg, extra = {}) => {
+    if (busyRef.current) return;
+    const beginsCustomerTrip = action === "repository_depart" || (action === "pickup" && leg === "direct");
+    if (beginsCustomerTrip) gps.prepare();
+    void execute("courier_action", { ...extra, action }, beginsCustomerTrip ? () => gps.start() : null,
+      beginsCustomerTrip ? () => gps.stop("La salida no se confirmó; la ubicación quedó detenida.") : null);
   };
   const authorize = () => {
     const value = input.includes("#") ? input.split("#").at(-1).trim() : input.trim();
@@ -83,7 +90,7 @@ export default function CourierPortal({ lookupId }) {
     setError(""); window.location.hash = value; setToken(value);
   };
   return <div className="fm-courier-panel">
-    <header><p className="fm-shipping-eyebrow">Portal de reparto · {route ? "Recorrido compartido" : shipment?.deliveryType === "repository" ? "Repositorio" : "Entrega al cliente"}</p><h1>{route ? `Recorrido · ${route.shipments.length} envíos` : shipment ? `Envío ${shipment.publicCode}` : "Panel del repartidor"}</h1>{route ? <Badge tone={route.status === "completed" ? "success" : "info"}>{route.status === "completed" ? "Recorrido completado" : `${route.shipments.filter(item => item.action).length} entregas con acción disponible`}</Badge> : shipment ? <Badge tone={shipment.status === "entregado" ? "success" : shipment.incident ? "error" : "info"}>{SHIPPING_STATES[shipment.status]}</Badge> : <p>Recibí el pedido, confirmá cada tramo y compartí tu ubicación cuando vayas al cliente.</p>}</header>
+    <header><p className="fm-shipping-eyebrow">Portal de reparto · {route ? "Recorrido compartido" : shipment?.deliveryType === "repository" ? "Repositorio" : "Entrega al cliente"}</p><h1>{route ? `Recorrido · ${route.shipments.length} envíos` : shipment ? shipment.leg === "origin" ? "Envío hacia el repositorio" : `Envío para ${shipment.customerName || "el cliente"}` : "Panel del repartidor"}</h1>{shipment && <p className="fm-shipping-courier-code">{shipment.publicCode}</p>}{route ? <Badge tone={route.status === "completed" ? "success" : "info"}>{route.status === "completed" ? "Recorrido completado" : `${route.shipments.filter(item => item.action).length} entregas con acción disponible`}</Badge> : shipment ? <Badge tone={shipment.status === "entregado" ? "success" : shipment.incident ? "error" : "info"}>{SHIPPING_STATES[shipment.status]}</Badge> : <p>Recibí el paquete y confirmá cada etapa. El teléfono activa el seguimiento al salir hacia el cliente.</p>}</header>
     {error && <p role="alert" className="fm-shipping-error">{error}</p>}
     {!token && lookupId ? <Panel title="Abriendo el reparto" description="El QR de esta etiqueta habilita las acciones del próximo tramo sin ingresar códigos.">
       <p>El acceso queda limitado a este envío, a la siguiente etapa permitida y vence automáticamente.</p>
@@ -93,19 +100,19 @@ export default function CourierPortal({ lookupId }) {
       <Button onClick={authorize}>Abrir mi reparto</Button>
       <p className="fm-shipping-muted">Al escanear la etiqueta de un pedido no hace falta ingresar un código.</p>
     </Panel> : route ? <>
-      <div className="fm-shipping-public-card"><strong>Una sesión para toda la ruta</strong><p>Tramo: {route.leg === "origin" ? "Origen → repositorio" : route.leg === "final" ? "Repositorio → clientes" : "Entrega directa → clientes"} · {route.shipments.length} pedidos asignados.</p><p>Acceso válido hasta {formatDateTime(route.accessExpiresAt)}.</p></div>
-      {route.shipments.map(item => <Panel key={item.id} title={`Envío ${item.publicCode}`} description={item.customerName ? `Entrega para ${item.customerName}` : undefined} action={<Badge tone={item.status === "entregado" ? "success" : item.incident ? "error" : "info"}>{SHIPPING_STATES[item.status]}</Badge>}>
+      <div className="fm-shipping-public-card"><strong>Una sesión para toda la ruta</strong><p>Tramo: {route.leg === "origin" ? "Origen → repositorio" : route.leg === "final" ? "Repositorio → clientes" : "Entrega directa → clientes"} · {route.shipments.length} pedidos asignados.</p><p>La ubicación se activa al confirmar la salida hacia el cliente. Acceso válido hasta {formatDateTime(route.accessExpiresAt)}.</p></div>
+      {route.shipments.map(item => <Panel key={item.id} title={route.leg === "origin" ? "Envío hacia el repositorio" : `Envío para ${item.customerName || "el cliente"}`} description={`Código ${item.publicCode}`} action={<Badge tone={item.status === "entregado" ? "success" : item.incident ? "error" : "info"}>{SHIPPING_STATES[item.status]}</Badge>}>
         {item.destination?.displayAddress && <p className="fm-courier-address">{item.destination.displayAddress}</p>}
         {item.destination?.notes && <p><strong>Para la entrega:</strong> {item.destination.notes}</p>}
         {item.customerPhone && <a className="fm-button fm-button--secondary" href={`tel:${item.customerPhone}`}>Llamar al cliente</a>}
         {item.destination?.displayAddress && <a className="fm-button fm-button--secondary" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.destination.displayAddress)}`} target="_blank" rel="noreferrer">Cómo llegar con Google Maps</a>}
         {item.incident && <p className="fm-shipping-incident">Incidencia: {item.incident.reason}. Esperá a Flor Mía.</p>}
-        {item.action ? <Button loading={busy} icon="Check" onClick={() => execute("courier_action", { shipmentId: item.id, action: item.action.action })}>{actionLabels[item.action.action] || item.action.label}</Button> : !CLOSED_SHIPPING_STATES.includes(item.status) && <p role="status">Esperá a que este paquete alcance la siguiente etapa del recorrido.</p>}
+        {item.action ? <Button loading={busy} icon="Check" onClick={() => runCourierAction(item.action.action, route.leg, { shipmentId: item.id })}>{actionLabels[item.action.action] || item.action.label}</Button> : !CLOSED_SHIPPING_STATES.includes(item.status) && <p role="status">Esperá a que este paquete alcance la siguiente etapa del recorrido.</p>}
       </Panel>)}
       {route.gpsAllowed && <Panel title="Ubicación del recorrido" description="Una sola posición se comparte para los pedidos activos de esta ruta. Cada cliente sólo recibe el punto durante su propia entrega final.">
         <section className={`fm-courier-gps is-${gpsState.phase}`}><div role="status" aria-live="polite"><Badge tone={gpsState.phase === "sharing" ? "success" : gpsState.phase === "error" ? "error" : "warning"}>{gpsState.phase === "sharing" ? "Ubicación compartida" : gpsState.phase === "error" ? "Ubicación sin confirmar" : gpsState.active ? "Esperando ubicación" : "GPS apagado"}</Badge><p>{gpsState.message}</p>{gpsState.confirmedAt && <p>Último envío confirmado: {formatDateTime(gpsState.confirmedAt)} · precisión ±{Math.round(gpsState.accuracy)} m</p>}</div>
           <ShippingMap className="fm-courier-live-map" position={gpsState.position || route.position} trail={gpsState.trail?.length ? gpsState.trail : route.trail} destinations={route.shipments.filter(item => item.status === "reparto_final" && item.destination?.verified).map(item => ({ ...item.destination, id: item.id, label: item.publicCode }))} active={gpsState.phase === "sharing"} label="Ubicación de la ruta" />
-          <Button variant={gpsState.active ? "secondary" : "primary"} onClick={() => gpsState.active ? void gps.stop() : void gps.start()}>{gpsState.active ? "Dejar de compartir ubicación" : gpsState.phase === "error" ? "Reintentar compartir ubicación" : "Compartir mi ubicación"}</Button>
+          {gpsState.active && gpsState.phase !== "error" ? <Button variant="secondary" onClick={() => void gps.stop()}>Dejar de compartir ubicación</Button> : <Button variant="secondary" onClick={() => void gps.start({ retry: true })}>{gpsState.phase === "error" ? "Reintentar ubicación" : "Reanudar ubicación de la ruta"}</Button>}
           <p className="fm-shipping-muted">El GPS requiere tu permiso. Mantené el panel abierto y la pantalla encendida; el navegador puede pausar la ubicación en segundo plano.</p>
         </section>
       </Panel>}
@@ -129,12 +136,12 @@ export default function CourierPortal({ lookupId }) {
             {gpsState.confirmedAt && <p>Último envío confirmado: {formatDateTime(gpsState.confirmedAt)} · precisión ±{Math.round(gpsState.accuracy)} m</p>}
           </div>
           <ShippingMap className="fm-courier-live-map" position={gpsState.position || shipment.lastPosition} trail={gpsState.trail?.length ? gpsState.trail : shipment.gpsTrail} destination={shipment.destination} active={gpsState.phase === "sharing"} label="Tu ubicación para este reparto" />
-          <Button variant={gpsState.active ? "secondary" : "primary"} onClick={() => gpsState.active ? void gps.stop() : void gps.start()}>{gpsState.active ? "Dejar de compartir ubicación" : gpsState.phase === "error" ? "Reintentar compartir ubicación" : "Compartir mi ubicación"}</Button>
-          <p className="fm-shipping-muted">Permití Ubicación cuando el teléfono lo solicite. Mantené este panel abierto y la pantalla encendida durante el reparto. Al entregar, el seguimiento se detiene automáticamente.</p>
+          {gpsState.active && gpsState.phase !== "error" ? <Button variant="secondary" onClick={() => void gps.stop()}>Dejar de compartir ubicación</Button> : <Button variant="secondary" onClick={() => void gps.start({ retry: true })}>{gpsState.phase === "error" ? "Reintentar ubicación" : "Reanudar ubicación de este tramo"}</Button>}
+          <p className="fm-shipping-muted">Al salir hacia el cliente, el teléfono solicita permiso automáticamente. Mantené este panel abierto y la pantalla encendida; al entregar, el seguimiento se detiene.</p>
           <details><summary>Ayuda con la ubicación</summary><p>Abrí el enlace en Chrome o Safari. Activá Ubicación en el teléfono y permití el acceso para este sitio desde los ajustes del navegador. Si no hay señal, probá al aire libre. Si persiste el problema, avisá a Flor Mía.</p></details>
         </section> : <p role="status">{shipment.leg === "origin" ? "En el tramo hacia el repositorio no se comparte ubicación con el cliente." : "El GPS se habilita cuando confirmes que saliste hacia el cliente."}</p>}
       </Panel>}
-      {shipment.action && <div className="fm-shipping-public-actions"><Button loading={busy} icon="Check" onClick={() => execute("courier_action", { action: shipment.action.action })}>{actionLabels[shipment.action.action] || shipment.action.label}</Button><Button variant="destructive" icon="CircleAlert" onClick={() => setIssue(!issue)}>Tengo un problema</Button></div>}
+      {shipment.action && <div className="fm-shipping-public-actions"><Button loading={busy} icon="Check" onClick={() => runCourierAction(shipment.action.action, shipment.leg)}>{actionLabels[shipment.action.action] || shipment.action.label}</Button><Button variant="destructive" icon="CircleAlert" onClick={() => setIssue(!issue)}>Tengo un problema</Button></div>}
       <p className="fm-shipping-muted">Acceso válido hasta {formatDateTime(shipment.accessExpiresAt)}. Si necesitás otro tramo, pedile un nuevo acceso a Flor Mía.</p>
     </> : !error && <Skeleton />}
   </div>;

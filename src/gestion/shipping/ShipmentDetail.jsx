@@ -87,7 +87,7 @@ export function ShipmentContent({ shipment, profile, reload, internal = false, r
     ...(canApprove && shipment.status === "reparto_final" ? [{ key: "delivery-exception", title: "Autorizar excepción de entrega", description: "Permite una confirmación supervisada cuando falta la geocerca del domicilio.", label: "Revisar excepción", run: () => open("delivery_exception"), secondary: true }] : []),
   ];
   if (review) return <div className="fm-shipping-review">
-    <Panel title={`Revisión · ${shipment.publicCode}`} description="El local que realizó la venta se conserva en sus métricas." action={<Badge tone="warning">{shipment.stockCommitState === "committed" ? "Stock imputado" : "Aún sin descuento de stock"}</Badge>}>
+    <Panel title={`Revisión · Envío para ${shipment.customerSnapshot.name}`} description={`${shipment.publicCode} · ${shipment.saleCode}. El local que realizó la venta se conserva en sus métricas.`} action={<Badge tone="warning">{shipment.stockCommitState === "committed" ? "Stock imputado" : "Aún sin descuento de stock"}</Badge>}>
       <div className="fm-shipping-review-summary"><div><small>VENTA REGISTRADA EN</small><strong>{shipment.commercialLocationName || "Venta administrativa"}</strong><p>Atribución comercial: no se modifica.</p></div><div><small>CLIENTE Y DESTINO</small><strong>{shipment.customerSnapshot.name}</strong><p>{shipment.destination.displayAddress}</p></div></div>
       <ul className="fm-shipping-review-items">{shipment.itemsSnapshot.map(item => <li key={item.productId}>{item.qty} × {item.name}</li>)}</ul>
       {shipment.approvalReview && <p className="fm-shipping-muted">En revisión: {shipment.approvalReview.reason}</p>}
@@ -101,7 +101,7 @@ export function ShipmentContent({ shipment, profile, reload, internal = false, r
     </Panel>
   </div>;
   return <div className="fm-shipping-detail">
-    <div className="fm-shipping-detail-toolbar"><Badge tone={shipment.incident ? "error" : shipment.status === "entregado" ? "success" : "warning"}>{SHIPPING_STATES[shipment.status]}</Badge><span>{shipment.saleCode}</span><a className="fm-button fm-button--secondary" href={`/e/${shipment.publicLookupId}`}>Abrir QR</a>
+    <div className="fm-shipping-detail-toolbar"><Badge tone={shipment.incident ? "error" : shipment.status === "entregado" ? "success" : "warning"}>{SHIPPING_STATES[shipment.status]}</Badge><span>{shipment.publicCode}</span><span>{shipment.saleCode}</span><a className="fm-button fm-button--secondary" href={`/e/${shipment.publicLookupId}`}>Abrir QR</a>
     {(isEditor || assigned) && shipment.stockCommitState === "committed" && <Button variant="secondary" icon="Printer" loading={busy} onClick={print}>Imprimir etiqueta</Button>}
     </div>
     <LabelPreview url={preview} onClose={() => setPreview(null)} />
@@ -134,9 +134,9 @@ export default function ShipmentDetail({ shipmentId, profile, onClose, revision,
   }, [shipmentId, revision]);
   const current = shipment?.id === shipmentId ? shipment : null;
   if (presentation !== "drawer") return <section className={`fm-shipping-detail-page is-${presentation}`}>
-    {presentation === "page" && <><button className="fm-shipping-back" onClick={onClose}>← Gestión de envíos <span> / {current?.publicCode || "Detalle"}</span></button>{current && <><header className="fm-shipping-view-heading"><div><p className="fm-shipping-eyebrow">Detalle del envío · Seguimiento</p><h1>{current.customerSnapshot.name}</h1><p>{current.saleCode} · {TRANSPORTS[current.deliveryType]} · Origen: {current.stockOriginName || "Por aprobar"}</p></div><Badge tone={current.status === "entregado" ? "success" : "warning"}>{SHIPPING_STATES[current.status]}</Badge></header><ShippingProgress status={current.status} repository={current.deliveryType === "repository"} /></>}</>}
+    {presentation === "page" && <><button className="fm-shipping-back" onClick={onClose}>← Gestión de envíos <span> / {current?.publicCode || "Detalle"}</span></button>{current && <><header className="fm-shipping-view-heading"><div><p className="fm-shipping-eyebrow">Detalle del envío · Seguimiento</p><h1>Envío para {current.customerSnapshot.name}</h1><p className="fm-shipping-detail-code">{current.publicCode}</p><p>{current.saleCode} · {TRANSPORTS[current.deliveryType]} · Origen: {current.stockOriginName || "Por aprobar"}</p></div><Badge tone={current.status === "entregado" ? "success" : "warning"}>{SHIPPING_STATES[current.status]}</Badge></header><ShippingProgress status={current.status} repository={current.deliveryType === "repository"} /></>}</>}
     {error && <p role="alert" className="fm-shipping-error">{error}</p>}{current ? <ShipmentContent key={`${shipmentId}-${presentation}`} shipment={current} profile={profile} reload={reload} review={presentation === "review"} /> : !error && <Skeleton />}
     {presentation === "review" && <Button variant="secondary" onClick={onClose}>Ver detalle del envío</Button>}
   </section>;
-  return <Drawer open={Boolean(shipmentId)} onClose={onClose} title={current?.publicCode || "Ficha de envío"}>{error && <p role="alert">{error}</p>}{current ? <ShipmentContent key={shipmentId} shipment={current} profile={profile} reload={reload} /> : !error && <Skeleton />}</Drawer>;
+  return <Drawer open={Boolean(shipmentId)} onClose={onClose} title={current ? `Envío para ${current.customerSnapshot.name}` : "Ficha de envío"}>{error && <p role="alert">{error}</p>}{current ? <><p className="fm-shipping-detail-code fm-shipping-drawer-code">{current.publicCode}</p><ShipmentContent key={shipmentId} shipment={current} profile={profile} reload={reload} /></> : !error && <Skeleton />}</Drawer>;
 }

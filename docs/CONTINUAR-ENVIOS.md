@@ -1,6 +1,6 @@
 # Continuar el módulo de envíos desde otra PC
 
-Estado actualizado: **19/10/2026**. Repositorio: [AgustinBazanUB/App-Integral-FM](https://github.com/AgustinBazanUB/App-Integral-FM). Rama: **`codex/modulo-envios-v08`**. PR de trabajo: [#40](https://github.com/AgustinBazanUB/App-Integral-FM/pull/40), mantenido como borrador.
+Estado actualizado: **20/10/2026**. Repositorio: [AgustinBazanUB/App-Integral-FM](https://github.com/AgustinBazanUB/App-Integral-FM). Rama: **`codex/modulo-envios-v08`**. PR de trabajo: [#40](https://github.com/AgustinBazanUB/App-Integral-FM/pull/40), mantenido como borrador.
 
 El código, la documentación, las referencias originales y las capturas de esta adaptación están versionados en esta rama. Los secretos en `.env`/`.env.local`, las credenciales, la configuración privada local de herramientas y las carpetas temporales no deben copiarse al repositorio. Conservar los archivos de superficies `.env.gestion` y `.env.ecommerce` que ya forman parte del proyecto; no reemplazarlos con credenciales privadas.
 
@@ -30,7 +30,7 @@ La configuración de frontend se orienta mediante `.env.example`. Configurar ún
 | Detalle | Página en Gestión con progreso, datos, última ubicación, eventos y operaciones administrativas. El vendedor conserva su ficha lateral. |
 | QR interno | Elección de rol para etiquetas; sesión y asignación obligatorias para preparar o reportar un problema. |
 | Repartidor | Acceso temporal por tramo, recepción, repositorio, salida final, entrega e incidencias. |
-| GPS | Solicitud explícita, confirmación de publicación, último punto, parada y rechazo de peticiones tardías mediante sesión GPS. |
+| GPS | Solicitud automática al confirmar la salida hacia el cliente; permiso ligado al toque, confirmación de publicación, último punto, parada y rechazo de peticiones tardías mediante sesión GPS. |
 | Cliente | Página independiente de sólo lectura, progreso y última posición permitida; enlace a Google Maps cuando está disponible. |
 
 La adaptación v07 reorganiza el código funcional existente. No agrega pedidos ficticios al backend ni reemplaza transacciones por los botones simulados del prototipo. El QR de etiqueta identifica un envío y ofrece los dos roles; el QR temporal emitido por Gestión permite entrar directamente como repartidor autorizado. Preparadores y repartidores conservan permisos diferentes.
@@ -56,7 +56,7 @@ npm run test:shipping
 npm run build:surfaces
 ```
 
-La regresión local de esta adaptación pasó **986 pruebas**. Gestión y ecommerce compilaron correctamente. CI incluye regresión y reglas en un emulador `demo-*`; los resultados definitivos de cada commit aparecen en el PR. Vite conserva avisos de tamaño de chunks, sin impedir la compilación.
+La regresión local de esta adaptación pasó **999 pruebas**. Gestión y ecommerce compilaron correctamente. CI incluye regresión y reglas en un emulador `demo-*`; los resultados definitivos de cada commit aparecen en el PR. Vite conserva avisos de tamaño de chunks, sin impedir la compilación.
 
 Para el laboratorio visual sin Firebase real:
 
@@ -92,3 +92,11 @@ La rama incluye cambios previos de facturación procedentes de `codex/vendedor-f
 - La anulación habitual de ventas vinculadas a envíos está bloqueada para evitar reposiciones al origen incorrecto. Cancelar un envío no devuelve stock ni dinero; la conciliación necesita movimientos compensatorios supervisados.
 
 Detalle: [prueba manual del preview](shipping-manual-preview-40.md), [guía de GPS](shipping-courier-gps.md) y [especificación técnica](shipping-v08.md).
+
+## Ajustes de títulos y GPS móvil — 20/10/2026
+
+Los tableros de Gestión, solicitudes, preparaciones, revisión, detalle, QR interno y portal de reparto ahora destacan **Envío para [cliente]** y dejan el código del envío en una línea secundaria. El tramo inicial hacia el repositorio conserva el título de destino y no muestra datos del cliente al repartidor del primer tramo. El enlace público del cliente continúa sin exponer su nombre.
+
+Al confirmar la salida directa o **Salir del repositorio hacia el cliente**, el navegador empieza a solicitar ubicación inmediatamente desde ese toque. El primer punto queda retenido localmente hasta que el servidor confirma que el pedido está en reparto final; después se comparte y aparece en el mapa con el marcador de moto. No se muestra un botón para iniciar la ubicación manualmente en el recorrido normal. Si el permiso o la señal fallan, el portal ofrece **Reintentar ubicación**.
+
+Pendiente de esta revisión: comprobar en el iPhone del usuario que Chrome muestra el permiso al tocar salida y que el mapa refleja una posición real en la preview HTTPS. En iOS, revisar **Ajustes → Apps → Chrome → Ubicación** si Chrome no tiene acceso. La prueba de interfaz automatizada usa geolocalización simulada y no reemplaza esa validación física.
