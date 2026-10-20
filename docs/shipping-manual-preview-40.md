@@ -70,3 +70,20 @@ No se fusionó el PR ni se publicaron reglas/índices globales de Firebase. El d
 Carpeta ignorada por Git: `tmp/shipping-manual-preview-40/`. Contiene capturas numeradas 01–13 (incluidos hallazgos previos a corregir), PDF y render de etiqueta, `pdf-verification.json`, `stock-proof.json` y salidas de tests/build. No se guardan credenciales temporales en el informe ni se versionan enlaces privados.
 
 Capturas finales: `12-tablero-entregados.jpg`, `11-entrega-manual-con-reintento.jpg` y `13-seguimiento-entregado.jpg`.
+
+## Actualización 20/10/2026 — validación en Firebase de pruebas
+
+Se repitieron los recorridos en el Deploy Preview 40 conectado a `app-integral-fm-pruebas`. Esta sesión usó registros y productos ficticios de staging; no se hicieron escrituras en Firebase de producción. Los registros de prueba se dejan en la base de staging para que el usuario pueda revisarlos.
+
+| Caso | Resultado observado |
+| --- | --- |
+| Venta Rápida con envío | `FM-QAENV-20261020-0001`: se creó la venta y el envío desde Venta Rápida. El stock de la ubicación de prueba se descontó una vez al registrar la venta. |
+| Reparto con repositorio | Se confirmaron retiro del origen y recepción en el repositorio; el portal no exigió una dirección para el repositorio. El acceso del segundo tramo mostró el destino ficticio y habilitó GPS para el recorrido al cliente. |
+| GPS real | Tras habilitar Ubicación del equipo y permitir el sitio en Chrome, “Reintentar compartir ubicación” obtuvo una posición real. El portal confirmó el envío al seguimiento (precisión reportada entre ±117 m y ±180 m); el enlace público mostró ubicación disponible durante el reparto. No se guardan coordenadas en este documento. |
+| Geocerca y excepción | La entrega quedó bloqueada porque el domicilio de prueba no tiene geocerca. Con autorización expresa del usuario, se concedió desde administración una excepción temporal, con motivo de prueba ficticia; el evento quedó auditado con el usuario administrador de pruebas. |
+| Cierre y privacidad del GPS | El repartidor confirmó la entrega. Su portal indicó que el GPS se detuvo. Tras actualizar el enlace público, el pedido apareció como entregado, sin señal activa y sin exponer la última posición; administración reflejó el mismo estado. |
+| Panel Vendedor | `FM-QAENV-20261020-0002`: la solicitud no descontó stock; luego de la aprobación administrativa el detalle indicó “Stock: Imputado una vez”. El envío sigue en “Por preparar” para revisión posterior. |
+| QR interno de preparación | **Pendiente / falla observada:** abrir el acceso interno desde el flujo de QR dejó el portal en “Cargando”, incluso después de volver a elegir “Soy personal de Flor Mía”. No se pudo confirmar preparación por ese camino. |
+| Etiqueta de staging | La selección y vista previa A4 mostraron el pedido ficticio y su QR. En esta sesión no se comprobó la descarga del PDF ni una impresión física. |
+
+La prueba GPS confirmó que la posición del dispositivo se publica en el recorrido final y que el cliente deja de verla al entregar. La validación no demuestra geocercado del domicilio: el ambiente de prueba no tiene coordenadas configuradas para ese destino y la entrega se terminó mediante la excepción supervisada autorizada. El acceso operativo del repartidor y el seguimiento público permanecen abiertos en las pestañas de Chrome para inspección.
