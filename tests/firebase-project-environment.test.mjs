@@ -119,8 +119,11 @@ test("Firebase Admin document reads use the selected staging database", async ()
   const requests = [];
   const env = {
     FIREBASE_PROJECT_ID: STAGING_FIREBASE_PROJECT_ID,
-    FIREBASE_ADMIN_CLIENT_EMAIL: `firebase-adminsdk-test@${STAGING_FIREBASE_PROJECT_ID}.iam.gserviceaccount.com`,
-    FIREBASE_ADMIN_PRIVATE_KEY: privateKey,
+    FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({
+      project_id: STAGING_FIREBASE_PROJECT_ID,
+      client_email: `firebase-adminsdk-test@${STAGING_FIREBASE_PROJECT_ID}.iam.gserviceaccount.com`,
+      private_key: privateKey,
+    }),
   };
   const fetchImpl = async (url, init = {}) => {
     requests.push({ url: String(url), init });

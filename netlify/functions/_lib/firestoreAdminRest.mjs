@@ -29,12 +29,41 @@ function base64Url(value) {
 
 function adminConfig(env = process.env) {
   const projectId = configuredFirebaseProjectId(env);
-  const clientEmail = required("FIREBASE_ADMIN_CLIENT_EMAIL", env);
+  let serviceAccount = null;
+  const rawServiceAccount = env.FIREBASE_SERVICE_ACCOUNT_JSON || env.FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM || "";
+  if (rawServiceAccount) {
+    try {
+      serviceAccount = JSON.parse(rawServiceAccount);
+    } catch {
+      const error = new Error("La cuenta de servicio Firebase server-side no tiene un formato válido.");
+      error.code = "firebase-admin-invalid";
+      error.status = 500;
+      throw error;
+    }
+    if (!serviceAccount || typeof serviceAccount !== "object" || Array.isArray(serviceAccount)) {
+      const error = new Error("La cuenta de servicio Firebase server-side no tiene un formato válido.");
+      error.code = "firebase-admin-invalid";
+      error.status = 500;
+      throw error;
+    }
+  }
+  if (serviceAccount?.project_id && serviceAccount.project_id !== projectId) {
+    const error = new Error("La cuenta de servicio Firebase no corresponde al proyecto configurado.");
+    error.code = "firebase-project-mismatch";
+    error.status = 500;
+    throw error;
+  }
+  const credentials = {
+    ...env,
+    FIREBASE_ADMIN_CLIENT_EMAIL: env.FIREBASE_ADMIN_CLIENT_EMAIL || serviceAccount?.client_email,
+    FIREBASE_ADMIN_PRIVATE_KEY: env.FIREBASE_ADMIN_PRIVATE_KEY || serviceAccount?.private_key,
+  };
+  const clientEmail = required("FIREBASE_ADMIN_CLIENT_EMAIL", credentials);
   assertFirebaseServiceAccountProject(projectId, clientEmail);
   return {
     projectId,
     clientEmail,
-    privateKey: required("FIREBASE_ADMIN_PRIVATE_KEY", env).replace(/\\n/g, "\n"),
+    privateKey: required("FIREBASE_ADMIN_PRIVATE_KEY", credentials).replace(/\\n/g, "\n"),
   };
 }
 
