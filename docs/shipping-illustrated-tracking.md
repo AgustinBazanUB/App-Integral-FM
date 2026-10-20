@@ -1,52 +1,57 @@
-# Seguimiento ilustrado por etapas — Flor Mía
+# Seguimiento ilustrado animado — Flor Mía
 
-Vigente desde el 20/10/2026 para la rama `codex/modulo-envios-v08` y el Deploy Preview #40. Esta guía reemplaza en la interfaz el seguimiento operativo con GPS descrito en los documentos históricos de v0.8.
+Vigente desde el 20/10/2026 para la rama `codex/modulo-envios-v08` y el Deploy Preview #40. Esta guía describe el flujo visual que reemplaza el mapa GPS en las vistas de Gestión, repartidor y cliente.
 
-## Comportamiento actual
+## Experiencia del pedido
 
-La vista de cliente, el detalle de Gestión y el portal del repartidor muestran una escena vectorial original de Flor Mía: local, caja, calle, moto y domicilio; en los envíos con Repositorio se agrega una parada ilustrada. La escena, el mensaje y la barra se derivan exclusivamente del estado persistido del envío. No interpolan posiciones, no inventan rutas geográficas, ETA ni avance temporal.
+La escena se inspira en la referencia visual compartida: el local de Flor Mía, el repartidor en moto y el domicilio, con una parada de repositorio para esos envíos. El paisaje es una ilustración panorámica local y la repartidora se anima con el reproductor oficial dotLottie para React. El panel ubica esa animación en la etapa guardada. La transición entre posiciones ocurre al cambiar un estado confirmado; no simula un trayecto geográfico ni el tiempo restante.
 
-Los hitos completados aparecen en verde, la etapa actual en amarillo y las pendientes en gris. La moto se desplaza entre hitos cuando llega una actualización real del estado; las ruedas giran y el vehículo tiene un movimiento leve sólo mientras el envío está en tránsito. Al preparar, la caja se mueve dentro del local; al quedar listo, aparece en la moto; al registrarse en repositorio se muestra allí; al entregar, la moto queda junto al domicilio y la caja aparece en la puerta con una marca de confirmación. Estados cancelados, devueltos, rechazados o no entregados no muestran avance normal ni una moto circulando. Las incidencias mantienen el punto actual y pausan el movimiento.
+La interfaz separa los hitos guardados de la acción que está ocurriendo. Los hitos confirmados quedan en verde y los próximos en gris. Una tarjeta cálida muestra la fase activa con una barra indeterminada: comunica “preparando”, “esperando” o “en camino” sin inventar un porcentaje de avance. Cuando el estado es `entregado`, la barra desaparece y todos los hitos quedan completos. Una incidencia pausa la escena y elimina la fase activa.
 
-La escena ilustrada reemplaza el mapa en el seguimiento del cliente, el detalle administrativo y el portal del repartidor. Ninguna de esas vistas pide permiso de ubicación ni envía coordenadas. El mapa Leaflet que queda en Gestión sirve únicamente para revisar y corregir manualmente el pin del domicilio; no representa movimiento ni recibe GPS. El Repositorio es un símbolo visual sin coordenadas ni dirección asumida.
+### Envío directo
 
-La API pública de seguimiento devuelve sólo el código público, estado, tipo de envío, etiqueta, indicador booleano de incidencia, texto genérico de la ilustración y hora de actualización. No devuelve el motivo interno de la incidencia ni consulta o expone posición, precisión, traza o sesión GPS. Si falla una actualización por conexión, el cliente conserva la última respuesta confirmada e indica que puede estar desactualizada; si el enlace venció o fue revocado, borra el estado almacenado. Al volver la conexión, la consulta actualiza la escena. La preferencia `prefers-reduced-motion` reduce transiciones y animaciones, y la pestaña oculta pausa el movimiento decorativo.
+`Pedido recibido` → **Preparando tu pedido** → `Listo para retirar` → **Esperando al repartidor** → `Repartidor lo retiró` → **Hacia tu domicilio** → `Entregado`.
 
-## Hitos conectados a los estados actuales
+### Envío por repositorio
 
-| Transporte | Estado de envío | Hito actual | Representación |
-| --- | --- | --- | --- |
-| Directo | `solicitud_pendiente`, `aprobado` | Pedido recibido | Caja en el local; moto detenida. |
-| Directo | `en_preparacion` | Preparando | Caja con movimiento suave dentro del local. |
-| Directo | `listo_retirar` | Listo para salir | Caja sobre la moto detenida en Flor Mía. |
-| Directo | `reparto_final` | En camino | Moto en ruta ilustrativa; el mapa no es geográfico. |
-| Directo | `entregado` | Entregado | Moto en el domicilio, caja en la puerta y confirmación. |
-| Repositorio | `solicitud_pendiente`, `aprobado`; `en_preparacion`; `listo_retirar` | Pedido recibido; Preparando; Listo para salir | Mismos hitos iniciales del envío directo. |
-| Repositorio | `hacia_repositorio` | Hacia el repositorio | Moto en el primer tramo ilustrado. |
-| Repositorio | `recibido_repositorio` | En repositorio | Moto detenida y paquete en el depósito simbólico. |
-| Repositorio | `reparto_final` | Hacia tu domicilio | Moto en el segundo tramo ilustrado. |
-| Repositorio | `entregado` | Entregado | Moto en el domicilio, caja en la puerta y confirmación. |
+`Pedido recibido` → **Preparando tu pedido** → `Listo para retirar` → **Esperando al repartidor** → `Repartidor lo retiró` → **En camino al repositorio** → `Entregado en repositorio` → **Esperando al repartidor** → `Salió del repositorio` → **Hacia tu domicilio** → `Entregado`.
 
-La lista `deliveryJourney` traduce estados sin cambiar el modelo operativo del envío. La barra usa el índice del hito confirmado dividido por los hitos del recorrido. El 100 % sólo ocurre cuando el servidor registra `entregado`. Una solicitud de vendedor pendiente muestra “Pedido recibido” con el mensaje de revisión, sin fingir preparación o salida.
+El panel público sigue sin exponer el nombre del cliente ni datos internos. El estado visual proviene de los estados existentes del envío; esta presentación no agrega transiciones ni modifica documentos de Firebase.
 
-## Ilustración y licencias
+## Correspondencia con estados persistidos
 
-`src/gestion/shipping/AnimatedDeliveryJourney.jsx` y `shipping-journey.css` implementan la escena con SVG/CSS dibujados para este proyecto; no se descargan animaciones ni imágenes de terceros y no se agrega una dependencia Lottie. El proyecto no tenía un recurso Lottie de reparto con licencia comercial verificada. Se reutiliza el archivo de marca existente `/images/flor-mia/logo-flor-mia.svg`; no se modifica el logotipo. Los trazos nuevos son código original del proyecto.
+| Transporte | Estado de envío | Hitos completados | Fase activa | Escena |
+| --- | --- | --- | --- | --- |
+| Directo | `solicitud_pendiente` | Pedido recibido | Confirmando tu pedido | Pedido en Flor Mía |
+| Ambos | `aprobado`, `en_preparacion` | Pedido recibido | Preparando tu pedido | Preparación en Flor Mía |
+| Ambos | `listo_retirar` | Pedido recibido, Listo para retirar | Esperando al repartidor | Retiro en el local |
+| Directo | `retirado_origen`, `reparto_final` | Pedido recibido, Listo para retirar, Repartidor lo retiró | Hacia tu domicilio | Repartidor en el trayecto ilustrado |
+| Repositorio | `retirado_origen`, `hacia_repositorio` | Primeros tres hitos | En camino al repositorio | Repartidor en el primer tramo ilustrado |
+| Repositorio | `recibido_repositorio` | Primeros cuatro hitos | Esperando al repartidor | Paquete en el repositorio simbólico |
+| Repositorio | `reparto_final` | Primeros cinco hitos | Hacia tu domicilio | Repartidor en el segundo tramo ilustrado |
+| Ambos | `entregado` | Todos los hitos del recorrido | — | Entrega confirmada en el domicilio |
 
-Este enfoque sigue la alternativa indicada en el prompt cuando no hay una animación adecuada con licencia: ilustración vectorial propia con movimiento ligero. La interfaz sigue siendo informativa si el SVG o las animaciones no se reproducen; los mensajes y etapas HTML continúan disponibles. Las animaciones decorativas respetan movimiento reducido y se pausan con la pestaña oculta.
+Los estados cancelados, devueltos, rechazados, fallidos o desconocidos muestran una pausa y no avanzan hitos. La ilustración congela la moto en vez de presentarla como si continuara el reparto.
 
-## GPS/Leaflet futuro
+## Implementación y recursos
 
-Los endpoints `gps_start`, `gps_stop`, `position` y `delivery_exception` responden `410` antes de abrir una transacción; los componentes activos ya no los llaman. Se eliminó el controlador de geolocalización del navegador, la interfaz de captura GPS, las trazas de ubicación y los mapas de seguimiento. Las escrituras de etapa eliminan también posiciones heredadas. Los campos antiguos se limpian sólo por compatibilidad/privacidad y no participan de la vista.
+- `src/gestion/shipping/AnimatedDeliveryJourney.jsx` conecta la escena y la línea de tiempo con el estado actual.
+- `src/gestion/shipping/deliveryJourney.mjs` traduce estados existentes a hitos y fases activas.
+- `src/gestion/shipping/DeliveryRiderAnimation.jsx` usa `@lottiefiles/dotlottie-react` y carga el recurso local `/animations/flor-mia-delivery-rider.lottie`.
+- `src/gestion/shipping/assets/shipping-scene.webp` contiene el paisaje panorámico y `assets/delivery-rider.png` es la ilustración que anima el archivo dotLottie.
+- `scripts/build-shipping-lottie.mjs` recompone el recurso local si cambia la ilustración. Se ejecuta con `npm run build:shipping:lottie`.
 
-Leaflet queda como selector manual de domicilio y puede reaprovecharse en una etapa futura mediante un componente separado `LiveGpsMap`. Para reactivarlo en otro trabajo habrá que diseñar primero consentimiento, autenticación, retención, validación y contrato API; luego volver a habilitar permisos, lectura autorizada y mapa en forma explícita. Esta entrega no deja un control GPS oculto ni una sección de mapa vacía.
+El jugador y el recurso se sirven desde la propia aplicación; la vista no depende de un CDN de animaciones. La escena no depende del reproductor para comunicar el estado: los títulos, hitos y texto accesible se renderizan como HTML. `prefers-reduced-motion` reduce el movimiento, la pestaña oculta pausa las animaciones y el avance sólo ocurre al recibir un estado nuevo confirmado.
+
+## Ubicación y mapa
+
+La escena no pide permiso de ubicación, no guarda ni envía coordenadas y no muestra un mapa interactivo. El repositorio es un símbolo ilustrativo, sin una dirección o geocerca supuesta. El mapa Leaflet se conserva sólo en Gestión para corregir manualmente el pin de destino. Los endpoints GPS anteriores permanecen deshabilitados con `410`.
 
 ## Verificación
 
-- `npm run test:shipping`: pruebas de mapeo de estados, excepciones, autorización, transacciones e invariantes sin coordenadas públicas.
-- `npm run test:shipping:ui`: recorrido de navegador con datos sintéticos; valida QR del repartidor, cliente, ausencia de Leaflet/teselas/GPS, movimiento reducido, desborde móvil y conservación del último estado ante error de conexión.
-- `npm run build`: valida el bundle de la aplicación.
+- `npm run test:shipping`: mapeo de estados y fases, excepciones, permisos y invariantes de datos.
+- `npm run test:shipping:ui`: navegación de escritorio y móvil con registros sintéticos en memoria; valida el recurso dotLottie, los estados directos y por repositorio, movimiento reducido, ausencia de mapa/GPS y errores del navegador.
+- `npm run build:shipping:lottie`: genera el `.lottie` local desde el PNG.
+- `npm run build:surfaces`: compila Gestión y Ecommerce.
 
-La prueba de interfaz no escribe en Firebase. No es una prueba de entrega física ni despliega Production.
-
-Capturas sintéticas de cada hito, la pausa por incidencia y la entrega fallida: [evidencia visual](shipping-evidence/illustrated-tracking/README.md).
+La prueba de interfaz no escribe en Firebase ni completa una entrega real. Las capturas sintéticas están en [evidencia visual](shipping-evidence/illustrated-tracking/README.md).

@@ -27,22 +27,23 @@ if(body.mode==='courier_action'){row.status=body.action==='pickup'?'reparto_fina
   arcaService: `export const lookupArcaBillingReceiver=async()=>null;export const validateArcaInvoiceDraft=async()=>{throw Error('ARCA deshabilitada en QA')};export const requestPendingArcaInvoice=async()=>{throw Error('ARCA deshabilitada en QA')};`,
   SaleInvoicePanel: `export default()=>null;`, ArcaInvoicePrintAction: `export default()=>null;`,
 };
-  await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{RouterProvider}from'./src/router';import ShippingPage from './src/gestion/pages/ShippingPage';import QuickSalesPage from './src/gestion/pages/QuickSalesPage';import ShippingPublicApp from './src/gestion/shipping/ShippingPublicApp';import '@fontsource/inter/latin-400.css';import '@fontsource/inter/latin-600.css';import '@fontsource/cormorant-garamond/latin-600.css';import './src/styles.css';import './src/styles/tokens.css';import './src/styles/theme.css';import './src/styles/management.css';import './src/styles/responsive.css';import './src/gestion/styles/quick-sales.css';document.body.className='fm-management-body';createRoot(document.getElementById('root')).render(<RouterProvider><div style={{padding:24,maxWidth:1500,margin:'auto'}}><p>QA LOCAL · DATOS SINTÉTICOS · SIN SERVICIOS PRODUCTIVOS</p>{location.pathname.includes('quick-sales')?<QuickSalesPage/>:location.pathname.startsWith('/e/')||location.pathname==='/reparto'||location.pathname==='/seguimiento'?<ShippingPublicApp/>:<ShippingPage/>}</div></RouterProvider>);`, resolveDir: process.cwd(), loader: "jsx" }, bundle: true, external: ["/images/*"], outdir: directory, entryNames: "app", format: "esm", jsx: "automatic", define: { "import.meta.env": "{}" }, loader: { ".woff": "dataurl", ".woff2": "dataurl", ".png": "dataurl" }, plugins: [{ name: "shipping-qa-mocks", setup(builder) {
+  await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{RouterProvider}from'./src/router';import ShippingPage from './src/gestion/pages/ShippingPage';import QuickSalesPage from './src/gestion/pages/QuickSalesPage';import ShippingPublicApp from './src/gestion/shipping/ShippingPublicApp';import '@fontsource/inter/latin-400.css';import '@fontsource/inter/latin-600.css';import '@fontsource/cormorant-garamond/latin-600.css';import './src/styles.css';import './src/styles/tokens.css';import './src/styles/theme.css';import './src/styles/management.css';import './src/styles/responsive.css';import './src/gestion/styles/quick-sales.css';document.body.className='fm-management-body';createRoot(document.getElementById('root')).render(<RouterProvider><div style={{padding:24,maxWidth:1500,margin:'auto'}}><p>QA LOCAL · DATOS SINTÉTICOS · SIN SERVICIOS PRODUCTIVOS</p>{location.pathname.includes('quick-sales')?<QuickSalesPage/>:location.pathname.startsWith('/e/')||location.pathname==='/reparto'||location.pathname==='/seguimiento'?<ShippingPublicApp/>:<ShippingPage/>}</div></RouterProvider>);`, resolveDir: process.cwd(), loader: "jsx" }, bundle: true, external: ["/images/*"], outdir: directory, entryNames: "app", format: "esm", jsx: "automatic", define: { "import.meta.env": "{}" }, loader: { ".woff": "dataurl", ".woff2": "dataurl", ".png": "dataurl", ".webp": "dataurl", ".wasm": "file" }, plugins: [{ name: "shipping-qa-mocks", setup(builder) {
   builder.onResolve({ filter: /(?:AuthContext|shippingService|sharedResources|inventoryService|managementService|customerService|arcaService|SaleInvoicePanel|ArcaInvoicePrintAction)$/ }, args => ({ path: args.path.split("/").at(-1), namespace: "mock" }));
   builder.onLoad({ filter: /.*/, namespace: "mock" }, args => ({ contents: mocks[args.path], loader: "jsx" }));
 } }] });
 const html = '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"><div id="root"></div><script type="module" src="/app.js"></script></html>';
 if (process.argv.includes("--build-only")) { console.log("Shipping UI laboratory bundle ready; no browser started."); process.exit(0); }
-const server = createServer(async (req, res) => { try { const pathname = new URL(req.url, "http://localhost").pathname; if (pathname === "/app.js" || pathname === "/app.css") { res.setHeader("Content-Type", pathname.endsWith("css") ? "text/css" : "text/javascript"); res.end(await readFile(path.join(directory, pathname.slice(1)))); } else if (pathname.startsWith("/images/")) { const target = path.resolve("public", pathname.slice(1)); if (!target.startsWith(path.resolve("public") + path.sep)) throw Error(); res.setHeader("Content-Type", "image/svg+xml"); res.end(await readFile(target)); } else { res.setHeader("Content-Type", "text/html"); res.end(html); } } catch { res.statusCode = 404; res.end(); } });
+const server = createServer(async (req, res) => { try { const pathname = new URL(req.url, "http://localhost").pathname; if (pathname === "/app.js" || pathname === "/app.css") { res.setHeader("Content-Type", pathname.endsWith("css") ? "text/css" : "text/javascript"); res.end(await readFile(path.join(directory, pathname.slice(1)))); } else if (pathname.startsWith("/images/")) { const target = path.resolve("public", pathname.slice(1)); if (!target.startsWith(path.resolve("public") + path.sep)) throw Error(); res.setHeader("Content-Type", pathname.endsWith(".svg") ? "image/svg+xml" : "image/*"); res.end(await readFile(target)); } else if (pathname.startsWith("/animations/")) { const target = path.resolve("public", pathname.slice(1)); if (!target.startsWith(path.resolve("public") + path.sep)) throw Error(); res.setHeader("Content-Type", "application/octet-stream"); res.end(await readFile(target)); } else if (pathname.endsWith(".wasm")) { const target = path.resolve(directory, path.basename(pathname)); if (!target.startsWith(path.resolve(directory) + path.sep)) throw Error(); res.setHeader("Content-Type", "application/wasm"); res.end(await readFile(target)); } else { res.setHeader("Content-Type", "text/html"); res.end(html); } } catch { res.statusCode = 404; res.end(); } });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 if (process.argv.includes("--serve")) { console.log(JSON.stringify({ base, data: "synthetic", productionWrites: 0 })); await new Promise(() => {}); }
 const { chromium } = require("playwright");
 const browser = await chromium.launch({ executablePath: process.env.SHIPPING_QA_CHROME || "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true });
-const errors = [], checks = []; let tileRequests = 0;
+const errors = [], checks = []; let tileRequests = 0, dotLottieStatus = null;
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.on("pageerror", error => errors.push(error.message));
+  page.on("response", response => { if (response.url().endsWith("/animations/flor-mia-delivery-rider.lottie")) dotLottieStatus = response.status(); });
   await page.addInitScript(() => { Object.defineProperty(navigator, "geolocation", { configurable: true, value: { watchPosition(success) { window.__gpsCalls = (window.__gpsCalls || 0) + 1; window.__gpsWatchCalls = (window.__gpsWatchCalls || 0) + 1; setTimeout(() => success({ coords: { latitude: -34.6, longitude: -58.4, accuracy: 12 }, timestamp: Date.now() }), 50); return 1; }, clearWatch() { window.__gpsCalls = (window.__gpsCalls || 0) + 1; }, getCurrentPosition(success) { window.__gpsCalls = (window.__gpsCalls || 0) + 1; setTimeout(() => success({ coords: { latitude: -34.6, longitude: -58.4, accuracy: 12 }, timestamp: Date.now() }), 50); } } }); });
   await page.route("https://tile.openstreetmap.org/**", route => { tileRequests++; return route.fulfill({ status: 200, contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/Z9sAAAAASUVORK5CYII=", "base64") }); });
   await page.goto(`${base}/gestion/shipping`); await page.getByRole("heading", { name: "Gestión de envíos", exact: true }).waitFor();
@@ -90,7 +91,7 @@ try {
   await page.getByRole("button", { name: /Soy repartidor/ }).click(); await page.getByRole("heading", { name: "Envío para Destinatario de prueba" }).waitFor();
   assert.equal(await page.getByLabel("Enlace o código temporal").count(), 0); checks.push("printed_courier_qr_needs_no_manual_code");
   await page.getByRole("button", { name: "Confirmar que recibí el paquete" }).click();
-  await page.getByText("El pedido salió de Flor Mía y va hacia tu domicilio.").waitFor();
+  await page.getByText("El repartidor retiró tu pedido y va hacia tu domicilio.").waitFor();
   assert.equal(await page.evaluate(() => window.__gpsWatchCalls || 0), 0);
   assert.equal(await page.getByRole("button", { name: /ubicación|GPS/i }).count(), 0);
   checks.push("courier_confirms_stage_without_requesting_gps");
@@ -103,14 +104,34 @@ try {
   await page.emulateMedia({ reducedMotion: "reduce" });
   assert.equal(await page.locator(".fm-delivery-journey__scene").count(), 1);
   const stageShots = [
-    ["manual", "aprobado", "received", 0], ["manual", "en_preparacion", "preparing", 25], ["manual", "listo_retirar", "ready", 50], ["manual", "reparto_final", "to-customer", 75], ["manual", "entregado", "delivered", 100],
-    ["repository", "hacia_repositorio", "to-repository", 50], ["repository", "recibido_repositorio", "at-repository", 67], ["repository", "reparto_final", "to-customer", 83], ["repository", "entregado", "delivered", 100],
+    ["manual", "aprobado", "preparing", "Preparando tu pedido", 1], ["manual", "en_preparacion", "preparing", "Preparando tu pedido", 1], ["manual", "listo_retirar", "ready", "Esperando al repartidor", 2], ["manual", "reparto_final", "to-customer", "Hacia tu domicilio", 3], ["manual", "entregado", "delivered", null, 4],
+    ["repository", "hacia_repositorio", "to-repository", "En camino al repositorio", 3], ["repository", "recibido_repositorio", "waiting-courier", "Esperando al repartidor", 4], ["repository", "reparto_final", "to-customer", "Hacia tu domicilio", 5], ["repository", "entregado", "delivered", null, 6],
   ];
-  for (const [type, status, scene, progress] of stageShots) {
+  for (const [type, status, scene, activePhase, completedCount] of stageShots) {
     await page.evaluate(([deliveryType, nextStatus]) => { window.__trackingDeliveryType = deliveryType; window.__trackingStatus = nextStatus; window.dispatchEvent(new Event("focus")); }, [type, status]);
     const journey = page.locator(`.fm-delivery-journey[data-stage="${scene}"]`);
     await journey.waitFor();
-    assert.equal(await journey.getByRole("progressbar").getAttribute("aria-valuenow"), String(progress));
+    assert.equal(await journey.locator(".fm-delivery-journey__checkpoints li.is-done").count(), completedCount);
+    if (activePhase) {
+      assert.equal(await journey.getByRole("progressbar").getAttribute("aria-valuetext"), "En progreso");
+      assert.ok((await journey.getByRole("status").innerText()).includes(activePhase));
+    } else {
+      assert.equal(await journey.getByRole("progressbar").count(), 0);
+      assert.match(await journey.getByRole("status").innerText(), /Pedido entregado/);
+    }
+    if (["ready", "to-repository", "to-customer", "delivered"].includes(scene)) {
+      const canvas = journey.locator(".fm-delivery-journey__courier canvas");
+      await canvas.waitFor();
+      const rendered = await canvas.evaluate(element => {
+        const context = element.getContext("2d");
+        if (!context || !element.width || !element.height) return false;
+        const pixels = context.getImageData(0, 0, element.width, element.height).data;
+        for (let index = 3; index < pixels.length; index += 4) if (pixels[index] > 0) return true;
+        return false;
+      });
+      assert.equal(dotLottieStatus, 200, "the local dotLottie bundle should load successfully");
+      assert.equal(rendered, true, "the local dotLottie player should render visible artwork");
+    }
     await journey.screenshot({ path: path.join(directory, `journey-${type}-${status}.png`) });
   }
   await page.evaluate(() => { window.__trackingDeliveryType = "manual"; window.__trackingStatus = "reparto_final"; window.dispatchEvent(new Event("focus")); });
@@ -119,11 +140,11 @@ try {
   await page.evaluate(() => { window.__trackingDeliveryType = "manual"; window.__trackingStatus = "reparto_final"; window.__trackingIncident = true; window.dispatchEvent(new Event("focus")); });
   await page.getByRole("heading", { name: "Estamos revisando tu envío" }).waitFor();
   assert.equal(await page.locator('.fm-delivery-journey[data-exception="true"]').count(), 1);
-  assert.equal(await page.locator(".fm-journey__motorcycle.is-moving").count(), 0);
+  assert.equal(await page.locator(".fm-delivery-journey__courier.is-moving").count(), 0);
   await page.locator(".fm-delivery-journey").screenshot({ path: path.join(directory, "journey-incident-paused.png") });
   await page.evaluate(() => { window.__trackingIncident = false; window.__trackingStatus = "no_entregado"; window.dispatchEvent(new Event("focus")); });
   await page.getByRole("heading", { name: "No pudimos entregar tu pedido" }).waitFor();
-  assert.equal(await page.locator(".fm-delivery-journey[data-stage=\"paused\"] .fm-journey__motorcycle.is-moving").count(), 0);
+  assert.equal(await page.locator(".fm-delivery-journey[data-stage=\"paused\"] .fm-delivery-journey__courier.is-moving").count(), 0);
   await page.screenshot({ path: path.join(directory, "journey-delivery-failed-mobile.png"), fullPage: true });
   checks.push("customer_tracking_updates_confirmed_direct_and_repository_stages");
   checks.push("customer_tracking_pauses_on_incidents_and_delivery_failures");
@@ -138,6 +159,7 @@ try {
   assert.equal(await page.evaluate(() => window.__gpsCalls || 0), 0, "customer and courier views must not call any geolocation method");
   assert(tileRequests === 0, "tracking and admin status views must not load map tiles");
   checks.push("customer_state_illustration_has_no_map_or_gps_and_supports_reduced_motion");
+  checks.push("dotlottie_player_renders_local_animation");
   checks.push("customer_tracking_keeps_last_confirmed_state_when_refresh_fails");
   checks.push("customer_tracking_clears_state_when_public_access_is_revoked");
   assert.deepEqual(errors, []);

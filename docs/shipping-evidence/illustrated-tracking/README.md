@@ -1,6 +1,6 @@
-# Evidencia visual del seguimiento ilustrado
+# Evidencia visual del seguimiento ilustrado dotLottie
 
-Capturas de la prueba de navegador local del 20/10/2026. Todos los envíos, direcciones y respuestas son sintéticos; Playwright usa adaptadores en memoria y no escribe en Firebase.
+Capturas actualizadas con la prueba de navegador local del 20/10/2026. Todos los envíos, direcciones y respuestas son sintéticos; Playwright usa adaptadores en memoria y no escribe en Firebase. La animación local responde al estado confirmado y usa el reproductor oficial [dotLottie para React](https://developers.lottiefiles.com/docs/dotlottie-player/dotlottie-react/).
 
 ## Entrega directa
 

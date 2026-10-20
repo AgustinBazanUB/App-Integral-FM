@@ -2,7 +2,7 @@
 
 Estado actualizado: **20/10/2026**. Repositorio: [AgustinBazanUB/App-Integral-FM](https://github.com/AgustinBazanUB/App-Integral-FM). Rama: **`codex/modulo-envios-v08`**. PR de trabajo: [#40](https://github.com/AgustinBazanUB/App-Integral-FM/pull/40), mantenido como borrador.
 
-**Actualización de seguimiento v0.9:** el mapa y el GPS en las pantallas de seguimiento se retiraron. Cliente, detalle y repartidor muestran hitos reales con una escena ilustrada SVG; el mapa Leaflet queda sólo en el formulario de Gestión para corregir manualmente la dirección. No se solicita ubicación, no se transmiten puntos y los endpoints GPS antiguos responden `410`. Ver [guía actual](shipping-illustrated-tracking.md). El Deploy Preview sigue conectado a Firebase staging `app-integral-fm-pruebas`; no publicar Production.
+**Actualización de seguimiento v0.10:** el mapa y el GPS en las pantallas de seguimiento se retiraron. Cliente, detalle y repartidor muestran hitos guardados y fases activas en una escena con animación dotLottie local, adaptada a envío directo y por repositorio. El mapa Leaflet queda sólo en el formulario de Gestión para corregir manualmente la dirección. No se solicita ubicación, no se transmiten puntos y los endpoints GPS antiguos responden `410`. Ver [guía actual](shipping-illustrated-tracking.md). El Deploy Preview sigue conectado a Firebase staging `app-integral-fm-pruebas`; no publicar Production.
 
 El código, la documentación, las referencias originales y las capturas de esta adaptación están versionados en esta rama. Los secretos en `.env`/`.env.local`, las credenciales, la configuración privada local de herramientas y las carpetas temporales no deben copiarse al repositorio. Conservar los archivos de superficies `.env.gestion` y `.env.ecommerce` que ya forman parte del proyecto; no reemplazarlos con credenciales privadas.
 
@@ -44,7 +44,8 @@ La adaptación v07 reorganiza el código funcional existente. No agrega pedidos 
 - `src/gestion/shipping/ShippingRequests.jsx` y `ShipmentDetail.jsx`: revisión de solicitudes, formulario compartido y ficha operativa.
 - `ShippingTasks.jsx` y `ShippingLabelSheet.jsx`: selección, vista A4 y QR; `shippingLabels.mjs` sigue generando el PDF autorizado.
 - `ShippingPublicApp.jsx` y `CourierPortal.jsx`: elección de rol, preparación interna, reparto y seguimiento del cliente.
-- `AnimatedDeliveryJourney.jsx`, `deliveryJourney.mjs`, `shipping-journey.css`: escena vectorial, hitos conectados a los estados, barra accesible y movimiento reducido.
+- `AnimatedDeliveryJourney.jsx`, `DeliveryRiderAnimation.jsx`, `deliveryJourney.mjs`, `shipping-journey.css`: hitos persistidos y fases activas con movimiento reducido; el jugador oficial React carga el archivo dotLottie local.
+- `src/gestion/shipping/assets/` y `public/animations/flor-mia-delivery-rider.lottie`: escena panorámica y animación original. Si se cambia el arte del repartidor, `npm run build:shipping:lottie` vuelve a generar el paquete.
 - `ShipmentDetail.jsx`, `CourierPortal.jsx`, `ShippingPublicApp.jsx`: composición de la escena para Gestión, repartidor y cliente. Los tres recorridos omiten ubicación GPS.
 - `netlify/functions/_lib/shipping.mjs` y `src/shared/shippingDomain.mjs`: endpoints GPS heredados rechazados con `410`, proyección pública por estado y limpieza de datos heredados.
 - `ShippingMap.jsx`: mapa Leaflet sólo como selector manual del domicilio en Gestión; no dibuja rutas ni puntos del repartidor.
@@ -61,7 +62,7 @@ npm run test:shipping
 npm run build:surfaces
 ```
 
-La regresión local de esta adaptación pasó **999 pruebas**. Gestión y ecommerce compilaron correctamente. CI incluye regresión y reglas en un emulador `demo-*`; los resultados definitivos de cada commit aparecen en el PR. Vite conserva avisos de tamaño de chunks, sin impedir la compilación.
+Ejecutar las pruebas en la PC de continuidad para validar el commit actual. CI incluye regresión y reglas en un emulador `demo-*`; los resultados definitivos de cada commit aparecen en el PR. Vite puede avisar por el tamaño de chunks sin impedir la compilación.
 
 Para el laboratorio visual sin Firebase real:
 
@@ -106,10 +107,10 @@ Al confirmar la salida directa o **Salir del repositorio hacia el cliente**, el 
 
 El texto anterior registra el intento de prueba en teléfono y queda sólo como historial. La versión vigente no muestra ese permiso y no necesita prueba de ubicación física.
 
-## Seguimiento ilustrado vigente — v0.9
+## Seguimiento ilustrado vigente — v0.10
 
-`AnimatedDeliveryJourney` comparte una escena SVG entre Gestión, el Panel del Repartidor y el seguimiento público. El local, la caja, la moto, el repositorio simbólico y la casa se ubican por la etapa guardada en Firebase; no son puntos en un mapa. Los hitos previos son verdes, el actual amarillo y los siguientes grises. El progreso no cambia con temporizadores: sólo avanza al recibir un cambio confirmado.
+`AnimatedDeliveryJourney` comparte una escena panorámica y la animación local dotLottie entre Gestión, el Panel del Repartidor y el seguimiento público. El local, la moto, el repositorio simbólico y la casa se ubican por la etapa guardada en Firebase; no son puntos en un mapa. Los hitos confirmados son verdes y los pendientes grises. Una fase activa muestra una barra indeterminada y texto —preparando, esperando o en camino—, sin porcentaje simulado. El avance ocurre cuando llega un cambio de estado confirmado.
 
-La entrega directa muestra Pedido recibido → Preparando → Listo para salir → En camino → Entregado. Repositorio agrega Hacia el repositorio → En repositorio → Hacia tu domicilio. Al cancelar, devolver, rechazar o registrar una falla se detiene el avance normal; una incidencia congela la moto en la etapa actual. El estado final coloca el vehículo ante la casa y la caja en la puerta.
+La entrega directa sigue Pedido recibido → Preparando tu pedido → Listo para retirar → Esperando al repartidor → Repartidor lo retiró → Hacia tu domicilio → Entregado. Repositorio suma En camino al repositorio → Entregado en repositorio → Esperando al repartidor → Salió del repositorio antes del tramo al domicilio. Al cancelar, devolver, rechazar o registrar una falla se detiene el avance normal; una incidencia congela la escena.
 
-La vista de cliente conserva el último estado confirmado si no puede actualizarse y aclara que puede estar desactualizado. `prefers-reduced-motion` reduce animaciones, la pestaña oculta las pausa y el texto HTML mantiene el contenido accesible. No hay recursos Lottie externos: la ilustración es SVG/CSS original y el logo reutiliza el archivo de marca existente. Más detalles de pruebas y del límite de Leaflet en la [guía vigente](shipping-illustrated-tracking.md).
+La vista de cliente conserva el último estado confirmado si no puede actualizarse y aclara que puede estar desactualizado. `prefers-reduced-motion` reduce animaciones, la pestaña oculta las pausa y el texto HTML mantiene el contenido accesible. El jugador de Lottie y su archivo se sirven localmente; el mapa de seguimiento se mantiene retirado y Leaflet sólo corrige manualmente el destino. Más detalles en la [guía vigente](shipping-illustrated-tracking.md).
