@@ -16,6 +16,8 @@ npx firebase-tools deploy --only firestore --project staging --config firebase.s
 
 ## Conexión de la aplicación
 
-Este cambio crea y protege la base remota, pero no conecta todavía el Deploy Preview ni las Functions a ella. La configuración web de Netlify sigue apuntando a producción, y las Functions validan el proyecto productivo de forma explícita. No uses ese preview para hacer escrituras de prueba hasta separar también la configuración cliente y las credenciales/validación del backend. Esa conexión requiere registrar una aplicación web en el proyecto de pruebas y configurar una cuenta de servicio de staging con acceso limitado a ese proyecto; no reutilices la credencial privada de producción.
+El backend ahora permite únicamente los proyectos conocidos de producción o staging, exige que el proyecto cliente y servidor coincidan, y verifica que la cuenta de servicio pertenezca al proyecto elegido. La aplicación también se niega a iniciar con una configuración de staging incompleta o mezclada con los valores conocidos de producción.
+
+El Deploy Preview todavía no está conectado: sus variables de Firebase siguen apuntando a producción. Para activarlo hay que registrar una app web en el proyecto de pruebas y cargar su configuración `VITE_FIREBASE_*`, además de guardar una cuenta de servicio exclusiva de staging como secreto limitado al contexto Deploy Preview en Netlify. No reutilices la clave privada productiva ni crees ventas desde la preview hasta terminar esa conexión.
 
 La consola del proyecto está en <https://console.firebase.google.com/project/app-integral-fm-pruebas/overview>.
