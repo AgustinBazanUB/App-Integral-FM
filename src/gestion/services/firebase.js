@@ -8,7 +8,10 @@ import {
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-const stagingProject = import.meta.env.VITE_FIREBASE_PROJECT_ID === "app-integral-fm-pruebas";
+// Keep the preview client config separate from the server-only VITE_FIREBASE_*
+// values that may be marked secret in Netlify. Firebase web config is public;
+// the service account remains exclusively in Functions environment variables.
+const stagingProject = import.meta.env.VITE_PREVIEW_FIREBASE_PROJECT_ID === "app-integral-fm-pruebas";
 const productionConfig = {
   apiKey: "AIzaSyCBVuIt36d_0DbDdEkGwRy85hmpZEjbrVg",
   authDomain: "app-integral-fm.firebaseapp.com",
@@ -20,21 +23,14 @@ const productionConfig = {
 
 export const firebaseConfig = stagingProject
   ? {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-      appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+      apiKey: import.meta.env.VITE_PREVIEW_FIREBASE_API_KEY || "",
+      authDomain: import.meta.env.VITE_PREVIEW_FIREBASE_AUTH_DOMAIN || "",
+      projectId: import.meta.env.VITE_PREVIEW_FIREBASE_PROJECT_ID,
+      storageBucket: import.meta.env.VITE_PREVIEW_FIREBASE_STORAGE_BUCKET || "",
+      messagingSenderId: import.meta.env.VITE_PREVIEW_FIREBASE_MESSAGING_SENDER_ID || "",
+      appId: import.meta.env.VITE_PREVIEW_FIREBASE_APP_ID || "",
     }
-  : {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY || productionConfig.apiKey,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || productionConfig.authDomain,
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || productionConfig.projectId,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || productionConfig.storageBucket,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || productionConfig.messagingSenderId,
-      appId: import.meta.env.VITE_FIREBASE_APP_ID || productionConfig.appId,
-    };
+  : productionConfig;
 
 if (stagingProject) {
   const requiredConfig = Object.values(firebaseConfig).every((value) => String(value || "").trim());

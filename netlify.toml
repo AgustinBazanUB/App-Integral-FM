@@ -7,7 +7,9 @@
   NODE_VERSION = "20"
   # Configuración pública de ARCA: sus valores aparecen intencionalmente en código y docs.
   # Mantener el escaneo de credenciales y claves privadas activo.
-  SECRETS_SCAN_OMIT_KEYS = "ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES,ARCA_ISSUER_VAT_CONDITION,ARCA_CONSUMER_FINAL_ID_THRESHOLD"
+  # Firebase web config is intentionally public in the browser bundle. Ignore
+  # only these client-config values; keep scanning service-account credentials.
+  SECRETS_SCAN_OMIT_KEYS = "ARCA_AUTO_AUTHORIZE_PRODUCTION_SOURCES,ARCA_ISSUER_VAT_CONDITION,ARCA_CONSUMER_FINAL_ID_THRESHOLD,FIREBASE_PROJECT_ID,FIREBASE_WEB_API_KEY,VITE_FIREBASE_API_KEY,VITE_FIREBASE_AUTH_DOMAIN,VITE_FIREBASE_PROJECT_ID,VITE_FIREBASE_STORAGE_BUCKET,VITE_FIREBASE_MESSAGING_SENDER_ID,VITE_FIREBASE_APP_ID"
   VITE_FIREBASE_API_KEY = "AIzaSyCBVuIt36d_0DbDdEkGwRy85hmpZEjbrVg"
   VITE_FIREBASE_AUTH_DOMAIN = "app-integral-fm.firebaseapp.com"
   VITE_FIREBASE_PROJECT_ID = "app-integral-fm"
