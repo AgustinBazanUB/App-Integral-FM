@@ -537,14 +537,22 @@ export async function shippingOperation({ body, session = null, runTransaction =
       if (changes.incident) changes.incident.alertPaths = notices.map(operation => operation.path);
     }
     if (routeSession && body.mode === "courier_action") {
+      const handingOffToRepository = routeSession.leg === "origin" && body.action === "repository_receive";
+      const routeMemberIds = handingOffToRepository ? (routeSession.shipmentIds || []).filter(memberId => memberId !== shipment.id) : (routeSession.shipmentIds || []);
+      if (handingOffToRepository) Object.assign(changes, {
+        courierSessionId: null, courierSessionLeg: null,
+        courierVersions: { ...(shipment.courierVersions || {}), origin: (shipment.courierVersions?.origin || 0) + 1 },
+        courierGrantHashes: { ...(shipment.courierGrantHashes || {}), origin: null },
+      });
       const routeRows = [];
-      for (const memberId of routeSession.shipmentIds || []) {
+      for (const memberId of routeMemberIds) {
         const row = memberId === shipment.id ? { ...shipment, ...changes } : { ...(await transaction.getDocument(`shipments/${memberId}`))?.data };
         if (row.saleId && !CLOSED_SHIPPING_STATES.includes(row.status)) routeRows.push(row);
       }
       const hasFinalStop = routeRows.some(row => row.status === "reparto_final");
-      const sessionChanges = { updatedAt: now };
-      if (!routeRows.length) Object.assign(sessionChanges, { status: "completed", completedAt: now, gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [] });
+      const originStopsRemain = routeRows.some(row => ["listo_retirar", "hacia_repositorio"].includes(row.status));
+      const sessionChanges = { updatedAt: now, ...(handingOffToRepository ? { shipmentIds: routeMemberIds } : {}) };
+      if (!routeRows.length || routeSession.leg === "origin" && !originStopsRemain) Object.assign(sessionChanges, { status: "completed", completedAt: now, gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [] });
       else if (!hasFinalStop && routeSession.gpsEnabled) Object.assign(sessionChanges, { gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [], gpsStoppedAt: now });
       operations.push(update(`deliverySessions/${routeSession.id}`, sessionChanges));
     }

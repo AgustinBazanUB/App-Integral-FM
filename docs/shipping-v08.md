@@ -93,8 +93,8 @@ Los índices nuevos cubren `shippingSchemaVersion + updatedAt`, asignación/crea
 
 ## Pruebas y evidencias
 
-- `npm test`: **994 pruebas** correctas en la última corrida completa.
-- `npm run test:shipping`: **36 pruebas** focalizadas correctas tras la ampliación GPS.
+- `npm test`: **995 pruebas** correctas en la última corrida completa.
+- `npm run test:shipping`: **37 pruebas** focalizadas correctas tras la ampliación GPS.
 - `npm run test:shipping:ui`: **8 verificaciones** headless con Playwright y datos sintéticos, incluida la vista del mapa cliente y la privacidad del `Referer`.
 - `npm run test:rules`: debe ejecutarse con Firestore Emulator. La última invocación local no encontró `FIRESTORE_EMULATOR_HOST`; los casos terminaron antes de evaluar reglas. La regla de lecturas manager-only de `deliverySessions` tiene cobertura en `tests/firestore.shipping.rules.mjs`.
 - `npm run build:surfaces`: compilación correcta de gestión y ecommerce. Vite conserva advertencia de chunks grandes; no es un error de compilación.

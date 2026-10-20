@@ -15,6 +15,8 @@ Se reutilizan `shipments`, los estados logísticos, autenticación/permisos Fire
 5. El equipo administrativo escucha la sesión directamente cuando sus reglas lo permiten. Si la regla de Firestore todavía no está instalada en staging, una función autenticada ofrece una lectura de respaldo cada 15 segundos sólo a usuarios con `shipping.view`; la respuesta excluye hash de acceso y credenciales de sesión. Si el listener y el respaldo fallan, se informa el error y no se simula una posición.
 6. El seguimiento del cliente consulta cada 15 segundos mientras la pestaña está visible y al recuperar foco. Cada enlace de cliente queda limitado al envío, sólo lectura y revocable. No expone historial privado, teléfono, nombre del repartidor ni otros pedidos. No hay ETA sin un proveedor confiable de rutas.
 
+En Repositorio, confirmar la recepción quita ese pedido de la sesión **Origen → repositorio**, revoca su acción de origen y lo libera para crear una sesión distinta **Repositorio → cliente**. Si quedan otros pedidos en el primer tramo, siguen visibles y autorizados en la sesión original; ésta se completa cuando todos alcanzan el repositorio. Así el mismo envío no queda bloqueado por el QR de un tramo ya terminado.
+
 Los accesos existentes por pedido siguen funcionando. El QR permanente de la etiqueta no contiene el token del repartidor ni datos personales: Gestión crea un QR temporal distinto para autorizar la ruta. Corregir dirección, reasignar, cancelar, cerrar o revocar accesos invalida la sesión y limpia la ubicación activa. La fecha de expiración se vuelve a verificar en cada operación.
 
 ### Mapas
@@ -44,8 +46,8 @@ La función de GPS escribe un punto por envío cuando opera un QR individual, o 
 
 ## Validación ejecutada y pendiente
 
-- `npm run test:shipping`: **36 pruebas correctas**, incluidas autenticación, revocación, sesión compartida de dos pedidos, continuidad después de entregar el primero, cierre después del último, limpieza y posición anómala.
-- `npm test`: **994 pruebas correctas** después del ajuste de respaldo de lectura.
+- `npm run test:shipping`: **37 pruebas correctas**, incluidas autenticación, revocación, sesión compartida de dos pedidos, continuidad después de entregar el primero, cierre después del último, handoff entre tramos, limpieza y posición anómala.
+- `npm test`: **995 pruebas correctas** después del cierre de sesión en el repositorio.
 - `npm run build:surfaces`: gestión y ecommerce compilan. Vite informa advertencias existentes de chunks JavaScript mayores a 500 KB.
 - `npm run test:shipping:ui`: **8 verificaciones en Chrome headless** con datos/posiciones sintéticas, incluidas mapa cliente Leaflet y privacidad de `Referer`. No constituye una prueba de GPS físico. Requiere los módulos Playwright del runtime de Codex indicados en el documento de continuidad.
 - `npm run test:rules`: **no se pudo verificar en esta máquina** porque falta iniciar Firestore Emulator (`FIRESTORE_EMULATOR_HOST` no configurado). Los 139 casos terminaron antes de evaluar reglas. Las pruebas locales de dominio y autorización sí pasan; la regla `deliverySessions` está cubierta en `tests/firestore.shipping.rules.mjs` para cuando se ejecute con emulador.

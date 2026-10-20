@@ -236,6 +236,37 @@ test("one temporary courier session shares GPS once across multiple orders and c
   await assert.rejects(courier("position", null, { gpsSessionId: "shared-gps", point }), /ya terminó/);
 });
 
+test("repository handoff releases each order for its own final-mile route", async () => {
+  const store = memoryStore();
+  const createReadyRepositoryShipment = async suffix => {
+    const created = await createShippingSale({ sale: sale({ shipping: { ...sale().shipping, deliveryType: "repository" } }), session: session(admin), requestId: `repository-route-sale-${suffix}`, administrative: true, runTransaction: store.runTransaction, now });
+    await shippingOperation({ body: { mode: "ready", shipmentId: created.shipmentId, requestId: `repository-route-ready-${suffix}` }, session: session(preparer), runTransaction: store.runTransaction, now, env: {} });
+    return created.shipmentId;
+  };
+  const [first, second] = await Promise.all([createReadyRepositoryShipment("one"), createReadyRepositoryShipment("two")]);
+  const createRoute = (sessionId, requestId, shipmentIds, leg, newToken) => createCourierSession({ body: { sessionId, requestId, shipmentIds, leg, newToken }, session: session(admin), runTransaction: store.runTransaction, now, env: {} });
+  const originToken = "f".repeat(43), finalToken = "g".repeat(43);
+  const origin = await createRoute("origin-route", "origin-route-create", [first, second], "origin", originToken);
+  const courier = (token, mode, shipmentId, data = {}) => shippingOperation({ body: { mode, token, ...(shipmentId ? { shipmentId } : {}), ...data }, runTransaction: store.runTransaction, now, env: {} });
+  await courier(originToken, "courier_action", first, { requestId: "origin-pickup-first", action: "pickup" });
+  await courier(originToken, "courier_action", first, { requestId: "origin-receive-first", action: "repository_receive" });
+  assert.deepEqual(store.documents.get(`deliverySessions/${origin.sessionId}`).shipmentIds, [second]);
+  assert.equal(store.documents.get(`shipments/${first}`).courierSessionId, null);
+  const nextRoute = await createRoute("final-route", "final-route-create", [first], "final", finalToken);
+  const remainingOriginRoute = await courier(originToken, "detail");
+  assert.deepEqual(remainingOriginRoute.shipments.map(row => row.id), [second]);
+  await assert.rejects(courier(originToken, "courier_action", first, { requestId: "stale-origin-action", action: "repository_receive" }), /no pertenece/);
+  await courier(originToken, "courier_action", second, { requestId: "origin-pickup-second", action: "pickup" });
+  await courier(originToken, "courier_action", second, { requestId: "origin-receive-second", action: "repository_receive" });
+  assert.equal(store.documents.get(`deliverySessions/${origin.sessionId}`).status, "completed");
+  assert.deepEqual(store.documents.get(`deliverySessions/${origin.sessionId}`).shipmentIds, []);
+  await courier(finalToken, "courier_action", first, { requestId: "final-depart", action: "repository_depart" });
+  await courier(finalToken, "gps_start", null, { gpsSessionId: "final-route-gps" });
+  const point = { lat: -34.6, lng: -58.4, accuracy: 20, observedAt: now.toISOString() };
+  await courier(finalToken, "position", null, { gpsSessionId: "final-route-gps", point });
+  assert.equal(store.documents.get(`deliverySessions/${nextRoute.sessionId}`).lastPosition.lat, point.lat);
+});
+
 test("courier-session management fallback requires shipping-view permission and returns only live route fields", async () => {
   const store = memoryStore(), nowPosition = { lat: -34.6, lng: -58.4, accuracy: 12, observedAt: now.toISOString(), receivedAt: now };
   store.documents.set("deliverySessions/manager-view", { status: "active", leg: "direct", shipmentIds: ["one"], createdBy: "admin", accessHash: "secret-hash", gpsEnabled: true, expiresAt: new Date(now.valueOf() + 3600000), lastPosition: { ...nowPosition, grantHash: "sensitive-hash" }, gpsTrail: [nowPosition], gpsSession: { id: "internal", accessHash: "sensitive-hash" } });
