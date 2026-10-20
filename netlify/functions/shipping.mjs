@@ -30,6 +30,12 @@ export default async function handler(request, context = {}) {
     } else result = await shippingOperation({ body, session });
     return json({ ok: true, result });
   } catch (error) {
+    // Keep server diagnostics useful without logging request bodies, tokens, or configuration values.
+    console.error("[shipping] request failed", {
+      mode: typeof body?.mode === "string" ? body.mode : "unknown",
+      code: typeof error?.code === "string" ? error.code : "unknown",
+      status: Number(error?.status) || 0,
+    });
     return json({ ok: false, code: error.publicMessage ? error.code : "shipping/unavailable", message: error.publicMessage ? error.message : "No se pudo completar la operación de envíos. Verificá la conexión y la configuración del servidor." }, Number(error.status) || 500);
   }
 }
