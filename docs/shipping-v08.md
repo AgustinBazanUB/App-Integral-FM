@@ -43,7 +43,7 @@ Los tokens viajan en fragmentos de URL y cuerpos POST, con respuestas sin caché
 - Anular, devolver o no entregar un envío no repone stock ni devuelve dinero. La edición y anulación antiguas de ventas vinculadas quedan bloqueadas para evitar reposición sobre un origen incorrecto. La conciliación financiera/fiscal y los movimientos compensatorios necesitan un flujo supervisado separado; no se automatizaron en esta versión.
 - Correcciones de dirección actualizan el snapshot del envío y su revisión, con antes/después y motivo; no modifican el CRM. Invalidan pruebas y excepciones anteriores de entrega.
 - Las notificaciones usan `alerts`, deduplicadas por envío/evento/destinatario. Sólo asignación, solicitud, listo, entrega y problemas generan avisos. Los demás movimientos y puntos GPS no generan ruido. Resolver una incidencia cierra sus alertas críticas.
-- Las etiquetas usan tres columnas y tamaño variable, con tres estándar por A4. No contienen precios, pagos, DNI/CUIT ni datos fiscales. Se auditan autorización/generación y solicitudes de reimpresión; el navegador no puede certificar que una impresora física imprimió. Si una etiqueta excede una página completa se informa el error y nunca se corta texto.
+- Las etiquetas usan tres columnas y tamaño variable, con hasta cinco estándar por A4. No contienen precios, pagos, DNI/CUIT ni datos fiscales. Se auditan autorización/generación y solicitudes de reimpresión; el navegador no puede certificar que una impresora física imprimió. Si una etiqueta excede una página completa se informa el error y nunca se corta texto.
 
 ## Archivos y alcance técnico
 
@@ -93,13 +93,13 @@ Los índices nuevos cubren `shippingSchemaVersion + updatedAt`, asignación/crea
 
 ## Pruebas y evidencias
 
-- `npm test`: **998 pruebas** correctas en la última corrida completa.
-- `npm run test:shipping`: **40 pruebas** focalizadas correctas tras la ampliación visual y del QR.
+- `npm test`: **1000 pruebas** correctas después del ajuste compacto de etiquetas.
+- `npm run test:shipping`: **42 pruebas** focalizadas correctas tras la ampliación visual y del QR.
 - `npm run test:shipping:ui`: **11 verificaciones** headless con Playwright y datos sintéticos, incluidas las nuevas vistas del tablero, filtros, acciones, controles del mapa y QR sin código.
 - `npm run test:rules`: debe ejecutarse con Firestore Emulator. La última invocación local no encontró `FIRESTORE_EMULATOR_HOST`; los casos terminaron antes de evaluar reglas. La regla de lecturas manager-only de `deliverySessions` tiene cobertura en `tests/firestore.shipping.rules.mjs`.
 - `npm run build:surfaces`: compilación correcta de gestión y ecommerce. Vite conserva advertencia de chunks grandes; no es un error de compilación.
 - Empaquetado esbuild de ambas funciones con objetivo Node 20: correcto.
-- `node tests/qa-shipping-pdf.mjs`: PDF sintético de 4 etiquetas en 2 páginas, renderizado con Poppler y revisado visualmente. `pdftoppm -r 300 -png …` + `qa-shipping-qr-render.mjs`: **4 QR diferentes decodificados desde el PDF real a 300 dpi**, no sólo desde el generador QR.
+- `node tests/qa-shipping-pdf.mjs`: PDF sintético de 6 etiquetas en 2 páginas; entran cinco etiquetas compactas estándar en la primera y la etiqueta extensa continúa en la segunda. Renderizado con Poppler y revisado visualmente. `pdftoppm -r 300 -png …` + `qa-shipping-qr-render.mjs`: **6 QR diferentes decodificados desde el PDF real a 300 dpi**, no sólo desde el generador QR.
 - `npm audit`: **0 vulnerabilidades** después de la actualización puntual de `source-map-js`. `git diff --check`: correcto.
 
 Evidencia sintética conservada en `docs/shipping-evidence/`: vistas de escritorio/móvil, modal del POS, selector QR, PDF y resultados. No demuestra GPS en un dispositivo físico ni acceso productivo. Las pruebas de reglas emiten denegaciones esperadas al probar ataques; la salida final tiene cero fallos.
@@ -121,6 +121,10 @@ El QR impreso es una capacidad temporal para el próximo tramo de un solo pedido
 El acceso **Soy personal de Flor Mía** sigue requiriendo una cuenta activa. El backend comprueba que el pedido esté asignado a esa cuenta antes de permitir marcarlo listo. Si la persona aún no tiene usuario, Administración debe crear su cuenta y asignarle el pedido; escanear la etiqueta no crea permisos de personal.
 
 Verificación de esta ampliación: `npm run test:shipping` cubre activación, idempotencia, vencimiento y rechazo de estados no elegibles; `npm run test:shipping:ui` cubre período predeterminado, filtros plegables, fila clicable, menú de acciones, posición de controles del mapa y QR sin ingreso manual. Ambos recorridos usan datos sintéticos en el laboratorio UI.
+
+## Etiquetas compactas (20/10/2026)
+
+Se revisó el PDF de ejemplo entregado por el usuario. La etiqueta estándar bajó de 78 mm a unos 46,8 mm de alto (40% menos); las fuentes principales crecieron un 20% y el QR vectorial quedó en 19,5 mm con su zona de silencio. Teléfono, dirección, observaciones y pedido ahora tienen el texto arriba y su renglón debajo. Las etiquetas más extensas crecen y saltan de página sin recortar información. La vista previa de Gestión muestra el formato compacto. Regresión: `npm run test:shipping`, compilación de Gestión y lectura de los seis QR desde el PDF renderizado a 300 dpi. [PDF sintético de muestra](../output/pdf/Flor-Mia-Etiquetas-compactas-ejemplo.pdf).
 
 ## Históricos y pendientes de activación
 

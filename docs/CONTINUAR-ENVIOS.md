@@ -26,7 +26,7 @@ La configuración de frontend se orienta mediante `.env.example`. Configurar ún
 | Panel Vendedor | Registra solicitud sin stock hasta la aprobación administrativa; conserva atribución comercial. |
 | Tablero | Navegación superior de tres apartados, tres resúmenes, filtros, incidencias por fila y acceso a detalle. |
 | Solicitudes | Lista y revisión en paralelo; origen real, transporte y preparadores; validaciones existentes del servidor. |
-| Preparaciones | Componente compartido en Gestión y Panel Vendedor, selección, QR individual, vista de etiquetas y PDF A4. |
+| Preparaciones | Componente compartido en Gestión y Panel Vendedor, selección, QR individual, vista compacta y PDF A4 con hasta cinco etiquetas estándar por página. |
 | Detalle | Página en Gestión con progreso, datos, última ubicación, eventos y operaciones administrativas. El vendedor conserva su ficha lateral. |
 | QR interno | Elección de rol para etiquetas; sesión y asignación obligatorias para preparar o reportar un problema. |
 | Repartidor | Acceso temporal por tramo, recepción, repositorio, salida final, entrega e incidencias. |
@@ -45,6 +45,8 @@ La adaptación v07 reorganiza el código funcional existente. No agrega pedidos 
 - `ShippingPublicApp.jsx` y `CourierPortal.jsx`: elección de rol, preparación interna, reparto y seguimiento del cliente.
 - `ShippingProgress.jsx`, `ShippingLocation.jsx`, `shipping.css`: progreso, presentación de la última ubicación y estilos del módulo.
 - `courierGps.mjs`, `services/shippingService.js` y `netlify/functions/_lib/shipping.mjs`: controlador GPS, transporte y validaciones transaccionales. La adaptación visual no cambió estos endpoints.
+
+Las etiquetas A4 se compactaron el 20/10/2026: la etiqueta estándar pasó de 78 mm a unos 46,8 mm de alto (40% menos), conservando una columna QR de 19,5 mm y ampliando las fuentes aproximadamente 20%. Teléfono, dirección, observaciones y pedido se muestran sobre su propia línea inferior. El contenido largo aumenta el alto automáticamente y conserva los saltos de página; la vista previa de Gestión refleja la misma jerarquía.
 
 Las instrucciones operativas actuales provienen del pedido del usuario y de estos documentos de implementación. El HTML, las imágenes y sus notas originales son referencias visuales; sus textos sobre direcciones, mapas simulados o sesiones de demostración no sustituyen las decisiones actuales.
 
