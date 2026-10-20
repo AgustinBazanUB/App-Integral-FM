@@ -1,5 +1,7 @@
 # Seguimiento GPS compartido — revisión del 20/10/2026
 
+> **DOCUMENTO HISTÓRICO / ARCHIVADO.** La guía describe la versión GPS anterior y no corresponde a la interfaz vigente. Desde la revisión del 20/10/2026 se retiraron el GPS y el mapa del seguimiento del cliente, del detalle de Gestión y del portal del repartidor; las acciones operan por hitos confirmados y la presentación es ilustrativa. No sigas los pasos de activación de GPS que aparecen abajo. Consultá la [guía vigente de seguimiento ilustrado](shipping-illustrated-tracking.md).
+
 ## Alcance y entorno
 
 El cambio extiende el módulo existente de envíos. El Deploy Preview de la rama `codex/modulo-envios-v08` usa el proyecto Firebase staging `app-integral-fm-pruebas`; la credencial de servicio permanece como secreto de Netlify para Deploy Previews. No se modifican Production, reglas remotas, planes de Firebase ni infraestructura de Realtime Database. La preview se actualiza al publicar esta rama en el PR #40.

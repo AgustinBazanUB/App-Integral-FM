@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createShippingSale, createCourierSession, activateCourierQr, readCourierSession, shippingOperation, limitShippingPublic } from "../netlify/functions/_lib/shipping.mjs";
 import { cancelSaleAndInvoice } from "../netlify/functions/_lib/arca/saleCancellation.mjs";
-import { shippingBucket, courierAction, customerTrackingView, validatePoint, deliveryProof, distanceMeters } from "../src/shared/shippingDomain.mjs";
+import { shippingBucket, courierAction, customerTrackingView, validCoordinates } from "../src/shared/shippingDomain.mjs";
 import { admin, seller, preparer, manager, session, sale, now, memoryStore } from "./helpers/shippingFixtures.mjs";
 const token = "a".repeat(43), token2 = "b".repeat(43), trackToken = "c".repeat(43), routeToken = "d".repeat(43), trackTokenTwo = "e".repeat(43);
 const sha = value => createHash("sha256").update(value).digest("hex");
@@ -107,7 +107,7 @@ test("critical incidents deduplicate, pause actions, notify managers and resolve
   assert.equal([...s.documents.values()].filter(row => row.severity === "critical" && row.active).length, 0);
   await s.op("ready", {}, preparer);
 });
-test("direct courier: scoped action, no internal data, one contextual delivery, server-approved exception; delivery stops GPS", async () => {
+test("direct courier: scoped actions confirm delivery without collecting GPS or requiring a geofence", async () => {
   const s = await setup(true);
   await s.op("ready", {}, preparer);
   await s.op("issue_access", { kind: "courier", newToken: token });
@@ -115,15 +115,12 @@ test("direct courier: scoped action, no internal data, one contextual delivery, 
   assert.equal(detail.action.action, "pickup"); assert.equal(detail.itemsSnapshot, undefined); assert.equal(detail.customerSnapshot, undefined);
   await assert.rejects(s.op("courier_action", { token, action: "deliver" }, null), /no corresponde/);
   await s.op("courier_action", { token, action: "pickup" }, null);
-  await assert.rejects(s.op("courier_action", { token, action: "deliver" }, null), /geocerca/);
-  await assert.rejects(s.op("delivery_exception", { token, grantHash: sha(token), reason: "Sin señal" }, null), /permiso/);
-  await s.op("delivery_exception", { grantHash: sha(token), reason: "Entrega verificada por llamada" });
   const body = { mode: "courier_action", shipmentId: s.result.shipmentId, token, requestId: "delivery-once", action: "deliver" };
   await shippingOperation({ body, runTransaction: s.runTransaction, now });
   await shippingOperation({ body, runTransaction: s.runTransaction, now });
   assert.equal(s.shipment().status, "entregado"); assert.equal(s.shipment().lastPosition, null);
   assert.equal([...s.documents.values()].filter(row => row.event === "delivery_completed").length, 2);
-  await assert.rejects(s.op("position", { token, point: { lat: 0, lng: 0, accuracy: 5, observedAt: now.toISOString() } }, null), /permiso/);
+  await assert.rejects(s.op("position", { token, point: { lat: 0, lng: 0, accuracy: 5, observedAt: now.toISOString() } }, null), /GPS está desactivado/);
 });
 test("printed shipment QR opens one short-lived courier stage without a manually entered code", async () => {
   const s = await setup(true);
@@ -149,22 +146,23 @@ test("printed QR cannot activate an unapproved, incident-paused, or not-ready sh
   await s.op("incident", { reason: "No hay bolsas/cajas", note: "Prueba" }, preparer);
   await assert.rejects(activateCourierQr({ body: { ...body, sessionId: "qr-paused", requestId: "qr-paused-request" }, runTransaction: s.runTransaction, now, env: {} }), /disponible/);
 });
-test("repository has separate legs, hides customer from first courier and GPS until final departure", async () => {
+test("repository has separate legs, hides customer from the first courier and tracks stages without GPS", async () => {
   const s = await setup(); await s.op("approve", { ...approval, deliveryType: "repository" }); await s.op("ready", {}, preparer);
   await s.op("issue_access", { kind: "tracking", newToken: trackToken });
-  assert.equal((await s.op("tracking", { token: trackToken }, null)).position, null);
+  assert.equal((await s.op("tracking", { token: trackToken }, null)).position, undefined);
   await s.op("issue_access", { kind: "courier", leg: "origin", newToken: token });
   await s.op("issue_access", { kind: "courier", leg: "final", newToken: token2 });
   const detail = await s.op("detail", { token }, null); assert.equal(detail.customerName, null); assert.equal(detail.customerPhone, null); assert.equal(detail.destination.displayName, "Repositorio de Flor Mía"); assert.equal(detail.destination.displayAddress, undefined);
-  await assert.rejects(s.op("position", { token, point: {} }, null), /permiso/);
+  await assert.rejects(s.op("position", { token, point: {} }, null), /GPS está desactivado/);
   await s.op("courier_action", { token, action: "pickup" }, null);
   await assert.rejects(s.op("courier_action", { token: token2, action: "repository_depart" }, null), /no corresponde/);
   await s.op("courier_action", { token, action: "repository_receive" }, null);
   const received = await s.op("tracking", { token: trackToken }, null);
-  assert.equal(received.label, "En repositorio"); assert.equal(received.position, null); assert.equal(received.destination, undefined);
+  assert.equal(received.label, "En el repositorio, esperando el siguiente tramo"); assert.equal(received.position, undefined); assert.equal(received.destination, undefined);
   await s.op("courier_action", { token: token2, action: "repository_depart" }, null);
   assert.equal(s.shipment().status, "reparto_final");
-  assert.equal((await s.op("tracking", { token: trackToken }, null)).label, "En camino a tu domicilio");
+  const tracking = await s.op("tracking", { token: trackToken }, null);
+  assert.equal(tracking.label, "En camino a tu domicilio"); assert.equal(tracking.deliveryType, "repository"); assert.equal(tracking.position, undefined);
   await s.op("issue_access", { kind: "tracking", newToken: "d".repeat(43) });
   await assert.rejects(s.op("tracking", { token: trackToken }, null), /permiso/);
   assert.equal(courierAction(s.shipment(), "origin"), null);
@@ -183,19 +181,17 @@ test("the same printed repository label activates the next courier leg only afte
   const final = await activate("qr-final", "qr-final-request", "i".repeat(43));
   assert.equal(s.documents.get(`deliverySessions/${final.sessionId}`).leg, "final");
 });
-test("tracking is readonly, distinct, revocable, excludes PII and only exposes fresh final-mile GPS", async () => {
+test("tracking is readonly, distinct, revocable, excludes PII and never exposes GPS data", async () => {
   const s = await setup(true); await s.op("ready", {}, preparer);
   await s.op("issue_access", { kind: "tracking", newToken: trackToken });
   await s.op("issue_access", { kind: "courier", newToken: token });
   const view = await s.op("tracking", { token: trackToken }, null);
-  assert.equal(view.position, null); assert.equal(view.destination, null); assert.equal(view.customerSnapshot, undefined); assert.equal(view.customerName, undefined);
+  assert.equal(view.position, undefined); assert.equal(view.destination, undefined); assert.equal(view.customerSnapshot, undefined); assert.equal(view.customerName, undefined);
   await assert.rejects(s.op("courier_action", { token: trackToken, action: "pickup" }, null), /permiso/);
   await s.op("courier_action", { token, action: "pickup" }, null);
-  await s.op("gps_start", { token, gpsSessionId: "gps-test" }, null);
-  await s.op("position", { token, gpsSessionId: "gps-test", point: { lat: -34.6, lng: -58.4, accuracy: 10, observedAt: now.toISOString() } }, null);
   const live = await s.op("tracking", { token: trackToken }, null);
-  assert(live.position); assert.equal(live.trail.length, 1); assert.equal(live.destination, null);
-  assert.equal((await s.op("tracking", { token: trackToken }, null, new Date(now.valueOf() + 130000))).position, null);
+  assert.equal(live.position, undefined); assert.equal(live.trail, undefined); assert.equal(live.destination, undefined);
+  await assert.rejects(s.op("gps_start", { token, gpsSessionId: "gps-test" }, null), /GPS está desactivado/);
   await assert.rejects(s.op("detail", { token }, null, new Date(now.valueOf() + 5 * 3600000)), /vencido/);
   await s.op("revoke_access");
   await assert.rejects(s.op("tracking", { token: trackToken }, null), /permiso/);
@@ -206,38 +202,25 @@ test("QR courier authorization is bound to its printed shipment, not another val
   const s = await setup(true); await s.op("ready", {}, preparer);
   await s.op("issue_access", { kind: "courier", newToken: token });
   const detail = await s.op("detail", { token, lookupId: s.shipment().publicLookupId }, null);
-  assert.equal(detail.leg, "direct"); assert.equal(detail.customerName, "Cliente de prueba"); assert.equal(detail.gpsAllowed, false); assert(detail.accessExpiresAt);
+  assert.equal(detail.leg, "direct"); assert.equal(detail.customerName, "Cliente de prueba"); assert.equal(detail.gpsAllowed, undefined); assert(detail.accessExpiresAt);
   await assert.rejects(s.op("detail", { token, lookupId: "another_label_lookup" }, null), /permiso/);
   await assert.rejects(s.op("courier_action", { token, lookupId: "another_label_lookup", action: "pickup" }, null), /permiso/);
   assert.equal(s.shipment().status, "listo_retirar");
-  await assert.rejects(s.op("gps_start", { token, gpsSessionId: "early" }, null), /únicamente/);
+  await assert.rejects(s.op("gps_start", { token, gpsSessionId: "early" }, null), /GPS está desactivado/);
 });
 
-test("GPS stop clears tracking immediately; late points and old sessions cannot restart publication", async () => {
+test("all GPS operations are rejected before they can read or write shipment location", async () => {
   const s = await setup(true); await s.op("ready", {}, preparer);
   await s.op("issue_access", { kind: "courier", newToken: token });
-  await s.op("issue_access", { kind: "tracking", newToken: trackToken });
-  await s.op("courier_action", { token, action: "pickup" }, null);
-  const point = { lat: -34.6, lng: -58.4, accuracy: 10, observedAt: now.toISOString() };
-  await assert.rejects(s.op("position", { token, point }, null), /sesión GPS/);
-  await s.op("gps_start", { token, gpsSessionId: "first" }, null);
-  const saved = await s.op("position", { token, gpsSessionId: "first", point }, null);
-  assert(saved.saved); assert(saved.receivedAt); assert((await s.op("tracking", { token: trackToken }, null)).position);
-  await s.op("gps_stop", { token, gpsSessionId: "first" }, null);
-  assert.equal(s.shipment().lastPosition, null);
-  assert.equal((await s.op("tracking", { token: trackToken }, null)).position, null);
-  await assert.rejects(s.op("position", { token, gpsSessionId: "first", point }, null), /sesión GPS/);
-  await s.op("gps_start", { token, gpsSessionId: "second" }, null);
-  await s.op("position", { token, gpsSessionId: "second", point }, null);
-  await s.op("gps_stop", { token, gpsSessionId: "first" }, null);
-  assert(s.shipment().lastPosition);
-  assert.equal(s.shipment().activeGpsSession.id, "second");
-  await s.op("delivery_exception", { grantHash: sha(token), reason: "Cierre supervisado de prueba GPS" });
-  await s.op("courier_action", { token, action: "deliver" }, null);
-  assert.equal(s.shipment().activeGpsSession, null); assert.equal(s.shipment().lastPosition, null); assert.deepEqual(s.shipment().gpsTrail, []);
-  await assert.rejects(s.op("gps_start", { token, gpsSessionId: "after-delivery" }, null), /únicamente/);
+  const beforeShipment = structuredClone(s.shipment());
+  const beforeWrites = s.documents.size;
+  for (const mode of ["gps_start", "gps_stop", "position", "delivery_exception"]) {
+    await assert.rejects(s.op(mode, { token, gpsSessionId: "disabled", point: { lat: -34.6, lng: -58.4 } }, null), /GPS está desactivado/);
+  }
+  assert.deepEqual(s.shipment(), beforeShipment);
+  assert.equal(s.documents.size, beforeWrites);
 });
-test("one temporary courier session shares GPS once across multiple orders and closes after the last delivery", async () => {
+test("one temporary courier session advances multiple orders without collecting GPS and closes after the last delivery", async () => {
   const store = memoryStore(), shipments = [];
   for (let index = 0; index < 2; index++) {
     const created = await createShippingSale({ sale: sale(), session: session(admin), requestId: `route-sale-${index}`, administrative: true, runTransaction: store.runTransaction, now });
@@ -251,27 +234,21 @@ test("one temporary courier session shares GPS once across multiple orders and c
   const courier = (mode, shipmentId, data = {}) => shippingOperation({ body: { mode, token: routeToken, ...(shipmentId ? { shipmentId } : {}), ...data }, runTransaction: store.runTransaction, now, env: {} });
   const staff = (shipmentId, data) => shippingOperation({ body: { mode: "issue_access", shipmentId, requestId: `track-${shipmentId}`, kind: "tracking", newToken: data }, session: session(admin), runTransaction: store.runTransaction, now, env: {} });
   await staff(shipments[0], trackToken); await staff(shipments[1], trackTokenTwo);
-  const initial = await courier("detail"); assert.equal(initial.kind, "courier_route"); assert.equal(initial.shipments.length, 2);
+  const initial = await courier("detail"); assert.equal(initial.kind, "courier_route"); assert.equal(initial.shipments.length, 2); assert.equal(initial.position, undefined); assert.equal(initial.trail, undefined);
   await courier("courier_action", shipments[0], { requestId: "pickup-first", action: "pickup" });
-  await courier("gps_start", null, { gpsSessionId: "shared-gps" });
-  const point = { lat: -34.6, lng: -58.4, accuracy: 15, observedAt: now.toISOString() };
-  await courier("position", null, { gpsSessionId: "shared-gps", point });
-  assert.equal(store.documents.get(`deliverySessions/${route.sessionId}`).lastPosition.lat, point.lat);
-  assert(shipments.every(id => store.documents.get(`shipments/${id}`).lastPosition == null), "the live point is stored once per route, not copied onto each order");
-  assert((await shippingOperation({ body: { mode: "tracking", token: trackToken }, runTransaction: store.runTransaction, now, env: {} })).position);
-  assert.equal((await shippingOperation({ body: { mode: "tracking", token: trackTokenTwo }, runTransaction: store.runTransaction, now, env: {} })).position, null);
+  assert.equal((await shippingOperation({ body: { mode: "tracking", token: trackToken }, runTransaction: store.runTransaction, now, env: {} })).position, undefined);
+  assert.equal((await shippingOperation({ body: { mode: "tracking", token: trackTokenTwo }, runTransaction: store.runTransaction, now, env: {} })).position, undefined);
   await courier("courier_action", shipments[1], { requestId: "pickup-second", action: "pickup" });
-  for (const shipmentId of shipments) await shippingOperation({ body: { mode: "delivery_exception", shipmentId, requestId: `exception-${shipmentId}`, grantHash: sha(routeToken), reason: "Excepción QA autorizada" }, session: session(admin), runTransaction: store.runTransaction, now, env: {} });
   await courier("courier_action", shipments[0], { requestId: "deliver-first", action: "deliver" });
-  assert.equal(store.documents.get(`deliverySessions/${route.sessionId}`).gpsEnabled, true);
-  assert.equal((await shippingOperation({ body: { mode: "tracking", token: trackToken }, runTransaction: store.runTransaction, now, env: {} })).position, null);
-  assert((await shippingOperation({ body: { mode: "tracking", token: trackTokenTwo }, runTransaction: store.runTransaction, now, env: {} })).position);
+  assert.equal(store.documents.get(`deliverySessions/${route.sessionId}`).gpsEnabled, false);
+  assert.equal((await shippingOperation({ body: { mode: "tracking", token: trackToken }, runTransaction: store.runTransaction, now, env: {} })).position, undefined);
+  assert.equal((await shippingOperation({ body: { mode: "tracking", token: trackTokenTwo }, runTransaction: store.runTransaction, now, env: {} })).position, undefined);
   await courier("courier_action", shipments[1], { requestId: "deliver-second", action: "deliver" });
   const completed = store.documents.get(`deliverySessions/${route.sessionId}`);
   assert.equal(completed.status, "completed"); assert.equal(completed.gpsEnabled, false); assert.equal(completed.lastPosition, null);
-  const receipt = await courier("detail"); assert.equal(receipt.status, "completed"); assert.equal(receipt.shipments[0].customerPhone, undefined);
-  assert.equal((await shippingOperation({ body: { mode: "tracking", token: trackTokenTwo }, runTransaction: store.runTransaction, now, env: {} })).position, null);
-  await assert.rejects(courier("position", null, { gpsSessionId: "shared-gps", point }), /ya terminó/);
+  const receipt = await courier("detail"); assert.equal(receipt.status, "completed"); assert.equal(receipt.shipments[0].customerPhone, undefined); assert.equal(receipt.position, undefined);
+  assert.equal((await shippingOperation({ body: { mode: "tracking", token: trackTokenTwo }, runTransaction: store.runTransaction, now, env: {} })).position, undefined);
+  await assert.rejects(courier("position", null, { gpsSessionId: "disabled", point: {} }), /GPS está desactivado/);
 });
 
 test("repository handoff releases each order for its own final-mile route", async () => {
@@ -299,54 +276,45 @@ test("repository handoff releases each order for its own final-mile route", asyn
   assert.equal(store.documents.get(`deliverySessions/${origin.sessionId}`).status, "completed");
   assert.deepEqual(store.documents.get(`deliverySessions/${origin.sessionId}`).shipmentIds, []);
   await courier(finalToken, "courier_action", first, { requestId: "final-depart", action: "repository_depart" });
-  await courier(finalToken, "gps_start", null, { gpsSessionId: "final-route-gps" });
-  const point = { lat: -34.6, lng: -58.4, accuracy: 20, observedAt: now.toISOString() };
-  await courier(finalToken, "position", null, { gpsSessionId: "final-route-gps", point });
-  assert.equal(store.documents.get(`deliverySessions/${nextRoute.sessionId}`).lastPosition.lat, point.lat);
+  await assert.rejects(courier(finalToken, "gps_start", null, { gpsSessionId: "disabled" }), /GPS está desactivado/);
+  assert.equal(store.documents.get(`deliverySessions/${nextRoute.sessionId}`).lastPosition, null);
 });
 
-test("courier-session management fallback requires shipping-view permission and returns only live route fields", async () => {
+test("courier-session management fallback requires shipping-view permission and never returns location fields", async () => {
   const store = memoryStore(), nowPosition = { lat: -34.6, lng: -58.4, accuracy: 12, observedAt: now.toISOString(), receivedAt: now };
   store.documents.set("deliverySessions/manager-view", { status: "active", leg: "direct", shipmentIds: ["one"], createdBy: "admin", accessHash: "secret-hash", gpsEnabled: true, expiresAt: new Date(now.valueOf() + 3600000), lastPosition: { ...nowPosition, grantHash: "sensitive-hash" }, gpsTrail: [nowPosition], gpsSession: { id: "internal", accessHash: "sensitive-hash" } });
   const view = await readCourierSession({ sessionId: "manager-view", session: session(admin), runTransaction: store.runTransaction, now });
-  assert.equal(view.gpsEnabled, true); assert.deepEqual(view.lastPosition, { lat: nowPosition.lat, lng: nowPosition.lng, accuracy: nowPosition.accuracy, observedAt: nowPosition.observedAt });
-  assert.equal(view.gpsTrail.length, 1); assert.equal(view.accessHash, undefined); assert.equal(view.gpsSession, undefined); assert.equal(view.createdBy, undefined);
+  assert.equal(view.gpsEnabled, undefined); assert.equal(view.lastPosition, undefined); assert.equal(view.gpsTrail, undefined);
+  assert.equal(view.accessHash, undefined); assert.equal(view.gpsSession, undefined); assert.equal(view.createdBy, undefined);
   await assert.rejects(readCourierSession({ sessionId: "manager-view", session: session(seller), runTransaction: store.runTransaction, now }), /permiso/);
 });
 
-test("GPS rejects anomalous jumps and returns only a bounded, PII-free route to the customer", async () => {
+test("public tracking returns only stage information, never destination or location coordinates", async () => {
   const s = await setup(true); await s.op("ready", {}, preparer);
   await s.op("issue_access", { kind: "courier", newToken: token });
   await s.op("issue_access", { kind: "tracking", newToken: trackToken });
   await s.op("courier_action", { token, action: "pickup" }, null);
-  await s.op("gps_start", { token, gpsSessionId: "route" }, null);
-  const first = { lat: -34.6, lng: -58.4, accuracy: 10, observedAt: now.toISOString() };
-  await s.op("position", { token, gpsSessionId: "route", point: first }, null);
-  const later = new Date(now.valueOf() + 10000);
-  await assert.rejects(s.op("position", { token, gpsSessionId: "route", point: { ...first, lat: -34.5, observedAt: later.toISOString() } }, null, later), /salto GPS/);
-  assert.equal(s.shipment().gpsTrail.length, 1);
   const view = await s.op("tracking", { token: trackToken }, null);
-  assert.deepEqual(view.trail, [{ lat: first.lat, lng: first.lng, observedAt: first.observedAt }]);
-  assert.equal(view.customerSnapshot, undefined); assert.equal(view.destination, null);
+  assert.equal(view.status, "reparto_final"); assert.equal(view.deliveryType, "manual");
+  assert.equal(view.customerSnapshot, undefined); assert.equal(view.destination, undefined);
+  assert.equal(view.position, undefined); assert.equal(view.trail, undefined);
+  assert.equal(view.hasIncident, false);
 });
 
-test("geofence validates accuracy, age, current grant, verified marker and destination revision of exceptions", () => {
-  const point = { lat: -34.6, lng: -58.4, accuracy: 10, observedAt: now.toISOString(), grantHash: "hash" };
-  const shipment = { destination: { lat: -34.6, lng: -58.4, verified: true }, lastPosition: point }, grant = { hash: "hash", actorId: "courier" }, config = { radiusMeters: 60, maxAccuracyMeters: 30, maxAgeMs: 120000 };
-  assert.equal(deliveryProof(shipment, grant, now, config).method, "geofence");
-  assert.throws(() => deliveryProof({ ...shipment, lastPosition: { ...point, accuracy: 100 } }, grant, now, config), /precisa/);
-  assert.throws(() => deliveryProof(shipment, { ...grant, hash: "other" }, now, config), /precisa/);
-  assert.throws(() => deliveryProof(shipment, grant, new Date(now.valueOf() + 130000), config), /reciente/);
-  assert.throws(() => deliveryProof({ ...shipment, destination: { ...shipment.destination, lng: -58 } }, grant, now, config), /fuera/);
-  assert.equal(validatePoint({ ...point, lat: "-34.6" }, now), false);
-  assert(distanceMeters(point, { ...point, lat: -34.601 }) > 100);
+test("manual delivery address coordinates retain numeric validation", () => {
+  const point = { lat: -34.6, lng: -58.4 };
+  assert.equal(validCoordinates(point), true);
+  assert.equal(validCoordinates({ ...point, lat: "-34.6" }), false);
+  assert.equal(validCoordinates({ ...point, lng: -181 }), false);
 });
 test("terminal exceptions never count as delivered and neither return nor cancel restock", async () => {
   for (const mode of ["cancel", "return", "undelivered"]) {
     const s = await setup(true); await s.op(mode, { reason: "Prueba de cierre" });
     assert.equal(shippingBucket(s.shipment()), "exceptions"); assert.equal(s.documents.get("locationStock/valle/items/oil").currentStock, 8);
   }
-  assert.equal(customerTrackingView({ publicCode: "test", status: "hacia_repositorio", lastPosition: { lat: 0, lng: 0, accuracy: 1, observedAt: now.toISOString() } }, now).position, null);
+  assert.equal(customerTrackingView({ publicCode: "test", status: "hacia_repositorio", lastPosition: { lat: 0, lng: 0, accuracy: 1, observedAt: now.toISOString() } }).position, undefined);
+  const paused = customerTrackingView({ publicCode: "test", status: "reparto_final", incident: { reason: "Privado" }, lastPosition: { lat: 0, lng: 0 } });
+  assert.equal(paused.hasIncident, true); assert.match(paused.label, /revisando una incidencia/); assert.equal(paused.position, undefined); assert.equal(paused.incident, undefined);
 });
 test("fiscal cancellation guards shipping sales before invoice or stock operations", async () => {
   let commits = 0;

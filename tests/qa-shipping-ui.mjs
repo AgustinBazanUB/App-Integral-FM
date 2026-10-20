@@ -15,11 +15,11 @@ const fixtures = Array.from({ length: 5 }, (_, index) => ({ id: `shipment_${inde
 const mocks = {
   AuthContext: `export const profile={id:'admin',name:'Administración QA',active:true,role:'admin'};export const useAuth=()=>({status:'ready',profile,logout:()=>{}});export const AuthProvider=({children})=>children;`,
   shippingService: `const rows=${JSON.stringify(fixtures)}; const listeners=new Set();const emit=()=>listeners.forEach(fn=>fn());export const subscribeShipments=(profile,notify,onError,assigned)=>{const fn=()=>notify(rows.filter(row=>!assigned||row.assignedPreparerIds.includes(profile.id)));listeners.add(fn);fn();return()=>listeners.delete(fn)};
-    export const shippingRequest=async body=>{if(body.mode==='resources')return[{id:'admin',name:'Preparador de prueba'}];const row=rows.find(row=>row.id===body.shipmentId||body.lookupId&&row.publicLookupId===body.lookupId)||(body.token?rows[2]:rows[1]);if(body.mode==='tracking')return{code:rows[2].publicCode,status:rows[2].status,label:rows[2].status==='entregado'?'Entregado':'En camino a tu domicilio',updatedAt:new Date().toISOString(),position:rows[2].status==='reparto_final'?{lat:-34.6,lng:-58.4,accuracy:12,observedAt:new Date().toISOString()}:null,locationMessage:'Datos sintéticos de laboratorio, sin ubicación real.'};
-if(body.mode==='detail'){if(body.token)return{...structuredClone(row),customerName:row.customerSnapshot.name,leg:row.deliveryType==='repository'?'final':'direct',gpsAllowed:row.status==='reparto_final',accessExpiresAt:new Date(Date.now()+3600000).toISOString(),action:row.status==='listo_retirar'?{action:'pickup',label:'Confirmar recepción'}:row.status==='reparto_final'?{action:'deliver',label:'Confirmar entrega'}:null};return structuredClone(row);}
+    export const shippingRequest=async body=>{if(body.mode==='resources')return[{id:'admin',name:'Preparador de prueba'}];const row=rows.find(row=>row.id===body.shipmentId||body.lookupId&&row.publicLookupId===body.lookupId)||(body.token?rows[2]:rows[1]);if(body.mode==='tracking'){if(window.__failTrackingRefresh)throw Error('Tracking refresh unavailable');if(window.__invalidateTracking)throw Object.assign(Error('Tracking access expired'),{status:403});const status=window.__trackingStatus||rows[2].status;const hasIncident=window.__trackingIncident===true;return{code:rows[2].publicCode,status,deliveryType:window.__trackingDeliveryType||rows[2].deliveryType,label:hasIncident?'Flor Mía está revisando una incidencia del envío.':status==='entregado'?'Entregado':status==='reparto_final'?'En camino a tu domicilio':'Estado de prueba',hasIncident,updatedAt:new Date().toISOString(),illustrationMessage:'La ilustración muestra etapas confirmadas y no una ubicación real.'};}
+if(body.mode==='detail'){if(body.token)return{...structuredClone(row),customerName:row.customerSnapshot.name,leg:row.deliveryType==='repository'?'final':'direct',accessExpiresAt:new Date(Date.now()+3600000).toISOString(),action:row.status==='listo_retirar'?{action:'pickup',label:'Confirmar recepción'}:row.status==='reparto_final'?{action:'deliver',label:'Confirmar entrega'}:null};return structuredClone(row);}
 if(body.mode==='ready'){row.status='listo_retirar';row.revision++;emit();return{id:row.id};}
 if(body.mode==='incident'){row.incident={reason:body.reason,note:body.note};row.revision++;emit();return{id:row.id};}
-if(body.mode==='courier_action'){row.status=body.action==='pickup'?'reparto_final':'entregado';row.revision++;emit();return{id:row.id};}if(body.mode==='gps_start')return{started:true};if(body.mode==='gps_stop')return{stopped:true};if(body.mode==='position')return{saved:true};if(body.mode==='labels')return{shipment:structuredClone(row)};if(body.mode==='approve'){row.status='aprobado';row.stockCommitState='committed';row.stockOriginName='Depósito Infal';row.assignedPreparerIds=['admin'];row.preparerNames=['Preparador de prueba'];row.deliveryType=body.deliveryType;row.revision++;emit();return{id:row.id}};return{id:row.id}};export const shippingAction=(shipmentId,mode,data={})=>shippingRequest({shipmentId,mode,...data});export const issueShippingAccess=async()=>({url:location.origin+'/reparto#synthetic',expiresAt:'2026-10-16T22:00:00Z'});export const createCourierRouteAccess=async()=>({url:location.origin+'/reparto#synthetic',expiresAt:'2026-10-16T22:00:00Z',shipmentIds:[]});export const createCourierQrAccess=async({sessionId,token})=>{rows[1].status='listo_retirar';return{sessionId,shipmentIds:['shipment_1'],expiresAt:new Date(Date.now()+3600000).toISOString(),token}};export const subscribeShippingShipment=(shipmentId,notify)=>{notify(structuredClone(rows.find(row=>row.id===shipmentId)));return()=>{}};export const subscribeCourierSession=(sessionId,notify)=>{notify(null);return()=>{}};`,
+if(body.mode==='courier_action'){row.status=body.action==='pickup'?'reparto_final':'entregado';row.revision++;emit();return{id:row.id};}if(['gps_start','gps_stop','position'].includes(body.mode))throw Error('GPS endpoint disabled in QA');if(body.mode==='labels')return{shipment:structuredClone(row)};if(body.mode==='approve'){row.status='aprobado';row.stockCommitState='committed';row.stockOriginName='Depósito Infal';row.assignedPreparerIds=['admin'];row.preparerNames=['Preparador de prueba'];row.deliveryType=body.deliveryType;row.revision++;emit();return{id:row.id}};return{id:row.id}};export const shippingAction=(shipmentId,mode,data={})=>shippingRequest({shipmentId,mode,...data});export const issueShippingAccess=async()=>({url:location.origin+'/reparto#synthetic',expiresAt:'2026-10-16T22:00:00Z'});export const createCourierRouteAccess=async()=>({url:location.origin+'/reparto#synthetic',expiresAt:'2026-10-16T22:00:00Z',shipmentIds:[]});export const createCourierQrAccess=async({sessionId,token})=>{rows[1].status='listo_retirar';return{sessionId,shipmentIds:['shipment_1'],expiresAt:new Date(Date.now()+3600000).toISOString(),token}};export const subscribeShippingShipment=(shipmentId,notify)=>{notify(structuredClone(rows.find(row=>row.id===shipmentId)));return()=>{}};export const subscribeCourierSession=(sessionId,notify)=>{notify(null);return()=>{}};`,
   sharedResources: `export const listLocationsShared=async()=>[{id:'valle',name:'Local Valle',active:true}];export const listMasterProductsShared=async()=>[{id:'oil',name:'Aceite de oliva 2 L',active:true,defaultPrice:1000,categoryId:'food',categoryName:'Almacén'}];export const listDiscountsShared=async()=>[];export const listProductCategoriesShared=async()=>[{id:'food',name:'Almacén'}];`,
   inventoryService: `export const listWarehouses=async()=>[{id:'infal',name:'Depósito Infal',active:true}];export const listQuickSaleStock=async()=>[{id:'oil',productId:'oil',productName:'Aceite de oliva 2 L',currentStock:10,active:true,price:1000}];`,
   managementService: `export const createQuickSale=async()=>({id:'sale-qa',saleCode:'FM-QA',shipmentId:'shipment_1',total:2000});`,
@@ -39,12 +39,12 @@ const base = `http://127.0.0.1:${server.address().port}`;
 if (process.argv.includes("--serve")) { console.log(JSON.stringify({ base, data: "synthetic", productionWrites: 0 })); await new Promise(() => {}); }
 const { chromium } = require("playwright");
 const browser = await chromium.launch({ executablePath: process.env.SHIPPING_QA_CHROME || "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true });
-const errors = [], checks = []; let tileReferer = "";
+const errors = [], checks = []; let tileRequests = 0;
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.on("pageerror", error => errors.push(error.message));
-  await page.addInitScript(() => { Object.defineProperty(navigator, "geolocation", { configurable: true, value: { watchPosition(success) { window.__gpsWatchCalls = (window.__gpsWatchCalls || 0) + 1; setTimeout(() => success({ coords: { latitude: -34.6, longitude: -58.4, accuracy: 12 }, timestamp: Date.now() }), 50); return 1; }, clearWatch() {}, getCurrentPosition(success) { setTimeout(() => success({ coords: { latitude: -34.6, longitude: -58.4, accuracy: 12 }, timestamp: Date.now() }), 50); } } }); });
-  await page.route("https://tile.openstreetmap.org/**", route => { tileReferer = route.request().headers().referer || ""; return route.fulfill({ status: 200, contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/Z9sAAAAASUVORK5CYII=", "base64") }); });
+  await page.addInitScript(() => { Object.defineProperty(navigator, "geolocation", { configurable: true, value: { watchPosition(success) { window.__gpsCalls = (window.__gpsCalls || 0) + 1; window.__gpsWatchCalls = (window.__gpsWatchCalls || 0) + 1; setTimeout(() => success({ coords: { latitude: -34.6, longitude: -58.4, accuracy: 12 }, timestamp: Date.now() }), 50); return 1; }, clearWatch() { window.__gpsCalls = (window.__gpsCalls || 0) + 1; }, getCurrentPosition(success) { window.__gpsCalls = (window.__gpsCalls || 0) + 1; setTimeout(() => success({ coords: { latitude: -34.6, longitude: -58.4, accuracy: 12 }, timestamp: Date.now() }), 50); } } }); });
+  await page.route("https://tile.openstreetmap.org/**", route => { tileRequests++; return route.fulfill({ status: 200, contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/Z9sAAAAASUVORK5CYII=", "base64") }); });
   await page.goto(`${base}/gestion/shipping`); await page.getByRole("heading", { name: "Gestión de envíos", exact: true }).waitFor();
   assert.equal(await page.getByRole("tab", { name: "Todos", exact: true }).getAttribute("aria-selected"), "true");
   assert.equal(await page.locator(".fm-data-table tbody tr").count(), 5); checks.push("dashboard_defaults_to_all_shipments_this_week");
@@ -59,11 +59,10 @@ try {
   await page.getByRole("heading", { name: "Envío para Destinatario de prueba", exact: true }).waitFor();
   await page.getByRole("button", { name: "Ver acciones" }).click();
   await page.getByText("Marcar como no entregado", { exact: true }).waitFor();
-  assert.equal(await page.locator(".fm-shipping-map-status").count(), 0);
-  assert.equal(await page.locator(".fm-shipping-map-info").count(), 1);
-  assert(await page.locator(".leaflet-control-zoom").evaluate(element => element.parentElement.classList.contains("leaflet-bottom") && element.parentElement.classList.contains("leaflet-right")));
+  assert.equal(await page.locator(".fm-delivery-journey").count(), 1);
+  assert.equal(await page.locator(".leaflet-container").count(), 0);
   await page.screenshot({ path: path.join(directory, "detail-actions.png"), fullPage: true });
-  checks.push("shipment_detail_row_actions_map_controls");
+  checks.push("admin_detail_shows_state_illustration_without_map");
   await page.getByRole("button", { name: /Gestión de envíos/ }).click();
   await page.getByRole("tab", { name: /^Solicitudes del vendedor/ }).click();
   await page.getByLabel("Origen físico real").selectOption("warehouse:infal");
@@ -91,16 +90,56 @@ try {
   await page.getByRole("button", { name: /Soy repartidor/ }).click(); await page.getByRole("heading", { name: "Envío para Destinatario de prueba" }).waitFor();
   assert.equal(await page.getByLabel("Enlace o código temporal").count(), 0); checks.push("printed_courier_qr_needs_no_manual_code");
   await page.getByRole("button", { name: "Confirmar que recibí el paquete" }).click();
-  await page.getByText("Estás compartiendo tu ubicación en camino al cliente.").waitFor();
-  assert.equal(await page.evaluate(() => window.__gpsWatchCalls), 1);
-  assert.equal(await page.getByRole("button", { name: "Compartir mi ubicación" }).count(), 0);
-  checks.push("courier_departure_requests_gps_and_shares_automatically");
+  await page.getByText("El pedido salió de Flor Mía y va hacia tu domicilio.").waitFor();
+  assert.equal(await page.evaluate(() => window.__gpsWatchCalls || 0), 0);
+  assert.equal(await page.getByRole("button", { name: /ubicación|GPS/i }).count(), 0);
+  checks.push("courier_confirms_stage_without_requesting_gps");
   await page.goto(`${base}/seguimiento#synthetic_tracking_credential_12345678901234567890`);
   await page.getByRole("heading", { name: "Tu pedido está en camino" }).waitFor();
-  await page.getByText("Ubicación en vivo").waitFor();
-  await page.locator(".leaflet-container").waitFor(); checks.push("customer_live_tracking_map");
-  assert(tileReferer.startsWith(base), "OSM tile request must include the site origin as Referer");
-  assert(!tileReferer.includes("synthetic_tracking_credential"), "tracking token fragment must not be sent as Referer"); checks.push("map_referer_keeps_token_private");
+  await page.locator(".fm-delivery-journey").waitFor();
+  assert.equal(await page.locator(".leaflet-container").count(), 0);
+  assert.equal(await page.getByText(/Precisión GPS|Ubicación en vivo|última ubicación/i).count(), 0);
+  assert.equal(await page.evaluate(() => window.__gpsWatchCalls || 0), 0);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  assert.equal(await page.locator(".fm-delivery-journey__scene").count(), 1);
+  const stageShots = [
+    ["manual", "aprobado", "received", 0], ["manual", "en_preparacion", "preparing", 25], ["manual", "listo_retirar", "ready", 50], ["manual", "reparto_final", "to-customer", 75], ["manual", "entregado", "delivered", 100],
+    ["repository", "hacia_repositorio", "to-repository", 50], ["repository", "recibido_repositorio", "at-repository", 67], ["repository", "reparto_final", "to-customer", 83], ["repository", "entregado", "delivered", 100],
+  ];
+  for (const [type, status, scene, progress] of stageShots) {
+    await page.evaluate(([deliveryType, nextStatus]) => { window.__trackingDeliveryType = deliveryType; window.__trackingStatus = nextStatus; window.dispatchEvent(new Event("focus")); }, [type, status]);
+    const journey = page.locator(`.fm-delivery-journey[data-stage="${scene}"]`);
+    await journey.waitFor();
+    assert.equal(await journey.getByRole("progressbar").getAttribute("aria-valuenow"), String(progress));
+    await journey.screenshot({ path: path.join(directory, `journey-${type}-${status}.png`) });
+  }
+  await page.evaluate(() => { window.__trackingDeliveryType = "manual"; window.__trackingStatus = "reparto_final"; window.dispatchEvent(new Event("focus")); });
+  await page.getByRole("heading", { name: "Tu pedido está en camino" }).waitFor();
+  await page.screenshot({ path: path.join(directory, "customer-journey-mobile.png"), fullPage: true });
+  await page.evaluate(() => { window.__trackingDeliveryType = "manual"; window.__trackingStatus = "reparto_final"; window.__trackingIncident = true; window.dispatchEvent(new Event("focus")); });
+  await page.getByRole("heading", { name: "Estamos revisando tu envío" }).waitFor();
+  assert.equal(await page.locator('.fm-delivery-journey[data-exception="true"]').count(), 1);
+  assert.equal(await page.locator(".fm-journey__motorcycle.is-moving").count(), 0);
+  await page.locator(".fm-delivery-journey").screenshot({ path: path.join(directory, "journey-incident-paused.png") });
+  await page.evaluate(() => { window.__trackingIncident = false; window.__trackingStatus = "no_entregado"; window.dispatchEvent(new Event("focus")); });
+  await page.getByRole("heading", { name: "No pudimos entregar tu pedido" }).waitFor();
+  assert.equal(await page.locator(".fm-delivery-journey[data-stage=\"paused\"] .fm-journey__motorcycle.is-moving").count(), 0);
+  await page.screenshot({ path: path.join(directory, "journey-delivery-failed-mobile.png"), fullPage: true });
+  checks.push("customer_tracking_updates_confirmed_direct_and_repository_stages");
+  checks.push("customer_tracking_pauses_on_incidents_and_delivery_failures");
+  await page.evaluate(() => { window.__failTrackingRefresh = true; window.dispatchEvent(new Event("focus")); });
+  await page.getByText("No pudimos actualizar el seguimiento. Te mostramos el último estado confirmado.").waitFor();
+  assert.equal(await page.locator(".fm-delivery-journey").count(), 1, "the last confirmed journey should remain visible during a refresh failure");
+  await page.evaluate(() => { window.__failTrackingRefresh = false; window.dispatchEvent(new Event("focus")); });
+  await page.getByText("No pudimos actualizar el seguimiento. Te mostramos el último estado confirmado.").waitFor({ state: "detached" });
+  await page.evaluate(() => { window.__invalidateTracking = true; window.dispatchEvent(new Event("focus")); });
+  await page.getByText("Tracking access expired").waitFor();
+  assert.equal(await page.locator(".fm-delivery-journey").count(), 0, "a revoked or expired public link must clear cached shipment data");
+  assert.equal(await page.evaluate(() => window.__gpsCalls || 0), 0, "customer and courier views must not call any geolocation method");
+  assert(tileRequests === 0, "tracking and admin status views must not load map tiles");
+  checks.push("customer_state_illustration_has_no_map_or_gps_and_supports_reduced_motion");
+  checks.push("customer_tracking_keeps_last_confirmed_state_when_refresh_fails");
+  checks.push("customer_tracking_clears_state_when_public_access_is_revoked");
   assert.deepEqual(errors, []);
   const result = { checks, browserErrors: errors, output: directory };
   await writeFile(path.join(directory, "results.json"), JSON.stringify(result, null, 2));

@@ -6,9 +6,7 @@ import LoginPage from "../pages/LoginPage";
 import { shippingRequest } from "../services/shippingService";
 import { PREPARATION_PROBLEMS, SHIPPING_STATES } from "../../shared/shippingDomain.mjs";
 import CourierPortal from "./CourierPortal";
-import ShippingProgress from "./ShippingProgress";
-import ShippingLocation from "./ShippingLocation";
-import ShippingMap from "./ShippingMap";
+import AnimatedDeliveryJourney from "./AnimatedDeliveryJourney";
 import { formatDateTime } from "../formatters";
 import "./shipping.css";
 
@@ -43,11 +41,11 @@ function InternalPreparation({ lookupId }) {
 
 function CustomerTracking() {
   const token = window.location.hash.slice(1), [data, setData] = useState(null), [error, setError] = useState("");
-  useEffect(() => { let live = true; const refresh = () => { if (document.visibilityState === "hidden") return; shippingRequest({ mode: "tracking", token }, { publicAccess: true }).then(data => { if (live) { setData(data); setError(""); } }).catch(error => { if (live) { setError(error.message); setData(null); } }); }; const timer = setInterval(refresh, 15000); const wake = () => { if (document.visibilityState === "visible") refresh(); }; refresh(); document.addEventListener("visibilitychange", wake); window.addEventListener("focus", refresh); return () => { live = false; clearInterval(timer); document.removeEventListener("visibilitychange", wake); window.removeEventListener("focus", refresh); }; }, [token]);
-  const title = data?.status === "entregado" ? "Tu pedido fue entregado" : data?.status === "reparto_final" ? "Tu pedido está en camino" : data?.status === "recibido_repositorio" ? "Tu pedido está en repositorio" : "Seguimiento de tu pedido";
-  return <section className="fm-shipping-customer-portal"><header><p className="fm-shipping-eyebrow">Enlace público · Sólo lectura</p><h1>{title}</h1><p>Podés consultar el estado y la última ubicación de tu envío.</p></header>
-    {error && <p role="alert" className="fm-shipping-error">{error}</p>}
-    {data ? <><div className="fm-shipping-public-card"><strong>Pedido {data.code}</strong><p>Estado: {data.label}</p><ShippingProgress status={data.status} customer /></div>{data.status === "reparto_final" && <ShippingMap position={data.position} trail={data.trail} destination={data.destination} active={Boolean(data.position)} label="Ubicación del repartidor" />}<ShippingLocation position={data.position} final={data.status === "reparto_final"} customer /><div className="fm-shipping-public-card"><strong>Información del envío</strong><p>{data.locationMessage}</p><p>Última actualización: {formatDateTime(data.updatedAt)}</p><p>Tiempo estimado: no disponible</p></div><p className="fm-shipping-muted">Este enlace muestra únicamente la información permitida para tu pedido. No permite modificar el envío.</p></> : !error && <Skeleton />}
+  useEffect(() => { let live = true; const refresh = () => { if (document.visibilityState === "hidden") return; shippingRequest({ mode: "tracking", token }, { publicAccess: true }).then(data => { if (live) { setData(data); setError(""); } }).catch(error => { if (live) { if ([400, 401, 403, 404].includes(error.status)) setData(null); setError(error.message); } }); }; const timer = setInterval(refresh, 15000); const wake = () => { if (document.visibilityState === "visible") refresh(); }; refresh(); document.addEventListener("visibilitychange", wake); window.addEventListener("focus", refresh); return () => { live = false; clearInterval(timer); document.removeEventListener("visibilitychange", wake); window.removeEventListener("focus", refresh); }; }, [token]);
+  const title = data?.hasIncident ? "Estamos revisando tu envío" : data?.status === "no_entregado" ? "No pudimos entregar tu pedido" : ["cancelado", "devuelto", "rechazado"].includes(data?.status) ? "Tu envío requiere una revisión" : data?.status === "entregado" ? "Tu pedido fue entregado" : data?.status === "reparto_final" ? "Tu pedido está en camino" : data?.status === "recibido_repositorio" ? "Tu pedido está en el repositorio" : "Seguimiento de tu pedido";
+  return <section className="fm-shipping-customer-portal"><header><p className="fm-shipping-eyebrow">Enlace público · Sólo lectura</p><h1>{title}</h1><p>Consultá el estado confirmado de tu envío.</p></header>
+    {error && <p role={data ? "status" : "alert"} className={data ? "fm-shipping-muted" : "fm-shipping-error"}>{data ? "No pudimos actualizar el seguimiento. Te mostramos el último estado confirmado." : error}</p>}
+    {data ? <><div className="fm-shipping-public-card"><strong>Pedido {data.code}</strong><p>Estado: {data.label}</p><AnimatedDeliveryJourney status={data.status} deliveryType={data.deliveryType} incident={data.hasIncident} /></div><div className="fm-shipping-public-card"><strong>Información del envío</strong><p>{data.illustrationMessage}</p><p>Estado actualizado: {formatDateTime(data.updatedAt)}</p></div><p className="fm-shipping-muted">Este enlace muestra únicamente la información permitida para tu pedido. No permite modificarlo ni muestra la ubicación del repartidor.</p></> : !error && <Skeleton />}
   </section>;
 }
 

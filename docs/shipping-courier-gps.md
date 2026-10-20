@@ -1,5 +1,7 @@
 # Panel del repartidor y prueba manual de GPS
 
+> **GUÍA HISTÓRICA / GPS DESHABILITADO.** No sigas la sección de GPS de este documento: esta guía registra una implementación anterior. El portal vigente confirma etapas del pedido y muestra una moto ilustrativa sin solicitar ubicación ni compartir coordenadas. Ver [seguimiento ilustrado vigente](shipping-illustrated-tracking.md). Las acciones del repartidor mediante QR siguen disponibles.
+
 Preview: https://deploy-preview-40--appintegralflormia.netlify.app/gestion/shipping
 
 El QR de una etiqueta abre **¿Cómo querés continuar?**, con acceso interno y de repartidor. Al elegir **Soy repartidor**, el servidor activa una autorización temporal para el próximo tramo elegible de ese envío y abre el panel sin pedir código. La etiqueta debe estar disponible físicamente; el permiso queda limitado a un envío y vence a las cuatro horas por defecto (configurable entre 1 y 24). Los QR temporales de recorrido que Gestión genera para varios pedidos siguen entrando directamente con su propia sesión. El botón **Soy personal de Flor Mía · Preparar pedido** conserva el acceso interno con sesión y asignación.
