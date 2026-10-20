@@ -27,6 +27,7 @@ export async function memoryServices(exports) {
       const count=constraints.find(c=>c.kind==='limit')?.count;if(count!=null)rows=rows.slice(0,count);
       return {docs:rows,size:rows.length};
     };
+    export const getDocsFromServer=getDocs;
     export const runTransaction=(_db,body)=>{const task=state.queue.then(async()=>{const pending=[];const result=await body({get:async ref=>{if(pending.length)throw Error('Lectura posterior a escritura');return snapshot(ref)},set:(ref,data,options)=>pending.push({ref,data,merge:options?.merge}),update:(ref,data)=>pending.push({ref,data,merge:true})});for(const write of pending){state.data.set(write.ref.path,{...(write.merge?state.data.get(write.ref.path):{}),...structuredClone(write.data)});state.writes.push(write);}return result;});state.queue=task.catch(()=>{});return task;};
     export const setDoc=async(ref,data,options)=>runTransaction({},async tx=>tx.set(ref,data,options));
     export const writeBatch=()=>{const writes=[];return {set:(...args)=>writes.push(args),commit:()=>runTransaction({},async tx=>writes.forEach(args=>tx.set(...args)))};};

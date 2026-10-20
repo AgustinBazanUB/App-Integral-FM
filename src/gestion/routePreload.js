@@ -1,4 +1,5 @@
 export const managementPageLoaders = {
+  shipping: () => import("./pages/ShippingPage"),
   administration: () => import("./pages/AdministrationPage"),
   actividad: () => import("./pages/ActivityPage"),
   audit: () => import("./pages/AuditPage"),

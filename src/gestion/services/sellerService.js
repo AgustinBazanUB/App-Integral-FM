@@ -1,5 +1,6 @@
 import { buildOperationalSalePlan, cleanOperationalSaleItems, customerSaleSnapshot, customerSaleWrite, resolveOperationalCustomer } from "../../shared/operationalWritePlans.mjs";
 import { saleActivitySnapshot } from "../../shared/activitySnapshots.mjs";
+import { createShippingSaleRequest } from "./shippingService";
 import { effectiveLocationPrice } from "../../modules/inventory/domain/inventory";
 import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
 import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
@@ -39,7 +40,7 @@ import {
   effectiveSellerLocations,
 } from "../permissions";
 import { db } from "./firebase";
-import { requestPendingArcaInvoice } from "./arcaService";
+import { requestPendingArcaInvoice, cancelSaleWithInvoice } from "./arcaService";
 import {
   listLocationsShared,
   loadSellerResourcesShared,
@@ -265,6 +266,11 @@ export async function createAdministrativeSale(sale) {
   if (!canAccessAdministration(sale.profile) || !sale.profile?.active) {
     throw saleValidationError("Venta Rápida administrativa requiere un Administrador.");
   }
+  if (sale.deliveryMethod === "shipping") {
+    const result = await createShippingSaleRequest(sale, true);
+    invalidateDashboardSales();
+    return result;
+  }
   const requestId = sale.requestId || crypto.randomUUID();
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(requestId)) throw saleValidationError("Identificador de venta inválido.");
   if (!SALES_CHANNELS.some(option => option.value === sale.channel)) throw saleValidationError("Elegí el canal comercial real.");
@@ -307,6 +313,7 @@ async function createSale({
   paymentMethodLabel,
   payments = [],
   ticketRequested = false,
+  fiscalReceiver = null,
   customer = null,
   offlineSale = null,
   administrative = false,
@@ -317,12 +324,22 @@ async function createSale({
   customerDni = "",
   invoiceRequested = false,
   deliveryMethod = "pickup",
+  shipping = null,
 }) {
+  if (deliveryMethod === "shipping") {
+    const result = await createShippingSaleRequest({ profile, location, items, discounts, paymentMethod, paymentMethodLabel, payments, ticketRequested, fiscalReceiver, customer, offlineSale, deliveryMethod, shipping });
+    invalidateDashboardSales();
+    if (!ticketRequested) return result;
+    try {
+      const invoice = await requestPendingArcaInvoice({ sourceType: "seller_sale", sourceId: result.id, receiver: fiscalReceiver });
+      return { ...result, fiscalPreparationStatus: invoice?.autoAuthorization?.status === "authorized" ? "authorized" : "pending", fiscalInvoiceId: invoice?.id || null };
+    } catch (error) { return { ...result, fiscalPreparationStatus: "error", fiscalPreparationError: error.message }; }
+  }
   if (!can(profile, "quick-sales", "create")) {
     throw saleValidationError("No tenés permiso para registrar ventas.");
   }
   if (ticketRequested && !can(profile, "quick-sales", "requestTicket")) {
-    throw saleValidationError("No tenés permiso para solicitar ticket.");
+    throw saleValidationError("No tenés permiso para generar facturas.");
   }
   const stockType = administrative ? stockOrigin?.type : "location";
   if (!["location", "warehouse"].includes(stockType)) throw saleValidationError("Elegí el origen físico del stock.");
@@ -427,12 +444,14 @@ async function createSale({
     const invoice = await requestPendingArcaInvoice({
       sourceType: "seller_sale",
       sourceId: result.id,
+      receiver: fiscalReceiver,
     });
     return {
       ...result,
-      fiscalPreparationStatus: "prepared",
+      fiscalPreparationStatus: invoice?.status === "authorized" ? "authorized" : "pending",
       fiscalInvoiceId: invoice?.id || null,
       fiscalReadiness: invoice?.fiscalReadiness || null,
+      fiscalAutoAuthorization: invoice?.autoAuthorization || null,
     };
   } catch (error) {
     return {
@@ -473,7 +492,7 @@ export async function updateSellerSale({
   const payment = normalizePayment(paymentMethod, paymentMethodLabel, payments, discountSummary.total);
   const nextTicketRequested = ticketRequested == null ? original.ticketRequested === true : Boolean(ticketRequested);
   if (nextTicketRequested && !can(profile, "quick-sales", "requestTicket")) {
-    throw new Error("No tenés permiso para solicitar ticket.");
+    throw new Error("No tenés permiso para generar facturas.");
   }
   const preparedCustomer = customer === undefined
     ? (original.customerId ? await prepareSaleCustomer({
@@ -488,6 +507,7 @@ export async function updateSellerSale({
     const saleSnapshot = await transaction.get(saleReference);
     if (!saleSnapshot.exists()) throw new Error("La venta ya no existe.");
     const sale = saleSnapshot.data();
+    if (sale.shipmentId) throw new Error("Esta venta tiene un envío vinculado. Solicitá revisión de logística antes de modificar productos o pagos.");
     if (sale.fiscalInvoiceId || sale.fiscalInvoice) throw new Error("La venta tiene una solicitud fiscal asociada. Requiere revisión administrativa.");
     if (sale.status !== "active") throw new Error("La venta está anulada.");
     if (!canAccessAdministration(profile) && sale.sellerId !== profile.id) {
@@ -612,78 +632,5 @@ export async function cancelSellerSale({ profile, saleId, reason }) {
   if (!can(profile, "quick-sales", "cancelOwn") && !canAccessAdministration(profile)) {
     throw new Error("No tenés permiso para anular ventas.");
   }
-  const safeReason = String(reason || "").trim() || null;
-  const saleReference = doc(db, "sales", saleId);
-  return runStockMutationWithRuleCompatibility(profile, (legacyStockMutation) => runTransaction(db, async (transaction) => {
-    const saleSnapshot = await transaction.get(saleReference);
-    if (!saleSnapshot.exists()) throw new Error("La venta ya no existe.");
-    const sale = saleSnapshot.data();
-    if (sale.fiscalInvoiceId || sale.fiscalInvoice) throw new Error("La venta tiene una solicitud fiscal asociada. Requiere revisión administrativa.");
-    if (sale.status !== "active") throw new Error("La venta ya está anulada.");
-    if (!canAccessAdministration(profile) && sale.sellerId !== profile.id) {
-      throw new Error("No podés anular una venta ajena.");
-    }
-    const locationSnapshot = await transaction.get(doc(db, "locations", sale.locationId));
-    if (!locationSnapshot.exists() || locationSnapshot.data().deleted === true) {
-      throw new Error("La ubicación de la venta ya no existe.");
-    }
-    const stockRefs = sale.items.map((item) => doc(db, "locationStock", sale.locationId, "items", item.productId));
-    const movementRefs = sale.items.map(() => doc(collection(db, "stockMovements")));
-    const stockSnapshots = [];
-    for (const stockRef of stockRefs) stockSnapshots.push(await transaction.get(stockRef));
-    sale.items.forEach((item, index) => {
-      if (!stockSnapshots[index].exists()) throw new Error(`Falta el stock de ${item.name}.`);
-      const previousStock = Number(stockSnapshots[index].data().currentStock || 0);
-      const newStock = previousStock + Number(item.qty || 0);
-      transaction.update(stockRefs[index], stockMutationFields({
-        currentStock: newStock,
-        lastSaleId: saleId,
-        lastMovementId: movementRefs[index].id,
-        legacy: legacyStockMutation,
-      }));
-      transaction.set(movementRefs[index], {
-        locationId: sale.locationId,
-        locationName: sale.locationName,
-        productId: item.productId,
-        productName: item.name,
-        type: "sale_cancel",
-        qty: Number(item.qty || 0),
-        previousStock,
-        newStock,
-        reason: safeReason ? `Anulación ${sale.saleCode}: ${safeReason}` : `Anulación ${sale.saleCode}`,
-        userId: profile.id,
-        userName: userName(profile),
-        saleId,
-        saleItemIndex: -1,
-        previousSaleItemIndex: index,
-        createdAt: serverTimestamp(),
-      });
-    });
-    transaction.update(saleReference, {
-      status: "cancelled",
-      cancelledAt: serverTimestamp(),
-      cancelledBy: profile.id,
-      cancelledByName: userName(profile),
-      ...(safeReason ? { cancelReason: safeReason } : {}),
-      ...(sale.ticketRequested ? { ticketStatus: "cancelled" } : {}),
-      updatedAt: serverTimestamp(),
-    });
-    transaction.set(doc(collection(db, "auditLogs")), {
-      action: "sale.cancelled",
-      title: "Venta anulada",
-      description: safeReason ? `${sale.saleCode} · ${safeReason}` : sale.saleCode,
-      moduleId: "quick-sales",
-      entityType: "sale",
-      entityId: saleId,
-      locationId: sale.locationId,
-      locationName: sale.locationName,
-      userId: profile.id,
-      userName: userName(profile),
-      status: "cancelled",
-      amount: Number(sale.total || 0),
-      detailSnapshot: saleActivitySnapshot({ ...sale, status: "cancelled", cancelReason: safeReason }),
-      createdAt: serverTimestamp(),
-    });
-    return { id: saleId, saleCode: sale.saleCode };
-  }));
+  return cancelSaleWithInvoice({saleId,reason});
 }

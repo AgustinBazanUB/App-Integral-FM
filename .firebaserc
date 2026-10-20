@@ -1,6 +1,7 @@
 {
   "projects": {
-    "default": "app-integral-fm"
+    "default": "app-integral-fm",
+    "staging": "app-integral-fm-pruebas"
   }
 }
 

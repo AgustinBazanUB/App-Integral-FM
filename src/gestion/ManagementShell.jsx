@@ -6,6 +6,7 @@ import {
 import { Link, useLocation } from "../router";
 import { useAuth } from "./AuthContext";
 import AnchoredPopover from "./components/AnchoredPopover";
+import ShippingBell from "./shipping/ShippingBell";
 import ConnectionIndicator from "./components/ConnectionIndicator";
 import { Icon } from "./components/icons";
 import { useConnectionStatus } from "./hooks";
@@ -167,6 +168,7 @@ export default function ManagementShell({ children }) {
         <div className="fm-management-header__actions">
           <OliviaLauncherSlot />
           <ConnectionIndicator />
+          <ShippingBell profile={profile} />
           <button
             ref={profileTriggerRef}
             type="button"

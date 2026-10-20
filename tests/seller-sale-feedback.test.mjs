@@ -44,7 +44,7 @@ test("offline y permisos específicos se validan antes de guardar", () => {
   assert.match(sellerSaleProblem({ ...valid, profile: deny("create") }), /VENTA-PERMISO/);
   assert.match(sellerSaleProblem({ ...valid, online: false, editing: true }), /VENTA-EDICION-OFFLINE/);
   assert.match(sellerSaleProblem({ ...valid, online: false, profile: deny("useOfflineSales") }), /VENTA-OFFLINE-PERMISO/);
-  assert.match(sellerSaleProblem({ ...valid, ticketRequested: true, profile: deny("requestTicket") }), /TICKET-PERMISO/);
+  assert.match(sellerSaleProblem({ ...valid, ticketRequested: true, profile: deny("requestTicket") }), /FACTURA-PERMISO/);
   assert.match(sellerSaleProblem({ ...valid, discounts: [{ source: "manual" }], profile: deny("useManualDiscounts") }), /DESCUENTO-MANUAL-PERMISO/);
   assert.equal(sellerSaleProblem({ ...valid, pendingStatus: "error", pendingError: { name: "SecurityError" } }), "");
   assert.match(sellerSaleProblem({ ...valid, online: false, pendingStatus: "error", pendingError: { name: "SecurityError" } }), /SecurityError/);
@@ -69,7 +69,7 @@ function submission(overrides = {}) {
     useCallback: fn => fn, submitRef: { current: false }, submitState: { busy: false },
     selectedLocation: valid.location, currentItems: valid.items, profile: valid.profile,
     paymentMethod: "cash", payments: [], summary: { total: 1000 }, selectedCustomer: null,
-    ticketRequested: false, online: true, editSale: null, appliedDiscounts: [],
+    ticketRequested: false, fiscalReceiver: null, online: true, editSale: null, appliedDiscounts: [], shipping: null,
     stockResult: { status: "ready" }, pendingSales: { status: "ready" }, PAYMENT_LABELS,
     sellerSaleProblem, sellerErrorMessage, setSubmitState: state => states.push(state),
     resetSale: () => resets.push(true), setReceipt: value => receipts.push(value),
@@ -90,6 +90,13 @@ test("dos clicks antes del render registran una sola venta", async () => {
   await Promise.all([first, second]);
   assert.equal(h.receipts.length, 1);
   assert.equal(h.context.submitRef.current, false);
+});
+
+test("seller shipping blocks offline before queueing and preserves presencial behavior", async () => {
+  let queued = false;
+  const h = submission({ shipping: { displayAddress: "Calle de prueba 123" }, online: false, savePending: async () => { queued = true; } });
+  await h.submit(); assert.equal(queued, false); assert.equal(h.resets.length, 0);
+  assert.match(h.states.at(-1).message, /requieren conexión/);
 });
 
 test("fallar la consulta después de guardar mantiene recibo y explica que ya se registró", async () => {
@@ -146,7 +153,7 @@ test("guardar pendiente y fallar su listado conserva la confirmación local", as
   const context = {
     useCallback: fn => fn, selectedLocation: { ...valid.location, name: "Local" }, profile: { ...valid.profile, name: "QA" },
     currentItems: valid.items, appliedDiscounts: [], summary: { total: 1000 }, paymentMethod: "cash", payments: [],
-    selectedCustomer: null, ticketRequested: false, PAYMENT_LABELS, sellerErrorMessage,
+    selectedCustomer: null, ticketRequested: false, fiscalReceiver: null, PAYMENT_LABELS, sellerErrorMessage,
     pendingSales: { refresh: async () => { throw { name: "QuotaExceededError" }; } },
     resetSale: () => resets.push(true), setSubmitState: value => states.push(value),
     saveSellerPendingSale: async value => saved.push(value),

@@ -17,17 +17,25 @@
     "build:surfaces": "npm run build:gestion && npm run build:ecommerce",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test tests/*.test.mjs",
-    "test:rules": "node --test tests/firestore.rules.mjs tests/firestore.whatsapp-release.rules.mjs tests/firestore.meta-ads.rules.mjs tests/firestore.meta-ads-theory.rules.mjs tests/firestore.meta-ads-planner.rules.mjs tests/firestore.meta-ads-creative.rules.mjs tests/firestore.ecommerce-stage6.rules.mjs tests/firestore.fiscal-recovery.rules.mjs tests/firestore.operations.rules.mjs tests/firestore.quick-sales.rules.mjs tests/firestore.crm-finance.rules.mjs tests/firestore.olivia.rules.mjs",
+    "test:rules": "node --test tests/firestore.rules.mjs tests/firestore.whatsapp-release.rules.mjs tests/firestore.meta-ads.rules.mjs tests/firestore.meta-ads-theory.rules.mjs tests/firestore.meta-ads-planner.rules.mjs tests/firestore.meta-ads-creative.rules.mjs tests/firestore.ecommerce-stage6.rules.mjs tests/firestore.fiscal-recovery.rules.mjs tests/firestore.operations.rules.mjs tests/firestore.quick-sales.rules.mjs tests/firestore.crm-finance.rules.mjs tests/firestore.olivia.rules.mjs tests/firestore.shipping.rules.mjs",
     "test:ecommerce": "node --test tests/ecommerce*.test.mjs",
-    "test:olivia:rules": "node --test tests/firestore.olivia.rules.mjs"
+    "test:olivia:rules": "node --test tests/firestore.olivia.rules.mjs",
+    "test:shipping": "node --test tests/shipping*.test.mjs",
+    "test:shipping:ui": "node tests/qa-shipping-ui.mjs",
+    "build:shipping:lottie": "node scripts/build-shipping-lottie.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.1.1",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/manrope": "^5.1.1",
+    "@lottiefiles/dotlottie-react": "^0.20.0",
     "fflate": "^0.8.3",
     "firebase": "^12.17.0",
+    "jspdf": "^4.2.1",
+    "leaflet": "1.9.4",
     "lucide-react": "^0.468.0",
+    "nodemailer": "^10.0.16",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "10.1.0",
@@ -37,7 +45,9 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",
+    "@lottiefiles/dotlottie-io": "0.0.4",
     "@vitejs/plugin-react": "^4.3.4",
+    "jsqr": "^1.4.0",
     "vite": "^6.0.5"
   }
 }

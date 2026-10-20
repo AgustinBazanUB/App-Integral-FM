@@ -362,7 +362,7 @@ export function DataTable({ columns, rows, rowKey = "id", empty = null, onRowCli
         <thead><tr>{columns.map((column) => <th key={column.key} scope="col">{column.label}</th>)}</tr></thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={row[rowKey] || index} onClick={onRowClick ? () => onRowClick(row) : undefined}>
+            <tr key={row[rowKey] || index} tabIndex={onRowClick ? 0 : undefined} onClick={onRowClick ? () => onRowClick(row) : undefined} onKeyDown={onRowClick ? event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onRowClick(row); } } : undefined}>
               {columns.map((column) => <td key={column.key} data-label={column.label}>{column.render ? column.render(row) : row[column.key] ?? "—"}</td>)}
             </tr>
           ))}

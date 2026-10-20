@@ -1,10 +1,22 @@
-const FIREBASE_PROJECT_ID = "app-integral-fm";
+import {
+  configuredFirebaseProjectId,
+  PRODUCTION_FIREBASE_PROJECT_ID,
+} from "./firebaseProject.mjs";
+
 const FIREBASE_WEB_API_KEY_FALLBACK = "AIzaSyCBVuIt36d_0DbDdEkGwRy85hmpZEjbrVg";
 
 function apiKey() {
-  return process.env.FIREBASE_WEB_API_KEY
+  const configuredKey = process.env.FIREBASE_WEB_API_KEY
     || process.env.VITE_FIREBASE_API_KEY
-    || FIREBASE_WEB_API_KEY_FALLBACK;
+    || "";
+  if (configuredKey) return configuredKey;
+  if (configuredFirebaseProjectId() !== PRODUCTION_FIREBASE_PROJECT_ID) {
+    const error = new Error("Falta la clave web de Firebase para el proyecto configurado.");
+    error.code = "firebase-config-missing";
+    error.status = 503;
+    throw error;
+  }
+  return FIREBASE_WEB_API_KEY_FALLBACK;
 }
 
 function firestoreValueToJs(value) {
@@ -53,8 +65,8 @@ async function lookupFirebaseUser(idToken) {
   return user;
 }
 
-async function loadOwnProfile(idToken, uid) {
-  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${encodeURIComponent(uid)}`, {
+async function loadOwnProfile(idToken, uid, projectId) {
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${encodeURIComponent(uid)}`, {
     headers: { Authorization: `Bearer ${idToken}`, Accept: "application/json" },
   });
   if (response.status === 403) {
@@ -105,13 +117,7 @@ function allowedAction(profile, action) {
 }
 
 export async function requireFirebaseMetaAdsPermission(request, action) {
-  const configuredProject = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID;
-  if (configuredProject !== FIREBASE_PROJECT_ID) {
-    const error = new Error("Configuración Firebase inválida.");
-    error.code = "firebase-project-mismatch";
-    error.status = 500;
-    throw error;
-  }
+  const projectId = configuredFirebaseProjectId();
   const idToken = bearerToken(request);
   if (!idToken) {
     const error = new Error("Falta una sesión válida.");
@@ -120,7 +126,7 @@ export async function requireFirebaseMetaAdsPermission(request, action) {
     throw error;
   }
   const identity = await lookupFirebaseUser(idToken);
-  const profile = await loadOwnProfile(idToken, identity.localId);
+  const profile = await loadOwnProfile(idToken, identity.localId, projectId);
   if (!allowedAction(profile, action)) {
     const error = new Error("No tenés permiso para esta operación.");
     error.code = "permission-denied";
@@ -131,18 +137,12 @@ export async function requireFirebaseMetaAdsPermission(request, action) {
 }
 
 export function publicFirebaseProjectId() {
-  return FIREBASE_PROJECT_ID;
+  return configuredFirebaseProjectId();
 }
 
 
 export async function requireFirebaseActiveProfile(request) {
-  const configuredProject = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || FIREBASE_PROJECT_ID;
-  if (configuredProject !== FIREBASE_PROJECT_ID) {
-    const error = new Error("Configuración Firebase inválida.");
-    error.code = "firebase-project-mismatch";
-    error.status = 500;
-    throw error;
-  }
+  const projectId = configuredFirebaseProjectId();
   const idToken = bearerToken(request);
   if (!idToken) {
     const error = new Error("Falta una sesión válida.");
@@ -151,7 +151,7 @@ export async function requireFirebaseActiveProfile(request) {
     throw error;
   }
   const identity = await lookupFirebaseUser(idToken);
-  const profile = await loadOwnProfile(idToken, identity.localId);
+  const profile = await loadOwnProfile(idToken, identity.localId, projectId);
   if (profile?.active !== true) {
     const error = new Error("El perfil no está activo.");
     error.code = "permission-denied";
