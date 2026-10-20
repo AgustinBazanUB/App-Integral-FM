@@ -30,7 +30,7 @@ Cada repartidor ve únicamente el tramo autorizado. Al dejar el paquete en el re
 3. En **Mi ubicación**, pulsá **Compartir mi ubicación** y aceptá el permiso del navegador.
 4. Comprobá la secuencia **Esperando ubicación** → **Enviando ubicación** → **Ubicación compartida**. El estado verde aparece solamente después de una posición real confirmada por el servidor. Muestra hora del envío y precisión.
 5. Desde otro dispositivo, abrí el enlace de cliente creado en Gestión. Durante el reparto final debe mostrar hora, precisión y **Ver ubicación real en Google Maps**. La ficha administrativa también muestra la última posición. La actualización de ambas vistas puede tardar hasta 20 segundos.
-6. Caminá unos metros manteniendo la página abierta y la pantalla encendida. Comprobá un nuevo envío confirmado. También se solicita una medición nueva cada 20 segundos aunque el teléfono permanezca quieto; no se inventan coordenadas ni marcas de tiempo.
+6. Caminá unos metros manteniendo la página abierta y la pantalla encendida. Comprobá un nuevo envío confirmado. El panel solicita mediciones reales aproximadamente cada 15 segundos aunque el teléfono permanezca quieto; no inventa coordenadas ni marcas de tiempo.
 7. Pulsá **Dejar de compartir ubicación**. El GPS local se detiene y el servidor elimina la última posición. Al actualizar el seguimiento debe mostrar ubicación no disponible. Podés volver a compartir manualmente.
 8. Confirmá la entrega. El pedido queda entregado y cesa la publicación. Solicitudes que hayan quedado pendientes de una sesión detenida no pueden volver a publicar la posición.
 
@@ -49,3 +49,11 @@ El GPS del navegador requiere HTTPS y permiso del usuario; la API permite detene
 - La captura de GPS desde un teléfono físico sigue pendiente de la prueba del usuario. El indicador verde del laboratorio no acredita una medición física.
 
 Evidencia local en `tmp/shipping-manual-preview-40/`: capturas 14–16 y logs `gps-*`. Las coordenadas y el QR de laboratorio son ficticios.
+
+## Recorrido GPS compartido (20/10/2026)
+
+La versión ampliada permite crear desde el **Tablero** un **Recorrido del repartidor**. Filtrá y marcá uno o varios envíos listos, elegí el tramo, y pulsá **Crear QR de N envío(s)**. El repartidor escanea el QR temporal, ve las órdenes autorizadas y comparte una sola ubicación para el recorrido. En un envío por Repositorio, primero se autoriza el tramo de origen si corresponde; el GPS sólo se habilita para el tramo al cliente.
+
+Al entregar un pedido, el recorrido conserva GPS para los pedidos restantes. Cuando se entrega el último, el servidor completa la sesión y borra la posición y la traza. En el detalle de Gestión aparece la posición de la sesión y el enlace del cliente sólo presenta el punto de su propio envío mientras esté en reparto final. Para verificar la sesión y los casos que requieren un teléfono físico, consultar [arquitectura y validación GPS](shipping-live-tracking.md).
+
+La validación física previa confirmó que este equipo pudo compartir una posición real con Firebase staging. Todavía falta completar en Android Chrome los períodos de cinco minutos en primer plano, segundo plano, otra aplicación, pantalla bloqueada y recuperación. El navegador no garantiza actualización continua con la pantalla bloqueada o Chrome en segundo plano.

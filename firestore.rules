@@ -1170,6 +1170,13 @@ service cloud.firestore {
     }
     match /shipmentAccess/{credential} { allow read, write: if false; }
     match /shipmentLookups/{lookup} { allow read, write: if false; }
+    match /deliverySessions/{sessionId} {
+      // Only authenticated shipping managers may subscribe to the shared live map.
+      allow get: if activeUser() && canModule("shipping", "view");
+      allow list, create, update, delete: if false;
+    }
+    match /deliverySessionAccess/{credential} { allow read, write: if false; }
+    match /shippingRouteOperations/{operationId} { allow read, write: if false; }
     match /shippingRateLimits/{bucket} { allow read, write: if false; }
     match /shippingOutbox/{event} { allow read, write: if false; }
     match /invoices/{invoiceId} {

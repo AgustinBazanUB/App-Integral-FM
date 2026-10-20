@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge, Button, Drawer, FormField, Panel, Select, Skeleton } from "../../design-system";
 import { SHIPPING_STATES, TRANSPORTS, CLOSED_SHIPPING_STATES, PREPARATION_PROBLEMS } from "../../shared/shippingDomain.mjs";
 import { can } from "../permissions";
-import { shippingRequest, issueShippingAccess } from "../services/shippingService";
+import { shippingRequest, issueShippingAccess, subscribeShippingShipment, subscribeCourierSession } from "../services/shippingService";
 import { listLocationsShared } from "../services/sharedResources";
 import { listWarehouses } from "../services/inventoryService";
 import { formatDateTime } from "../formatters";
@@ -11,13 +11,19 @@ import LabelPreview from "./LabelPreview";
 import ShippingAccessQr from "./ShippingAccessQr";
 import ShippingProgress from "./ShippingProgress";
 import ShippingLocation from "./ShippingLocation";
+import ShippingMap from "./ShippingMap";
 import "./shipping.css";
 
 export function ShipmentContent({ shipment, profile, reload, internal = false, review = false }) {
   const [mode, setMode] = useState(review && can(profile, "shipping", "approve") ? "approve" : ""), [form, setForm] = useState(() => review ? { ...shipment.destination, deliveryType: shipment.deliveryType || "manual", assignedPreparerIds: shipment.assignedPreparerIds, reason: "", origin: "" } : {}), [people, setPeople] = useState([]), [origins, setOrigins] = useState([]), [busy, setBusy] = useState(false), [error, setError] = useState(""), [access, setAccess] = useState(null);
   const operationRef = useRef(null), busyRef = useRef(false);
-  const [preview, setPreview] = useState(null);
+  const [preview, setPreview] = useState(null), [liveSession, setLiveSession] = useState(null);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  useEffect(() => {
+    setLiveSession(null);
+    if (!shipment.courierSessionId || !can(profile, "shipping", "view")) return undefined;
+    return subscribeCourierSession(shipment.courierSessionId, setLiveSession, error => { setLiveSession(null); setError(error.message); });
+  }, [shipment.courierSessionId, profile.id]);
   const isEditor = can(profile, "shipping", "edit"), canApprove = can(profile, "shipping", "approve"), assigned = shipment.assignedPreparerIds.includes(profile.id), closed = CLOSED_SHIPPING_STATES.includes(shipment.status);
   useEffect(() => { if (!isEditor && !canApprove) return; let active = true;
     shippingRequest({ mode: "resources" }).then(rows => active && setPeople(rows)).catch(error => active && setError(error.message));
@@ -50,13 +56,14 @@ export function ShipmentContent({ shipment, profile, reload, internal = false, r
       {mode === "approve" && <FormField label="Origen físico real" required><Select value={form.origin} onChange={event => set("origin", event.target.value)}><option value="">Elegí ubicación o depósito</option>{origins.map(row => <option key={`${row.type}:${row.id}`} value={`${row.type}:${row.id}`}>{row.type === "warehouse" ? "Depósito" : "Local"} · {row.name}</option>)}</Select></FormField>}
       {["approve", "address"].includes(mode) && <ShippingFields value={form} onChange={setForm} administrative={mode !== "address"} people={people} />}
       {mode === "assign" && <fieldset className="fm-shipping-people"><legend>Personas que preparan</legend>{people.map(person => <label key={person.id}><input type="checkbox" checked={form.assignedPreparerIds.includes(person.id)} onChange={event => set("assignedPreparerIds", event.target.checked ? [...form.assignedPreparerIds, person.id] : form.assignedPreparerIds.filter(id => id !== person.id))} />{person.label || person.name}</label>)}</fieldset>}
-      {mode === "address" && <><label className="fm-shipping-check"><input type="checkbox" checked={form.verified} onChange={event => set("verified", event.target.checked)} />Verifiqué estas coordenadas en el mapa</label><div className="fm-shipping-detail-grid"><FormField label="Latitud"><input type="number" step="any" value={form.lat} onChange={event => set("lat", event.target.value)} /></FormField><FormField label="Longitud"><input type="number" step="any" value={form.lng} onChange={event => set("lng", event.target.value)} /></FormField><FormField label="Provincia o CABA"><input maxLength={100} value={form.provinceOrCaba || ""} onChange={event => set("provinceOrCaba", event.target.value)} /></FormField><FormField label="Barrio o localidad"><input maxLength={100} value={form.neighborhoodOrLocality || ""} onChange={event => set("neighborhoodOrLocality", event.target.value)} /></FormField></div></>}
+      {mode === "address" && <><p>Buscá el domicilio en el mapa y tocá su ubicación. También podés ingresar las coordenadas. Flor Mía no comparte la dirección con un servicio externo de geocodificación.</p><ShippingMap selectDestination onDestinationChange={({ lat, lng }) => setForm(current => ({ ...current, lat, lng, verified: false }))} destination={{ lat: Number(form.lat), lng: Number(form.lng), verified: false }} /><label className="fm-shipping-check"><input type="checkbox" checked={form.verified} onChange={event => set("verified", event.target.checked)} />Verifiqué que el marcador señala el domicilio correcto</label><div className="fm-shipping-detail-grid"><FormField label="Latitud"><input type="number" step="any" value={form.lat} onChange={event => set("lat", event.target.value)} /></FormField><FormField label="Longitud"><input type="number" step="any" value={form.lng} onChange={event => set("lng", event.target.value)} /></FormField><FormField label="Provincia o CABA"><input maxLength={100} value={form.provinceOrCaba || ""} onChange={event => set("provinceOrCaba", event.target.value)} /></FormField><FormField label="Barrio o localidad"><input maxLength={100} value={form.neighborhoodOrLocality || ""} onChange={event => set("neighborhoodOrLocality", event.target.value)} /></FormField></div></>}
       {mode === "incident" ? <><FormField label="Motivo"><Select value={form.reason} onChange={event => set("reason", event.target.value)}><option value="">Elegí motivo</option>{[...PREPARATION_PROBLEMS, "Cliente ausente", "Dirección incorrecta", "Problema de transporte"].map(reason => <option key={reason}>{reason}</option>)}</Select></FormField><FormField label="Detalle"><textarea maxLength={1000} value={form.note || ""} onChange={event => set("note", event.target.value)} /></FormField></> : mode !== "approve" && <FormField label="Motivo" required><textarea maxLength={1000} value={form.reason} onChange={event => set("reason", event.target.value)} /></FormField>}
       {["return", "cancel", "undelivered"].includes(mode) && <p>No repone stock ni devuelve dinero. Esos movimientos requieren registro y revisión por separado.</p>}
       {mode === "delivery_exception" && <p>Permite al repartidor vigente confirmar una entrega sin geocerca durante 30 minutos. Quedan registrados tu usuario, motivo y la versión del domicilio.</p>}
       <div className="fm-shipping-actions"><Button loading={busy} onClick={verify}>Confirmar</Button><Button variant="secondary" onClick={() => setMode("")}>Volver</Button></div>
     </Panel>;
-  const position = shipment.lastPosition;
+  const position = shipment.courierSessionId ? liveSession?.lastPosition : shipment.lastPosition;
+  const gpsTrail = shipment.courierSessionId ? liveSession?.gpsTrail : shipment.gpsTrail;
   if (review) return <div className="fm-shipping-review">
     <Panel title={`Revisión · ${shipment.publicCode}`} description="El local que realizó la venta se conserva en sus métricas." action={<Badge tone="warning">{shipment.stockCommitState === "committed" ? "Stock imputado" : "Aún sin descuento de stock"}</Badge>}>
       <div className="fm-shipping-review-summary"><div><small>VENTA REGISTRADA EN</small><strong>{shipment.commercialLocationName || "Venta administrativa"}</strong><p>Atribución comercial: no se modifica.</p></div><div><small>CLIENTE Y DESTINO</small><strong>{shipment.customerSnapshot.name}</strong><p>{shipment.destination.displayAddress}</p></div></div>
@@ -80,7 +87,7 @@ export function ShipmentContent({ shipment, profile, reload, internal = false, r
     {isEditor && shipment.status === "no_entregado" && <Button onClick={() => open("retry")}>Reintentar entrega</Button>}
     <Panel className="fm-shipping-customer-card" title="Datos del pedido"><dl className="fm-shipping-key-values"><div><dt>Cliente</dt><dd>{shipment.customerSnapshot.name}</dd></div><div><dt>Teléfono</dt><dd><a href={`tel:${shipment.customerSnapshot.phone}`}>{shipment.customerSnapshot.phone}</a></dd></div><div><dt>Dirección</dt><dd>{shipment.destination.displayAddress}</dd></div><div><dt>Zona</dt><dd>{shipment.destination.verified ? `${shipment.destination.provinceOrCaba || ""} · ${shipment.destination.neighborhoodOrLocality || "Marcador verificado"}` : "Zona por confirmar"}</dd></div><div><dt>Observaciones</dt><dd>{shipment.destination.notes || "No hay observaciones"}</dd></div></dl><p><a target="_blank" rel="noreferrer" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shipment.destination.displayAddress)}`}>Cómo llegar con Google Maps</a></p></Panel>
     <div className="fm-shipping-detail-grid"><Panel title="Pedido"><ul>{shipment.itemsSnapshot.map(item => <li key={item.productId}>{item.qty} × {item.name}</li>)}</ul><p>Preparan: {shipment.preparerNames.join(", ") || "Por asignar"}</p><p>Transporte: {TRANSPORTS[shipment.deliveryType] || "Por definir"}</p></Panel><Panel title="Origen de la operación"><p>Local comercial: {shipment.commercialLocationName || "Venta administrativa"}</p><p>Salida física: {shipment.stockOriginName || "Pendiente de aprobación"}</p><p>Stock: {shipment.stockCommitState === "committed" ? "Imputado una vez" : "Sin descontar"}</p>{shipment.repository && <p>Etapa intermedia: {shipment.repository.displayAddress || shipment.repository.displayName || "Repositorio de Flor Mía"}</p>}</Panel></div>
-    {!internal && <Panel className="fm-shipping-tracking-card" title="Seguimiento del recorrido" description={shipment.deliveryType === "repository" ? "Repositorio · Última ubicación permitida durante el tramo al cliente." : "Reparto directo · Última ubicación compartida."}><ShippingLocation position={position} final={shipment.status === "reparto_final"} /><p className="fm-shipping-muted">{shipment.geofenceConfigured ? "Geocerca configurada en servidor." : "La entrega sin geocerca requiere una excepción supervisada."}</p></Panel>}
+    {!internal && <Panel className="fm-shipping-tracking-card" title="Seguimiento del recorrido" description={shipment.deliveryType === "repository" ? "Repositorio · Última ubicación permitida durante el tramo al cliente." : "Reparto directo · Última ubicación compartida."}><ShippingMap position={position} trail={gpsTrail} destination={shipment.destination} active={shipment.courierSessionId ? Boolean(liveSession?.gpsEnabled) : shipment.status === "reparto_final"} /><ShippingLocation position={position} final={shipment.status === "reparto_final"} /><p className="fm-shipping-muted">{shipment.geofenceConfigured ? "Geocerca configurada en servidor." : "La entrega sin geocerca requiere una excepción supervisada."}</p></Panel>}
     {assigned && !closed && !shipment.incident && ["aprobado", "en_preparacion"].includes(shipment.status) && <div className="fm-shipping-actions">{shipment.status === "aprobado" && <Button variant="secondary" loading={busy} onClick={() => execute("start_preparing")}>Comenzar preparación</Button>}<Button loading={busy} onClick={() => execute("ready")}>Pedido preparado y listo para retirar</Button><Button variant="secondary" onClick={() => open("incident")}>No puedo preparar el pedido</Button></div>}
     {!internal && !closed && <div className="fm-shipping-actions">
       {canApprove && shipment.status === "solicitud_pendiente" && <><Button onClick={() => open("approve")}>Aprobar origen y descontar stock</Button><Button variant="secondary" onClick={() => open("review")}>Solicitar corrección / En revisión</Button><Button variant="secondary" onClick={() => open("reject")}>Rechazar solicitud</Button></>}
@@ -102,9 +109,9 @@ export default function ShipmentDetail({ shipmentId, profile, onClose, revision,
   useEffect(() => { setShipment(null); setError(""); }, [shipmentId]);
   useEffect(() => {
     let live = true;
-    const refresh = () => shipmentId && shippingRequest({ mode: "detail", shipmentId }).then(row => { if (live) { setShipment(row); setError(""); } }).catch(error => live && setError(error.message));
-    refresh(); const timer = shipmentId ? setInterval(refresh, 20000) : null;
-    return () => { live = false; if (timer) clearInterval(timer); };
+    if (!shipmentId) return () => { live = false; };
+    const unsubscribe = subscribeShippingShipment(shipmentId, row => { if (live) { setShipment(row); setError(""); } }, error => live && setError(error.message));
+    return () => { live = false; unsubscribe(); };
   }, [shipmentId, revision]);
   const current = shipment?.id === shipmentId ? shipment : null;
   if (presentation !== "drawer") return <section className={`fm-shipping-detail-page is-${presentation}`}>

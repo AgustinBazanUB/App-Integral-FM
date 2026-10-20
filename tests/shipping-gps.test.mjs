@@ -4,27 +4,28 @@ import { createCourierGps } from "../src/gestion/shipping/courierGps.mjs";
 
 function harness(implementation = async () => ({ saved: true })) {
   const states = [], requests = [], cleared = [];
-  let success, failure, tick, time = Date.parse("2026-10-16T20:00:00Z"), sequence = 0, currentRequests = 0;
+  let success, failure, tick, watchOptions, refreshEvery, time = Date.parse("2026-10-16T20:00:00Z"), sequence = 0, currentRequests = 0;
   const request = async (body, options) => { requests.push(body); return implementation(body, options); };
   const gps = createCourierGps({ request, onChange: state => states.push(state), clock: () => time, makeId: () => `session-${++sequence}`,
-    geolocation: { watchPosition: (yes, no) => { success = yes; failure = no; return sequence; }, clearWatch: id => cleared.push(id), getCurrentPosition: () => { currentRequests++; } },
-    every: callback => { tick = callback; return sequence; }, cancelEvery: () => { tick = null; } });
+    geolocation: { watchPosition: (yes, no, options) => { success = yes; failure = no; watchOptions = options; return sequence; }, clearWatch: id => cleared.push(id), getCurrentPosition: () => { currentRequests++; } },
+    every: (callback, milliseconds) => { tick = callback; refreshEvery = milliseconds; return sequence; }, cancelEvery: () => { tick = null; } });
   return { gps, states, requests, cleared, state: () => states.at(-1), advance: () => { time += 20000; tick?.(); }, currentRequests: () => currentRequests,
-    locate: () => success({ coords: { latitude: -34.6, longitude: -58.4, accuracy: 12 }, timestamp: time }), fail: code => failure({ code }) };
+    config: () => ({ watchOptions, refreshEvery }), locate: () => success({ coords: { latitude: -34.6, longitude: -58.4, accuracy: 12 }, timestamp: time }), fail: code => failure({ code }) };
 }
 
 test("courier GPS confirms sharing only after server acknowledgement and refreshes a stationary device", async () => {
   let acknowledge;
   const h = harness(body => body.mode === "position" ? new Promise(resolve => { acknowledge = resolve; }) : Promise.resolve({}));
   await h.gps.start(); assert.equal(h.state().phase, "waiting");
+  assert.deepEqual(h.config(), { watchOptions: { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }, refreshEvery: 15000 });
   const publishing = h.locate(); assert.equal(h.state().phase, "sending");
   assert(!h.states.some(state => state.phase === "sharing"));
   acknowledge({ saved: true }); await publishing;
-  assert.equal(h.state().phase, "sharing"); assert.equal(h.state().accuracy, 12); assert(h.state().confirmedAt);
+  assert.equal(h.state().phase, "sharing"); assert.equal(h.state().accuracy, 12); assert(h.state().confirmedAt); assert.equal(h.state().trail.length, 1);
   h.advance(); assert.equal(h.currentRequests(), 1);
   const next = h.locate(); acknowledge({ saved: true }); await next;
   const positions = h.requests.filter(body => body.mode === "position");
-  assert.equal(positions.length, 2); assert.notEqual(positions[0].point.observedAt, positions[1].point.observedAt);
+  assert.equal(positions.length, 2); assert.notEqual(positions[0].point.observedAt, positions[1].point.observedAt); assert.equal(h.state().trail.length, 2);
   await h.gps.stop(); assert.equal(h.state().active, false); assert.equal(h.requests.at(-1).mode, "gps_stop"); assert.equal(h.cleared.length, 1);
 });
 

@@ -57,7 +57,14 @@ export function deliveryProof(shipment, grant, now, config = {}) {
 }
 export function customerTrackingView(shipment, now = new Date(), maxAgeMs = 120000) {
   const final = shipment.status === "reparto_final";
+  const livePoint = final && validatePoint(shipment.lastPosition, now, maxAgeMs) ? shipment.lastPosition : null;
+  const trail = livePoint && Array.isArray(shipment.gpsTrail)
+    ? shipment.gpsTrail.filter(point => validatePoint(point, now, 2 * 60 * 60 * 1000)).slice(-120).map(point => ({ lat: point.lat, lng: point.lng, observedAt: point.observedAt }))
+    : [];
+  const destination = shipment.destination?.verified === true && validatePoint({ ...shipment.destination, accuracy: 1, observedAt: now.toISOString() }, now)
+    ? { lat: shipment.destination.lat, lng: shipment.destination.lng, verified: true }
+    : null;
   if (shipment.deliveryType === "repository" && shipment.status === "recibido_repositorio") return { code: shipment.publicCode, status: shipment.status, label: "En repositorio", updatedAt: shipment.updatedAt, position: null, locationMessage: "El seguimiento de ubicación se activa cuando el pedido sale hacia tu domicilio." };
   if (shipment.deliveryType === "repository" && ["aprobado", "en_preparacion", "listo_retirar", "hacia_repositorio"].includes(shipment.status)) return { code: shipment.publicCode, status: "preparing", label: "Preparando tu pedido", updatedAt: shipment.updatedAt, position: null, locationMessage: "El seguimiento se activa cuando comienza el reparto final." };
-  return { code: shipment.publicCode, status: shipment.status, label: final ? "En camino a tu domicilio" : SHIPPING_STATES[shipment.status] || "En revisión", updatedAt: shipment.updatedAt, position: final && validatePoint(shipment.lastPosition, now, maxAgeMs) ? { lat: shipment.lastPosition.lat, lng: shipment.lastPosition.lng, accuracy: shipment.lastPosition.accuracy, observedAt: shipment.lastPosition.observedAt } : null, locationMessage: final ? "La ubicación se comparte mientras el repartidor mantiene esta página abierta y autoriza GPS." : "El seguimiento del recorrido está disponible únicamente durante el reparto final." };
+  return { code: shipment.publicCode, status: shipment.status, label: final ? "En camino a tu domicilio" : SHIPPING_STATES[shipment.status] || "En revisión", updatedAt: shipment.updatedAt, position: livePoint ? { lat: livePoint.lat, lng: livePoint.lng, accuracy: livePoint.accuracy, observedAt: livePoint.observedAt } : null, trail, destination, locationMessage: final ? "La ubicación se comparte mientras el repartidor mantiene esta página abierta y autoriza GPS." : "El seguimiento del recorrido está disponible únicamente durante el reparto final." };
 }

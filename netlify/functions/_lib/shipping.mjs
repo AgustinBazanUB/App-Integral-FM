@@ -10,7 +10,7 @@ import { normalizePayment } from "../../../src/modules/locations/domain/payments
 import { argentinaDateKey } from "../../../src/modules/locations/domain/time.js";
 import { SALES_CHANNELS } from "../../../src/modules/locations/domain/channels.js";
 import { isLocationActiveNow } from "../../../src/modules/locations/domain/locations.js";
-import { cleanShippingDraft, shippingError, CLOSED_SHIPPING_STATES, courierAction, deliveryProof, customerTrackingView, validatePoint, PREPARATION_PROBLEMS, COURIER_PROBLEMS, TRANSPORTS } from "../../../src/shared/shippingDomain.mjs";
+import { cleanShippingDraft, shippingError, CLOSED_SHIPPING_STATES, courierAction, deliveryProof, customerTrackingView, validatePoint, distanceMeters, PREPARATION_PROBLEMS, COURIER_PROBLEMS, TRANSPORTS } from "../../../src/shared/shippingDomain.mjs";
 
 const hash = value => createHash("sha256").update(String(value)).digest("hex");
 const id = value => { if (!/^[A-Za-z0-9_-]{1,200}$/.test(value || "")) throw shippingError("Identificador inválido.", 400); return value; };
@@ -163,10 +163,106 @@ export async function createShippingSale({ sale, session, requestId, administrat
 
 // Read/write capabilities are checked in the transaction, including grant revocation,
 // user deactivation and request identity. Neither a QR nor a shipment ID authorizes writes.
+export async function createCourierSession({ body, session, runTransaction = adminRunTransaction, env = process.env, now = new Date() }) {
+  if (env.SHIPPING_ENABLED === "false") throw shippingError("El módulo de envíos está deshabilitado.", 503);
+  return runTransaction(async transaction => {
+    const profile = { ...(await transaction.getDocument(`users/${session?.uid}`))?.data, id: session?.uid };
+    if (profile.active !== true || !edit(profile)) forbidden();
+    const sessionId = id(body.sessionId), requestId = id(body.requestId), leg = body.leg;
+    const shipmentIds = [...new Set((Array.isArray(body.shipmentIds) ? body.shipmentIds : []).map(id))];
+    assert(shipmentIds.length >= 1 && shipmentIds.length <= 25 && shipmentIds.length === body.shipmentIds.length, "Elegí entre uno y veinticinco envíos distintos.");
+    assert(["direct", "origin", "final"].includes(leg), "Elegí un tramo de reparto válido.");
+    const token = String(body.newToken || "");
+    assert(/^[A-Za-z0-9_-]{43,128}$/.test(token), "La credencial debe ser aleatoria y segura.");
+    const credentialHash = hash(token), operationId = hash(`${profile.id}:${requestId}`).slice(0, 48);
+    const receiptPath = `shippingRouteOperations/${operationId}`, fingerprint = hash(JSON.stringify({ shipmentIds, leg, sessionId, credentialHash }));
+    const receipt = (await transaction.getDocument(receiptPath))?.data;
+    if (receipt) {
+      assert(receipt.fingerprint === fingerprint, "El intento ya se usó con otros datos.");
+      return receipt.result;
+    }
+    const hours = configNumber(env.SHIPPING_COURIER_TTL_HOURS, 1, 24) || 4;
+    const expiresAt = new Date(now.valueOf() + hours * 3600000), updates = [];
+    for (const shipmentId of shipmentIds) {
+      const shipment = { ...(await transaction.getDocument(`shipments/${shipmentId}`))?.data, id: shipmentId };
+      assert(shipment.saleId && shipment.stockCommitState === "committed" && !shipment.incident, `${shipment.publicCode || shipmentId}: el envío no está listo para asignarse.`);
+      const eligible = leg === "direct"
+        ? shipment.deliveryType !== "repository" && ["listo_retirar", "reparto_final"].includes(shipment.status)
+        : leg === "origin"
+          ? shipment.deliveryType === "repository" && ["listo_retirar", "hacia_repositorio"].includes(shipment.status)
+          : shipment.deliveryType === "repository" && ["recibido_repositorio", "reparto_final"].includes(shipment.status);
+      assert(eligible, `${shipment.publicCode || shipmentId}: el estado o transporte no corresponde al tramo elegido.`);
+      if (shipment.courierSessionId) {
+        const previousSession = (await transaction.getDocument(`deliverySessions/${shipment.courierSessionId}`))?.data;
+        assert(previousSession?.status !== "active" || new Date(previousSession.expiresAt) <= now, `${shipment.publicCode || shipmentId}: ya pertenece a un reparto activo.`);
+      }
+      const versions = { ...(shipment.courierVersions || {}), [leg]: (shipment.courierVersions?.[leg] || 0) + 1 };
+      updates.push(update(`shipments/${shipmentId}`, { courierSessionId: sessionId, courierSessionLeg: leg, courierVersions: versions, courierGrantHashes: { ...(shipment.courierGrantHashes || {}), [leg]: credentialHash }, lastPosition: null, gpsTrail: [], activeGpsSession: null, updatedAt: now, revision: (shipment.revision || 0) + 1 }));
+    }
+    const result = { sessionId, shipmentIds, expiresAt };
+    updates.push(create(`deliverySessions/${sessionId}`, { shipmentIds, leg, status: "active", version: 1, accessHash: credentialHash, createdBy: profile.id, createdAt: now, expiresAt, gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [] }));
+    updates.push(create(`deliverySessionAccess/${credentialHash}`, { sessionId, kind: "courier_route", leg, version: 1, issuedBy: profile.id, createdAt: now, expiresAt }));
+    updates.push(create(receiptPath, { fingerprint, result, createdAt: now }));
+    await transaction.commitDocuments(updates);
+    return result;
+  }, { env });
+}
+
+export async function readCourierSession({ sessionId, session, runTransaction = adminRunTransaction, env = process.env, now = new Date() }) {
+  if (env.SHIPPING_ENABLED === "false") throw shippingError("El módulo de envíos está deshabilitado.", 503);
+  return runTransaction(async transaction => {
+    const profile = { ...(await transaction.getDocument(`users/${session?.uid}`))?.data, id: session?.uid };
+    if (profile.active !== true || !management(profile)) forbidden();
+    const safeSessionId = id(sessionId);
+    const routeSession = (await transaction.getDocument(`deliverySessions/${safeSessionId}`))?.data;
+    if (!routeSession) throw shippingError("El recorrido ya no está disponible.", 404);
+    const current = routeSession.status === "active" && routeSession.gpsEnabled === true && new Date(routeSession.expiresAt) > now && validatePoint(routeSession.lastPosition, now, config(env).maxAgeMs || 120000);
+    const trail = current ? (routeSession.gpsTrail || []).filter(point => validatePoint(point, now, 2 * 60 * 60 * 1000)).slice(-120).map(({ lat, lng, observedAt }) => ({ lat, lng, observedAt })) : [];
+    return {
+      id: safeSessionId,
+      status: routeSession.status,
+      leg: routeSession.leg,
+      shipmentIds: routeSession.shipmentIds,
+      createdAt: routeSession.createdAt,
+      expiresAt: routeSession.expiresAt,
+      gpsEnabled: current,
+      gpsStartedAt: routeSession.gpsStartedAt || null,
+      gpsUpdatedAt: current ? routeSession.gpsUpdatedAt || null : null,
+      lastPosition: current ? { lat: routeSession.lastPosition.lat, lng: routeSession.lastPosition.lng, accuracy: routeSession.lastPosition.accuracy, observedAt: routeSession.lastPosition.observedAt } : null,
+      gpsTrail: trail,
+    };
+  }, { env });
+}
+
+async function courierRouteView(transaction, routeSession, now, maxAgeMs) {
+  const rows = [];
+  const completed = routeSession.status === "completed";
+  for (const shipmentId of routeSession.shipmentIds || []) {
+    const shipment = { ...(await transaction.getDocument(`shipments/${shipmentId}`))?.data, id: shipmentId };
+    assert(shipment.saleId && shipment.courierSessionId === routeSession.id, "El reparto cambió. Pedí un nuevo QR a Flor Mía.");
+    const destination = routeSession.leg === "origin" ? shipment.repository : shipment.destination;
+    rows.push(completed || CLOSED_SHIPPING_STATES.includes(shipment.status) ? { id: shipment.id, publicCode: shipment.publicCode, status: shipment.status, leg: routeSession.leg, deliveryType: shipment.deliveryType, action: null }
+      : {
+      id: shipment.id, publicCode: shipment.publicCode, status: shipment.status, leg: routeSession.leg,
+      deliveryType: shipment.deliveryType, destination: destination ? { displayAddress: destination.displayAddress || destination.displayName, verified: destination.verified === true, ...(destination.verified ? { lat: destination.lat, lng: destination.lng } : {}), notes: destination.notes || "" } : null,
+      customerName: shipment.customerSnapshot.name, customerPhone: routeSession.leg === "origin" ? null : shipment.customerSnapshot.phone,
+      action: courierAction(shipment, routeSession.leg), incident: shipment.incident ? { reason: shipment.incident.reason } : null,
+    });
+  }
+  const currentPosition = !completed && routeSession.gpsEnabled && validatePoint(routeSession.lastPosition, now, maxAgeMs) ? {
+    lat: routeSession.lastPosition.lat, lng: routeSession.lastPosition.lng, accuracy: routeSession.lastPosition.accuracy,
+    observedAt: routeSession.lastPosition.observedAt,
+  } : null;
+  const trail = currentPosition ? (routeSession.gpsTrail || []).filter(point => validatePoint(point, now, 2 * 60 * 60 * 1000)).slice(-120).map(({ lat, lng, observedAt }) => ({ lat, lng, observedAt })) : [];
+  return { kind: "courier_route", sessionId: routeSession.id, leg: routeSession.leg, status: routeSession.status, accessExpiresAt: routeSession.expiresAt,
+    gpsAllowed: routeSession.leg !== "origin" && rows.some(row => row.status === "reparto_final"), gpsEnabled: routeSession.gpsEnabled === true,
+    position: currentPosition, trail, shipments: rows };
+}
+
 export async function shippingOperation({ body, session = null, runTransaction = adminRunTransaction, env = process.env, now = new Date() }) {
   if (env.SHIPPING_ENABLED === "false") throw shippingError("El módulo de envíos está deshabilitado.", 503);
   return runTransaction(async transaction => {
-    let profile = null, grant = null, shipmentId = body.shipmentId;
+    let profile = null, grant = null, routeSession = null, shipmentId = body.shipmentId;
     if (session) {
       profile = { ...(await transaction.getDocument(`users/${session.uid}`))?.data, id: session.uid };
       if (profile.active !== true) forbidden();
@@ -174,17 +270,62 @@ export async function shippingOperation({ body, session = null, runTransaction =
       assert(typeof body.token === "string" && /^[A-Za-z0-9_-]{32,128}$/.test(body.token), "Acceso inválido o vencido.");
       const credentialHash = hash(body.token);
       grant = { ...(await transaction.getDocument(`shipmentAccess/${credentialHash}`))?.data, hash: credentialHash, actorId: `courier_${credentialHash.slice(0, 16)}` };
-      assert(grant.shipmentId && !grant.revoked && new Date(grant.expiresAt) > now, "Acceso inválido o vencido.");
-      shipmentId = grant.shipmentId;
+      if (grant.shipmentId) {
+        assert(!grant.revoked && new Date(grant.expiresAt) > now, "Acceso inválido o vencido.");
+        shipmentId = grant.shipmentId;
+      } else {
+        const routeAccess = { ...(await transaction.getDocument(`deliverySessionAccess/${credentialHash}`))?.data, hash: credentialHash };
+        routeSession = { ...(await transaction.getDocument(`deliverySessions/${routeAccess.sessionId || "invalid"}`))?.data, id: routeAccess.sessionId };
+        assert(routeAccess.sessionId && routeAccess.kind === "courier_route" && routeAccess.version === routeSession.version && ["active", "completed"].includes(routeSession.status) && new Date(routeAccess.expiresAt) > now && new Date(routeSession.expiresAt) > now && routeSession.accessHash === credentialHash, "Acceso inválido o vencido.");
+        grant = { ...routeAccess, kind: "courier", hash: credentialHash, actorId: `courier_${credentialHash.slice(0, 16)}`, routeSessionId: routeSession.id };
+        if (body.mode === "detail") return courierRouteView(transaction, routeSession, now, config(env).maxAgeMs || 120000);
+        assert(routeSession.status === "active", "Este recorrido ya terminó.");
+        if (["gps_start", "gps_stop", "position"].includes(body.mode)) {
+          if (routeSession.leg === "origin") forbidden();
+          const memberRows = [];
+          for (const memberId of routeSession.shipmentIds || []) {
+            const member = { ...(await transaction.getDocument(`shipments/${memberId}`))?.data, id: memberId };
+            assert(member.saleId && member.courierSessionId === routeSession.id, "El reparto cambió. Pedí un nuevo QR a Flor Mía.");
+            memberRows.push(member);
+          }
+          if (body.mode !== "gps_stop") assert(memberRows.some(row => row.status === "reparto_final"), "El GPS se comparte sólo mientras haya entregas en camino al cliente.");
+          const sessionPath = `deliverySessions/${routeSession.id}`, gpsSessionId = id(body.gpsSessionId);
+          if (body.mode === "gps_start") {
+            await transaction.commitDocuments([update(sessionPath, { gpsEnabled: true, gpsSession: { id: gpsSessionId, accessHash: credentialHash }, lastPosition: null, gpsTrail: [], gpsStartedAt: now })]);
+            return { started: true };
+          }
+          if (body.mode === "gps_stop") {
+            if (routeSession.gpsSession?.id === gpsSessionId && routeSession.gpsSession?.accessHash === credentialHash) await transaction.commitDocuments([update(sessionPath, { gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [], gpsStoppedAt: now })]);
+            return { stopped: true };
+          }
+          assert(routeSession.gpsEnabled && routeSession.gpsSession?.id === gpsSessionId && routeSession.gpsSession?.accessHash === credentialHash, "La sesión GPS se detuvo. Volvé a compartir ubicación.");
+          assert(validatePoint(body.point, now), "La ubicación es inválida o está vencida.");
+          const previousPosition = routeSession.lastPosition;
+          assert(!previousPosition || now - new Date(previousPosition.receivedAt) >= 5000, "Esperá unos segundos antes de actualizar la ubicación.");
+          if (previousPosition && validatePoint(previousPosition, now, 2 * 60 * 60 * 1000)) {
+            const elapsedSeconds = Math.max(1, (new Date(body.point.observedAt).valueOf() - new Date(previousPosition.observedAt).valueOf()) / 1000);
+            const allowedMeters = 55 * elapsedSeconds + Math.min(250, Number(previousPosition.accuracy || 0) + Number(body.point.accuracy || 0));
+            assert(distanceMeters(previousPosition, body.point) <= allowedMeters, "La posición parece un salto GPS. Esperá una medición nueva antes de compartir.");
+          }
+          const point = { lat: body.point.lat, lng: body.point.lng, accuracy: body.point.accuracy, observedAt: body.point.observedAt, receivedAt: now, expiresAt: new Date(now.valueOf() + (config(env).maxAgeMs || 120000)), grantHash: credentialHash };
+          const gpsTrail = [...(routeSession.gpsTrail || []).filter(sample => validatePoint(sample, now, 2 * 60 * 60 * 1000)), point].slice(-120);
+          await transaction.commitDocuments([update(sessionPath, { lastPosition: point, gpsTrail, gpsUpdatedAt: now })]);
+          return { saved: true, receivedAt: now, expiresAt: point.expiresAt };
+        }
+        shipmentId = id(body.shipmentId);
+        assert(routeSession.shipmentIds?.includes(shipmentId), "Este pedido no pertenece a tu recorrido.");
+      }
     }
     if (body.lookupId && profile) shipmentId = (await transaction.getDocument(`shipmentLookups/${id(body.lookupId)}`))?.data?.shipmentId;
     const shipment = { ...(await transaction.getDocument(`shipments/${id(shipmentId)}`))?.data, id: shipmentId };
     assert(shipment.saleId, "El envío no existe.");
     if (!profile && body.lookupId && body.lookupId !== shipment.publicLookupId) forbidden();
-    if (profile ? !readAllowed(profile, shipment) : grant.kind === "tracking" ? grant.version !== shipment.trackingVersion : grant.version !== shipment.courierVersions?.[grant.leg]) forbidden();
+    if (profile ? !readAllowed(profile, shipment) : routeSession ? routeSession.status !== "active" || routeSession.version !== grant.version || shipment.courierSessionId !== routeSession.id : grant.kind === "tracking" ? grant.version !== shipment.trackingVersion : grant.version !== shipment.courierVersions?.[grant.leg]) forbidden();
     if (!profile && grant.kind === "tracking") {
       if (body.mode !== "tracking") forbidden();
-      return customerTrackingView(shipment, now, config(env).maxAgeMs || 120000);
+      const route = shipment.courierSessionId ? (await transaction.getDocument(`deliverySessions/${shipment.courierSessionId}`))?.data : null;
+      const liveShipment = route?.status === "active" && route.gpsEnabled && new Date(route.expiresAt) > now ? { ...shipment, lastPosition: route.lastPosition, gpsTrail: route.gpsTrail } : shipment;
+      return customerTrackingView(liveShipment, now, config(env).maxAgeMs || 120000);
     }
     if (!profile && grant.kind !== "courier") forbidden();
     if (body.mode === "detail") {
@@ -197,9 +338,9 @@ export async function shippingOperation({ body, session = null, runTransaction =
       const gpsSessionId = id(body.gpsSessionId);
       if (body.mode === "gps_start") {
         assert(shipment.status === "reparto_final", "La ubicación se comparte únicamente en camino al cliente.");
-        await transaction.commitDocuments([update(`shipments/${shipment.id}`, { activeGpsSession: { id: gpsSessionId, grantHash: grant.hash }, lastPosition: null })]);
+        await transaction.commitDocuments([update(`shipments/${shipment.id}`, { activeGpsSession: { id: gpsSessionId, grantHash: grant.hash }, lastPosition: null, gpsTrail: [] })]);
       } else if (shipment.activeGpsSession?.id === gpsSessionId && shipment.activeGpsSession.grantHash === grant.hash) {
-        await transaction.commitDocuments([update(`shipments/${shipment.id}`, { activeGpsSession: null, lastPosition: null })]);
+        await transaction.commitDocuments([update(`shipments/${shipment.id}`, { activeGpsSession: null, lastPosition: null, gpsTrail: [] })]);
       }
       return { started: body.mode === "gps_start", stopped: body.mode === "gps_stop" };
     }
@@ -209,8 +350,14 @@ export async function shippingOperation({ body, session = null, runTransaction =
       assert(validatePoint(body.point, now), "La ubicación es inválida o está vencida.");
       const previous = shipment.lastPosition;
       assert(!previous || now - new Date(previous.receivedAt) >= 5000, "Esperá unos segundos antes de actualizar la ubicación.");
+      if (previous && validatePoint(previous, now, 2 * 60 * 60 * 1000)) {
+        const elapsedSeconds = Math.max(1, (new Date(body.point.observedAt).valueOf() - new Date(previous.observedAt).valueOf()) / 1000);
+        const allowedMeters = 55 * elapsedSeconds + Math.min(250, Number(previous.accuracy || 0) + Number(body.point.accuracy || 0));
+        assert(distanceMeters(previous, body.point) <= allowedMeters, "La posición parece un salto GPS. Esperá una medición nueva antes de compartir.");
+      }
       const point = { lat: body.point.lat, lng: body.point.lng, accuracy: body.point.accuracy, observedAt: body.point.observedAt, receivedAt: now, expiresAt: new Date(now.valueOf() + (config(env).maxAgeMs || 120000)), grantHash: grant.hash };
-      await transaction.commitDocuments([update(`shipments/${shipment.id}`, { lastPosition: point })]);
+      const trail = [...(shipment.gpsTrail || []).filter(sample => validatePoint(sample, now, 2 * 60 * 60 * 1000)), point].slice(-120);
+      await transaction.commitDocuments([update(`shipments/${shipment.id}`, { lastPosition: point, gpsTrail: trail })]);
       return { saved: true, receivedAt: now, expiresAt: point.expiresAt };
     }
     const actor = profile?.id || grant.actorId;
@@ -230,6 +377,26 @@ export async function shippingOperation({ body, session = null, runTransaction =
     const requireEdit = () => { if (!profile || !edit(profile)) forbidden(); };
     const requireApproval = () => { if (!profile || !approve(profile)) forbidden(); };
     const reason = () => { const value = String(body.reason || "").trim(); assert(value.length >= 4 && value.length <= 1000, "Indicá un motivo de entre 4 y 1000 caracteres."); return value; };
+    const revokeCourierSession = async revokeReason => {
+      const routeId = shipment.courierSessionId;
+      if (!routeId) return;
+      const route = (await transaction.getDocument(`deliverySessions/${routeId}`))?.data;
+      if (!route || route.status !== "active") return;
+      const leg = route.leg;
+      operations.push(update(`deliverySessions/${routeId}`, { status: "revoked", revokedBy: actor, revokeReason, revokedAt: now, gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [] }));
+      for (const memberId of route.shipmentIds || []) {
+        if (memberId === shipment.id) continue;
+        const member = (await transaction.getDocument(`shipments/${memberId}`))?.data;
+        if (member?.courierSessionId !== routeId) continue;
+        operations.push(update(`shipments/${memberId}`, { courierSessionId: null, courierSessionLeg: null,
+          courierVersions: { ...(member.courierVersions || {}), [leg]: (member.courierVersions?.[leg] || 0) + 1 },
+          courierGrantHashes: { ...(member.courierGrantHashes || {}), [leg]: null }, lastPosition: null, gpsTrail: [], activeGpsSession: null,
+          updatedAt: now, revision: (member.revision || 0) + 1 }));
+      }
+      changes.courierSessionId = null; changes.courierSessionLeg = null;
+      changes.courierGrantHashes = { ...(shipment.courierGrantHashes || {}), [leg]: null };
+      changes.courierVersions = { ...(shipment.courierVersions || {}), [leg]: (shipment.courierVersions?.[leg] || 0) + 1 };
+    };
     if (body.mode === "approve") {
       requireApproval();
       assert(shipment.status === "solicitud_pendiente" && shipment.stockCommitState === "pending", "La solicitud ya se aprobó o no está pendiente.");
@@ -287,6 +454,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
       changes.approvalReview = { reason: reason(), reviewedBy: actor, reviewedAt: now }; detail = changes.approvalReview;
     } else if (body.mode === "retry") {
       requireEdit(); assert(shipment.status === "no_entregado" && shipment.stockCommitState === "committed", "Sólo se reintentan envíos no entregados con stock ya imputado.");
+      await revokeCourierSession("Reintento de envío");
       assert(body.physicalPositionConfirmed === true && ["origin", "repository", "final"].includes(body.retryFrom), "Confirmá dónde se encuentra físicamente el pedido.");
       assert(body.retryFrom !== "repository" || shipment.deliveryType === "repository", "Este pedido no usa repositorio.");
       changes.status = { origin: "listo_retirar", repository: "recibido_repositorio", final: "reparto_final" }[body.retryFrom];
@@ -295,12 +463,14 @@ export async function shippingOperation({ body, session = null, runTransaction =
       for (const path of shipment.incident?.alertPaths || []) operations.push(update(path, { active: false, status: "resolved", resolvedBy: actor, updatedAt: now }));
     } else if (["cancel", "return", "undelivered"].includes(body.mode)) {
       requireEdit(); detail.reason = reason();
+      await revokeCourierSession(`Envío ${body.mode}`);
       changes.status = { cancel: "cancelado", return: "devuelto", undelivered: "no_entregado" }[body.mode];
       changes.lastPosition = null; changes.trackingVersion = shipment.trackingVersion + 1;
       changes.courierVersions = Object.fromEntries(Object.entries(shipment.courierVersions).map(([key, value]) => [key, value + 1]));
       detail.stockAndFinance = "Sin devolución automática: requiere movimiento de inventario y operación financiera separados.";
     } else if (body.mode === "address") {
       requireEdit(); detail = { reason: reason(), before: shipment.destination };
+      await revokeCourierSession("Se modificó el domicilio");
       const draft = cleanShippingDraft(body);
       const destination = { displayAddress: draft.displayAddress, notes: draft.notes, verified: false };
       if (body.verified === true) {
@@ -308,7 +478,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
         Object.assign(destination, { lat: body.lat, lng: body.lng, verified: true, verifiedBy: actor, verifiedAt: now,
           provinceOrCaba: String(body.provinceOrCaba || "").slice(0, 100), neighborhoodOrLocality: String(body.neighborhoodOrLocality || "").slice(0, 100) });
       }
-      changes.destination = destination; changes.destinationRevision = (shipment.destinationRevision || 0) + 1; changes.deliveryException = null; detail.after = destination;
+      changes.destination = destination; changes.destinationRevision = (shipment.destinationRevision || 0) + 1; changes.deliveryException = null; changes.lastPosition = null; detail.after = destination;
     } else if (body.mode === "assign") {
       requireEdit(); assert(["aprobado", "en_preparacion", "listo_retirar"].includes(previous), "Reasigná antes del retiro.");
       const assigned = await preparers(transaction, [...new Set(body.assignedPreparerIds || [])]);
@@ -317,6 +487,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
     } else if (body.mode === "issue_access") {
       requireEdit();
       assert(body.kind === "courier" || body.kind === "tracking", "Tipo de acceso inválido.");
+      if (body.kind === "courier") await revokeCourierSession("Se generó un acceso de reparto individual");
       if (body.kind === "courier") assert(shipment.stockCommitState === "committed", "Aprobá el origen antes de autorizar al repartidor.");
       const leg = body.kind === "tracking" ? "tracking" : shipment.deliveryType === "repository" ? body.leg : "direct";
       assert(["origin", "final", "direct", "tracking"].includes(leg) && (shipment.deliveryType === "repository" ? leg !== "direct" : !["origin", "final"].includes(leg)), "Tramo inválido.");
@@ -330,12 +501,15 @@ export async function shippingOperation({ body, session = null, runTransaction =
       if (body.kind === "tracking") operations.push(create(`shippingOutbox/${operationId}`, { event: "shipping.tracking_ready", shipmentId: shipment.id, adapter: "disabled", createdAt: now }));
     } else if (body.mode === "revoke_access") {
       requireEdit(); changes.trackingVersion = shipment.trackingVersion + 1;
+      await revokeCourierSession("Gestión revocó el acceso de reparto");
       changes.courierVersions = Object.fromEntries(Object.entries(shipment.courierVersions).map(([key, value]) => [key, value + 1])); changes.lastPosition = null;
     } else if (body.mode === "delivery_exception") {
       requireApproval(); assert(previous === "reparto_final", "La excepción sólo se aprueba durante el reparto final.");
       const accessHash = String(body.grantHash || ""); assert(/^[a-f0-9]{64}$/.test(accessHash), "Elegí la autorización vigente del repartidor.");
-      const access = (await transaction.getDocument(`shipmentAccess/${accessHash}`))?.data;
-      assert(access?.shipmentId === shipment.id && access.kind === "courier" && access.leg !== "origin" && access.version === shipment.courierVersions[access.leg] && new Date(access.expiresAt) > now, "La autorización no está vigente.");
+      const access = (await transaction.getDocument(`shipmentAccess/${accessHash}`))?.data || (await transaction.getDocument(`deliverySessionAccess/${accessHash}`))?.data;
+      const individualAccess = access?.shipmentId === shipment.id && access.kind === "courier" && access.version === shipment.courierVersions?.[access.leg];
+      const routeAccess = access?.sessionId === shipment.courierSessionId && access.kind === "courier_route" && routeSession === null && access.version === (await transaction.getDocument(`deliverySessions/${access.sessionId}`))?.data?.version;
+      assert((individualAccess || routeAccess) && access.leg !== "origin" && new Date(access.expiresAt) > now, "La autorización no está vigente.");
       assert(access.issuedBy !== `courier_${accessHash.slice(0, 16)}` && actor !== `courier_${accessHash.slice(0, 16)}`, "El repartidor no puede aprobar su propia excepción.");
       changes.deliveryException = { approvedBy: actor, reason: reason(), grantHash: accessHash, destinationRevision: shipment.destinationRevision || 0, expiresAt: new Date(now.valueOf() + 30 * 60000).toISOString() };
       detail = changes.deliveryException;
@@ -344,7 +518,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
       const action = courierAction(shipment, grant.leg);
       assert(action && action.action === body.action, "La acción no corresponde al estado o tramo actual.");
       if (action.action === "deliver") {
-        detail.proof = deliveryProof(shipment, grant, now, config(env)); changes.lastPosition = null; changes.deliveredAt = now;
+        detail.proof = deliveryProof(routeSession ? { ...shipment, lastPosition: routeSession.lastPosition } : shipment, grant, now, config(env)); changes.lastPosition = null; changes.gpsTrail = []; changes.deliveredAt = now;
         notice = { event: "delivery_completed", title: "Pedido entregado" };
       }
       changes.status = action.next;
@@ -355,12 +529,24 @@ export async function shippingOperation({ body, session = null, runTransaction =
       result = { shipment: { ...shipment, events: undefined } };
     } else throw shippingError("Operación desconocida.", 400);
     Object.assign(changes, { updatedAt: now, revision: (shipment.revision || 0) + 1 });
-    if (changes.lastPosition === null) changes.activeGpsSession = null;
+    if (changes.lastPosition === null) { changes.activeGpsSession = null; changes.gpsTrail = []; }
     const next = { ...shipment, ...changes };
     if (notice) {
       const notices = await notifications(transaction, next, notice.event, { ...notice, stamp: now, eventId: operationId });
       operations.push(...notices);
       if (changes.incident) changes.incident.alertPaths = notices.map(operation => operation.path);
+    }
+    if (routeSession && body.mode === "courier_action") {
+      const routeRows = [];
+      for (const memberId of routeSession.shipmentIds || []) {
+        const row = memberId === shipment.id ? { ...shipment, ...changes } : { ...(await transaction.getDocument(`shipments/${memberId}`))?.data };
+        if (row.saleId && !CLOSED_SHIPPING_STATES.includes(row.status)) routeRows.push(row);
+      }
+      const hasFinalStop = routeRows.some(row => row.status === "reparto_final");
+      const sessionChanges = { updatedAt: now };
+      if (!routeRows.length) Object.assign(sessionChanges, { status: "completed", completedAt: now, gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [] });
+      else if (!hasFinalStop && routeSession.gpsEnabled) Object.assign(sessionChanges, { gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [], gpsStoppedAt: now });
+      operations.push(update(`deliverySessions/${routeSession.id}`, sessionChanges));
     }
     operations.push(update(`shipments/${shipment.id}`, changes), eventWrite(next, operationId, body.mode, actor, previous, now, { ...detail, actorRole: profile ? normalizedRole(profile) : "external_courier" }), create(receiptPath, { fingerprint, result: body.mode === "labels" ? { authorized: true } : result, createdAt: now }));
     await transaction.commitDocuments(operations);

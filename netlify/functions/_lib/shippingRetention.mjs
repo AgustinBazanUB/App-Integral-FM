@@ -23,7 +23,7 @@ export async function clearExpiredShippingPositions({ env = process.env, now = n
       for (const path of paths.slice(offset, offset + 40)) {
         if (!/^shipments\/[A-Za-z0-9_-]+$/.test(path)) throw new Error("Ruta de retención inválida.");
         const shipment = (await transaction.getDocument(path))?.data;
-        if (shipment?.lastPosition?.expiresAt && new Date(shipment.lastPosition.expiresAt) <= now) operations.push({ type: "update", path, data: { lastPosition: null } });
+        if (shipment?.lastPosition?.expiresAt && new Date(shipment.lastPosition.expiresAt) <= now) operations.push({ type: "update", path, data: { lastPosition: null, gpsTrail: [], activeGpsSession: null } });
       }
       await transaction.commitDocuments(operations);
       return operations.length;

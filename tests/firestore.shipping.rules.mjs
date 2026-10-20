@@ -22,6 +22,8 @@ before(async () => {
     await setDoc(doc(database, "shipments/protected"), { createdBy: seller.id, assignedPreparerIds: [preparer.id], stockCommitState: "pending", status: "solicitud_pendiente" });
     await setDoc(doc(database, "shipments/protected/events/start"), { action: "created" });
     await setDoc(doc(database, "shipmentAccess/hash"), { secret: "hash-only" });
+    await setDoc(doc(database, "deliverySessions/route"), { shipmentIds: ["protected"], status: "active", lastPosition: { lat: -34.6, lng: -58.4 } });
+    await setDoc(doc(database, "deliverySessionAccess/hash"), { sessionId: "route", kind: "courier_route" });
     await setDoc(doc(database, "sales/protected"), { sourceType: "seller_sale", sellerId: seller.id, locationId: "valle", shipmentId: "protected", status: "active" });
     await setDoc(doc(database, "alerts/shipping-protected"), { source: "shipping", moduleId: "shipping", active: true, responsibleId: preparer.id, read: false, title: "Preparar" });
   });
@@ -33,6 +35,17 @@ test("shipping rules deny every direct browser shipment write, including adminis
     await assertFails(updateDoc(doc(userDb(uid), "shipments/protected"), { status: "entregado" }));
     await assertFails(setDoc(doc(userDb(uid), "shipments/protected/events/fake"), { action: "approved" }));
     await assertFails(getDoc(doc(userDb(uid), "shipmentAccess/hash")));
+  }
+});
+test("shared courier sessions are readable only by authenticated shipping managers and never writable from browsers", async () => {
+  await assertSucceeds(getDoc(doc(userDb(admin.id), "deliverySessions/route")));
+  await assertSucceeds(getDoc(doc(userDb(manager.id), "deliverySessions/route")));
+  await assertFails(getDoc(doc(userDb(seller.id), "deliverySessions/route")));
+  await assertFails(getDoc(doc(environment.unauthenticatedContext().firestore(), "deliverySessions/route")));
+  await assertFails(updateDoc(doc(userDb(admin.id), "deliverySessions/route"), { status: "completed" }));
+  for (const uid of [admin.id, seller.id, manager.id]) {
+    await assertFails(getDoc(doc(userDb(uid), "deliverySessionAccess/hash")));
+    await assertFails(setDoc(doc(userDb(uid), "deliverySessionAccess/fake"), { sessionId: "route" }));
   }
 });
 test("shipping read scopes: manager, creator and assigned staff only; QR/anonymous cannot read", async () => {

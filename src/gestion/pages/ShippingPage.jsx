@@ -1,19 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, DataTable, EmptyState, FilterBar, FormField, PageHeader, Panel, SearchInput, Select, Skeleton, StatCard, Tabs } from "../../design-system";
 import { useAuth } from "../AuthContext";
 import { Link, useLocation, useNavigate } from "../../router";
-import { subscribeShipments } from "../services/shippingService";
+import { subscribeShipments, createCourierRouteAccess } from "../services/shippingService";
 import { SHIPPING_STATES, TRANSPORTS, shippingBucket } from "../../shared/shippingDomain.mjs";
 import { argentinaDateKey } from "../../modules/locations/domain/time.js";
 import { formatDateTime } from "../formatters";
 import ShippingTasks from "../shipping/ShippingTasks";
 import ShipmentDetail from "../shipping/ShipmentDetail";
 import ShippingRequests from "../shipping/ShippingRequests";
+import ShippingAccessQr from "../shipping/ShippingAccessQr";
+import { can } from "../permissions";
 import "../shipping/shipping.css";
 
 export default function ShippingPage() {
   const { profile } = useAuth(), location = useLocation(), navigate = useNavigate();
   const [rows, setRows] = useState(null), [error, setError] = useState(""), [tab, setTab] = useState("board"), [bucket, setBucket] = useState("pending"), [filters, setFilters] = useState({});
+  const [routeLeg, setRouteLeg] = useState("direct"), [selectedRouteIds, setSelectedRouteIds] = useState([]), [routeAccess, setRouteAccess] = useState(null), [routeError, setRouteError] = useState(""), [routeBusy, setRouteBusy] = useState(false);
+  const routeAttempt = useRef(null), canManage = can(profile, "shipping", "edit");
   const selected = new URLSearchParams(location.search).get("shipment");
   useEffect(() => subscribeShipments(profile, setRows, error => setError(error.message)), [profile.id]);
   const open = id => navigate(`/gestion/shipping${id ? `?shipment=${encodeURIComponent(id)}` : ""}`);
@@ -29,8 +33,29 @@ export default function ShippingPage() {
   });
   const origins = [...new Map((rows || []).filter(row => row.stockOriginId).map(row => [`${row.stockOriginType}:${row.stockOriginId}`, row.stockOriginName])).entries()];
   const people = [...new Map((rows || []).flatMap(row => row.assignedPreparerIds.map((id, index) => [id, row.preparerNames[index]]))).entries()];
+  const routeEligible = row => Boolean(row && row.stockCommitState === "committed" && !row.incident && (
+    routeLeg === "direct" ? row.deliveryType !== "repository" && ["listo_retirar", "reparto_final"].includes(row.status)
+      : routeLeg === "origin" ? row.deliveryType === "repository" && ["listo_retirar", "hacia_repositorio"].includes(row.status)
+        : row.deliveryType === "repository" && ["recibido_repositorio", "reparto_final"].includes(row.status)
+  ));
+  const createRoute = async () => {
+    const shipmentIds = selectedRouteIds.filter(id => routeEligible((rows || []).find(row => row.id === id)));
+    if (!shipmentIds.length || routeBusy) return;
+    const signature = JSON.stringify({ shipmentIds: [...shipmentIds].sort(), routeLeg });
+    if (routeAttempt.current?.signature !== signature) {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      routeAttempt.current = { signature, shipmentIds, leg: routeLeg, sessionId: crypto.randomUUID(), requestId: crypto.randomUUID(), token: btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "") };
+    }
+    setRouteBusy(true); setRouteError("");
+    try {
+      const access = await createCourierRouteAccess(routeAttempt.current);
+      setRouteAccess(access); setSelectedRouteIds([]); routeAttempt.current = null;
+    } catch (error) { setRouteError(error.message); }
+    finally { setRouteBusy(false); }
+  };
   const requests = (rows || []).filter(row => row.status === "solicitud_pendiente");
   const columns = [
+    ...(canManage ? [{ key: "route", label: "Ruta", render: row => <input type="checkbox" aria-label={`Incluir ${row.publicCode} en el recorrido`} disabled={!routeEligible(row)} checked={selectedRouteIds.includes(row.id)} onChange={event => setSelectedRouteIds(current => event.target.checked ? [...new Set([...current, row.id])] : current.filter(id => id !== row.id))} /> }] : []),
     { key: "issue", label: "!", render: row => row.incident ? <span className="fm-shipping-issue-mark" title={row.incident.reason} aria-label={`Incidencia: ${row.incident.reason}`}>!</span> : <span className="fm-shipping-neutral-dot" aria-label="Sin incidencia" /> },
     { key: "code", label: "Envío y venta", render: row => <div><strong>{row.publicCode}</strong><small>{row.saleCode}</small></div> },
     { key: "customer", label: "Cliente", render: row => <div>{row.customerSnapshot.name}<small>{row.customerSnapshot.phone}</small></div> },
@@ -57,6 +82,11 @@ export default function ShippingPage() {
         <FormField label="Preparador"><Select aria-label="Preparador" value={filters.preparer || ""} onChange={event => set("preparer", event.target.value)}><option value="">Todos los preparadores</option>{people.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</Select></FormField>
         <FormField label="Estado"><Select aria-label="Estado" value={filters.status || ""} onChange={event => set("status", event.target.value)}><option value="">Todos los estados</option>{Object.entries(SHIPPING_STATES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</Select></FormField>
       </FilterBar>
+      {canManage && <Panel title="Recorrido del repartidor" description="Seleccioná pedidos compatibles para generar un QR temporal. El repartidor comparte una sola ubicación para toda la ruta.">
+        <div className="fm-shipping-route-tools"><FormField label="Tramo"><Select value={routeLeg} onChange={event => { setRouteLeg(event.target.value); setSelectedRouteIds(current => current.filter(id => { const row = (rows || []).find(item => item.id === id); return event.target.value === "direct" ? row?.deliveryType !== "repository" && ["listo_retirar", "reparto_final"].includes(row?.status) : event.target.value === "origin" ? row?.deliveryType === "repository" && ["listo_retirar", "hacia_repositorio"].includes(row?.status) : row?.deliveryType === "repository" && ["recibido_repositorio", "reparto_final"].includes(row?.status); })); setRouteAccess(null); routeAttempt.current = null; }}><option value="direct">Entrega directa · cliente</option><option value="origin">Repositorio · origen a repositorio</option><option value="final">Repositorio · repositorio a cliente</option></Select></FormField><Button loading={routeBusy} disabled={!selectedRouteIds.some(id => routeEligible((rows || []).find(row => row.id === id)))} onClick={createRoute}>Crear QR de {selectedRouteIds.filter(id => routeEligible((rows || []).find(row => row.id === id))).length} envío(s)</Button></div>
+        {routeError && <p role="alert" className="fm-shipping-error">{routeError}</p>}
+        {routeAccess && <div className="fm-shipping-route-access"><p role="status">QR de recorrido válido hasta {formatDateTime(routeAccess.expiresAt)}. El acceso reúne {routeAccess.shipmentIds?.length || selectedRouteIds.length} envío(s).</p><input readOnly aria-label="Enlace temporal del recorrido" value={routeAccess.url} /><Button variant="secondary" onClick={() => navigator.clipboard.writeText(routeAccess.url).catch(() => setRouteError("Seleccioná y copiá el enlace manualmente."))}>Copiar enlace</Button><ShippingAccessQr url={routeAccess.url} title="Abrir el recorrido en el teléfono" description="Escaneá una vez para ver los pedidos asignados y compartir una única ubicación GPS durante las entregas." /></div>}
+      </Panel>}
       {rows === null && !error ? <Skeleton lines={6} /> : <DataTable columns={columns} rows={visible} empty={<EmptyState icon="Truck" title="No hay envíos para estos filtros" description="Los envíos se generan al confirmar ventas con envío en Venta Rápida o en el Panel Vendedor." />} />}
     </Panel><p className="fm-shipping-muted">Las incidencias se marcan en rojo dentro del pedido. Las excepciones se consultan en Todos y no cuentan como entregados.</p></>}
     </>}

@@ -1,5 +1,5 @@
 import { requireFirebaseActiveProfile } from "./_lib/firebaseAuth.mjs";
-import { createShippingSale, shippingOperation, listShippingResources, limitShippingPublic } from "./_lib/shipping.mjs";
+import { createShippingSale, createCourierSession, readCourierSession, shippingOperation, listShippingResources, limitShippingPublic } from "./_lib/shipping.mjs";
 import { shippingFeed, markShippingNotificationRead } from "./_lib/shippingFeed.mjs";
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" } });
 export default async function handler(request, context = {}) {
@@ -18,6 +18,12 @@ export default async function handler(request, context = {}) {
     if (body.mode === "create_sale") {
       if (!session) return json({ ok: false }, 401);
       result = await createShippingSale({ sale: body.sale || {}, session, requestId: body.requestId, administrative: body.administrative === true });
+    } else if (body.mode === "create_courier_session") {
+      if (!session) return json({ ok: false }, 401);
+      result = await createCourierSession({ body, session });
+    } else if (body.mode === "courier_session_detail") {
+      if (!session) return json({ ok: false }, 401);
+      result = await readCourierSession({ sessionId: body.sessionId, session });
     } else if (body.mode === "resources") {
       if (!session) return json({ ok: false }, 401);
       result = await listShippingResources(session);

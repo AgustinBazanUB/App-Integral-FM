@@ -8,6 +8,7 @@ import { PREPARATION_PROBLEMS, SHIPPING_STATES } from "../../shared/shippingDoma
 import CourierPortal from "./CourierPortal";
 import ShippingProgress from "./ShippingProgress";
 import ShippingLocation from "./ShippingLocation";
+import ShippingMap from "./ShippingMap";
 import { formatDateTime } from "../formatters";
 import "./shipping.css";
 
@@ -42,11 +43,11 @@ function InternalPreparation({ lookupId }) {
 
 function CustomerTracking() {
   const token = window.location.hash.slice(1), [data, setData] = useState(null), [error, setError] = useState("");
-  useEffect(() => { let live = true; const refresh = () => shippingRequest({ mode: "tracking", token }, { publicAccess: true }).then(data => { if (live) { setData(data); setError(""); } }).catch(error => { if (live) { setError(error.message); setData(null); } }); refresh(); const timer = setInterval(refresh, 20000); return () => { live = false; clearInterval(timer); }; }, [token]);
+  useEffect(() => { let live = true; const refresh = () => { if (document.visibilityState === "hidden") return; shippingRequest({ mode: "tracking", token }, { publicAccess: true }).then(data => { if (live) { setData(data); setError(""); } }).catch(error => { if (live) { setError(error.message); setData(null); } }); }; const timer = setInterval(refresh, 15000); const wake = () => { if (document.visibilityState === "visible") refresh(); }; refresh(); document.addEventListener("visibilitychange", wake); window.addEventListener("focus", refresh); return () => { live = false; clearInterval(timer); document.removeEventListener("visibilitychange", wake); window.removeEventListener("focus", refresh); }; }, [token]);
   const title = data?.status === "entregado" ? "Tu pedido fue entregado" : data?.status === "reparto_final" ? "Tu pedido está en camino" : data?.status === "recibido_repositorio" ? "Tu pedido está en repositorio" : "Seguimiento de tu pedido";
   return <section className="fm-shipping-customer-portal"><header><p className="fm-shipping-eyebrow">Enlace público · Sólo lectura</p><h1>{title}</h1><p>Podés consultar el estado y la última ubicación de tu envío.</p></header>
     {error && <p role="alert" className="fm-shipping-error">{error}</p>}
-    {data ? <><div className="fm-shipping-public-card"><strong>Pedido {data.code}</strong><p>Estado: {data.label}</p><ShippingProgress status={data.status} customer /></div><ShippingLocation position={data.position} final={data.status === "reparto_final"} customer /><div className="fm-shipping-public-card"><strong>Información del envío</strong><p>{data.locationMessage}</p><p>Última actualización: {formatDateTime(data.updatedAt)}</p></div><p className="fm-shipping-muted">Este enlace muestra únicamente la información permitida para tu pedido. No permite modificar el envío.</p></> : !error && <Skeleton />}
+    {data ? <><div className="fm-shipping-public-card"><strong>Pedido {data.code}</strong><p>Estado: {data.label}</p><ShippingProgress status={data.status} customer /></div>{data.status === "reparto_final" && <ShippingMap position={data.position} trail={data.trail} destination={data.destination} active={Boolean(data.position)} label="Ubicación del repartidor" />}<ShippingLocation position={data.position} final={data.status === "reparto_final"} customer /><div className="fm-shipping-public-card"><strong>Información del envío</strong><p>{data.locationMessage}</p><p>Última actualización: {formatDateTime(data.updatedAt)}</p><p>Tiempo estimado: no disponible</p></div><p className="fm-shipping-muted">Este enlace muestra únicamente la información permitida para tu pedido. No permite modificar el envío.</p></> : !error && <Skeleton />}
   </section>;
 }
 
@@ -56,7 +57,7 @@ export default function ShippingPublicApp() {
   const [role, setRole] = useState(explicitRole === "internal" ? "internal" : explicitRole === "courier" || /^[A-Za-z0-9_-]{32,128}$/.test(window.location.hash.slice(1)) ? "courier" : "");
   const [accessHash, setAccessHash] = useState(() => window.location.hash);
   useEffect(() => { const changed = () => { setAccessHash(window.location.hash); if (/^[A-Za-z0-9_-]{32,128}$/.test(window.location.hash.slice(1))) setRole("courier"); }; window.addEventListener("hashchange", changed); return () => window.removeEventListener("hashchange", changed); }, []);
-  useEffect(() => { document.body.classList.add("fm-management-body"); const meta = document.createElement("meta"); meta.name = "referrer"; meta.content = "no-referrer"; document.head.appendChild(meta); return () => { document.body.classList.remove("fm-management-body"); meta.remove(); }; }, []);
+  useEffect(() => { document.body.classList.add("fm-management-body"); const meta = document.createElement("meta"); meta.name = "referrer"; meta.content = "strict-origin-when-cross-origin"; document.head.appendChild(meta); return () => { document.body.classList.remove("fm-management-body"); meta.remove(); }; }, []);
   useEffect(() => { const skip = event => { if (event.target.closest?.('a[href="#main-content"]')) { event.preventDefault(); document.getElementById("main-content")?.focus(); } }; document.addEventListener("click", skip); return () => document.removeEventListener("click", skip); }, []);
   const invalid = lookupId !== null && !/^[A-Za-z0-9_-]{12,200}$/.test(lookupId);
   return <div className="fm-shipping-public-shell"><header className="fm-shipping-public-brand"><a href="/gestion" aria-label="Flor Mía">Flor Mía</a></header><main id="main-content" tabIndex={-1} className="fm-shipping-public">

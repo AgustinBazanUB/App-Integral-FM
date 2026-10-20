@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { createShippingSale, shippingOperation, limitShippingPublic } from "../netlify/functions/_lib/shipping.mjs";
+import { createShippingSale, createCourierSession, readCourierSession, shippingOperation, limitShippingPublic } from "../netlify/functions/_lib/shipping.mjs";
 import { cancelSaleAndInvoice } from "../netlify/functions/_lib/arca/saleCancellation.mjs";
 import { shippingBucket, courierAction, customerTrackingView, validatePoint, deliveryProof, distanceMeters } from "../src/shared/shippingDomain.mjs";
 import { admin, seller, preparer, manager, session, sale, now, memoryStore } from "./helpers/shippingFixtures.mjs";
-const token = "a".repeat(43), token2 = "b".repeat(43), trackToken = "c".repeat(43);
+const token = "a".repeat(43), token2 = "b".repeat(43), trackToken = "c".repeat(43), routeToken = "d".repeat(43), trackTokenTwo = "e".repeat(43);
 const sha = value => createHash("sha256").update(value).digest("hex");
 async function setup(administrative = false, overrides = {}) {
   const store = memoryStore();
@@ -150,12 +150,13 @@ test("tracking is readonly, distinct, revocable, excludes PII and only exposes f
   await s.op("issue_access", { kind: "tracking", newToken: trackToken });
   await s.op("issue_access", { kind: "courier", newToken: token });
   const view = await s.op("tracking", { token: trackToken }, null);
-  assert.equal(view.position, null); assert.equal(view.destination, undefined); assert.equal(view.customerSnapshot, undefined);
+  assert.equal(view.position, null); assert.equal(view.destination, null); assert.equal(view.customerSnapshot, undefined);
   await assert.rejects(s.op("courier_action", { token: trackToken, action: "pickup" }, null), /permiso/);
   await s.op("courier_action", { token, action: "pickup" }, null);
   await s.op("gps_start", { token, gpsSessionId: "gps-test" }, null);
   await s.op("position", { token, gpsSessionId: "gps-test", point: { lat: -34.6, lng: -58.4, accuracy: 10, observedAt: now.toISOString() } }, null);
-  assert((await s.op("tracking", { token: trackToken }, null)).position);
+  const live = await s.op("tracking", { token: trackToken }, null);
+  assert(live.position); assert.equal(live.trail.length, 1); assert.equal(live.destination, null);
   assert.equal((await s.op("tracking", { token: trackToken }, null, new Date(now.valueOf() + 130000))).position, null);
   await assert.rejects(s.op("detail", { token }, null, new Date(now.valueOf() + 5 * 3600000)), /vencido/);
   await s.op("revoke_access");
@@ -195,9 +196,71 @@ test("GPS stop clears tracking immediately; late points and old sessions cannot 
   assert.equal(s.shipment().activeGpsSession.id, "second");
   await s.op("delivery_exception", { grantHash: sha(token), reason: "Cierre supervisado de prueba GPS" });
   await s.op("courier_action", { token, action: "deliver" }, null);
-  assert.equal(s.shipment().activeGpsSession, null); assert.equal(s.shipment().lastPosition, null);
+  assert.equal(s.shipment().activeGpsSession, null); assert.equal(s.shipment().lastPosition, null); assert.deepEqual(s.shipment().gpsTrail, []);
   await assert.rejects(s.op("gps_start", { token, gpsSessionId: "after-delivery" }, null), /únicamente/);
 });
+test("one temporary courier session shares GPS once across multiple orders and closes after the last delivery", async () => {
+  const store = memoryStore(), shipments = [];
+  for (let index = 0; index < 2; index++) {
+    const created = await createShippingSale({ sale: sale(), session: session(admin), requestId: `route-sale-${index}`, administrative: true, runTransaction: store.runTransaction, now });
+    shipments.push(created.shipmentId);
+    await shippingOperation({ body: { mode: "ready", shipmentId: created.shipmentId, requestId: `route-ready-${index}` }, session: session(preparer), runTransaction: store.runTransaction, now, env: {} });
+  }
+  assert.equal(store.documents.get("locationStock/valle/items/oil").currentStock, 6);
+  const route = await createCourierSession({ body: { sessionId: "shared-route", requestId: "route-create", shipmentIds: shipments, leg: "direct", newToken: routeToken }, session: session(admin), runTransaction: store.runTransaction, now, env: {} });
+  assert.equal(route.shipmentIds.length, 2);
+  assert(shipments.every(id => store.documents.get(`shipments/${id}`).courierSessionId === route.sessionId));
+  const courier = (mode, shipmentId, data = {}) => shippingOperation({ body: { mode, token: routeToken, ...(shipmentId ? { shipmentId } : {}), ...data }, runTransaction: store.runTransaction, now, env: {} });
+  const staff = (shipmentId, data) => shippingOperation({ body: { mode: "issue_access", shipmentId, requestId: `track-${shipmentId}`, kind: "tracking", newToken: data }, session: session(admin), runTransaction: store.runTransaction, now, env: {} });
+  await staff(shipments[0], trackToken); await staff(shipments[1], trackTokenTwo);
+  const initial = await courier("detail"); assert.equal(initial.kind, "courier_route"); assert.equal(initial.shipments.length, 2);
+  await courier("courier_action", shipments[0], { requestId: "pickup-first", action: "pickup" });
+  await courier("gps_start", null, { gpsSessionId: "shared-gps" });
+  const point = { lat: -34.6, lng: -58.4, accuracy: 15, observedAt: now.toISOString() };
+  await courier("position", null, { gpsSessionId: "shared-gps", point });
+  assert.equal(store.documents.get(`deliverySessions/${route.sessionId}`).lastPosition.lat, point.lat);
+  assert(shipments.every(id => store.documents.get(`shipments/${id}`).lastPosition == null), "the live point is stored once per route, not copied onto each order");
+  assert((await shippingOperation({ body: { mode: "tracking", token: trackToken }, runTransaction: store.runTransaction, now, env: {} })).position);
+  assert.equal((await shippingOperation({ body: { mode: "tracking", token: trackTokenTwo }, runTransaction: store.runTransaction, now, env: {} })).position, null);
+  await courier("courier_action", shipments[1], { requestId: "pickup-second", action: "pickup" });
+  for (const shipmentId of shipments) await shippingOperation({ body: { mode: "delivery_exception", shipmentId, requestId: `exception-${shipmentId}`, grantHash: sha(routeToken), reason: "Excepción QA autorizada" }, session: session(admin), runTransaction: store.runTransaction, now, env: {} });
+  await courier("courier_action", shipments[0], { requestId: "deliver-first", action: "deliver" });
+  assert.equal(store.documents.get(`deliverySessions/${route.sessionId}`).gpsEnabled, true);
+  assert.equal((await shippingOperation({ body: { mode: "tracking", token: trackToken }, runTransaction: store.runTransaction, now, env: {} })).position, null);
+  assert((await shippingOperation({ body: { mode: "tracking", token: trackTokenTwo }, runTransaction: store.runTransaction, now, env: {} })).position);
+  await courier("courier_action", shipments[1], { requestId: "deliver-second", action: "deliver" });
+  const completed = store.documents.get(`deliverySessions/${route.sessionId}`);
+  assert.equal(completed.status, "completed"); assert.equal(completed.gpsEnabled, false); assert.equal(completed.lastPosition, null);
+  const receipt = await courier("detail"); assert.equal(receipt.status, "completed"); assert.equal(receipt.shipments[0].customerPhone, undefined);
+  assert.equal((await shippingOperation({ body: { mode: "tracking", token: trackTokenTwo }, runTransaction: store.runTransaction, now, env: {} })).position, null);
+  await assert.rejects(courier("position", null, { gpsSessionId: "shared-gps", point }), /ya terminó/);
+});
+
+test("courier-session management fallback requires shipping-view permission and returns only live route fields", async () => {
+  const store = memoryStore(), nowPosition = { lat: -34.6, lng: -58.4, accuracy: 12, observedAt: now.toISOString(), receivedAt: now };
+  store.documents.set("deliverySessions/manager-view", { status: "active", leg: "direct", shipmentIds: ["one"], createdBy: "admin", accessHash: "secret-hash", gpsEnabled: true, expiresAt: new Date(now.valueOf() + 3600000), lastPosition: { ...nowPosition, grantHash: "sensitive-hash" }, gpsTrail: [nowPosition], gpsSession: { id: "internal", accessHash: "sensitive-hash" } });
+  const view = await readCourierSession({ sessionId: "manager-view", session: session(admin), runTransaction: store.runTransaction, now });
+  assert.equal(view.gpsEnabled, true); assert.deepEqual(view.lastPosition, { lat: nowPosition.lat, lng: nowPosition.lng, accuracy: nowPosition.accuracy, observedAt: nowPosition.observedAt });
+  assert.equal(view.gpsTrail.length, 1); assert.equal(view.accessHash, undefined); assert.equal(view.gpsSession, undefined); assert.equal(view.createdBy, undefined);
+  await assert.rejects(readCourierSession({ sessionId: "manager-view", session: session(seller), runTransaction: store.runTransaction, now }), /permiso/);
+});
+
+test("GPS rejects anomalous jumps and returns only a bounded, PII-free route to the customer", async () => {
+  const s = await setup(true); await s.op("ready", {}, preparer);
+  await s.op("issue_access", { kind: "courier", newToken: token });
+  await s.op("issue_access", { kind: "tracking", newToken: trackToken });
+  await s.op("courier_action", { token, action: "pickup" }, null);
+  await s.op("gps_start", { token, gpsSessionId: "route" }, null);
+  const first = { lat: -34.6, lng: -58.4, accuracy: 10, observedAt: now.toISOString() };
+  await s.op("position", { token, gpsSessionId: "route", point: first }, null);
+  const later = new Date(now.valueOf() + 10000);
+  await assert.rejects(s.op("position", { token, gpsSessionId: "route", point: { ...first, lat: -34.5, observedAt: later.toISOString() } }, null, later), /salto GPS/);
+  assert.equal(s.shipment().gpsTrail.length, 1);
+  const view = await s.op("tracking", { token: trackToken }, null);
+  assert.deepEqual(view.trail, [{ lat: first.lat, lng: first.lng, observedAt: first.observedAt }]);
+  assert.equal(view.customerSnapshot, undefined); assert.equal(view.destination, null);
+});
+
 test("geofence validates accuracy, age, current grant, verified marker and destination revision of exceptions", () => {
   const point = { lat: -34.6, lng: -58.4, accuracy: 10, observedAt: now.toISOString(), grantHash: "hash" };
   const shipment = { destination: { lat: -34.6, lng: -58.4, verified: true }, lastPosition: point }, grant = { hash: "hash", actorId: "courier" }, config = { radiusMeters: 60, maxAccuracyMeters: 30, maxAgeMs: 120000 };
