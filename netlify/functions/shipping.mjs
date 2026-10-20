@@ -4,11 +4,11 @@ import { shippingFeed, markShippingNotificationRead } from "./_lib/shippingFeed.
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" } });
 export default async function handler(request, context = {}) {
   if (request.method !== "POST") return json({ ok: false }, 405);
+  let body;
   try {
     if (process.env.SHIPPING_ENABLED === "false") return json({ ok: false, message: "El módulo de envíos está deshabilitado." }, 503);
     const raw = await request.text();
     if (raw.length > 120000) return json({ ok: false, message: "Solicitud demasiado grande." }, 413);
-    let body;
     try { body = JSON.parse(raw); } catch { return json({ ok: false, message: "El formato de la solicitud no es válido." }, 400); }
     if (!body || Array.isArray(body) || typeof body !== "object") return json({ ok: false }, 400);
     const authenticated = Boolean(request.headers.get("authorization"));
