@@ -18,6 +18,22 @@
 .fm-seller-cart .fm-text-button, .fm-seller-section-head button { font-size:12px; }
 .fm-seller-applied-discount span strong, .fm-seller-applied-discount > strong, .fm-seller-discount-total { font-size:12px; }
 .fm-seller-applied-discount small { font-size:10.8px; color:#514a40; }
+/* Dejar espacio para recorrer los descuentos sin achicar los controles táctiles. */
+.fm-seller-discount-strip .fm-seller-section-head button { gap:3px; padding-inline:5px; font-size:10.5px; white-space:nowrap; }
+.fm-seller-discount-strip .fm-seller-section-head button svg { width:13px; flex:none; }
+.fm-seller-shell .fm-seller-discount-list { gap:5px; padding-bottom:4px; scrollbar-width:thin !important; scrollbar-color:#b88a2d #f3e8cf; }
+.fm-seller-shell .fm-seller-discount-list::-webkit-scrollbar { display:block !important; width:auto; height:8px !important; }
+.fm-seller-shell .fm-seller-discount-list::-webkit-scrollbar-track { background:#f3e8cf; border-radius:8px; }
+.fm-seller-shell .fm-seller-discount-list::-webkit-scrollbar-thumb { background:#b88a2d; border:1px solid #f3e8cf; border-radius:8px; }
+.fm-seller-discount-list .fm-seller-applied-discount { width:190px; grid-template-columns:minmax(0,1fr) auto 30px; gap:4px; padding:4px 3px 4px 7px; }
+.fm-seller-discount-list .fm-seller-applied-discount span strong { font-size:11px; white-space:normal; overflow-wrap:anywhere; line-height:1.2; }
+.fm-seller-discount-list .fm-seller-applied-discount small { font-size:10px; }
+.fm-seller-discount-list .fm-seller-applied-discount > strong { font-size:11px; }
+.fm-seller-discount-list .fm-seller-applied-discount button { width:30px; min-height:44px; }
+@media (max-width:360px) {
+  .fm-seller-discount-strip .fm-seller-section-head button { width:90px; white-space:normal; text-align:left; line-height:1.15; }
+  .fm-seller-discount-list .fm-seller-applied-discount { width:min(170px,100%); }
+}
 .fm-seller-payments legend { font-size:13.2px; color:#302a23; }
 .fm-seller-payments button { font-size:14.4px; min-height:48px; color:#302a23; }
 .fm-seller-payment-summary { font-size:12px; color:#514a40; }
