@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
+import { validatePreviewFirebase } from "./scripts/validate-preview-firebase.mjs";
 
 const surfaceByMode = {
   gestion: {
@@ -33,7 +34,8 @@ function surfaceHtml(surface) {
   };
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
+  if (command === "build") validatePreviewFirebase();
   const surface = surfaceByMode[mode];
   const surfaceEntry = mode === "gestion"
     ? "./src/surfaces/ManagementSurface.jsx"
