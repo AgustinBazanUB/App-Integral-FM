@@ -880,8 +880,8 @@ export default function SellerPanel() {
           <fieldset className={`fm-seller-payments${multiplePaymentAllowed ? " has-multiple" : ""}`}><legend>Forma de pago *</legend>{PAYMENT_OPTIONS.filter((option) => option.value !== "multiple" || multiplePaymentAllowed).map((option) => { const selected = paymentMethod === option.value; return <button key={option.value} type="button" className={`${selected ? "is-selected" : ""}${option.value === "multiple" ? " fm-seller-payments-multiple" : ""}`} aria-pressed={selected} onClick={() => option.value === "multiple" ? setMultipleOpen(true) : (setPaymentMethod(option.value), setPayments([]), setSubmitState({ busy: false, tone: "info", message: "" }))}>{selected ? <Icon name="Check" /> : null}<span>{friendlyPayment[option.value]}</span></button>; })}</fieldset>
           {paymentMethod === "multiple" ? <p className="fm-seller-payment-summary">{payments.map((payment) => `${friendlyPayment[payment.method]} ${formatMoney(payment.amount)}`).join(" · ")}</p> : null}
 
-          <div className="fm-seller-customer-section">
-            {selectedCustomer ? (
+          {selectedCustomer ? (
+            <div className="fm-seller-customer-section">
               <div className="fm-seller-customer-selected">
                 <div className="fm-seller-customer-selected__icon"><Icon name="UserRoundCheck" /></div>
                 <div>
@@ -895,20 +895,15 @@ export default function SellerPanel() {
                   <button type="button" onClick={() => setSelectedCustomer(null)}>Quitar</button>
                 </div>
               </div>
-            ) : (
-              <button type="button" className="fm-seller-add-customer" onClick={() => setCustomerOpen(true)}>
-                <Icon name="UserPlus" />
-                <span><strong>Agregar cliente</strong></span>
-                <Icon name="ChevronRight" />
-              </button>
-            )}
-          </div>
+            </div>
+          ) : null}
 
         </Panel>
         </fieldset>
       </aside>
       <footer className="fm-seller-sticky-action fm-seller-sale-footer">
         <div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div>
+        <Button variant="secondary" icon={selectedCustomer ? "UserRoundCheck" : "UserPlus"} disabled={submitState.busy} onClick={() => setCustomerOpen(true)} className="fm-seller-footer-customer">{selectedCustomer ? "Cambiar cliente" : "Agregar cliente"}</Button>
         <Button variant="secondary" icon="FileText" disabled={submitState.busy || !ticketAllowed || !online || Boolean(editSale)} onClick={() => setBillingOpen(true)}>Generar factura</Button>
         <Button icon="Check" loading={submitState.busy} onClick={() => submitSale()} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Continuar" : shipping ? "Envío requiere conexión" : "Guardar pendiente"}</Button>
         {submitState.message ? <div className="fm-seller-action-feedback" role={submitState.tone === "error" ? "alert" : "status"}>{submitState.tone === "error" ? <p className="fm-form-error">{submitState.message}</p> : <Toast tone={submitState.tone}>{submitState.message}</Toast>}</div> : null}

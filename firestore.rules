@@ -413,7 +413,6 @@ service cloud.firestore {
         && request.resource.data.phoneNormalized.size() >= 8
         && request.resource.data.phoneNormalized.size() <= 11
         && request.resource.data.zoneName is string
-        && request.resource.data.zoneName.size() > 0
         && request.resource.data.active == true
         && request.resource.data.deleted == false
         && linkedSellerCustomer(customerId);
