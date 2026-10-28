@@ -215,7 +215,7 @@ export function defaultOliviaConfiguration(env = {}) {
       enabled: true,
       voice: "es-US-Chirp3-HD-Aoede",
       speakingRate: 1,
-      turnEndSilenceMs: 350,
+      turnEndSilenceMs: 1900,
       maxCharactersPerTurn: 1600,
       maxMonthlyCharacters: 50000,
     },
@@ -269,7 +269,9 @@ export function validateConfiguration(value) {
   clean.modelPolicyVersion = 2;
   validateSchema(clean.responseLimits, object({ maxOutputTokens: { type: "integer", minimum: 700, maximum: 8000 }, maxToolCalls: { type: "integer", minimum: 2, maximum: 12 }, maxRounds: { type: "integer", minimum: 2, maximum: 8 }, timeoutMs: { type: "integer", minimum: 10000, maximum: 55000 }, providerTimeoutMs: { type: "integer", minimum: 5000, maximum: 30000 } }));
   validateSchema(clean.routing, object({ toolThreshold: { type: "integer", minimum: 2, maximum: 12 }, entityThreshold: { type: "integer", minimum: 2, maximum: 100 }, rowThreshold: { type: "integer", minimum: 50, maximum: 10000 }, documentThreshold: { type: "integer", minimum: 1, maximum: 4 } }));
-  validateSchema(clean.naturalVoice, { type: "object", additionalProperties: false, required: ["enabled", "voice", "speakingRate", "turnEndSilenceMs", "maxCharactersPerTurn", "maxMonthlyCharacters"], properties: { enabled: { type: "boolean" }, voice: { type: "string", enum: ["es-US-Chirp3-HD-Aoede", "es-US-Chirp3-HD-Charon"] }, speakingRate: { type: "number", minimum: 0.9, maximum: 1.1 }, turnEndSilenceMs: { type: "integer", minimum: 250, maximum: 500 }, maxCharactersPerTurn: { type: "integer", minimum: 100, maximum: 3000 }, maxMonthlyCharacters: { type: "integer", minimum: 1000, maximum: 1000000 } } });
+  clean.naturalVoice = clean.naturalVoice && { ...clean.naturalVoice };
+  if (Number.isInteger(clean.naturalVoice?.turnEndSilenceMs) && clean.naturalVoice.turnEndSilenceMs >= 250 && clean.naturalVoice.turnEndSilenceMs <= 500) clean.naturalVoice.turnEndSilenceMs = 1900;
+  validateSchema(clean.naturalVoice, { type: "object", additionalProperties: false, required: ["enabled", "voice", "speakingRate", "turnEndSilenceMs", "maxCharactersPerTurn", "maxMonthlyCharacters"], properties: { enabled: { type: "boolean" }, voice: { type: "string", enum: ["es-US-Chirp3-HD-Aoede", "es-US-Chirp3-HD-Charon"] }, speakingRate: { type: "number", minimum: 0.9, maximum: 1.1 }, turnEndSilenceMs: { type: "integer", minimum: 1900, maximum: 4000 }, maxCharactersPerTurn: { type: "integer", minimum: 100, maximum: 3000 }, maxMonthlyCharacters: { type: "integer", minimum: 1000, maximum: 1000000 } } });
   validateSchema(clean.audioLimits, { type: "object", additionalProperties: false, required: ["maxSeconds", "maxBytes"], properties: { maxSeconds: { type: "integer", minimum: 5, maximum: 60 }, maxBytes: { type: "integer", minimum: 65536, maximum: 4194304 } } });
   validateSchema(clean.forecast, { type: "object", additionalProperties: false, required: ["safetyStockPercent"], properties: { safetyStockPercent: { type: "integer", minimum: 0, maximum: 100 } } });
   if (

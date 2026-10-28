@@ -46,7 +46,7 @@ test("browser VAD sends a bounded turn with a short in-memory pre-roll and relea
   const context = {
     currentTime: 0, destination: {}, resume: async () => {}, close: async () => {},
     createMediaStreamSource: () => ({ connect() {}, disconnect() {} }),
-    createAnalyser: () => ({ fftSize: 1024, getFloatTimeDomainData(samples) { samples.fill(amplitude); }, disconnect() {} }),
+    createAnalyser: () => ({ fftSize: 1024, getFloatTimeDomainData(samples) { samples.fill(amplitude); }, connect() {}, disconnect() {} }),
   };
   const voice = new NaturalVoiceConversation({
     mediaDevices: { getUserMedia: async (constraints) => { assert.equal(constraints.audio.echoCancellation, true); assert.equal(constraints.audio.noiseSuppression, true); return stream; } },
@@ -60,11 +60,11 @@ test("browser VAD sends a bounded turn with a short in-memory pre-roll and relea
   assert.equal(voice.recordingTurn, true);
   assert.deepEqual(speechStarts.map(({ bargeIn }) => bargeIn), [false]);
   recorder.ondataavailable({ data: new Blob(["speech"]) });
-  now = 500; amplitude = 0; frames.shift()();
+  now = 2100; amplitude = 0; frames.shift()();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(turns.length, 1);
   assert.equal(turns[0].text, "headerold-1old-2speechtail");
-  assert.equal(turns[0].metadata.durationSeconds, 0.4);
+  assert.equal(turns[0].metadata.durationSeconds, 2);
   assert.ok(states.includes("recording"));
   voice.close();
   assert.equal(track.stopped, true);

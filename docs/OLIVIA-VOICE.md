@@ -8,8 +8,8 @@ GPT-Live, Realtime y la prueba de voz económica se retiraron como modalidades d
 
 ## Flujo y datos
 
-- `NaturalVoiceConversation` solicita el micrófono solo después del clic del usuario, con cancelación de eco, supresión de ruido y control automático de ganancia. Detecta la voz localmente, corta el turno tras 350 ms de silencio y limita cada grabación a 60 s/4 MB.
-- Cada turno completo se envía como archivo a `gpt-transcribe`, junto a `language=es`, contexto de Flor Mía y sugerencias de términos. Las sugerencias son pistas, no obligan al modelo a incluir palabras no escuchadas. GPT Transcribe trabaja con audio completo; transmitir los bytes de Chirp sí es streaming, no una transcripción continua.
+- `NaturalVoiceConversation` solicita el micrófono solo después del clic del usuario, con cancelación de eco, supresión de ruido y control automático de ganancia. Detecta la voz localmente, cierra el turno tras 1900 ms de silencio, ampliables a 3000–4000 ms cuando la voz retoma pausas dentro de la misma intervención y limita cada grabación a 60 s/4 MB.
+- Cada turno completo se envía como archivo a `gpt-transcribe`, junto a `languages[]=es`, contexto de Flor Mía y sugerencias de términos. Las sugerencias son pistas, no obligan al modelo a incluir palabras no escuchadas. GPT Transcribe trabaja con audio completo; transmitir los bytes de Chirp sí es streaming, no una transcripción continua.
 - El audio de entrada vive en memoria del navegador y se descarta tras procesar el turno. La transcripción del usuario y las respuestas de Olivia se conservan en el historial normal. No se guarda audio sintetizado ni texto de TTS en el registro de medición.
 - El motor de Olivia usa la misma política Luna HIGH/XHIGH, permisos, herramientas de solo lectura y tarjetas de confirmación que el chat escrito. Ninguna confirmación oral ejecuta una acción. La respuesta escrita es canónica; el modelo puede preparar una versión breve para voz.
 - Chirp 3 HD se invoca solo después de persistir la respuesta. El endpoint autenticado valida identidad, propiedad de conversación, límites y cuota mensual, y transmite PCM mono de 24 kHz. Cortar el audio cancela el lector local y el stream proveedor. Hablar durante la reproducción interrumpe el audio y cancela la solicitud anterior antes del siguiente turno.
@@ -61,3 +61,5 @@ Netlify documenta un tope de 60 segundos y 20 MB para funciones con respuesta st
 ## Validación pendiente para uso real
 
 Sin secretos de proveedores, el backend cloud no puede confirmar una respuesta real de Chirp ni su precio final. La aceptación de audio, el comportamiento de barge-in, voces, ruido y reproducción deben verificarse con micrófono/altavoz en Chrome y Safari/iPhone antes de habilitar usuarios adicionales. La respuesta de la API confirma que el backend recibió el stream; no prueba la salida física del dispositivo.
+
+La integración visual, estados, pausas y validación del Equalizer Orb se documentan en [OLIVIA-EQUALIZER-ORB.md](OLIVIA-EQUALIZER-ORB.md).

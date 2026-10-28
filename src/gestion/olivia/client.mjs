@@ -70,7 +70,7 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
     if (!token) throw new Error("Iniciá sesión para usar Olivia.");
     const controller = new AbortController();
     let timedOut = false;
-    const abort = () => controller.abort();
+    const abort = () => controller.abort(signal?.reason);
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) controller.abort();
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
@@ -115,33 +115,51 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
     let acceptedId = null, text = "", voiceText = "", phase = "", failures = 0;
     const started = Date.now();
     options.onEvent?.({ type: "job", jobId });
-    while (Date.now() - started < 390000) {
+    // The backend owns the job deadline. Polling delays or a transient disconnect
+    // cannot establish that the operation failed or authorize a second request.
+    while (true) {
       options.signal?.throwIfAborted();
       let status;
       try { status = await send("/.netlify/functions/olivia", { operation: "chatStatus", jobId }, { signal: options.signal }); failures = 0; }
       catch (error) {
-        if (!["olivia-network-error", "olivia-timeout"].includes(error.code) || ++failures > 5) throw error;
+        if (!["olivia-network-error", "olivia-timeout"].includes(error.code) && !(error.status >= 500)) throw error;
+        failures++;
         options.onEvent?.({ type: "phase", label: "Sigo esperando la respuesta. Estoy recuperando la conexión…" });
-        await delay(options.signal, options.pollIntervalMs); continue;
+        await delay(options.signal, Math.min(10000, (options.pollIntervalMs ?? pollIntervalMs) * Math.min(failures, 5))); continue;
       }
       if (status.accepted && acceptedId !== status.accepted.id) { acceptedId = status.accepted.id; options.onEvent?.({ type: "accepted", conversationId: status.conversationId, message: status.accepted }); }
       const elapsed = Date.now() - started;
-      const nextPhase = elapsed > 90000 ? "Sigo trabajando en tu solicitud…" : elapsed > 30000 && status.phase === "Pensando…" ? "Sigo pensando para completar la respuesta…" : status.phase || "Pensando…";
+      const nextPhase = elapsed > 20000 ? "Estoy terminando de procesarla…" : elapsed > 9000 ? "Sigo trabajando en tu consulta…" : status.phase || "Olivia está pensando…";
       if (nextPhase !== phase || !status.text.startsWith(text)) { phase = nextPhase; if (!status.text.startsWith(text)) text = ""; options.onEvent?.({ type: "phase", label: phase, ...(text === "" ? { tools: [] } : {}) }); }
       if (status.text !== text) { options.onEvent?.({ type: "delta", delta: status.text.slice(text.length) }); text = status.text; }
       if (status.voiceText && status.voiceText !== voiceText) { voiceText = status.voiceText; options.onEvent?.({ type: "voice.ready", text: voiceText }); }
       if (status.status === "completed") return status.result;
       if (status.status === "failed") throw Object.assign(new Error(status.failure.message), { ...status.failure });
-      if (status.status === "cancelled") throw new DOMException("Respuesta detenida", "AbortError");
+      if (status.status === "cancelled") throw Object.assign(new Error("Detuviste la respuesta. El chat se conserva."), { name: "AbortError", code: "chat-job-cancelled" });
       await delay(options.signal, options.pollIntervalMs);
     }
-    throw Object.assign(new Error("Olivia no pudo terminar esta consulta a tiempo. Actualizá el chat para recuperar lo guardado."), { code: "chat-job-expired" });
   };
   return {
     request: async (payload, options) => {
       if (payload.operation === "waitChat") return waitForChat(payload.jobId, options);
       if (payload.operation === "chat" && payload.background === true) {
-        const started = await send("/.netlify/functions/olivia", { ...payload, operation: "startChat" }, { signal: options?.signal });
+        let started;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try { started = await send("/.netlify/functions/olivia", { ...payload, operation: "startChat" }, { signal: options?.signal }); break; }
+          catch (error) {
+            if (!["olivia-network-error", "olivia-timeout"].includes(error.code) && !(error.status >= 500)) throw error;
+            if (!payload.conversationId) throw error;
+            if (attempt === 2) {
+              // A lost acknowledgement may already have created the job. Read
+              // its status before offering any retry; never invent a new ID.
+              const recovered = await send("/.netlify/functions/olivia", { operation: "state", conversationId: payload.conversationId }, { signal: options?.signal });
+              if (recovered.activeChatJob?.jobId) { started = recovered.activeChatJob; break; }
+              throw error;
+            }
+            options?.onEvent?.({ type: "phase", label: "Estoy recuperando la conexión con tu consulta…" });
+            await delay(options?.signal);
+          }
+        }
         return waitForChat(started.jobId, options);
       }
       return send("/.netlify/functions/olivia", payload, options);

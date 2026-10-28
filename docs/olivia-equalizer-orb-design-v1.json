@@ -1,0 +1,186 @@
+{
+  "schema_version": "1.0.0",
+  "project": "Flor Mía · Olivia",
+  "initiative": "Modernización visual del chat y experiencia de voz Equalizer Orb",
+  "intent": "Referencia de diseño y criterios de aceptación para Codex; no es una descripción pixel-perfect de la web original.",
+  "source": {
+    "showcase": "https://voiceorbs.vercel.app/orbs/equalizer-orb",
+    "repository": "https://github.com/amunozdev/voiceorbs",
+    "license": "MIT: conservar los avisos y atribuciones requeridos",
+    "orb_source_files": [
+      "src/registry/orbe/equalizer-orb/equalizer-orb.tsx",
+      "src/registry/orbe/equalizer-orb/equalizer-orb.module.css",
+      "src/registry/lib/orb-state.ts",
+      "src/registry/lib/use-orb-level.ts"
+    ],
+    "facts": [
+      "Componente React con visualización CSS; no requiere Three.js ni WebGL.",
+      "Acepta state, size, speed, colorFrom, colorTo, levelRef y label.",
+      "El estado de audio puede representarse mediante levelRef entre 0 y 1; el modo procedural queda disponible como fallback.",
+      "Los siete estados oficiales son idle, connecting, listening, thinking, speaking, error y disabled."
+    ]
+  },
+  "flor_mia_repository": {
+    "url": "https://github.com/AgustinBazanUB/App-Integral-FM",
+    "stack_observed": ["React 18", "Vite 6", "JavaScript/JSX", "CSS", "Netlify Functions", "Firestore"],
+    "focus_files_to_audit": [
+      "AGENTS.md",
+      "src/gestion/olivia/OliviaAssistant.jsx",
+      "src/gestion/olivia/OliviaVoiceControls.jsx",
+      "src/gestion/olivia/OliviaComposer.jsx",
+      "src/gestion/olivia/olivia.css",
+      "src/gestion/olivia/dictation.mjs",
+      "src/gestion/olivia/live.mjs",
+      "src/gestion/olivia/realtime.mjs",
+      "src/gestion/olivia/client.mjs",
+      "src/gestion/olivia/service.js",
+      "netlify/functions/_lib/olivia/chatJobs.mjs",
+      "docs/OLIVIA-VOICE.md",
+      "docs/OLIVIA-VOICE-MINI-TRIAL.md"
+    ],
+    "observed_risks": [
+      "OliviaAssistant.perform marca AbortError de chat como Respuesta detenida y error visible; distinguir interrupción automática de cancelación explícita.",
+      "OliviaAssistant actualmente representa fases de streaming y estado de voz en superficies separadas; unificar su presentación, no sus responsabilidades.",
+      "El dictado y la conversación WebRTC existente son flujos distintos; auditarlos antes de aplicar VAD de otra arquitectura."
+    ]
+  },
+  "design_language": {
+    "name": "Olivia · Fluid Intelligence",
+    "direction": "minimalismo tecnológico cálido, limpio, premium y calmado",
+    "note": "Los siguientes tokens de interfaz son propuestas para Olivia inspiradas en VoiceOrbs, no valores CSS exactos verificados de su sitio.",
+    "mode": "light-default, dark-optional",
+    "light": {
+      "appBackground": "#F6F7FB",
+      "panel": "#FFFFFF",
+      "stage": "#F1F3FA",
+      "border": "#E5E9F2",
+      "textPrimary": "#1F2937",
+      "textSecondary": "#657089",
+      "messageUser": "#EDF4FF",
+      "messageAssistant": "#FFFFFF",
+      "accent": "#6366F1"
+    },
+    "dark": {
+      "appBackground": "#111827",
+      "panel": "#172033",
+      "stage": "#1B2540",
+      "border": "#29354C",
+      "textPrimary": "#F4F7FC",
+      "textSecondary": "#BAC5D8",
+      "messageUser": "#24365F",
+      "messageAssistant": "#1B2740",
+      "accent": "#A5B4FC"
+    },
+    "orb_original_defaults": {
+      "colorFrom": "#38BDF8",
+      "colorTo": "#818CF8",
+      "sizePx": 168,
+      "speed": 1
+    },
+    "shape": {"panelRadiusPx": 22, "bubbleRadiusPx": 18, "composerRadiusPx": 24, "buttonRadiusPx": 14},
+    "spacing": {"basePx": 8, "smallPx": 12, "mediumPx": 16, "largePx": 24, "sectionPx": 32},
+    "shadow": "0 18px 48px rgba(22, 32, 68, 0.10)",
+    "font": "Usar preferentemente Manrope o Inter ya disponibles, sin importar una tipografía nueva; títulos sobrios y jerarquía accesible",
+    "brand_rule": "Mantener identidad y permisos de Flor Mía sin imponer el azul a otros módulos del sistema."
+  },
+  "layout": {
+    "desktop": {
+      "container": "drawer actual adaptable; conservar panel y launcher",
+      "header": "Olivia, subtítulo de Flor Mía, acceso a chats, nueva conversación, configuraciones y cerrar",
+      "voice_stage": "zona serena y central con EqualizerOrb; solo cuando hay voz/dictado, o hero compacto en estado inicial",
+      "messages": "historial visible y navegable, globos livianos, contenido enriquecido intacto",
+      "composer": "barra inferior fija o sticky con texto editable, adjuntos, micrófono, conversación, enviar/detener según el contexto",
+      "advanced": "costos, diagnóstico y detalles técnicos disponibles en lugar secundario, no como cartel central"
+    },
+    "mobile": {
+      "viewport": "respetar safe-area, visualViewport y teclado virtual",
+      "orb_size_px": 124,
+      "composer": "acciones accesibles, mínimo táctil 44px, sin tapar mensajes ni tarjeta de confirmación",
+      "notes": "probar iPhone Safari, Android Chrome y escritorio"
+    },
+    "states_visible": {
+      "listening": "orb activo y leyenda Escuchando…",
+      "thinking": "orb animado y leyenda Olivia está pensando…",
+      "speaking": "orb acompasado y leyenda Olivia está respondiendo…",
+      "connecting": "orb suave y leyenda Conectando…",
+      "idle": "orb en reposo o compacto",
+      "disabled": "estado silencioso, con contexto accesible",
+      "error": "mostrar texto comprensible y acción recuperable solo ante falla real"
+    }
+  },
+  "orb_integration": {
+    "component_name": "OliviaEqualizerOrb",
+    "strategy": "Copiar/adaptar archivos MIT a React 18 + JSX de la app, evitando instalar un framework nuevo",
+    "reactivity": {
+      "microphone": "Reutilizar el MediaStream o AnalyserNode ya autorizado de Olivia; no solicitar un segundo permiso ni abrir getUserMedia redundante",
+      "tts": "En speaking, usar volumen real de audio reproducido cuando el navegador y el pipeline lo permitan; si no, animación procedural honesta",
+      "ref_range": [0, 1],
+      "performance": "ref/Raf fuera de React render en cada frame, limpiar streams y contextos, pausar animación en pestaña oculta"
+    },
+    "states": ["idle", "connecting", "listening", "thinking", "speaking", "error", "disabled"],
+    "state_mapping": {
+      "idle": ["ready", "session_ended", "waiting_for_user"],
+      "connecting": ["requesting_permission", "connecting_voice", "initializing_pipeline"],
+      "listening": ["microphone_open", "user_speech", "natural_pause"],
+      "thinking": ["transcribing", "request_queued", "receiving_stream", "tool_running", "background_job", "generating_answer"],
+      "speaking": ["tts_playing", "assistant_audio_playing"],
+      "error": ["confirmed_nonrecoverable_error", "user_action_required_after_retries"],
+      "disabled": ["not_available", "permissions_denied"]
+    },
+    "accessibility": ["aria-label contextual", "aria-live discreto para estado", "prefers-reduced-motion", "contraste AA", "foco de teclado"]
+  },
+  "conversation_behavior": {
+    "priority": "Tolerancia a pausas naturales y ausencia de falsos errores sin esconder fallas reales",
+    "speech_end": {
+      "default_trailing_silence_ms": 1900,
+      "adaptive_pause_ms": 3000,
+      "upper_pause_ms": 4000,
+      "note": "Parámetros iniciales para ensayos, no garantías de capacidad del proveedor. Aplicar solo a un VAD/pipeline controlable y medir impacto en latencia.",
+      "manual_send": "No retrasar el envío al presionar Terminar/Enviar",
+      "buffering": "No tomar cada speech_stopped como frase final; cuando sea posible consolidar segmentos de la misma intervención y proteger contra dobles envíos",
+      "if_provider_controls_vad": "Revisar la configuración efectiva del proveedor; documentar limitaciones y no simular un cambio de VAD únicamente en CSS"
+    },
+    "response_waiting": {
+      "soft_notice_ms": 9000,
+      "second_notice_ms": 20000,
+      "busy_copy": ["Olivia está pensando…", "Sigo trabajando en tu consulta…", "Estoy terminando de procesarla…"],
+      "timeout_policy": "El timeout definitivo debe responder a contrato backend/capa de red, latidos y señales reales; no cortar una tarea activa por un timer UI arbitrario",
+      "background_job": "Mantener polling/streaming/resume por jobId cuando la petición sigue viva",
+      "network": "Reintentar solamente operaciones idempotentes/seguras con el mismo identificador apropiado; no duplicar ventas ni acciones de negocio",
+      "partial_stream": "No convertir stream parcial o heartbeat tardío en un error terminal mientras el job sigue activo"
+    },
+    "error_categories": {
+      "user_cancel": "Se detuvo porque vos lo pediste; estado neutral, no falla",
+      "stale_or_superseded_response": "Descartar callbacks antiguos; no contaminar conversación actual",
+      "transient_disconnect": "Mostrar Reconectando… y recuperación controlada, sin declarar error de inmediato",
+      "real_failure": "Error explícito con opción segura de reintentar o continuar por texto",
+      "browser_permission_denied": "Permiso de micrófono denegado; instrucción específica de recuperación",
+      "backend_timeout": "Mostrar error si se confirma que no puede completar y no hay trabajo activo"
+    },
+    "safety": "Conservar confirmación visual Sí/No para operaciones, roles, auditoría, límites y aislamiento entre usuarios."
+  },
+  "preserve": [
+    "Mensajes escritos, historial y citas/contenido enriquecido",
+    "Adjuntos y dictado editable",
+    "Modo voz y silenciar/activar micrófono",
+    "Terminar conversación y detener respuesta cuando es realmente el deseo del usuario",
+    "Confirmaciones de operaciones que afectan datos reales",
+    "Métricas de uso y panel desarrollador",
+    "Estados de sesión reales, gastos, autenticación y permisos",
+    "Capacidad de escribir mientras se procesa cuando sea seguro"
+  ],
+  "acceptance_tests": [
+    "Al abrir Olivia no aparecen carteles de error heredados de una sesión ya finalizada.",
+    "El orb escucha, piensa y habla según eventos reales, no temporizadores simulados.",
+    "Un silencio corto dentro de una frase no envía la petición prematuramente si el motor permite configurar VAD.",
+    "Una respuesta lenta mantiene el indicador Pensando y se recupera por jobId si hay trabajo activo.",
+    "AbortError por interrupción automática no se etiqueta como cancelación humana ni error terminal.",
+    "Detener voluntariamente se refleja con texto neutro y no borra una respuesta útil ya persistida.",
+    "Fallos definitivos muestran explicación y recuperación visible; no ocultarlos detrás del orb.",
+    "No se abre un micrófono adicional para la visualización.",
+    "El texto previo del composer no se pierde al agregar dictado.",
+    "Mobile Safari, Android Chrome, escritorio, teclado y prefers-reduced-motion funcionan.",
+    "No hay duplicación de acciones comerciales ante reintentos o reconexiones.",
+    "npm run build:gestion y pruebas focalizadas pasan; cambios en CI o pruebas globales solo según impacto."
+  ]
+}

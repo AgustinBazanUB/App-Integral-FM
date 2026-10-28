@@ -1,7 +1,7 @@
 const mimeChoice = (Recorder) => ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"].find((type) => Recorder.isTypeSupported(type));
 
 export class NaturalVoiceConversation {
-  constructor({ onTurn, onState = () => {}, onSpeechStart = () => {}, onFrame = () => {}, onError = () => {}, mediaDevices = globalThis.navigator?.mediaDevices, Recorder = globalThis.MediaRecorder, AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext, frame = (fn) => requestAnimationFrame(fn), cancelFrame = (id) => cancelAnimationFrame(id), now = () => performance.now(), silenceMs = 350, maxSeconds = 60, maxBytes = 4 * 1024 * 1024 } = {}) {
+  constructor({ onTurn, onState = () => {}, onSpeechStart = () => {}, onFrame = () => {}, onError = () => {}, mediaDevices = globalThis.navigator?.mediaDevices, Recorder = globalThis.MediaRecorder, AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext, frame = (fn) => requestAnimationFrame(fn), cancelFrame = (id) => cancelAnimationFrame(id), now = () => performance.now(), silenceMs = 1900, maxSeconds = 60, maxBytes = 4 * 1024 * 1024 } = {}) {
     Object.assign(this, { onTurn, onState, onSpeechStart, onFrame, onError, mediaDevices, Recorder, AudioContext, frame, cancelFrame, now, silenceMs, maxSeconds, maxBytes });
     this.closed = false; this.muted = false; this.sources = new Set(); this.playGeneration = 0;
   }
@@ -16,6 +16,9 @@ export class NaturalVoiceConversation {
       this.source = this.context.createMediaStreamSource(this.stream);
       this.analyser = this.context.createAnalyser(); this.analyser.fftSize = 1024; this.source.connect(this.analyser);
       this.samples = new Float32Array(this.analyser.fftSize);
+      this.outputAnalyser = this.context.createAnalyser(); this.outputAnalyser.fftSize = 1024;
+      this.outputAnalyser.connect(this.context.destination);
+      this.outputSamples = new Float32Array(this.outputAnalyser.fftSize);
       this.startRecorder();
       this.startedAt = this.now(); this.onState("listening"); this.loop();
     } catch (error) { this.onError(error); this.close(); }
@@ -26,12 +29,18 @@ export class NaturalVoiceConversation {
     this.analyser?.getFloatTimeDomainData(this.samples);
     let sum = 0; for (const sample of this.samples) sum += sample * sample;
     const rms = Math.sqrt(sum / this.samples.length), level = Math.min(1, rms * 5), now = this.now();
-    this.onFrame({ seconds: Math.floor((now - this.startedAt) / 1000), level });
+    this.outputAnalyser?.getFloatTimeDomainData(this.outputSamples);
+    const outputLevel = Math.min(1, Math.sqrt(this.outputSamples.reduce((sum, sample) => sum + sample * sample, 0) / this.outputSamples.length) * 5);
+    this.onFrame({ seconds: Math.floor((now - this.startedAt) / 1000), level: this.muted ? 0 : level, outputLevel, recording: this.recordingTurn });
     if (!this.muted) {
       if (!this.recordingTurn && rms > 0.025) this.beginTurn(now);
       if (this.recordingTurn) {
-        if (rms > 0.016) this.lastSpeechAt = now;
-        if (now - this.recordingStartedAt >= this.maxSeconds * 1000 || (this.lastSpeechAt && now - this.lastSpeechAt >= this.silenceMs && now - this.recordingStartedAt >= 400)) this.finishTurn();
+        if (rms > 0.016) {
+          if (now - this.lastSpeechAt >= 350) this.pauseResumes++;
+          this.lastSpeechAt = now;
+        }
+        const silence = Math.max(this.silenceMs, this.pauseResumes > 1 ? 4000 : this.pauseResumes ? 3000 : 1900);
+        if (now - this.recordingStartedAt >= this.maxSeconds * 1000 || (now - this.lastSpeechAt >= silence && now - this.recordingStartedAt >= 400)) this.finishTurn();
       }
     }
     this.animation = this.frame(this.loop);
@@ -53,8 +62,9 @@ export class NaturalVoiceConversation {
     };
     recorder.onerror = () => { this.discardTurn = true; this.finishTurn(); this.onError(new Error("La grabación se interrumpió. Podés volver a hablar.")); };
     recorder.onstop = () => {
+      clearTimeout(this.turnTimer);
       const wasTurn = this.recordingTurn, chunks = this.chunks || [], durationSeconds = wasTurn ? Math.max(0.1, (this.now() - this.recordingStartedAt) / 1000) : 0, actualType = recorder.mimeType || type || "audio/webm", discard = this.discardTurn;
-      this.recorder = null; this.recordingTurn = false; this.chunks = []; this.bytes = 0; this.discardTurn = false;
+      this.recorder = null; this.recordingTurn = false; this.finishing = false; this.chunks = []; this.bytes = 0; this.discardTurn = false;
       if (!this.closed) this.startRecorder();
       if (!wasTurn || discard || this.closed) return;
       const blob = new Blob(chunks, { type: actualType }); blob.durationSeconds = Math.min(this.maxSeconds, durationSeconds);
@@ -67,7 +77,8 @@ export class NaturalVoiceConversation {
     try {
       if (!this.recorder) this.startRecorder();
       const preRoll = [...new Set([this.idleHeader, ...(this.idleRing || [])].filter(Boolean))];
-      this.chunks = preRoll; this.bytes = preRoll.reduce((total, chunk) => total + chunk.size, 0); this.discardTurn = false; this.recordingTurn = true; this.recordingStartedAt = now; this.lastSpeechAt = now;
+      this.chunks = preRoll; this.bytes = preRoll.reduce((total, chunk) => total + chunk.size, 0); this.discardTurn = false; this.recordingTurn = true; this.recordingStartedAt = now; this.lastSpeechAt = now; this.pauseResumes = 0;
+      clearTimeout(this.turnTimer); this.turnTimer = setTimeout(() => this.finishTurn(), this.maxSeconds * 1000);
       const bargeIn = this.sources?.size > 0;
       if (bargeIn) this.stopPlayback();
       this.onSpeechStart({ at: now, bargeIn }); this.onState("recording");
@@ -75,8 +86,9 @@ export class NaturalVoiceConversation {
   }
 
   finishTurn() {
-    if (!this.recorder || this.recorder.state === "inactive") return;
-    try { this.recorder.stop(); } catch { this.recorder = null; }
+    if (!this.recorder || !this.recordingTurn || this.finishing || this.recorder.state === "inactive") return;
+    this.finishing = true;
+    try { this.recorder.stop(); } catch (error) { this.recorder = null; this.finishing = false; this.recordingTurn = false; this.onError(error); if (!this.closed) this.startRecorder(); }
   }
 
   async play(response, { signal, onFirstScheduled = () => {}, onComplete = () => {} } = {}) {
@@ -85,32 +97,35 @@ export class NaturalVoiceConversation {
     if (!reader) throw new Error("No se recibió audio de Olivia.");
     this.activeReader = reader;
     const sources = this.sources; let nextAt = this.context.currentTime + 0.035, first = true, oddByte = null;
-    const abort = () => { try { reader.cancel(); } catch {} this.stopPlayback(); };
+    const abort = () => { Promise.resolve(reader.cancel()).catch(() => {}); this.stopPlayback(); };
     signal?.addEventListener("abort", abort, { once: true });
     try {
       while (!this.closed && !signal?.aborted && generation === this.playGeneration) {
         const { value, done } = await reader.read(); if (done) break;
         let bytes = value;
-        if (oddByte) { const combined = new Uint8Array(bytes.length + 1); combined[0] = oddByte; combined.set(bytes, 1); bytes = combined; oddByte = null; }
+        if (oddByte !== null) { const combined = new Uint8Array(bytes.length + 1); combined[0] = oddByte; combined.set(bytes, 1); bytes = combined; oddByte = null; }
         if (bytes.length % 2) { oddByte = bytes[bytes.length - 1]; bytes = bytes.subarray(0, bytes.length - 1); }
         if (!bytes.length) continue;
         const samples = new Int16Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
         const audio = this.context.createBuffer(1, samples.length, 24000), channel = audio.getChannelData(0);
         for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
-        const source = this.context.createBufferSource(); source.buffer = audio; source.connect(this.context.destination); source.start(Math.max(nextAt, this.context.currentTime + 0.005));
-        nextAt = Math.max(nextAt, this.context.currentTime + 0.005) + audio.duration; sources.add(source); source.onended = () => sources.delete(source);
+        const source = this.context.createBufferSource(); source.buffer = audio; source.connect(this.outputAnalyser); source.start(Math.max(nextAt, this.context.currentTime + 0.005));
+        nextAt = Math.max(nextAt, this.context.currentTime + 0.005) + audio.duration; sources.add(source); source.onended = () => { sources.delete(source); source.disconnect?.(); };
         if (first) { first = false; onFirstScheduled(this.now()); }
       }
-      if (oddByte) throw new Error("El audio de Olivia llegó incompleto.");
+      if (oddByte !== null) throw new Error("El audio de Olivia llegó incompleto.");
       if (signal?.aborted || generation !== this.playGeneration) return;
-      await new Promise((resolve) => setTimeout(resolve, Math.max(0, (nextAt - this.context.currentTime) * 1000)));
+      if (first) throw new Error("Olivia no devolvió audio. Podés reintentar la reproducción.");
+      await new Promise((resolve) => { this.playbackDoneResolve = resolve; this.playbackTimer = setTimeout(resolve, Math.max(0, (nextAt - this.context.currentTime) * 1000)); });
       if (!this.closed && generation === this.playGeneration) onComplete(this.now());
-    } finally { signal?.removeEventListener("abort", abort); if (this.activeReader === reader) this.activeReader = null; try { reader.releaseLock(); } catch {} }
+    } catch (error) { if (generation === this.playGeneration) this.stopPlayback(); throw error;
+    } finally { if (generation === this.playGeneration) { clearTimeout(this.playbackTimer); this.playbackDoneResolve = null; } signal?.removeEventListener("abort", abort); if (this.activeReader === reader) this.activeReader = null; try { reader.releaseLock(); } catch {} }
   }
 
   stopPlayback() {
     this.playGeneration++;
-    try { this.activeReader?.cancel(); } catch {}
+    clearTimeout(this.playbackTimer); this.playbackDoneResolve?.(); this.playbackDoneResolve = null;
+    try { Promise.resolve(this.activeReader?.cancel()).catch(() => {}); } catch {}
     this.activeReader = null;
     for (const source of this.sources || []) { try { source.stop(); } catch {} }
     this.sources?.clear();
@@ -122,12 +137,13 @@ export class NaturalVoiceConversation {
   close() {
     if (this.closed) return;
     this.closed = true; this.discardTurn = true; this.cancelFrame(this.animation); this.stopPlayback();
+    clearTimeout(this.turnTimer);
     if (this.recorder?.state === "recording") { try { this.recorder.stop(); } catch {} }
     this.source?.disconnect(); this.analyser?.disconnect(); this.stream?.getTracks().forEach((track) => track.stop());
-    this.context?.close()?.catch(() => {}); this.context = null; this.onState("ended");
+    this.outputAnalyser?.disconnect(); this.context?.close()?.catch(() => {}); this.context = null; this.onState("ended");
   }
 
-  release() { this.source?.disconnect(); this.analyser?.disconnect(); this.stream?.getTracks().forEach((track) => track.stop()); this.context?.close()?.catch(() => {}); }
+  release() { this.source?.disconnect(); this.analyser?.disconnect(); this.outputAnalyser?.disconnect(); this.stream?.getTracks().forEach((track) => track.stop()); this.context?.close()?.catch(() => {}); }
 }
 
 export function latencyPercentile(samples, percentile) {
