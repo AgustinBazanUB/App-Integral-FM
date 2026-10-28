@@ -20,8 +20,9 @@ export async function transcribeAudio({ session, form, store, engine, env = proc
     upload.append("file", file, file.name || "audio.webm");
     upload.append("model", event.model);
     upload.append("response_format", "json");
-    upload.append("languages", JSON.stringify(["es"]));
-    upload.append("keywords", JSON.stringify(["Flor Mía", "Olivia", "Arbequina", "Arbosana", "Coratina", "Picual", "Arauco", "depósito", "ubicación", "transferencia de stock", "mercadería", "promoción", "factura"]));
+    upload.append("languages[]", "es");
+    for (const keyword of ["Flor Mía", "Olivia", "Arbequina", "Arbosana", "Coratina", "Picual", "Arauco", "depósito", "ubicación", "transferencia de stock", "mercadería", "promoción", "factura"])
+      upload.append("keywords[]", keyword);
     upload.append("prompt", "Transcribí en español rioplatense conservando nombres propios, números, variedades de aceituna y términos comerciales. El contexto es Flor Mía: Olivia, Arbequina, Arbosana, Coratina, Picual, Arauco, locales, depósitos, stock, transferencias, clientes, ventas, promociones y facturas. No agregues palabras que no se escuchan.");
     event = { ...event, totalTokens: 6000, measurement: "reserved-estimate" };
     const payload = await provider("audio/transcriptions", upload, { env, multipart: true });

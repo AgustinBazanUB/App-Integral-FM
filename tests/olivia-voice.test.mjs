@@ -99,8 +99,10 @@ test("dictation and natural voice turns use GPT Transcribe with Spanish and Flor
   let sent;
   const result = await transcribeAudio({ ...f, form, provider: async (_path, upload) => { sent = upload; return { text: "Coratina en Pilar" }; } });
   assert.equal(sent.get("model"), "gpt-transcribe");
-  assert.deepEqual(JSON.parse(sent.get("languages")), ["es"]);
-  assert.match(sent.get("keywords"), /Arbequina/);
+  assert.deepEqual(sent.getAll("languages[]"), ["es"]);
+  assert.ok(sent.getAll("keywords[]").includes("Arbequina"));
+  assert.equal(sent.has("languages"), false);
+  assert.equal(sent.has("keywords"), false);
   assert.match(sent.get("prompt"), /español rioplatense/);
   assert.equal(usage(f).billingUnit, "audio-seconds");
   assert.equal(usage(f).durationSeconds, 3.5);
