@@ -6,8 +6,7 @@ import {
   firebaseAdminAccessToken,
 } from "../firestoreAdminRest.mjs";
 import { oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
-const BASE =
-  "https://firestore.googleapis.com/v1/projects/app-integral-fm/databases/(default)/documents";
+import { configuredFirebaseProjectId } from "../firebaseProject.mjs";
 export function oliviaServerEnvironment(env = process.env) {
   if (env.FIREBASE_ADMIN_CLIENT_EMAIL && env.FIREBASE_ADMIN_PRIVATE_KEY)
     return env;
@@ -25,7 +24,7 @@ export function oliviaServerEnvironment(env = process.env) {
         503,
       );
     }
-    if (account.project_id !== "app-integral-fm")
+    if (account.project_id !== configuredFirebaseProjectId(env))
       throw oliviaError(
         "firebase-project-mismatch",
         "La configuración del backend de Olivia necesita revisión.",
@@ -89,6 +88,7 @@ export function createOliviaStore({
     env: oliviaServerEnvironment(env),
     fetchImpl: boundedFetch,
   };
+  const BASE = `https://firestore.googleapis.com/v1/projects/${configuredFirebaseProjectId(options.env)}/databases/(default)/documents`;
   return {
     list: (collection) => adminListDocuments(collection, { ...options, maxDocuments: 5000 }),
     async get(path) {
