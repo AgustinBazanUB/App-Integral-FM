@@ -28,6 +28,21 @@
 .fm-seller-sale-footer > div:first-child strong { color:#76510f; font-size:36px; font-weight:700; line-height:1.1; }
 .fm-seller-sale-footer .fm-button, .fm-seller-sale-footer .fm-seller-confirm { min-height:52px; font-size:14px; padding-inline:20px; margin:0; }
 .fm-seller-sale-footer .fm-seller-action-feedback { grid-column:1/-1; margin:0; font-size:13px; }
+/* En escritorio, catálogo y venta comparten el alto disponible sin quedar detrás del pie. */
+@media (min-width:1024px) and (min-height:600px) {
+  .fm-seller-shell:has(.fm-seller-sale-layout) { height:100dvh; display:flex; flex-direction:column; }
+  .fm-seller-shell:has(.fm-seller-sale-layout) .fm-seller-header,
+  .fm-seller-shell:has(.fm-seller-sale-layout) .fm-seller-nav { flex:none; }
+  .fm-seller-main:has(.fm-seller-sale-layout) { flex:1; min-height:0; padding-bottom:12px; }
+  .fm-seller-sale-layout { height:100%; min-height:0; grid-template-rows:minmax(0,1fr) auto; align-items:stretch; }
+  .fm-seller-catalog { min-height:0; overflow-y:auto; }
+  .fm-seller-cart, .fm-seller-cart .fm-seller-sale-controls, .fm-seller-cart .fm-panel { height:100%; min-height:0; }
+  .fm-seller-cart .fm-panel { display:flex; flex-direction:column; }
+  .fm-seller-cart .fm-panel__header { flex:none; }
+  .fm-seller-cart .fm-panel__body { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; }
+  .fm-seller-cart .fm-panel__body > .fm-button { align-self:flex-start; }
+  .fm-seller-cart-lines { flex:1 1 auto; min-height:80px; max-height:none; }
+}
 .fm-billing-total { display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:16px; }
 .fm-billing-total strong { font-size:28px; }
 .fm-seller-detail { display:grid; gap:18px; }
