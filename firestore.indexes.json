@@ -38,7 +38,7 @@
     {"collectionGroup":"oliviaUsage","queryScope":"COLLECTION","fields":[{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]}
   ],
   "fieldOverrides": [
-    {"collectionGroup":"shipmentAccess","fieldPath":"expiresAt","ttl":true,"indexes":[]},
-    {"collectionGroup":"shippingRateLimits","fieldPath":"expiresAt","ttl":true,"indexes":[]}
+    {"collectionGroup":"shipmentAccess","fieldPath":"expiresAt","ttl":false,"indexes":[]},
+    {"collectionGroup":"shippingRateLimits","fieldPath":"expiresAt","ttl":false,"indexes":[]}
   ]
 }

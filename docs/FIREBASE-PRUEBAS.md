@@ -40,3 +40,9 @@ Configurá también las siguientes variables con alcance **Functions** y context
 El backend acepta el JSON de servicio de staging y rechaza credenciales cuyo proyecto no coincida. No reutilices la clave privada productiva ni crees ventas desde la preview hasta terminar la conexión y confirmar que el proyecto activo sea `app-integral-fm-pruebas`.
 
 La consola del proyecto está en <https://console.firebase.google.com/project/app-integral-fm-pruebas/overview>.
+
+## Producción y despliegue automático
+
+El proyecto de producción `app-integral-fm` usa el plan Spark. Su archivo `firestore.indexes.json` mantiene los mismos índices compuestos y desactiva las políticas TTL de `shipmentAccess.expiresAt` y `shippingRateLimits.expiresAt`. La lógica de expiración sigue aplicándose, pero los documentos vencidos no se borran automáticamente. TTL administrado requiere facturación; no activar Blaze ni TTL sin aprobación.
+
+El workflow `Deploy Firestore — main` verifica las reglas en emulador y despliega las reglas e índices de `main`. La cuenta del secreto `FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM` necesita permisos para reglas y para administrar índices (`roles/datastore.indexAdmin`). No imprimir ni guardar el JSON de la cuenta en el repositorio.
