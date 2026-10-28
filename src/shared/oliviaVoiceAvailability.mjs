@@ -4,7 +4,15 @@ export function canUseOliviaVoice(identity) {
 }
 
 export function hasGoogleCloudTtsCredentials(env = process.env) {
-  return Boolean(env.GOOGLE_APPLICATION_CREDENTIALS_JSON || env.GOOGLE_APPLICATION_CREDENTIALS);
+  if (env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+    try {
+      const account = JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+      return Boolean(account?.project_id && account?.client_email && account?.private_key);
+    } catch {
+      return false;
+    }
+  }
+  return Boolean(env.GOOGLE_APPLICATION_CREDENTIALS);
 }
 
 export const OLIVIA_VOICE_UNAVAILABLE_CODE = "voice-not-enabled";

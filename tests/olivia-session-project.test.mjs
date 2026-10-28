@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { oliviaSession } from "../netlify/functions/_lib/olivia/http.mjs";
+import { hasGoogleCloudTtsCredentials } from "../src/shared/oliviaVoiceAvailability.mjs";
+
+test("voice availability rejects malformed and incomplete TTS secrets", () => {
+  for (const value of ["credentials.json", "{invalid}", "null", "{}", '{"project_id":"fixture"}']) {
+    assert.equal(hasGoogleCloudTtsCredentials({ GOOGLE_APPLICATION_CREDENTIALS_JSON: value }), false);
+  }
+  assert.equal(hasGoogleCloudTtsCredentials({ GOOGLE_APPLICATION_CREDENTIALS_JSON: JSON.stringify({ project_id: "fixture", client_email: "fixture@example.test", private_key: "fixture-key" }) }), true);
+  assert.equal(hasGoogleCloudTtsCredentials({ GOOGLE_APPLICATION_CREDENTIALS: "/server/credentials.json" }), true);
+});
 
 test("Olivia binds authenticated sessions to the configured Firebase environment", async () => {
   const originalFetch = globalThis.fetch;
