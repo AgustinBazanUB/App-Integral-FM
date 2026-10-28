@@ -12,7 +12,7 @@ function ownJob(session, job) {
 }
 export async function startChatJob({ store, engine, session, body, dispatch, now = new Date() }) {
   const requestId = safeId(body.requestId), conversationId = body.conversationId ? safeId(body.conversationId) : (await engine.state(session)).conversationId;
-  const payload = { operation: "chat", requestId, conversationId, message: safeUserMessage(body.message), screenContext: screenContext(body.screenContext || {}), attachmentIds: Array.isArray(body.attachmentIds) ? body.attachmentIds.map(id => safeId(id)).slice(0, 4) : [], inputMode: body.inputMode === "dictation" ? "dictation" : "text" };
+  const payload = { operation: "chat", requestId, conversationId, message: safeUserMessage(body.message), screenContext: screenContext(body.screenContext || {}), attachmentIds: Array.isArray(body.attachmentIds) ? body.attachmentIds.map(id => safeId(id)).slice(0, 4) : [], inputMode: ["dictation", "natural-voice"].includes(body.inputMode) ? body.inputMode : "text" };
   const jobId = digest([session.uid, sessionBinding(session), requestId]), path = `oliviaChatJobs/${jobId}`, fingerprint = digest(payload);
   let created = false;
   await store.transaction(async tx => {
@@ -60,7 +60,7 @@ export async function chatJobStatus({ store, session, body, now = new Date() }) 
     });
     job = await store.get(path);
   }
-  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase, text: job.text || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
+  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase, text: job.text || "", voiceText: job.voiceText || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
 }
 export async function activeChatJob({ store, session, conversationId }) {
   const conversation = await store.get(`oliviaConversations/${conversationId}`);
@@ -91,7 +91,7 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
   });
   if (!payload) return;
   const controller = new AbortController();
-  let progress = { phase: "Pensando…", text: "" }, changed = false, flushing = Promise.resolve();
+  let progress = { phase: "Pensando…", text: "", voiceText: "" }, changed = false, flushing = Promise.resolve();
   const flush = () => flushing = flushing.catch(() => {}).then(async () => {
     await store.transaction(async tx => {
       const job = (await tx.getDocument(path))?.data;
@@ -106,6 +106,7 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
       if (event.type === "accepted") progress.accepted = event.message;
       if (event.type === "phase") { progress.phase = event.label; if (event.tools) progress.text = ""; }
       if (event.type === "delta") progress.text = (progress.text + event.delta).slice(-64000);
+      if (event.type === "voice.ready" && typeof event.text === "string") { progress.voiceText = event.text.slice(0, 3000); changed = true; flush().catch(() => {}); }
       changed = true;
     } });
     await flush();

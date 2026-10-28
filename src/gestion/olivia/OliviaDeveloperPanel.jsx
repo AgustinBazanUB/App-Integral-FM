@@ -1,4 +1,4 @@
-export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceCosts, voiceConfiguration, telemetry, money }) {
+export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceConfiguration, telemetry, money }) {
   const ms = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
   const rows = [
     ...(voiceConfiguration ? [["Modelo de conversación", voiceConfiguration.model], ["Cerebro y acciones de voz", `${voiceConfiguration.backendModel} / ${voiceConfiguration.reasoningEffort}`], ["Voz fija de Olivia", voiceConfiguration.voice]] : []),
@@ -9,25 +9,16 @@ export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMe
     ["Entrada / salida / total de última llamada", `${quota?.inputTokens ?? "—"} / ${quota?.outputTokens ?? "—"} / ${quota?.totalTokens ?? "—"}`],
     ["Consumo / reservas", `${quota?.usedTokens ?? 0} / ${quota?.reservedTokens ?? 0}`],
     ["Último costo USD", money(quota?.actualCostUsd, "USD")],
-    ...(voiceCosts ? [
-      ["Modelo de voz", voiceCosts.voiceModel || "—"],
-      ["Transcripción · sesión", voiceCosts.transcription.included ? "Incluida en la voz" : money(voiceCosts.transcription.ars)],
-      ["Voz y contexto · sesión", money(voiceCosts.voice.ars)],
-      ["Luna / consultas del negocio · sesión", money(voiceCosts.backend.ars)],
-      ["Consultas del negocio medidas", voiceCosts.backend.queries],
-      ["Total de la conversación", money(voiceCosts.totalArs)],
-      ["Total de la conversación USD", money(voiceCosts.totalUsd, "USD")],
-      ["Medición de la conversación", voiceCosts.complete ? "Completa" : voiceCosts.truncated ? "Parcial: historial de consultas excedido" : voiceCosts.settled && !voiceCosts.backendPending ? "Incompleta: falta medición o conversión" : "Pendiente: falta medición o conversión"],
-      ["Cierre de voz / medición del proveedor", `${voiceCosts.closeReason || "En curso"} / ${voiceCosts.measurement}`],
-    ] : []),
     ["Click → mensaje visible (ms)", ms(latency?.visibleMs)],
     ["Mensaje → request (ms)", ms(latency?.requestMs)],
     ["Request → primer texto (ms)", ms(latency?.firstDeltaMs)],
     ["Primer texto → completa (ms)", latency?.firstDeltaMs != null ? ms(latency.totalMs - latency.firstDeltaMs) : "—"],
-    ["Voz → transcripción, desde fin de habla (ms)", ms(voiceMetrics?.voiceToTranscriptionMs)],
-    ["Transcripción → herramienta (ms)", ms(voiceMetrics?.transcriptionToToolMs)],
-    ["Herramienta → respuesta (ms)", ms(voiceMetrics?.toolToResponseMs)],
-    ["Respuesta → audio (ms)", ms(voiceMetrics?.responseToAudioMs)],
+    ["Voz natural · Chirp 3 HD", voiceConfiguration?.voice || "No disponible"],
+    ["Fin de habla → transcripción · mediana / P95 (ms)", `${ms(voiceMetrics?.turnToTranscript?.medianMs)} / ${ms(voiceMetrics?.turnToTranscript?.p95Ms)}`],
+    ["Transcripción → primer audio programado · mediana / P95 (ms)", `${ms(voiceMetrics?.transcriptToVoice?.medianMs)} / ${ms(voiceMetrics?.transcriptToVoice?.p95Ms)}`],
+    ["TTFA programado · mediana / P95 (ms)", `${ms(voiceMetrics?.ttfaScheduled?.medianMs)} / ${ms(voiceMetrics?.ttfaScheduled?.p95Ms)}`],
+    ["Última síntesis · caracteres / costo USD estimado", `${voiceMetrics?.lastCharacters ?? "—"} / ${money(voiceMetrics?.lastEstimatedCostUsd, "USD")}`],
+    ["Medición de audio", "Primer bloque programado por el navegador; no mide el inicio físico del altavoz"],
     ["Backend: retrieval / proveedor / herramientas (ms)", `${ms(telemetry?.retrievalMs)} / ${ms(telemetry?.providerMs)} / ${ms(telemetry?.toolsMs)}`],
     ["Llamadas de modelo / herramientas", `${telemetry?.modelCalls ?? "—"} / ${telemetry?.toolCalls ?? "—"}`],
     ["Skills", telemetry?.skills?.map((skill) => `${skill.name}@${skill.version}`).join(", ") || "Ninguna en esta consulta"],

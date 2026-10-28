@@ -10,7 +10,7 @@ Este anexo reemplaza la selección anterior de modelos y el protocolo de voz pre
 | Pronóstico, comparación, análisis complejo | La misma Luna | `xhigh` |
 | Contenido/diseño creativo en Marketing o Redes con permiso | `gpt-6.1-sol` | `high` |
 | Creatividad con análisis, restricciones o volumen complejo | La misma Sol creativa | `xhigh` |
-| Conversación de voz | `gpt-live-1` | Delega al backend cliente |
+| Conversación natural por voz | `gpt-transcribe` + motor Luna + Google Chirp 3 HD | Turnos finalizados; Chirp solo para síntesis |
 | Slots inequívocos, esperar, cancelar, confirmación visual | Código de aplicación | Sin llamada de razonamiento |
 
 La [documentación de Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) y de [Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol) confirma los IDs y niveles utilizados. La disponibilidad en la cuenta configurada requiere una llamada real, que no forma parte de las pruebas con fixtures.
@@ -19,7 +19,7 @@ La [documentación de Luna](https://developers.openai.com/api/docs/models/gpt-6-
 
 La decisión no llama a otro modelo. Un aumento de complejidad entre rondas sube el razonamiento de Luna, conserva el modelo y registra cada llamada por separado. Una aclaración breve mantiene la ruta de la tarea incompleta; una intención nueva o una tarea completada permite volver a HIGH. Las Skills de pronóstico activan XHIGH; los análisis simples de ventas mantienen HIGH.
 
-`oliviaConfiguration/global` contiene `modelPolicyVersion`, perfiles, `routing`, `responseLimits`, `voiceProtocol` y tarifas. El administrador puede editar y confirmar perfiles HIGH/XHIGH, umbrales, límites y tarifas. Los modelos administrativos normal/complejo deben pertenecer a Luna y coincidir; los perfiles creativos deben pertenecer a Sol y coincidir. La validación rechaza escalamiento administrativo a Sol. Al leer configuración de política anterior se normalizan sus perfiles en memoria; no se reescribe producción. `complexModules` se conserva solo por compatibilidad y no decide la ruta. `OLIVIA_MODEL_COMPLEX` anterior deja de seleccionar otro modelo.
+`oliviaConfiguration/global` contiene `modelPolicyVersion`, perfiles de negocio, `routing`, `responseLimits` y `naturalVoice`. El administrador puede editar y confirmar perfiles HIGH/XHIGH, umbrales, límites, voz Chirp y cuota. Los modelos administrativos normal/complejo deben pertenecer a Luna y coincidir; los perfiles creativos deben pertenecer a Sol y coincidir. Los perfiles Live/Reatime antiguos se eliminan al normalizar configuración; la transcripción queda fijada a `gpt-transcribe`. `complexModules` se conserva solo por compatibilidad y no decide la ruta.
 
 ## Estado persistente de tarea
 
@@ -35,23 +35,23 @@ La carga de stock tiene una ruta determinística con búsquedas reales y acotada
 
 Las demás tareas usan Luna/Sol con `update_task`, herramientas de búsqueda y preparación. Los tests inyectan respuestas controladas para verificar esa integración; no certifican que un modelo real elija siempre la herramienta o formule cada pregunta del mismo modo.
 
-## GPT-Live y texto
+## Conversación natural por voz
 
-`createLive` usa [POST /v1/live/sessions](https://developers.openai.com/api/reference/resources/live/methods/create), audio WebRTC y `delegation.type=client`. `OliviaLive` espera ICE completo y `session.started`. La clave permanece en el servidor, que conserva la relación entre IDs. La API de Olivia devuelve al browser un ID de sesión propio; los eventos de transporte del proveedor pueden incluir su ID público.
+GPT-Live, Realtime y la variante económica se retiraron como modalidades de conversación. La API legacy rechaza creación, interrupción, herramientas, transcript y cost polling con HTTP 410. El chat escrito y el dictado revisable siguen funcionando.
 
-El canal del browser admite solo mute/unmute/cierre; no admite instrucciones, resultados ni herramientas. `liveMonitor` se adjunta a la sesión por un WebSocket autenticado, reúne transcripciones y recibe `session.delegation.created`. Ese evento contiene un ID, no el texto del usuario; el backend correlaciona transcripción e historial y llama al mismo `engine.chat` utilizado por texto. La delegación se deduplica en un registro privado. Las consultas empresariales, análisis y preparaciones pasan por el backend; respuestas conversacionales simples pueden permanecer en GPT-Live. [Delegación y contexto](https://developers.openai.com/api/docs/guides/live-delegation).
+El micrófono permanece en el navegador con VAD local y controles de cancelación de eco, supresión de ruido y ganancia. Cada turno cerrado por silencio produce un archivo acotado que se envía a [GPT Transcribe](https://developers.openai.com/api/docs/guides/transcription) con idioma/contexto/pistas de dominio. Esta integración usa transcripción de archivo completado; recibir texto incremental de un archivo no significa que el audio del micrófono se esté enviando en vivo.
 
-El servidor persiste intervenciones simples sin invocar Luna. Una respuesta empresarial canónica conserva además su versión hablada, evitando dos burbujas para un mismo resultado. El monitor devuelve un resumen breve mediante `session.commentary.append`; no realiza otra llamada para reescribirlo. También refleja resultados escritos y confirmaciones visuales desde la conversación de servidor.
+El texto transcrito se manda al mismo `engine.chat` que el chat escrito. Para voz, Luna devuelve respuesta escrita completa y resumen breve bajo salida estructurada. Las llamadas con herramientas conservan todo el flujo existente; una confirmación oral no ejecuta una tarjeta.
 
-Una corrección durante trabajo aborta la solicitud delegada y revoca su lease. El resultado anterior no puede recrear una propuesta. La interrupción se solicita por endpoint autenticado, se aplica desde el sideband y controla reproducción en el cliente. Mute mantiene la sesión y permite continuar por texto. La sesión tiene tope de tres minutos. El protocolo Realtime anterior se conserva como opción administrativa explícita, sin fallback automático ni cambio silencioso de costo.
+Cuando la respuesta final queda guardada, `chatJobs` publica el resumen hablado. `/olivia-synthesize` valida identidad y propiedad de conversación, limita caracteres y cuota, y llama al stream bidireccional PCM de [Google Chirp 3 HD](https://docs.cloud.google.com/text-to-speech/docs/create-audio-text-streaming). Ese endpoint está en Preview; el cliente Google exige primero la configuración de voz y después el texto. El navegador programa audio PCM mono 24 kHz y cancela la lectura/proveedor cuando el usuario interrumpe.
 
-El cierre mantiene conexiones hasta `session.closed` o un timeout acotado. Ese evento confirma duración final; un corte sin él conserva la última duración observada y registra finalización incompleta. [Controles y cierre oficiales](https://developers.openai.com/api/docs/guides/voice-server-controls).
+La función de streaming Netlify tiene un máximo documentado de 60 segundos y 20 MB. El máximo por respuesta hablada y la cuota mensual de caracteres se fijan en la configuración validada por servidor. La única cuenta habilitada durante la prueba es `agsreserva@gmail.com`; la disponibilidad además requiere OpenAI y credenciales ADC/Google TTS en el backend.
 
 ## Uso, costo y seguridad
 
 Cada llamada Responses guarda modelo/esfuerzo/ruta/motivo, tokens y costo conocidos, duración, herramientas, módulo, Skill, conversationId y taskId. Los fallos dejan costos desconocidos cuando falta medición. El panel de desarrollo administrativo muestra ruta y tarea; la configuración agrega distribución de las llamadas de los últimos 500 registros. No cuenta comandos determinísticos como llamadas de modelo. Una ronda que pasa de HIGH a XHIGH aparece en ambas categorías según sus llamadas reales.
 
-GPT-Live se contabiliza aparte por segundos. La tarifa central inicial es USD 0,05/minuto, tomada de [GPT-Live](https://developers.openai.com/api/docs/models/gpt-live-1). La creación WebRTC factura 15 segundos que se acreditan contra la duración: se aplica el piso de inicialización, sin sumar otros 15 segundos a una sesión ya contabilizada. [Contabilidad oficial](https://developers.openai.com/api/docs/guides/voice-latency-cost). Con finalización no confirmada el importe queda desconocido. No se inventan tokens de audio; los tokens de backend quedan en sus eventos propios. La reserva inicial de admisión se libera al cerrar; el límite temporal controla la exposición de voz. Los costos de almacenamiento/Firestore sin medición no están incluidos en esas cifras.
+GPT Transcribe se estima por minutos de audio y Chirp por caracteres sintetizados; el historial guarda conteos y costo estimado, no audio ni texto de síntesis. Las tarifas de referencia consultadas son USD 0,0045/minuto para GPT Transcribe y USD 30 por millón de caracteres para Chirp 3 HD. Los montos reales pueden variar con cuota gratuita, consumo, impuestos y cotización. Las métricas de navegador presentan mediana/P95 de fin de habla a transcripción, transcripción a primer bloque programado y TTFA programado. No miden salida física del altavoz.
 
 La transacción de confirmación sigue releyendo perfil, permisos, cuota y huella de datos. Ningún modelo confirma acciones, modifica reglas, concede permisos ni publica contenido. `oliviaLiveDelegations` y el resto del estado Olivia rechazan lecturas/escrituras directas de browser. La limpieza programada incluye nuevas delegaciones; la retención reconoce solicitudes Live. Los fallos preservan slots conocidos, muestran error y permiten continuar con una nueva solicitud o el flujo manual; no cambian a Sol.
 
@@ -60,9 +60,8 @@ La transacción de confirmación sigue releyendo perfil, permisos, cuota y huell
 ```mermaid
 flowchart TD
   Text[Texto autenticado] --> Core[Backend Olivia]
-  Voice[Micrófono y audio WebRTC] --> Live[GPT-Live]
-  Live -->|Transcripción y delegación cliente| Monitor[Sideband privado]
-  Monitor --> Core
+  Voice[Micrófono con VAD local] -->|Turno grabado| ASR[GPT Transcribe]
+  ASR -->|Texto final| Core
   Core --> Task[Conversación y taskState de servidor]
   Core --> Fast[Slots inequívocos y controles]
   Core --> Router[Router determinístico]
@@ -75,8 +74,8 @@ flowchart TD
   Card -->|Sí visual| Transaction[Revalidación transaccional y auditoría]
   Core --> Ledger[Uso por llamada y costo conocido]
   Monitor --> Duration[Duración de voz independiente]
-  Core -->|Resumen verificado| Monitor
-  Monitor -->|Commentary| Live
+  Core -->|Respuesta escrita y texto hablado guardados| Chirp[Google Chirp 3 HD]
+  Chirp -->|PCM en streaming| VoiceOut[Reproductor del navegador]
 ```
 
 Pruebas y evidencia: `olivia-router-tasks.test.mjs`, `olivia-live.test.mjs`, suites existentes y reglas de emulador. La [matriz del anexo](OLIVIA-ANNEX-REQUIREMENTS.md) distingue código implementado, evidencia con fixtures y validaciones externas pendientes.

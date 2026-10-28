@@ -1,12 +1,9 @@
 import { createOliviaStore } from "./_lib/olivia/store.mjs";
 import { resolveOliviaPricing } from "./_lib/olivia/pricing.mjs";
 import { createOliviaEngine } from "./_lib/olivia/engine.mjs";
-import { stopRealtime } from "./_lib/olivia/voice.mjs";
 import { oliviaSession, json, errorResponse } from "./_lib/olivia/http.mjs";
 import { oliviaError } from "../../src/shared/oliviaContracts.mjs";
 import { chatStream } from "./_lib/olivia/stream.mjs";
-import { createLive, interruptLive } from "./_lib/olivia/live.mjs";
-import { canUseOliviaVoice, OLIVIA_VOICE_UNAVAILABLE_CODE, OLIVIA_VOICE_UNAVAILABLE_MESSAGE } from "../../src/shared/oliviaVoiceAvailability.mjs";
 import { startChatJob, chatJobStatus, activeChatJob, cancelChatJob } from "./_lib/olivia/chatJobs.mjs";
 import { captureOliviaFailure, sendOliviaErrorReport } from "./_lib/olivia/errorReports.mjs";
 export default async function handler(request) {
@@ -30,8 +27,8 @@ export default async function handler(request) {
     } catch {
       throw oliviaError("invalid-json", "Solicitud inválida.");
     }
-    if (["realtime", "realtimeTool", "realtimeTranscript", "interruptVoice"].includes(body.operation) && !canUseOliviaVoice(session))
-      throw oliviaError(OLIVIA_VOICE_UNAVAILABLE_CODE, OLIVIA_VOICE_UNAVAILABLE_MESSAGE, 409);
+    if (["realtime", "realtimeTool", "realtimeTranscript", "interruptVoice", "stopRealtime", "voiceCosts"].includes(body.operation))
+      throw oliviaError("voice-mode-retired", "GPT-Live fue retirado. La única conversación por voz disponible es la voz natural de Olivia.", 410);
     store = createOliviaStore();
     const engine = createOliviaEngine({ store, pricingResolver: resolveOliviaPricing });
     if (body.operation === "chat" && body.stream === true) {
@@ -56,12 +53,6 @@ export default async function handler(request) {
       result = await engine.chat(session, body);
     else if (body.operation === "confirm")
       result = await engine.confirm(session, body);
-    else if (body.operation === "realtimeTool")
-      result = await engine.realtimeTool(session, body);
-    else if (body.operation === "realtimeTranscript")
-      result = await engine.realtimeTranscript(session, body);
-    else if (body.operation === "voiceCosts")
-      result = await engine.voiceCosts(session, body);
     else if (body.operation === "cancel")
       result = await engine.cancel(session, body);
     else if (body.operation === "estimate")
@@ -76,18 +67,6 @@ export default async function handler(request) {
       result = await engine.getConfiguration(session);
     else if (body.operation === "saveConfiguration")
       result = await engine.saveConfiguration(session, body);
-    else if (body.operation === "realtime")
-      result = await createLive({
-        session,
-        body,
-        store,
-        engine,
-        applicationOrigin: new URL(request.url).origin,
-      });
-    else if (body.operation === "interruptVoice")
-      result = await interruptLive({ session, body, store });
-    else if (body.operation === "stopRealtime")
-      result = await stopRealtime({ session, body, store });
     else throw oliviaError("invalid-operation", "Operación no disponible.");
     if (["state", "resume"].includes(body.operation) && result.conversationId) result.activeChatJob = await activeChatJob({ store, session, conversationId: result.conversationId });
     return json(result);

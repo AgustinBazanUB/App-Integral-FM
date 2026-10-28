@@ -10,13 +10,13 @@ const OPERATIONS = new Set([
   "chat",
   "text",
   "transcription",
-  "realtime",
-  "live",
+  "natural-voice",
+  "chirp-synthesis",
   "sale",
   "stock_load",
   "observation",
 ]);
-const INPUT_MODES = new Set(["text", "audio", "transcription", "realtime"]);
+const INPUT_MODES = new Set(["text", "audio", "transcription", "natural-voice"]);
 const milliseconds = (value) =>
   value instanceof Date ? value.getTime() : new Date(value).getTime();
 const expired = (value, now) =>
@@ -476,9 +476,9 @@ async function purgeExpiredRecords(store, collection, rows, now) {
         )
       )
         continue;
-      if (collection === "oliviaRequests" && data.status === "running")
+      if (["oliviaRequests", "oliviaVoiceRequests"].includes(collection) && ["running", "streaming"].includes(data.status))
         continue;
-      if (collection === "oliviaBudgets" && counter(data.reservedTokens) > 0)
+      if (["oliviaBudgets", "oliviaVoiceBudgets"].includes(collection) && counter(data.reservedTokens) > 0)
         continue;
       // The voice lease owner must hang up first. Never erase an active call's
       // remote callId or release its budget from this privacy cleanup.
@@ -495,7 +495,7 @@ async function purgeExpiredRecords(store, collection, rows, now) {
           aggregate.counts,
           collection === "oliviaRealtime"
             ? "voiceSessionsRemoved"
-            : collection === "oliviaBudgets"
+            : ["oliviaBudgets", "oliviaVoiceBudgets"].includes(collection)
               ? "budgetsRemoved"
               : collection === "oliviaQuotaRequests"
                 ? "quotaRequestsRemoved"
@@ -510,7 +510,7 @@ async function purgeExpiredRecords(store, collection, rows, now) {
 }
 
 /**
- * Eight bounded top-level queries, plus two bounded history queries per expired
+ * Ten bounded top-level queries, plus two bounded history queries per expired
  * conversation (at most 12 parents and 12 messages per parent per invocation).
  * Each phase re-reads candidates inside a transaction, so renewal, confirmed
  * execution and overlapping cleanup runs cannot delete/reconcile stale state.
@@ -519,7 +519,7 @@ async function purgeExpiredRecords(store, collection, rows, now) {
  *
  * Indexes: oliviaRequests/oliviaRealtime(status ASC, expiresAt ASC); single-field
  * expiresAt for conversations/confirmations, retentionExpiresAt for requests/
- * usage/budgets/quota requests. oliviaAnonymousUsage is server-only. Retention for auditLogs
+ * usage/budgets/quota requests and natural voice records. oliviaAnonymousUsage is server-only. Retention for auditLogs
  * is independent and this job never deletes those records.
  */
 export async function runOliviaRetention({
@@ -595,6 +595,16 @@ export async function runOliviaRetention({
       [["retentionExpiresAt", "LESS_THAN_OR_EQUAL", now]],
       "retentionExpiresAt",
     ],
+    [
+      "oliviaVoiceRequests",
+      [["retentionExpiresAt", "LESS_THAN_OR_EQUAL", now]],
+      "retentionExpiresAt",
+    ],
+    [
+      "oliviaVoiceBudgets",
+      [["retentionExpiresAt", "LESS_THAN_OR_EQUAL", now]],
+      "retentionExpiresAt",
+    ],
   ];
   const rows = await Promise.all(
     definitions.map(([collection, filters, field]) =>
@@ -613,6 +623,8 @@ export async function runOliviaRetention({
       () => purgeExpiredRecords(store, "oliviaRealtime", rows[5], now),
       () => purgeExpiredRecords(store, "oliviaBudgets", rows[6], now),
       () => purgeExpiredRecords(store, "oliviaQuotaRequests", rows[7], now),
+      () => purgeExpiredRecords(store, "oliviaVoiceRequests", rows[8], now),
+      () => purgeExpiredRecords(store, "oliviaVoiceBudgets", rows[9], now),
     ];
   let completedPhases = 0,
     historyBacklog = false;

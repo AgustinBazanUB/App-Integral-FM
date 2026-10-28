@@ -1,11 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createOliviaEngine } from "../netlify/functions/_lib/olivia/engine.mjs";
-import {
-  transcribeAudio,
-  createRealtime,
-  stopRealtime,
-} from "../netlify/functions/_lib/olivia/voice.mjs";
+import { transcribeAudio } from "../netlify/functions/_lib/olivia/voice.mjs";
 import { defaultOliviaConfiguration } from "../src/shared/oliviaContracts.mjs";
 function fixture() {
   const now = new Date("2026-10-04T15:00:00Z"),
@@ -97,6 +93,19 @@ test("transcription rejects foreign conversations and invalid audio before provi
   assert.equal(calls, 0);
   assert.equal(usage(f), undefined);
 });
+test("dictation and natural voice turns use GPT Transcribe with Spanish and Flor Mía term hints", async () => {
+  const f = await initialized(), form = f.form(f.conversationId);
+  form.set("durationSeconds", "3.5");
+  let sent;
+  const result = await transcribeAudio({ ...f, form, provider: async (_path, upload) => { sent = upload; return { text: "Coratina en Pilar" }; } });
+  assert.equal(sent.get("model"), "gpt-transcribe");
+  assert.deepEqual(JSON.parse(sent.get("languages")), ["es"]);
+  assert.match(sent.get("keywords"), /Arbequina/);
+  assert.match(sent.get("prompt"), /español rioplatense/);
+  assert.equal(usage(f).billingUnit, "audio-seconds");
+  assert.equal(usage(f).durationSeconds, 3.5);
+  assert.equal(result.usage.lastCost.estimated, true);
+});
 for (const providerUsage of [
   undefined,
   { type: "duration", seconds: 10 },
@@ -111,8 +120,9 @@ for (const providerUsage of [
     });
     assert.equal(result.text, "Hola Olivia");
     assert.equal(usage(f).totalTokens, 6000);
-    assert.equal(usage(f).measurement, "reserved-estimate");
-    assert.equal(usage(f).actualCostUsd, null);
+    const measuredDuration = providerUsage?.type === "duration";
+    assert.equal(usage(f).measurement, measuredDuration ? "provider" : "reserved-estimate");
+    assert.equal(usage(f).actualCostUsd, measuredDuration ? 10 * 0.0045 / 60 : null);
     assert.deepEqual(Object.keys(result.usage).sort(), [
       "lastCost",
       "period",
@@ -145,147 +155,4 @@ test("measured transcription is idempotent and empty text never becomes a chat i
     { code: "request-already-used" },
   );
   assert.equal(calls, 1);
-});
-async function realtimeFixture({
-  monitorStatus = 202,
-  connected = true,
-  answer = "v=0\r\nanswer",
-  hangupFails = false,
-} = {}) {
-  const f = await initialized(),
-    calls = [];
-  const fetchImpl = async (url, init) => {
-    calls.push({ url, init });
-    if (url.endsWith("/realtime/calls"))
-      return new Response(answer, {
-        status: 201,
-        headers: {
-          location: "https://api.openai.com/v1/realtime/calls/rtc_fixture",
-        },
-      });
-    if (url.endsWith("/olivia-voice-meter-background")) {
-      if (connected) {
-        const [path] = [...f.docs].find(([p]) =>
-          p.startsWith("oliviaRealtime/"),
-        );
-        f.docs.set(path, {
-          ...f.docs.get(path),
-          meteringConnectedAt: f.now,
-          meteringStatus: "running",
-        });
-      }
-      return new Response(null, { status: monitorStatus });
-    }
-    if (url.endsWith("/hangup"))
-      return new Response(null, { status: hangupFails ? 503 : 200 });
-    throw new Error("Unexpected URL");
-  };
-  return {
-    ...f,
-    calls,
-    fetchImpl,
-    applicationOrigin: "https://fixture.invalid",
-    waitImpl: async () => {},
-    body: {
-      conversationId: f.conversationId,
-      requestId: "realtime",
-      sdp: "v=0\r\noffer",
-    },
-  };
-}
-test("realtime sends answer only after trusted sideband connects and retains all keys server-side", async () => {
-  const f = await realtimeFixture(),
-    result = await createRealtime(f),
-    live = f.docs.get(`oliviaRealtime/${result.realtimeSessionId}`);
-  assert.equal(result.sdp, "v=0\r\nanswer");
-  assert.equal(result.maxDurationSeconds, 180);
-  assert.equal(live.model, f.configuration.profiles.realtime.model);
-  assert.equal(
-    live.transcriptionModel,
-    f.configuration.profiles.liveTranscription.model,
-  );
-  assert.equal(usage(f), undefined);
-  assert.equal(
-    JSON.stringify(result).includes("fixture-backend-secret"),
-    false,
-  );
-  const session = JSON.parse(f.calls[0].init.body.get("session"));
-  assert.equal(session.audio.input.turn_detection.create_response, false);
-  assert.deepEqual(session.output_modalities, ["audio"]);
-  assert.match(result.voiceGreeting, /Olivia/);
-  await assert.rejects(
-    stopRealtime({
-      ...f,
-      session: { ...f.session, uid: "other" },
-      body: {
-        realtimeSessionId: result.realtimeSessionId,
-        conversationId: f.conversationId,
-      },
-    }),
-    { code: "permission-denied" },
-  );
-  await stopRealtime({
-    ...f,
-    body: {
-      realtimeSessionId: result.realtimeSessionId,
-      conversationId: f.conversationId,
-    },
-  });
-  assert.equal(
-    f.docs.get(`oliviaRealtime/${result.realtimeSessionId}`).status,
-    "closed",
-  );
-});
-for (const options of [
-  { connected: false },
-  { monitorStatus: 503 },
-  { answer: "<html>Error</html>" },
-])
-  test(`realtime refuses uncontrolled or invalid provider session: ${JSON.stringify(options)}`, async () => {
-    const f = await realtimeFixture(options);
-    await assert.rejects(createRealtime(f), (e) =>
-      ["realtime-monitor-unavailable", "realtime-invalid"].includes(e.code),
-    );
-    assert.ok(f.calls.some((c) => c.url.endsWith("/hangup")));
-    assert.equal(usage(f).totalTokens, 20000);
-    assert.equal(usage(f).actualCostUsd, null);
-  });
-test("failed remote hangup keeps expired session active for cleanup retry", async () => {
-  const f = await realtimeFixture({ connected: false, hangupFails: true });
-  await assert.rejects(createRealtime(f), {
-    code: "realtime-monitor-unavailable",
-  });
-  const live = [...f.docs].find(([p]) => p.startsWith("oliviaRealtime/"))[1];
-  assert.equal(live.status, "active");
-  assert.ok(live.closeRequestedAt);
-});
-
-
-test("starting voice preserves the previous cost while updating its reservation", async () => {
-  const f = await realtimeFixture(), originalState = f.engine.state;
-  f.engine.state = async (...args) => { const result = await originalState(...args); return { ...result, usage: { ...result.usage, lastCost: { ars: 12.50, estimated: false } } }; };
-  const result = await createRealtime(f);
-  assert.deepEqual(result.usage.lastCost, { ars: 12.50, estimated: false });
-  assert.ok(result.usage.remainingPercent < 100);
-});
-
-test("Mini trial is administrator-only and fixes both audio models without changing default voice", async () => {
-  const denied = await realtimeFixture();
-  denied.body.voiceMode = "realtime-mini";
-  await assert.rejects(createRealtime(denied), { code: "permission-denied" });
-  assert.equal(denied.calls.length, 0);
-  const f = await realtimeFixture();
-  f.session.profile.role = "admin"; f.docs.set("users/seller", f.session.profile);
-  f.body.conversationId = (await f.engine.state(f.session)).conversationId;
-  f.body.voiceMode = "realtime-mini"; f.body.nativeTools = true;
-  const result = await createRealtime(f), config = JSON.parse(f.calls[0].init.body.get("session"));
-  assert.equal(config.model, "gpt-realtime-2.1-mini");
-  assert.equal(config.audio.input.transcription.model, "gpt-4o-mini-transcribe");
-  assert.equal(config.audio.output.voice, "marin");
-  assert.equal(config.audio.input.turn_detection.create_response, false);
-  assert.deepEqual(config.tools.map(({ name }) => name), ["olivia_request"]);
-  assert.equal(result.voiceProtocol, "realtime");
-  assert.equal(result.voiceMode, "realtime-mini");
-  assert.equal(f.docs.get(`oliviaRealtime/${result.realtimeSessionId}`).nativeTools, false);
-  assert.equal(f.docs.get("oliviaConfiguration/global").voiceProtocol, "live");
 });

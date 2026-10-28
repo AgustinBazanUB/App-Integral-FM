@@ -71,6 +71,7 @@ function fixture({
   role = "seller",
   provider: suppliedProvider,
   quotaTokens = 1000000,
+  env: envOverrides = {},
 } = {}) {
   let time = new Date(initialNow),
     sequence = 0,
@@ -290,9 +291,10 @@ function fixture({
       ? suppliedProvider(path, body, options, calls)
       : textResponse("Te ayudo con tu Panel Vendedor.");
   };
+  const env = { OPENAI_API_KEY: "fake-key-for-local-fixtures", ...envOverrides };
   const engine = createOliviaEngine({
     store,
-    env: { OPENAI_API_KEY: "fake-key-for-local-fixtures" },
+    env,
     provider,
     clock: () => new Date(time),
   });
@@ -304,6 +306,7 @@ function fixture({
     store,
     session,
     config,
+    env,
     engine,
     providerCalls: () => calls,
     advance: (ms) => {
@@ -1545,4 +1548,27 @@ test("tool failures retain the report button after reloading a conversation", as
   const recovered = await f.engine.resumeConversation(f.session, { conversationId: result.conversationId });
   assert.equal(recovered.failure.reportId, result.failure.reportId);
   assert.equal(newBusinessSales(f).length, 0);
+});
+test("natural voice uses a structured Luna answer, persists the spoken version and rejects legacy input modes", async () => {
+  const f = fixture({
+    role: "admin",
+    env: { GOOGLE_APPLICATION_CREDENTIALS_JSON: JSON.stringify({ project_id: "fixture", client_email: "tts@example.test", private_key: "fixture-private-key" }) },
+    provider: async () => textResponse(JSON.stringify({ complete: "Respuesta completa verificada.", spoken: "Respuesta breve hablada." })),
+  });
+  f.session.email = "AGSRESERVA@gmail.com";
+  f.documents.set("users/user_a", { ...f.documents.get("users/user_a"), role: "admin" });
+  const initial = await start(f);
+  assert.equal(initial.voiceConversationAvailable, true);
+  const events = [];
+  const result = await f.engine.chat(f.session, { conversationId: initial.conversationId, requestId: "natural_voice_1", message: "Consultá el stock", inputMode: "natural-voice" }, { onEvent: (event) => events.push(event) });
+  assert.equal(f.providerRequests[0].text.format.type, "json_schema");
+  assert.equal(result.messages.at(-1).content, "Respuesta completa verificada.");
+  assert.equal(result.messages.at(-1).voiceTranscript, "Respuesta breve hablada.");
+  assert.equal(result.spokenText, "Respuesta breve hablada.");
+  assert.equal(events.some((event) => event.type === "voice.ready" && event.text === "Respuesta breve hablada."), true);
+  await assert.rejects(f.engine.chat(f.session, { conversationId: initial.conversationId, requestId: "legacy_voice_1", message: "Hola", inputMode: "realtime" }), { code: "voice-mode-retired" });
+
+  const unavailable = fixture(); unavailable.session.email = "agsreserva@gmail.com";
+  await assert.rejects(unavailable.engine.chat(unavailable.session, { requestId: "voice_missing_credentials", message: "Hola", inputMode: "natural-voice" }), { code: "voice-not-enabled" });
+  assert.equal(unavailable.providerCalls(), 0);
 });

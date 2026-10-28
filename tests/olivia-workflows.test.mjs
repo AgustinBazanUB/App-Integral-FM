@@ -4,7 +4,7 @@ import { fixture, start, functionResponse } from "./helpers/olivia-fixture.mjs";
 import { runTool } from "../netlify/functions/_lib/olivia/tools.mjs";
 import { publishKnowledge, retrieveKnowledge, removeKnowledge, listKnowledge } from "../netlify/functions/_lib/olivia/knowledge.mjs";
 import { prepareExtendedOperation } from "../netlify/functions/_lib/olivia/extendedOperations.mjs";
-import { OliviaRealtime } from "../src/gestion/olivia/realtime.mjs";
+
 const transfer = { originType: "warehouse", originId: "main", destinationType: "location", destinationId: "local_a", reason: "Feria de prueba local", carrierName: "Ana", lines: [{ productId: "oil", quantity: 3, preparedQuantity: 3, receivedQuantity: 2 }] };
 function inventoryFixture(options = {}) {
   const f = fixture({ role: "admin", provider: () => functionResponse("prepare_stock_transfer", transfer), ...options });
@@ -121,29 +121,6 @@ test("knowledge provider failure falls back to curated context; missing visual a
   assert.equal(result.retrieval, "curated-fallback"); assert.equal(result.storageCostUsd, null); assert.ok(result.documents.length);
   await assert.rejects(publishKnowledge({ ...f, form: new FormData() }), { code: "confirmation-required" });
 });
-async function nativeFixture() {
-  const f = inventoryFixture(), state = await start(f), realtimeSessionId = "voice_a";
-  f.documents.set(`oliviaRealtime/${realtimeSessionId}`, { status: "active", nativeTools: true, userId: f.session.uid, conversationId: state.conversationId, sessionBinding: String(f.session.authTime), expiresAt: new Date(f.clock().getTime() + 180000) });
-  return { ...f, conversationId: state.conversationId, realtimeSessionId };
-}
-test("native knowledge uses authorized semantic retrieval and records only backend-loaded Skills", async () => {
-  const f = await nativeFixture(), requests = [];
-  f.documents.set("oliviaKnowledgeSettings/global", { vectorStoreId: "vs_qa" });
-  f.documents.set("oliviaKnowledgeDocuments/procedure", { name: "Procedimiento QA", active: true, status: "completed", audience: "admin", module: "warehouse", providerFileId: "file-qa" });
-  // Build an engine with the same durable fixture store and a real-shaped retrieval response.
-  const { createOliviaEngine } = await import("../netlify/functions/_lib/olivia/engine.mjs");
-  const engine = createOliviaEngine({ store: f.store, clock: f.clock, env: { OPENAI_API_KEY: "fixture" }, provider: async (path) => { requests.push(path); return { data: [{ file_id: "file-qa", attributes: { documentId: "procedure" }, content: [{ type: "text", text: "Revisar recepción física." }] }] }; } });
-  const base = { conversationId: f.conversationId, realtimeSessionId: f.realtimeSessionId, inputId: "spoken_a", message: "Prepará mercadería", skills: ["pronosticar-feria"] };
-  const knowledge = await engine.realtimeTool(f.session, { ...base, requestId: "knowledge", callId: "knowledge_call", tool: "search_knowledge", args: { query: "Recepción física" } });
-  assert.ok(knowledge.data.documents.some((row) => row.id === "procedure"));
-  assert.equal(requests.some((path) => path === "responses"), false);
-  const proposal = await engine.realtimeTool(f.session, { ...base, requestId: "forged", callId: "forged_call", tool: "prepare_stock_transfer", args: transfer });
-  const action = f.documents.get(`oliviaConfirmations/${proposal.pendingAction.id}`);
-  assert.equal(action.prepared.skill, null);
-  await engine.realtimeTool(f.session, { ...base, requestId: "load", callId: "load_call", tool: "load_skill", args: { name: "pronosticar-feria" } });
-  const verified = await engine.realtimeTool(f.session, { ...base, requestId: "verified", callId: "verified_call", tool: "prepare_stock_transfer", args: transfer });
-  assert.deepEqual(f.documents.get(`oliviaConfirmations/${verified.pendingAction.id}`).prepared.skill, { name: "pronosticar-feria", version: "1.1.0" });
-});
 test("CRM confirmation uses canonical identity and preserves existing nonempty data and history", async () => {
   const args = { customerId: null, phone: "+54 9 11 2345 6789", name: "Cliente QA", zoneId: null, zoneName: "" };
   const f = fixture({ role: "admin", provider: () => functionResponse("prepare_customer_create", args) });
@@ -159,67 +136,4 @@ test("CRM confirmation uses canonical identity and preserves existing nonempty d
   assert.equal(f.documents.get(path).name, "Nombre registrado");
   assert.equal(f.documents.get(path).totalPurchases, 7);
   assert.equal(f.documents.get(path).lastSaleId, "previous_sale");
-});
-test("native voice executes only an authorized backend tool without a Responses round-trip and deduplicates actual transcripts", async () => {
-  const f = await nativeFixture(), fields = { conversationId: f.conversationId, realtimeSessionId: f.realtimeSessionId, requestId: "voice_tool", inputId: "spoken_a", callId: "call_a", message: "¿Cuánto stock hay?", tool: "get_inventory_summary", args: { inventoryType: "warehouse", inventoryId: "main" } };
-  const result = await f.engine.realtimeTool(f.session, fields); assert.equal(result.data.items[0].currentStock, 10); assert.equal(f.providerCalls(), 0);
-  await f.engine.realtimeTool(f.session, fields); assert.equal(f.providerCalls(), 0);
-  await assert.rejects(f.engine.realtimeTool(f.session, { ...fields, args: { ...fields.args, inventoryId: "other" } }), { code: "request-already-used" });
-  const transcript = { ...fields, responseId: "response_a", text: "Hay diez unidades en Depósito." };
-  await f.engine.realtimeTranscript(f.session, transcript); await f.engine.realtimeTranscript(f.session, transcript);
-  const snapshot = await f.engine.state(f.session, f.conversationId);
-  assert.equal(snapshot.messages.filter((message) => message.role === "user").length, 1);
-  assert.equal(snapshot.messages.filter((message) => message.content === transcript.text).length, 1);
-  assert.equal(snapshot.messages.filter((message) => message.hiddenFromChat).length, 1);
-});
-test("native voice keeps a visual proposal across further reads and never writes on spoken yes", async () => {
-  const f = await nativeFixture(), base = { conversationId: f.conversationId, realtimeSessionId: f.realtimeSessionId, inputId: "spoken_a", message: "Prepará la transferencia" };
-  const result = await f.engine.realtimeTool(f.session, { ...base, requestId: "prepare", callId: "call_a", tool: "prepare_stock_transfer", args: transfer }); assert.ok(result.pendingAction);
-  const afterRead = await f.engine.realtimeTool(f.session, { ...base, requestId: "read", callId: "call_b", tool: "list_warehouses", args: {} }); assert.equal(afterRead.pendingAction.id, result.pendingAction.id);
-  await f.engine.realtimeTranscript(f.session, { ...base, responseId: "response_a", text: "Confirmá en la tarjeta" });
-  assert.equal(f.documents.get("warehouseStock/main/items/oil").currentStock, 10);
-  await assert.rejects(f.engine.realtimeTool({ ...f.session, uid: "foreign" }, { ...base, requestId: "foreign", callId: "foreign", tool: "list_warehouses", args: {} }), { code: "realtime-expired" });
-});
-function browserVoice(overrides = {}) {
-  const events = [], errors = [], tools = [], transcripts = [], states = [], inputs = [], acknowledgements = [];
-  const track = { enabled: true, stopped: 0, stop() { this.stopped++; } }, channel = { readyState: "open", send(text) { events.push(JSON.parse(text)); }, close() { this.readyState = "closed"; } };
-  class Peer { constructor() { this.connectionState = "connected"; } addTrack() {} createDataChannel() { return channel; } async createOffer() { return { sdp: "offer" }; } async setLocalDescription() {} async setRemoteDescription() {} close() { this.closed = true; } }
-  const voice = new OliviaRealtime({ createSession: async () => ({ sdp: "answer", nativeTools: true, realtimeSessionId: "voice_a" }), onRequest: () => { throw new Error("Native voice must not call Responses"); }, onTool: async (fields) => { tools.push(fields); return { data: { stock: 10 } }; }, onTranscript: async (fields) => transcripts.push(fields), onInput: (input) => inputs.push(input), acknowledge: () => { acknowledgements.push(true); return "Reviso eso"; }, onError: (error) => errors.push(error), onState: (state) => states.push(state), mediaDevices: { getUserMedia: async () => ({ getTracks: () => [track], getAudioTracks: () => [track] }) }, PeerConnection: Peer, createAudio: () => ({ pause() {}, remove() {} }), setTimer: () => 1, clearTimer() {}, ...overrides });
-  return { voice, events, errors, tools, transcripts, states, inputs, track, acknowledgements };
-}
-test("native browser voice handles function-before-ASR, mute, typed context, barge-in, teardown and reconnection", async () => {
-  const f = browserVoice(); await f.voice.connect();
-  f.voice.setMuted(true); assert.equal(f.track.enabled, false); assert.equal(f.voice.closed, false);
-  f.voice.handleEvent({ type: "input_audio_buffer.committed", item_id: "input_a" });
-  f.voice.handleEvent({ type: "response.created", response: { id: "response_a" } });
-  f.voice.handleEvent({ type: "response.function_call_arguments.done", response_id: "response_a", call_id: "call_a", name: "get_stock", arguments: "{}" });
-  assert.equal(f.tools.length, 0);
-  f.voice.handleEvent({ type: "conversation.item.input_audio_transcription.completed", item_id: "input_a", transcript: "Revisá el stock" });
-  f.voice.handleEvent({ type: "response.done", response: { id: "response_a", output: [{ type: "function_call" }] } });
-  await f.voice.queue;
-  assert.equal(f.tools.length, 1); assert.equal(f.acknowledgements.length, 1); assert.equal(f.inputs[0].message, "Revisá el stock");
-  assert.ok(f.events.some((event) => event.type === "response.create"));
-  f.voice.handleEvent({ type: "response.created", response: { id: "response_b" } });
-  f.voice.handleEvent({ type: "input_audio_buffer.speech_started" });
-  f.voice.handleEvent({ type: "response.output_audio_transcript.done", response_id: "response_b", transcript: "Hay diez unidades" });
-  await f.voice.queue; assert.equal(f.transcripts[0].inputId, "input_a");
-  f.voice.handleEvent({ type: "response.done", response: { output: [] } });
-  f.voice.shareTextTurn("Compará ventas", { state: "INFORMACION", messages: [{ role: "assistant", content: "Resumen verificado" }] });
-  assert.ok(f.events.some((event) => event.item?.role === "user" && event.item.content[0].text === "Compará ventas"));
-  f.voice.setMuted(false); assert.equal(f.track.enabled, true); f.voice.interrupt();
-  assert.ok(f.events.some((event) => event.type === "response.cancel")); f.voice.close(); assert.equal(f.track.stopped, 1);
-  const next = browserVoice(); await next.voice.connect(); assert.equal(next.voice.closed, false); next.voice.close();
-});
-
-test("late completion of a cancelled voice response preserves the current response", async () => {
-  const f = browserVoice(); await f.voice.connect();
-  f.voice.handleEvent({ type: "response.created", response: { id: "old" } });
-  f.voice.interrupt();
-  f.voice.handleEvent({ type: "response.created", response: { id: "current" } });
-  f.voice.handleEvent({ type: "response.done", response: { id: "old", status: "cancelled" } });
-  assert.equal(f.voice.responseActive, true);
-  assert.equal(f.voice.activeResponseId, "current");
-  f.voice.handleEvent({ type: "response.done", response: { id: "current", output: [] } });
-  assert.equal(f.voice.responseActive, false);
-  f.voice.close();
 });

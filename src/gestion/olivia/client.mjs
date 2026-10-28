@@ -105,14 +105,14 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
       throw failure;
     } finally { clearTimeout(timer); signal?.removeEventListener("abort", abort); }
   };
-  const delay = signal => new Promise((resolve, reject) => {
+  const delay = (signal, interval = pollIntervalMs) => new Promise((resolve, reject) => {
     const abort = () => { clearTimeout(timer); signal?.removeEventListener("abort", abort); reject(new DOMException("Respuesta detenida", "AbortError")); };
-    const timer = setTimeout(() => { signal?.removeEventListener("abort", abort); resolve(); }, pollIntervalMs);
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", abort); resolve(); }, interval);
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
   });
   const waitForChat = async (jobId, options = {}) => {
-    let acceptedId = null, text = "", phase = "", failures = 0;
+    let acceptedId = null, text = "", voiceText = "", phase = "", failures = 0;
     const started = Date.now();
     options.onEvent?.({ type: "job", jobId });
     while (Date.now() - started < 390000) {
@@ -122,17 +122,18 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
       catch (error) {
         if (!["olivia-network-error", "olivia-timeout"].includes(error.code) || ++failures > 5) throw error;
         options.onEvent?.({ type: "phase", label: "Sigo esperando la respuesta. Estoy recuperando la conexión…" });
-        await delay(options.signal); continue;
+        await delay(options.signal, options.pollIntervalMs); continue;
       }
       if (status.accepted && acceptedId !== status.accepted.id) { acceptedId = status.accepted.id; options.onEvent?.({ type: "accepted", conversationId: status.conversationId, message: status.accepted }); }
       const elapsed = Date.now() - started;
       const nextPhase = elapsed > 90000 ? "Sigo trabajando en tu solicitud…" : elapsed > 30000 && status.phase === "Pensando…" ? "Sigo pensando para completar la respuesta…" : status.phase || "Pensando…";
       if (nextPhase !== phase || !status.text.startsWith(text)) { phase = nextPhase; if (!status.text.startsWith(text)) text = ""; options.onEvent?.({ type: "phase", label: phase, ...(text === "" ? { tools: [] } : {}) }); }
       if (status.text !== text) { options.onEvent?.({ type: "delta", delta: status.text.slice(text.length) }); text = status.text; }
+      if (status.voiceText && status.voiceText !== voiceText) { voiceText = status.voiceText; options.onEvent?.({ type: "voice.ready", text: voiceText }); }
       if (status.status === "completed") return status.result;
       if (status.status === "failed") throw Object.assign(new Error(status.failure.message), { ...status.failure });
       if (status.status === "cancelled") throw new DOMException("Respuesta detenida", "AbortError");
-      await delay(options.signal);
+      await delay(options.signal, options.pollIntervalMs);
     }
     throw Object.assign(new Error("Olivia no pudo terminar esta consulta a tiempo. Actualizá el chat para recuperar lo guardado."), { code: "chat-job-expired" });
   };
@@ -162,8 +163,19 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
       const form = new FormData();
       const extension = audio.type?.includes("mp4") ? "mp4" : audio.type?.includes("ogg") ? "ogg" : "webm";
       form.set("audio", audio, `olivia.${extension}`);
-      Object.entries(payload).forEach(([key, value]) => { if (value != null) form.set(key, typeof value === "object" ? JSON.stringify(value) : String(value)); });
+      Object.entries({ ...payload, durationSeconds: payload.durationSeconds ?? audio.durationSeconds }).forEach(([key, value]) => { if (value != null) form.set(key, typeof value === "object" ? JSON.stringify(value) : String(value)); });
       return send("/.netlify/functions/olivia-transcribe", form, { ...options, isForm: true });
+    },
+    synthesize: async (text, payload, { signal } = {}) => {
+      const token = await getToken();
+      if (!token) throw new Error("Iniciá sesión para usar Olivia.");
+      const response = await fetchImpl("/.netlify/functions/olivia-synthesize", { method: "POST", signal, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, text }) });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const error = new Error(data.message || "Olivia no pudo generar el audio. La respuesta escrita quedó guardada.");
+        error.code = data.code || "chirp-synthesis-failed"; error.status = response.status; throw error;
+      }
+      return response;
     },
   };
 }
