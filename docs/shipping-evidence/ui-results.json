@@ -1,0 +1,12 @@
+{
+  "checks": [
+    "approve_actual_origin_form",
+    "assigned_batch_pdf_preview",
+    "dialog_escape",
+    "mobile_no_page_overflow",
+    "existing_quick_sale_shipping_modal",
+    "qr_requires_courier_credential"
+  ],
+  "browserErrors": [],
+  "output": "docs/shipping-evidence"
+}

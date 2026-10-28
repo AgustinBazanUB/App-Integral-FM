@@ -23,22 +23,8 @@ test("el modal de anulación conserva el foco y el motivo es opcional", () => {
   assert.doesNotMatch(sellerPanel, /Motivo \*/);
 });
 
-test("el servicio normaliza el motivo vacío sin impedir la anulación", () => {
-  assert.match(sellerService, /const safeReason = String\(reason \|\| ""\)\.trim\(\) \|\| null;/);
-  assert.doesNotMatch(sellerService, /safeReason\.length < 3/);
-  assert.match(sellerService, /\.\.\.\(safeReason \? \{ cancelReason: safeReason \} : \{\}\)/);
-  assert.match(sellerService, /reason: safeReason \? `Anulación \$\{sale\.saleCode\}: \$\{safeReason\}` : `Anulación \$\{sale\.saleCode\}`/);
-});
-
-test("anular continúa restituyendo stock y registrando movimiento y auditoría", () => {
-  assert.match(sellerService, /const newStock = previousStock \+ Number\(item\.qty \|\| 0\);/);
-  assert.match(sellerService, /type: "sale_cancel"/);
-  assert.match(sellerService, /status: "cancelled"/);
-  assert.match(sellerService, /cancelledAt: serverTimestamp\(\)/);
-  assert.match(sellerService, /cancelledBy: profile\.id/);
-  assert.match(sellerService, /action: "sale\.cancelled"/);
-  assert.match(sellerService, /runStockMutationWithRuleCompatibility/);
-});
+// Stock, motivo vacío e idempotencia se verifican ejecutando el backend real
+// con almacenamiento transaccional aislado en sale-cancellation.test.mjs.
 
 test("Métricas Generales usa una sola ruta y un solo componente", () => {
   assert.match(modules, /export const SALES_METRICS_PATH = "\/gestion\/metrics\/sales";/);

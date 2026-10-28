@@ -1,6 +1,9 @@
 import { createSign } from "node:crypto";
+import {
+  assertFirebaseServiceAccountProject,
+  configuredFirebaseProjectId,
+} from "./firebaseProject.mjs";
 
-const PROJECT_ID = "app-integral-fm";
 const TOKEN_AUDIENCE = "https://oauth2.googleapis.com/token";
 const DATASTORE_SCOPE = "https://www.googleapis.com/auth/datastore";
 let cachedToken = null;
@@ -22,19 +25,22 @@ function serviceAccount() {
     error.status = 500;
     throw error;
   }
-  if (parsed.project_id !== PROJECT_ID || !parsed.client_email || !parsed.private_key) {
-    const error = new Error("La cuenta de servicio Firebase no corresponde a app-integral-fm.");
+  const projectId = configuredFirebaseProjectId();
+  if (parsed.project_id !== projectId || !parsed.client_email || !parsed.private_key) {
+    const error = new Error("La cuenta de servicio Firebase no corresponde al proyecto configurado.");
     error.code = "firebase-project-mismatch";
     error.status = 500;
     throw error;
   }
+  assertFirebaseServiceAccountProject(projectId, parsed.client_email);
   return parsed;
 }
 
 async function serviceToken() {
   const now = Math.floor(Date.now() / 1000);
-  if (cachedToken?.accessToken && cachedToken.expiresAt - now > 120) return cachedToken.accessToken;
   const account = serviceAccount();
+  const cacheKey = `${account.project_id}:${account.client_email}`;
+  if (cachedToken?.cacheKey === cacheKey && cachedToken.expiresAt - now > 120) return cachedToken.accessToken;
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const payload = base64url(JSON.stringify({
     iss: account.client_email,
@@ -64,7 +70,7 @@ async function serviceToken() {
     error.status = 503;
     throw error;
   }
-  cachedToken = { accessToken: data.access_token, expiresAt: now + Number(data.expires_in || 3600) };
+  cachedToken = { cacheKey, accessToken: data.access_token, expiresAt: now + Number(data.expires_in || 3600) };
   return cachedToken.accessToken;
 }
 
@@ -100,7 +106,7 @@ function fromFsFields(fields = {}) {
   return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, fromFsValue(value)]));
 }
 
-const documentUrl = (path) => `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${path.split("/").map(encodeURIComponent).join("/")}`;
+const documentUrl = (path) => `https://firestore.googleapis.com/v1/projects/${configuredFirebaseProjectId()}/databases/(default)/documents/${path.split("/").map(encodeURIComponent).join("/")}`;
 
 async function adminFetch(url, options = {}) {
   const token = await serviceToken();
@@ -187,5 +193,5 @@ export function backendFirebaseConfigured() {
 }
 
 export function backendFirebaseProjectId() {
-  return PROJECT_ID;
+  return configuredFirebaseProjectId();
 }

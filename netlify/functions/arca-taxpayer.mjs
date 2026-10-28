@@ -520,11 +520,11 @@ export default async function handler(request) {
             readonly: safeStatus.productionReadonlyEnabled,
             invoicePreparation: safeStatus.productionInvoicePreparationEnabled,
             taxpayerLookup: safeStatus.productionTaxpayerLookupEnabled,
-            cae: false,
+            cae: safeStatus.productionCaeEnabled,
           },
           failedStages,
           ready,
-          caeProductionEnabled: false,
+          caeProductionEnabled: safeStatus.productionCaeEnabled,
         },
       });
     }

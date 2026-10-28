@@ -1,6 +1,9 @@
 import { createSign } from "node:crypto";
+import {
+  assertFirebaseServiceAccountProject,
+  configuredFirebaseProjectId,
+} from "./firebaseProject.mjs";
 
-const PROJECT_ID = "app-integral-fm";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const FIRESTORE_SCOPE = "https://www.googleapis.com/auth/datastore";
 let tokenCache = null;
@@ -25,16 +28,42 @@ function base64Url(value) {
 }
 
 function adminConfig(env = process.env) {
-  const projectId = String(env.FIREBASE_PROJECT_ID || env.VITE_FIREBASE_PROJECT_ID || PROJECT_ID).trim();
-  if (projectId !== PROJECT_ID) {
-    const error = new Error("Configuración Firebase administrativa inválida.");
+  const projectId = configuredFirebaseProjectId(env);
+  let serviceAccount = null;
+  const rawServiceAccount = env.FIREBASE_SERVICE_ACCOUNT_JSON || env.FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM || "";
+  if (rawServiceAccount) {
+    try {
+      serviceAccount = JSON.parse(rawServiceAccount);
+    } catch {
+      const error = new Error("La cuenta de servicio Firebase server-side no tiene un formato válido.");
+      error.code = "firebase-admin-invalid";
+      error.status = 500;
+      throw error;
+    }
+    if (!serviceAccount || typeof serviceAccount !== "object" || Array.isArray(serviceAccount)) {
+      const error = new Error("La cuenta de servicio Firebase server-side no tiene un formato válido.");
+      error.code = "firebase-admin-invalid";
+      error.status = 500;
+      throw error;
+    }
+  }
+  if (serviceAccount?.project_id && serviceAccount.project_id !== projectId) {
+    const error = new Error("La cuenta de servicio Firebase no corresponde al proyecto configurado.");
     error.code = "firebase-project-mismatch";
+    error.status = 500;
     throw error;
   }
+  const credentials = {
+    ...env,
+    FIREBASE_ADMIN_CLIENT_EMAIL: env.FIREBASE_ADMIN_CLIENT_EMAIL || serviceAccount?.client_email,
+    FIREBASE_ADMIN_PRIVATE_KEY: env.FIREBASE_ADMIN_PRIVATE_KEY || serviceAccount?.private_key,
+  };
+  const clientEmail = required("FIREBASE_ADMIN_CLIENT_EMAIL", credentials);
+  assertFirebaseServiceAccountProject(projectId, clientEmail);
   return {
     projectId,
-    clientEmail: required("FIREBASE_ADMIN_CLIENT_EMAIL", env),
-    privateKey: required("FIREBASE_ADMIN_PRIVATE_KEY", env).replace(/\\n/g, "\n"),
+    clientEmail,
+    privateKey: required("FIREBASE_ADMIN_PRIVATE_KEY", credentials).replace(/\\n/g, "\n"),
   };
 }
 
@@ -65,10 +94,11 @@ export async function firebaseAdminAccessToken({
   now = new Date(),
   forceRefresh = false,
 } = {}) {
-  if (!forceRefresh && tokenCache && tokenCache.expiresAt - now.getTime() > 5 * 60 * 1000) {
+  const config = adminConfig(env);
+  const cacheKey = `${config.projectId}:${config.clientEmail}`;
+  if (!forceRefresh && tokenCache?.cacheKey === cacheKey && tokenCache.expiresAt - now.getTime() > 5 * 60 * 1000) {
     return tokenCache.token;
   }
-  const config = adminConfig(env);
   const assertion = serviceAccountAssertion(config, now);
   const response = await fetchImpl(TOKEN_URL, {
     method: "POST",
@@ -86,6 +116,7 @@ export async function firebaseAdminAccessToken({
     throw error;
   }
   tokenCache = {
+    cacheKey,
     token: payload.access_token,
     expiresAt: now.getTime() + Number(payload.expires_in || 3600) * 1000,
   };

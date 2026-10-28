@@ -24,6 +24,7 @@ const bundle = await build({stdin:{contents:'export * from "./src/gestion/servic
     export const limit = count => ({count});
     export const query = (collection,...constraints) => ({...collection,constraints});
     export const getDocs = async target => { mock.queries.push(target); return {docs:[]}; };
+    export const getDocsFromServer = getDocs;
     export const getCountFromServer = async () => ({data:()=>({count:0})});
     const commit = writes => {
       const next=new Map(mock.data);

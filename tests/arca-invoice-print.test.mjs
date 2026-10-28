@@ -31,9 +31,9 @@ test("Venta Rápida y Panel Vendedor exponen la acción asociada a su factura", 
   const sellerPanel = await readFile(new URL("../src/gestion/seller/SellerPanel.jsx", import.meta.url), "utf8");
   const printAction = await readFile(new URL("../src/gestion/components/ArcaInvoicePrintAction.jsx", import.meta.url), "utf8");
 
-  assert.match(quickSales, /<ArcaInvoicePrintAction \{\.\.\.registeredInvoice\} \/>/);
-  assert.match(sellerPanel, /sourceType="seller_sale"[\s\S]*?invoiceId=\{receipt\.fiscalInvoiceId\}/);
-  assert.match(sellerPanel, /<ArcaInvoicePrintAction[\s\S]*?invoice=\{fiscalDetail\.invoice\}/);
+  assert.match(quickSales, /<SaleInvoicePanel sale=\{registeredInvoice\}/);
+  assert.match(sellerPanel, /<SaleInvoicePanel sale=\{receipt\}/);
+  assert.match(sellerPanel, /<SaleInvoicePanel sale=\{detailSale\}/);
   assert.match(printAction, /fetchArcaInvoicePdf/);
   assert.match(printAction, /disposition: "inline"/);
 });

@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-16",
+  "branch": "codex/modulo-envios-v08",
+  "initialHead": "6608b43eea831a9b4f348a8d7c79765fb449c376",
+  "regression": {
+    "failed": 0,
+    "passed": 975,
+    "tests": 975
+  },
+  "shipping": {
+    "failed": 0,
+    "passed": 22,
+    "tests": 22
+  },
+  "firestoreRules": {
+    "failed": 0,
+    "environment": "local emulator",
+    "passed": 138,
+    "tests": 138
+  },
+  "browser": {
+    "services": "synthetic adapters",
+    "errors": 0,
+    "widths": [
+      1440,
+      390
+    ],
+    "checks": 6
+  },
+  "pdf": {
+    "pages": 2,
+    "dpi": 300,
+    "labels": 4,
+    "decodedQrFromRaster": 4
+  },
+  "builds": [
+    "gestion",
+    "ecommerce",
+    "shipping function Node20",
+    "shipping retention function Node20"
+  ],
+  "productionActions": false,
+  "liveGpsTested": false,
+  "integratedMapConfigured": false
+}

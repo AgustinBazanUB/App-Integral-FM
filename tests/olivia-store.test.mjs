@@ -10,7 +10,7 @@ beforeEach(() => clearFirebaseAdminTokenCache());
 
 test("catalog lists paginate completely, bind confirmation reads to the transaction and refuse truncated catalogs", async () => {
   const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048, privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
-  const env = { FIREBASE_ADMIN_CLIENT_EMAIL: "catalog-fixture@example.invalid", FIREBASE_ADMIN_PRIVATE_KEY: privateKey };
+  const env = { FIREBASE_ADMIN_CLIENT_EMAIL: "catalog-fixture@app-integral-fm.iam.gserviceaccount.com", FIREBASE_ADMIN_PRIVATE_KEY: privateKey };
   const calls = [];
   const fetchImpl = async (url, init) => {
     calls.push({ url, init });
@@ -39,7 +39,7 @@ test("server queries preserve injected credentials when using an opaque history 
   const env = {
       FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({
         project_id: "app-integral-fm",
-        client_email: "fixture@example.invalid",
+        client_email: "fixture@app-integral-fm.iam.gserviceaccount.com",
         private_key: privateKey,
       }),
     },
