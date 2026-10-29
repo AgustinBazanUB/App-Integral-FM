@@ -25,6 +25,7 @@ import "../../../src/styles/scrollbars.css";
 import "../../../src/styles/seller-compact.css";
 import "../../../src/styles/seller-pos.css";
 import OliviaAssistant from '../../../src/gestion/olivia/OliviaAssistant';
+import { FixtureModule } from './mocks';
 
 // Synthetic WebAudio input/output only. No system microphone permission and no
 // audible test noise; production mediaDevices are untouched outside this tab.
@@ -43,4 +44,4 @@ Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async () 
   return destination.stream;
 } });
 document.body.style.cssText = 'margin:0;min-height:100vh;background:#e9edf3;padding:24px;font-family:Manrope,sans-serif';
-createRoot(document.getElementById('root')).render(<div className="fm-management-body"><p>QA local · datos y audio sintéticos</p><OliviaAssistant /></div>);
+createRoot(document.getElementById('root')).render(<div className="fm-management-body"><p>QA local · datos y audio sintéticos</p><FixtureModule /><OliviaAssistant /></div>);

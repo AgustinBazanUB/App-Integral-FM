@@ -13,12 +13,17 @@ export class NaturalVoiceConversation {
       await this.context.resume();
       this.stream = await this.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       if (this.closed) return this.release();
+      this.onMediaInterrupted = () => {
+        if (this.closed) return;
+        this.onError(new Error("El navegador interrumpió el micrófono o el audio. Volvé a conectar la voz para continuar."));
+        this.close();
+      };
+      this.stream.getAudioTracks().forEach(track => track.addEventListener?.('ended', this.onMediaInterrupted));
+      this.onContextState = () => { if (['suspended', 'interrupted', 'closed'].includes(this.context?.state)) this.onMediaInterrupted(); };
+      this.context.addEventListener?.('statechange', this.onContextState);
       this.source = this.context.createMediaStreamSource(this.stream);
       this.analyser = this.context.createAnalyser(); this.analyser.fftSize = 1024; this.source.connect(this.analyser);
       this.samples = new Float32Array(this.analyser.fftSize);
-      this.outputAnalyser = this.context.createAnalyser(); this.outputAnalyser.fftSize = 1024;
-      this.outputAnalyser.connect(this.context.destination);
-      this.outputSamples = new Float32Array(this.outputAnalyser.fftSize);
       this.startRecorder();
       this.startedAt = this.now(); this.onState("listening"); this.loop();
     } catch (error) { this.onError(error); this.close(); }
@@ -29,9 +34,7 @@ export class NaturalVoiceConversation {
     this.analyser?.getFloatTimeDomainData(this.samples);
     let sum = 0; for (const sample of this.samples) sum += sample * sample;
     const rms = Math.sqrt(sum / this.samples.length), level = Math.min(1, rms * 5), now = this.now();
-    this.outputAnalyser?.getFloatTimeDomainData(this.outputSamples);
-    const outputLevel = Math.min(1, Math.sqrt(this.outputSamples.reduce((sum, sample) => sum + sample * sample, 0) / this.outputSamples.length) * 5);
-    this.onFrame({ seconds: Math.floor((now - this.startedAt) / 1000), level: this.muted ? 0 : level, outputLevel, recording: this.recordingTurn });
+    this.onFrame({ seconds: Math.floor((now - this.startedAt) / 1000), level: this.muted ? 0 : level, recording: this.recordingTurn });
     if (!this.muted) {
       if (!this.recordingTurn && rms > 0.025) this.beginTurn(now);
       if (this.recordingTurn) {
@@ -109,7 +112,7 @@ export class NaturalVoiceConversation {
         const samples = new Int16Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
         const audio = this.context.createBuffer(1, samples.length, 24000), channel = audio.getChannelData(0);
         for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
-        const source = this.context.createBufferSource(); source.buffer = audio; source.connect(this.outputAnalyser); source.start(Math.max(nextAt, this.context.currentTime + 0.005));
+        const source = this.context.createBufferSource(); source.buffer = audio; source.connect(this.context.destination); source.start(Math.max(nextAt, this.context.currentTime + 0.005));
         nextAt = Math.max(nextAt, this.context.currentTime + 0.005) + audio.duration; sources.add(source); source.onended = () => { sources.delete(source); source.disconnect?.(); };
         if (first) { first = false; onFirstScheduled(this.now()); }
       }
@@ -137,13 +140,15 @@ export class NaturalVoiceConversation {
   close() {
     if (this.closed) return;
     this.closed = true; this.discardTurn = true; this.cancelFrame(this.animation); this.stopPlayback();
+    this.stream?.getAudioTracks().forEach(track => track.removeEventListener?.('ended', this.onMediaInterrupted));
+    this.context?.removeEventListener?.('statechange', this.onContextState);
     clearTimeout(this.turnTimer);
     if (this.recorder?.state === "recording") { try { this.recorder.stop(); } catch {} }
     this.source?.disconnect(); this.analyser?.disconnect(); this.stream?.getTracks().forEach((track) => track.stop());
-    this.outputAnalyser?.disconnect(); this.context?.close()?.catch(() => {}); this.context = null; this.onState("ended");
+    this.context?.close()?.catch(() => {}); this.context = null; this.onState("ended");
   }
 
-  release() { this.source?.disconnect(); this.analyser?.disconnect(); this.outputAnalyser?.disconnect(); this.stream?.getTracks().forEach((track) => track.stop()); this.context?.close()?.catch(() => {}); }
+  release() { this.source?.disconnect(); this.analyser?.disconnect(); this.stream?.getTracks().forEach((track) => track.stop()); this.context?.close()?.catch(() => {}); }
 }
 
 export function latencyPercentile(samples, percentile) {

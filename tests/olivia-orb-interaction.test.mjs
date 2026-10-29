@@ -4,6 +4,29 @@ import { NaturalVoiceConversation } from '../src/gestion/olivia/naturalVoice.mjs
 import { interactionState, appendDictation, requestFailure } from '../src/gestion/olivia/interactionState.mjs';
 import { createOliviaTransport } from '../src/gestion/olivia/client.mjs';
 import { defaultOliviaConfiguration, validateConfiguration } from '../src/shared/oliviaContracts.mjs';
+import { stateEnergy, createStateMix, blendEnergy } from '../src/gestion/olivia/voiceorbs/orb-state.js';
+import { readFloatingPreference, writeFloatingPreference } from '../src/gestion/olivia/preferences.mjs';
+
+test('floating preference is opt-in, user scoped, and denied storage is harmless', () => {
+  const data = new Map(), storage = { getItem: key => data.get(key), setItem: (key, value) => data.set(key, value) };
+  assert.equal(readFloatingPreference(storage, 'a'), false);
+  writeFloatingPreference(storage, 'a', true);
+  assert.equal(readFloatingPreference(storage, 'a'), true);
+  assert.equal(readFloatingPreference(storage, 'b'), false);
+  writeFloatingPreference(storage, 'a', false);
+  assert.equal(readFloatingPreference(storage, 'a'), false);
+  const denied = { getItem() { throw Error('blocked'); }, setItem() { throw Error('blocked'); } };
+  assert.equal(readFloatingPreference(denied, 'a'), false);
+  assert.doesNotThrow(() => writeFloatingPreference(denied, 'a', true));
+});
+
+test('procedural energy moves without audio and transitions remain bounded', () => {
+  const patterns = ['listening', 'thinking', 'speaking', 'connecting'].map(state => Array.from({ length: 20 }, (_, i) => stateEnergy(state, i / 10)));
+  for (const pattern of patterns) assert.ok(new Set(pattern).size > 1 && pattern.every(value => value >= 0 && value <= 1));
+  assert.equal(new Set(patterns.map(JSON.stringify)).size, 4);
+  const mix = createStateMix('listening');
+  for (let i = 0; i < 60; i++) { mix.update('speaking', 1 / 60); assert.ok(blendEnergy(mix.weights, i / 60) >= 0 && blendEnergy(mix.weights, i / 60) <= 1); }
+});
 
 test('one orb lifecycle prioritizes real recording/playback over work and does not treat rejection as failure', () => {
   assert.equal(interactionState({ activeJob: { jobId: 'job' } }).state, 'thinking');
@@ -15,6 +38,9 @@ test('one orb lifecycle prioritizes real recording/playback over work and does n
   assert.equal(interactionState({ pending: {} }).state, 'idle');
   assert.equal(requestFailure({ name: 'AbortError' }, { reason: 'user-stop' }).kind, 'neutral');
   assert.equal(requestFailure({ name: 'AbortError' }, { reason: 'voice-ended' }).kind, 'neutral');
+  assert.equal(requestFailure({ name: 'AbortError' }, { reason: 'superseded' }).kind, 'neutral');
+  assert.equal(interactionState({ busy: true, voiceDisabled: true }).state, 'thinking');
+  assert.equal(interactionState({ voiceDisabled: true }).state, 'disabled');
   assert.equal(requestFailure({ name: 'AbortError' }, { jobId: 'same-job' }).kind, 'recover');
   assert.equal(requestFailure({ code: 'olivia-network-error' }, { jobId: 'same-job' }).kind, 'recover');
   assert.equal(requestFailure({ message: 'Invalid request' }).kind, 'error');
@@ -30,14 +56,15 @@ test('dictation appends to a written draft and legacy short silence migrates wit
 
 function voiceFixture({ denied = false } = {}) {
   let now = 0, amplitude = 0, requested = 0;
-  const frames = [], turns = [], levels = [], tracks = [{ enabled: true, stop() { this.stopped = true; } }];
+  const trackEvents = new Map(), contextEvents = new Map();
+  const frames = [], turns = [], levels = [], tracks = [{ enabled: true, stop() { this.stopped = true; }, addEventListener(type, fn) { trackEvents.set(type, fn); }, removeEventListener(type) { trackEvents.delete(type); } }];
   class Recorder {
     static isTypeSupported(type) { return type === 'audio/mp4'; }
     constructor(_, options) { this.mimeType = options.mimeType; this.state = 'inactive'; }
     start() { this.state = 'recording'; }
     stop() { this.state = 'inactive'; this.ondataavailable({ data: new Blob(['recorded']) }); this.onstop(); }
   }
-  const context = { currentTime: 0, destination: {}, resume: async () => {}, close: async () => {},
+  const context = { currentTime: 0, destination: {}, resume: async () => {}, close: async () => {}, addEventListener(type, fn) { contextEvents.set(type, fn); }, removeEventListener(type) { contextEvents.delete(type); },
     createMediaStreamSource: () => ({ connect() {}, disconnect() {} }),
     createAnalyser: () => ({ fftSize: 1024, connect() {}, disconnect() {}, getFloatTimeDomainData(samples) { samples.fill(amplitude); } }) };
   const errors = [];
@@ -45,8 +72,21 @@ function voiceFixture({ denied = false } = {}) {
     mediaDevices: { getUserMedia: async () => { requested++; if (denied) throw new DOMException('Denied', 'NotAllowedError'); return { getAudioTracks: () => tracks, getTracks: () => tracks }; } },
     frame: fn => { frames.push(fn); return frames.length; }, cancelFrame() {}, now: () => now,
     onTurn: (blob, metadata) => turns.push({ blob, metadata }), onFrame: frame => levels.push(frame), onError: error => errors.push(error) });
-  return { voice, turns, levels, errors, tracks, requested: () => requested, tick(t, a) { now = t; amplitude = a; frames.shift()?.(); } };
+  return { voice, turns, levels, errors, tracks, context, trackEvents, contextEvents, requested: () => requested, tick(t, a) { now = t; amplitude = a; frames.shift()?.(); } };
 }
+
+test('browser revocation or suspended audio ends capture truthfully and permits a fresh explicit session', async () => {
+  for (const cause of ['track-ended', 'suspended']) {
+    const f = voiceFixture(); await f.voice.start();
+    if (cause === 'track-ended') f.trackEvents.get('ended')();
+    else { f.context.state = 'suspended'; f.contextEvents.get('statechange')(); }
+    assert.equal(f.voice.closed, true); assert.equal(f.tracks[0].stopped, true);
+    assert.equal(f.errors.length, 1); assert.equal(f.requested(), 1);
+    assert.equal(f.trackEvents.size, 0); assert.equal(f.contextEvents.size, 0);
+    f.voice.close(); assert.equal(f.errors.length, 1);
+    const next = voiceFixture(); await next.voice.start(); assert.equal(next.voice.closed, false); next.voice.close();
+  }
+});
 
 test('natural pauses stay in one turn, acoustic continuations extend to 3–4s, manual send is immediate', async () => {
   const f = voiceFixture(); await f.voice.start();
@@ -95,13 +135,12 @@ test('a lost start acknowledgement retries the same request and manual cancellat
   assert.deepEqual(starts[0], starts[1]);
 });
 
-test('PCM output uses the existing analyser, preserves a zero odd byte and interruption resolves playback promptly', async () => {
+test('PCM output connects directly to speakers, preserves a zero odd byte and interruption resolves playback promptly', async () => {
   const voice = new NaturalVoiceConversation();
-  const analyser = {}, played = []; let completed = false;
-  voice.outputAnalyser = analyser;
-  voice.context = { currentTime: 0,
+  const destination = {}, played = []; let completed = false;
+  voice.context = { currentTime: 0, destination,
     createBuffer: (_, length) => ({ duration: 10, samples: new Float32Array(length), getChannelData() { return this.samples; } }),
-    createBufferSource: () => { const source = { connect(node) { assert.equal(node, analyser); }, start() { played.push(this); }, stop() { this.onended?.(); }, disconnect() {} }; return source; } };
+    createBufferSource: () => { const source = { connect(node) { assert.equal(node, destination); }, start() { played.push(this); }, stop() { this.onended?.(); }, disconnect() {} }; return source; } };
   const response = new Response(new ReadableStream({ start(c) { c.enqueue(new Uint8Array([0])); c.enqueue(new Uint8Array([1, 0, 2])); c.close(); } }));
   const playing = voice.play(response, { onComplete: () => { completed = true; } });
   await new Promise(resolve => setImmediate(resolve));

@@ -9,6 +9,7 @@ import { formatDateTime } from "../formatters";
 import { operationLabel, prependHistoryMessages, requestId } from "./client.mjs";
 import { oliviaClient } from "./service";
 import OliviaKnowledgeManager from "./OliviaKnowledgeManager";
+import OliviaPreferences from "./OliviaPreferences";
 import { formatOliviaCost } from "../../shared/oliviaCostFormat.mjs";
 import "./olivia.css";
 
@@ -138,6 +139,7 @@ export default function OliviaSettings() {
         <FormField label="Cupo predeterminado de vendedores (tokens)"><input type="number" min="1000" step="1000" value={configuration.defaultQuota?.tokens || ""} onChange={(event) => edit({ defaultQuota: { ...configuration.defaultQuota, tokens: Number(event.target.value) } })}/></FormField>
         <FormField label="Renovación predeterminada"><select value={configuration.defaultQuota?.frequency || "monthly"} onChange={(event) => edit({ defaultQuota: { ...configuration.defaultQuota, frequency: event.target.value } })}>{Object.entries(frequencies).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></FormField>
       </div>
+      <OliviaPreferences uid={user.uid} />
       <fieldset><legend>Política de modelos</legend><p>La operación habitual usa Luna. El análisis complejo aumenta su razonamiento; Sol se reserva para creatividad en Marketing o Redes. Los cambios requieren confirmación y quedan en Auditoría.</p><div className="fm-olivia-settings-grid">
         {Object.entries(configuration.profiles || {}).filter(([key]) => key !== "transcription").map(([key, value]) => <div key={key} className="fm-olivia-model-profile"><FormField label={profileLabels[key] || key}><input value={value.model || ""} onChange={(event) => changeProfile(key, { model: event.target.value })}/></FormField>{value.reasoningEffort != null ? <FormField label="Razonamiento"><select value={value.reasoningEffort} onChange={(event) => changeProfile(key, { reasoningEffort: event.target.value })}>{["high", "xhigh"].map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></FormField> : null}{value.voice != null ? <FormField label="Voz"><input value={value.voice} onChange={(event) => changeProfile(key, { voice: event.target.value })}/></FormField> : null}</div>)}
       </div></fieldset>

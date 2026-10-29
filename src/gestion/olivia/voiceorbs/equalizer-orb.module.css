@@ -670,3 +670,27 @@
 
 /* Pause CSS animation as well as the level RAF when offscreen. */
 .orb[data-inactive="true"] * { animation-play-state: paused !important; }
+
+/* Flor Mía: procedural state patterns, never microphone/speaker amplitude. */
+.orb[data-state='speaking'] .layerActive { opacity:0; }
+.orb[data-state='speaking'] .layerFlat { opacity:1; }
+@media (prefers-reduced-motion: no-preference) {
+  .orb[data-state='listening'] .layerActive .bar {
+    animation: fm-ripple calc(2.1s / var(--orb-speed)) ease-in-out calc(var(--bar-i) * -.22s) infinite;
+  }
+  .orb[data-state='speaking'] .layerFlat .bar {
+    animation: fm-flow calc(1.35s / var(--orb-speed)) ease-in-out calc(var(--bar-i) * -.17s) infinite;
+  }
+  .orb[data-state='connecting'] .layerSweep .bar { animation-duration:calc(2.6s / var(--orb-speed)); }
+  .orb[data-state='thinking'] .layerWave .bar { animation-duration:calc(3.2s / var(--orb-speed)); }
+}
+@keyframes fm-ripple {
+  0%,100% { clip-path:inset(39% 0 round 999px); transform:scaleY(.6); }
+  50% { clip-path:inset(12% 0 round 999px); transform:scaleY(1); }
+}
+@keyframes fm-flow {
+  0%,100% { clip-path:inset(32% 0 round 999px); transform:scaleY(.7); }
+  28% { clip-path:inset(4% 0 round 999px); transform:scaleY(1); }
+  54% { clip-path:inset(24% 0 round 999px); transform:scaleY(.65); }
+  78% { clip-path:inset(10% 0 round 999px); transform:scaleY(.9); }
+}

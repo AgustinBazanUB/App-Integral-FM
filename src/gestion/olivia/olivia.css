@@ -286,7 +286,7 @@
  .fm-olivia-drawer { top:var(--olivia-viewport-top,0px); right:0; bottom:auto; height:var(--olivia-viewport-height,100dvh); max-height:100dvh; width:100%; border-radius:0; padding-bottom:env(safe-area-inset-bottom,0px); }
  .fm-olivia-header { padding:12px 12px 8px; padding-top:max(12px,env(safe-area-inset-top,0px)); }
  .fm-olivia-header h2 { font-size:23px; }
- .fm-olivia-voice-stage.is-active [role=img] { --orb-size:124px !important; }
+ .fm-olivia-voice-stage.is-active [role=img] { --orb-size:99.2px !important; }
  .fm-olivia-voice-stage { padding:10px 20px; }
  .fm-olivia-messages { padding:10px 14px; }
  .fm-olivia-composer { padding:10px 12px 8px; }
@@ -297,7 +297,7 @@
 }
 @media(max-height:600px) {
  .fm-olivia-voice-stage.is-active { flex-direction:row; padding:6px 16px; gap:14px; }
- .fm-olivia-voice-stage.is-active [role=img] { --orb-size:64px !important; }
+ .fm-olivia-voice-stage.is-active [role=img] { --orb-size:51.2px !important; }
  .fm-olivia-voice-stage__copy { text-align:left; }
  .fm-olivia-caption { max-height:36px; }
  .fm-olivia-welcome { padding:0; }
@@ -313,3 +313,34 @@
 @keyframes olivia-work-spin { to { transform:rotate(360deg); } }
 @keyframes olivia-work-slide { from { transform:translateX(-110%); } to { transform:translateX(300%); } }
 @media (prefers-reduced-motion:reduce) { .fm-olivia-working__spinner,.fm-olivia-working__bar::after { animation:none; } .fm-olivia-working__bar::after { width:100%; opacity:.6; } }
+
+/* Olivia presentation and session controls are scoped to this assistant. */
+.fm-olivia-sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+.fm-olivia-microphone-status { color:#536276;font-size:11px;letter-spacing:.02em; }
+.fm-olivia-preferences { padding:14px 20px;border-bottom:1px solid #e7eaf2;background:#f6f8fe; }
+.fm-olivia-preferences label { display:flex;align-items:center;gap:10px;min-height:44px;font-size:13px;color:#273651;cursor:pointer; }
+.fm-olivia-preferences input { width:18px;height:18px;accent-color:#6366f1;flex-shrink:0; }
+.fm-olivia-preferences small { display:block;color:#66728a;line-height:1.5;font-size:11px; }
+.fm-olivia-preferences-extras { display:flex;align-items:center;justify-content:space-between;padding:4px 20px;color:#536276;font-size:12px; }
+.fm-olivia-floating { position:fixed;z-index:950;right:max(20px,env(safe-area-inset-right));bottom:calc(24px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:8px;max-width:calc(100vw - 24px);padding:6px;border:1px solid #dce3f0;border-radius:28px;background:#fffffff5;box-shadow:0 12px 40px #1e30522b;backdrop-filter:blur(16px);color:#354369; }
+.fm-olivia-floating__open { border:0;padding:0;background:transparent;color:inherit;cursor:pointer;min-height:44px;border-radius:24px; }
+.fm-olivia-floating__open > span { border:0;box-shadow:none;background:transparent;--pill-font:12px;--pill-gap:6px; }
+.fm-olivia-floating { flex-wrap:wrap;justify-content:flex-end; }
+.fm-olivia-session-controls button[aria-pressed="false"] { color:#167258;background:#edf9f3; }
+.fm-olivia-session-controls { display:flex;align-items:center;gap:4px; }
+.fm-olivia-session-controls small { max-width:100px;font-size:10px;line-height:1.4;color:#536276; }
+.fm-olivia-floating:not(.fm-olivia-floating--controls) .fm-olivia-session-controls small { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }
+.fm-olivia-session-controls button { min-height:44px;min-width:44px; }
+.fm-olivia-session-controls button:last-child { margin-left:10px;border-left:1px solid #dde4f0;color:#9e4054; }
+.fm-olivia-recovery { padding:8px 20px;color:#6c5373;font-size:12px; }
+.fm-olivia-recovery p { margin:0 0 6px; }
+.fm-olivia-floating button:focus-visible,.fm-olivia-preferences input:focus-visible { outline:3px solid #818cf8;outline-offset:3px; }
+.fm-olivia-header { gap:4px; }
+.fm-olivia-identity { flex:1;min-width:66px; }
+.fm-olivia-message--assistant { border-radius:6px 20px 20px 20px; }
+.fm-olivia-message--user { border-radius:20px 6px 20px 20px; }
+@media (max-width:600px) {
+ .fm-olivia-floating { right:max(12px,env(safe-area-inset-right));bottom:calc(84px + env(safe-area-inset-bottom,0px)); }
+ .fm-olivia-header { padding-left:16px;padding-right:10px; }
+ .fm-olivia-header button { min-width:40px; }
+}
