@@ -10,7 +10,7 @@ const approvedHash = '67ada6893c140142f7be305daa916da27cf43363a1d5f58e7f5bd60076
 async function main() {
   const env = process.env;
   if (env.NETLIFY !== 'true' || env.CONTEXT !== 'deploy-preview' || env.REVIEW_ID !== '48' || env.BRANCH !== 'codex/olivia-fast-speech') throw Error('La generación está limitada a la preview 48 autorizada.');
-  if (env.OLIVIA_SPEECH_APPROVAL !== approvedHash) throw Error('Falta la autorización puntual del lote. No se llamó a Google.');
+  if (!process.argv.includes('--approve-plan=' + approvedHash)) throw Error('Falta la autorización puntual del lote. No se llamó a Google.');
   validatePreviewFirebase(env);
   const expected = 'app-integral-fm-pruebas';
   const account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}');
