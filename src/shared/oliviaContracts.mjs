@@ -211,6 +211,7 @@ export function defaultOliviaConfiguration(env = {}) {
     routing: { toolThreshold: 6, entityThreshold: 5, rowThreshold: 500, documentThreshold: 2 },
     responseLimits: { maxOutputTokens: 2400, maxToolCalls: 12, maxRounds: 8, timeoutMs: 45000, providerTimeoutMs: 20000 },
     voiceProtocol: "chirp",
+    conversationLatency: { enabled: true, transcriptionDelay: "minimal" },
     naturalVoice: {
       enabled: true,
       voice: "es-US-Chirp3-HD-Aoede",
@@ -259,6 +260,8 @@ export function validateConfiguration(value) {
   // The old values remain readable so an in-flight legacy session can settle,
   // but cannot select a conversational engine. New sessions use Chirp only.
   clean.voiceProtocol = "chirp";
+  clean.conversationLatency = { ...defaults.conversationLatency, ...clean.conversationLatency };
+  validateSchema(clean.conversationLatency, { type: "object", additionalProperties: false, required: ["enabled", "transcriptionDelay"], properties: { enabled: { type: "boolean" }, transcriptionDelay: { type: "string", enum: ["minimal", "low"] } } });
   delete clean.liveUsdPerMinute;
   // Read-time migration only: old expensive administrative profiles cannot
   // silently survive the new policy. No production document is rewritten.

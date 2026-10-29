@@ -1,12 +1,14 @@
 import { createOliviaTransport } from '../../../src/gestion/olivia/client.mjs';
 import { voiceVersion, chooseLocalGreeting } from '../../../src/shared/oliviaFastSpeech.mjs';
+import {instantConversation} from '../../../src/shared/oliviaConversationRouter.mjs';
+import {streamFrame} from '../../../src/shared/oliviaStream.mjs';
 const params=new URLSearchParams(location.search);
-export const qaTraffic={live:0,transcribe:0,tts:0,selector:0,private:0,clips:0};
+export const qaTraffic={live:0,transcribe:0,tts:0,selector:0,private:0,clips:0,foreground:0};
 export const countTraffic=kind=>{qaTraffic[kind]++;window.dispatchEvent(new Event('olivia:qa-traffic'));};
 const conversationId = 'a1234567-1234-4234-8234-123456789012';
 let messages = [], pendingAction = null;
 const jobs = new Map();
-const state = () => ({ conversationId, messages, pendingAction, enabled: true, providerConfigured: true, googleTtsConfigured: true, voiceConversationAvailable: !params.has('voiceDisabled'), audioLimits: { maxSeconds: 60, maxBytes: 4194304 }, voiceSettings: { turnEndSilenceMs: 1900,voice:'es-US-Chirp3-HD-Aoede',speakingRate:1,...(params.has('live')?{transcriptionModel:'gpt-live-transcribe'}:{}) }, state: pendingAction ? 'ESPERANDO_CONFIRMACION' : 'INFORMACION', usage: { unlimited: true }, estimate: null });
+const state = () => ({ conversationId, messages, pendingAction, enabled: true, providerConfigured: true, googleTtsConfigured: true, voiceConversationAvailable: !params.has('voiceDisabled'), audioLimits: { maxSeconds: 60, maxBytes: 4194304 }, voiceSettings: { latencyMode:params.get('latency')==='v3',turnEndSilenceMs: 1900,voice:'es-US-Chirp3-HD-Aoede',speakingRate:1,...(params.has('live')?{transcriptionModel:'gpt-live-transcribe'}:{}) }, state: pendingAction ? 'ESPERANDO_CONFIRMACION' : 'INFORMACION', usage: { unlimited: true }, estimate: null });
 export const oliviaClient = createOliviaTransport({ getToken: async () => 'synthetic-only', pollIntervalMs: 200, fetchImpl: async (url, init) => {
   if(url.includes('live-transcribe')) {
     countTraffic('live');
@@ -25,6 +27,13 @@ export const oliviaClient = createOliviaTransport({ getToken: async () => 'synth
   const b = JSON.parse(init.body);
   if (['state', 'resume'].includes(b.operation)) return Response.json(state());
   if (b.operation === 'estimate') return Response.json({ estimate: null });
+  if (b.operation==='cancelTurn')return Response.json({cancelled:true});
+  if(b.operation==='chat' && b.stream===true){
+    countTraffic('foreground');const input={id:'user-'+b.requestId,role:'user',content:b.message};
+    const content=instantConversation(b.message)?.text||chooseLocalGreeting(b.message)?.text||'Almendras: 31 unidades en el local de prueba.';
+    messages=[...messages,input,{id:'assistant-'+b.requestId,role:'assistant',content,voiceTranscript:content}];
+    return new Response(new ReadableStream({start(controller){for(const event of [{type:'accepted',conversationId,message:input},{type:'voice.ready',text:content},{type:'completed',result:{...state(),spokenText:content,telemetry:{route:instantConversation(b.message)?'instant':'quick-read',modelCalls:0,toolCalls:instantConversation(b.message)?0:1}}}])controller.enqueue(streamFrame(event));controller.close();}}),{headers:{'content-type':'text/event-stream'}});
+  }
   if (b.operation === 'history') {
     if (b.conversationId) return Response.json({ selectedConversation: { messages: Array.from({ length: 20 }, (_, i) => ({ id: 'archived-'+i, role: i % 2 ? 'assistant' : 'user', content: 'Mensaje anterior sintético ' + (i + 1) + '. Historial de prueba para verificar scroll sin botones.' })), nextCursor: null } });
     return Response.json({ conversations: [{ id: conversationId, title: 'Conversación de prueba', updatedAt: new Date().toISOString() }], conversationsCursor: null });

@@ -27,6 +27,7 @@ import "../../../src/styles/seller-pos.css";
 import OliviaAssistant from '../../../src/gestion/olivia/OliviaAssistant';
 import { FixtureModule } from './mocks';
 import { speechClips, voiceVersion } from '../../../src/shared/oliviaFastSpeech.mjs';
+import {conversationClips} from '../../../src/shared/oliviaConversationRouter.mjs';
 import { qaTraffic, countTraffic } from './service.mjs';
 function Traffic(){const [,refresh]=React.useState(0);React.useEffect(()=>{const update=()=>refresh(x=>x+1);window.addEventListener('olivia:qa-traffic',update);return()=>window.removeEventListener('olivia:qa-traffic',update);},[]);return <output aria-label="Tráfico sintético">{JSON.stringify(qaTraffic)}</output>;}
 
@@ -36,10 +37,10 @@ if(qaParams.has('live'))window.RTCPeerConnection=class {
   addTrack(track){this.track=track;}
   createDataChannel(){return this.channel={readyState:'open',send:raw=>{
     const event=JSON.parse(raw);
-    if(event.type==='input_audio_buffer.clear') {this.item='item-'+Math.random().toString(16).slice(2);this.partialTimer=setTimeout(()=>this.channel.onmessage?.({data:JSON.stringify({type:'conversation.item.input_audio_transcription.delta',item_id:this.item,delta:'Hola'})}),200);}
+    if(event.type==='input_audio_buffer.clear') {this.item='item-'+Math.random().toString(16).slice(2);this.partialTimer=setTimeout(()=>this.channel.onmessage?.({data:JSON.stringify({type:'conversation.item.input_audio_transcription.delta',item_id:this.item,delta:qaParams.has('wellbeing')?'Olivia, ¿cómo estás?':qaParams.has('stockRead')?'¿Cuántas almendras quedan?':'Hola'})}),200);}
     if(event.type==='input_audio_buffer.commit') {
       this.channel.onmessage?.({data:JSON.stringify({type:'input_audio_buffer.committed',item_id:this.item})});
-      const transcript=qaParams.has('greeting')?'Hola':qaParams.has('slowVoice')?'Hola, revisame las ventas. Consulta lenta de prueba.':'Hola, revisame las ventas';
+      const transcript=qaParams.has('wellbeing')?'Olivia, ¿cómo estás?':qaParams.has('stockRead')?'¿Cuántas almendras quedan?':qaParams.has('greeting')?'Hola':qaParams.has('slowVoice')?'Hola, revisame las ventas. Consulta lenta de prueba.':'Hola, revisame las ventas';
       this.finalTimer=setTimeout(()=>this.channel.onmessage?.({data:JSON.stringify({type:'conversation.item.input_audio_transcription.completed',item_id:this.item,transcript})}),30);
     }
   },close(){}};}
@@ -53,7 +54,7 @@ if(qaParams.get('clips')==='ready') {
   for(let i=0;i<pcm.length;i++)pcm[i]=Math.sin(i/12)*3000;
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',pcm.buffer)),x=>x.toString(16).padStart(2,'0')).join('');
   const fetchOriginal=window.fetch.bind(window);
-  window.fetch=(url,options)=>{if(String(url).startsWith('/olivia-speech/')){if(!String(url).endsWith('manifest.json'))countTraffic('clips');return Promise.resolve(String(url).endsWith('manifest.json')?Response.json({voiceVersion:version,libraryVersion:'1.0.0',entries:speechClips.map(clip=>({id:clip.id,status:'ready',url:`/olivia-speech/${version}/${clip.id}.pcm`,codec:'pcm_s16le',sampleRate:24000,checksum:digest}))}):new Response(pcm));}return fetchOriginal(url,options);};
+  window.fetch=(url,options)=>{if(String(url).startsWith('/olivia-speech/')){if(!String(url).endsWith('manifest.json'))countTraffic('clips');const entries=String(url).endsWith('conversation-manifest.json')?conversationClips:speechClips;return Promise.resolve(String(url).endsWith('manifest.json')?Response.json({voiceVersion:version,libraryVersion:'1.0.0',entries:entries.map(clip=>({id:clip.id,status:'ready',url:`/olivia-speech/${version}/${clip.id}.pcm`,codec:'pcm_s16le',sampleRate:24000,checksum:digest}))}):new Response(pcm));}return fetchOriginal(url,options);};
 }
 
 // Synthetic WebAudio input/output only. No system microphone permission and no

@@ -70,11 +70,8 @@ async function liveProduct(session, args, store, context) {
       context,
       store,
     ),
-    location = await permittedLocation(session, locationId, store),
-    product = await store.get(`products/${args.productId}`),
-    item = await store.get(
-      `locationStock/${locationId}/items/${args.productId}`,
-    );
+    location = await permittedLocation(session, locationId, store);
+  const [product,item]=await Promise.all([store.get(`products/${args.productId}`),store.get(`locationStock/${locationId}/items/${args.productId}`)]);
   if (
     !product ||
     product.active === false ||
@@ -146,8 +143,7 @@ export async function runTool({
         ...new Set([q, q.charAt(0).toLocaleUpperCase("es") + q.slice(1)]),
       ];
       const result = [];
-      for (const prefix of variants) {
-        const docs = await store.query(
+      const pages=await Promise.all(variants.map(prefix=>store.query(
           "products",
           prefix
             ? [
@@ -156,7 +152,8 @@ export async function runTool({
               ]
             : [],
           30,
-        );
+        )));
+      for (const docs of pages) {
         for (const p of docs)
           if (!p.deleted && p.active !== false)
             result.push({
@@ -188,10 +185,7 @@ export async function runTool({
     const variants = [
       ...new Set([q, q.charAt(0).toLocaleUpperCase("es") + q.slice(1)]),
     ];
-    const items = [];
-    for (const prefix of variants)
-      items.push(
-        ...(await store.query(
+    const items = (await Promise.all(variants.map(prefix=>store.query(
           `locationStock/${locationId}/items`,
           prefix
             ? [
@@ -200,8 +194,7 @@ export async function runTool({
               ]
             : [],
           30,
-        )),
-      );
+        )))).flat();
     const unique = [...new Map(items.map((i) => [i.id, i])).values()]
       .filter((i) => !i.deleted && i.active !== false && !i.productDeleted)
       .slice(0, 30);

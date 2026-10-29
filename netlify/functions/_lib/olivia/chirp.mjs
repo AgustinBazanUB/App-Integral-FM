@@ -43,7 +43,8 @@ async function reserveCharacters({ store, session, config, requestId, characters
   return { requestPath, period };
 }
 
-export async function synthesizeChirp({ request, session, store, engine, env = process.env, createClient = () => chirpClient(env), now = new Date() }) {
+export async function synthesizeChirp({ request, session, store, engine, env = process.env, createClient = () => chirpClient(env), now = new Date(), onTiming = metric => console.info('olivia.tts_timing',metric) }) {
+  const startedAt=Date.now();let firstPacketMs=null;
   if (request.method !== "POST") throw oliviaError("method-not-allowed", "Método no permitido.", 405);
   if (!canUseOliviaVoice(session)) throw oliviaError("voice-not-enabled", "La conversación por voz sigue limitada a la prueba administrativa.", 403);
   const config = await engine.configuration();
@@ -73,6 +74,7 @@ export async function synthesizeChirp({ request, session, store, engine, env = p
   const finalize = async (status) => {
     if (ended) return;
     ended = true;
+    onTiming({requestId,firstPacketMs,totalMs:Date.now()-startedAt,characters:text.length,status,sampleRate:24000});
     try { await store.commit([
       { type: "update", path: reservation.requestPath, data: { status, completedAt: new Date() } },
       { type: "update", path: `oliviaUsage/${session.uid}_${requestId}`, data: { success: status === "completed", ...(status === "completed" ? {} : { errorCode: `chirp-${status}` }) } },
@@ -81,7 +83,7 @@ export async function synthesizeChirp({ request, session, store, engine, env = p
   const bodyStream = new ReadableStream({
     start(controller) {
       upstream.on("data", (frame) => {
-        if (frame.audioContent?.length) controller.enqueue(new Uint8Array(frame.audioContent));
+        if (frame.audioContent?.length) {firstPacketMs??=Date.now()-startedAt;controller.enqueue(new Uint8Array(frame.audioContent));}
       });
       upstream.on("end", () => { finalize("completed"); try { controller.close(); } catch {} });
       upstream.on("error", () => { finalize("provider-error"); try { controller.error(new Error("La voz no pudo sintetizarse.")); } catch {} });

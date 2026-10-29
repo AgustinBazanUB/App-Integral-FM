@@ -12,7 +12,7 @@ export function latestInstruction(message = "") {
 
 export function requestedTaskIntent(message = "") {
   const text = latestInstruction(message);
-  if (!/carg|crea|registra|agrega|ingresa|dar de alta|alta de|quiero.*cliente/.test(text)) return null;
+  if (!/carg|crea|registra|agrega|ingresa|dar de alta|alta de/.test(text)) return null;
   if (/campana|publicacion|post |reel|anuncio/.test(text)) return null;
   if (/\bcliente\b/.test(text)) return "prepare_customer_create";
   if (/transfer|traslad/.test(text)) return "prepare_stock_transfer";

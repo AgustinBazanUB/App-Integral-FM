@@ -1,4 +1,4 @@
-export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceConfiguration, telemetry, money }) {
+export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceConfiguration, telemetry, turnTrace, money }) {
   const ms = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
   const percentiles=value=>`${ms(value?.medianMs)} / ${ms(value?.p90Ms)} / ${ms(value?.p95Ms)}`;
   const rows = [
@@ -19,14 +19,22 @@ export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMe
     ["Silencio de fin de turno · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.silence)],
     ["Detección → transcripción final · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.turnToTranscript)],
     ["Fin real de voz → transcripción · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.voiceEndToTranscript)],
-    ["Selector Luna NONE · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.selection)],
+    ['Fin de voz → primer audio útil · P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.voiceEndToUsefulAudio)],
+    ['Fin de voz → audio final completo · P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.voiceEndToComplete)],
+    ['Charla breve · primer audio útil P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.['instant.voiceEndToUsefulAudio'])],
+    ['Lectura · primer audio útil P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.['read.voiceEndToUsefulAudio'])],
+    ['Acción/consulta compleja · primer audio útil P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.['controlled.voiceEndToUsefulAudio'])],
+    ['HTTP hasta cabeceras · P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.httpHeaders)],
+    ['Servidor antes de cabeceras · P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.httpServer)],
+    ['Transporte/cola estimados · P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.httpTransportEstimate)],
+    ["Selección de intervención · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.selection)],
     ["Selector iniciado → clip disponible · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.fastAudioAvailable)],
     ["Turno confirmado → primera intervención · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.turnToFirstIntervention)],
     ["Selector · costo USD estimado mediano",money(voiceMetrics?.selectionCostUsd?.medianMs,'USD')],
     ["Transcripción → primer audio programado · mediana / P95 (ms)", `${ms(voiceMetrics?.transcriptToVoice?.medianMs)} / ${ms(voiceMetrics?.transcriptToVoice?.p95Ms)}`],
     ["TTFA programado · mediana / P95 (ms)", `${ms(voiceMetrics?.ttfaScheduled?.medianMs)} / ${ms(voiceMetrics?.ttfaScheduled?.p95Ms)}`],
     ["Última síntesis · caracteres / costo USD estimado", `${voiceMetrics?.lastCharacters ?? "—"} / ${money(voiceMetrics?.lastEstimatedCostUsd, "USD")}`],
-    ["Medición de audio", "Primer bloque programado por el navegador; no mide el inicio físico del altavoz"],
+    ["Medición de audio", "Primer bloque programado; no mide el inicio físico del altavoz. Transporte incluye colas y es estimado."],
     ["Backend: retrieval / proveedor / herramientas (ms)", `${ms(telemetry?.retrievalMs)} / ${ms(telemetry?.providerMs)} / ${ms(telemetry?.toolsMs)}`],
     ["Llamadas de modelo / herramientas", `${telemetry?.modelCalls ?? "—"} / ${telemetry?.toolCalls ?? "—"}`],
     ["Skills", telemetry?.skills?.map((skill) => `${skill.name}@${skill.version}`).join(", ") || "Ninguna en esta consulta"],
@@ -36,5 +44,5 @@ export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMe
     ["Costo de almacenamiento semántico", "Sin medición del proveedor"],
     ["Cotización", estimate?.reference ? `${money(estimate.reference.rate)} por USD · ${estimate.reference.date || "Manual"}` : "Sin cotización"],
   ];
-  return <section className="fm-olivia-developer" aria-label="Métricas de desarrollo"><h3>Métricas de desarrollo</h3><dl>{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>{telemetry?.retrievalWarning ? <p>{telemetry.retrievalWarning}</p> : null}{estimate?.reference?.source?.startsWith("https://") ? <a href={estimate.reference.source} target="_blank" rel="noreferrer">Fuente de cotización</a> : null}</section>;
+  return <section className="fm-olivia-developer" aria-label="Métricas de desarrollo"><h3>Métricas de desarrollo</h3><dl>{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>{[turnTrace,telemetry?.trace].filter(Boolean).map(trace=><details key={trace.origin}><summary>Traza del turno · {trace.origin==='client'?'navegador':'servidor'}</summary><p>Turno: {trace.id} · Solicitud: {trace.requestId || trace.id}</p><ol>{trace.events.map((event,index)=><li key={index}>{event.stage}: {ms(event.ms)} ms{event.tool?` · ${event.tool}`:''}{event.model?` · ${event.model}`:''}</li>)}</ol></details>)}{telemetry?.retrievalWarning ? <p>{telemetry.retrievalWarning}</p> : null}{estimate?.reference?.source?.startsWith("https://") ? <a href={estimate.reference.source} target="_blank" rel="noreferrer">Fuente de cotización</a> : null}</section>;
 }

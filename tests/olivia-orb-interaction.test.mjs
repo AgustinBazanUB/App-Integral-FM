@@ -54,7 +54,7 @@ test('dictation appends to a written draft and legacy short silence migrates wit
   assert.equal(legacy.naturalVoice.turnEndSilenceMs, 350);
 });
 
-function voiceFixture({ denied = false } = {}) {
+function voiceFixture({ denied = false, adaptiveEndpointing = false } = {}) {
   let now = 0, amplitude = 0, requested = 0;
   const trackEvents = new Map(), contextEvents = new Map();
   const frames = [], turns = [], levels = [], tracks = [{ enabled: true, stop() { this.stopped = true; }, addEventListener(type, fn) { trackEvents.set(type, fn); }, removeEventListener(type) { trackEvents.delete(type); } }];
@@ -68,7 +68,7 @@ function voiceFixture({ denied = false } = {}) {
     createMediaStreamSource: () => ({ connect() {}, disconnect() {} }),
     createAnalyser: () => ({ fftSize: 1024, connect() {}, disconnect() {}, getFloatTimeDomainData(samples) { samples.fill(amplitude); } }) };
   const errors = [];
-  const voice = new NaturalVoiceConversation({ Recorder, AudioContext: class { constructor() { return context; } },
+  const voice = new NaturalVoiceConversation({ Recorder,adaptiveEndpointing, AudioContext: class { constructor() { return context; } },
     mediaDevices: { getUserMedia: async () => { requested++; if (denied) throw new DOMException('Denied', 'NotAllowedError'); return { getAudioTracks: () => tracks, getTracks: () => tracks }; } },
     frame: fn => { frames.push(fn); return frames.length; }, cancelFrame() {}, now: () => now,
     onTurn: (blob, metadata) => turns.push({ blob, metadata }), onFrame: frame => levels.push(frame), onError: error => errors.push(error) });

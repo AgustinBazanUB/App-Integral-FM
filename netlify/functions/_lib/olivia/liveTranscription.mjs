@@ -4,7 +4,7 @@ import { canUseOliviaVoice } from '../../../../src/shared/oliviaVoiceAvailabilit
 import { assertConversationOwner, sessionBinding } from './conversations.mjs';
 import { hangupCall } from './voice.mjs';
 export const LIVE_TRANSCRIPTION_LIMIT_SECONDS=180;
-export const liveTranscriptionConfig=()=>({type:'transcription',audio:{input:{transcription:{model:'gpt-live-transcribe',languages:['es'],delay:'low',prompt:'Conversación en español argentino de Flor Mía sobre productos, stock, ventas y envíos.'},turn_detection:null}}});
+export const liveTranscriptionConfig=(delay='low')=>({type:'transcription',audio:{input:{transcription:{model:'gpt-live-transcribe',languages:['es'],delay,keywords:['Flor Mía','Arbequina','Arbosana','almendras','dietética'],prompt:'Conversación en español argentino de Flor Mía sobre productos, stock, ventas y envíos.'},turn_detection:null}}});
 export async function liveTranscriptionSession({session,store,engine,body,env=process.env,fetchImpl=fetch,now=new Date()}) {
   if(!canUseOliviaVoice(session))throw oliviaError('voice-not-enabled','La voz sigue limitada a la prueba administrativa.',403);
   const config=await engine.configuration();
@@ -48,7 +48,7 @@ export async function liveTranscriptionSession({session,store,engine,body,env=pr
   });
   if(previous)return {sdp:previous.answer,requestId:identity,maxSessionSeconds:LIVE_TRANSCRIPTION_LIMIT_SECONDS,model:'gpt-live-transcribe'};
   try {
-    const form=new FormData();form.set('sdp',body.sdp);form.set('session',JSON.stringify(liveTranscriptionConfig()));
+    const form=new FormData();form.set('sdp',body.sdp);form.set('session',JSON.stringify(liveTranscriptionConfig(config.conversationLatency.enabled ? config.conversationLatency.transcriptionDelay : 'low')));
     const response=await fetchImpl('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},body:form,signal:AbortSignal.timeout(12000)});
     const answer=await response.text(),location=response.headers.get('location') || '',callId=location.split('/').at(-1);
     if(!response.ok || !answer.startsWith('v=0') || !/^rtc_[A-Za-z0-9_-]+$/.test(callId))throw oliviaError('live-transcription-unavailable','No pude conectar la transcripción en vivo. Podés continuar con dictado por turnos.',503);

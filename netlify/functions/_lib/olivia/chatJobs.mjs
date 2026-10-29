@@ -60,7 +60,7 @@ export async function chatJobStatus({ store, session, body, now = new Date() }) 
     });
     job = await store.get(path);
   }
-  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase, text: job.text || "", voiceText: job.voiceText || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
+  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase,tools:(job.tools || []).filter(tool=>/^[a-z_]{1,80}$/.test(tool)).slice(0,12), text: job.text || "", voiceText: job.voiceText || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
 }
 export async function activeChatJob({ store, session, conversationId }) {
   const conversation = await store.get(`oliviaConversations/${conversationId}`);

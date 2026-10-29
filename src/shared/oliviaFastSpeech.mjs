@@ -5,7 +5,7 @@ export const speechClips = library.clips;
 export const speechTemplates = library.personalized_templates;
 export const normalizeSpeech = text => String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[¿?¡!.,;:]/g, ' ').replace(/\s+/g, ' ').trim();
 export const voiceVersion = ({ voice, speakingRate = 1 }) => `${voice}-r${speakingRate}-pcm24k-v1`;
-export const isGreetingOnly = text => /^(?:(?:hola|buenas|buen dia|buenos dias|buenas tardes|buenas noches|hey)(?: olivia)?|hola como (?:va|estas)|como andas)$/.test(normalizeSpeech(text));
+export const isGreetingOnly = text => /^(?:(?:hola|buenas|buen dia|buenos dias|buenas tardes|buenas noches|hey)(?: olivia)?|hola como (?:va|estas)|como andas)$/.test(normalizeSpeech(text).replace(/^olivia /,''));
 export function speechIntent(text) {
   const value = normalizeSpeech(text);
   if (isGreetingOnly(text)) return 'greeting';

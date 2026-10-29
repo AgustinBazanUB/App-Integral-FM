@@ -6,8 +6,10 @@ document.querySelector('#search').addEventListener('input', event => { const q=e
 try {
   const response = await fetch('./es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/manifest.json', {cache:'no-cache'});
   if (!response.ok) throw Error('Biblioteca no disponible.');
-  const manifest = await response.json(), ready = manifest.entries.filter(entry => entry.status === 'ready');
-  status.textContent = `${ready.length} de 90 frases listas · Chirp 3 HD · Aoede · Velocidad ${manifest.speakingRate}`;
+  const manifest = await response.json();let extra=null;
+  try{const more=await fetch('./es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/conversation-manifest.json',{cache:'no-cache'});if(more.ok)extra=await more.json();}catch{}
+  const ready = [...manifest.entries,...(extra?.voiceVersion===manifest.voiceVersion?extra.entries || []:[])].filter(entry => entry.status === 'ready');
+  status.textContent = `${ready.length} frases listas · Chirp 3 HD · Aoede · Velocidad ${manifest.speakingRate}`;
   for (const entry of ready) {
     const card = document.createElement('article'), category = document.createElement('small'), text = document.createElement('p'), button = document.createElement('button');
     card.className = 'clip'; category.textContent = entry.category.replaceAll('_',' ') + ' · ' + (entry.durationMs / 1000).toFixed(1) + ' s'; text.textContent = entry.text; button.type='button'; button.textContent='▶ Escuchar'; button.setAttribute('aria-label','Escuchar: '+entry.text);

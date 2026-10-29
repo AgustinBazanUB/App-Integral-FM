@@ -1,11 +1,11 @@
 import { voiceVersion, speechClips } from '../../shared/oliviaFastSpeech.mjs';
 
 export class SpeechClipCache {
-  constructor({ voice, userId, fetchImpl=(...args)=>globalThis.fetch(...args), privateAudio, preparePrivate, digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('') }) {
-    Object.assign(this,{voice,userId,fetchImpl,privateAudio,preparePrivate,digest});this.version=voiceVersion(voice);this.memory=new Map();this.ready=new Map();this.prepared=new Set();this.controller=new AbortController();
+  constructor({ voice, userId, conversation=false, fetchImpl=(...args)=>globalThis.fetch(...args), privateAudio, preparePrivate, digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('') }) {
+    Object.assign(this,{voice,userId,fetchImpl,privateAudio,preparePrivate,digest,conversation});this.version=voiceVersion(voice);this.memory=new Map();this.ready=new Map();this.prepared=new Set();this.controller=new AbortController();
   }
   async manifest() {
-    this.manifestPromise ||= this.fetchImpl(`/olivia-speech/${this.version}/manifest.json`,{signal:this.controller.signal,cache:'no-cache'}).then(r=>r.ok?r.json():null).then(m=>m?.voiceVersion===this.version && m?.libraryVersion==='1.0.0'?m:null).catch(()=>null);
+    this.manifestPromise ||= Promise.all([this.fetchImpl(`/olivia-speech/${this.version}/manifest.json`,{signal:this.controller.signal,cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null),this.conversation?this.fetchImpl(`/olivia-speech/${this.version}/conversation-manifest.json`,{signal:this.controller.signal,cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null):null]).then(([main,extra])=>main?.voiceVersion===this.version && main?.libraryVersion==='1.0.0'?{...main,entries:[...main.entries,...(extra?.voiceVersion===this.version?extra.entries || []:[])]}:null).catch(()=>null);
     return this.manifestPromise;
   }
   async get(id,{prepare=true}={}) {
@@ -35,7 +35,7 @@ export class SpeechClipCache {
     if(this.memory.size>8){const oldest=this.memory.keys().next().value;this.memory.delete(oldest);this.ready.delete(oldest);}
     const bytes=await promise;if(!bytes)this.memory.delete(id);else if(!this.controller.signal.aborted)this.ready.set(id,bytes);return bytes;
   }
-  async warm() {await Promise.all([...['saludo_01','espera_real_01','espera_real_02'].map(id=>this.get(id)),...(this.privateAudio?[this.get('personalizada_01',{prepare:false})]:[])]);}
+  async warm() {await Promise.all([...['saludo_01','espera_real_01','espera_real_02',...(this.conversation?['bienestar_01','agradecimiento_01','despedida_01']:[])].map(id=>this.get(id)),...(this.privateAudio?[this.get('personalizada_01',{prepare:false})]:[])]);}
   peek(id){return this.ready.get(id) || null;}
   async response(choice) {
     let bytes=await this.get(choice.clip_id);

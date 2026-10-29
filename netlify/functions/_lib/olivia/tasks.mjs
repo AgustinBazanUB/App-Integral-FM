@@ -53,9 +53,13 @@ export function missingQuestion(fields = []) {
   return names.length ? `Me falta ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} y ${names.at(-1)}`}.` : "Revisá la propuesta antes de confirmar.";
 }
 export function shortVoiceQuestion(task, fallback) {
+  if(task?.intent==='prepare_customer_create' && task.status==='collecting' && task.missingFields?.includes('phone'))return 'Pasame el teléfono del cliente para preparar la ficha.';
   if (task?.intent !== "prepare_stock_load" || task.status !== "collecting" || Object.values(task.ambiguities || {}).some((options) => options?.length) || /no (?:pude|encontr)/i.test(fallback || "")) return fallback;
   const missing = task.missingFields || [];
-  if (missing.includes("productId") && missing.includes("locationId")) return "Ok. ¿Qué producto y en dónde querés cargarlo?";
+  if (missing.includes("productId") && missing.includes("locationId") && missing.includes("quantity")) return "¿Qué producto, cuántas unidades y en qué ubicación querés cargarlo?";
+  if (missing.includes("productId") && missing.includes("quantity")) return "¿Qué producto y cuántas unidades querés cargar?";
+  if (missing.includes("locationId") && missing.includes("quantity")) return "¿Cuántas unidades y en qué ubicación querés cargarlo?";
+  if (missing.includes("productId") && missing.includes("locationId")) return "¿Qué producto y en qué ubicación querés cargarlo?";
   if (missing.includes("productId")) return "¿Qué producto querés cargar?";
   if (missing.includes("locationId")) return "¿En qué ubicación querés cargarlo?";
   if (missing.includes("quantity")) return "¿Cuántas unidades querés cargar?";
@@ -84,8 +88,9 @@ export async function progressiveStock({ previous, initialId, message, context, 
   const continuation = previous?.intent === "prepare_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/\b(?:cliente|cancel[a-z]*|explic[a-z]*|ensen[a-z]*|queria decir|no me cargues)\b/.test(text) && !/^(ahora|consulta|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|mandame|transferi|vende|registra|crea|disena)/.test(text);
   if (!start && !continuation) return null;
   check();
-  let task = continuation ? structuredClone(previous) : { id: initialId || randomUUID(), intent: "prepare_stock_load", revision: 0, status: "collecting", slots: { locationId: null, productId: null, quantity: null, reason: null }, missingFields: [], ambiguities: {}, route: null, createdAt: now };
+  let task = continuation ? structuredClone(previous) : { id: initialId || randomUUID(), intent: "prepare_stock_load", revision: 0, status: "collecting", slots: { locationId: context.locationId || null, productId: null, quantity: null, reason: null }, missingFields: [], ambiguities: {}, route: null, createdAt: now };
   task.revision++; task.updatedAt = now; task.status = "collecting";
+  if(!task.slots.locationId && context.locationId)task.slots.locationId=context.locationId;
   const quantityCorrection = /^(?:no )?(?:mejor |eran |son |que sean |cambia a |corregi a )?(?:de )?(\d+)(?: unidades?| botellas?)?$/.exec(text);
   let productQuery = null, locationQuery = null;
   if (start) {

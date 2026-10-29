@@ -1,7 +1,8 @@
 import { can, normalizedRole } from "../../../../src/gestion/permissions.js";
 import { latestInstruction } from "./conversationTasks.mjs";
+import { latencyEnabled } from '../../../../src/shared/oliviaConversationRouter.mjs';
 
-export const MODEL_POLICY_VERSION = 2;
+export const MODEL_POLICY_VERSION = 3;
 export function classifyIntent(message = "", module = "") {
   const text = latestInstruction(message);
   if (/demanda|estima.*(?:vend|venta)|cuanto.*vender/.test(text)) return "demand.forecast";
@@ -50,7 +51,9 @@ export function routeModel(configuration, session, { message = "", context = {},
   const route = useCreative ? "sol-creative" : reasons.length ? "luna-complex" : "luna-normal";
   const creativeComplex = reasons.some((reason) => reason !== "active-creative-task") || (continuation && task.route.reasoningEffort === "xhigh");
   const profile = configuration.profiles[useCreative ? creativeComplex ? "creativeComplex" : "creative" : route === "luna-complex" ? "adminComplex" : seller ? "seller" : "adminDefault"];
-  return { ...profile, ...(seller && !useCreative ? { model: configuration.profiles.seller.model } : {}), intent: continuation ? task.intent : classifyIntent(message, module), route, routingReason: useCreative ? ["creative-intent-authorized-module", ...reasons].join(",") : reasons.join(",") || "routine-operation", policyVersion: MODEL_POLICY_VERSION };
+  const model = seller && !useCreative ? configuration.profiles.seller.model : profile.model;
+  const reasoning = latencyEnabled(configuration) && model === 'gpt-6-luna' && !useCreative ? (route === 'luna-normal' ? 'none' : 'medium') : profile.reasoningEffort;
+  return { ...profile, model, reasoningEffort:reasoning, intent: continuation ? task.intent : classifyIntent(message, module), route, routingReason: useCreative ? ["creative-intent-authorized-module", ...reasons].join(",") : reasons.join(",") || "routine-operation", policyVersion: MODEL_POLICY_VERSION };
 }
 
 export function aggregateRoutes(events = []) {

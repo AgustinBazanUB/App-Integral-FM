@@ -1,0 +1,371 @@
+{
+  "createdAt": "2026-10-29T22:03:27.306Z",
+  "baselineCommit": "d2d36b8407cd5acf49e09754dd6d1a1a443d7839",
+  "scope": "Local microphone/VAD simulation with actual before/after code; in-memory database and synthetic model responses. Not a real STT, network, hardware, or provider end-to-end latency measurement.",
+  "cases": 40,
+  "samples": [
+    {
+      "text": "Olivia, ¿cómo estás?",
+      "kind": "instant",
+      "maxWindow": 550,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 464
+    },
+    {
+      "text": "¿Cómo estás?",
+      "kind": "instant",
+      "maxWindow": 550,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 464
+    },
+    {
+      "text": "Hola Olivia, ¿cómo estás?",
+      "kind": "instant",
+      "maxWindow": 550,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 464
+    },
+    {
+      "text": "¿Cómo andás?",
+      "kind": "instant",
+      "maxWindow": 550,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 464
+    },
+    {
+      "text": "¿Todo bien?",
+      "kind": "instant",
+      "maxWindow": 550,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 464
+    },
+    {
+      "text": "Gracias",
+      "kind": "instant",
+      "maxWindow": 550,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 464
+    },
+    {
+      "text": "Muchas gracias, Olivia",
+      "kind": "instant",
+      "maxWindow": 550,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 464
+    },
+    {
+      "text": "Chau",
+      "kind": "instant",
+      "maxWindow": 550,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 464
+    },
+    {
+      "text": "Hasta luego",
+      "kind": "instant",
+      "maxWindow": 550,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 464
+    },
+    {
+      "text": "Nos vemos",
+      "kind": "instant",
+      "maxWindow": 550,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 464
+    },
+    {
+      "text": "¿Cuántas almendras quedan?",
+      "kind": "read",
+      "maxWindow": 900,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 704
+    },
+    {
+      "text": "¿Cuántas botellas de aceite hay?",
+      "kind": "read",
+      "maxWindow": 900,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 704
+    },
+    {
+      "text": "¿Cuántos frascos tenemos?",
+      "kind": "read",
+      "maxWindow": 900,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 704
+    },
+    {
+      "text": "Stock de almendras",
+      "kind": "read",
+      "maxWindow": 900,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 704
+    },
+    {
+      "text": "Decime el stock de arroz",
+      "kind": "read",
+      "maxWindow": 900,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 704
+    },
+    {
+      "text": "Mostrame el precio de almendras",
+      "kind": "read",
+      "maxWindow": 900,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 704
+    },
+    {
+      "text": "¿Cuánto sale aceite?",
+      "kind": "read",
+      "maxWindow": 900,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 704
+    },
+    {
+      "text": "¿Cuánto cuesta arroz?",
+      "kind": "read",
+      "maxWindow": 900,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 704
+    },
+    {
+      "text": "Precio de almendras en el local",
+      "kind": "read",
+      "maxWindow": 900,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 704
+    },
+    {
+      "text": "¿Cuántas almendras quedan en Tribunales?",
+      "kind": "read",
+      "maxWindow": 900,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 704
+    },
+    {
+      "text": "Cargá 20 botellas de Arbequina en el local",
+      "kind": "controlled",
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 912
+    },
+    {
+      "text": "Agregame 10 botellas de Arbosana",
+      "kind": "controlled",
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 1808
+    },
+    {
+      "text": "Creá un cliente",
+      "kind": "controlled",
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 1808
+    },
+    {
+      "text": "Registrá una venta",
+      "kind": "controlled",
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 1808
+    },
+    {
+      "text": "Mandá un WhatsApp al cliente",
+      "kind": "controlled",
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 1808
+    },
+    {
+      "text": "Sí",
+      "kind": "controlled",
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 960
+    },
+    {
+      "text": "No, no cargues stock",
+      "kind": "controlled",
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 960
+    },
+    {
+      "text": "Mejor cargá un cliente",
+      "kind": "controlled",
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 1808
+    },
+    {
+      "text": "Hola, revisame las ventas",
+      "kind": "controlled",
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 960
+    },
+    {
+      "text": "Explicame cómo cargar varios productos",
+      "kind": "controlled",
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 2000
+    },
+    {
+      "text": "Cargá 20 botellas de",
+      "kind": "unfinished",
+      "minWindow": 1800,
+      "beforeSilenceMs": 4000,
+      "afterSilenceMs": 2000
+    },
+    {
+      "text": "Agregá 10 de Arbequina y",
+      "kind": "unfinished",
+      "minWindow": 1800,
+      "beforeSilenceMs": 4000,
+      "afterSilenceMs": 2000
+    },
+    {
+      "text": "Quiero cargar tres productos",
+      "kind": "unfinished",
+      "minWindow": 1800,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 2000
+    },
+    {
+      "text": "Primero almendras y después",
+      "kind": "unfinished",
+      "minWindow": 1800,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 2000
+    },
+    {
+      "text": "Con el nombre de",
+      "kind": "unfinished",
+      "minWindow": 1800,
+      "beforeSilenceMs": 4000,
+      "afterSilenceMs": 2000
+    },
+    {
+      "text": "Cargá 20 de Arbequina, 10 de Arbosana y",
+      "kind": "unfinished",
+      "minWindow": 1800,
+      "beforeSilenceMs": 4000,
+      "afterSilenceMs": 2000
+    },
+    {
+      "text": "Mandalo al cliente que",
+      "kind": "unfinished",
+      "minWindow": 1800,
+      "beforeSilenceMs": 4000,
+      "afterSilenceMs": 2000
+    },
+    {
+      "text": "Botellas de",
+      "kind": "unfinished",
+      "minWindow": 1800,
+      "beforeSilenceMs": 4000,
+      "afterSilenceMs": 2000
+    },
+    {
+      "text": "El producto y la",
+      "kind": "unfinished",
+      "minWindow": 1800,
+      "beforeSilenceMs": 4000,
+      "afterSilenceMs": 2000
+    },
+    {
+      "text": "Cargame 12 de aceite,",
+      "kind": "unfinished",
+      "minWindow": 1800,
+      "beforeSilenceMs": 1904,
+      "afterSilenceMs": 1808
+    }
+  ],
+  "endpointing": {
+    "instant": {
+      "before": {
+        "count": 10,
+        "p50": 1904,
+        "p90": 1904,
+        "p95": 1904
+      },
+      "after": {
+        "count": 10,
+        "p50": 464,
+        "p90": 464,
+        "p95": 464
+      }
+    },
+    "read": {
+      "before": {
+        "count": 10,
+        "p50": 1904,
+        "p90": 1904,
+        "p95": 1904
+      },
+      "after": {
+        "count": 10,
+        "p50": 704,
+        "p90": 704,
+        "p95": 704
+      }
+    },
+    "controlled": {
+      "before": {
+        "count": 10,
+        "p50": 1904,
+        "p90": 1904,
+        "p95": 1904
+      },
+      "after": {
+        "count": 10,
+        "p50": 1808,
+        "p90": 1808,
+        "p95": 2000
+      }
+    },
+    "unfinished": {
+      "before": {
+        "count": 10,
+        "p50": 4000,
+        "p90": 4000,
+        "p95": 4000
+      },
+      "after": {
+        "count": 10,
+        "p50": 2000,
+        "p90": 2000,
+        "p95": 2000
+      }
+    }
+  },
+  "serverAdapter": {
+    "scope": "Wall-clock time in this computer, in-memory Firestore and model stubs",
+    "before": {
+      "count": 12,
+      "p50": 6.961900000000014,
+      "p90": 9.55740000000003,
+      "p95": 21.109699999999975
+    },
+    "after": {
+      "count": 12,
+      "p50": 3.254599999999982,
+      "p90": 3.7805000000000177,
+      "p95": 4.2149
+    },
+    "beforeModelCalls": [
+      2
+    ],
+    "afterModelCalls": [
+      0
+    ]
+  },
+  "realEndToEnd": {
+    "p50": null,
+    "p90": null,
+    "p95": null,
+    "reason": "Requires real user audio, provider access and device trials; reported 3/7/10 seconds are user observations, not instrumented baseline samples."
+  },
+  "providerCost": {
+    "instantCachedTtsUsd": 0,
+    "instantLlmUsd": 0,
+    "typedReadLlmUsd": 0,
+    "dynamicTtsUsdPerMillionCharacters": 30,
+    "liveTranscriptionUsdPerMinute": 0.017,
+    "measuredLiveInvoiceUsd": null
+  }
+}

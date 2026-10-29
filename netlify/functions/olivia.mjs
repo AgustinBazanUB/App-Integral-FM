@@ -2,11 +2,12 @@ import { createOliviaStore } from "./_lib/olivia/store.mjs";
 import { resolveOliviaPricing } from "./_lib/olivia/pricing.mjs";
 import { createOliviaEngine } from "./_lib/olivia/engine.mjs";
 import { oliviaSession, json, errorResponse } from "./_lib/olivia/http.mjs";
-import { oliviaError } from "../../src/shared/oliviaContracts.mjs";
+import { oliviaError,safeId } from "../../src/shared/oliviaContracts.mjs";
 import { chatStream } from "./_lib/olivia/stream.mjs";
 import { startChatJob, chatJobStatus, activeChatJob, cancelChatJob } from "./_lib/olivia/chatJobs.mjs";
 import { captureOliviaFailure, sendOliviaErrorReport } from "./_lib/olivia/errorReports.mjs";
 export default async function handler(request) {
+  const receivedAt=Date.now(),timed=response=>{response.headers.set('X-Olivia-Server-Ms',String(Date.now()-receivedAt));return response;};
   if (request.method !== "POST")
     return json(
       { code: "method-not-allowed", message: "Método no permitido." },
@@ -33,7 +34,7 @@ export default async function handler(request) {
     const engine = createOliviaEngine({ store, pricingResolver: resolveOliviaPricing });
     if (body.operation === "chat" && body.stream === true) {
       const stream = chatStream((options) => engine.chat(session, body, options));
-      return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+      return timed(new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } }));
     }
     let result;
     if (body.operation === "startChat") result = await startChatJob({ store, engine, session, body, dispatch: async jobId => {
@@ -42,6 +43,7 @@ export default async function handler(request) {
     } });
     else if (body.operation === "chatStatus") result = await chatJobStatus({ store, session, body });
     else if (body.operation === "cancelChat") result = await cancelChatJob({ store, session, body });
+    else if (body.operation === 'cancelTurn') {await engine.invalidateTask(session,body.conversationId,safeId(body.requestId));result={cancelled:true};}
     else if (body.operation === "reportError") result = await sendOliviaErrorReport({ store, session, body });
     else if (body.operation === "state")
       result = await engine.state(
@@ -69,7 +71,7 @@ export default async function handler(request) {
       result = await engine.saveConfiguration(session, body);
     else throw oliviaError("invalid-operation", "Operación no disponible.");
     if (["state", "resume"].includes(body.operation) && result.conversationId) result.activeChatJob = await activeChatJob({ store, session, conversationId: result.conversationId });
-    return json(result);
+    return timed(json(result));
   } catch (error) {
     if (session && store && ["chat", "tool", "confirm", "startChat"].includes(body?.operation) && !error.reportId) {
       try { await captureOliviaFailure({ store, session, error, operation: body.operation, conversationId: body.conversationId, requestId: body.requestId }); } catch { /* Keep the original failure if diagnostics storage is unavailable. */ }
@@ -79,6 +81,6 @@ export default async function handler(request) {
       status: error.status || 500,
       userId: session?.uid || null,
     });
-    return errorResponse(error);
+    return timed(errorResponse(error));
   }
 }

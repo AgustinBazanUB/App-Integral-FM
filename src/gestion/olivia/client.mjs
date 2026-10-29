@@ -65,7 +65,8 @@ export function prependHistoryMessages(older, current) {
 }
 
 export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, timeoutMs = 60000, pollIntervalMs = 2000 }) {
-  const send = async (endpoint, body, { signal, isForm = false, keepalive = false, onEvent } = {}) => {
+  const send = async (endpoint, body, { signal, isForm = false, keepalive = false, onEvent, onTiming } = {}) => {
+    const requestedAt=performance.now();
     const token = await getToken();
     if (!token) throw new Error("Iniciá sesión para usar Olivia.");
     const controller = new AbortController();
@@ -80,6 +81,8 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
         headers: { Authorization: `Bearer ${token}`, ...(!isForm ? { "Content-Type": "application/json" } : {}) },
         body: isForm ? body : JSON.stringify(body),
       });
+      const header=response.headers?.get?.('X-Olivia-Server-Ms'),serverMs=header==null?null:Number(header),durationMs=performance.now()-requestedAt;
+      onTiming?.({durationMs,serverMs:Number.isFinite(serverMs)?serverMs:null,transportEstimateMs:Number.isFinite(serverMs)?Math.max(0,durationMs-serverMs):null});
       if (response.ok && onEvent && response.headers.get("content-type")?.includes("text/event-stream")) {
         let result;
         await readEventStream(response.body, (event) => {
@@ -112,7 +115,7 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
     if (signal?.aborted) abort();
   });
   const waitForChat = async (jobId, options = {}) => {
-    let acceptedId = null, text = "", voiceText = "", phase = "", failures = 0;
+    let acceptedId = null, text = "", voiceText = "", phase = "", toolState='', failures = 0;
     const started = Date.now();
     options.onEvent?.({ type: "job", jobId });
     // The backend owns the job deadline. Polling delays or a transient disconnect
@@ -120,7 +123,7 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
     while (true) {
       options.signal?.throwIfAborted();
       let status;
-      try { status = await send("/.netlify/functions/olivia", { operation: "chatStatus", jobId }, { signal: options.signal }); failures = 0; }
+      try { status = await send("/.netlify/functions/olivia", { operation: "chatStatus", jobId }, { signal: options.signal,onTiming:options.onTiming }); failures = 0; }
       catch (error) {
         if (!["olivia-network-error", "olivia-timeout"].includes(error.code) && !(error.status >= 500)) throw error;
         failures++;
@@ -130,7 +133,8 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
       if (status.accepted && acceptedId !== status.accepted.id) { acceptedId = status.accepted.id; options.onEvent?.({ type: "accepted", conversationId: status.conversationId, message: status.accepted }); }
       const elapsed = Date.now() - started;
       const nextPhase = elapsed > 20000 ? "Estoy terminando de procesarla…" : elapsed > 9000 ? "Sigo trabajando en tu consulta…" : status.phase || "Olivia está pensando…";
-      if (nextPhase !== phase || !status.text.startsWith(text)) { phase = nextPhase; if (!status.text.startsWith(text)) text = ""; options.onEvent?.({ type: "phase", label: phase, ...(text === "" ? { tools: [] } : {}) }); }
+      const tools=JSON.stringify(status.tools || []);
+      if (nextPhase !== phase || tools!==toolState || !status.text.startsWith(text)) { phase = nextPhase;toolState=tools; if (!status.text.startsWith(text)) text = ""; options.onEvent?.({ type: "phase", label: phase, tools:status.tools || [] }); }
       if (status.text !== text) { options.onEvent?.({ type: "delta", delta: status.text.slice(text.length) }); text = status.text; }
       if (status.voiceText && status.voiceText !== voiceText) { voiceText = status.voiceText; options.onEvent?.({ type: "voice.ready", text: voiceText }); }
       if (status.status === "completed") return status.result;
@@ -145,7 +149,7 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
       if (payload.operation === "chat" && payload.background === true) {
         let started;
         for (let attempt = 0; attempt < 3; attempt++) {
-          try { started = await send("/.netlify/functions/olivia", { ...payload, operation: "startChat" }, { signal: options?.signal }); break; }
+          try { started = await send("/.netlify/functions/olivia", { ...payload, operation: "startChat" }, { signal: options?.signal,onTiming:options?.onTiming }); break; }
           catch (error) {
             if (!["olivia-network-error", "olivia-timeout"].includes(error.code) && !(error.status >= 500)) throw error;
             if (!payload.conversationId) throw error;

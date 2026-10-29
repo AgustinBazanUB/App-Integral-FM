@@ -9,17 +9,17 @@ import { runTool } from "../netlify/functions/_lib/olivia/tools.mjs";
 const config = defaultOliviaConfiguration();
 const session = { profile: { role: "admin", active: true } };
 for (const [message, module, route, effort] of [
-  ["¿Cuánto stock hay?", "locations", "luna-normal", "high"],
-  ["¿Cómo nos fue este fin de semana?", "metrics", "luna-normal", "high"],
-  ["Pronóstico de Pilar sábado y domingo", "locations", "luna-complex", "xhigh"],
-  ["Compará rentabilidad de los últimos tres meses", "finance", "luna-complex", "xhigh"],
+  ["¿Cuánto stock hay?", "locations", "luna-normal", "none"],
+  ["¿Cómo nos fue este fin de semana?", "metrics", "luna-normal", "none"],
+  ["Pronóstico de Pilar sábado y domingo", "locations", "luna-complex", "medium"],
+  ["Compará rentabilidad de los últimos tres meses", "finance", "luna-complex", "medium"],
   ["Diseñame un concepto para Instagram de almendras Guara", "social", "sol-creative", "high"],
   ["Creá una campaña creativa", "marketing", "sol-creative", "high"],
-  ["Mostrame las métricas de Instagram", "social", "luna-normal", "high"],
-  ["Revisá el inbox", "social", "luna-normal", "high"],
-  ["Creá el registro de la campaña Mayo", "marketing", "luna-normal", "high"],
-  ["Diseñame un flujo de autorización de stock", "marketing", "luna-normal", "high"],
-  ["Diseñame un concepto", "warehouse", "luna-normal", "high"],
+  ["Mostrame las métricas de Instagram", "social", "luna-normal", "none"],
+  ["Revisá el inbox", "social", "luna-normal", "none"],
+  ["Creá el registro de la campaña Mayo", "marketing", "luna-normal", "none"],
+  ["Diseñame un flujo de autorización de stock", "marketing", "luna-normal", "none"],
+  ["Diseñame un concepto", "warehouse", "luna-normal", "none"],
 ]) test(`ruta: ${message}`, () => {
   const result = routeModel(config, session, { message, context: { module } });
   assert.equal(result.route, route); assert.equal(result.reasoningEffort, effort);
@@ -30,13 +30,13 @@ test("volumen, herramientas y módulos elevan Luna sin cambiar de modelo", () =>
     const result = routeModel(config, session, { message: "Revisalo", signals });
     assert.equal(result.route, "luna-complex"); assert.equal(result.model, "gpt-6-luna");
   }
-  assert.equal(routeModel(config, session, { attachments: [{}, {}] }).reasoningEffort, "xhigh");
+  assert.equal(routeModel(config, session, { attachments: [{}, {}] }).reasoningEffort, "medium");
 });
 test("la longitud sola no escala y los vendedores no usan Sol", () => {
   assert.equal(routeModel(config, session, { message: "stock ".repeat(400) }).route, "luna-normal");
   assert.equal(routeModel(config, { profile: { role: "seller", active: true } }, { message: "Diseñame una campaña", context: { module: "marketing" } }).model, "gpt-6-luna");
 });
-test("una aclaración conserva XHIGH; una tarea nueva vuelve a HIGH", () => {
+test("una aclaración compleja conserva MEDIUM; una tarea nueva vuelve a NONE", () => {
   const task = { status: "collecting", route: { route: "luna-complex" } };
   assert.equal(routeModel(config, session, { message: "Pilar", task }).route, "luna-complex");
   assert.equal(routeModel(config, session, { message: "Mostrame stock", task }).route, "luna-normal");
@@ -189,7 +189,7 @@ test("Luna conserva los slots de un pronóstico y registra cada llamada", async 
   const usage = [...f.documents].find(([path]) => path.startsWith("oliviaUsage/"))[1];
   assert.equal(usage.modelCalls.length, 1); assert.equal(usage.taskId, task.id);
   assert.equal(result.telemetry.questionRoundAvoided, true);
-  assert.equal(result.telemetry.reasoningEffort, "xhigh");
+  assert.equal(result.telemetry.reasoningEffort, "medium");
 });
 for (const slotsJson of ['{"period":"este fin de semana"}', '{malformed']) test(`Luna corrige slots inválidos sin guardarlos: ${slotsJson}`, async () => {
   let calls = 0;
@@ -270,7 +270,7 @@ test("un fallo de proveedor nunca reintenta con Sol", async () => {
 test("el cliente no selecciona taskId, modelo, esfuerzo, permisos ni estado", async () => {
   const f = stockFixture(), { conversationId } = await start(f);
   const result = await turn(f, conversationId, "¿Cuánto stock tengo?", "a", { taskState: { id: "forged", slots: { quantity: 900 }, status: "completed" }, model: "gpt-6.1-sol", reasoningEffort: "xhigh", permissions: { admin: true } });
-  assert.equal(result.telemetry.model, "gpt-6-luna"); assert.equal(result.telemetry.reasoningEffort, "high");
+  assert.equal(result.telemetry.model, "gpt-6-luna"); assert.equal(result.telemetry.reasoningEffort, "none");
   const task = f.documents.get(`oliviaConversations/${conversationId}`).taskState;
   assert.notEqual(task.id, "forged"); assert.deepEqual(task.slots, {});
 });

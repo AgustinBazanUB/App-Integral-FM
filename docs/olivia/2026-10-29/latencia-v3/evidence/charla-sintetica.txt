@@ -1,0 +1,121 @@
+- paragraph: QA local · datos y audio sintéticos
+- status "Tráfico sintético": "{\"live\":2,\"transcribe\":0,\"tts\":0,\"selector\":0,\"private\":1,\"clips\":6,\"foreground\":1}"
+- region "Módulo sintético":
+  - button "Abrir Productos de prueba"
+  - heading "Inicio" [level=1]
+- dialog "Olivia":
+  - banner:
+    - heading "Olivia" [level=2]: Olivia
+    - generic: Flor Mía · Tu asistente
+    - button "Preferencias de Olivia" [expanded]:
+    - button "Mis chats" [disabled]:
+    - button "Nueva conversación" [disabled]:
+    - button "Minimizar Olivia":
+  - region "Preferencias de Olivia":
+    - checkbox "Mostrar Olivia flotante al minimizar" [checked]
+    - text: Mostrar Olivia flotante al minimizar
+    - generic: Se guarda en este dispositivo. Minimizar conserva la voz; podés silenciarla o finalizarla en cualquier momento.
+  - generic: Modo desarrollador
+  - button "Modo desarrollador" [pressed]:
+  - region "Estado de Olivia":
+    - 'img "Olivia: Te escucho…"'
+    - status: Te escucho…
+    - generic: Micrófono activado
+  - log "Conversación con Olivia":
+    - article:
+      - strong: Vos
+      - paragraph: Olivia, ¿cómo estás?
+    - article:
+      - strong: Olivia
+      - paragraph: ¡Bien! ¿Y vos?
+  - generic "Adjuntar archivos": +
+  - generic: Mensaje para Olivia
+  - textbox "Mensaje para Olivia":
+    - /placeholder: Escribile a Olivia…
+  - button "Silenciar micrófono":
+  - button "Finalizar conversación por voz" [active] [pressed]:
+  - button "Enviar mensaje" [disabled]:
+  - generic "Uso y costos"
+  - region "Métricas de desarrollo":
+    - heading "Métricas de desarrollo" [level=3]
+    - term: Modelo / razonamiento
+    - definition: — / —
+    - term: Ruta / motivo
+    - definition: instant / —
+    - term: Tarea
+    - definition: —
+    - term: Tokens próximos estimados
+    - definition: —
+    - term: Entrada / salida / total de última llamada
+    - definition: — / — / —
+    - term: Consumo / reservas
+    - definition: 0 / 0
+    - term: Último costo USD
+    - definition: Sin medición
+    - term: Click → mensaje visible (ms)
+    - definition: —
+    - term: Mensaje → request (ms)
+    - definition: "0"
+    - term: Request → primer texto (ms)
+    - definition: —
+    - term: Primer texto → completa (ms)
+    - definition: —
+    - term: Voz natural · Chirp 3 HD
+    - definition: No disponible
+    - term: Transcripción de esta sesión
+    - definition: GPT Live Transcribe
+    - term: Silencio de fin de turno · P50 / P90 / P95 (ms)
+    - definition: 466 / 466 / 466
+    - term: Detección → transcripción final · P50 / P90 / P95 (ms)
+    - definition: 31 / 31 / 31
+    - term: Fin real de voz → transcripción · P50 / P90 / P95 (ms)
+    - definition: 497 / 497 / 497
+    - term: Fin de voz → primer audio útil · P50 / P90 / P95 (ms)
+    - definition: 534 / 534 / 534
+    - term: Fin de voz → audio final completo · P50 / P90 / P95 (ms)
+    - definition: 1035 / 1035 / 1035
+    - term: Charla breve · primer audio útil P50 / P90 / P95 (ms)
+    - definition: 534 / 534 / 534
+    - term: Lectura · primer audio útil P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: Acción/consulta compleja · primer audio útil P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: HTTP hasta cabeceras · P50 / P90 / P95 (ms)
+    - definition: 1 / 1 / 1
+    - term: Servidor antes de cabeceras · P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: Transporte/cola estimados · P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: Selección de intervención · P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: Selector iniciado → clip disponible · P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: Turno confirmado → primera intervención · P50 / P90 / P95 (ms)
+    - definition: 67 / 67 / 67
+    - term: Selector · costo USD estimado mediano
+    - definition: Sin medición
+    - term: Transcripción → primer audio programado · mediana / P95 (ms)
+    - definition: — / —
+    - term: TTFA programado · mediana / P95 (ms)
+    - definition: — / —
+    - term: Última síntesis · caracteres / costo USD estimado
+    - definition: — / Sin medición
+    - term: Medición de audio
+    - definition: Primer bloque programado; no mide el inicio físico del altavoz. Transporte incluye colas y es estimado.
+    - term: "Backend: retrieval / proveedor / herramientas (ms)"
+    - definition: — / — / —
+    - term: Llamadas de modelo / herramientas
+    - definition: 0 / 0
+    - term: Skills
+    - definition: Ninguna en esta consulta
+    - term: Documentos recuperados
+    - definition: Ninguno en esta consulta
+    - term: Request / response
+    - definition: — / —
+    - term: Contexto
+    - definition: 16 mensajes recientes, memoria acotada y referencias verificadas
+    - term: Costo de almacenamiento semántico
+    - definition: Sin medición del proveedor
+    - term: Cotización
+    - definition: Sin cotización
+    - generic "Traza del turno · navegador"

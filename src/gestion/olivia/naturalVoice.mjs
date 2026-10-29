@@ -1,10 +1,11 @@
+import { endpointingWindow } from './endpointing.mjs';
 const mimeChoice = (Recorder) => ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"].find((type) => Recorder.isTypeSupported(type));
 
 export class NaturalVoiceConversation {
-  constructor({ createTranscriber, onPartial = () => {}, onNotice = () => {}, onTurn, onState = () => {}, onSpeechStart = () => {}, onFrame = () => {}, onError = () => {}, mediaDevices = globalThis.navigator?.mediaDevices, Recorder = globalThis.MediaRecorder, AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext, frame = (fn) => requestAnimationFrame(fn), cancelFrame = (id) => cancelAnimationFrame(id), now = () => performance.now(), silenceMs = 1900, maxSeconds = 60, maxBytes = 4 * 1024 * 1024 } = {}) {
+  constructor({ createTranscriber, adaptiveEndpointing = true, onTrace = () => {}, onPartial = () => {}, onNotice = () => {}, onTurn, onState = () => {}, onSpeechStart = () => {}, onFrame = () => {}, onError = () => {}, mediaDevices = globalThis.navigator?.mediaDevices, Recorder = globalThis.MediaRecorder, AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext, frame = (fn) => requestAnimationFrame(fn), cancelFrame = (id) => cancelAnimationFrame(id), now = () => performance.now(), silenceMs = 1900, maxSeconds = 60, maxBytes = 4 * 1024 * 1024 } = {}) {
     Object.assign(this, { onTurn, onState, onSpeechStart, onFrame, onError, mediaDevices, Recorder, AudioContext, frame, cancelFrame, now, silenceMs, maxSeconds, maxBytes });
     this.closed = false; this.muted = false; this.sources = new Set(); this.playGeneration = 0;
-    Object.assign(this,{createTranscriber,onPartial,onNotice});
+    Object.assign(this,{createTranscriber,onPartial,onNotice,adaptiveEndpointing,onTrace});
     this.captureController=new AbortController();
     this.deliveryQueue=Promise.resolve();
   }
@@ -28,7 +29,7 @@ export class NaturalVoiceConversation {
       this.analyser = this.context.createAnalyser(); this.analyser.fftSize = 1024; this.source.connect(this.analyser);
       this.samples = new Float32Array(this.analyser.fftSize);
       if(this.createTranscriber) {
-        try { this.transcriber=await this.createTranscriber(this.stream,text=>{this.partial=text;this.onPartial(text);},this.captureController.signal); }
+        try { this.transcriber=await this.createTranscriber(this.stream,text=>{if(text!==this.partial)this.partialChangedAt=this.now();this.partial=text;this.onPartial(text);},this.captureController.signal); }
         catch { if(!this.closed)this.onNotice('La transcripción en vivo no pudo conectarse. La voz continúa con dictado por turnos.'); }
         if(this.closed){this.transcriber?.close();return this.release();}
       }
@@ -39,6 +40,7 @@ export class NaturalVoiceConversation {
 
   loop = () => {
     if (this.closed) return;
+    if(this.adaptiveEndpointing && this.transcriber?.renewalDue && !this.recordingTurn && !this.transcriber.pending?.length && !this.sources.size && !this.renewing)void this.renewTranscription();
     this.analyser?.getFloatTimeDomainData(this.samples);
     let sum = 0; for (const sample of this.samples) sum += sample * sample;
     const rms = Math.sqrt(sum / this.samples.length), level = Math.min(1, rms * 5), now = this.now();
@@ -50,13 +52,27 @@ export class NaturalVoiceConversation {
           if (now - this.lastSpeechAt >= 350) this.pauseResumes++;
           this.lastSpeechAt = now;
         }
-        const incomplete=/\b(de|del|para|y|pero|con|en|a|que|porque|por|el|la|los|las|un|una)\s*$/i.test(this.partial || '');
-        const silence = Math.max(this.silenceMs, incomplete ? 4000 : this.pauseResumes > 1 ? 4000 : this.pauseResumes ? 3000 : 1900);
+        const silence = endpointingWindow({partial:this.partial,stableMs:now-(this.partialChangedAt ?? now),pauseResumes:this.pauseResumes,legacySilenceMs:this.silenceMs,enabled:this.adaptiveEndpointing});
+        this.endpointWindowMs=silence;
         if (now - this.recordingStartedAt >= this.maxSeconds * 1000 || (now - this.lastSpeechAt >= silence && now - this.recordingStartedAt >= 400)) this.finishTurn();
       }
     }
     this.animation = this.frame(this.loop);
   };
+
+  async renewTranscription() {
+    const previous=this.transcriber;if(this.renewing || !previous?.renewalDue || this.closed)return;
+    this.renewing=true;previous.renewalDue=false;
+    previous.close();
+    try {
+      await previous.stopping;
+      if(this.closed)return;
+      const next=await this.createTranscriber(this.stream,text=>{if(text!==this.partial)this.partialChangedAt=this.now();this.partial=text;this.onPartial(text);},this.captureController.signal);
+      if(this.closed){next.close();return;}
+      this.transcriber=next;
+    } catch {if(!this.closed)this.onNotice('Continúo con dictado por turnos. Podés reconectar la voz cuando quieras.');}
+    finally {this.renewing=false;}
+  }
 
   startRecorder() {
     if (this.closed || this.recorder) return;
@@ -80,7 +96,8 @@ export class NaturalVoiceConversation {
       if (!this.closed) this.startRecorder();
       if (!wasTurn || discard || this.closed) { if(discard && !this.transcriber?.closed)this.transcriber?.discardTurn?.(); return; }
       const blob = new Blob(chunks, { type: actualType }); blob.durationSeconds = Math.min(this.maxSeconds, durationSeconds);
-      const metadata={durationSeconds:blob.durationSeconds,endedAt:this.now(),voiceEndedAt:this.lastSpeechAt};
+      const metadata={durationSeconds:blob.durationSeconds,endedAt:this.now(),voiceEndedAt:this.lastSpeechAt,turnId:this.turnId,endpointWindowMs:this.endpointWindowMs};
+      this.onTrace({stage:'audio.commit',at:metadata.endedAt,turnId:this.turnId});
       this.onState("processing");
       const ready=(async()=>{
         if(this.transcriber && !this.transcriber.closed) {
@@ -103,11 +120,12 @@ export class NaturalVoiceConversation {
       const preRoll = [...new Set([this.idleHeader, ...(this.idleRing || [])].filter(Boolean))];
       this.chunks = preRoll; this.bytes = preRoll.reduce((total, chunk) => total + chunk.size, 0); this.discardTurn = false; this.recordingTurn = true; this.recordingStartedAt = now; this.lastSpeechAt = now; this.pauseResumes = 0;
       this.partial='';
+      this.partialChangedAt=now;this.turnId=globalThis.crypto.randomUUID();
       if(this.transcriber && !this.transcriber.closed) {try{this.transcriber.beginTurn();}catch{this.transcriber.close();}}
       clearTimeout(this.turnTimer); this.turnTimer = setTimeout(() => this.finishTurn(), this.maxSeconds * 1000);
       const bargeIn = this.sources?.size > 0;
       if (bargeIn) this.stopPlayback();
-      this.onSpeechStart({ at: now, bargeIn }); this.onState("recording");
+      this.onSpeechStart({ at: now, bargeIn, turnId:this.turnId }); this.onState("recording");
     } catch (error) { this.onError(error); }
   }
 
@@ -117,7 +135,7 @@ export class NaturalVoiceConversation {
     try { this.recorder.stop(); } catch (error) { this.recorder = null; this.finishing = false; this.recordingTurn = false; this.onError(error); if (!this.closed) this.startRecorder(); }
   }
 
-  async play(response, { signal, onFirstScheduled = () => {}, onComplete = () => {} } = {}) {
+  async play(response, { signal, onFirstPacket = () => {}, onFirstScheduled = () => {}, onComplete = () => {} } = {}) {
     this.stopPlayback();
     const generation = ++this.playGeneration, reader = response.body?.getReader();
     if (!reader) throw new Error("No se recibió audio de Olivia.");
@@ -139,7 +157,7 @@ export class NaturalVoiceConversation {
         for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
         const source = this.context.createBufferSource(); source.buffer = audio; source.connect(gain || this.context.destination); source.start(Math.max(nextAt, this.context.currentTime + 0.005));
         nextAt = Math.max(nextAt, this.context.currentTime + 0.005) + audio.duration; sources.add(source); source.onended = () => { sources.delete(source); source.disconnect?.(); };
-        if (first) { first = false; onFirstScheduled(this.now()); }
+        if (first) { first = false; onFirstPacket(this.now()); onFirstScheduled(this.now()+Math.max(0,nextAt-audio.duration-this.context.currentTime)*1000); }
       }
       if (oddByte !== null) throw new Error("El audio de Olivia llegó incompleto.");
       if (signal?.aborted || generation !== this.playGeneration) return;

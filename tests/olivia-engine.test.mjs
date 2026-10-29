@@ -1296,7 +1296,7 @@ test("admin receives technical estimates while seller receives only their own pe
     module: "marketing",
   });
   assert.equal(state.estimate.model, f.config.profiles.adminComplex.model);
-  assert.equal(state.estimate.reasoningEffort, "high");
+  assert.equal(state.estimate.reasoningEffort, "none");
   assert.ok(state.estimate.estimatedCostUsd > 0);
   const seller = fixture();
   assert.deepEqual((await start(seller)).estimate, { estimatedCostArs: null });
