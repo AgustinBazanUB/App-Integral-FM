@@ -28,10 +28,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1320,
+      "checksum": "305bad60508e2211d7e3702ad2dda07e024472fd6e3da17c2ab50038430167ef",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/saludo_01.pcm"
     },
     {
       "id": "saludo_02",
@@ -44,10 +44,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2600,
+      "checksum": "e81f88435b6c3b1a8054bbe6253b07806475d5d992112fcb97b26abf0bee34b1",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/saludo_02.pcm"
     },
     {
       "id": "saludo_03",
@@ -60,10 +60,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2080,
+      "checksum": "aeb0d2fb19e7e031a250d33cb828659c1b55718cadd128a90cc819dd2cb829de",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/saludo_03.pcm"
     },
     {
       "id": "saludo_04",
@@ -76,10 +76,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2360,
+      "checksum": "1164c1994bcf1713959180db942ea86b3a5ed2248d909bb4aafdcaf297a1450b",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/saludo_04.pcm"
     },
     {
       "id": "saludo_05",
@@ -92,10 +92,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1840,
+      "checksum": "0b035e3059ad4fa40777d4de3b1a4b03436f5429dbbd5c41e1d6c9699057b417",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/saludo_05.pcm"
     },
     {
       "id": "saludo_06",
@@ -108,10 +108,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3080,
+      "checksum": "7416a22e4c4ab4604876c873884e6c73a69fa663520adab0bc25f9e65a473a8b",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/saludo_06.pcm"
     },
     {
       "id": "saludo_07",
@@ -124,10 +124,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2160,
+      "checksum": "1414c503879cfff793b53676b6b0e920fd3fa8d716d9b62ab7990d234013ddc4",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/saludo_07.pcm"
     },
     {
       "id": "saludo_08",
@@ -140,10 +140,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2160,
+      "checksum": "59e68ddeb7a65613dd757049795912e2cfbfebbec0398f69470ca715f4c194b6",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/saludo_08.pcm"
     },
     {
       "id": "saludo_09",
@@ -156,10 +156,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1680,
+      "checksum": "fdd68484c8f47b5e75e44f210d2b33e8eda481751ffff57bedc38c94dd6250d0",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/saludo_09.pcm"
     },
     {
       "id": "acuse_breve_01",
@@ -172,10 +172,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1000,
+      "checksum": "69ff1c6eab4eeceea1514d76ac3bee2a235bc5d34823a4f7aa45e22f678a3a35",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/acuse_breve_01.pcm"
     },
     {
       "id": "acuse_breve_02",
@@ -188,10 +188,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1200,
+      "checksum": "4ea62d9f6e40be0ef8aafd5ded487c24a7cd3edd0af33096dfcd0ca123cb48e0",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/acuse_breve_02.pcm"
     },
     {
       "id": "acuse_breve_03",
@@ -204,10 +204,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1480,
+      "checksum": "7891e41771de0d364371000022f47dbba93064a088f5f454b73abfddaa4ef1e6",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/acuse_breve_03.pcm"
     },
     {
       "id": "acuse_breve_04",
@@ -220,10 +220,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1120,
+      "checksum": "65ef8d6cba016180c48b200276086498a71bec9f418c395353d082792286a628",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/acuse_breve_04.pcm"
     },
     {
       "id": "acuse_breve_05",
@@ -236,10 +236,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1000,
+      "checksum": "e3f48feb8ab5ab02cef1478d34fe7af186a9e8c89287d7f9fa97eaa18863c45d",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/acuse_breve_05.pcm"
     },
     {
       "id": "acuse_breve_06",
@@ -252,10 +252,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1360,
+      "checksum": "b27806208da9a812d37b0181b66e0061c969631c52bc762cf48d9c184c610fd2",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/acuse_breve_06.pcm"
     },
     {
       "id": "acuse_breve_07",
@@ -268,10 +268,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1840,
+      "checksum": "29faae9a056a6a0d4c86a52021ba0862998d15919111b8d98633411b4815bac0",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/acuse_breve_07.pcm"
     },
     {
       "id": "acuse_breve_08",
@@ -284,10 +284,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1120,
+      "checksum": "9babce0ee387e6bf096101597f05c9f25d5e84d04c6fc7044f2a10a3e80833a5",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/acuse_breve_08.pcm"
     },
     {
       "id": "acuse_breve_09",
@@ -300,10 +300,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2040,
+      "checksum": "553fe9704359b5fc8f8d48679cae11c51b81b007bca6316e1515df6acd6fcd00",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/acuse_breve_09.pcm"
     },
     {
       "id": "espera_real_01",
@@ -316,10 +316,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1640,
+      "checksum": "6312e786a92ad37e949f1988a049df3f0d713cac1761dc0ef6eb209ba81a7bb6",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/espera_real_01.pcm"
     },
     {
       "id": "espera_real_02",
@@ -332,10 +332,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1800,
+      "checksum": "91221d72245f437d6555086fc823acfea48096769bcdaa05b30c685bc0a8d5dd",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/espera_real_02.pcm"
     },
     {
       "id": "espera_real_03",
@@ -348,10 +348,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2360,
+      "checksum": "7986e96fef726e98bd405fe1044f11f830540b6b869b059ea05f37b0c4b5f827",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/espera_real_03.pcm"
     },
     {
       "id": "espera_real_04",
@@ -364,10 +364,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2680,
+      "checksum": "0c96adba97e0cc7ee48dad466fbaa77f805885f6f888cb33b0fb0028139a9d7b",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/espera_real_04.pcm"
     },
     {
       "id": "espera_real_05",
@@ -380,10 +380,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1480,
+      "checksum": "15baf4f3eecc259a24dc04b1dce10733f9e69442e24ba68faf1a7058488b4b15",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/espera_real_05.pcm"
     },
     {
       "id": "espera_real_06",
@@ -396,10 +396,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1640,
+      "checksum": "1b49dbd5201b55cc990db17991c163dff75c4d8171700df8c7a8fc4079bb7578",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/espera_real_06.pcm"
     },
     {
       "id": "espera_real_07",
@@ -412,10 +412,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1680,
+      "checksum": "664512b42660a568d930eac71eb4a7e6e65f6527d64a1c2e4c557d3b40cb0f88",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/espera_real_07.pcm"
     },
     {
       "id": "espera_real_08",
@@ -428,10 +428,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1640,
+      "checksum": "7f5623e6b6b4f394a32dc385c11d349616a03226241eb06b0616629142e43869",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/espera_real_08.pcm"
     },
     {
       "id": "espera_real_09",
@@ -444,10 +444,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1800,
+      "checksum": "ab63bb65c2e07a979622514e2e14d37e9888b675c6696d01b17c75ce4d906944",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/espera_real_09.pcm"
     },
     {
       "id": "stock_en_curso_01",
@@ -460,10 +460,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2320,
+      "checksum": "43eddd16919acd30587a5bf969d8a0958fda7d3e691b96d74f79c1b7aa8382d0",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/stock_en_curso_01.pcm"
     },
     {
       "id": "stock_en_curso_02",
@@ -476,10 +476,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2240,
+      "checksum": "9065d544f096a45499f73786ed901446cd3510ba0eb6865353b9e87634861f4a",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/stock_en_curso_02.pcm"
     },
     {
       "id": "stock_en_curso_03",
@@ -492,10 +492,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3320,
+      "checksum": "d011bb6a00f1446277d3fbc9e3dcf93d85ef730add3a68494d350e280f0ca519",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/stock_en_curso_03.pcm"
     },
     {
       "id": "stock_en_curso_04",
@@ -508,10 +508,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2080,
+      "checksum": "76bd2715a18961b1aac88f5dee6f670a60e5a19bea0d6c0a63a6850e879b8559",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/stock_en_curso_04.pcm"
     },
     {
       "id": "stock_en_curso_05",
@@ -524,10 +524,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2200,
+      "checksum": "9f82bf17e96e3072ffefd0ef82d95ef76305aeb627a7a440d2bb0a8caed2be1e",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/stock_en_curso_05.pcm"
     },
     {
       "id": "stock_en_curso_06",
@@ -540,10 +540,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2480,
+      "checksum": "786b7e71e07ab0b10b68d1208d0ebb49b2cb1ac81e42d7c5f84ff63f03d4f9c3",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/stock_en_curso_06.pcm"
     },
     {
       "id": "stock_en_curso_07",
@@ -556,10 +556,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2960,
+      "checksum": "4a37afbd77b926b2d36e5ddad95d6446557e0df504ac1f65e7bd57456f721bdd",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/stock_en_curso_07.pcm"
     },
     {
       "id": "stock_en_curso_08",
@@ -572,10 +572,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2480,
+      "checksum": "538b8d60705d1caa9c74718c5d8da04fdaa1224120100b74beff1ab04ecbe111",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/stock_en_curso_08.pcm"
     },
     {
       "id": "stock_en_curso_09",
@@ -588,10 +588,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2920,
+      "checksum": "fb979f5f50d9f126a18b09b7dac99fe62057dc35b9f846442137f7fef6987453",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/stock_en_curso_09.pcm"
     },
     {
       "id": "ventas_en_curso_01",
@@ -604,10 +604,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3280,
+      "checksum": "207e15289c34595365c24d1f92483c09febf424f1264ccb9325ae5f1629507fa",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/ventas_en_curso_01.pcm"
     },
     {
       "id": "ventas_en_curso_02",
@@ -620,10 +620,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2040,
+      "checksum": "f385d97cb85a15c690cff210e32f0fade656996191623124713ba0be6ba5fd2f",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/ventas_en_curso_02.pcm"
     },
     {
       "id": "ventas_en_curso_03",
@@ -636,10 +636,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3160,
+      "checksum": "d62682d6d51d253fc3ad3bf9bcc462eb4b5444105cc7f0c197e767fc06de110e",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/ventas_en_curso_03.pcm"
     },
     {
       "id": "ventas_en_curso_04",
@@ -652,10 +652,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2080,
+      "checksum": "aa1d57e20ea1cecd7d9e360fed4f2f2b7059e3ead49798f70473cdcdf3d0802b",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/ventas_en_curso_04.pcm"
     },
     {
       "id": "ventas_en_curso_05",
@@ -668,10 +668,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2600,
+      "checksum": "caf1acaef890cc99b6f8ad78cbe1c89552e3c96ab0ec74e2000e82d576c20ef0",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/ventas_en_curso_05.pcm"
     },
     {
       "id": "ventas_en_curso_06",
@@ -684,10 +684,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2800,
+      "checksum": "1d910c722b7004976977a91490ebef2872c5fd9659df4336f5aef39284cdf8ea",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/ventas_en_curso_06.pcm"
     },
     {
       "id": "ventas_en_curso_07",
@@ -700,10 +700,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2440,
+      "checksum": "b9137860af48bc2a7baf1141cc6249e6e027eb31d83cf0879442fc8291322e1f",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/ventas_en_curso_07.pcm"
     },
     {
       "id": "ventas_en_curso_08",
@@ -716,10 +716,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2520,
+      "checksum": "c2cad314c1a81bb0379b05a4faba0ef61e95faae550a6f6c255af39fcd0d029d",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/ventas_en_curso_08.pcm"
     },
     {
       "id": "ventas_en_curso_09",
@@ -732,10 +732,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2360,
+      "checksum": "59c877488d1a9b75337279437c13e294d81b164779f8e2fbcb4d1482e9f1de44",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/ventas_en_curso_09.pcm"
     },
     {
       "id": "envios_en_curso_01",
@@ -748,10 +748,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2520,
+      "checksum": "e68430f70ac372299352a32e2cd066720b7d0df879a13943ae5a743a804411b6",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/envios_en_curso_01.pcm"
     },
     {
       "id": "envios_en_curso_02",
@@ -764,10 +764,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2040,
+      "checksum": "6e4c7f219a07e4d3dd8726178d59f5bfe5327faa03a2f9c9b1b18af2defb89d1",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/envios_en_curso_02.pcm"
     },
     {
       "id": "envios_en_curso_03",
@@ -780,10 +780,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2400,
+      "checksum": "922f33341f4b3525290a49cd1f66b2050e4185e26cdd060eff5a89e4fccdae19",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/envios_en_curso_03.pcm"
     },
     {
       "id": "envios_en_curso_04",
@@ -796,10 +796,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2200,
+      "checksum": "89b19179cf93b7566754008e034b734563317a5ec4410ab5db59d78c0a444530",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/envios_en_curso_04.pcm"
     },
     {
       "id": "envios_en_curso_05",
@@ -812,10 +812,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2400,
+      "checksum": "b568365a450e405edece511b59ac6c715680fa04c59500be5dcfda3567ea361a",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/envios_en_curso_05.pcm"
     },
     {
       "id": "envios_en_curso_06",
@@ -828,10 +828,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1960,
+      "checksum": "8e41bfe48bd1437231549b15412b6198a554e125fc10f2a959ae660422b96c67",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/envios_en_curso_06.pcm"
     },
     {
       "id": "envios_en_curso_07",
@@ -844,10 +844,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2880,
+      "checksum": "0178a820b0e6449a03c7d3407d551240c40adae495c0de156d4b3296c464e819",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/envios_en_curso_07.pcm"
     },
     {
       "id": "envios_en_curso_08",
@@ -860,10 +860,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2520,
+      "checksum": "22231a75724237ab5e69cb62245d9f26ff68a63c2878b1e96fb222c145c58f4a",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/envios_en_curso_08.pcm"
     },
     {
       "id": "envios_en_curso_09",
@@ -876,10 +876,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2320,
+      "checksum": "043153be36da3671fabb737bcfea65aec2b2eb9e9f43a4b4a4fcc0114f4deeee",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/envios_en_curso_09.pcm"
     },
     {
       "id": "productos_en_curso_01",
@@ -892,10 +892,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2080,
+      "checksum": "6f221d856cfa8996631135eb8b07475772e245634abdbc439122d9a87fb04ce2",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/productos_en_curso_01.pcm"
     },
     {
       "id": "productos_en_curso_02",
@@ -908,10 +908,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2040,
+      "checksum": "004b4c11669b9018674990333e448ba0d8d05924e1973a26d0358c35b7f3007c",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/productos_en_curso_02.pcm"
     },
     {
       "id": "productos_en_curso_03",
@@ -924,10 +924,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2520,
+      "checksum": "fd24751bff7a48f4f7a1ac19e5ca70bf4d6a2faca926a905b31c2320d5836fba",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/productos_en_curso_03.pcm"
     },
     {
       "id": "productos_en_curso_04",
@@ -940,10 +940,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3000,
+      "checksum": "dcf4fa7d4109114c9ce4fddbedda87fa8114207a8d533fa8202b7031ddbc5f75",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/productos_en_curso_04.pcm"
     },
     {
       "id": "productos_en_curso_05",
@@ -956,10 +956,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2360,
+      "checksum": "45b33f38a7f9217fe6d805b520f457064044a24ff3fa7e41716ee384bb7ef17c",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/productos_en_curso_05.pcm"
     },
     {
       "id": "productos_en_curso_06",
@@ -972,10 +972,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2680,
+      "checksum": "a2437d2e45bf04c3c915b037755da3098d7da11b9e5918664b53971f915f473a",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/productos_en_curso_06.pcm"
     },
     {
       "id": "productos_en_curso_07",
@@ -988,10 +988,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2560,
+      "checksum": "b285835b3a345304d9b047be09ced3e63a059bff290e426afc31082181c071d4",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/productos_en_curso_07.pcm"
     },
     {
       "id": "productos_en_curso_08",
@@ -1004,10 +1004,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2520,
+      "checksum": "deb50ab2242cbe66c43883025dc48d745e8472eba151b3d5c48f0ff91da26070",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/productos_en_curso_08.pcm"
     },
     {
       "id": "productos_en_curso_09",
@@ -1020,10 +1020,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2640,
+      "checksum": "de1e919229f6d834ab0c088dfcf2be0aed2da734af064db6a58365870893a96b",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/productos_en_curso_09.pcm"
     },
     {
       "id": "aclaracion_condicional_01",
@@ -1036,10 +1036,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2880,
+      "checksum": "d09b05774ad9906e848817a4c6d61580232bd51aa7e0b9d8185fddd33377260b",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/aclaracion_condicional_01.pcm"
     },
     {
       "id": "aclaracion_condicional_02",
@@ -1052,10 +1052,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3240,
+      "checksum": "fb6c291a68f229dff5baff49c163b28debcf59b0342628df3e58d49c1b271234",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/aclaracion_condicional_02.pcm"
     },
     {
       "id": "aclaracion_condicional_03",
@@ -1068,10 +1068,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2360,
+      "checksum": "9638d047350cba25f735cbdb903ce226267104d8c575b307b643006932f364e7",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/aclaracion_condicional_03.pcm"
     },
     {
       "id": "aclaracion_condicional_04",
@@ -1084,10 +1084,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 1960,
+      "checksum": "ebdf0e39096f4fa35f2b8259e2d663efef07603613639f1d1afd1a415b07f9a0",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/aclaracion_condicional_04.pcm"
     },
     {
       "id": "aclaracion_condicional_05",
@@ -1100,10 +1100,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2280,
+      "checksum": "9c31d03b76eb0e2bcb8003f96a22626004c92a2f17c0c2f42696d92305c4bde8",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/aclaracion_condicional_05.pcm"
     },
     {
       "id": "aclaracion_condicional_06",
@@ -1116,10 +1116,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3080,
+      "checksum": "027bb07c134833247ed4cfc6cd2917847d33d982c8627e6dbc5106b34f2fc7b9",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/aclaracion_condicional_06.pcm"
     },
     {
       "id": "aclaracion_condicional_07",
@@ -1132,10 +1132,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2880,
+      "checksum": "8a3a92bd4732716a100d8e5f9e34cf90a8c9ab1723b26a3396d48ebba4c036dd",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/aclaracion_condicional_07.pcm"
     },
     {
       "id": "aclaracion_condicional_08",
@@ -1148,10 +1148,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3080,
+      "checksum": "f1b15d18e8f22d9f2eb5f349d2f6410289e36cd4cb32e3af6bdacb2a7f01a541",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/aclaracion_condicional_08.pcm"
     },
     {
       "id": "aclaracion_condicional_09",
@@ -1164,10 +1164,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 4360,
+      "checksum": "21f7d31836f448bfeb9bb4b9be0ad0134dd15d93905dc7eed6a3b41be6657d70",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/aclaracion_condicional_09.pcm"
     },
     {
       "id": "confirmacion_condicional_01",
@@ -1180,10 +1180,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3120,
+      "checksum": "9d47f2f4f8b3de6163d32b874b056dc0301d30e0f8f0cfad636e22f7f6b69909",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/confirmacion_condicional_01.pcm"
     },
     {
       "id": "confirmacion_condicional_02",
@@ -1196,10 +1196,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2800,
+      "checksum": "cd70753d042c54f0b5c61f7fa32f3632ca15a60ac87e9d4e6bedb3f220b31549",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/confirmacion_condicional_02.pcm"
     },
     {
       "id": "confirmacion_condicional_03",
@@ -1212,10 +1212,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2960,
+      "checksum": "bb0e013e9fd6338b558c04c2a27c7c5aa35e8c277a04edae83a12b61ef758519",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/confirmacion_condicional_03.pcm"
     },
     {
       "id": "confirmacion_condicional_04",
@@ -1228,10 +1228,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2920,
+      "checksum": "6fed80c75b1b36eb6c491a691027f50e75c1ac7d7fb0df3576ffee78322894a9",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/confirmacion_condicional_04.pcm"
     },
     {
       "id": "confirmacion_condicional_05",
@@ -1244,10 +1244,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2360,
+      "checksum": "91e4f655298ff6be4127cafc604bcb5baa9680b2dae6315e8018bd8160e3a71e",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/confirmacion_condicional_05.pcm"
     },
     {
       "id": "confirmacion_condicional_06",
@@ -1260,10 +1260,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3120,
+      "checksum": "cf88016a2800bc1fe8da1a55a585dfeadc6513657f933cc8efcac7fe35f47264",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/confirmacion_condicional_06.pcm"
     },
     {
       "id": "confirmacion_condicional_07",
@@ -1276,10 +1276,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3920,
+      "checksum": "36557f01b5fbb3cf8b01c169f7c1d06ee494672023454d935213782feff181ad",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/confirmacion_condicional_07.pcm"
     },
     {
       "id": "confirmacion_condicional_08",
@@ -1292,10 +1292,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2280,
+      "checksum": "ee53cb717b8e1766be7df69df8dc57e1fb1811c3981d036acc1b2b04f727104c",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/confirmacion_condicional_08.pcm"
     },
     {
       "id": "confirmacion_condicional_09",
@@ -1308,10 +1308,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3280,
+      "checksum": "f1effb62d97dab93028d39ea831706e1b3267cb4a5c15f97f8ebcd70cfd70031",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/confirmacion_condicional_09.pcm"
     },
     {
       "id": "recuperacion_real_01",
@@ -1324,10 +1324,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 4080,
+      "checksum": "b7cc860f61ff7a8fbeea6706bca7ba874a97e2dc56a0e0372f57ea46a2c33f26",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/recuperacion_real_01.pcm"
     },
     {
       "id": "recuperacion_real_02",
@@ -1340,10 +1340,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 4000,
+      "checksum": "2351326de810aa404f41359aa9b53f833b060ea37067c335d348379ceef7a7bf",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/recuperacion_real_02.pcm"
     },
     {
       "id": "recuperacion_real_03",
@@ -1356,10 +1356,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3920,
+      "checksum": "542b077c734690a97c2777eed840edab652dbe52a0d8f02198c47a427af5d902",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/recuperacion_real_03.pcm"
     },
     {
       "id": "recuperacion_real_04",
@@ -1372,10 +1372,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2520,
+      "checksum": "9d4a995b60eb4e8806a2bfdeb4463c7a16f143ce45dc721f737f40ad2b8605eb",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/recuperacion_real_04.pcm"
     },
     {
       "id": "recuperacion_real_05",
@@ -1388,10 +1388,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 4480,
+      "checksum": "1d1ee610d696f9dc2c8af26faba123522da4f207a6362d53b1d2c274e8e44030",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/recuperacion_real_05.pcm"
     },
     {
       "id": "recuperacion_real_06",
@@ -1404,10 +1404,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 2480,
+      "checksum": "88a01841202eb2870679ee13720bfdef10856f5c5c2bd43126c33705bd5e1595",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/recuperacion_real_06.pcm"
     },
     {
       "id": "recuperacion_real_07",
@@ -1420,10 +1420,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3240,
+      "checksum": "d4f5ee9ba134a2e67c085fcb5e886c2f674e42640a4cf0fe125e218adc8739c9",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/recuperacion_real_07.pcm"
     },
     {
       "id": "recuperacion_real_08",
@@ -1436,10 +1436,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3240,
+      "checksum": "08afea6065ba87a1303ecf10f76254cabd724346d14190d25b9e6fcf19721e0e",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/recuperacion_real_08.pcm"
     },
     {
       "id": "recuperacion_real_09",
@@ -1452,10 +1452,10 @@
       "voiceLocale": "es-US",
       "codec": "pcm_s16le",
       "sampleRate": 24000,
-      "durationMs": null,
-      "checksum": null,
-      "status": "pending-authorization",
-      "url": null
+      "durationMs": 3320,
+      "checksum": "2ac49bc93a4c7043da6d759494af593266b5738c05dd6f99e33e4ac9642bc08d",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/recuperacion_real_09.pcm"
     }
   ]
 }

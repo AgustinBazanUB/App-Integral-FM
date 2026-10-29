@@ -2,9 +2,6 @@
   command = "npm run build"
   publish = "dist"
 
-[context.deploy-preview]
-  command = "node scripts/build-olivia-preview-speech.mjs --approve-plan=67ada6893c140142f7be305daa916da27cf43363a1d5f58e7f5bd600765d3904 && npm run build"
-
 # Esta configuración también se aplica a los Deploy Previews para probar la app completa.
 [build.environment]
   NODE_VERSION = "20"

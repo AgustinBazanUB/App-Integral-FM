@@ -15,11 +15,11 @@ Revisión sobre `origin/main` actualizado, incorporando la revisión pendiente #
 
 Si Live no conecta, falla, excede su ventana o no entrega un final, se conserva el turno y se usa la transcripción de archivo existente (`gpt-transcribe`). El aviso informa este cambio. No se ejecuta una segunda consulta comercial ni se reproduce un parcial.
 
-## Biblioteca y autorización pendiente
+## Biblioteca generada con autorización
 
 `src/shared/oliviaSpeechLibrary.json` conserva los 90 clips y 10 templates recibidos. Las expresiones `eligibility` son datos: nunca se evalúan como código. La voz y speaking rate se toman de la configuración real; no se cambia Chirp ni el modelo principal de Olivia.
 
-El generador `scripts/build-olivia-speech-library.mjs` calcula el costo sin llamadas de pago, crea manifiestos versionados y permite reanudar un lote verificando texto, voz y SHA-256 de los bytes antes de reutilizarlos. Incluye ID, texto, voz, idioma del texto, locale real de voz, PCM 16 bits/24 kHz, duración y checksum. Las duraciones/checksums de audio permanecen nulas mientras no existe un archivo.
+El generador `scripts/build-olivia-speech-library.mjs` calcula el costo sin llamadas de pago, crea manifiestos versionados y permite reanudar un lote verificando texto, voz y SHA-256 de los bytes antes de reutilizarlos. Incluye ID, texto, voz, idioma del texto, locale real de voz, PCM 16 bits/24 kHz, duración y checksum. Los 90 archivos están guardados en `public/olivia-speech/`, con manifiesto completo y estado `ready`.
 
 Plan preparado para `es-US-Chirp3-HD-Aoede`, rate 1, manteniendo el locale `es-US` de la voz actual y frases en español argentino:
 
@@ -29,19 +29,25 @@ Plan preparado para `es-US-Chirp3-HD-Aoede`, rate 1, manteniendo el locale `es-U
 - Diez variantes para un nombre de N caracteres: `184 + 10 × N` caracteres. Con N=8, USD 0,00792 si eventualmente se generan las diez; no se generan juntas.
 - Hash del plan: `67ada6893c140142f7be305daa916da27cf43363a1d5f58e7f5bd600765d3904`.
 
-Ejecutado solamente el cálculo:
+El cálculo previo a la autorización se obtiene con:
 
 ```powershell
 node scripts/build-olivia-speech-library.mjs
 ```
 
-Después de autorización explícita de este lote y con las credenciales Google del entorno previsto verificadas, el comando preparado es:
+El usuario autorizó explícitamente generar las 90 frases, con la misma voz y el costo estimado, exclusivamente para la preview. El comando de generación admite el hash del plan exacto:
 
 ```powershell
 node scripts/build-olivia-speech-library.mjs --execute --approve-plan=67ada6893c140142f7be305daa916da27cf43363a1d5f58e7f5bd600765d3904
 ```
 
-`--config=ruta.json` admite una exportación con `naturalVoice` para generar exactamente otra configuración autorizada; cambia el hash de aprobación. No se ejecutó `--execute`, no se generó audio con Google y el manifiesto público continúa con 90 entradas `pending-authorization`. La preview actual conserva el acuse dinámico anterior como alternativa mientras no estén autorizados/publicados los clips. No se promete el tiempo de un clip precargado cuando el archivo todavía no existe.
+`--config=ruta.json` admite una exportación con `naturalVoice` para generar exactamente otra configuración autorizada; cambia el hash de aprobación.
+
+El 29 de octubre de 2026 se generó el lote real dentro del build de Netlify de la preview #48, sin extraer sus credenciales secretas. Antes de llamar a Google se verificaron el frontend efectivo `VITE_PREVIEW_*`, el servidor, las cuentas de servicio y Firebase Auth de `app-integral-fm-pruebas` (número `545036860675`). Se leyó únicamente `oliviaConfiguration/global`: la voz configurada coincide con Aoede, velocidad 1. La síntesis usó el proyecto Google `app-integral-fm-olivia-preview`. No hubo escrituras en Firestore ni llamadas a OpenAI para generar este lote.
+
+Resultado: **90/90 clips reales**, 2699 caracteres, costo de síntesis estimado **USD 0,08097** (la factura final corresponde al proveedor), 10.667.520 bytes y 222,24 segundos de audio. Cada clip dura entre 1 y 4,48 segundos. Se descargaron los archivos publicados, verificando texto, voz, formato PCM sin cabecera WAV, duración, señal no silenciosa y SHA-256 de los 90. Una segunda pasada local reutilizó los 90 sin sintetizar ninguno. Detalles en `GENERACION.json` y `public/olivia-speech/generation-report.json`.
+
+El paso temporal de generación se retiró del build después de conservar los archivos en Git. Los siguientes despliegues copian los audios estáticos y no regeneran el lote. La página `/olivia-speech/` permite buscar y escuchar las 90 frases individualmente, sin llamadas a modelos ni a síntesis. Reproducir usa la transferencia habitual de Netlify. Las diez plantillas personalizadas mantienen su circuito privado bajo demanda; no se generaron como parte de este lote.
 
 ## Caché y privacidad
 
@@ -59,7 +65,7 @@ Precio Live de referencia: USD 0,017/minuto. El registro de sesión separa reser
 
 ## Validación
 
-- `npm run build:gestion`: correcto (continúa el aviso previo de chunks grandes). `npm test`: **994/994**. Pruebas focalizadas de Olivia: **326/326**. Importación de las tres nuevas Functions correcta. Generación paga ejecutada: **0 clips**.
+- `npm run build:gestion`: correcto (continúa el aviso previo de chunks grandes). `npm test`: **994/994**. Pruebas focalizadas de Olivia: **326/326**. Importación de las tres nuevas Functions correcta. Generación paga ejecutada: **90 clips**, con verificación del proveedor real y reutilización sin síntesis adicional. Para esta actualización también pasaron las 13 pruebas de biblioteca/voz rápida y aislamiento de previews.
 - Pruebas focalizadas y suite general cubren biblioteca, elegibilidad contextual, saludo combinado, stock sin/reutilizando ubicación, selección sin herramientas, respuestas falsas, carreras con la respuesta principal, privacidad y nombre autenticado, caché/checksum, autorización y reanudación del lote, orden de finales, fallos Live, pausas, mute y liberación del micrófono, retención privada y límites de sesión.
 - QA local de navegador con datos, red OpenAI y PCM simulados: saludo final «Hola» con **0 llamadas al selector, 0 a transcripción de archivo, 0 a TTS genérico y 3 clips cargados**. La comprobación/preparación privada es simulada. No contacta a Google ni OpenAI.
 - Una muestra sintética de saludo: silencio 1906 ms, detección a final 32 ms, primera intervención 33 ms desde el turno confirmado.
@@ -67,7 +73,7 @@ Precio Live de referencia: USD 0,017/minuto. El registro de sesión separa reser
 - El modo desarrollador muestra P50/P90/P95 y cantidad de muestras de la sesión para silencio, transcripción, selección, disponibilidad del clip y primera intervención. «Fin de voz» es la aproximación del umbral acústico local; «primer audio» es el primer bloque programado, no el inicio físico del altavoz. Con una sola muestra los percentiles coinciden; estas muestras no son una medición de latencia real ni una comparación estadística con los ~3 s percibidos por el usuario.
 - También se verifica fallback de Live con aviso y continuidad por turnos, conservación de borrador, minimizar/reabrir y separación de los estados del orb. Capturas y lectura de métricas en `evidence/`.
 
-Falta probar proveedores reales, disponibilidad de `gpt-live-transcribe` en la cuenta, acento/ruido, micrófono físico y Safari/iPhone/Android. Se conserva detección MediaRecorder/mp4 y WebKit AudioContext. La continuidad está limitada por permisos y suspensión del navegador. Antes de cualquier prueba remota con escrituras hay que verificar frontend, Functions, Authentication, Firestore y cuenta de servicio de `app-integral-fm-pruebas`; esta revisión usa fixtures locales y comprobaciones remotas de lectura.
+Google Chirp se verificó con el lote real. Falta probar OpenAI Live/Luna reales, disponibilidad de `gpt-live-transcribe` en la cuenta, acento/ruido, micrófono físico y Safari/iPhone/Android. La verificación técnica de PCM no sustituye la revisión auditiva del usuario ni mide latencia real de conversación. Se conserva detección MediaRecorder/mp4 y WebKit AudioContext. La continuidad está limitada por permisos y suspensión del navegador. Antes de cualquier prueba remota con escrituras hay que verificar también el contexto efectivo de las Functions desplegadas; esta actualización no creó datos comerciales ni registros de prueba en Firestore.
 
 ## Fuentes verificadas el 29 de octubre de 2026
 
