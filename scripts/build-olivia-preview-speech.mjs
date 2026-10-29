@@ -17,13 +17,15 @@ async function main() {
   const account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}');
   const authResponse = await fetch('https://identitytoolkit.googleapis.com/v1/projects?key=' + encodeURIComponent(env.FIREBASE_WEB_API_KEY || ''), {signal: AbortSignal.timeout(15000)});
   const auth = authResponse.ok ? await authResponse.json() : {};
-  const identity = {serverProject: env.FIREBASE_PROJECT_ID, clientProject: env.VITE_FIREBASE_PROJECT_ID, effectiveClientProject: env.VITE_PREVIEW_FIREBASE_PROJECT_ID, accountProject: account.project_id, accountMatches: !!account.client_email?.endsWith('@' + expected + '.iam.gserviceaccount.com'), authProject: auth.projectId, authStatus: authResponse.status};
+  const identity = {serverProject: env.FIREBASE_PROJECT_ID, effectiveClientProject: env.VITE_PREVIEW_FIREBASE_PROJECT_ID, accountProject: account.project_id, accountMatches: !!account.client_email?.endsWith('@' + expected + '.iam.gserviceaccount.com'), adminMatches: !env.FIREBASE_ADMIN_CLIENT_EMAIL || env.FIREBASE_ADMIN_CLIENT_EMAIL.endsWith('@' + expected + '.iam.gserviceaccount.com'), authProject: auth.projectId, authStatus: authResponse.status};
   console.log(JSON.stringify({event: 'olivia-speech-firebase-verification', ...identity}));
-  if (identity.serverProject !== expected || identity.clientProject !== expected || identity.accountProject !== expected || !identity.accountMatches || identity.authProject !== expected) throw Error('El backend, Auth y el frontend deben corresponder exclusivamente a Firebase de pruebas.');
+  if (identity.serverProject !== expected || identity.effectiveClientProject !== expected || identity.accountProject !== expected || !identity.accountMatches || !identity.adminMatches || identity.authProject !== expected) throw Error('El backend, Auth y el frontend deben corresponder exclusivamente a Firebase de pruebas.');
   const google = JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS_JSON || '{}');
   if (google.project_id !== 'app-integral-fm-olivia-preview' || env.GOOGLE_CLOUD_PROJECT !== google.project_id) throw Error('La voz debe usar el proyecto de Olivia para previews.');
   // Read only the assistant configuration; no business records or Firestore writes.
-  const configured = await createOliviaStore().get('oliviaConfiguration/global');
+  // Netlify's TOML still contains the public production defaults; Vite selects VITE_PREVIEW_*.
+  // Match that effective client identity for this build-only read. Functions use their own scoped env.
+  const configured = await createOliviaStore({env: {...env, VITE_FIREBASE_PROJECT_ID: env.VITE_PREVIEW_FIREBASE_PROJECT_ID}}).get('oliviaConfiguration/global');
   const config = configured?.naturalVoice || defaultOliviaConfiguration().naturalVoice;
   const plan = speechBuildPlan(config);
   if (plan.approvalHash !== approvedHash) throw Error('La voz configurada difiere del lote autorizado. No se llamó a Google.');
