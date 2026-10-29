@@ -9,7 +9,8 @@ import { chirpClient } from '../netlify/functions/_lib/olivia/chirp.mjs';
 const approvedHash = '67ada6893c140142f7be305daa916da27cf43363a1d5f58e7f5bd600765d3904';
 async function main() {
   const env = process.env;
-  if (env.NETLIFY !== 'true' || env.CONTEXT !== 'deploy-preview' || env.REVIEW_ID !== '48' || env.BRANCH !== 'codex/olivia-fast-speech') throw Error('La generación está limitada a la preview 48 autorizada.');
+  console.log(JSON.stringify({ event: 'olivia-speech-build-context', netlify: env.NETLIFY, context: env.CONTEXT, reviewId: env.REVIEW_ID, branch: env.BRANCH, head: env.HEAD, preview: env.DEPLOY_PRIME_URL }));
+  if (env.NETLIFY !== 'true' || env.CONTEXT !== 'deploy-preview' || env.DEPLOY_PRIME_URL !== 'https://deploy-preview-48--appintegralflormia.netlify.app' || (env.HEAD || env.BRANCH) !== 'codex/olivia-fast-speech') throw Error('La generación está limitada a la preview 48 autorizada.');
   if (!process.argv.includes('--approve-plan=' + approvedHash)) throw Error('Falta la autorización puntual del lote. No se llamó a Google.');
   validatePreviewFirebase(env);
   const expected = 'app-integral-fm-pruebas';
