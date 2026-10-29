@@ -19,7 +19,8 @@ async function main() {
   const auth = authResponse.ok ? await authResponse.json() : {};
   const identity = {serverProject: env.FIREBASE_PROJECT_ID, effectiveClientProject: env.VITE_PREVIEW_FIREBASE_PROJECT_ID, accountProject: account.project_id, accountMatches: !!account.client_email?.endsWith('@' + expected + '.iam.gserviceaccount.com'), adminMatches: !env.FIREBASE_ADMIN_CLIENT_EMAIL || env.FIREBASE_ADMIN_CLIENT_EMAIL.endsWith('@' + expected + '.iam.gserviceaccount.com'), authProject: auth.projectId, authStatus: authResponse.status};
   console.log(JSON.stringify({event: 'olivia-speech-firebase-verification', ...identity}));
-  if (identity.serverProject !== expected || identity.effectiveClientProject !== expected || identity.accountProject !== expected || !identity.accountMatches || !identity.adminMatches || identity.authProject !== expected) throw Error('El backend, Auth y el frontend deben corresponder exclusivamente a Firebase de pruebas.');
+  // Identity Toolkit returns the numeric project number under projectId.
+  if (identity.serverProject !== expected || identity.effectiveClientProject !== expected || identity.accountProject !== expected || !identity.accountMatches || !identity.adminMatches || identity.authProject !== '545036860675' || !auth.authorizedDomains?.includes(expected + '.firebaseapp.com')) throw Error('El backend, Auth y el frontend deben corresponder exclusivamente a Firebase de pruebas.');
   const google = JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS_JSON || '{}');
   if (google.project_id !== 'app-integral-fm-olivia-preview' || env.GOOGLE_CLOUD_PROJECT !== google.project_id) throw Error('La voz debe usar el proyecto de Olivia para previews.');
   // Read only the assistant configuration; no business records or Firestore writes.
