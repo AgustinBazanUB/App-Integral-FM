@@ -1,8 +1,11 @@
 import { CURRENT_CAPABILITIES } from "./oliviaCurrentCapabilities.mjs";
+import { OLIVIA_APP_GUIDE, APP_GUIDE_VERSION } from "./oliviaAppGuide.mjs";
 
 const normalize = value => String(value || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 const tokens = value => [...new Set(normalize(value).match(/[a-z0-9]+/g) || [])].filter(word => word.length > 2);
-const indexed = CURRENT_CAPABILITIES.map((entry, index) => ({ entry, index, title: new Set(tokens(entry.title)), body: new Set(tokens(entry.text)) }));
+const currentGuide = OLIVIA_APP_GUIDE.map(row => ({ id: `guide-${row.module}`, module: row.module, audience: row.module === "seller" ? "seller" : "admin", title: row.title, text: `Olivia: ${row.assisted} Flujo manual y límites: ${row.manual}`, sourceUrl: row.route, version: APP_GUIDE_VERSION, status: "implemented" }));
+const historical = CURRENT_CAPABILITIES.filter(entry => entry.module !== "shipping" && !/GPT-Live|voz.*deshabilitada|voz.*tiempo real|perfil fijo/.test(entry.text));
+const indexed = [...currentGuide, ...historical].map((entry, index) => ({ entry, index, title: new Set(tokens(entry.title)), body: new Set(tokens(entry.text)) }));
 
 // This index describes the deployed code; proposed-solution knowledge is separate.
 // Authorization and live business values always come from backend tools.

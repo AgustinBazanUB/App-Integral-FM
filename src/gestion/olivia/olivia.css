@@ -304,3 +304,12 @@
  .fm-olivia-welcome p:last-child { display:none; }
 }
 @media(prefers-reduced-motion:reduce) { .fm-olivia-message { animation:none; } .fm-olivia-drawer * { scroll-behavior:auto; } }
+/* Indeterminate progress describes ongoing work without inventing completion. */
+.fm-olivia-working { display:flex; align-items:center; gap:9px; position:relative; overflow:hidden; align-self:flex-start; justify-self:start; width:fit-content; max-width:100%; padding:10px 15px 13px; border-radius:999px; background:#eef3ff; color:#343e70; font-size:13px; line-height:1.4; flex-shrink:0; }
+.fm-olivia-working__spinner { width:14px; height:14px; border:2px solid #c3cceb; border-top-color:#5b65bd; border-radius:50%; animation:olivia-work-spin 1s linear infinite; flex-shrink:0; }
+.fm-olivia-working__bar { position:absolute; left:12px; right:12px; bottom:4px; height:2px; border-radius:999px; background:#d8e1f4; overflow:hidden; }
+.fm-olivia-working__bar::after { content:""; display:block; width:35%; height:100%; border-radius:inherit; background:linear-gradient(90deg,#40bdc9,#7770da); animation:olivia-work-slide 1.6s ease-in-out infinite; }
+.fm-olivia-history-loading { display:block; text-align:center; padding:8px; color:#68708b; }
+@keyframes olivia-work-spin { to { transform:rotate(360deg); } }
+@keyframes olivia-work-slide { from { transform:translateX(-110%); } to { transform:translateX(300%); } }
+@media (prefers-reduced-motion:reduce) { .fm-olivia-working__spinner,.fm-olivia-working__bar::after { animation:none; } .fm-olivia-working__bar::after { width:100%; opacity:.6; } }

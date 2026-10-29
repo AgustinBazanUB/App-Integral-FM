@@ -8,11 +8,14 @@ export const oliviaClient = createOliviaTransport({ getToken: async () => 'synth
     const samples = new Int16Array(72000); for (let i = 0; i < samples.length; i++) samples[i] = Math.sin(i / 12) * 7000;
     return new Response(samples, { headers: { 'content-type': 'audio/pcm;rate=24000;channels=1' } });
   }
-  if (url.includes('transcribe')) return Response.json({ text: 'Hola Olivia, probemos la conversación.' });
+  if (url.includes('transcribe')) return Response.json({ text: new URLSearchParams(location.search).has('slowVoice') ? 'Consulta lenta de prueba de voz' : 'Hola Olivia, probemos la conversación.' });
   const b = JSON.parse(init.body);
   if (['state', 'resume'].includes(b.operation)) return Response.json(state());
   if (b.operation === 'estimate') return Response.json({ estimate: null });
-  if (b.operation === 'history') return Response.json({ conversations: [{ id: conversationId, title: 'Conversación de prueba', updatedAt: new Date().toISOString() }], conversationsCursor: null });
+  if (b.operation === 'history') {
+    if (b.conversationId) return Response.json({ selectedConversation: { messages: Array.from({ length: 20 }, (_, i) => ({ id: 'archived-'+i, role: i % 2 ? 'assistant' : 'user', content: 'Mensaje anterior sintético ' + (i + 1) + '. Historial de prueba para verificar scroll sin botones.' })), nextCursor: null } });
+    return Response.json({ conversations: [{ id: conversationId, title: 'Conversación de prueba', updatedAt: new Date().toISOString() }], conversationsCursor: null });
+  }
   if (b.operation === 'startChat') {
     if (!jobs.has(b.requestId)) jobs.set(b.requestId, { ...b, started: Date.now(), input: { id: 'user-'+b.requestId, role: 'user', content: b.message } });
     return Response.json({ jobId: b.requestId, conversationId });

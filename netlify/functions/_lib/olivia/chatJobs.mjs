@@ -76,7 +76,14 @@ export async function cancelChatJob({ store, session, body, now = new Date() }) 
     const job = (await tx.getDocument(path))?.data; ownJob(session, job);
     if (!live(job)) return;
     const conversationPath = `oliviaConversations/${job.payload.conversationId}`, conversation = (await tx.getDocument(conversationPath))?.data;
-    await tx.commitDocuments([{ type: "update", path, data: { status: "cancelled", updatedAt: now } }, ...(conversation?.busyRequestId === job.payload.requestId || conversation?.queuedChatRequestId === job.payload.requestId ? [{ type: "update", path: conversationPath, data: { busyRequestId: null, busyUntil: null, queuedChatRequestId: null, state: "CANCELADA", taskState: conversation.taskState ? { ...conversation.taskState, status: "cancelled", updatedAt: now } : null } }] : [])]);
+    const ownsWork = conversation?.busyRequestId === job.payload.requestId || conversation?.queuedChatRequestId === job.payload.requestId;
+    const pending = ownsWork && conversation.pendingActionId ? (await tx.getDocument(`oliviaConfirmations/${conversation.pendingActionId}`))?.data : null;
+    const preserveTask = body.preserveTask === true;
+    await tx.commitDocuments([
+      { type: "update", path, data: { status: "cancelled", interruption: preserveTask ? "new-user-instruction" : "user-stop", updatedAt: now } },
+      ...(pending?.status === "pending" ? [{ type: "update", path: `oliviaConfirmations/${conversation.pendingActionId}`, data: { status: "superseded", updatedAt: now } }] : []),
+      ...(ownsWork ? [{ type: "update", path: conversationPath, data: { busyRequestId: null, busyUntil: null, queuedChatRequestId: null, pendingActionId: null, state: preserveTask ? "DATOS_INCOMPLETOS" : "CANCELADA", taskState: conversation.taskState ? { ...conversation.taskState, status: preserveTask ? "collecting" : "cancelled", updatedAt: now } : null } }] : []),
+    ]);
   });
   return { cancelled: true };
 }
@@ -103,8 +110,8 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
   const timer = setTimeout(() => controller.abort(oliviaError("assistant-timeout", "La consulta alcanzó su límite de procesamiento.", 503)), 300000);
   try {
     const result = await engine.chat(session, payload, { longRunning: true, signal: controller.signal, onEvent: event => {
-      if (event.type === "accepted") progress.accepted = event.message;
-      if (event.type === "phase") { progress.phase = event.label; if (event.tools) progress.text = ""; }
+      if (event.type === "accepted") { progress.accepted = event.message; changed = true; flush().catch(() => {}); }
+      if (event.type === "phase") { progress.phase = event.label; if (event.tools) progress.text = ""; changed = true; flush().catch(() => {}); }
       if (event.type === "delta") progress.text = (progress.text + event.delta).slice(-64000);
       if (event.type === "voice.ready" && typeof event.text === "string") { progress.voiceText = event.text.slice(0, 3000); changed = true; flush().catch(() => {}); }
       changed = true;

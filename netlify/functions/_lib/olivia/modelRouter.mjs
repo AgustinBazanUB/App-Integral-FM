@@ -1,8 +1,10 @@
 import { can, normalizedRole } from "../../../../src/gestion/permissions.js";
+import { latestInstruction } from "./conversationTasks.mjs";
 
 export const MODEL_POLICY_VERSION = 2;
 export function classifyIntent(message = "", module = "") {
-  const text = normalize(message);
+  const text = latestInstruction(message);
+  if (/demanda|estima.*(?:vend|venta)|cuanto.*vender/.test(text)) return "demand.forecast";
   if (/pronostic|forecast|prevision/.test(text)) return "fair.forecast";
   if (/transfer|mandame|manda |enviame.*(aceite|botella|unidades)/.test(text)) return "stock.transfer";
   if (/cargame|ingresa|agrega/.test(text) && /stock|botella|unidades|mercaderia/.test(text)) return "stock.load";
@@ -10,7 +12,7 @@ export function classifyIntent(message = "", module = "") {
   if (/compara|comparacion/.test(text)) return "sales.compare";
   if (/stock|inventario/.test(text)) return "stock.read";
   if (/venta|nos fue|factur|ticket|rendimiento|metric/.test(text)) return "metrics.analysis";
-  if (/client|telefono/.test(text)) return /crea|registra|agrega/.test(text) ? "customer.create" : "customer.read";
+  if (/client|telefono/.test(text)) return /crea|registra|agrega|carg|alta/.test(text) ? "customer.create" : "customer.read";
   if (/envio|despacho/.test(text)) return "shipping.create";
   return `${module || "core"}.query`;
 }
@@ -20,13 +22,14 @@ const complex = /pronostic|forecast|prevision|proyect|optimiza|compara|comparaci
 
 /** Deterministic server policy. Neither model output nor browser flags select a model. */
 export function routeModel(configuration, session, { message = "", context = {}, task = null, skills = [], attachments = [], signals = {} } = {}) {
-  const text = normalize(message);
+  const text = latestInstruction(message);
   const module = context.module || "";
   const seller = normalizedRole(session.profile) === "seller";
   const creativeModule = ["marketing", "social"].includes(module) && can(session.profile, module, "view");
   const creativeIntent = !seller && creativeModule && creative.test(text);
   const reasons = [];
   if (complex.test(text)) reasons.push("analysis-or-forecast");
+  if (/estima|demanda|cuanto.*vender/.test(text) && !reasons.includes("analysis-or-forecast")) reasons.push("analysis-or-forecast");
   const dates = [...text.matchAll(/\d{4}-\d{2}-\d{2}/g)].map((match) => Date.parse(match[0])).filter(Number.isFinite);
   if (dates.length > 1 && Math.max(...dates) - Math.min(...dates) > 31 * 86400000) reasons.push("historical-horizon");
   if ((text.match(/\b(sin|maximo|minimo|limite|restriccion)\b/g) || []).length >= 2) reasons.push("multiple-constraints");

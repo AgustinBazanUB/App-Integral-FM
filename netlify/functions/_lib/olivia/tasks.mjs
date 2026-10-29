@@ -3,11 +3,13 @@ import { OLIVIA_TOOL_SCHEMAS, validateSchema, oliviaError } from "../../../../sr
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
 
 const normalize = (text = "") => String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const productReferenceWords = (value) => normalize(value).replace(/([a-z])(\d)/g, "$1 $2").replace(/medio litro|media botella de litro/g, "500 ml").replace(/\b(\d+)\s*(?:mililitros?|cc|ml)\b/g, "$1ml").replace(/\b(?:botellas?|bidones?|de|del|la|el|los|las|aceite|oliva|por|favor)\b/g, " ").split(/\s+/).filter(Boolean);
 export const isCorrection = (text = "") => /^(no |mejor |corregi|corrigi|cambia|cancel|eran |que sean )/.test(normalize(text));
-export const operationalIntent = (intent) => ({ "stock.load": "prepare_stock_load", "stock.transfer": "prepare_stock_transfer", "stock.read": "get_stock", "fair.forecast": "forecast_fair", "metrics.analysis": "get_sales_metrics", "sales.compare": "compare_locations", "customer.create": "prepare_customer_create", "customer.read": "get_customer", "shipping.create": "prepare_shipment_create", "marketing.creative": "creative_brief", "social.creative": "creative_brief" })[intent] || intent;
-const labels = { inventoryType: "si es un depósito o una ubicación", inventoryId: "el depósito o ubicación", locationId: "la ubicación de destino", productId: "el producto y su presentación", quantity: "la cantidad", reason: "el motivo", originId: "el origen", destinationId: "el destino", paymentMethod: "el medio de pago", ticketRequested: "si necesitás factura", customerDecision: "si asociamos un cliente", promotionDecision: "si aplicamos promociones", lines: "los productos y cantidades", carrierName: "quién transporta la mercadería" };
+export const operationalIntent = (intent) => ({ "stock.load": "prepare_stock_load", "stock.transfer": "prepare_stock_transfer", "stock.read": "get_stock", "fair.forecast": "forecast_fair", "demand.forecast": "forecast_product_demand", "metrics.analysis": "get_sales_metrics", "sales.compare": "compare_locations", "customer.create": "prepare_customer_create", "customer.read": "get_customer", "shipping.create": "prepare_shipment_create", "marketing.creative": "creative_brief", "social.creative": "creative_brief" })[intent] || intent;
+const labels = { forecastDays: "para cuantos dias queres la estimacion", inventoryType: "si es un depósito o una ubicación", inventoryId: "el depósito o ubicación", locationId: "la ubicación de destino", productId: "el producto y su presentación", quantity: "la cantidad", reason: "el motivo", originId: "el origen", destinationId: "el destino", paymentMethod: "el medio de pago", ticketRequested: "si necesitás factura", customerDecision: "si asociamos un cliente", promotionDecision: "si aplicamos promociones", lines: "los productos y cantidades", carrierName: "quién transporta la mercadería" };
 export function requiredFields(intent) {
   if (intent === "forecast_fair") return ["locationId", "startDate", "days"];
+  if (intent === "forecast_product_demand") return ["productId", "startDate", "endDate", "forecastDays"];
   if (intent === "creative_brief") return ["objective", "audience", "format"];
   if (["get_sales_metrics", "get_location_metrics", "compare_locations", "get_product_performance", "get_seller_performance", "get_sales_history", "get_product_sales_history"].includes(intent)) return ["startDate", "endDate"];
   if (intent === "get_all_time_sales_metrics") return [];
@@ -79,7 +81,7 @@ export function taskControl(text) {
 export async function progressiveStock({ previous, initialId, message, context, run, check = () => {}, now = new Date() }) {
   const text = normalize(message);
   const start = /^(?:cargame|carga|ingresa|ingresame|agrega|agregame)\s+(\d+)\s+(?:unidades? |botellas? |bidones? )?(?:de )?(.+)$/.exec(text);
-  const continuation = previous?.intent === "prepare_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/^(ahora|consulta|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|mandame|transferi|vende|registra|crea|disena)/.test(text);
+  const continuation = previous?.intent === "prepare_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/\b(?:cliente|cancel[a-z]*|explic[a-z]*|ensen[a-z]*|queria decir|no me cargues)\b/.test(text) && !/^(ahora|consulta|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|mandame|transferi|vende|registra|crea|disena)/.test(text);
   if (!start && !continuation) return null;
   check();
   let task = continuation ? structuredClone(previous) : { id: initialId || randomUUID(), intent: "prepare_stock_load", revision: 0, status: "collecting", slots: { locationId: null, productId: null, quantity: null, reason: null }, missingFields: [], ambiguities: {}, route: null, createdAt: now };
@@ -105,8 +107,9 @@ export async function progressiveStock({ previous, initialId, message, context, 
       products = (await run("search_products", { query: productQuery, locationId: null })).data.products || [];
       if (!products.length) products = (await run("search_products", { query: "", locationId: null })).data.products || [];
     }
-    const words = normalize(productQuery).split(" ");
-    const matches = products.filter((product) => words.every((word) => normalize(product.name).includes(word)));
+    const selectiveWords = productReferenceWords(productQuery);
+    const words = selectiveWords.length ? selectiveWords : normalize(productQuery).split(" ");
+    const matches = products.filter((product) => words.length && words.every((word) => productReferenceWords(product.name).includes(word) || normalize(product.name).includes(word)));
     if (matches.length === 1) { task.slots.productId = matches[0].productId; task.productName = matches[0].name; delete task.ambiguities.productId; }
     else { task.ambiguities.productId = matches; task.slots.productId = null; }
   }

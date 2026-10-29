@@ -187,7 +187,8 @@ test("Luna conserva los slots de un pronóstico y registra cada llamada", async 
   const task = f.documents.get(`oliviaConversations/${id}`).taskState;
   assert.equal(task.intent, "forecast_fair"); assert.deepEqual(task.missingFields, ["locationId"]);
   const usage = [...f.documents].find(([path]) => path.startsWith("oliviaUsage/"))[1];
-  assert.equal(usage.modelCalls.length, 2); assert.equal(usage.taskId, task.id);
+  assert.equal(usage.modelCalls.length, 1); assert.equal(usage.taskId, task.id);
+  assert.equal(result.telemetry.questionRoundAvoided, true);
   assert.equal(result.telemetry.reasoningEffort, "xhigh");
 });
 for (const slotsJson of ['{"period":"este fin de semana"}', '{malformed']) test(`Luna corrige slots inválidos sin guardarlos: ${slotsJson}`, async () => {

@@ -30,7 +30,8 @@ export default function OliviaComposer({ textareaRef, draft, setDraft, sendMessa
       <IconButton label={voiceActive ? muted ? "Activar micrófono" : "Silenciar micrófono" : "Dictar un mensaje"} icon={voiceActive && muted ? "MicOff" : "Mic"} aria-pressed={voiceActive ? muted : undefined} disabled={!voiceActive && (busy || disabled)} onClick={voiceActive ? toggleMute : startRecording} />
       {voiceAvailable || voiceActive ? <IconButton label={voiceActive ? "Finalizar conversación por voz" : "Conversar con Olivia por voz"} icon="AudioLines" aria-pressed={voiceActive} disabled={!voiceActive && (busy || disabled)} onClick={voiceActive ? stopVoice : startVoice} /> : null}
       {voiceActive && voiceRecording ? <IconButton label="Enviar turno de voz ahora" icon="Send" onClick={finishVoiceTurn} /> : null}
-      {busy ? <IconButton label="Detener respuesta" icon="Square" onClick={cancelRequest} /> : <IconButton label="Enviar mensaje" icon="Send" disabled={disabled || sendingDisabled || uploading || (!draft.trim() && !attachments.some((file) => file.id))} onClick={sendMessage} />}
+      {busy ? <IconButton label="Detener respuesta" icon="Square" onClick={() => cancelRequest()} /> : null}
+      {!busy || draft.trim() ? <IconButton label={busy ? "Enviar nueva instrucción" : "Enviar mensaje"} icon="Send" disabled={disabled || sendingDisabled || uploading || (!draft.trim() && !attachments.some((file) => file.id))} onClick={sendMessage} /> : null}
     </div>}
     {recording ? <small>Podés cancelar, revisar el dictado o enviarlo directamente.</small> : null}
   </form>;
