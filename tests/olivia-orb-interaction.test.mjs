@@ -94,13 +94,37 @@ test('natural pauses stay in one turn, acoustic continuations extend to 3–4s, 
   f.tick(3500, 0); assert.equal(f.turns.length, 0);
   f.tick(4000, .1); // second resumed pause => 4s
   f.tick(7100, 0); assert.equal(f.turns.length, 0);
-  f.tick(8100, 0); assert.equal(f.turns.length, 1);
+  f.tick(8100, 0); await f.voice.deliveryQueue; assert.equal(f.turns.length, 1);
   assert.equal(f.turns[0].blob.type, 'audio/mp4');
   f.tick(8200, .1); f.voice.finishTurn(); f.voice.finishTurn();
+  await f.voice.deliveryQueue;
   assert.equal(f.turns.length, 2); assert.equal(f.requested(), 1);
   assert.ok(f.levels.some(frame => frame.level > 0));
   f.voice.setMuted(true); f.tick(9000, .1); assert.equal(f.levels.at(-1).level, 0);
   f.voice.close(); assert.ok(f.tracks[0].stopped);
+});
+
+test('incomplete live partials extend silence and final live text bypasses duplicate file transcription',async()=>{
+  const f=voiceFixture();let commits=0;
+  f.voice.createTranscriber=async(_stream,onPartial)=>{onPartial('Necesito el stock de');return {closed:false,beginTurn(){onPartial('Necesito el stock de');},commit:async()=>{commits++;return {text:'Necesito el stock de aceite',itemId:'item-a'};},close(){this.closed=true;}};};
+  await f.voice.start();f.tick(100,.1);f.tick(2200,0);assert.equal(f.turns.length,0);f.tick(4200,0);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(commits,1);assert.equal(f.turns[0].metadata.transcript.text,'Necesito el stock de aceite');assert.equal(f.requested(),1);f.voice.close();
+});
+
+test('live setup failure preserves the same authorized capture and releases setup when ended',async()=>{
+  const f=voiceFixture(),notices=[];
+  f.voice.createTranscriber=async()=>{throw Error('Unavailable');};f.voice.onNotice=text=>notices.push(text);
+  await f.voice.start();assert.equal(f.requested(),1);assert.equal(f.voice.closed,false);assert.equal(notices.length,1);
+  f.tick(100,.1);f.voice.finishTurn();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.turns.length,1);assert.equal(f.turns[0].metadata.transcript,undefined);f.voice.close();
+});
+
+test('out-of-order live finals are delivered chronologically and mute discards provider input',async()=>{
+  const f=voiceFixture(),resolvers=[];let discards=0;
+  f.voice.createTranscriber=async()=>({closed:false,beginTurn(){},commit:()=>new Promise(resolve=>resolvers.push(resolve)),discardTurn(){discards++;},close(){this.closed=true;}});
+  await f.voice.start();f.tick(100,.1);f.voice.finishTurn();f.tick(200,.1);f.voice.finishTurn();
+  resolvers[1]({text:'Después cliente'});await new Promise(resolve=>setImmediate(resolve));assert.equal(f.turns.length,0);
+  resolvers[0]({text:'Primero stock'});await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(f.turns.map(x=>x.metadata.transcript.text),['Primero stock','Después cliente']);
+  f.tick(300,.1);f.voice.setMuted(true);assert.ok(discards>0);assert.equal(f.tracks[0].enabled,false);f.voice.close();
 });
 
 test('permission rejection closes the pipeline and reports the real failure without a second permission', async () => {

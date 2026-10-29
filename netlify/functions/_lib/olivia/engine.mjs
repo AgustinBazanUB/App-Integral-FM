@@ -1,4 +1,5 @@
 import { executeToolBatch } from "./toolExecution.mjs";
+import { chooseLocalGreeting } from '../../../../src/shared/oliviaFastSpeech.mjs';
 import { metricsForModel } from "./analytics.mjs";
 import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, taskSlotSchema, requiredFields, isCorrection, operationalIntent, shortVoiceQuestion } from "./tasks.mjs";
 import { aggregateRoutes } from "./modelRouter.mjs";
@@ -186,7 +187,7 @@ export function createOliviaEngine({
       voiceProtocol: "chirp",
       voiceConversationAvailable: Boolean(config.naturalVoice.enabled && canUseOliviaVoice(session) && env.OPENAI_API_KEY && hasGoogleCloudTtsCredentials(env)),
       voiceTrialAvailable: false,
-      ...(config.naturalVoice.enabled && canUseOliviaVoice(session) ? { voiceSettings: { turnEndSilenceMs: config.naturalVoice.turnEndSilenceMs } } : {}),
+      ...(config.naturalVoice.enabled && canUseOliviaVoice(session) ? { voiceSettings: { turnEndSilenceMs: config.naturalVoice.turnEndSilenceMs, transcriptionModel:'gpt-live-transcribe', voice:config.naturalVoice.voice, speakingRate:config.naturalVoice.speakingRate } } : {}),
       ...(canAccessAdministration(session.profile) && canUseOliviaVoice(session) ? { voiceConfiguration: { model: "Google Chirp 3 HD", backendModel: "GPT-6 Luna · router HIGH/XHIGH", reasoningEffort: "enrutado", voice: config.naturalVoice.voice } } : {}),
       policyVersion: OLIVIA_POLICY_VERSION,
       ...(estimate ? { estimate } : {}),
@@ -440,6 +441,13 @@ export function createOliviaEngine({
         await tx.commitDocuments([{ type: "update", path: `oliviaConversations/${id}`, data: { taskState: task, suspendedTasks: currentSuspendedTasks, draft: task?.slots || null } }]);
       });
       onEvent?.({ type: "accepted", conversationId: id, message: conversation.messages.at(-1) });
+      const greeting=naturalVoice && !attachments.length ? chooseLocalGreeting(userMessage) : null;
+      if(greeting) {
+        const result=await persistTurn({content:greeting.text,taskState:conversation.taskState || null,draft:conversation.draft,state:'INFORMACION',preservePending:true});
+        event={...event,route:'deterministic',routingReason:'greeting-only',measurement:'provider',modelCalls:[],tools:[],durationMs:Date.now()-startedAt};
+        await settleUsage({store,session,reservation,event,configuration:config,result:{conversationId:id},now:clock()});settled=true;
+        result.usage=await usage(session,config,event);return result;
+      }
       const deterministicTools = [];
       const deterministicTaskId = conversation.taskState?.intent === "prepare_stock_load" && !["completed", "cancelled"].includes(conversation.taskState.status) ? conversation.taskState.id : randomUUID();
       const run = async (name, args) => {

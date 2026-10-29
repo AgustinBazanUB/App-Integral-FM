@@ -8,6 +8,15 @@ import {
 const NOW = new Date("2026-10-04T15:00:00.000Z");
 const PAST = new Date("2026-10-04T14:59:00.000Z");
 const FUTURE = new Date("2026-11-04T15:00:00.000Z");
+test('private personalized audio follows retention without deleting unexpired user audio',async()=>{
+  const f=memoryStore([
+    ['oliviaPrivateSpeech/old',{userId:'a',audio:'synthetic',retentionExpiresAt:PAST}],
+    ['oliviaPrivateSpeech/current',{userId:'b',audio:'synthetic',retentionExpiresAt:FUTURE}],
+  ]);
+  await runOliviaRetention({store:f.store,now:NOW});
+  assert.equal(f.data.has('oliviaPrivateSpeech/old'),false);
+  assert.equal(f.data.has('oliviaPrivateSpeech/current'),true);
+});
 function memoryStore(entries = []) {
   const data = new Map(
     entries.map(([path, value]) => [path, structuredClone(value)]),
@@ -711,7 +720,7 @@ test("query/transaction work is bounded and interrupted runs leave backlog for n
   assert.equal(result.possibleBacklog, true);
   assert.equal(
     fixture.queries.filter((query) => !query.collection.includes("/")).length,
-    10,
+    11,
   );
   assert.ok(fixture.queries.every((query) => query.limit <= 12));
   assert.ok(

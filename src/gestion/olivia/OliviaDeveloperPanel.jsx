@@ -1,5 +1,6 @@
 export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceConfiguration, telemetry, money }) {
   const ms = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
+  const percentiles=value=>`${ms(value?.medianMs)} / ${ms(value?.p90Ms)} / ${ms(value?.p95Ms)}`;
   const rows = [
     ...(voiceConfiguration ? [["Modelo de conversación", voiceConfiguration.model], ["Cerebro y acciones de voz", `${voiceConfiguration.backendModel} / ${voiceConfiguration.reasoningEffort}`], ["Voz fija de Olivia", voiceConfiguration.voice]] : []),
     ["Modelo / razonamiento", `${telemetry?.model || estimate?.model || "—"} / ${telemetry?.reasoningEffort || estimate?.reasoningEffort || "—"}`],
@@ -14,7 +15,14 @@ export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMe
     ["Request → primer texto (ms)", ms(latency?.firstDeltaMs)],
     ["Primer texto → completa (ms)", latency?.firstDeltaMs != null ? ms(latency.totalMs - latency.firstDeltaMs) : "—"],
     ["Voz natural · Chirp 3 HD", voiceConfiguration?.voice || "No disponible"],
-    ["Fin de habla → transcripción · mediana / P95 (ms)", `${ms(voiceMetrics?.turnToTranscript?.medianMs)} / ${ms(voiceMetrics?.turnToTranscript?.p95Ms)}`],
+    ['Transcripción de esta sesión',voiceMetrics?.transcriptionMode || 'Sin iniciar'],
+    ["Silencio de fin de turno · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.silence)],
+    ["Detección → transcripción final · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.turnToTranscript)],
+    ["Fin real de voz → transcripción · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.voiceEndToTranscript)],
+    ["Selector Luna NONE · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.selection)],
+    ["Selector iniciado → clip disponible · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.fastAudioAvailable)],
+    ["Turno confirmado → primera intervención · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.turnToFirstIntervention)],
+    ["Selector · costo USD estimado mediano",money(voiceMetrics?.selectionCostUsd?.medianMs,'USD')],
     ["Transcripción → primer audio programado · mediana / P95 (ms)", `${ms(voiceMetrics?.transcriptToVoice?.medianMs)} / ${ms(voiceMetrics?.transcriptToVoice?.p95Ms)}`],
     ["TTFA programado · mediana / P95 (ms)", `${ms(voiceMetrics?.ttfaScheduled?.medianMs)} / ${ms(voiceMetrics?.ttfaScheduled?.p95Ms)}`],
     ["Última síntesis · caracteres / costo USD estimado", `${voiceMetrics?.lastCharacters ?? "—"} / ${money(voiceMetrics?.lastEstimatedCostUsd, "USD")}`],

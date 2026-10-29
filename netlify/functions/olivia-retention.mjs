@@ -605,6 +605,7 @@ export async function runOliviaRetention({
       [["retentionExpiresAt", "LESS_THAN_OR_EQUAL", now]],
       "retentionExpiresAt",
     ],
+    ["oliviaPrivateSpeech", [["retentionExpiresAt", "LESS_THAN_OR_EQUAL", now]], "retentionExpiresAt"],
   ];
   const rows = await Promise.all(
     definitions.map(([collection, filters, field]) =>
@@ -625,6 +626,7 @@ export async function runOliviaRetention({
       () => purgeExpiredRecords(store, "oliviaQuotaRequests", rows[7], now),
       () => purgeExpiredRecords(store, "oliviaVoiceRequests", rows[8], now),
       () => purgeExpiredRecords(store, "oliviaVoiceBudgets", rows[9], now),
+      () => purgeExpiredRecords(store, "oliviaPrivateSpeech", rows[10], now),
     ];
   let completedPhases = 0,
     historyBacklog = false;

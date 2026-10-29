@@ -14,7 +14,10 @@ import { DictationCapture } from "./dictation.mjs";
 import OliviaComposer from "./OliviaComposer";
 import OliviaDeveloperPanel from "./OliviaDeveloperPanel";
 import { NaturalVoiceConversation, latencyPercentile } from "./naturalVoice.mjs";
-import { VoiceAcknowledgement } from "./voiceAcknowledgement.mjs";
+import { FastSpeechPlayer } from "./fastSpeechPlayer.mjs";
+import { SpeechClipCache } from "./speechClips.mjs";
+import { LiveTranscription } from "./liveTranscription.mjs";
+import { isGreetingOnly } from "../../shared/oliviaFastSpeech.mjs";
 import OliviaVoiceControls from "./OliviaVoiceControls";
 import { EqualizerOrb } from "./voiceorbs/EqualizerOrb";
 import { OrbPill } from "./voiceorbs/OrbPill";
@@ -64,6 +67,8 @@ export default function OliviaAssistant() {
   const voiceTurnQueue = useRef(Promise.resolve());
   const acknowledgementRef = useRef(null);
   const voiceSpeechEpoch = useRef(0);
+  const greetingPlayedEpoch = useRef(-1);
+  const mainVoiceEpoch = useRef(-1);
   const submittingRef = useRef(false);
   const playedVoice = useRef(new Set());
   const [sessionNotice, setSessionNotice] = useState("");
@@ -177,13 +182,14 @@ export default function OliviaAssistant() {
     if (!Number.isFinite(duration) || duration < 0) return;
     const samples = voiceMetricsSamples.current;
     samples[key] = [...(samples[key] || []), duration].slice(-100);
-    const summary = (name) => ({ medianMs: latencyPercentile(samples[name] || [], 0.5), p95Ms: latencyPercentile(samples[name] || [], 0.95), count: (samples[name] || []).length });
-    setVoiceMetrics({ turnToTranscript: summary("turnToTranscript"), transcriptToVoice: summary("transcriptToVoice"), ttfaScheduled: summary("ttfa") });
+    const summary = (name) => ({ medianMs: latencyPercentile(samples[name] || [], 0.5), p90Ms: latencyPercentile(samples[name] || [], 0.9), p95Ms: latencyPercentile(samples[name] || [], 0.95), count: (samples[name] || []).length });
+    setVoiceMetrics(current => ({...current,...Object.fromEntries(Object.keys(samples).map(name=>[name,summary(name)])),ttfaScheduled:summary('ttfa')}));
   };
 
   const playNaturalText = async (text) => {
     if (!text || !voiceRef.current || voiceRef.current.closed) return;
     acknowledgementRef.current?.cancel();
+    mainVoiceEpoch.current = voiceSpeechEpoch.current;
     lastSpokenText.current = text;
     if (voiceRef.current.recordingTurn) return;
     const controller = new AbortController(); voiceSynthesisRef.current?.abort(); voiceSynthesisRef.current = controller;
@@ -213,31 +219,34 @@ export default function OliviaAssistant() {
         setStreamText(""); setPhase("Olivia está pensando la respuesta…");
         setOptimistic({ id: `optimistic-${identity}`, role: "user", content: fields.message, attachments: fields.attachmentPreviews || [] });
         streamStart.current = { sentAt: performance.now(), firstDeltaMs: null, visibleMs: null };
-        if (fields.inputMode === "natural-voice") acknowledgementRef.current?.start(() => requestRef.current === controller && !voiceRef.current?.recordingTurn);
       }
       if (operation === "chat") streamStart.current.requestMs = performance.now() - streamStart.current.sentAt;
       const result = await oliviaClient.request({ ...payload, ...(operation === "chat" ? { background: true } : {}) }, { signal: controller.signal, ...(fields.inputMode === "natural-voice" ? { pollIntervalMs: 350 } : {}),
         onEvent: ["chat", "waitChat"].includes(operation) ? (event) => {
           if (!mounted.current || controller.signal.aborted || requestRef.current !== controller) return;
-          if (event.type === "job") { jobRef.current = event.jobId; setSnapshot(current => ({ ...current, activeChatJob: { jobId: event.jobId, inputMode: fields.inputMode } })); }
+          if (event.type === "job") {
+            jobRef.current = event.jobId; setSnapshot(current => ({ ...current, activeChatJob: { jobId: event.jobId, inputMode: fields.inputMode } }));
+            if(operation==='chat' && fields.inputMode==='natural-voice' && !isGreetingOnly(fields.message)) acknowledgementRef.current?.start(()=>requestRef.current===controller && voiceSpeechEpoch.current===speechEpoch && !voiceRef.current?.recordingTurn,{jobId:event.jobId,text:fields.message,conversationId:conversationRef.current});
+          }
           if (event.type === "accepted") { setOptimistic(event.message); conversationRef.current = event.conversationId; }
           if (event.type === "delta") {
             if (streamStart.current && streamStart.current.firstDeltaMs == null) streamStart.current.firstDeltaMs = performance.now() - streamStart.current.sentAt;
             setStreamText((current) => current + event.delta);
           }
           if (event.type === "phase") { setPhase(event.label); if (event.tools) setStreamText(""); }
-          if (event.type === "voice.ready" && fields.inputMode === "natural-voice" && voiceSpeechEpoch.current === speechEpoch) {
+          if (event.type === "voice.ready" && fields.inputMode === "natural-voice" && voiceSpeechEpoch.current === speechEpoch && greetingPlayedEpoch.current !== speechEpoch) {
             const key = `${jobRef.current || identity}:${event.text}`;
             if (!playedVoice.current.has(key)) { playedVoice.current.add(key); voiceSpeechPromiseRef.current = playNaturalText(event.text); }
           }
         } : undefined });
       if (!mounted.current || controller.signal.aborted || requestRef.current !== controller) return result;
-      if (["chat", "waitChat"].includes(operation) && fields.inputMode === "natural-voice" && voiceSpeechEpoch.current === speechEpoch) {
+      if (["chat", "waitChat"].includes(operation) && fields.inputMode === "natural-voice" && voiceSpeechEpoch.current === speechEpoch && greetingPlayedEpoch.current !== speechEpoch) {
         const spoken = result.spokenText || result.messages?.filter((message) => message.role === "assistant").at(-1)?.voiceTranscript;
         const key = `${jobRef.current || identity}:${spoken}`;
         if (spoken && !playedVoice.current.has(key)) { playedVoice.current.add(key); voiceSpeechPromiseRef.current = playNaturalText(spoken); }
       }
       apply(result);
+      if(fields.inputMode==='natural-voice' && greetingPlayedEpoch.current===speechEpoch && voiceRef.current && !voiceRef.current.recordingTurn && !voiceRef.current.sources.size)setVoiceState(mutedRef.current?'muted':'listening');
       if (operation === "chat") { setOptimistic(null); setStreamText(""); setLatency({ ...streamStart.current, totalMs: performance.now() - streamStart.current.sentAt }); }
       if (["chat", "waitChat"].includes(operation) && fields.inputMode === "natural-voice") { await voiceSpeechPromiseRef.current; voiceSpeechPromiseRef.current = null; }
       jobRef.current = null;
@@ -261,7 +270,7 @@ export default function OliviaAssistant() {
       }
       throw failure;
     } finally {
-      if (requestRef.current === controller) acknowledgementRef.current?.cancel();
+      if (requestRef.current === controller && !isGreetingOnly(fields.message)) acknowledgementRef.current?.cancel();
       if (requestRef.current === controller) { requestRef.current = null; if (mounted.current) setBusy(false); }
     }
   }, [apply]);
@@ -552,19 +561,22 @@ export default function OliviaAssistant() {
     }
   };
 
-  const submitVoiceTurn = async (audio, { durationSeconds, endedAt }) => {
+  const submitVoiceTurn = async (audio, { durationSeconds, endedAt, voiceEndedAt, transcript }) => {
     if (!mounted.current || !voiceRef.current || voiceRef.current.closed) return;
     lastVoiceBlob.current = { audio, durationSeconds };
     const controller = new AbortController(); voiceTranscriptionRef.current = controller; setBusy(true); setVoiceState("processing"); setPhase("Transcribiendo tu mensaje…"); setVoiceFailure(false);
     let text = "";
     try {
-      const result = await oliviaClient.transcribe(audio, { conversationId: conversationRef.current, requestId: requestId(), durationSeconds }, { signal: controller.signal });
+      const result = transcript?.text ? transcript : await oliviaClient.transcribe(audio, { conversationId: conversationRef.current, requestId: requestId(), durationSeconds }, { signal: controller.signal });
       if (!mounted.current || controller.signal.aborted || !voiceRef.current || voiceRef.current.closed) return;
       text = String(result.text || "").trim();
       if (!text) throw new Error("No se reconoció el mensaje. Podés reintentar la transcripción o volver a hablar.");
       if (result.usage) setSnapshot((current) => ({ ...current, usage: result.usage }));
+      const liveSession=voiceRef.current?.transcriber?.session;
+      if(transcript?.itemId && liveSession)void oliviaClient.liveTranscription({operation:'turn',requestId:liveSession.requestId,conversationId:conversationRef.current,itemId:transcript.itemId,durationSeconds}).catch(()=>{});
       const transcriptAt = performance.now(); voiceTurnTiming.current = { endedAt, transcriptAt };
       recordVoiceMetric("turnToTranscript", transcriptAt - endedAt);
+      if(Number.isFinite(voiceEndedAt)) {recordVoiceMetric('silence',endedAt-voiceEndedAt);recordVoiceMetric('voiceEndToTranscript',transcriptAt-voiceEndedAt);}
       setCaption(text); stickToBottom.current = true; setOptimistic({ id: `natural-voice-${requestId()}`, role: "user", content: text });
     } catch (failure) {
       if (mounted.current && voiceTranscriptionRef.current === controller && !controller.signal.aborted && failure.name !== "AbortError") {
@@ -575,6 +587,10 @@ export default function OliviaAssistant() {
     } finally { if (voiceTranscriptionRef.current === controller) voiceTranscriptionRef.current = null; if (mounted.current) setBusy(Boolean(requestRef.current)); }
     if (text && mounted.current && !controller.signal.aborted) {
       if (requestRef.current && !await cancelRequest({ preserveTask: true })) return;
+      if(isGreetingOnly(text)) {
+        const epoch=voiceSpeechEpoch.current;
+        void acknowledgementRef.current?.greeting(text,()=>mounted.current && voiceSpeechEpoch.current===epoch && mainVoiceEpoch.current!==epoch && !voiceRef.current?.recordingTurn).then(played=>{if(played)greetingPlayedEpoch.current=epoch;});
+      }
       // Release the transcription queue once dispatched: a new spoken correction
       // can now be transcribed while the previous reasoning request is running.
       void perform("chat", { message: text, inputMode: "natural-voice" }).catch(() => { if (mounted.current) setVoiceState("listening"); });
@@ -599,6 +615,18 @@ export default function OliviaAssistant() {
     if (busy || recording || voiceRef.current || exhausted || unavailable || snapshot.pendingAction || !conversationRef.current) return;
     setError(""); setCaption(""); setMuted(false); setVoiceRetryType(""); setVoiceFailure(false); setPermissionDenied(false); setSessionNotice(""); lastVoiceBlob.current = null; voiceTurnTiming.current = null;
     const connection = new NaturalVoiceConversation({
+      createTranscriber: snapshot.voiceSettings?.transcriptionModel==='gpt-live-transcribe' ? async(stream,onPartial,signal)=>{
+        const identity=requestId(), sessionConversation=conversationRef.current, transcriber=new LiveTranscription({
+          connect:(sdp,signal)=>oliviaClient.liveTranscription({operation:'start',sdp,requestId:identity,conversationId:sessionConversation},{signal}),
+          stop:()=>oliviaClient.liveTranscription({operation:'stop',requestId:identity,conversationId:sessionConversation}),
+          onPartial,onUnavailable:()=>{if(mounted.current && voiceRef.current===connection){setVoiceNotice('La transcripción en vivo se interrumpió; continúo con dictado por turnos.');setVoiceMetrics(current=>({...current,transcriptionMode:'GPT Transcribe · respaldo por turnos'}));}},
+        });
+        signal.addEventListener('abort',()=>transcriber.close(),{once:true});
+        if(signal.aborted){transcriber.close();throw new DOMException('Finalizada','AbortError');}
+        try{const ready=await transcriber.start(stream);if(mounted.current && voiceRef.current===connection)setVoiceMetrics(current=>({...current,transcriptionMode:'GPT Live Transcribe'}));return ready;}catch(error){transcriber.close();throw error;}
+      } : undefined,
+      onPartial:text=>acknowledgementRef.current?.anticipate(text),
+      onNotice:notice=>{if(mounted.current && voiceRef.current===connection){setVoiceNotice(notice);setVoiceMetrics(current=>({...current,transcriptionMode:'GPT Transcribe · respaldo por turnos'}));}},
       silenceMs: Math.max(1900, snapshot.voiceSettings?.turnEndSilenceMs || 1900),
       maxSeconds: snapshot.audioLimits?.maxSeconds || 60,
       maxBytes: snapshot.audioLimits?.maxBytes || 4 * 1024 * 1024,
@@ -617,10 +645,17 @@ export default function OliviaAssistant() {
     });
     voiceRef.current = connection;
     acknowledgementRef.current?.dispose();
-    acknowledgementRef.current = new VoiceAcknowledgement({
-      load: (text, signal) => oliviaClient.synthesize(text, { conversationId: conversationRef.current, requestId: requestId() }, { signal }),
+    const clipCache = new SpeechClipCache({voice:{voice:snapshot.voiceSettings?.voice || snapshot.voiceConfiguration?.voice || 'es-US-Chirp3-HD-Aoede',speakingRate:snapshot.voiceSettings?.speakingRate || 1},userId:user.uid,
+      privateAudio:(clipId,signal)=>oliviaClient.speechAudio({operation:'get',clipId,conversationId:conversationRef.current},{signal}),
+      preparePrivate:(clipId,signal)=>oliviaClient.speechAudio({operation:'prepare',clipId,conversationId:conversationRef.current,requestId:requestId()},{signal}),
+    });
+    acknowledgementRef.current = new FastSpeechPlayer({
+      cache:clipCache,
+      select:(fields,signal)=>oliviaClient.fastSpeech({...fields,requestId:requestId()},{signal}),
+      loadFallback: (text, signal) => oliviaClient.synthesize(text, { conversationId: conversationRef.current, requestId: requestId() }, { signal }),
+      onMetric:(key,value)=>recordVoiceMetric(key,value),
       play: (response, { signal, text }) => connection.play(response, { signal,
-        onFirstScheduled: () => { if (!signal.aborted && voiceRef.current === connection) { setCaption(text); setVoiceState("speaking"); } },
+        onFirstScheduled: at => { if (!signal.aborted && voiceRef.current === connection) { setCaption(text); setVoiceState("speaking"); if(voiceTurnTiming.current)recordVoiceMetric('turnToFirstIntervention',at-voiceTurnTiming.current.endedAt); } },
         onComplete: () => { if (!signal.aborted && voiceRef.current === connection && !connection.recordingTurn) setVoiceState(requestRef.current ? "processing" : mutedRef.current ? "muted" : "listening"); },
       }),
     });

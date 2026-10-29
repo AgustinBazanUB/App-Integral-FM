@@ -35,11 +35,13 @@ export async function closeExpiredVoiceSessions({
             now,
           });
         }
+        const liveTranscription = session.kind === 'live-transcription';
+        const estimatedSeconds = Math.max(0, Math.min(240, (now - new Date(session.createdAt)) / 1000));
         await store.commit([
           {
             type: "update",
             path: `oliviaRealtime/${session.id}`,
-            data: { status: "closed", closedAt: now, meteringStatus: "settled", finalization: "retired" },
+            data: { status: "closed", closedAt: now, meteringStatus: liveTranscription ? "unconfirmed" : "settled", finalization: liveTranscription ? "duration-limit" : "retired", ...(liveTranscription ? { estimatedSeconds, estimatedCostUsd: estimatedSeconds * .017 / 60 } : {}) },
           },
         ]);
         closed++;

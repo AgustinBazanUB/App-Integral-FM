@@ -111,7 +111,7 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
   try {
     const result = await engine.chat(session, payload, { longRunning: true, signal: controller.signal, onEvent: event => {
       if (event.type === "accepted") { progress.accepted = event.message; changed = true; flush().catch(() => {}); }
-      if (event.type === "phase") { progress.phase = event.label; if (event.tools) progress.text = ""; changed = true; flush().catch(() => {}); }
+      if (event.type === "phase") { progress.phase = event.label; if (event.tools) { progress.text = ""; progress.tools = event.tools; } changed = true; flush().catch(() => {}); }
       if (event.type === "delta") progress.text = (progress.text + event.delta).slice(-64000);
       if (event.type === "voice.ready" && typeof event.text === "string") { progress.voiceText = event.text.slice(0, 3000); changed = true; flush().catch(() => {}); }
       changed = true;

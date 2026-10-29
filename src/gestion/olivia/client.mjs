@@ -165,6 +165,12 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
       return send("/.netlify/functions/olivia", payload, options);
     },
     knowledge: (payload, options) => send("/.netlify/functions/olivia-knowledge", payload, options),
+    liveTranscription: (payload, options) => send("/.netlify/functions/olivia-live-transcribe",payload,options),
+    fastSpeech: (payload, options) => send("/.netlify/functions/olivia-fast-speech",payload,options),
+    speechAudio: async (payload,{signal}={}) => {
+      const token=await getToken();
+      return fetchImpl('/.netlify/functions/olivia-speech-audio',{method:'POST',signal,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    },
     publishKnowledge: (file, payload, options) => {
       const form = new FormData(); form.set("file", file, file.name);
       Object.entries(payload).forEach(([key, value]) => form.set(key, String(value)));
