@@ -10,6 +10,9 @@ import { aggregateRoutes } from "./modelRouter.mjs";
 import { transitionConversationTask, manageConversationTask, taskManagementTool, isTaskInterruption } from "./conversationTasks.mjs";
 import { isSuggestionRequest, isFeedbackCaptureRequest, isSuggestionContinuation, processSuggestion } from "./suggestions.mjs";
 import { fieldGuidance } from '../../../../src/shared/oliviaOperationGuide.mjs';
+import { assistiveIntent } from '../../../../src/shared/oliviaAssistiveIntent.mjs';
+import { guideForMessage, getUiGuide } from '../../../../src/shared/oliviaUiGuides.mjs';
+import { chooseExpression, naturalStyleContext } from '../../../../src/shared/oliviaExpressions.mjs';
 import { canUseOliviaVoice, hasGoogleCloudTtsCredentials } from "../../../../src/shared/oliviaVoiceAvailability.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { captureOliviaFailure, publicOliviaFailure } from "./errorReports.mjs";
@@ -184,6 +187,7 @@ export function createOliviaEngine({
           ? "RECHAZADA"
           : conversation.state,
       pendingAction,
+      guide: conversation.guide || null,
       failure: conversation.lastFailure || null,
       usage: await usage(session, config),
       capabilities: capabilities(session),
@@ -291,7 +295,7 @@ export function createOliviaEngine({
     session,
     id,
     requestId,
-    { content, prepared, draft, taskState, suspendedTasks, activeSkills, metricsPeriod, state: nextState, navigation, failure = null, hiddenFromChat = false, preservePending = false, voiceTranscript = null },
+    { content, prepared, draft, taskState, suspendedTasks, activeSkills, metricsPeriod, guideState, guide, guideControl, ideaContext, state: nextState, navigation, failure = null, hiddenFromChat = false, preservePending = false, voiceTranscript = null },
     config,
     onSaved,
   ) {
@@ -358,6 +362,9 @@ export function createOliviaEngine({
           ...(taskState !== undefined ? { taskState } : {}),
           ...(suspendedTasks !== undefined ? { suspendedTasks } : {}),
           ...(metricsPeriod !== undefined ? { metricsPeriod } : {}),
+          ...(guideState !== undefined ? { guideState } : {}),
+          ...(guide !== undefined ? { guide } : { guide: null }),
+          ...(ideaContext !== undefined ? { ideaContext } : {}),
           ...(activeSkills ? { activeSkills: activeSkills.slice(0, 2).map(({ name, version }) => ({ name, version })) } : {}),
           busyRequestId: null,
           busyUntil: null,
@@ -369,6 +376,8 @@ export function createOliviaEngine({
     onSaved?.();
     const result = await state(session, id);
     if (navigation) result.navigation = navigation;
+    if (guide) result.guide = guide;
+    if (guideControl) result.guideControl = guideControl;
     return result;
   }
   async function chat(session, body, options = {}) {
@@ -446,10 +455,39 @@ export function createOliviaEngine({
         body.foreground===true,
       );
       claimed = true;
+      const assistance = assistiveIntent(userMessage, conversation.ideaContext);
       const suggestionFlow = !attachments.length && (isSuggestionRequest(userMessage) || isFeedbackCaptureRequest(userMessage) || isSuggestionContinuation(conversation, userMessage));
+      const guidePlan = !attachments.length && !assistance.pure && !suggestionFlow ? guideForMessage(userMessage, context, conversation.guideState, session.profile) : null;
+      if (guidePlan?.control) {
+        const action = guidePlan.control;
+        const currentGuide = getUiGuide(session.profile, context.uiGuide.guideId, context), at = currentGuide.steps.findIndex(step => step.id === context.uiGuide.stepId);
+        const selected = currentGuide.steps[Math.max(0, at + (action === 'next' ? 1 : action === 'previous' ? -1 : 0))];
+        const detail = selected ? `${selected.title}. ${selected.description}` : 'Llegamos al final de los pasos de esta guía.';
+        const marked = context.uiGuide.errors.map(id => currentGuide.steps.find(step => step.id === id)?.title).filter(Boolean);
+        const errors = context.uiGuide.errors.length ? ` El formulario marca datos para revisar${marked.length ? ': ' + marked.join(', ') : ''}. Podés corregirlos antes de guardar; la guía no completa ni envía el formulario.` : '';
+        const content = action === 'cancel' ? 'Terminé la guía visual. La conversación y tus datos siguen disponibles.' : action === 'pause' ? 'Pausé la guía. Podés retomarla cuando quieras.' : action === 'resume' ? `Retomamos la guía visual. ${detail}` : `${action === 'explain' ? 'Claro.' : action === 'next' ? 'Paso siguiente:' : 'Paso anterior:'} ${detail}${errors}`;
+        const result = await persistTurn({ content, guideControl: { action, guideId: context.uiGuide.guideId }, preservePending: true, state: 'INFORMACION' });
+        event = { ...event, route: 'deterministic', routingReason: 'visual-guide-control', measurement: 'provider', modelCalls: [], tools: [] };
+        await settleUsage({ store, session, reservation, event, configuration: config, result: { conversationId: id }, now: clock() }); settled = true;
+        result.usage = await usage(session, config, event); return result;
+      }
+      if (guidePlan) {
+        const guide = guidePlan.id ? getUiGuide(session.profile, guidePlan.id, context) : null;
+        const managed = manageConversationTask({ task: conversation.taskState, suspendedTasks: conversation.suspendedTasks || [] }, 'pause', null, clock());
+        currentSuspendedTasks = managed.suspendedTasks;
+        const content = guidePlan.question || (guide ? `${chooseExpression('guide', conversation.messages)} ${guide.title}.\n\n${guide.steps.map((step, index) => `${index + 1}. **${step.title}**: ${step.description}`).join('\n')}\n\nPodés iniciar los pasos visuales. Vos controlás los botones y podés cancelar cuando quieras.` : 'Esa guía no está habilitada con tus permisos. Puedo ayudarte con las funciones disponibles en tu panel.');
+        const guideSkills = guide || guidePlan.question ? await routeSkills(session, 'Guiame paso a paso') : [];
+        const voiceTranscript = guidePlan.question || (guide ? `${guide.title}. ${guide.steps[0].description} En el chat tenés el botón para mostrar los pasos en pantalla. Podés pedirme que explique cada paso.` : content);
+        const result = await persistTurn({ content, voiceTranscript, taskState: null, draft: null, guideState: guidePlan.question ? { topic: guidePlan.topic } : null, guide: guide ? { guideId: guide.id, version: guide.version } : null, state: guidePlan.question ? 'DATOS_INCOMPLETOS' : guide ? 'INFORMACION' : 'RECHAZADA', activeSkills: guideSkills });
+        event = { ...event, route: 'deterministic', routingReason: 'contextual-guide', measurement: 'provider', modelCalls: [], tools: [], durationMs: Date.now() - startedAt };
+        await settleUsage({ store, session, reservation, event, configuration: config, result: { conversationId: id }, now: clock() }); settled = true;
+        result.usage = await usage(session, config, event);
+        if (canAccessAdministration(session.profile)) result.telemetry = { requestId, route: 'contextual-guide', modelCalls: 0, toolCalls: 0, totalMs: Date.now() - startedAt };
+        return result;
+      }
       // A saved improvement proposal does not monopolize later business turns.
       if (!suggestionFlow && conversation.draft?.kind === 'app-suggestion') conversation.draft = null;
-      const transition = suggestionFlow ? { ...manageConversationTask({ task: conversation.taskState, suspendedTasks: conversation.suspendedTasks || [] }, "pause", null, clock()), handled: false, directive: null } : transitionConversationTask(conversation, userMessage, clock());
+      const transition = suggestionFlow || assistance.pure ? { ...manageConversationTask({ task: conversation.taskState, suspendedTasks: conversation.suspendedTasks || [] }, "pause", null, clock()), handled: false, directive: assistance.pure ? 'ideation' : null } : transitionConversationTask(conversation, userMessage, clock());
       if(latencyEnabled(config) && ['start','switch'].includes(transition.directive) && transition.task?.intent==='prepare_stock_load' && context.locationId && !transition.task.slots.locationId){transition.task.slots.locationId=context.locationId;transition.task.missingFields=requiredFields(transition.task.intent).filter(key=>transition.task.slots[key]==null);}
       if (transition.handled && ['start', 'switch'].includes(transition.directive) && transition.task) transition.content = missingQuestion(transition.task.missingFields, transition.task.intent, { starting: true });
       conversation.taskState = transition.task;
@@ -541,17 +579,17 @@ export function createOliviaEngine({
           },
         },
         context,
-        { message: userMessage, task: conversation.taskState, attachments },
+        { message: userMessage, task: conversation.taskState, attachments, ideaContext: conversation.ideaContext },
       );
       event.model = profile.model;
       const retrievalStarted = Date.now();
       const slotContinuation = conversation.taskState?.status === "collecting" && !isTaskInterruption(userMessage) && userMessage.split(/\s+/).length <= 18 && !attachments.length;
       const routineDataIntent=['stock.read','customer.read','stock.load','customer.create'].includes(profile.intent) && !/como|explica|guia|procedimiento|reglas|politica/i.test(userMessage);
-      const [knowledgeResult, routedSkills] = await Promise.all([retrieveKnowledge({ session, query: userMessage, context, store, provider, env, semantic: !slotContinuation && !(latencyEnabled(config) && routineDataIntent) }), routeSkills(session, userMessage, conversation.activeSkills)]);
+      const [knowledgeResult, routedSkills] = await Promise.all([assistance.pure ? { documents: [], retrieval: 'skipped-generation' } : retrieveKnowledge({ session, query: userMessage, context, store, provider, env, semantic: !slotContinuation && !(latencyEnabled(config) && routineDataIntent) }), routeSkills(session, userMessage, conversation.activeSkills, { ideaContext: conversation.ideaContext })]);
       timings.retrievalMs = Date.now() - retrievalStarted;
       const knowledge = knowledgeResult.documents;
       const activeSkills = routedSkills;
-      profile = modelProfile(config, session, context, { message: userMessage, task: conversation.taskState, skills: activeSkills, attachments });
+      profile = modelProfile(config, session, context, { message: userMessage, task: conversation.taskState, skills: activeSkills, attachments, ideaContext: conversation.ideaContext });
       event.model = profile.model;
       const intent = operationalIntent(profile.intent);
       let taskState = conversation.taskState?.status === "collecting" && conversation.taskState.intent === intent ? { ...structuredClone(conversation.taskState), route: profile, updatedAt: clock() } : { id: randomUUID(), intent, revision: 1, status: "working", slots: {}, missingFields: [], ambiguities: {}, route: profile, createdAt: clock(), updatedAt: clock() };
@@ -579,6 +617,8 @@ export function createOliviaEngine({
             taskRequirements: Object.fromEntries(capabilities(session).filter((name) => latencyEnabled(config) ? name===taskState.intent : name.startsWith("prepare_") || name === "forecast_fair").map((name) => [name, requiredFields(name)])),
             taskFieldExplanations: Object.fromEntries(requiredFields(taskState.intent).map(field => [field, fieldGuidance(taskState.intent, field)])),
             memory: conversation.memory || null,
+            ideaContext: conversation.ideaContext || null,
+            naturalStyle: naturalStyleContext(conversation.messages),
             documentation: knowledge,
           }),
         },
@@ -628,6 +668,7 @@ export function createOliviaEngine({
       let prepared = null,
         draft = null,
         navigation = null,
+        guide = null,
         nextState = "INFORMACION",
         content = "",
         spokenContent = "",
@@ -649,16 +690,16 @@ export function createOliviaEngine({
           model: profile.model,
           reasoning: { effort: profile.reasoningEffort },
           store: false,
-          instructions: responseInstructions({ query: userMessage, task: taskState, loadedTools: [...loadedTools], skills: activeSkills }),
+          instructions: responseInstructions({ query: userMessage, task: taskState, loadedTools: [...loadedTools], skills: activeSkills, generationOnly: assistance.pure }),
           input,
-          tools: finalResponse ? [] : [...toolDefinitions(session, { query: userMessage, context, required: [...activeSkills.flatMap((skill) => skill.requiredTools), taskState.intent], loaded: [...loadedTools] }), taskUpdateTool(capabilities(session)), taskManagementTool()],
-          ...(finalResponse ? { tool_choice: "none" } : {}),
+          tools: finalResponse || assistance.pure ? [] : [...toolDefinitions(session, { query: userMessage, context, required: [...activeSkills.flatMap((skill) => skill.requiredTools), taskState.intent], loaded: [...loadedTools] }), taskUpdateTool(capabilities(session)), taskManagementTool()],
+          ...(finalResponse || assistance.pure ? { tool_choice: "none" } : {}),
           parallel_tool_calls: true,
           max_output_tokens: naturalVoice && latencyEnabled(config) && profile.route==='luna-normal' ? Math.min(1200,config.responseLimits.maxOutputTokens) : config.responseLimits.maxOutputTokens,
           ...(onEvent ? { stream: true } : {}),
         };
         if (naturalVoice) {
-          bodyRequest.instructions += "\n" + OLIVIA_VOICE_INSTRUCTIONS + "\nLa respuesta se escuchará en voz alta. Cuando no haya más herramientas, devolvé una versión completa y otra hablada breve, natural, en español argentino. Conservá hechos e incertidumbres respaldados por los mismos resultados de herramientas. No leas URLs ni Markdown. Una confirmación hablada nunca ejecuta una acción; solo la tarjeta visual autoriza operaciones.";
+          bodyRequest.instructions += "\n" + OLIVIA_VOICE_INSTRUCTIONS + "\nLa respuesta se escuchará en voz alta. Cuando no haya más herramientas, devolvé una versión completa y otra hablada breve, natural, en español argentino. Conservá hechos e incertidumbres respaldados por los mismos resultados de herramientas. No leas URLs ni Markdown ni código extenso: explicá su propósito y decí que el código está en pantalla. Una confirmación hablada nunca ejecuta una acción; solo la tarjeta visual autoriza operaciones.";
           bodyRequest.text = { format: { type: "json_schema", name: "olivia_natural_voice_reply", strict: true, schema: { type: "object", properties: { complete: { type: "string" }, spoken: { type: "string" } }, required: ["complete", "spoken"], additionalProperties: false } } };
         }
         // UTF-8 bytes conservatively bound tokenizer input; output is capped by API.
@@ -727,6 +768,7 @@ export function createOliviaEngine({
           (item) => item.type === "function_call",
         );
         event.modelCalls.at(-1).tools = calls.map((call) => call.name);
+        if (assistance.pure && calls.length) throw oliviaError('unexpected-tool-call', 'No pude completar la propuesta de contenido. No se ejecutó ninguna herramienta.', 502);
         content = responseText(payload) || content;
         if (naturalVoice && !calls.length && content) {
           const dual = dualVoiceResponse(content, config.naturalVoice.maxCharactersPerTurn);
@@ -822,6 +864,7 @@ export function createOliviaEngine({
                 "La operación necesita revisión.";
             }
             if (result.navigation) navigation = result.navigation;
+            if (result.guide) guide = result.guide;
           } catch (e) {
             result = {
               data: {
@@ -884,7 +927,7 @@ export function createOliviaEngine({
       Object.assign(event, { conversationId: id, taskId: taskState.id, route: profile.route, reasoningEffort: profile.reasoningEffort, routingReason: profile.routingReason, module: context.module, skills: activeSkills.map(({ name, version }) => ({ name, version })), tools: [...seen.keys()].map((key) => JSON.parse(key)[0]), durationMs: Date.now() - startedAt });
       event.modelCalls.forEach((call) => { call.taskId = taskState.id; });
       signal?.throwIfAborted();
-      const result = await persistTurn({ content, prepared, draft, taskState, activeSkills, metricsPeriod, state: nextState, navigation, failure, voiceTranscript: spokenContent });
+      const result = await persistTurn({ content, prepared, draft, taskState, activeSkills, metricsPeriod, guide, guideState: null, ...(assistance.pure ? { ideaContext: { kind: assistance.kind, route: profile.route, request: userMessage.slice(0, 2000), content: content.slice(0, 8000), updatedAt: clock().toISOString() } } : {}), state: nextState, navigation, failure, voiceTranscript: spokenContent });
       const budget = await settleUsage({
         store,
         session,

@@ -1,17 +1,17 @@
 # Skills de Olivia
 
-`pronosticar-feria` pasa a versión 1.1.0: añade `resolve_transfer_origin` a contrato y contenido. Las otras dos Skills conservan 1.0.0. La ruta de pronóstico usa Luna XHIGH; la Skill sigue sin conceder permisos.
-
-El catálogo está en `netlify/functions/_lib/olivia/skills.mjs`; los procesos reales residen en `skills/<nombre>/SKILL.md` y se incluyen en el bundle de Netlify. Solo esos nombres cerrados pueden cargarse, sin rutas proporcionadas por el modelo.
+El catálogo del servidor (`skills.mjs`) tiene siete skills internas. El cargador valida nombre, versión, rol y herramientas requeridas; Netlify incluye sus archivos en el bundle. Una skill no concede permisos.
 
 | Skill | Versión | Uso |
-|---|---|---|
-| pronosticar-feria | 1.0.0 | Escenarios, mercadería y propuesta de transferencia |
-| analizar-ventas | 1.0.0 | Métricas y comparación de períodos |
-| operar-panel-vendedor | 1.0.0 | Venta, stock, precios y ayuda del vendedor |
+| --- | --- | --- |
+| pronosticar-feria | 1.1.0 | Escenarios, mercadería y propuesta de transferencia |
+| analizar-ventas | 1.1.0 | Métricas y comparación de períodos |
+| operar-panel-vendedor | 1.1.0 | Venta, stock, precios y ayuda del vendedor |
+| guiar-uso-aplicacion | 1.0.0 | Procedimientos reales, contexto y explicación de datos |
+| guiar-interfaz-visual | 1.0.0 | Pasos registrados, sin hacer clic ni escribir |
+| conversacion-natural-argentina | 1.0.0 | Voseo y continuidad de conversación |
+| idear-y-crear | 1.0.0 | Ideas, nombres, códigos, textos y programación |
 
-Cada Skill contiene objetivo, intención, pasos, reglas, resultado y metadatos de rol/herramientas. `discover_skills` ofrece metadatos permitidos; `load_skill` valida nombre y versión antes de leer el contenido. El texto enruta hasta dos Skills por intención; Realtime descubre y carga procesos mediante herramientas.
+La selección es contextual, hasta dos procesos por turno. La ruta creativa carga ideación y conversación natural, sin herramientas empresariales. Los recorridos registrados usan reglas deterministas con las versiones de guía y cero llamadas de modelo. El panel vendedor conserva prioridad para su manual específico. Los seguimientos mantienen solo versiones aún autorizadas.
 
-Una Skill está disponible solo si su rol y todas sus herramientas necesarias están autorizadas. Cargarla no concede permisos. El engine incorpora el proceso y puede habilitar sus herramientas en rondas posteriores. La sesión de voz conserva las versiones realmente cargadas en el backend; declarar una Skill desde el navegador no basta para atribuirla.
-
-Eventos de herramientas y operaciones correlacionan Skill/version, usuario, conversación y solicitud. Modificar un proceso requiere actualizar su versión y pruebas; el loader rechaza contenidos cuyo encabezado no coincide con el catálogo.
+La skill de desarrollo para Codex está en `.agents/skills/olivia-guia-conversacional/SKILL.md`; es distinta del catálogo que usan las conversaciones. El diseño y los límites están en [OLIVIA-COPILOT.md](OLIVIA-COPILOT.md).

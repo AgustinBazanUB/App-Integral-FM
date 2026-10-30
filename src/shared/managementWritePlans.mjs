@@ -1,5 +1,8 @@
 import { LOCATION_TYPES, normalizeOperatingCalendar } from "../modules/locations/domain/locations.js";
 import { moduleById } from "../gestion/modules.js";
+export function validateLocationPrefixAvailability(prefix, locationId, locations, claim) {
+  if ((claim && claim.locationId !== locationId) || locations.some(location => location.id !== locationId && String(location.codePrefix || '').trim().toUpperCase() === prefix)) throw new Error('Ese código de ubicación ya está en uso. Elegí otro de hasta 8 letras o números.');
+}
 export function buildLocationPayload({ values, previous, profile, stamp, startAt = null, endAt = null }) {
   const name = String(values.name || "").trim(), prefix = String(values.codePrefix || "").trim().toUpperCase();
   if (!name || !/^[A-Z0-9]{1,8}$/.test(prefix)) throw new Error("Completá un nombre y un prefijo de hasta 8 letras o números.");

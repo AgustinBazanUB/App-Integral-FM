@@ -24,6 +24,7 @@ import {
 import { prepareOperation } from "./operations.mjs";
 import { OLIVIA_CAPABILITIES, selectCapabilities } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { runExtendedTool } from "./extendedTools.mjs";
+import { UI_GUIDES, guideAllowed } from '../../../../src/shared/oliviaUiGuides.mjs';
 const descriptions = {
   get_current_user_context:
     "Permisos y capacidades actuales del usuario autenticado, sin credenciales.",
@@ -51,7 +52,7 @@ export function toolDefinitions(session, { query, context = {}, required = [], l
     name,
     description: descriptions[name] || OLIVIA_CAPABILITIES[name]?.description,
     strict: true,
-    parameters: OLIVIA_TOOL_SCHEMAS[name] || OLIVIA_CAPABILITIES[name]?.parameters,
+    parameters: ['get_ui_guide', 'show_ui_guide'].includes(name) ? { type: 'object', additionalProperties: false, properties: { guideId: { type: 'string', enum: Object.keys(UI_GUIDES).filter(id => guideAllowed(session.profile, UI_GUIDES[id])) } }, required: ['guideId'] } : OLIVIA_TOOL_SCHEMAS[name] || OLIVIA_CAPABILITIES[name]?.parameters,
   }));
 }
 const publicStock = (product, item, location) => ({

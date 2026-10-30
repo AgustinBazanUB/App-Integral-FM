@@ -8,6 +8,9 @@ export function OliviaScreenProvider({ children }) {
   const [screen, setScreen] = useState(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [review, setReview] = useState(null);
+  const [guideRequest, setGuideRequest] = useState(null);
+  const [guideCommand, setGuideCommand] = useState(null);
+  const [guideContext, setGuideContext] = useState(null);
   const publish = useCallback((route, owner, fields) => {
     setScreen({ route, owner, fields });
     return () => setScreen((current) => current?.owner === owner ? null : current);
@@ -20,9 +23,10 @@ export function OliviaScreenProvider({ children }) {
       ...(parts[1] === "locations" && parts[2] ? { locationId: decodeURIComponent(parts[2]), entityType: "location", entityId: decodeURIComponent(parts[2]) } : {}),
       ...(parts[1] === "warehouse" && parts[2] ? { warehouseId: decodeURIComponent(parts[2]), entityType: "warehouse", entityId: decodeURIComponent(parts[2]) } : {}),
       ...(screen?.route === pathname ? screen.fields : {}),
+      ...(guideContext ? { uiGuide: guideContext } : {}),
     };
-  }, [pathname, screen]);
-  return <ScreenContext.Provider value={{ context, publish, assistantOpen, setAssistantOpen, review, setReview }}>{children}</ScreenContext.Provider>;
+  }, [pathname, screen, guideContext]);
+  return <ScreenContext.Provider value={{ context, publish, assistantOpen, setAssistantOpen, review, setReview, guideRequest, setGuideRequest, guideCommand, setGuideCommand, setGuideContext }}>{children}</ScreenContext.Provider>;
 }
 
 export function useOliviaContext() {

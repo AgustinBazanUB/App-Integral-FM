@@ -1,0 +1,18 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import '@fontsource/manrope/latin-400.css';
+import '@fontsource/manrope/latin-600.css';
+import '../../../src/styles.css';
+import '../../../src/styles/tokens.css';
+import '../../../src/styles/theme.css';
+import '../../../src/styles/management.css';
+import '../../../src/styles/location-enhancements.css';
+import '../../../src/styles/responsive.css';
+import { RouterProvider } from '../../../src/router';
+import { OliviaScreenProvider } from '../../../src/gestion/olivia/ScreenContext';
+import { OliviaLauncherProvider, OliviaLauncherSlot } from '../../../src/gestion/olivia/LauncherHost';
+import OliviaAssistant from '../../../src/gestion/olivia/OliviaAssistant';
+import OliviaGuideHost from '../../../src/gestion/olivia/OliviaGuideHost';
+import LocationsPage from '../../../src/gestion/pages/LocationsPage';
+document.body.className = 'fm-management-body';
+createRoot(document.getElementById('root')).render(<RouterProvider><OliviaScreenProvider><OliviaLauncherProvider><header style={{padding:20,display:'flex',justifyContent:'space-between'}}><strong>QA local · motor e interfaz reales · datos y redacción simulados · sin acceso a Firebase</strong><OliviaLauncherSlot /></header><main id="main-content" data-olivia="module.content" tabIndex={-1} style={{padding:24}}><LocationsPage /></main><OliviaAssistant /><OliviaGuideHost /></OliviaLauncherProvider></OliviaScreenProvider></RouterProvider>);

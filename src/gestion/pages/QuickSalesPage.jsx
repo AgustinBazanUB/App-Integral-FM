@@ -297,7 +297,7 @@ export default function QuickSalesPage() {
       <div className="fm-quick-pos__layout">
         <div className="fm-quick-pos__catalog-column">
         <PageHeader eyebrow="Administración" title="Venta rápida" />
-        <section className="fm-quick-pos__catalog" aria-label="Catálogo de productos">
+        <section data-olivia="sale.catalog" className="fm-quick-pos__catalog" aria-label="Catálogo de productos">
           <FormField label="Buscar producto o catálogo"><input type="search" disabled={locked} value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar en catálogo" /></FormField>
           {[locationsResult, warehousesResult, productsResult].some(result => result.status === "error") ? <EmptyState icon="AlertTriangle" title="No se pudieron leer los recursos" description="Revisá conexión y permisos." /> : null}
           {productsResult.status === "loading" || stock.status === "loading" ? <Skeleton lines={4} /> : null}
@@ -321,7 +321,7 @@ export default function QuickSalesPage() {
           </div>
         </section>
         </div>
-        <section className="fm-quick-pos__sale" aria-label="Venta actual">
+        <section data-olivia="sale.cart" className="fm-quick-pos__sale" aria-label="Venta actual">
           <div className="fm-quick-pos__cart-head"><h2>Venta actual</h2><Button variant="ghost" disabled={locked || !cart.length} onClick={() => { setQuantities({}); setPrices({}); }}>Vaciar</Button></div>
           <div className="fm-quick-pos__cart">
             {!cart.length ? <p className="fm-quick-pos__empty">Tocá un producto para agregarlo a la venta.</p> : cart.map(item => <article key={item.id} className="fm-quick-pos__line">
@@ -333,21 +333,21 @@ export default function QuickSalesPage() {
           <SaleStockWarning discrepancies={stockDiscrepancies} />
           <div className="fm-quick-pos__extras">
             <Button variant="secondary" disabled={locked || discountsResult.status === "loading"} onClick={() => setDialog("discount")}>Descuento</Button>
-            <Button variant="secondary" disabled={locked} title={customer.phone ? customer.name || customer.phone : undefined} onClick={() => setDialog("customer")}>Cliente</Button>
+            <Button data-olivia="sale.customer" variant="secondary" disabled={locked} title={customer.phone ? customer.name || customer.phone : undefined} onClick={() => setDialog("customer")}>Cliente</Button>
             <Button variant="secondary" disabled={locked} aria-pressed={deliveryMethod === "shipping"} onClick={() => setDialog("shipping")}>{deliveryMethod === "shipping" ? "Con envío · editar" : "Con envío"}</Button>
-            <Button variant="secondary" disabled={locked} onClick={openOriginDialog}>Canal</Button>
+            <Button data-olivia="sale.origin" variant="secondary" disabled={locked} onClick={openOriginDialog}>Canal</Button>
           </div>
           {appliedDiscounts.length ? <div className="fm-quick-pos__discounts">{appliedDiscounts.map((discount, index) => <button type="button" disabled={locked} key={`${discount.id || discount.discountId}-${index}`} aria-label={`Quitar ${discount.name}`} onClick={() => discount.source === "manual" ? setManualDiscounts(manual => manual.filter(entry => entry !== discount)) : setDiscountIds(ids => ids.filter(id => id !== (discount.discountId || discount.id)))}>{discount.name} ×</button>)}</div> : null}
-          <div className="fm-quick-pos__payments" role="group" aria-label="Forma de pago">{PAYMENT_OPTIONS.map(option => <button type="button" key={option.value} disabled={locked || (option.value === "multiple" && !can(profile, "quick-sales", "useMultiplePayments"))} aria-pressed={paymentMethod === option.value} className={paymentMethod === option.value ? "is-selected" : ""} onClick={() => { setPaymentMethod(option.value); if (option.value === "multiple") setDialog("payments"); }}>{friendlyPayments[option.value] || option.label}{option.value === "multiple" && paymentMethod === "multiple" ? <small>{paymentStatus}</small> : null}</button>)}</div>
+          <div data-olivia="sale.payment" className="fm-quick-pos__payments" role="group" aria-label="Forma de pago">{PAYMENT_OPTIONS.map(option => <button type="button" key={option.value} disabled={locked || (option.value === "multiple" && !can(profile, "quick-sales", "useMultiplePayments"))} aria-pressed={paymentMethod === option.value} className={paymentMethod === option.value ? "is-selected" : ""} onClick={() => { setPaymentMethod(option.value); if (option.value === "multiple") setDialog("payments"); }}>{friendlyPayments[option.value] || option.label}{option.value === "multiple" && paymentMethod === "multiple" ? <small>{paymentStatus}</small> : null}</button>)}</div>
         </section>
       </div>
       {pendingIntent ? <Toast tone="warning">Confirmación pendiente. Recuperá el resultado de esta misma venta.</Toast> : null}
       {lastShipmentId && <Link className="fm-button fm-button--secondary" to={`/gestion/shipping?shipment=${encodeURIComponent(lastShipmentId)}`}>Ver ficha del envío generado</Link>}
       <ShippingDialog open={dialog === "shipping"} value={shipping} administrative onClose={() => setDialog("")} onConfirm={draft => { setShipping(draft); setDeliveryMethod("shipping"); setDialog(""); }} onRemove={() => { setShipping({}); setDeliveryMethod("pickup"); setDialog(""); }} />
-      {submitState.error ? <Toast tone="error">{submitState.error}</Toast> : null}
+      {submitState.error ? <div data-olivia-error="sale.form"><Toast tone="error">{submitState.error}</Toast></div> : null}
       {submitState.success ? <Toast tone="success">{submitState.success}</Toast> : null}
       {registeredInvoice ? <SaleInvoicePanel sale={registeredInvoice} allowGenerate={can(profile,"quick-sales","requestTicket")}/> : null}
-      <footer className="fm-quick-pos__actions"><div><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div><Button variant="secondary" icon="FileText" disabled={locked || !canConfirm} onClick={() => setDialog("billing")}>Generar factura</Button><Button icon="Check" loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, false)}>{pendingIntent ? "Recuperar confirmación" : "Continuar"}</Button></footer>
+      <footer className="fm-quick-pos__actions"><div><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div><Button variant="secondary" icon="FileText" disabled={locked || !canConfirm} onClick={() => setDialog("billing")}>Generar factura</Button><Button data-olivia="sale.submit" icon="Check" loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, false)}>{pendingIntent ? "Recuperar confirmación" : "Continuar"}</Button></footer>
       <Modal open={dialog === "origin"} title="Canal y origen del stock" description="Elegí por dónde llegó la venta y de dónde sale la mercadería." onClose={() => setDialog("")} footer={<><Button variant="secondary" onClick={() => setDialog("")}>Cancelar</Button><Button onClick={confirmOrigin}>Confirmar canal y origen</Button></>}>
         <FormField label="Canal comercial" required><Select value={originDraft?.channel || ""} onChange={event => setOriginDraft(current => ({ ...current, channel: event.target.value }))}><option value="">Elegir canal real</option>{SALES_CHANNELS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></FormField>
         <FormField label="Tipo de origen"><Select value={originDraft?.stockType || "location"} onChange={event => setOriginDraft(current => ({ ...current, stockType: event.target.value, locationId: "" }))}><option value="location">Ubicación</option><option value="warehouse">Depósito</option></Select></FormField>

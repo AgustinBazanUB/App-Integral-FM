@@ -1,4 +1,5 @@
 /** Shared public Olivia contracts. All business authorization is server-side. */
+import { UI_GUIDES, UI_TARGET_IDS, UI_ERROR_IDS } from './oliviaUiGuides.mjs';
 export const OLIVIA_POLICY_VERSION = "olivia-1.0.0";
 export const OLIVIA_STATES = Object.freeze([
   "INFORMACION",
@@ -69,6 +70,12 @@ export function screenContext(value = {}) {
     if (value.filters.categoryId)
       filters.categoryId = safeId(value.filters.categoryId);
     if (Object.keys(filters).length) clean.filters = filters;
+  }
+  if (value.uiGuide && UI_GUIDES[value.uiGuide.guideId]?.steps.some(step => step.id === value.uiGuide.stepId)) {
+    clean.uiGuide = { guideId: value.uiGuide.guideId, stepId: value.uiGuide.stepId,
+      status: ['active', 'waiting', 'paused'].includes(value.uiGuide.status) ? value.uiGuide.status : 'waiting',
+      errors: Array.isArray(value.uiGuide.errors) ? [...new Set(value.uiGuide.errors.filter(id => UI_ERROR_IDS.includes(id) || UI_TARGET_IDS.has(id)))].slice(0, 6) : [],
+    };
   }
   return clean;
 }

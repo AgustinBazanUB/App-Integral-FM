@@ -34,16 +34,18 @@ test("side explanations preserve partial slots and explicit resume restores the 
   await turn(f, id, "Cargame 12 botellas de Original", "stock");
   const original = structuredClone(f.documents.get(`oliviaConversations/${id}`).taskState);
   await turn(f, id, "Antes explicame cómo se carga el stock manualmente", "help");
-  assert.equal(context.taskState, null);
-  assert.equal(context.suspendedTasks[0].slots.quantity, 12);
-  assert.equal(context.suspendedTasks[0].slots.productId, "oil");
+  const explained = f.documents.get(`oliviaConversations/${id}`);
+  assert.equal(explained.taskState, null);
+  assert.equal(explained.suspendedTasks[0].slots.quantity, 12);
+  assert.equal(explained.suspendedTasks[0].slots.productId, "oil");
+  assert.equal(f.providerCalls(), 0);
   const resumed = await turn(f, id, "Retomemos la carga de stock", "resume");
   const saved = f.documents.get(`oliviaConversations/${id}`);
   assert.equal(saved.taskState.id, original.id);
   assert.equal(saved.taskState.slots.quantity, 12);
   assert.equal(saved.suspendedTasks.length, 0);
   assert.match(resumed.messages.at(-1).content, /ubicación/);
-  assert.equal(f.providerCalls(), 1);
+  assert.equal(f.providerCalls(), 0);
 });
 test("resume of a formerly prepared task creates a fresh proposal and rechecks live stock", async () => {
   const f = stockFixture(), { conversationId: id } = await start(f);

@@ -269,7 +269,7 @@ export default function LoyalCustomersPage() {
         actions={tab === "customers" && canCreateCustomers
           ? (
             <div className="fm-customer-page-actions">
-              <Button icon="UserPlus" onClick={openNewCustomer}>Nuevo cliente</Button>
+              <Button data-olivia="customer.create" icon="UserPlus" onClick={openNewCustomer}>Nuevo cliente</Button>
               <div className="fm-customer-import-help">
                 <Button
                   variant="secondary"
@@ -390,15 +390,15 @@ export default function LoyalCustomersPage() {
         onClose={() => !customerBusy && setCustomerOpen(false)}
         title="Nuevo cliente"
         description="Sólo el teléfono es obligatorio; nombre y zona son opcionales."
-        footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={() => setCustomerOpen(false)}>Cancelar</Button><Button icon="Save" loading={customerBusy} onClick={saveCustomer}>Guardar</Button></div>}
+        footer={<div className="fm-dialog-actions"><Button variant="secondary" onClick={() => setCustomerOpen(false)}>Cancelar</Button><Button data-olivia="customer.save" icon="Save" loading={customerBusy} onClick={saveCustomer}>Guardar</Button></div>}
       >
         <div className="fm-customer-form">
-          <FormField label="Teléfono" required hint="Se usa para evitar clientes duplicados aunque cambie el formato escrito."><input type="tel" inputMode="tel" autoComplete="tel" value={customerForm.phone} onBlur={async () => { try { const existing = customerForm.phone ? await findCustomerByPhone(customerForm.phone) : null; setCustomerLookup(existing ? "Cliente existente: se reutiliza su identidad; sólo se completan campos vacíos." : "Teléfono nuevo. Nombre y zona son opcionales."); } catch (error) { setCustomerError(error.message); } }} onChange={(event) => setCustomerForm((current) => ({ ...current, phone: event.target.value }))} /></FormField>
+          <FormField label="Teléfono" required hint="Se usa para evitar clientes duplicados aunque cambie el formato escrito."><input data-olivia="customer.phone" type="tel" inputMode="tel" autoComplete="tel" value={customerForm.phone} onBlur={async () => { try { const existing = customerForm.phone ? await findCustomerByPhone(customerForm.phone) : null; setCustomerLookup(existing ? "Cliente existente: se reutiliza su identidad; sólo se completan campos vacíos." : "Teléfono nuevo. Nombre y zona son opcionales."); } catch (error) { setCustomerError(error.message); } }} onChange={(event) => setCustomerForm((current) => ({ ...current, phone: event.target.value }))} /></FormField>
           <FormField label="Zona (opcional)"><select value={customerForm.zoneId} onChange={(event) => setCustomerForm((current) => ({ ...current, zoneId: event.target.value }))}><option value="">Elegir zona</option>{activeZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}<option value="__custom">Otra zona</option></select></FormField>
           {customerForm.zoneId === "__custom" ? <FormField label="Nueva zona (opcional)"><input value={customerForm.customZone} onChange={(event) => setCustomerForm((current) => ({ ...current, customZone: event.target.value }))} /></FormField> : null}
-          <FormField label="Nombre (opcional)"><input autoComplete="name" value={customerForm.name} onChange={(event) => setCustomerForm((current) => ({ ...current, name: event.target.value }))} /></FormField>
+          <FormField label="Nombre (opcional)"><input data-olivia="customer.name" autoComplete="name" value={customerForm.name} onChange={(event) => setCustomerForm((current) => ({ ...current, name: event.target.value }))} /></FormField>
           {customerLookup ? <p role="status">{customerLookup}</p> : null}
-          {customerError ? <Toast tone="error">{customerError}</Toast> : null}
+          {customerError ? <div data-olivia-error="customer.form"><Toast tone="error">{customerError}</Toast></div> : null}
         </div>
       </Modal>
 

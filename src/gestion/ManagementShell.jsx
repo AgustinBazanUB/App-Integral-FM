@@ -209,7 +209,7 @@ export default function ManagementShell({ children }) {
         </div>
       </header>
 
-      <main className="fm-management-main" id="main-content">
+      <main className="fm-management-main" id="main-content" data-olivia="module.content" tabIndex={-1}>
         {children}
       </main>
       <div className="fm-live-region" aria-live="polite">

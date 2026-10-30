@@ -1,6 +1,7 @@
 import { can, normalizedRole } from "../../../../src/gestion/permissions.js";
 import { latestInstruction } from "./conversationTasks.mjs";
 import { latencyEnabled } from '../../../../src/shared/oliviaConversationRouter.mjs';
+import { assistiveIntent } from '../../../../src/shared/oliviaAssistiveIntent.mjs';
 
 export const MODEL_POLICY_VERSION = 3;
 export function classifyIntent(message = "", module = "") {
@@ -22,12 +23,13 @@ const creative = /disena.{0,50}(concepto|post|publicacion|reel|carrusel|campana|
 const complex = /pronostic|forecast|prevision|proyect|optimiza|compara|comparacion|tendencia|escenarios|restricciones|rentabilidad|historico|trimestre|semestre|anual|ultimos? \d+ meses|causa|cruza|cruzar|correlacion/;
 
 /** Deterministic server policy. Neither model output nor browser flags select a model. */
-export function routeModel(configuration, session, { message = "", context = {}, task = null, skills = [], attachments = [], signals = {} } = {}) {
+export function routeModel(configuration, session, { message = "", context = {}, task = null, skills = [], attachments = [], signals = {}, ideaContext = null } = {}) {
   const text = latestInstruction(message);
   const module = context.module || "";
   const seller = normalizedRole(session.profile) === "seller";
   const creativeModule = ["marketing", "social"].includes(module) && can(session.profile, module, "view");
-  const creativeIntent = !seller && creativeModule && creative.test(text);
+  const assistance = assistiveIntent(message, ideaContext);
+  const creativeIntent = !seller && creativeModule && (creative.test(text) || (assistance.pure && ideaContext?.route === 'sol-creative'));
   const reasons = [];
   if (complex.test(text)) reasons.push("analysis-or-forecast");
   if (/estima|demanda|cuanto.*vender/.test(text) && !reasons.includes("analysis-or-forecast")) reasons.push("analysis-or-forecast");
@@ -53,7 +55,7 @@ export function routeModel(configuration, session, { message = "", context = {},
   const profile = configuration.profiles[useCreative ? creativeComplex ? "creativeComplex" : "creative" : route === "luna-complex" ? "adminComplex" : seller ? "seller" : "adminDefault"];
   const model = seller && !useCreative ? configuration.profiles.seller.model : profile.model;
   const reasoning = latencyEnabled(configuration) && model === 'gpt-6-luna' && !useCreative ? (route === 'luna-normal' ? 'none' : 'medium') : profile.reasoningEffort;
-  return { ...profile, model, reasoningEffort:reasoning, intent: continuation ? task.intent : classifyIntent(message, module), route, routingReason: useCreative ? ["creative-intent-authorized-module", ...reasons].join(",") : reasons.join(",") || "routine-operation", policyVersion: MODEL_POLICY_VERSION };
+  return { ...profile, model, reasoningEffort:reasoning, intent: assistance.pure ? `${assistance.kind}.ideation` : continuation ? task.intent : classifyIntent(message, module), route, routingReason: useCreative ? ["creative-intent-authorized-module", ...reasons].join(",") : reasons.join(",") || (assistance.pure ? 'generation-without-business-tools' : "routine-operation"), policyVersion: MODEL_POLICY_VERSION };
 }
 
 export function aggregateRoutes(events = []) {

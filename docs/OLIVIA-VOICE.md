@@ -1,19 +1,16 @@
 # Voz natural de Olivia
 
-## Modalidades
+## Ruta vigente (revisión 30/10/2026)
 
-La conversación escrita sigue disponible. **Conversar por voz** usa una sola ruta: micrófono/VAD en el navegador → GPT Transcribe (`gpt-transcribe`) al cerrar cada turno → motor Luna y herramientas autorizadas de Olivia → respuesta escrita canónica y resumen hablado → Google Cloud Text-to-Speech Chirp 3 HD transmitido como PCM. El dictado revisable sigue usando su control independiente y deja la transcripción editable antes de enviarla.
+Una conversación usa micrófono/VAD local → GPT Live Transcribe (`gpt-live-transcribe`) por WebRTC → motor y herramientas de Olivia → texto canónico y resumen hablado → Google Cloud TTS Chirp 3 HD/Aoede, PCM mono a 24 kHz. GPT Transcribe (`gpt-transcribe`) conserva la ruta de archivo cuando corresponde; no se incorporó otro proveedor. Los antiguos modos Live conversacional/Realtime multimodal siguen retirados; la transcripción Live actual es una sesión dedicada a STT.
 
-GPT-Live, Realtime y la prueba de voz económica se retiraron como modalidades de conversación. El endpoint `olivia` responde HTTP 410 a las operaciones antiguas. No existe fallback automático a otro proveedor. La conversación nueva queda limitada a `agsreserva@gmail.com` mientras esté en prueba administrativa; se requieren Olivia, OpenAI y Google TTS habilitados en el servidor.
+El endpointing adaptativo, los límites, el flag de reversión y las trazas se describen en [la auditoría de latencia](olivia/2026-10-29/latencia-v3/AUDITORIA.md). La política actual mantiene Luna NONE/MEDIUM y Sol creativo HIGH/XHIGH en los módulos autorizados. Las respuestas de conversación simples reutilizan audios estáticos; no se regeneraron para esta revisión.
 
-## Flujo y datos
+La voz conserva interrupciones, cancelación de respuestas obsoletas, transcripción parcial con pistas de vocabulario y ventanas limitadas de sesión. Hablar no otorga permisos: las operaciones comerciales requieren la tarjeta visual. La respuesta escrita contiene el detalle; la hablada resume los mismos hechos. Para código, explica el resultado y remite al fragmento en pantalla, sin leerlo completo.
 
-- `NaturalVoiceConversation` solicita el micrófono solo después del clic del usuario, con cancelación de eco, supresión de ruido y control automático de ganancia. Detecta la voz localmente, cierra el turno tras 1900 ms de silencio, ampliables a 3000–4000 ms cuando la voz retoma pausas dentro de la misma intervención y limita cada grabación a 60 s/4 MB.
-- Cada turno completo se envía como archivo a `gpt-transcribe`, junto a `languages[]=es`, contexto de Flor Mía y sugerencias de términos. Las sugerencias son pistas, no obligan al modelo a incluir palabras no escuchadas. GPT Transcribe trabaja con audio completo; transmitir los bytes de Chirp sí es streaming, no una transcripción continua.
-- El audio de entrada vive en memoria del navegador y se descarta tras procesar el turno. La transcripción del usuario y las respuestas de Olivia se conservan en el historial normal. No se guarda audio sintetizado ni texto de TTS en el registro de medición.
-- El motor de Olivia usa la misma política Luna HIGH/XHIGH, permisos, herramientas de solo lectura y tarjetas de confirmación que el chat escrito. Ninguna confirmación oral ejecuta una acción. La respuesta escrita es canónica; el modelo puede preparar una versión breve para voz.
-- Chirp 3 HD se invoca solo después de persistir la respuesta. El endpoint autenticado valida identidad, propiedad de conversación, límites y cuota mensual, y transmite PCM mono de 24 kHz. Cortar el audio cancela el lector local y el stream proveedor. Hablar durante la reproducción interrumpe el audio y cancela la solicitud anterior antes del siguiente turno.
-- La interfaz mide fin de habla a transcripción, transcripción a primer bloque de audio programado, y TTFA de síntesis. Mediana y P95 usan hasta 100 muestras de la sesión abierta. TTFA indica cuándo el navegador programó la reproducción, no cuándo el sonido llegó físicamente al altavoz.
+Las guías se ofrecen en el chat y el usuario inicia los resaltados. El contexto incluye el paso visible y códigos de validación, sin valores de formulario. Pedir siguiente, anterior, explicar, pausar o cancelar una guía usa los pasos registrados; no hace clic ni registra operaciones.
+
+El audio entrante se procesa en memoria y no se guarda como grabación del negocio. La transcripción y las respuestas se conservan con la retención de conversación. Los límites de sesión, caracteres TTS y cupo de uso permanecen en los contratos del servidor. Las métricas indican programación de audio, no salida física por el altavoz.
 
 ## Configuración backend
 

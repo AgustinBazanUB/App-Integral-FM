@@ -20,7 +20,7 @@ export const sessionBinding = (session) => String(session.authTime || "");
 export const permissionScope = (session, allowed = capabilities(session)) => hash(JSON.stringify({ context: { ...userContext(session), capabilities: [...allowed] }, capabilities: [...allowed].sort() }));
 // Adding the batch tool changes capabilities without changing an existing
 // user's authority. Accept only the exact previous scope for this release.
-export const compatiblePermissionScope = (session, scope) => scope === permissionScope(session) || scope === permissionScope(session, capabilities(session).filter(name => name !== "prepare_batch_sales"));
+export const compatiblePermissionScope = (session, scope) => [[], ['prepare_batch_sales'], ['get_ui_guide', 'show_ui_guide'], ['prepare_batch_sales', 'get_ui_guide', 'show_ui_guide']].some(added => scope === permissionScope(session, capabilities(session).filter(name => !added.includes(name))));
 export const dateMs = (value) => new Date(value).getTime();
 export async function verifyLegacyConversationScope(session, conversation, store) {
   if (!conversation || conversation.roleBinding || canAccessAdministration(session.profile) || !(conversation.messageCount || conversation.messages?.length)) return;

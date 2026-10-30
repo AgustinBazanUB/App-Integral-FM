@@ -31,12 +31,13 @@ import { formatOliviaCost } from "../../shared/oliviaCostFormat.mjs";
 import { OLIVIA_VOICE_UNAVAILABLE_MESSAGE } from "../../shared/oliviaVoiceAvailability.mjs";
 import "./olivia.css";
 import { OliviaLauncherPortal } from "./LauncherHost";
+import { getUiGuide, UI_GUIDE_VERSION } from '../../shared/oliviaUiGuides.mjs';
 
 export default function OliviaAssistant() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const context = useOliviaContext();
-  const { setAssistantOpen, setReview } = useOliviaVisibility();
+  const { setAssistantOpen, setReview, setGuideRequest, setGuideCommand } = useOliviaVisibility();
   const contextRef = useRef(context);
   contextRef.current = context;
   const admin = canAccessAdministration(profile);
@@ -161,6 +162,7 @@ export default function OliviaAssistant() {
     setAssistantOpen(open);
     return () => setAssistantOpen(false);
   }, [open, setAssistantOpen]);
+  useEffect(() => { const show = () => { setOpen(true); setMinimized(false); }; window.addEventListener('olivia:open-chat', show); return () => window.removeEventListener('olivia:open-chat', show); }, []);
 
   const apply = useCallback((result) => {
     if (!mounted.current) return;
@@ -177,11 +179,12 @@ export default function OliviaAssistant() {
     const destination = safeNavigation(result.navigation?.path, window.location.origin);
     if (destination && result.navigation?.review) setReview?.({ ...result.navigation.review, path: destination });
     if (destination) navigate(destination);
+    if (result.guideControl && ['next','previous','pause','resume','cancel'].includes(result.guideControl.action)) { setGuideCommand?.({ ...result.guideControl, requestId: requestId() }); if (['next','previous','resume'].includes(result.guideControl.action)) { setOpen(false); setMinimized(true); } }
     if (["completed", "COMPLETADA"].includes(typeof result.state === "string" ? result.state : result.state?.status)) {
       clearRuntimeCache();
       window.dispatchEvent(new CustomEvent("flor-mia:olivia-completed"));
     }
-  }, [navigate, user.uid, setReview]);
+  }, [navigate, user.uid, setReview, setGuideCommand]);
 
   const recordVoiceMetric = (key, duration) => {
     if (!Number.isFinite(duration) || duration < 0) return;
@@ -727,6 +730,7 @@ export default function OliviaAssistant() {
         {streamText ? <article className="fm-olivia-message fm-olivia-message--assistant"><strong>Olivia</strong><OliviaMessageContent content={streamText} />{!busy ? <small>Respuesta incompleta</small> : null}</article> : null}
         {busy || snapshot.activeChatJob ? <div className="fm-olivia-working" role="status"><span className="fm-olivia-working__spinner" aria-hidden="true" /><span>Estoy trabajando en ello</span><span className="fm-olivia-working__bar" aria-hidden="true" /></div> : null}
       </div>
+      {snapshot.guide?.version === UI_GUIDE_VERSION && getUiGuide(profile, snapshot.guide.guideId, context) ? <div className="fm-olivia-guide-offer"><Button variant="secondary" disabled={busy} onClick={() => { setGuideRequest?.({ ...snapshot.guide, requestId: requestId() }); minimizeChat(); }}>Mostrarme los pasos en pantalla</Button></div> : null}
       {pending ? <section className="fm-olivia-confirmation" aria-labelledby="fm-olivia-confirm-title"><h3 id="fm-olivia-confirm-title">¿Confirmar esta acción?</h3><OliviaMessageContent content={typeof pending.summary === "string" ? pending.summary : JSON.stringify(pending.summary, null, 2)} />{expired ? <p role="alert">La confirmación venció. Pedile a Olivia que prepare la acción nuevamente.</p> : null}<div className="fm-olivia-confirmation-actions"><Button onClick={() => answer(true)} disabled={busy || expired || exhausted || unavailable}>Sí</Button><Button variant="secondary" onClick={() => answer(false)} disabled={busy || !online}>No</Button></div><small>La acción se ejecuta únicamente al tocar Sí. Podés corregir los datos escribiendo.</small></section> : null}
       {unavailable ? <div className="fm-olivia-error" role="status"><p>{!online ? "Olivia necesita conexión a Internet." : snapshot.enabled === false ? "Olivia está deshabilitada por el Administrador." : "Olivia todavía necesita configurar su conexión con OpenAI."}</p><small>Podés continuar operando desde tu panel.</small>{admin && online ? <Button variant="secondary" onClick={() => navigate("/gestion/settings")}>Abrir configuración</Button> : null}</div> : null}
       {error ? <div className="fm-olivia-error" role="alert"><p>{error}</p>{reportNotice ? <p>{reportNotice}</p> : null}{errorReportId ? <Button className="fm-olivia-report-error" variant="secondary" loading={reportState === "sending"} disabled={reportState === "sent"} onClick={reportError}>{reportState === "sent" ? "Enviado a Agustín" : "Enviar error a Agustín"}</Button> : ["conversation-not-found", "session-changed", "permission-scope-changed", "conversation-expired"].includes(errorCode) ? <Button variant="secondary" disabled={busy} onClick={newConversation}>Iniciar nueva conversación</Button> : retryRef.current && !busy ? <Button variant="secondary" onClick={() => { const retry = retryRef.current; perform(retry.operation, retry.fields, retry.identity).then(() => { if (retry.operation === "chat") setDraft(""); }).catch(() => {}); }}>{retryRef.current.operation === "resume" ? "Recuperar conversación" : errorCode === "request-already-used" ? "Actualizar conversación" : "Reintentar solicitud"}</Button> : null}</div> : null}

@@ -35,6 +35,7 @@ export const FIELD_GUIDANCE = {
   objective: 'qué querés lograr; por ejemplo, dar a conocer un producto o aumentar las ventas', audience: 'a quién querés llegar', format: 'qué pieza necesitás; por ejemplo, un post, un video o un texto', style: 'el tono o estilo que preferís',
   notes: 'los detalles que querés dejar anotados', query: 'qué querés buscar o conocer', topic: 'qué tema público querés investigar',
   module: 'qué sección de la aplicación querés abrir; por ejemplo, Productos o Ubicaciones',
+  guideId: 'qué procedimiento querés recorrer; por ejemplo, crear una ubicación o registrar una venta',
 };
 export function fieldGuidance(intent, field) {
   if (/receivedQuantity/.test(field)) return 'cuántas unidades llegaron físicamente al destino; no des por recibida mercadería que todavía está en camino';
