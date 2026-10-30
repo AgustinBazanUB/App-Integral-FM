@@ -106,8 +106,8 @@ export function subscribeCourierSession(sessionId, notify, onError) {
     window.removeEventListener("focus", refresh);
   };
 }
-export async function createCourierRouteAccess({ shipmentIds, leg, sessionId, token, requestId }) {
-  const result = await shippingRequest({ mode: "create_courier_session", shipmentIds, leg, sessionId, newToken: token, requestId });
+export async function createCourierRouteAccess({ shipmentIds, leg, sessionId, token, requestId, replaceExisting = false, reason = "" }) {
+  const result = await shippingRequest({ mode: "create_courier_session", shipmentIds, leg, sessionId, newToken: token, requestId, ...(replaceExisting ? { replaceExisting, reason } : {}) });
   return { ...result, kind: "courier_route", url: `${window.location.origin}/reparto#${token}` };
 }
 export async function createCourierQrAccess({ lookupId, sessionId, token, requestId }) {

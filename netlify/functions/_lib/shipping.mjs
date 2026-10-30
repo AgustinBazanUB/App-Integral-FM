@@ -172,14 +172,17 @@ export async function createCourierSession({ body, session, runTransaction = adm
     const token = String(body.newToken || "");
     assert(/^[A-Za-z0-9_-]{43,128}$/.test(token), "La credencial debe ser aleatoria y segura.");
     const credentialHash = hash(token), operationId = hash(`${profile.id}:${requestId}`).slice(0, 48);
-    const receiptPath = `shippingRouteOperations/${operationId}`, fingerprint = hash(JSON.stringify({ shipmentIds, leg, sessionId, credentialHash }));
+    const replacing = body.replaceExisting === true;
+    const replacementReason = replacing ? String(body.reason || "").trim() : "";
+    if (replacing) assert(replacementReason.length >= 4 && replacementReason.length <= 1000, "Indicá un motivo de entre 4 y 1000 caracteres.");
+    const receiptPath = `shippingRouteOperations/${operationId}`, fingerprint = hash(JSON.stringify({ shipmentIds, leg, sessionId, credentialHash, ...(replacing ? { replacing, replacementReason } : {}) }));
     const receipt = (await transaction.getDocument(receiptPath))?.data;
     if (receipt) {
       assert(receipt.fingerprint === fingerprint, "El intento ya se usó con otros datos.");
       return receipt.result;
     }
     const hours = configNumber(env.SHIPPING_COURIER_TTL_HOURS, 1, 24) || 4;
-    const expiresAt = new Date(now.valueOf() + hours * 3600000), updates = [];
+    const expiresAt = new Date(now.valueOf() + hours * 3600000), updates = [], previousSessions = new Map();
     for (const shipmentId of shipmentIds) {
       const shipment = { ...(await transaction.getDocument(`shipments/${shipmentId}`))?.data, id: shipmentId };
       assert(shipment.saleId && shipment.stockCommitState === "committed" && !shipment.incident, `${shipment.publicCode || shipmentId}: el envío no está listo para asignarse.`);
@@ -190,11 +193,22 @@ export async function createCourierSession({ body, session, runTransaction = adm
           : shipment.deliveryType === "repository" && ["recibido_repositorio", "reparto_final"].includes(shipment.status);
       assert(eligible, `${shipment.publicCode || shipmentId}: el estado o transporte no corresponde al tramo elegido.`);
       if (shipment.courierSessionId) {
-        const previousSession = (await transaction.getDocument(`deliverySessions/${shipment.courierSessionId}`))?.data;
-        assert(previousSession?.status !== "active" || new Date(previousSession.expiresAt) <= now, `${shipment.publicCode || shipmentId}: ya pertenece a un reparto activo.`);
+        const oldId = id(shipment.courierSessionId);
+        if (!previousSessions.has(oldId)) previousSessions.set(oldId, (await transaction.getDocument(`deliverySessions/${oldId}`))?.data || null);
+        const previousSession = previousSessions.get(oldId);
+        assert(replacing || previousSession?.status !== "active" || new Date(previousSession.expiresAt) <= now, `${shipment.publicCode || shipmentId}: ya pertenece a un reparto activo.`);
       }
       const versions = { ...(shipment.courierVersions || {}), [leg]: (shipment.courierVersions?.[leg] || 0) + 1 };
-      updates.push(update(`shipments/${shipmentId}`, { courierSessionId: sessionId, courierSessionLeg: leg, courierVersions: versions, courierGrantHashes: { ...(shipment.courierGrantHashes || {}), [leg]: credentialHash }, lastPosition: null, gpsTrail: [], activeGpsSession: null, updatedAt: now, revision: (shipment.revision || 0) + 1 }));
+      const changes = { courierSessionId: sessionId, courierSessionLeg: leg, courierVersions: versions, courierGrantHashes: { ...(shipment.courierGrantHashes || {}), [leg]: credentialHash }, lastPosition: null, gpsTrail: [], activeGpsSession: null, updatedAt: now, revision: (shipment.revision || 0) + 1 };
+      updates.push(update(`shipments/${shipmentId}`, changes));
+      if (replacing) updates.push(eventWrite({ ...shipment, ...changes }, operationId, "courier_reassigned", profile.id, shipment.status, now, { actorRole: normalizedRole(profile), leg, previousSessionId: shipment.courierSessionId || null, newSessionId: sessionId, reason: replacementReason }));
+    }
+    if (replacing) for (const [oldId, previous] of previousSessions) {
+      if (previous?.status !== "active") continue;
+      const remaining = (previous.shipmentIds || []).filter(member => !shipmentIds.includes(member));
+      updates.push(update(`deliverySessions/${oldId}`, remaining.length
+        ? { shipmentIds: remaining, updatedAt: now }
+        : { shipmentIds: [], status: "revoked", revokedBy: profile.id, revokeReason: replacementReason, revokedAt: now, gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [] }));
     }
     const result = { sessionId, shipmentIds, expiresAt };
     updates.push(create(`deliverySessions/${sessionId}`, { shipmentIds, leg, status: "active", version: 1, accessHash: credentialHash, createdBy: profile.id, createdAt: now, expiresAt }));

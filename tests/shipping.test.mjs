@@ -358,3 +358,37 @@ test("preparer reassignment validates the new person and preserves assignment hi
   assert.equal(event.actorId, admin.id);
   assert.ok(s.documents.has(`sales/${s.result.id}`));
 });
+
+test("bulk courier replacement is atomic, audited, idempotent and preserves other route members", async () => {
+  const store = memoryStore(), shipments = [];
+  for (let i = 0; i < 3; i++) {
+    const created = await createShippingSale({ sale: sale(), session: session(admin), requestId: `replacement-sale-${i}`, administrative: true, runTransaction: store.runTransaction, now });
+    shipments.push(created.shipmentId);
+    await shippingOperation({ body: { mode: "ready", shipmentId: created.shipmentId, requestId: `replacement-ready-${i}` }, session: session(preparer), runTransaction: store.runTransaction, now, env: {} });
+  }
+  const makeRoute = (body, user = admin) => createCourierSession({ body, session: session(user), runTransaction: store.runTransaction, now, env: {} });
+  const original = { sessionId: "old-route", requestId: "old-route-req", shipmentIds: shipments, leg: "direct", newToken: routeToken };
+  await makeRoute(original);
+  const replacement = { sessionId: "replacement-route", requestId: "replacement-request", shipmentIds: shipments.slice(0, 2), leg: "direct", newToken: token2, replaceExisting: true, reason: "Cambio de turno QA" };
+  await assert.rejects(makeRoute(replacement, seller), /permiso/);
+  await assert.rejects(makeRoute({ ...replacement, replaceExisting: false }), /reparto activo/);
+  const before = structuredClone(store.documents.get(`shipments/${shipments[0]}`));
+  const closed = store.documents.get(`shipments/${shipments[1]}`); closed.status = "entregado";
+  await assert.rejects(makeRoute(replacement), /estado o transporte/);
+  assert.deepEqual(store.documents.get(`shipments/${shipments[0]}`), before);
+  closed.status = "listo_retirar";
+  const result = await makeRoute(replacement);
+  assert.deepEqual(await makeRoute(replacement), result);
+  assert.deepEqual(store.documents.get("deliverySessions/old-route").shipmentIds, [shipments[2]]);
+  assert.equal(store.documents.get("deliverySessions/old-route").status, "active");
+  for (const shipmentId of shipments.slice(0, 2)) {
+    assert.equal(store.documents.get(`shipments/${shipmentId}`).courierSessionId, "replacement-route");
+    const events = [...store.documents.entries()].filter(([key, value]) => key.startsWith(`shipments/${shipmentId}/events/`) && value.action === "courier_reassigned");
+    assert.equal(events.length, 1); assert.equal(events[0][1].previousSessionId, "old-route"); assert.equal(events[0][1].actorId, admin.id);
+    await assert.rejects(shippingOperation({ body: { mode: "courier_action", shipmentId, token: routeToken, action: "pickup", requestId: `stale-${shipmentId}` }, runTransaction: store.runTransaction, now, env: {} }));
+  }
+  const remaining = await shippingOperation({ body: { mode: "detail", token: routeToken }, runTransaction: store.runTransaction, now, env: {} });
+  assert.deepEqual(remaining.shipments.map(item => item.id), [shipments[2]]);
+  const next = await shippingOperation({ body: { mode: "detail", token: token2 }, runTransaction: store.runTransaction, now, env: {} });
+  assert.equal(next.shipments.length, 2);
+});

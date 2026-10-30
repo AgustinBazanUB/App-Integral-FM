@@ -35,6 +35,8 @@ export default function ShippingPage() {
   const [selectedIds, setSelectedIds] = useState([]), [actionRow, setActionRow] = useState(null);
   const [bulkOpen, setBulkOpen] = useState(false), [bulkPeople, setBulkPeople] = useState([]), [bulkPerson, setBulkPerson] = useState(""), [bulkReason, setBulkReason] = useState(""), [bulkBusy, setBulkBusy] = useState(false), [bulkNotice, setBulkNotice] = useState("");
   const [stateMode, setStateMode] = useState(""), [stateBusy, setStateBusy] = useState(false), [stateNotice, setStateNotice] = useState("");
+  const [replaceOpen, setReplaceOpen] = useState(false), [replaceLeg, setReplaceLeg] = useState("direct"), [replaceReason, setReplaceReason] = useState(""), [replaceBusy, setReplaceBusy] = useState(false), [replaceError, setReplaceError] = useState(""), [replaceAccess, setReplaceAccess] = useState(null);
+  const replacementAttempt = useRef(null);
   const stateAttempt = useRef(null);
   const bulkAttempt = useRef(null);
   const routeAttempt = useRef(null), canManage = can(profile, "shipping", "edit");
@@ -111,6 +113,24 @@ export default function ShippingPage() {
     setStateNotice(`${successes.length} envío(s) actualizado(s). ${failures.length} con error.` + (failures.length ? ` ${failures.map(item => `${(rows || []).find(row => row.id === item.id)?.publicCode || item.id}: ${item.message}`).join(" · ")}` : ""));
     setStateBusy(false);
   };
+  const openCourierReplacement = row => {
+    const ids = selectedIds.length > 1 ? [...selectedIds] : [row.id];
+    replacementAttempt.current = { ids }; setReplaceLeg("direct"); setReplaceReason(""); setReplaceError(""); setReplaceAccess(null); setActionRow(null); setReplaceOpen(true);
+  };
+  const replaceCouriers = async () => {
+    if (replaceBusy || !replacementAttempt.current || replaceReason.trim().length < 4) return;
+    const ids = replacementAttempt.current.ids;
+    if (!ids.length || ids.length > 25) { setReplaceError("Seleccioná entre 1 y 25 envíos."); return; }
+    const signature = JSON.stringify({ ids: [...ids].sort(), leg: replaceLeg, reason: replaceReason.trim() });
+    if (replacementAttempt.current.signature !== signature) {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      replacementAttempt.current = { ids, signature, shipmentIds: ids, leg: replaceLeg, reason: replaceReason.trim(), replaceExisting: true, sessionId: crypto.randomUUID(), requestId: crypto.randomUUID(), token: btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "") };
+    }
+    setReplaceBusy(true); setReplaceError("");
+    try { const access = await createCourierRouteAccess(replacementAttempt.current); setReplaceAccess(access); setSelectedIds(current => current.filter(id => !ids.includes(id))); }
+    catch (error) { setReplaceError(error.message); }
+    finally { setReplaceBusy(false); }
+  };
   const requests = (rows || []).filter(row => row.status === "solicitud_pendiente");
   const columns = [
     ...(canManage ? [{ key: "select", label: "Seleccionar", render: row => <input type="checkbox" aria-label={`Seleccionar ${row.publicCode}`} checked={selectedIds.includes(row.id)} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} onChange={event => setSelectedIds(current => event.target.checked ? [...new Set([...current, row.id])] : current.filter(id => id !== row.id))} /> }] : []),
@@ -122,7 +142,7 @@ export default function ShippingPage() {
     { key: "status", label: "Estado", render: row => <Badge tone={row.incident ? "error" : row.status === "entregado" ? "success" : ["reparto_final", "hacia_repositorio", "recibido_repositorio"].includes(row.status) ? "info" : "warning"}>{row.incident ? "Incidencia crítica" : SHIPPING_STATES[row.status]}</Badge> },
     { key: "people", label: "Preparadores", render: row => row.preparerNames.join(", ") || "Por asignar" },
     { key: "updatedAt", label: "Actualizado", render: row => formatDateTime(row.updatedAt) },
-    ...(canManage ? [{ key: "actions", label: "Acciones", render: row => <div onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}><button type="button" aria-label={`Acciones de ${row.publicCode}`} aria-expanded={actionRow === row.id} onClick={() => setActionRow(current => current === row.id ? null : row.id)}>⋮</button>{actionRow === row.id && <div><button type="button" onClick={() => openBulkAssign(row)}>Asignar preparador{selectedIds.length > 1 ? ` a ${selectedIds.length} envíos` : ""}</button><button type="button" onClick={() => openBulkState(row, "start_preparing")}>Comenzar preparación{selectedIds.length > 1 ? ` de ${selectedIds.length} envíos` : ""}</button><button type="button" onClick={() => openBulkState(row, "ready")}>Marcar listo para retiro{selectedIds.length > 1 ? ` (${selectedIds.length} envíos)` : ""}</button></div>}</div> }] : []),
+    ...(canManage ? [{ key: "actions", label: "Acciones", render: row => <div onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}><button type="button" aria-label={`Acciones de ${row.publicCode}`} aria-expanded={actionRow === row.id} onClick={() => setActionRow(current => current === row.id ? null : row.id)}>⋮</button>{actionRow === row.id && <div><button type="button" onClick={() => openBulkAssign(row)}>Asignar preparador{selectedIds.length > 1 ? ` a ${selectedIds.length} envíos` : ""}</button><button type="button" onClick={() => openCourierReplacement(row)}>Reemplazar repartidor{selectedIds.length > 1 ? ` en ${selectedIds.length} envíos` : ""}</button><button type="button" onClick={() => openBulkState(row, "start_preparing")}>Comenzar preparación{selectedIds.length > 1 ? ` de ${selectedIds.length} envíos` : ""}</button><button type="button" onClick={() => openBulkState(row, "ready")}>Marcar listo para retiro{selectedIds.length > 1 ? ` (${selectedIds.length} envíos)` : ""}</button></div>}</div> }] : []),
   ];
   return <div className="fm-shipping-page">
     <nav className="fm-shipping-module-nav" aria-label="Gestión de envíos"><Tabs tabs={[{ id: "board", label: "Tablero" }, { id: "requests", label: <>Solicitudes del vendedor {requests.length > 0 && <span className="fm-shipping-tab-count">{requests.length}</span>}</> }, { id: "tasks", label: "Mis preparaciones y etiquetas" }]} active={tab} onChange={id => { setTab(id); if (selected) open(null); }} /><Link className="fm-button fm-button--primary" to="/gestion/quick-sales">Cargar un envío · Venta Rápida</Link></nav>
@@ -154,6 +174,11 @@ export default function ShippingPage() {
       {routeError && <p role="alert" className="fm-shipping-error">{routeError}</p>}
       {routeAccess && <div className="fm-shipping-route-access"><p role="status">QR de recorrido válido hasta {formatDateTime(routeAccess.expiresAt)}. El acceso reúne {routeAccess.shipmentIds?.length || selectedRouteIds.length} envío(s).</p><input readOnly aria-label="Enlace temporal del recorrido" value={routeAccess.url} /><Button variant="secondary" onClick={() => navigator.clipboard.writeText(routeAccess.url).catch(() => setRouteError("Seleccioná y copiá el enlace manualmente."))}>Copiar enlace</Button><ShippingAccessQr url={routeAccess.url} title="Abrir el recorrido en el teléfono" description="Escaneá una vez para consultar los pedidos asignados y confirmar sus etapas." /></div>}
     </Panel>}
+    <Modal open={replaceOpen} onClose={() => { if (!replaceBusy) setReplaceOpen(false); }} title="Reemplazar repartidor" description={`Se actualizarán ${replacementAttempt.current?.ids.length || 0} envío(s) en una sola operación. Los accesos anteriores dejarán de servir para estos pedidos; los demás envíos de sus recorridos se conservan.`}>
+      {!replaceAccess ? <><p>Se creará un enlace y QR temporal para entregar al nuevo repartidor. El QR no identifica personalmente a quien lo recibe.</p><FormField label="Tramo" required><Select value={replaceLeg} disabled={replaceBusy} onChange={event => setReplaceLeg(event.target.value)}><option value="direct">Entrega directa al cliente</option><option value="origin">Origen a repositorio</option><option value="final">Repositorio al cliente</option></Select></FormField><FormField label="Motivo del reemplazo" required><textarea maxLength={1000} value={replaceReason} disabled={replaceBusy} onChange={event => setReplaceReason(event.target.value)} /></FormField></> : <><p role="status">Reemplazo guardado para {replaceAccess.shipmentIds.length} envío(s). Acceso válido hasta {formatDateTime(replaceAccess.expiresAt)}.</p><input readOnly aria-label="Enlace del nuevo repartidor" value={replaceAccess.url} /><ShippingAccessQr url={replaceAccess.url} title="QR para el nuevo repartidor" description="Compartí este acceso solo con el repartidor autorizado." /></>}
+      {replaceError && <p className="fm-shipping-error" role="alert">{replaceError} No se modificó ningún envío.</p>}
+      <div className="fm-shipping-actions">{!replaceAccess && <Button loading={replaceBusy} disabled={replaceReason.trim().length < 4} onClick={replaceCouriers}>Confirmar {replacementAttempt.current?.ids.length || 0} envío(s)</Button>}<Button variant="secondary" disabled={replaceBusy} onClick={() => setReplaceOpen(false)}>Cerrar</Button></div>
+    </Modal>
     <Modal open={Boolean(stateMode)} onClose={() => { if (!stateBusy) setStateMode(""); }} title={stateMode === "ready" ? "Marcar listo para retiro" : "Comenzar preparación"} description={`Se intentará actualizar ${stateAttempt.current?.ids.length || 0} envío(s). Solo se modifican pedidos compatibles asignados a tu usuario; cada uno se valida por separado.`}>
       {stateNotice && <p role="status">{stateNotice}</p>}
       <div className="fm-shipping-actions"><Button loading={stateBusy} disabled={!stateAttempt.current?.ids.length} onClick={applyBulkState}>Confirmar {stateAttempt.current?.ids.length || 0} envío(s)</Button><Button variant="secondary" disabled={stateBusy} onClick={() => setStateMode("")}>Cerrar</Button></div>
