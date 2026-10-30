@@ -10,7 +10,7 @@ import { clearRuntimeCache } from "../services/runtimeCache";
 import { conversationForUser, forgetConversation, operationLabel, pendingExpired, prependHistoryMessages, rememberConversation, requestId, safeNavigation } from "./client.mjs";
 import { useOliviaContext, useOliviaVisibility } from "./ScreenContext";
 import { oliviaClient } from "./service";
-import { DictationCapture } from "./dictation.mjs";
+import { DictationCapture, appendTranscript } from "./dictation.mjs";
 import OliviaComposer from "./OliviaComposer";
 import OliviaDeveloperPanel from "./OliviaDeveloperPanel";
 import { OliviaLive } from "./live.mjs";
@@ -59,7 +59,12 @@ export default function OliviaAssistant() {
   const [draftEstimate, setDraftEstimate] = useState(null);
   const historyRef = useRef(null);
   const estimateRef = useRef(null);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraftState] = useState("");
+  const draftRef = useRef("");
+  const setDraft = (value) => {
+    const next = typeof value === "function" ? value(draftRef.current) : value;
+    draftRef.current = next; setDraftState(next);
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [errorCode, setErrorCode] = useState("");
@@ -417,7 +422,8 @@ export default function OliviaAssistant() {
         try {
           const result = await oliviaClient.transcribe(audio, { conversationId: conversationRef.current, requestId: requestId() }, { signal: controller.signal });
           if (!mounted.current || controller.signal.aborted) return;
-          text = result.text || ""; setDraft(text);
+          text = result.text || "";
+          if (text.trim()) { text = appendTranscript(draftRef.current, text); setDraft(text); }
           if (result.usage) setSnapshot((current) => ({ ...current, usage: result.usage }));
           if (!text.trim()) setError("No se reconoció texto. Podés volver a dictar.");
           textareaRef.current?.focus();

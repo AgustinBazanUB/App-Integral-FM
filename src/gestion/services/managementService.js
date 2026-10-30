@@ -16,6 +16,7 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   where,
@@ -150,19 +151,30 @@ export async function setManagedUserActive(userId, active, administrator) {
   if (userId === administrator.id && active === false) {
     throw new Error("No podés desactivar tu propia sesión.");
   }
-  await setDoc(
-    doc(db, "users", userId),
-    {
-      active,
-      updatedBy: administrator.id,
-      updatedByName: administrator.name || administrator.email,
+  await runTransaction(db, async (transaction) => {
+    const ref = doc(db, "users", userId);
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists() || snapshot.data().archived === true) throw new Error("El usuario ya no está disponible.");
+    transaction.update(ref, {
+      active, deleted: !active,
+      updatedBy: administrator.id, updatedByName: administrator.name || administrator.email,
       updatedAt: serverTimestamp(),
-      ...(active
-        ? { restoredAt: serverTimestamp() }
-        : { deleted: true, deletedAt: serverTimestamp() }),
-    },
-    { merge: true },
-  );
+      ...(active ? { restoredAt: serverTimestamp() } : { deletedAt: serverTimestamp() }),
+    });
+  });
+}
+
+export async function archiveManagedUser(userId, administrator) {
+  if (normalizedRole(administrator) !== "admin") throw new Error("Sólo un administrador puede eliminar usuarios.");
+  if (userId === administrator.id) throw new Error("No podés eliminar tu propia sesión.");
+  await runTransaction(db, async (transaction) => {
+    const ref = doc(db, "users", userId);
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists() || snapshot.data().archived === true) throw new Error("El usuario ya no está disponible.");
+    if (snapshot.data().active === true) throw new Error("Desactivá el usuario antes de eliminarlo.");
+    transaction.update(ref, { active: false, deleted: true, archived: true, archivedBy: administrator.id,
+      archivedByName: administrator.name || administrator.email, archivedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  });
 }
 
 export async function listAuditLogs(pageSize = 50) {

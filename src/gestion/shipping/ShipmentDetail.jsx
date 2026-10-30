@@ -31,7 +31,7 @@ export function ShipmentContent({ shipment, profile, reload, internal = false, r
     if (operationRef.current?.identity !== identity) operationRef.current = { identity, requestId: crypto.randomUUID() };
     try { await shippingRequest({ mode: action, shipmentId: shipment.id, requestId: operationRef.current.requestId, ...data }); operationRef.current = null; setMode(""); await reload(); } catch (error) { setError(error.message); } finally { busyRef.current = false; setBusy(false); }
   };
-  const open = action => { setMode(action); setActionsOpen(false); setError(""); setForm({ ...shipment.destination, deliveryType: shipment.deliveryType || "manual", assignedPreparerIds: shipment.assignedPreparerIds, reason: "", origin: "", verified: shipment.destination.verified === true, lat: shipment.destination.lat ?? "", lng: shipment.destination.lng ?? "" }); };
+  const open = action => { setMode(action); setActionsOpen(false); setError(""); setForm({ ...shipment.destination, deliveryType: shipment.deliveryType || "manual", assignedPreparerIds: action === "assign" ? shipment.assignedPreparerIds.filter(id => people.some(person => person.id === id)) : shipment.assignedPreparerIds, reason: "", origin: "", verified: shipment.destination.verified === true, lat: shipment.destination.lat ?? "", lng: shipment.destination.lng ?? "" }); };
   const set = (key, value) => setForm(current => ({ ...current, [key]: value }));
   const generateAccess = async (kind, leg) => { if (busyRef.current) return; busyRef.current = true; setBusy(true); setError(""); try {
     const result = await issueShippingAccess(shipment.id, kind, leg);

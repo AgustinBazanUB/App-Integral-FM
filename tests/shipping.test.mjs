@@ -134,7 +134,12 @@ test("printed shipment QR opens one short-lived courier stage without a manually
   assert.equal(s.documents.get(`deliverySessions/${body.sessionId}`).leg, "direct");
   assert.equal(s.documents.get(`deliverySessions/${body.sessionId}`).source, "printed_shipment_qr");
   assert.equal(s.documents.get(`deliverySessionAccess/${sha(newToken)}`).kind, "courier_route");
-  await assert.rejects(activateCourierQr({ body: { ...body, requestId: "another-scan", sessionId: "second-session", newToken: "g".repeat(43) }, runTransaction: s.runTransaction, now, env: {} }), /reparto activo/);
+  const replacementToken = "g".repeat(43);
+  await activateCourierQr({ body: { ...body, requestId: "another-scan", sessionId: "second-session", newToken: replacementToken }, runTransaction: s.runTransaction, now, env: {} });
+  assert.equal(s.shipment().courierSessionId, "second-session");
+  assert.equal(s.documents.get(`deliverySessions/${body.sessionId}`).status, "revoked");
+  await assert.rejects(shippingOperation({ body: { mode: "courier_action", shipmentId: s.result.shipmentId, token: newToken, action: "pickup", requestId: "old-courier" }, runTransaction: s.runTransaction, now, env: {} }));
+  await shippingOperation({ body: { mode: "courier_action", shipmentId: s.result.shipmentId, token: replacementToken, action: "pickup", requestId: "new-courier" }, runTransaction: s.runTransaction, now, env: {} });
 });
 test("printed QR cannot activate an unapproved, incident-paused, or not-ready shipment", async () => {
   const s = await setup();
@@ -339,4 +344,17 @@ test("review and retry are audited without charging stock again, correcting addr
   await s.op("retry", { retryFrom: "final", physicalPositionConfirmed: true, reason: "El cliente confirmó su disponibilidad" });
   assert.equal(s.shipment().status, "reparto_final");
   assert.equal(s.documents.get("warehouseStock/infal/items/oil").currentStock, 18);
+});
+
+test("preparer reassignment validates the new person and preserves assignment history", async () => {
+  const s = await setup(true);
+  s.documents.set(`users/${preparer.id}`, { ...preparer, active: false });
+  await assert.rejects(s.op("assign", { assignedPreparerIds: [preparer.id], reason: "Cambio de personal" }), /no está activo/);
+  await s.op("assign", { assignedPreparerIds: [seller.id], reason: "Cambio de personal" });
+  assert.deepEqual(s.shipment().assignedPreparerIds, [seller.id]);
+  const event = [...s.documents.entries()].find(([path, value]) => path.includes("/events/") && value.action === "assign")[1];
+  assert.deepEqual(event.before.assignedPreparerIds, [preparer.id]);
+  assert.deepEqual(event.after.assignedPreparerIds, [seller.id]);
+  assert.equal(event.actorId, admin.id);
+  assert.ok(s.documents.has(`sales/${s.result.id}`));
 });

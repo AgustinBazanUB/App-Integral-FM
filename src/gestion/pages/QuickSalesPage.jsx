@@ -347,7 +347,13 @@ export default function QuickSalesPage() {
       {submitState.error ? <Toast tone="error">{submitState.error}</Toast> : null}
       {submitState.success ? <Toast tone="success">{submitState.success}</Toast> : null}
       {registeredInvoice ? <SaleInvoicePanel sale={registeredInvoice} allowGenerate={can(profile,"quick-sales","requestTicket")}/> : null}
-      <footer className="fm-quick-pos__actions"><div><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div><Button variant="secondary" icon="FileText" disabled={locked || !canConfirm} onClick={() => setDialog("billing")}>Generar factura</Button><Button icon="Check" loading={submitState.busy} disabled={!canConfirm} onClick={event => handleSubmit(event, false)}>{pendingIntent ? "Recuperar confirmación" : "Continuar"}</Button></footer>
+      <footer className="fm-quick-pos__actions"><div><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div><Button variant="secondary" icon="FileText" disabled={locked || !canConfirm} onClick={() => setDialog("billing")}>Generar factura</Button><Button icon="Check" loading={submitState.busy} aria-disabled={!canConfirm || undefined} onClick={event => {
+        if (!canConfirm) {
+          const message = !cart.length ? "No se puede continuar. Agregá al menos un producto." : !paymentMethod ? "No se puede continuar. Seleccioná el medio de pago." : !channel ? "No se puede continuar. Falta seleccionar el canal de venta." : "No se puede continuar. Completá los pagos para cubrir el total.";
+          setSubmitState({ busy: false, error: message, success: "" }); return;
+        }
+        handleSubmit(event, false);
+      }}>{pendingIntent ? "Recuperar confirmación" : "Continuar"}</Button></footer>
       <Modal open={dialog === "origin"} title="Canal y origen del stock" description="Elegí por dónde llegó la venta y de dónde sale la mercadería." onClose={() => setDialog("")} footer={<><Button variant="secondary" onClick={() => setDialog("")}>Cancelar</Button><Button onClick={confirmOrigin}>Confirmar canal y origen</Button></>}>
         <FormField label="Canal comercial" required><Select value={originDraft?.channel || ""} onChange={event => setOriginDraft(current => ({ ...current, channel: event.target.value }))}><option value="">Elegir canal real</option>{SALES_CHANNELS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></FormField>
         <FormField label="Tipo de origen"><Select value={originDraft?.stockType || "location"} onChange={event => setOriginDraft(current => ({ ...current, stockType: event.target.value, locationId: "" }))}><option value="location">Ubicación</option><option value="warehouse">Depósito</option></Select></FormField>
