@@ -236,7 +236,7 @@
 .fm-shipping-page .fm-shipping-row-actions__trigger:focus-visible { outline: 2px solid #a87823; outline-offset: 2px; }
 .fm-shipping-page .fm-shipping-row-actions__trigger svg { width: 20px; height: 20px; fill: currentColor; }
 .fm-shipping-page .fm-shipping-row-actions__menu {
-  display: grid; gap: 2px; min-width: 220px; margin-top: 6px; padding: 5px;
+  display: grid; gap: 2px; width: 220px; min-width: 220px; margin: 6px 0 0 -184px; padding: 5px;
   border: 1px solid #ded3c2; border-radius: 9px; background: #fff; box-shadow: 0 5px 16px #3b30241c;
 }
 .fm-shipping-page .fm-shipping-row-actions__menu button {
@@ -245,3 +245,7 @@
 }
 .fm-shipping-page .fm-shipping-row-actions__menu button:hover,
 .fm-shipping-page .fm-shipping-row-actions__menu button:focus-visible { background: #f4eee2; outline: 2px solid #a87823; outline-offset: -2px; }
+
+@media (max-width:700px) {
+  .fm-shipping-page .fm-shipping-row-actions__menu { width: min(220px, 100%); min-width: 0; margin-left: 0; }
+}
