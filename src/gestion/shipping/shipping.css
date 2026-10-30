@@ -218,10 +218,12 @@
 @media(max-width:700px){.fm-shipping-filter-toolbar{align-items:flex-start;flex-direction:column}.fm-shipping-filter-actions{display:grid;grid-template-columns:1fr}.fm-shipping-action-list article{grid-template-columns:minmax(0,1fr);gap:9px}.fm-shipping-action-list .fm-button{width:100%}.fm-shipping-route-cell{justify-content:flex-start}}
 
 /* Una selección compartida por acciones y recorridos. */
-.fm-shipping-page .fm-data-table input.fm-shipping-select-checkbox {
-  width: 16px; height: 16px; min-width: 16px; margin: 0; padding: 0;
+.fm-shipping-page input.fm-shipping-select-checkbox {
+  appearance: auto; color-scheme: light; width: 16px; height: 16px;
+  min-width: 16px; min-height: 16px; margin: 0; padding: 0;
   accent-color: var(--fm-gold-primary); cursor: pointer;
 }
+.fm-shipping-page .fm-shipping-select-all { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .fm-shipping-page .fm-shipping-row-actions { position: relative; min-width: 40px; }
 .fm-shipping-page .fm-shipping-row-actions__trigger {
   display: inline-flex; align-items: center; justify-content: center;
