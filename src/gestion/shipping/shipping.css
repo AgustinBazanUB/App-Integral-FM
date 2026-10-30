@@ -216,3 +216,30 @@
 .fm-shipping-request-list>button>strong{font-size:16px;line-height:1.35}
 .fm-shipping-qr-preview>small{font-size:12px;color:var(--fm-text-muted)}
 @media(max-width:700px){.fm-shipping-filter-toolbar{align-items:flex-start;flex-direction:column}.fm-shipping-filter-actions{display:grid;grid-template-columns:1fr}.fm-shipping-action-list article{grid-template-columns:minmax(0,1fr);gap:9px}.fm-shipping-action-list .fm-button{width:100%}.fm-shipping-route-cell{justify-content:flex-start}}
+
+/* Una selección compartida por acciones y recorridos. */
+.fm-shipping-page .fm-data-table input.fm-shipping-select-checkbox {
+  width: 16px; height: 16px; min-width: 16px; margin: 0; padding: 0;
+  accent-color: var(--fm-gold-primary); cursor: pointer;
+}
+.fm-shipping-page .fm-shipping-row-actions { position: relative; min-width: 40px; }
+.fm-shipping-page .fm-shipping-row-actions__trigger {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 6px; border: 1px solid #d9cdbb;
+  border-radius: 8px; background: #fff; color: #34342f; cursor: pointer;
+  box-shadow: none;
+}
+.fm-shipping-page .fm-shipping-row-actions__trigger:hover,
+.fm-shipping-page .fm-shipping-row-actions__trigger[aria-expanded="true"] { background: #f4eee2; border-color: #aa803a; }
+.fm-shipping-page .fm-shipping-row-actions__trigger:focus-visible { outline: 2px solid #a87823; outline-offset: 2px; }
+.fm-shipping-page .fm-shipping-row-actions__trigger svg { width: 20px; height: 20px; fill: currentColor; }
+.fm-shipping-page .fm-shipping-row-actions__menu {
+  display: grid; gap: 2px; min-width: 220px; margin-top: 6px; padding: 5px;
+  border: 1px solid #ded3c2; border-radius: 9px; background: #fff; box-shadow: 0 5px 16px #3b30241c;
+}
+.fm-shipping-page .fm-shipping-row-actions__menu button {
+  text-align: left; padding: 8px 10px; border: 0; border-radius: 6px;
+  background: transparent; color: #34342f; font: inherit; cursor: pointer;
+}
+.fm-shipping-page .fm-shipping-row-actions__menu button:hover,
+.fm-shipping-page .fm-shipping-row-actions__menu button:focus-visible { background: #f4eee2; outline: 2px solid #a87823; outline-offset: -2px; }
