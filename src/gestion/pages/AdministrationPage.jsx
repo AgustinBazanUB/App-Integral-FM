@@ -15,6 +15,7 @@ import { useAuth } from "../AuthContext";
 import { useOliviaVisibility } from "../olivia/ScreenContext";
 import { normalizedRole, ROLE_TEMPLATES } from "../permissions";
 import {
+  archiveManagedUser,
   createManagedUser,
   listLocations,
   listUsers,
@@ -77,6 +78,12 @@ export default function AdministrationPage() {
     }
   };
 
+  const archiveUser = async (user) => {
+    if (!window.confirm(`¿Eliminar a ${user.name || user.email}? Se conservará el historial y la cuenta de acceso quedará inactiva.`)) return;
+    try { await archiveManagedUser(user.id, profile); await result.refresh(); }
+    catch (error) { setSaveState({ busy: false, error: error.message }); }
+  };
+
   return (
     <div className="fm-page-enter">
       <PageHeader
@@ -96,7 +103,7 @@ export default function AdministrationPage() {
               { key: "role", label: "Rol", render: (user) => roleLabels[normalizedRole(user)] || normalizedRole(user) },
               { key: "locations", label: "Ubicaciones", render: (user) => user.allowedLocationIds?.length || (normalizedRole(user) === "admin" ? "Todas" : 0) },
               { key: "active", label: "Estado", render: (user) => <Badge tone={user.active ? "success" : "neutral"}>{user.active ? "Activo" : "Inactivo"}</Badge> },
-              { key: "actions", label: "Acciones", render: (user) => <Button variant="text" onClick={() => toggleActive(user)} disabled={user.id === profile.id}>{user.active ? "Desactivar" : "Reactivar"}</Button> },
+              { key: "actions", label: "Acciones", render: (user) => <><Button variant="text" onClick={() => toggleActive(user)} disabled={user.id === profile.id}>{user.active ? "Desactivar" : "Reactivar"}</Button>{!user.active && <Button variant="text" onClick={() => archiveUser(user)}>Eliminar</Button>}</> },
             ]}
             empty={<EmptyState icon="UsersRound" title="No hay usuarios" description="Creá el primer perfil operativo." />}
           />

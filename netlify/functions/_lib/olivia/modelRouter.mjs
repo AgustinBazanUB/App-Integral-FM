@@ -1,8 +1,12 @@
 import { can, normalizedRole } from "../../../../src/gestion/permissions.js";
+import { latestInstruction } from "./conversationTasks.mjs";
+import { latencyEnabled } from '../../../../src/shared/oliviaConversationRouter.mjs';
+import { assistiveIntent } from '../../../../src/shared/oliviaAssistiveIntent.mjs';
 
-export const MODEL_POLICY_VERSION = 2;
+export const MODEL_POLICY_VERSION = 3;
 export function classifyIntent(message = "", module = "") {
-  const text = normalize(message);
+  const text = latestInstruction(message);
+  if (/demanda|estima.*(?:vend|venta)|cuanto.*vender/.test(text)) return "demand.forecast";
   if (/pronostic|forecast|prevision/.test(text)) return "fair.forecast";
   if (/transfer|mandame|manda |enviame.*(aceite|botella|unidades)/.test(text)) return "stock.transfer";
   if (/cargame|ingresa|agrega/.test(text) && /stock|botella|unidades|mercaderia/.test(text)) return "stock.load";
@@ -10,7 +14,7 @@ export function classifyIntent(message = "", module = "") {
   if (/compara|comparacion/.test(text)) return "sales.compare";
   if (/stock|inventario/.test(text)) return "stock.read";
   if (/venta|nos fue|factur|ticket|rendimiento|metric/.test(text)) return "metrics.analysis";
-  if (/client|telefono/.test(text)) return /crea|registra|agrega/.test(text) ? "customer.create" : "customer.read";
+  if (/client|telefono/.test(text)) return /crea|registra|agrega|carg|alta/.test(text) ? "customer.create" : "customer.read";
   if (/envio|despacho/.test(text)) return "shipping.create";
   return `${module || "core"}.query`;
 }
@@ -19,15 +23,16 @@ const creative = /disena.{0,50}(concepto|post|publicacion|reel|carrusel|campana|
 const complex = /pronostic|forecast|prevision|proyect|optimiza|compara|comparacion|tendencia|escenarios|restricciones|rentabilidad|historico|trimestre|semestre|anual|ultimos? \d+ meses|causa|cruza|cruzar|correlacion/;
 
 /** Deterministic server policy. Neither model output nor browser flags select a model. */
-export function routeModel(configuration, session, { message = "", context = {}, task = null, skills = [], attachments = [], signals = {} } = {}) {
-  if (configuration.voiceBackend) return { ...configuration.voiceBackend, intent: classifyIntent(message, context.module), route: "luna-voice", routingReason: "live-delegation", policyVersion: MODEL_POLICY_VERSION };
-  const text = normalize(message);
+export function routeModel(configuration, session, { message = "", context = {}, task = null, skills = [], attachments = [], signals = {}, ideaContext = null } = {}) {
+  const text = latestInstruction(message);
   const module = context.module || "";
   const seller = normalizedRole(session.profile) === "seller";
   const creativeModule = ["marketing", "social"].includes(module) && can(session.profile, module, "view");
-  const creativeIntent = !seller && creativeModule && creative.test(text);
+  const assistance = assistiveIntent(message, ideaContext);
+  const creativeIntent = !seller && creativeModule && (creative.test(text) || (assistance.pure && ideaContext?.route === 'sol-creative'));
   const reasons = [];
   if (complex.test(text)) reasons.push("analysis-or-forecast");
+  if (/estima|demanda|cuanto.*vender/.test(text) && !reasons.includes("analysis-or-forecast")) reasons.push("analysis-or-forecast");
   const dates = [...text.matchAll(/\d{4}-\d{2}-\d{2}/g)].map((match) => Date.parse(match[0])).filter(Number.isFinite);
   if (dates.length > 1 && Math.max(...dates) - Math.min(...dates) > 31 * 86400000) reasons.push("historical-horizon");
   if ((text.match(/\b(sin|maximo|minimo|limite|restriccion)\b/g) || []).length >= 2) reasons.push("multiple-constraints");
@@ -39,16 +44,18 @@ export function routeModel(configuration, session, { message = "", context = {},
   if ((signals.moduleCount || 0) >= 2) reasons.push("cross-module");
   // Carry the route only while collecting the same task. Completed tasks never
   // cause a following short/simple query to inherit an expensive route.
-  const continuation = task?.status === "collecting" && task?.route && text.split(/\s+/).length <= 10 && !/[?¿]/.test(message) && !/^(consulta|ahora|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|carga|manda|transfer|vende|registra|crea|disena)/.test(text) && !/stock|ventas?|estadistic|metric|inbox|gasto|deposit|transfer|factura|permis|usuarios?/.test(text);
-  if (continuation && task.route.route === "luna-complex") reasons.push("active-complex-task");
-  if (continuation && task.route.route === "sol-creative" && creativeModule && !seller) {
+  const continuation = task?.status === "collecting" && text.split(/\s+/).length <= 10 && !/[?¿]/.test(message) && !/^(consulta|ahora|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|carga|manda|transfer|vende|registra|crea|disena)/.test(text) && !/stock|ventas?|estadistic|metric|inbox|gasto|deposit|transfer|factura|permis|usuarios?/.test(text);
+  if (continuation && task.route?.route === "luna-complex") reasons.push("active-complex-task");
+  if (continuation && task.route?.route === "sol-creative" && creativeModule && !seller) {
     reasons.push("active-creative-task");
   }
   const useCreative = creativeIntent || reasons.includes("active-creative-task");
   const route = useCreative ? "sol-creative" : reasons.length ? "luna-complex" : "luna-normal";
-  const creativeComplex = reasons.some((reason) => reason !== "active-creative-task") || (continuation && task.route.reasoningEffort === "xhigh");
+  const creativeComplex = reasons.some((reason) => reason !== "active-creative-task") || (continuation && task.route?.reasoningEffort === "xhigh");
   const profile = configuration.profiles[useCreative ? creativeComplex ? "creativeComplex" : "creative" : route === "luna-complex" ? "adminComplex" : seller ? "seller" : "adminDefault"];
-  return { ...profile, ...(seller && !useCreative ? { model: configuration.profiles.seller.model } : {}), intent: continuation ? task.intent : classifyIntent(message, module), route, routingReason: useCreative ? ["creative-intent-authorized-module", ...reasons].join(",") : reasons.join(",") || "routine-operation", policyVersion: MODEL_POLICY_VERSION };
+  const model = seller && !useCreative ? configuration.profiles.seller.model : profile.model;
+  const reasoning = latencyEnabled(configuration) && model === 'gpt-6-luna' && !useCreative ? (route === 'luna-normal' ? 'none' : 'medium') : profile.reasoningEffort;
+  return { ...profile, model, reasoningEffort:reasoning, intent: assistance.pure ? `${assistance.kind}.ideation` : continuation ? task.intent : classifyIntent(message, module), route, routingReason: useCreative ? ["creative-intent-authorized-module", ...reasons].join(",") : reasons.join(",") || (assistance.pure ? 'generation-without-business-tools' : "routine-operation"), policyVersion: MODEL_POLICY_VERSION };
 }
 
 export function aggregateRoutes(events = []) {

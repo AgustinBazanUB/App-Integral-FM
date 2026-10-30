@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Olivia · Prueba de frases</title>
+  <link rel="stylesheet" href="./library.css">
+  <script type="module" src="./library.js"></script>
+</head>
+<body>
+  <main>
+    <a class="back" href="/gestion/">← Volver a Gestión</a>
+    <p class="eyebrow">OLIVIA · BIBLIOTECA DE VOZ</p>
+    <h1>Escuchá las frases de Olivia</h1>
+    <p class="intro">Probá el tono y la pronunciación de cada frase. Estos audios ya están generados: reproducirlos no vuelve a solicitar síntesis de voz.</p>
+    <p id="status" role="status">Cargando biblioteca…</p>
+    <div class="filters"><label for="search">Buscar una frase</label><input id="search" type="search" placeholder="Por ejemplo: pensando, stock, cliente…"><button id="stop" type="button">Detener audio</button></div>
+    <div id="clips" class="clips"></div>
+  </main>
+</body>
+</html>

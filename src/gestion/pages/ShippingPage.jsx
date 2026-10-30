@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, DataTable, EmptyState, FilterBar, FormField, PageHeader, Panel, SearchInput, Select, Skeleton, StatCard, Tabs } from "../../design-system";
+import { Badge, Button, DataTable, EmptyState, FilterBar, FormField, Modal, PageHeader, Panel, SearchInput, Select, Skeleton, StatCard, Tabs } from "../../design-system";
 import { useAuth } from "../AuthContext";
 import { Link, useLocation, useNavigate } from "../../router";
-import { subscribeShipments, createCourierRouteAccess } from "../services/shippingService";
+import { subscribeShipments, createCourierRouteAccess, shippingRequest } from "../services/shippingService";
 import { SHIPPING_STATES, TRANSPORTS, shippingBucket } from "../../shared/shippingDomain.mjs";
 import { addArgentinaDays, argentinaDateKey, argentinaPeriodRange } from "../../modules/locations/domain/time.js";
 import { formatDateTime } from "../formatters";
+import { assignPreparersToShipments, changeShippingStates } from "../shipping/bulkAssignments.mjs";
 import ShippingTasks from "../shipping/ShippingTasks";
 import ShipmentDetail from "../shipping/ShipmentDetail";
 import ShippingRequests from "../shipping/ShippingRequests";
@@ -30,7 +31,14 @@ function RoutePreview() {
 export default function ShippingPage() {
   const { profile } = useAuth(), location = useLocation(), navigate = useNavigate();
   const [rows, setRows] = useState(null), [error, setError] = useState(""), [tab, setTab] = useState("board"), [bucket, setBucket] = useState("all"), [filters, setFilters] = useState(() => ({ preset: "week", ...presetDates("week") })), [filtersOpen, setFiltersOpen] = useState(false);
-  const [routeLeg, setRouteLeg] = useState("direct"), [selectedRouteIds, setSelectedRouteIds] = useState([]), [routeAccess, setRouteAccess] = useState(null), [routeError, setRouteError] = useState(""), [routeBusy, setRouteBusy] = useState(false);
+  const [routeLeg, setRouteLeg] = useState("direct"), [routeAccess, setRouteAccess] = useState(null), [routeError, setRouteError] = useState(""), [routeBusy, setRouteBusy] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]), [actionRow, setActionRow] = useState(null);
+  const [bulkOpen, setBulkOpen] = useState(false), [bulkPeople, setBulkPeople] = useState([]), [bulkPerson, setBulkPerson] = useState(""), [bulkReason, setBulkReason] = useState(""), [bulkBusy, setBulkBusy] = useState(false), [bulkNotice, setBulkNotice] = useState("");
+  const [stateMode, setStateMode] = useState(""), [stateBusy, setStateBusy] = useState(false), [stateNotice, setStateNotice] = useState("");
+  const [replaceOpen, setReplaceOpen] = useState(false), [replaceLeg, setReplaceLeg] = useState("direct"), [replaceReason, setReplaceReason] = useState(""), [replaceBusy, setReplaceBusy] = useState(false), [replaceError, setReplaceError] = useState(""), [replaceAccess, setReplaceAccess] = useState(null);
+  const replacementAttempt = useRef(null);
+  const stateAttempt = useRef(null);
+  const bulkAttempt = useRef(null);
   const routeAttempt = useRef(null), canManage = can(profile, "shipping", "edit");
   const selected = new URLSearchParams(location.search).get("shipment");
   useEffect(() => subscribeShipments(profile, setRows, error => setError(error.message)), [profile.id]);
@@ -58,8 +66,11 @@ export default function ShippingPage() {
         : row.deliveryType === "repository" && ["recibido_repositorio", "reparto_final"].includes(row.status)
   ));
   const createRoute = async () => {
-    const shipmentIds = selectedRouteIds.filter(id => routeEligible((rows || []).find(row => row.id === id)));
+    const shipmentIds = [...selectedIds];
     if (!shipmentIds.length || routeBusy) return;
+    if (shipmentIds.length > 25) { setRouteError("Seleccioná hasta 25 envíos para el recorrido."); return; }
+    const incompatible = shipmentIds.filter(id => !routeEligible((rows || []).find(row => row.id === id)));
+    if (incompatible.length) { setRouteError(`${incompatible.length} envío(s) seleccionado(s) no corresponden al tramo o no están listos. Revisá la selección.`); return; }
     const signature = JSON.stringify({ shipmentIds: [...shipmentIds].sort(), routeLeg });
     if (routeAttempt.current?.signature !== signature) {
       const bytes = crypto.getRandomValues(new Uint8Array(32));
@@ -68,13 +79,65 @@ export default function ShippingPage() {
     setRouteBusy(true); setRouteError("");
     try {
       const access = await createCourierRouteAccess(routeAttempt.current);
-      setRouteAccess(access); setSelectedRouteIds([]); routeAttempt.current = null;
+      setRouteAccess(access); setSelectedIds(current => current.filter(id => !shipmentIds.includes(id))); routeAttempt.current = null;
     } catch (error) { setRouteError(error.message); }
     finally { setRouteBusy(false); }
   };
+  const openBulkAssign = async (row) => {
+    setActionRow(null); setBulkPerson(""); setBulkReason(""); setBulkNotice(""); setBulkOpen(true);
+    const ids = selectedIds.length > 1 ? selectedIds : [row.id];
+    bulkAttempt.current = { ids, requests: Object.fromEntries(ids.map(id => [id, crypto.randomUUID()])), signature: null };
+    try { setBulkPeople(await shippingRequest({ mode: "resources" })); }
+    catch (error) { setBulkPeople([]); setBulkNotice(error.message); }
+  };
+  const applyBulkAssign = async () => {
+    if (bulkBusy || !bulkPerson || bulkReason.trim().length < 4 || !bulkAttempt.current) return;
+    const attempt = bulkAttempt.current, signature = JSON.stringify([bulkPerson, bulkReason.trim()]);
+    if (attempt.signature && attempt.signature !== signature) attempt.requests = Object.fromEntries(attempt.ids.map(id => [id, crypto.randomUUID()]));
+    attempt.signature = signature; setBulkBusy(true); setBulkNotice("");
+    const { failures, successes } = await assignPreparersToShipments(attempt.ids, attempt.requests, bulkPerson, bulkReason.trim(), shippingRequest);
+    setSelectedIds(current => current.filter(id => !successes.includes(id)));
+    attempt.ids = failures.map(item => item.id);
+    setBulkNotice(`${successes.length} envío(s) actualizado(s). ${failures.length} con error.` + (failures.length ? ` ${failures.map(item => `${(rows || []).find(row => row.id === item.id)?.publicCode || item.id}: ${item.message}`).join(" · ")}` : ""));
+    setBulkBusy(false);
+  };
+  const openBulkState = (row, mode) => {
+    const ids = selectedIds.length > 1 ? selectedIds : [row.id];
+    stateAttempt.current = { ids, requests: Object.fromEntries(ids.map(id => [id, crypto.randomUUID()])) };
+    setActionRow(null); setStateNotice(""); setStateMode(mode);
+  };
+  const applyBulkState = async () => {
+    if (stateBusy || !stateAttempt.current?.ids.length) return;
+    setStateBusy(true); setStateNotice("");
+    const attempt = stateAttempt.current;
+    const { successes, failures } = await changeShippingStates(attempt.ids, attempt.requests, stateMode, shippingRequest);
+    setSelectedIds(current => current.filter(id => !successes.includes(id)));
+    attempt.ids = failures.map(item => item.id);
+    setStateNotice(`${successes.length} envío(s) actualizado(s). ${failures.length} con error.` + (failures.length ? ` ${failures.map(item => `${(rows || []).find(row => row.id === item.id)?.publicCode || item.id}: ${item.message}`).join(" · ")}` : ""));
+    setStateBusy(false);
+  };
+  const openCourierReplacement = row => {
+    const ids = selectedIds.length > 1 ? [...selectedIds] : [row.id];
+    replacementAttempt.current = { ids }; setReplaceLeg("direct"); setReplaceReason(""); setReplaceError(""); setReplaceAccess(null); setActionRow(null); setReplaceOpen(true);
+  };
+  const replaceCouriers = async () => {
+    if (replaceBusy || !replacementAttempt.current || replaceReason.trim().length < 4) return;
+    const ids = replacementAttempt.current.ids;
+    if (!ids.length || ids.length > 25) { setReplaceError("Seleccioná entre 1 y 25 envíos."); return; }
+    const signature = JSON.stringify({ ids: [...ids].sort(), leg: replaceLeg, reason: replaceReason.trim() });
+    if (replacementAttempt.current.signature !== signature) {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      replacementAttempt.current = { ids, signature, shipmentIds: ids, leg: replaceLeg, reason: replaceReason.trim(), replaceExisting: true, sessionId: crypto.randomUUID(), requestId: crypto.randomUUID(), token: btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "") };
+    }
+    setReplaceBusy(true); setReplaceError("");
+    try { const access = await createCourierRouteAccess(replacementAttempt.current); setReplaceAccess(access); setSelectedIds(current => current.filter(id => !ids.includes(id))); }
+    catch (error) { setReplaceError(error.message); }
+    finally { setReplaceBusy(false); }
+  };
   const requests = (rows || []).filter(row => row.status === "solicitud_pendiente");
   const columns = [
-    ...(canManage ? [{ key: "route", label: "Ruta", render: row => <div className="fm-shipping-route-cell"><input type="checkbox" aria-label={`Incluir ${row.publicCode} en el recorrido`} onClick={event => event.stopPropagation()} disabled={!routeEligible(row)} checked={selectedRouteIds.includes(row.id)} onChange={event => setSelectedRouteIds(current => event.target.checked ? [...new Set([...current, row.id])] : current.filter(id => id !== row.id))} /><RoutePreview /></div> }] : []),
+    ...(canManage ? [{ key: "select", label: "Seleccionar", render: row => <input className="fm-shipping-select-checkbox" type="checkbox" aria-label={`Seleccionar ${row.publicCode}`} checked={selectedIds.includes(row.id)} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} onChange={event => setSelectedIds(current => event.target.checked ? [...new Set([...current, row.id])] : current.filter(id => id !== row.id))} /> }] : []),
+    ...(canManage ? [{ key: "route", label: "Ruta", render: () => <div className="fm-shipping-route-cell"><RoutePreview /></div> }] : []),
     { key: "issue", label: "!", render: row => row.incident ? <span className="fm-shipping-issue-mark" title={row.incident.reason} aria-label={`Incidencia: ${row.incident.reason}`}>!</span> : <span className="fm-shipping-neutral-dot" aria-label="Sin incidencia" /> },
     { key: "code", label: "Envío", render: row => <div className="fm-shipping-row-title"><strong>Envío para {row.customerSnapshot.name}</strong><small>{row.publicCode} · {row.saleCode}</small></div> },
     { key: "destination", label: "Destino y zona", render: row => <div>{row.destination.displayAddress}<small>{row.destination.verified ? row.destination.neighborhoodOrLocality || "Marcador verificado" : "Zona por confirmar"}</small></div> },
@@ -82,6 +145,7 @@ export default function ShippingPage() {
     { key: "status", label: "Estado", render: row => <Badge tone={row.incident ? "error" : row.status === "entregado" ? "success" : ["reparto_final", "hacia_repositorio", "recibido_repositorio"].includes(row.status) ? "info" : "warning"}>{row.incident ? "Incidencia crítica" : SHIPPING_STATES[row.status]}</Badge> },
     { key: "people", label: "Preparadores", render: row => row.preparerNames.join(", ") || "Por asignar" },
     { key: "updatedAt", label: "Actualizado", render: row => formatDateTime(row.updatedAt) },
+    ...(canManage ? [{ key: "actions", label: "Acciones", render: row => <div className="fm-shipping-row-actions" onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}><button className="fm-shipping-row-actions__trigger" type="button" aria-label={`Acciones de ${row.publicCode}`} aria-expanded={actionRow === row.id} onClick={() => setActionRow(current => current === row.id ? null : row.id)}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>{actionRow === row.id && <div className="fm-shipping-row-actions__menu"><button type="button" onClick={() => openBulkAssign(row)}>Asignar preparador{selectedIds.length > 1 ? ` a ${selectedIds.length} envíos` : ""}</button><button type="button" onClick={() => openCourierReplacement(row)}>Reemplazar repartidor{selectedIds.length > 1 ? ` en ${selectedIds.length} envíos` : ""}</button><button type="button" onClick={() => openBulkState(row, "start_preparing")}>Comenzar preparación{selectedIds.length > 1 ? ` de ${selectedIds.length} envíos` : ""}</button><button type="button" onClick={() => openBulkState(row, "ready")}>Marcar listo para retiro{selectedIds.length > 1 ? ` (${selectedIds.length} envíos)` : ""}</button></div>}</div> }] : []),
   ];
   return <div className="fm-shipping-page">
     <nav className="fm-shipping-module-nav" aria-label="Gestión de envíos"><Tabs tabs={[{ id: "board", label: "Tablero" }, { id: "requests", label: <>Solicitudes del vendedor {requests.length > 0 && <span className="fm-shipping-tab-count">{requests.length}</span>}</> }, { id: "tasks", label: "Mis preparaciones y etiquetas" }]} active={tab} onChange={id => { setTab(id); if (selected) open(null); }} /><Link className="fm-button fm-button--primary" to="/gestion/quick-sales">Cargar un envío · Venta Rápida</Link></nav>
@@ -105,13 +169,30 @@ export default function ShippingPage() {
         </FilterBar>
         <div className="fm-shipping-filter-actions"><Button variant="secondary" onClick={() => { setFilters({ preset: "week", ...presetDates("week") }); setBucket("all"); }}>Restablecer filtros</Button><Button onClick={() => setFiltersOpen(false)}>Ver {visible.length} envíos</Button></div>
       </section>}
+      {canManage && <div className="fm-shipping-filter-toolbar"><label className="fm-shipping-select-all"><input className="fm-shipping-select-checkbox" type="checkbox" checked={visible.length > 0 && visible.every(row => selectedIds.includes(row.id))} onChange={event => setSelectedIds(current => event.target.checked ? [...new Set([...current, ...visible.map(row => row.id)])] : current.filter(id => !visible.some(row => row.id === id)))} /> Seleccionar todos los envíos visibles</label><p role="status">{selectedIds.length} seleccionado(s), incluidos los que quedaron fuera del filtro.</p></div>}
       {rows === null && !error ? <Skeleton lines={6} /> : <DataTable columns={columns} rows={visible} onRowClick={row => open(row.id)} empty={<EmptyState icon="Truck" title="No hay envíos para estos filtros" description="Los envíos se generan al confirmar ventas con envío en Venta Rápida o en el Panel Vendedor." />} />}
     </Panel>
     {canManage && <Panel title="Recorrido del repartidor" description="Seleccioná pedidos compatibles para generar un QR temporal. El repartidor comparte una sola ubicación para toda la ruta.">
-      <div className="fm-shipping-route-tools"><FormField label="Tramo"><Select value={routeLeg} onChange={event => { setRouteLeg(event.target.value); setSelectedRouteIds(current => current.filter(id => { const row = (rows || []).find(item => item.id === id); return event.target.value === "direct" ? row?.deliveryType !== "repository" && ["listo_retirar", "reparto_final"].includes(row?.status) : event.target.value === "origin" ? row?.deliveryType === "repository" && ["listo_retirar", "hacia_repositorio"].includes(row?.status) : row?.deliveryType === "repository" && ["recibido_repositorio", "reparto_final"].includes(row?.status); })); setRouteAccess(null); routeAttempt.current = null; }}><option value="direct">Entrega directa · cliente</option><option value="origin">Repositorio · origen a repositorio</option><option value="final">Repositorio · repositorio a cliente</option></Select></FormField><Button loading={routeBusy} disabled={!selectedRouteIds.some(id => routeEligible((rows || []).find(row => row.id === id)))} onClick={createRoute}>Crear QR de {selectedRouteIds.filter(id => routeEligible((rows || []).find(row => row.id === id))).length} envío(s)</Button></div>
+      <div className="fm-shipping-route-tools"><FormField label="Tramo"><Select value={routeLeg} onChange={event => { setRouteLeg(event.target.value); setRouteAccess(null); setRouteError(""); routeAttempt.current = null; }}><option value="direct">Entrega directa · cliente</option><option value="origin">Repositorio · origen a repositorio</option><option value="final">Repositorio · repositorio a cliente</option></Select></FormField><Button loading={routeBusy} disabled={!selectedIds.length} onClick={createRoute}>Crear QR de {selectedIds.length} envío(s)</Button></div>
+      <p>El recorrido usa los envíos marcados en la columna Seleccionar. Todos deben ser compatibles con el tramo elegido.</p>
       {routeError && <p role="alert" className="fm-shipping-error">{routeError}</p>}
-      {routeAccess && <div className="fm-shipping-route-access"><p role="status">QR de recorrido válido hasta {formatDateTime(routeAccess.expiresAt)}. El acceso reúne {routeAccess.shipmentIds?.length || selectedRouteIds.length} envío(s).</p><input readOnly aria-label="Enlace temporal del recorrido" value={routeAccess.url} /><Button variant="secondary" onClick={() => navigator.clipboard.writeText(routeAccess.url).catch(() => setRouteError("Seleccioná y copiá el enlace manualmente."))}>Copiar enlace</Button><ShippingAccessQr url={routeAccess.url} title="Abrir el recorrido en el teléfono" description="Escaneá una vez para consultar los pedidos asignados y confirmar sus etapas." /></div>}
+      {routeAccess && <div className="fm-shipping-route-access"><p role="status">QR de recorrido válido hasta {formatDateTime(routeAccess.expiresAt)}. El acceso reúne {routeAccess.shipmentIds?.length || 0} envío(s).</p><input readOnly aria-label="Enlace temporal del recorrido" value={routeAccess.url} /><Button variant="secondary" onClick={() => navigator.clipboard.writeText(routeAccess.url).catch(() => setRouteError("Seleccioná y copiá el enlace manualmente."))}>Copiar enlace</Button><ShippingAccessQr url={routeAccess.url} title="Abrir el recorrido en el teléfono" description="Escaneá una vez para consultar los pedidos asignados y confirmar sus etapas." /></div>}
     </Panel>}
+    <Modal open={replaceOpen} onClose={() => { if (!replaceBusy) setReplaceOpen(false); }} title="Reemplazar repartidor" description={`Se actualizarán ${replacementAttempt.current?.ids.length || 0} envío(s) en una sola operación. Los accesos anteriores dejarán de servir para estos pedidos; los demás envíos de sus recorridos se conservan.`}>
+      {!replaceAccess ? <><p>Se creará un enlace y QR temporal para entregar al nuevo repartidor. El QR no identifica personalmente a quien lo recibe.</p><FormField label="Tramo" required><Select value={replaceLeg} disabled={replaceBusy} onChange={event => setReplaceLeg(event.target.value)}><option value="direct">Entrega directa al cliente</option><option value="origin">Origen a repositorio</option><option value="final">Repositorio al cliente</option></Select></FormField><FormField label="Motivo del reemplazo" required><textarea maxLength={1000} value={replaceReason} disabled={replaceBusy} onChange={event => setReplaceReason(event.target.value)} /></FormField></> : <><p role="status">Reemplazo guardado para {replaceAccess.shipmentIds.length} envío(s). Acceso válido hasta {formatDateTime(replaceAccess.expiresAt)}.</p><input readOnly aria-label="Enlace del nuevo repartidor" value={replaceAccess.url} /><ShippingAccessQr url={replaceAccess.url} title="QR para el nuevo repartidor" description="Compartí este acceso solo con el repartidor autorizado." /></>}
+      {replaceError && <p className="fm-shipping-error" role="alert">{replaceError} Si se interrumpió la conexión, reintentá con el mismo tramo y motivo para recuperar el resultado sin duplicar la operación.</p>}
+      <div className="fm-shipping-actions">{!replaceAccess && <Button loading={replaceBusy} disabled={replaceReason.trim().length < 4} onClick={replaceCouriers}>Confirmar {replacementAttempt.current?.ids.length || 0} envío(s)</Button>}<Button variant="secondary" disabled={replaceBusy} onClick={() => setReplaceOpen(false)}>Cerrar</Button></div>
+    </Modal>
+    <Modal open={Boolean(stateMode)} onClose={() => { if (!stateBusy) setStateMode(""); }} title={stateMode === "ready" ? "Marcar listo para retiro" : "Comenzar preparación"} description={`Se intentará actualizar ${stateAttempt.current?.ids.length || 0} envío(s). Solo se modifican pedidos compatibles asignados a tu usuario; cada uno se valida por separado.`}>
+      {stateNotice && <p role="status">{stateNotice}</p>}
+      <div className="fm-shipping-actions"><Button loading={stateBusy} disabled={!stateAttempt.current?.ids.length} onClick={applyBulkState}>Confirmar {stateAttempt.current?.ids.length || 0} envío(s)</Button><Button variant="secondary" disabled={stateBusy} onClick={() => setStateMode("")}>Cerrar</Button></div>
+    </Modal>
+    <Modal open={bulkOpen} onClose={() => { if (!bulkBusy) setBulkOpen(false); }} title="Asignar preparador" description={`Se intentará actualizar ${bulkAttempt.current?.ids.length || 0} envío(s). Cada envío se valida por separado y se conserva su historial.`}>
+      <FormField label="Preparador activo" required><Select value={bulkPerson} onChange={event => setBulkPerson(event.target.value)} disabled={bulkBusy}><option value="">Elegí un preparador</option>{bulkPeople.map(person => <option key={person.id} value={person.id}>{person.label || person.name}</option>)}</Select></FormField>
+      <FormField label="Motivo del cambio" required><textarea value={bulkReason} maxLength={1000} disabled={bulkBusy} onChange={event => setBulkReason(event.target.value)} /></FormField>
+      {bulkNotice && <p role="status">{bulkNotice}</p>}
+      <div className="fm-shipping-actions"><Button loading={bulkBusy} disabled={!bulkAttempt.current?.ids.length || !bulkPerson || bulkReason.trim().length < 4} onClick={applyBulkAssign}>Confirmar {bulkAttempt.current?.ids.length || 0} envío(s)</Button><Button variant="secondary" disabled={bulkBusy} onClick={() => setBulkOpen(false)}>Cerrar</Button></div>
+    </Modal>
     <p className="fm-shipping-muted">Las incidencias se marcan en rojo dentro del pedido. Las excepciones se consultan en Todos y no cuentan como entregados.</p></>}
     </>}
   </div>;

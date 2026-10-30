@@ -134,7 +134,12 @@ test("printed shipment QR opens one short-lived courier stage without a manually
   assert.equal(s.documents.get(`deliverySessions/${body.sessionId}`).leg, "direct");
   assert.equal(s.documents.get(`deliverySessions/${body.sessionId}`).source, "printed_shipment_qr");
   assert.equal(s.documents.get(`deliverySessionAccess/${sha(newToken)}`).kind, "courier_route");
-  await assert.rejects(activateCourierQr({ body: { ...body, requestId: "another-scan", sessionId: "second-session", newToken: "g".repeat(43) }, runTransaction: s.runTransaction, now, env: {} }), /reparto activo/);
+  const replacementToken = "g".repeat(43);
+  await activateCourierQr({ body: { ...body, requestId: "another-scan", sessionId: "second-session", newToken: replacementToken }, runTransaction: s.runTransaction, now, env: {} });
+  assert.equal(s.shipment().courierSessionId, "second-session");
+  assert.equal(s.documents.get(`deliverySessions/${body.sessionId}`).status, "revoked");
+  await assert.rejects(shippingOperation({ body: { mode: "courier_action", shipmentId: s.result.shipmentId, token: newToken, action: "pickup", requestId: "old-courier" }, runTransaction: s.runTransaction, now, env: {} }));
+  await shippingOperation({ body: { mode: "courier_action", shipmentId: s.result.shipmentId, token: replacementToken, action: "pickup", requestId: "new-courier" }, runTransaction: s.runTransaction, now, env: {} });
 });
 test("printed QR cannot activate an unapproved, incident-paused, or not-ready shipment", async () => {
   const s = await setup();
@@ -339,4 +344,51 @@ test("review and retry are audited without charging stock again, correcting addr
   await s.op("retry", { retryFrom: "final", physicalPositionConfirmed: true, reason: "El cliente confirmó su disponibilidad" });
   assert.equal(s.shipment().status, "reparto_final");
   assert.equal(s.documents.get("warehouseStock/infal/items/oil").currentStock, 18);
+});
+
+test("preparer reassignment validates the new person and preserves assignment history", async () => {
+  const s = await setup(true);
+  s.documents.set(`users/${preparer.id}`, { ...preparer, active: false });
+  await assert.rejects(s.op("assign", { assignedPreparerIds: [preparer.id], reason: "Cambio de personal" }), /no está activo/);
+  await s.op("assign", { assignedPreparerIds: [seller.id], reason: "Cambio de personal" });
+  assert.deepEqual(s.shipment().assignedPreparerIds, [seller.id]);
+  const event = [...s.documents.entries()].find(([path, value]) => path.includes("/events/") && value.action === "assign")[1];
+  assert.deepEqual(event.before.assignedPreparerIds, [preparer.id]);
+  assert.deepEqual(event.after.assignedPreparerIds, [seller.id]);
+  assert.equal(event.actorId, admin.id);
+  assert.ok(s.documents.has(`sales/${s.result.id}`));
+});
+
+test("bulk courier replacement is atomic, audited, idempotent and preserves other route members", async () => {
+  const store = memoryStore(), shipments = [];
+  for (let i = 0; i < 3; i++) {
+    const created = await createShippingSale({ sale: sale(), session: session(admin), requestId: `replacement-sale-${i}`, administrative: true, runTransaction: store.runTransaction, now });
+    shipments.push(created.shipmentId);
+    await shippingOperation({ body: { mode: "ready", shipmentId: created.shipmentId, requestId: `replacement-ready-${i}` }, session: session(preparer), runTransaction: store.runTransaction, now, env: {} });
+  }
+  const makeRoute = (body, user = admin) => createCourierSession({ body, session: session(user), runTransaction: store.runTransaction, now, env: {} });
+  const original = { sessionId: "old-route", requestId: "old-route-req", shipmentIds: shipments, leg: "direct", newToken: routeToken };
+  await makeRoute(original);
+  const replacement = { sessionId: "replacement-route", requestId: "replacement-request", shipmentIds: shipments.slice(0, 2), leg: "direct", newToken: token2, replaceExisting: true, reason: "Cambio de turno QA" };
+  await assert.rejects(makeRoute(replacement, seller), /permiso/);
+  await assert.rejects(makeRoute({ ...replacement, replaceExisting: false }), /reparto activo/);
+  const before = structuredClone(store.documents.get(`shipments/${shipments[0]}`));
+  const closed = store.documents.get(`shipments/${shipments[1]}`); closed.status = "entregado";
+  await assert.rejects(makeRoute(replacement), /estado o transporte/);
+  assert.deepEqual(store.documents.get(`shipments/${shipments[0]}`), before);
+  closed.status = "listo_retirar";
+  const result = await makeRoute(replacement);
+  assert.deepEqual(await makeRoute(replacement), result);
+  assert.deepEqual(store.documents.get("deliverySessions/old-route").shipmentIds, [shipments[2]]);
+  assert.equal(store.documents.get("deliverySessions/old-route").status, "active");
+  for (const shipmentId of shipments.slice(0, 2)) {
+    assert.equal(store.documents.get(`shipments/${shipmentId}`).courierSessionId, "replacement-route");
+    const events = [...store.documents.entries()].filter(([key, value]) => key.startsWith(`shipments/${shipmentId}/events/`) && value.action === "courier_reassigned");
+    assert.equal(events.length, 1); assert.equal(events[0][1].previousSessionId, "old-route"); assert.equal(events[0][1].actorId, admin.id);
+    await assert.rejects(shippingOperation({ body: { mode: "courier_action", shipmentId, token: routeToken, action: "pickup", requestId: `stale-${shipmentId}` }, runTransaction: store.runTransaction, now, env: {} }));
+  }
+  const remaining = await shippingOperation({ body: { mode: "detail", token: routeToken }, runTransaction: store.runTransaction, now, env: {} });
+  assert.deepEqual(remaining.shipments.map(item => item.id), [shipments[2]]);
+  const next = await shippingOperation({ body: { mode: "detail", token: token2 }, runTransaction: store.runTransaction, now, env: {} });
+  assert.equal(next.shipments.length, 2);
 });

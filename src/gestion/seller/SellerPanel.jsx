@@ -795,7 +795,7 @@ export default function SellerPanel() {
   }
 
   const saleView = (
-    <div className="fm-seller-sale-layout">
+    <div data-olivia="seller.sale" className="fm-seller-sale-layout">
       <section className="fm-seller-catalog">
         <div className="fm-seller-location-row">
           <label><span>Ubicación</span><select value={locationId} onChange={(event) => requestLocation(event.target.value)}>{locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></label>

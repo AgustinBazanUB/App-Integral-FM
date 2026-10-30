@@ -13,7 +13,7 @@ const adapter = work => runTransaction(database, transaction => work({
   commitDocuments: async operations => { for (const operation of operations) { const ref = doc(database, operation.path); if (operation.type === "create") transaction.set(ref, operation.data); else transaction.update(ref, operation.data); } },
 }));
 before(async () => {
-  environment = await initializeTestEnvironment({ projectId: "demo-flor-mia-shipping", firestore: { host: "127.0.0.1", port: 8080, rules: await readFile(new URL("../firestore.rules", import.meta.url), "utf8") } });
+  environment = await initializeTestEnvironment({ projectId: "demo-flor-mia-shipping", firestore: { host: "127.0.0.1", port: Number(process.env.FM_TEST_FIRESTORE_PORT || 8080), rules: await readFile(new URL("../firestore.rules", import.meta.url), "utf8") } });
   await environment.clearFirestore();
   await environment.withSecurityRulesDisabled(async context => {
     database = context.firestore();
@@ -82,4 +82,18 @@ test("emulator integration: concurrent sale retries and stock approval commit ex
     assert.equal(stock.currentStock, 18);
     assert.equal((await getDoc(doc(database, "sales", results[0].id))).data().locationId, "valle");
   });
+});
+
+test("only admins can archive an inactive profile; archived profiles cannot be reactivated", async () => {
+  const target = "archive-check";
+  await environment.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), "users", target), { role: "seller", active: true });
+  });
+  await assertFails(updateDoc(doc(userDb(admin.id), "users", target), { active: false, archived: true }));
+  await assertFails(updateDoc(doc(userDb(seller.id), "users", target), { active: false }));
+  await assertSucceeds(updateDoc(doc(userDb(admin.id), "users", target), { active: false }));
+  await assertFails(getDoc(doc(userDb(target), "shipments/protected")));
+  await assertSucceeds(updateDoc(doc(userDb(admin.id), "users", target), { archived: true }));
+  await assertFails(updateDoc(doc(userDb(admin.id), "users", target), { active: true, archived: false }));
+  await assertFails(updateDoc(doc(userDb(seller.id), "users", target), { active: true }));
 });

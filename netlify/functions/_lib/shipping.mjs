@@ -172,14 +172,17 @@ export async function createCourierSession({ body, session, runTransaction = adm
     const token = String(body.newToken || "");
     assert(/^[A-Za-z0-9_-]{43,128}$/.test(token), "La credencial debe ser aleatoria y segura.");
     const credentialHash = hash(token), operationId = hash(`${profile.id}:${requestId}`).slice(0, 48);
-    const receiptPath = `shippingRouteOperations/${operationId}`, fingerprint = hash(JSON.stringify({ shipmentIds, leg, sessionId, credentialHash }));
+    const replacing = body.replaceExisting === true;
+    const replacementReason = replacing ? String(body.reason || "").trim() : "";
+    if (replacing) assert(replacementReason.length >= 4 && replacementReason.length <= 1000, "Indicá un motivo de entre 4 y 1000 caracteres.");
+    const receiptPath = `shippingRouteOperations/${operationId}`, fingerprint = hash(JSON.stringify({ shipmentIds, leg, sessionId, credentialHash, ...(replacing ? { replacing, replacementReason } : {}) }));
     const receipt = (await transaction.getDocument(receiptPath))?.data;
     if (receipt) {
       assert(receipt.fingerprint === fingerprint, "El intento ya se usó con otros datos.");
       return receipt.result;
     }
     const hours = configNumber(env.SHIPPING_COURIER_TTL_HOURS, 1, 24) || 4;
-    const expiresAt = new Date(now.valueOf() + hours * 3600000), updates = [];
+    const expiresAt = new Date(now.valueOf() + hours * 3600000), updates = [], previousSessions = new Map();
     for (const shipmentId of shipmentIds) {
       const shipment = { ...(await transaction.getDocument(`shipments/${shipmentId}`))?.data, id: shipmentId };
       assert(shipment.saleId && shipment.stockCommitState === "committed" && !shipment.incident, `${shipment.publicCode || shipmentId}: el envío no está listo para asignarse.`);
@@ -190,11 +193,22 @@ export async function createCourierSession({ body, session, runTransaction = adm
           : shipment.deliveryType === "repository" && ["recibido_repositorio", "reparto_final"].includes(shipment.status);
       assert(eligible, `${shipment.publicCode || shipmentId}: el estado o transporte no corresponde al tramo elegido.`);
       if (shipment.courierSessionId) {
-        const previousSession = (await transaction.getDocument(`deliverySessions/${shipment.courierSessionId}`))?.data;
-        assert(previousSession?.status !== "active" || new Date(previousSession.expiresAt) <= now, `${shipment.publicCode || shipmentId}: ya pertenece a un reparto activo.`);
+        const oldId = id(shipment.courierSessionId);
+        if (!previousSessions.has(oldId)) previousSessions.set(oldId, (await transaction.getDocument(`deliverySessions/${oldId}`))?.data || null);
+        const previousSession = previousSessions.get(oldId);
+        assert(replacing || previousSession?.status !== "active" || new Date(previousSession.expiresAt) <= now, `${shipment.publicCode || shipmentId}: ya pertenece a un reparto activo.`);
       }
       const versions = { ...(shipment.courierVersions || {}), [leg]: (shipment.courierVersions?.[leg] || 0) + 1 };
-      updates.push(update(`shipments/${shipmentId}`, { courierSessionId: sessionId, courierSessionLeg: leg, courierVersions: versions, courierGrantHashes: { ...(shipment.courierGrantHashes || {}), [leg]: credentialHash }, lastPosition: null, gpsTrail: [], activeGpsSession: null, updatedAt: now, revision: (shipment.revision || 0) + 1 }));
+      const changes = { courierSessionId: sessionId, courierSessionLeg: leg, courierVersions: versions, courierGrantHashes: { ...(shipment.courierGrantHashes || {}), [leg]: credentialHash }, lastPosition: null, gpsTrail: [], activeGpsSession: null, updatedAt: now, revision: (shipment.revision || 0) + 1 };
+      updates.push(update(`shipments/${shipmentId}`, changes));
+      if (replacing) updates.push(eventWrite({ ...shipment, ...changes }, operationId, "courier_reassigned", profile.id, shipment.status, now, { actorRole: normalizedRole(profile), leg, previousSessionId: shipment.courierSessionId || null, newSessionId: sessionId, reason: replacementReason }));
+    }
+    if (replacing) for (const [oldId, previous] of previousSessions) {
+      if (previous?.status !== "active") continue;
+      const remaining = (previous.shipmentIds || []).filter(member => !shipmentIds.includes(member));
+      updates.push(update(`deliverySessions/${oldId}`, remaining.length
+        ? { shipmentIds: remaining, updatedAt: now }
+        : { shipmentIds: [], status: "revoked", revokedBy: profile.id, revokeReason: replacementReason, revokedAt: now, gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [] }));
     }
     const result = { sessionId, shipmentIds, expiresAt };
     updates.push(create(`deliverySessions/${sessionId}`, { shipmentIds, leg, status: "active", version: 1, accessHash: credentialHash, createdBy: profile.id, createdAt: now, expiresAt }));
@@ -230,9 +244,15 @@ export async function activateCourierQr({ body, runTransaction = adminRunTransac
       ? ["listo_retirar", "hacia_repositorio"].includes(shipment.status) ? "origin" : ["recibido_repositorio", "reparto_final"].includes(shipment.status) ? "final" : null
       : ["listo_retirar", "reparto_final"].includes(shipment.status) ? "direct" : null;
     assert(leg, "El envío todavía no está listo para el siguiente tramo.");
-    if (shipment.courierSessionId) {
-      const previous = (await transaction.getDocument(`deliverySessions/${shipment.courierSessionId}`))?.data;
-      assert(previous?.status !== "active" || new Date(previous.expiresAt) <= now, "Este envío ya tiene un reparto activo. Usá el QR que abrió el repartidor.");
+    const previousSessionId = shipment.courierSessionId || null;
+    const previousSession = previousSessionId ? (await transaction.getDocument(`deliverySessions/${previousSessionId}`))?.data : null;
+    // Keep other shipments in a shared route; the replaced courier loses this one atomically.
+    const previousUpdates = [];
+    if (previousSession?.status === "active") {
+      const remaining = (previousSession.shipmentIds || []).filter(member => member !== shipment.id);
+      previousUpdates.push(update(`deliverySessions/${previousSessionId}`, remaining.length
+        ? { shipmentIds: remaining }
+        : { shipmentIds: [], status: "revoked", revokedBy: "external_courier_qr", revokeReason: "Reemplazado mediante QR", revokedAt: now, gpsEnabled: false, gpsSession: null, lastPosition: null, gpsTrail: [] }));
     }
     const hours = configNumber(env.SHIPPING_COURIER_TTL_HOURS, 1, 24) || 4;
     const expiresAt = new Date(now.valueOf() + hours * 3600000);
@@ -240,10 +260,11 @@ export async function activateCourierQr({ body, runTransaction = adminRunTransac
     const result = { sessionId, shipmentIds: [shipment.id], expiresAt };
     const next = { ...shipment, courierSessionId: sessionId, courierSessionLeg: leg, courierVersions: versions, courierGrantHashes: { ...(shipment.courierGrantHashes || {}), [leg]: credentialHash }, lastPosition: null, gpsTrail: [], activeGpsSession: null, updatedAt: now, revision: (shipment.revision || 0) + 1 };
     await transaction.commitDocuments([
+      ...previousUpdates,
       update(`shipments/${shipment.id}`, { courierSessionId: sessionId, courierSessionLeg: leg, courierVersions: versions, courierGrantHashes: next.courierGrantHashes, lastPosition: null, gpsTrail: [], activeGpsSession: null, updatedAt: now, revision: next.revision }),
       create(`deliverySessions/${sessionId}`, { shipmentIds: [shipment.id], leg, status: "active", version: 1, accessHash: credentialHash, createdBy: "label_qr", source: "printed_shipment_qr", createdAt: now, expiresAt }),
       create(`deliverySessionAccess/${credentialHash}`, { sessionId, kind: "courier_route", leg, version: 1, issuedBy: "printed_shipment_qr", createdAt: now, expiresAt }),
-      eventWrite(next, operationId, "issue_access", "external_courier_qr", shipment.status, now, { leg, actorRole: "external_courier" }),
+      eventWrite(next, operationId, "issue_access", "external_courier_qr", shipment.status, now, { leg, actorRole: "external_courier", previousSessionId, newSessionId: sessionId }),
       create(receiptPath, { fingerprint, result, createdAt: now }),
     ]);
     return result;
@@ -454,7 +475,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
       requireEdit(); assert(["aprobado", "en_preparacion", "listo_retirar"].includes(previous), "Reasigná antes del retiro.");
       const assigned = await preparers(transaction, [...new Set(body.assignedPreparerIds || [])]);
       Object.assign(changes, { assignedPreparerIds: assigned.map(user => user.id), preparerNames: assigned.map(user => user.name) });
-      detail.reason = reason(); notice = { event: "preparation_assigned", title: "Se actualizó tu asignación de preparación", assigned: true };
+      detail = { reason: reason(), before: { assignedPreparerIds: shipment.assignedPreparerIds, preparerNames: shipment.preparerNames }, after: { assignedPreparerIds: changes.assignedPreparerIds, preparerNames: changes.preparerNames } }; notice = { event: "preparation_assigned", title: "Se actualizó tu asignación de preparación", assigned: true };
     } else if (body.mode === "issue_access") {
       requireEdit();
       assert(body.kind === "courier" || body.kind === "tracking", "Tipo de acceso inválido.");

@@ -1,0 +1,28 @@
+{
+  "environment": "Adaptador local en memoria y respuesta de modelo simulada. No representa red, proveedor, tokens reales ni audio físico.",
+  "n": 20,
+  "localTurnMs": {
+    "p50": 4.57,
+    "p90": 8.32,
+    "p95": 10.31
+  },
+  "sample": {
+    "modelCalls": 1,
+    "businessToolCalls": 0,
+    "requestBytes": 16717,
+    "counterfactualWithSchemasBytes": 42011,
+    "schemaCount": 33
+  },
+  "allSamplesOneModelNoBusinessTools": true,
+  "paidProviderCalls": 0,
+  "counterfactual": "Mismo cuerpo actual con esquemas que se habrían ofrecido sin la ruta de generación. Es una comparación de bytes, no una medición del modelo anterior ni de tokens.",
+  "visualGuideModelCalls": 0,
+  "driverAssets": [
+    {
+      "name": "driver.js-dawuFUe9.js",
+      "bytes": 27759,
+      "gzipBytes": 8076,
+      "loaded": "Solo al iniciar guía visual"
+    }
+  ]
+}

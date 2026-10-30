@@ -1,0 +1,6 @@
+export const latencyCases = [
+  ...['Olivia, ¿cómo estás?','¿Cómo estás?','Hola Olivia, ¿cómo estás?','¿Cómo andás?','¿Todo bien?','Gracias','Muchas gracias, Olivia','Chau','Hasta luego','Nos vemos'].map(text=>({text,kind:'instant',maxWindow:550})),
+  ...['¿Cuántas almendras quedan?','¿Cuántas botellas de aceite hay?','¿Cuántos frascos tenemos?','Stock de almendras','Decime el stock de arroz','Mostrame el precio de almendras','¿Cuánto sale aceite?','¿Cuánto cuesta arroz?','Precio de almendras en el local','¿Cuántas almendras quedan en Tribunales?'].map(text=>({text,kind:'read',maxWindow:900})),
+  ...['Cargá 20 botellas de Arbequina en el local','Agregame 10 botellas de Arbosana','Creá un cliente','Registrá una venta','Mandá un WhatsApp al cliente','Sí','No, no cargues stock','Mejor cargá un cliente','Hola, revisame las ventas','Explicame cómo cargar varios productos'].map(text=>({text,kind:'controlled'})),
+  ...['Cargá 20 botellas de','Agregá 10 de Arbequina y','Quiero cargar tres productos','Primero almendras y después','Con el nombre de','Cargá 20 de Arbequina, 10 de Arbosana y','Mandalo al cliente que','Botellas de','El producto y la','Cargame 12 de aceite,'].map(text=>({text,kind:'unfinished',minWindow:1800})),
+];

@@ -298,12 +298,12 @@ function AddStockModal({ open, location, product, profile, onClose, onSaved }) {
           <div><dt>Stock actual</dt><dd>{current}</dd></div>
           <div><dt>Nuevo stock</dt><dd>{next}</dd></div>
         </dl>
-        <FormField label="Cantidad a agregar" required><input type="number" min="1" step="1" inputMode="numeric" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></FormField>
+        <FormField label="Cantidad a agregar" required><input data-olivia="stock.quantity" type="number" min="1" step="1" inputMode="numeric" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></FormField>
         <FormField label="Observación" hint="Opcional. Ejemplo: Ingreso mercadería Mendoza."><input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ingreso de mercadería" /></FormField>
         {state.error ? <Toast tone="error">{state.error}</Toast> : null}
         <div className="fm-dialog-actions">
           <HelpTooltip label="Cierra esta ventana sin modificar el stock."><Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button></HelpTooltip>
-          <HelpTooltip label="Suma esta cantidad al stock actual y registra el movimiento."><Button type="submit" loading={state.busy} disabled={Number(quantity || 0) <= 0}>Confirmar ingreso</Button></HelpTooltip>
+          <HelpTooltip label="Suma esta cantidad al stock actual y registra el movimiento."><Button data-olivia="stock.save" type="submit" loading={state.busy} disabled={Number(quantity || 0) <= 0}>Confirmar ingreso</Button></HelpTooltip>
         </div>
       </form>
     </Modal>
@@ -529,7 +529,7 @@ export default function LocationDetailPage({ locationId }) {
                 <SearchInput label="Buscar en esta ubicación" value={search} onChange={(event) => setSearch(event.target.value)} />
                 <Select aria-label="Filtrar stock por categoría" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="">Todas las categorías</option>{result.data.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select>
               </div>
-              {visibleInventory.length ? <div className="fm-inventory-card-grid">{visibleInventory.map((product) => (
+              {visibleInventory.length ? <div data-olivia="location.stock" className="fm-inventory-card-grid">{visibleInventory.map((product) => (
                 <article className="fm-inventory-card" key={product.productId}>
                   <header className="fm-inventory-card__identity"><ProductImage product={product} /><div><h3>{product.productName}</h3><p>{product.categoryName || "Sin categoría"}</p></div><Badge tone={product.active ? "success" : "neutral"}>{product.active ? "Activo" : "Inactivo"}</Badge></header>
                   <dl className="fm-inventory-card__stats">

@@ -1,10 +1,19 @@
 import { executeToolBatch } from "./toolExecution.mjs";
+import { chooseLocalGreeting } from '../../../../src/shared/oliviaFastSpeech.mjs';
+import { instantConversation, quickReadPlan, latencyEnabled } from '../../../../src/shared/oliviaConversationRouter.mjs';
+import { latencyTrace, tracedStore } from '../../../../src/shared/oliviaLatencyTrace.mjs';
+import { fastConversationRead, formatQuickRead } from './fastConversation.mjs';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { metricsForModel } from "./analytics.mjs";
-import { aggregateVoiceCosts } from "../../../../src/shared/oliviaVoicePricing.mjs";
 import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, taskSlotSchema, requiredFields, isCorrection, operationalIntent, shortVoiceQuestion } from "./tasks.mjs";
 import { aggregateRoutes } from "./modelRouter.mjs";
-import { isSuggestionRequest, processSuggestion } from "./suggestions.mjs";
-import { canUseOliviaVoice, oliviaVoiceConfiguration, OLIVIA_VOICE_POLICY } from "../../../../src/shared/oliviaVoiceAvailability.mjs";
+import { transitionConversationTask, manageConversationTask, taskManagementTool, isTaskInterruption } from "./conversationTasks.mjs";
+import { isSuggestionRequest, isFeedbackCaptureRequest, isSuggestionContinuation, processSuggestion } from "./suggestions.mjs";
+import { fieldGuidance } from '../../../../src/shared/oliviaOperationGuide.mjs';
+import { assistiveIntent } from '../../../../src/shared/oliviaAssistiveIntent.mjs';
+import { guideForMessage, getUiGuide } from '../../../../src/shared/oliviaUiGuides.mjs';
+import { chooseExpression, naturalStyleContext } from '../../../../src/shared/oliviaExpressions.mjs';
+import { canUseOliviaVoice, hasGoogleCloudTtsCredentials } from "../../../../src/shared/oliviaVoiceAvailability.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { captureOliviaFailure, publicOliviaFailure } from "./errorReports.mjs";
 import { randomUUID, createHash, timingSafeEqual } from "node:crypto";
@@ -38,10 +47,8 @@ import {
 } from "./guards.mjs";
 import {
   OLIVIA_INSTRUCTIONS,
-  OLIVIA_CATALOG_STOCK_INSTRUCTIONS,
-  OLIVIA_BATCH_SALE_INSTRUCTIONS,
+  responseInstructions,
   OLIVIA_VOICE_INSTRUCTIONS,
-  OLIVIA_METRICS_INSTRUCTIONS,
   modelProfile,
   openaiRequest,
   providerUsage,
@@ -59,17 +66,42 @@ import {
   settleUsage,
 } from "./usage.mjs";
 const hash = (value) => createHash("sha256").update(value).digest("hex");
+export function spokenFallback(value, maxCharacters = 1600) {
+  const clean = String(value || "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/[\n\r]+/g, " ")
+    .replace(/[#*_`>|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (clean.length <= maxCharacters) return clean;
+  const head = clean.slice(0, maxCharacters), boundary = Math.max(head.lastIndexOf(". "), head.lastIndexOf("? "), head.lastIndexOf("! "));
+  if (boundary >= maxCharacters * 0.65) return head.slice(0, boundary + 1).trim();
+  return `${head.replace(/\s+\S*$/, "").trimEnd()}…`;
+}
+export function dualVoiceResponse(raw, maxCharacters) {
+  try {
+    const value = JSON.parse(raw);
+    const complete = typeof value.complete === "string" ? value.complete.trim() : "";
+    const spoken = typeof value.spoken === "string" ? value.spoken.trim() : "";
+    if (complete) return { complete, spoken: spokenFallback(spoken || complete, maxCharacters) };
+  } catch { /* Fall back to the canonical verified text if structured output is unavailable. */ }
+  return { complete: String(raw || ""), spoken: spokenFallback(raw, maxCharacters) };
+}
 import { message, retainedMessage, sessionBinding, permissionScope, dateMs, trimMessages, assertConversationOwner, verifyLegacyConversationScope, createConversationStorage } from "./conversations.mjs";
 export { assertConversationOwner } from "./conversations.mjs";
 export function createOliviaEngine({
-  store,
+  store: sourceStore,
   env = process.env,
   provider = openaiRequest,
   clock = () => new Date(),
   pricingResolver = async (config) => config,
 } = {}) {
+  const traceContext = new AsyncLocalStorage();
+  const store = tracedStore(sourceStore, () => traceContext.getStore());
   const { history, resumeConversation } = createConversationStorage({ store, clock, configuration, state });
-  async function configuration({ resolveCosts = true } = {}) {
+  async function configuration({ resolveCosts = true, allowPricingNetwork = false } = {}) {
     const raw = await store.get("oliviaConfiguration/global");
     const config = raw
       ? validateConfiguration(
@@ -80,7 +112,7 @@ export function createOliviaEngine({
           ),
         )
       : validateConfiguration(defaultOliviaConfiguration(env));
-    return resolveCosts ? pricingResolver(config, clock()) : config;
+    return resolveCosts ? pricingResolver(config, clock(),{allowNetwork:allowPricingNetwork || !latencyEnabled(config)}) : config;
   }
   async function usage(session, config, event = null) {
     const quota = quotaFor(config, session.uid, clock(), session.profile),
@@ -155,16 +187,19 @@ export function createOliviaEngine({
           ? "RECHAZADA"
           : conversation.state,
       pendingAction,
+      guide: conversation.guide || null,
       failure: conversation.lastFailure || null,
       usage: await usage(session, config),
       capabilities: capabilities(session),
       providerConfigured: Boolean(env.OPENAI_API_KEY),
+      googleTtsConfigured: hasGoogleCloudTtsCredentials(env),
       enabled: config.enabled,
       audioLimits: config.audioLimits,
-      voiceProtocol: "live",
-      voiceConversationAvailable: canUseOliviaVoice(session),
+      voiceProtocol: "chirp",
+      voiceConversationAvailable: Boolean(config.naturalVoice.enabled && canUseOliviaVoice(session) && env.OPENAI_API_KEY && hasGoogleCloudTtsCredentials(env)),
       voiceTrialAvailable: false,
-      ...(canAccessAdministration(session.profile) && canUseOliviaVoice(session) ? { voiceConfiguration: OLIVIA_VOICE_POLICY } : {}),
+      ...(config.naturalVoice.enabled && canUseOliviaVoice(session) ? { voiceSettings: { turnEndSilenceMs: config.naturalVoice.turnEndSilenceMs, latencyMode:latencyEnabled(config),transcriptionDelay:config.conversationLatency.transcriptionDelay,transcriptionModel:'gpt-live-transcribe', voice:config.naturalVoice.voice, speakingRate:config.naturalVoice.speakingRate } } : {}),
+      ...(canAccessAdministration(session.profile) && canUseOliviaVoice(session) ? { voiceConfiguration: { model: "Google Chirp 3 HD", backendModel: latencyEnabled(config)?"GPT-6 Luna · rutas instantánea / lectura / controlada":"GPT-6 Luna · modo anterior", reasoningEffort: latencyEnabled(config)?"NONE / MEDIUM según complejidad":"HIGH/XHIGH", voice: config.naturalVoice.voice } } : {}),
       policyVersion: OLIVIA_POLICY_VERSION,
       ...(estimate ? { estimate } : {}),
     };
@@ -183,7 +218,7 @@ export function createOliviaEngine({
     assertConversationOwner(session, c, clock());
     await verifyLegacyConversationScope(session, c, store);
     const draft = typeof body.message === "string" ? body.message.slice(0, 12000) : "";
-    return { estimate: estimateFor(session, await configuration(), c, body.screenContext || {}, draft) };
+    return { estimate: estimateFor(session, await configuration({allowPricingNetwork:true}), c, body.screenContext || {}, draft) };
   }
 
   async function claimConversation(
@@ -193,16 +228,16 @@ export function createOliviaEngine({
     userMessage,
     inputMode,
     attachments = [],
-    inputId = null,
-    preserveInputPending = true,
     context = null,
     leaseMs = 120000,
+    cancelGuard = false,
   ) {
     const now = clock();
     return store.transaction(async (tx) => {
       const snapshot = await tx.getDocument(`oliviaConversations/${id}`);
       const conversation = snapshot ? { ...snapshot.data, id } : null;
       assertConversationOwner(session, conversation, now);
+      if(cancelGuard && (await tx.getDocument(`oliviaRequests/${session.uid}_${requestId}`))?.data?.interruptRequested) throw oliviaError('request-expired','Esta consulta fue reemplazada.',409);
       await verifyLegacyConversationScope(session, conversation, store);
       if (conversation.queuedChatRequestId && conversation.queuedChatRequestId !== requestId)
         throw oliviaError("conversation-busy", "Olivia sigue trabajando en la consulta anterior.", 409);
@@ -221,7 +256,7 @@ export function createOliviaEngine({
           )
         : null;
       const writes = [];
-      const repeatedInput = taskControl(userMessage) === "acknowledge" || (preserveInputPending && inputId && conversation.messages?.some((entry) => entry.inputId === inputId && entry.role === "user"));
+      const repeatedInput = taskControl(userMessage) === "acknowledge" || (!attachments.length && inputMode==='natural-voice' && (instantConversation(userMessage) || chooseLocalGreeting(userMessage)));
       if (previous?.data.status === "pending" && !repeatedInput)
         writes.push({
           type: "update",
@@ -230,12 +265,6 @@ export function createOliviaEngine({
         });
       const userEntry = message("user", userMessage, now, inputMode),
         messages = trimMessages([...(conversation.messages || []), userEntry]);
-      if (inputId) {
-        const previousInput = conversation.messages?.find((entry) => entry.inputId === inputId && entry.role === "user");
-        if (previousInput && previousInput.content !== userMessage) throw oliviaError("realtime-input-changed", "La intervención de voz cambió.", 409);
-        if (previousInput) { messages.pop(); }
-        else userEntry.inputId = inputId;
-      }
       if (attachments.length) { userEntry.attachmentIds = attachments.map((file) => file.id); userEntry.attachments = attachments.map(publicAttachment); }
       await tx.commitDocuments([
         ...writes,
@@ -266,8 +295,9 @@ export function createOliviaEngine({
     session,
     id,
     requestId,
-    { content, prepared, draft, taskState, activeSkills, metricsPeriod, state: nextState, navigation, failure = null, hiddenFromChat = false, preservePending = false },
+    { content, prepared, draft, taskState, suspendedTasks, activeSkills, metricsPeriod, guideState, guide, guideControl, ideaContext, state: nextState, navigation, failure = null, hiddenFromChat = false, preservePending = false, voiceTranscript = null },
     config,
+    onSaved,
   ) {
     const now = clock(),
       actionId = prepared ? randomUUID() : null,
@@ -314,6 +344,7 @@ export function createOliviaEngine({
           ...(conversation.messages || []),
           assistantEntry,
         ]);
+      if (voiceTranscript) assistantEntry.voiceTranscript = voiceTranscript;
       if (hiddenFromChat) assistantEntry.hiddenFromChat = true;
       writes.push(retainedMessage(id, assistantEntry), {
         type: "update",
@@ -329,7 +360,11 @@ export function createOliviaEngine({
           lastFailure: failure,
           draft: prepared?.canonicalArgs || (draft !== undefined ? draft : conversation.draft || null),
           ...(taskState !== undefined ? { taskState } : {}),
+          ...(suspendedTasks !== undefined ? { suspendedTasks } : {}),
           ...(metricsPeriod !== undefined ? { metricsPeriod } : {}),
+          ...(guideState !== undefined ? { guideState } : {}),
+          ...(guide !== undefined ? { guide } : { guide: null }),
+          ...(ideaContext !== undefined ? { ideaContext } : {}),
           ...(activeSkills ? { activeSkills: activeSkills.slice(0, 2).map(({ name, version }) => ({ name, version })) } : {}),
           busyRequestId: null,
           busyUntil: null,
@@ -338,15 +373,25 @@ export function createOliviaEngine({
       });
       await tx.commitDocuments(writes);
     });
+    onSaved?.();
     const result = await state(session, id);
     if (navigation) result.navigation = navigation;
+    if (guide) result.guide = guide;
+    if (guideControl) result.guideControl = guideControl;
     return result;
   }
-  async function chat(session, body, { onEvent, signal, voiceInputId = null, longRunning = false } = {}) {
-    const startedAt = Date.now(), timings = { modelCalls: 0, providerMs: 0, toolsMs: 0 };
+  async function chat(session, body, options = {}) {
+    const trace = latencyTrace({ id: body.requestId, origin: 'server', now: () => Date.now() });
+    return traceContext.run(trace, () => chatTurn(session, body, options));
+  }
+  async function chatTurn(session, body, { onEvent, signal, longRunning = false } = {}) {
+    const trace = traceContext.getStore();
+    trace.mark('request.start');
+    const startedAt = Date.now(), timings = { modelCalls: 0, providerMs: 0, toolsMs: 0 }, naturalVoice = body.inputMode === "natural-voice";
     assertOliviaAccess(session);
     const userMessage = safeUserMessage(body.message),
       config = await configuration();
+    signal?.throwIfAborted();
     // This option is set only by the authenticated background worker, never by
     // request fields. Quota reservations still include the actual output bound.
     if (longRunning) config.responseLimits = { ...config.responseLimits, timeoutMs: 300000, providerTimeoutMs: 90000, maxOutputTokens: Math.max(config.responseLimits.maxOutputTokens, 6000) };
@@ -356,34 +401,15 @@ export function createOliviaEngine({
         "Olivia está deshabilitada. La aplicación sigue disponible manualmente.",
         503,
       );
+    if (naturalVoice && (!config.naturalVoice.enabled || !canUseOliviaVoice(session) || !env.OPENAI_API_KEY || !hasGoogleCloudTtsCredentials(env)))
+      throw oliviaError("voice-not-enabled", "La conversación natural por voz no está disponible para esta cuenta.", 403);
+    if (["realtime", "live"].includes(body.inputMode) || body.voiceSessionId || body.realtimeSessionId)
+      throw oliviaError("voice-mode-retired", "GPT-Live fue retirado. Usá la conversación natural por voz de Olivia.", 410);
     const requestId = safeId(body.requestId, "intento"),
       context = screenContext(body.screenContext || {}),
       id = body.conversationId
         ? safeId(body.conversationId)
         : (await state(session)).conversationId;
-    const voiceSessionId = body.inputMode === "realtime" ? safeId(body.realtimeSessionId, "sesión de voz") : body.voiceSessionId ? safeId(body.voiceSessionId, "sesión de voz") : null;
-    if (voiceSessionId) {
-      const live = await store.get(
-        `oliviaRealtime/${voiceSessionId}`,
-      );
-      if (
-        !live ||
-        live.userId !== session.uid ||
-        live.conversationId !== id ||
-        live.sessionBinding !== sessionBinding(session) ||
-        live.status !== "active" ||
-        dateMs(live.expiresAt) < clock().getTime()
-      )
-        throw oliviaError(
-          "realtime-expired",
-          "La conversación de voz terminó. Podés continuar escribiendo.",
-          409,
-        );
-      if (live.protocol === "live") {
-        if (!canUseOliviaVoice(session)) throw oliviaError("voice-not-enabled", "La conversación por voz no está habilitada para esta cuenta.", 409);
-        Object.assign(config, oliviaVoiceConfiguration(config));
-      }
-    }
     const reservation = await reserveUsage({
       store,
       session,
@@ -393,10 +419,23 @@ export function createOliviaEngine({
       reservedTokens: 0,
       now: clock(),
     });
-    let event = { model: "", inputTokens: 0, outputTokens: 0, totalTokens: 0, ...(voiceSessionId ? { realtimeSessionId: voiceSessionId } : {}) },
+    let event = { model: "", inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       claimed = false,
       settled = false,
-      currentTask = undefined;
+      currentTask = undefined,
+      currentSuspendedTasks = undefined;
+    const persistTurn = async (turn) => {
+      const voiceTranscript = naturalVoice
+        ? spokenFallback(turn.voiceTranscript || turn.prepared?.summary || turn.content, config.naturalVoice.maxCharactersPerTurn)
+        : null;
+      const saved = await saveTurn(session, id, requestId, { ...turn, ...(currentSuspendedTasks !== undefined ? { suspendedTasks: currentSuspendedTasks } : {}), ...(naturalVoice ? { voiceTranscript } : {}) }, config, () => {
+        if (naturalVoice && voiceTranscript) { timings.voiceReadyMs = Date.now() - startedAt; trace.mark('response.voice_ready');onEvent?.({ type: "voice.ready", text: voiceTranscript, requestId }); }
+      });
+      if (naturalVoice && voiceTranscript) {
+        saved.spokenText = voiceTranscript;
+      }
+      return saved;
+    };
     try {
       const attachments = await resolveAttachments({ ids: body.attachmentIds || [], session, conversationId: id, store, now: clock() });
       if (isCorrection(userMessage)) {
@@ -411,43 +450,118 @@ export function createOliviaEngine({
         userMessage,
         body.inputMode || "text",
         attachments,
-        voiceInputId,
-        false,
         context,
         longRunning ? 360000 : 120000,
+        body.foreground===true,
       );
       claimed = true;
+      const assistance = assistiveIntent(userMessage, conversation.ideaContext);
+      const suggestionFlow = !attachments.length && (isSuggestionRequest(userMessage) || isFeedbackCaptureRequest(userMessage) || isSuggestionContinuation(conversation, userMessage));
+      const guidePlan = !attachments.length && !assistance.pure && !suggestionFlow ? guideForMessage(userMessage, context, conversation.guideState, session.profile) : null;
+      if (guidePlan?.control) {
+        const action = guidePlan.control;
+        const currentGuide = getUiGuide(session.profile, context.uiGuide.guideId, context), at = currentGuide.steps.findIndex(step => step.id === context.uiGuide.stepId);
+        const selected = currentGuide.steps[Math.max(0, at + (action === 'next' ? 1 : action === 'previous' ? -1 : 0))];
+        const detail = selected ? `${selected.title}. ${selected.description}` : 'Llegamos al final de los pasos de esta guía.';
+        const marked = context.uiGuide.errors.map(id => currentGuide.steps.find(step => step.id === id)?.title).filter(Boolean);
+        const errors = context.uiGuide.errors.length ? ` El formulario marca datos para revisar${marked.length ? ': ' + marked.join(', ') : ''}. Podés corregirlos antes de guardar; la guía no completa ni envía el formulario.` : '';
+        const content = action === 'cancel' ? 'Terminé la guía visual. La conversación y tus datos siguen disponibles.' : action === 'pause' ? 'Pausé la guía. Podés retomarla cuando quieras.' : action === 'resume' ? `Retomamos la guía visual. ${detail}` : `${action === 'explain' ? 'Claro.' : action === 'next' ? 'Paso siguiente:' : 'Paso anterior:'} ${detail}${errors}`;
+        const result = await persistTurn({ content, guideControl: { action, guideId: context.uiGuide.guideId }, preservePending: true, state: 'INFORMACION' });
+        event = { ...event, route: 'deterministic', routingReason: 'visual-guide-control', measurement: 'provider', modelCalls: [], tools: [] };
+        await settleUsage({ store, session, reservation, event, configuration: config, result: { conversationId: id }, now: clock() }); settled = true;
+        result.usage = await usage(session, config, event); return result;
+      }
+      if (guidePlan) {
+        const guide = guidePlan.id ? getUiGuide(session.profile, guidePlan.id, context) : null;
+        const managed = manageConversationTask({ task: conversation.taskState, suspendedTasks: conversation.suspendedTasks || [] }, 'pause', null, clock());
+        currentSuspendedTasks = managed.suspendedTasks;
+        const content = guidePlan.question || (guide ? `${chooseExpression('guide', conversation.messages)} ${guide.title}.\n\n${guide.steps.map((step, index) => `${index + 1}. **${step.title}**: ${step.description}`).join('\n')}\n\nPodés iniciar los pasos visuales. Vos controlás los botones y podés cancelar cuando quieras.` : 'Esa guía no está habilitada con tus permisos. Puedo ayudarte con las funciones disponibles en tu panel.');
+        const guideSkills = guide || guidePlan.question ? await routeSkills(session, 'Guiame paso a paso') : [];
+        const voiceTranscript = guidePlan.question || (guide ? `${guide.title}. ${guide.steps[0].description} En el chat tenés el botón para mostrar los pasos en pantalla. Podés pedirme que explique cada paso.` : content);
+        const result = await persistTurn({ content, voiceTranscript, taskState: null, draft: null, guideState: guidePlan.question ? { topic: guidePlan.topic } : null, guide: guide ? { guideId: guide.id, version: guide.version } : null, state: guidePlan.question ? 'DATOS_INCOMPLETOS' : guide ? 'INFORMACION' : 'RECHAZADA', activeSkills: guideSkills });
+        event = { ...event, route: 'deterministic', routingReason: 'contextual-guide', measurement: 'provider', modelCalls: [], tools: [], durationMs: Date.now() - startedAt };
+        await settleUsage({ store, session, reservation, event, configuration: config, result: { conversationId: id }, now: clock() }); settled = true;
+        result.usage = await usage(session, config, event);
+        if (canAccessAdministration(session.profile)) result.telemetry = { requestId, route: 'contextual-guide', modelCalls: 0, toolCalls: 0, totalMs: Date.now() - startedAt };
+        return result;
+      }
+      // A saved improvement proposal does not monopolize later business turns.
+      if (!suggestionFlow && conversation.draft?.kind === 'app-suggestion') conversation.draft = null;
+      const transition = suggestionFlow || assistance.pure ? { ...manageConversationTask({ task: conversation.taskState, suspendedTasks: conversation.suspendedTasks || [] }, "pause", null, clock()), handled: false, directive: assistance.pure ? 'ideation' : null } : transitionConversationTask(conversation, userMessage, clock());
+      if(latencyEnabled(config) && ['start','switch'].includes(transition.directive) && transition.task?.intent==='prepare_stock_load' && context.locationId && !transition.task.slots.locationId){transition.task.slots.locationId=context.locationId;transition.task.missingFields=requiredFields(transition.task.intent).filter(key=>transition.task.slots[key]==null);}
+      if (transition.handled && ['start', 'switch'].includes(transition.directive) && transition.task) transition.content = missingQuestion(transition.task.missingFields, transition.task.intent, { starting: true });
+      conversation.taskState = transition.task;
+      currentSuspendedTasks = transition.suspendedTasks;
+      if (transition.directive) { conversation.draft = transition.task?.slots || null; conversation.activeSkills = []; }
       currentTask = conversation.taskState || null;
+      const checkpointTask = async (task) => store.transaction(async tx => {
+        const saved = (await tx.getDocument(`oliviaConversations/${id}`))?.data;
+        if (saved?.busyRequestId !== requestId) throw oliviaError("request-expired", "La consulta fue reemplazada.", 409);
+        await tx.commitDocuments([{ type: "update", path: `oliviaConversations/${id}`, data: { taskState: task, suspendedTasks: currentSuspendedTasks, draft: task?.slots || null } }]);
+      });
       onEvent?.({ type: "accepted", conversationId: id, message: conversation.messages.at(-1) });
+      const greeting=naturalVoice && !attachments.length ? (latencyEnabled(config) ? instantConversation(userMessage) : null) || chooseLocalGreeting(userMessage) : null;
+      if(greeting) {
+        signal?.throwIfAborted();
+        const result=await persistTurn({content:greeting.text,taskState:conversation.taskState || null,draft:conversation.draft,state:'INFORMACION',preservePending:true});
+        event={...event,route:'deterministic',routingReason:'greeting-only',measurement:'provider',modelCalls:[],tools:[],durationMs:Date.now()-startedAt};
+        await settleUsage({store,session,reservation,event,configuration:config,result:{conversationId:id},now:clock()});settled=true;
+        result.usage=await usage(session,config,event);
+        trace.mark('response.complete',{route:'instant'});
+        if(canAccessAdministration(session.profile)) result.telemetry={requestId,route:'instant',modelCalls:0,toolCalls:0,totalMs:Date.now()-startedAt,trace:trace.snapshot()};
+        return result;
+      }
       const deterministicTools = [];
       const deterministicTaskId = conversation.taskState?.intent === "prepare_stock_load" && !["completed", "cancelled"].includes(conversation.taskState.status) ? conversation.taskState.id : randomUUID();
       const run = async (name, args) => {
-        const result = await runTool({ session, name, args, store, context, now: clock(), provider, env });
+        signal?.throwIfAborted();
+        onEvent?.({type:'phase',label:'Consultando datos…',tools:[name]});
+        const result = await trace.span('tool',{tool:name},()=>runTool({ session, name, args, store, context, now: clock(), provider, env }));
         deterministicTools.push(name);
         await store.commit([{ type: "create", path: `oliviaToolEvents/${randomUUID()}`, data: { userId: session.uid, conversationId: id, taskId: deterministicTaskId, requestId, tool: name, module: context.module, mode: body.inputMode || "text", result: "completed", origin: "Asistente IA / Olivia", createdAt: clock(), expiresAt: new Date(clock().getTime() + 30 * 86400000) } }]);
         return result;
       };
-      const control = !attachments.length ? taskControl(userMessage) : null;
-      if (!control && (isSuggestionRequest(userMessage) || conversation.draft?.kind === "app-suggestion")) {
-        const suggestion = await processSuggestion({ session, store, provider, env, conversation, conversationId: id, requestId, message: userMessage, context, now: clock(), signal,
+      trace.mark('router.start');
+      const readPlan = latencyEnabled(config) && !attachments.length && !conversation.pendingActionId && !transition.handled ? quickReadPlan(userMessage) : null;
+      trace.mark('router.end',{route:readPlan?'quick-read':greeting?'instant':'controlled'});
+      const quick = readPlan ? await fastConversationRead({plan:readPlan,context,previous:conversation.taskState,run,check:name=>assertCapability(session,name),signal,now:clock()}) : null;
+      if(quick?.content) {
+        signal?.throwIfAborted();
+        const result=await persistTurn({...quick,taskState:quick.taskState || conversation.taskState || null,preservePending:true});
+        event={...event,route:'deterministic',routingReason:'quick-read',measurement:'provider',modelCalls:[],tools:deterministicTools,durationMs:Date.now()-startedAt};
+        await settleUsage({store,session,reservation,event,configuration:config,result:{conversationId:id},now:clock()});settled=true;
+        result.usage=await usage(session,config,event);trace.mark('response.complete',{route:'quick-read'});
+        if(canAccessAdministration(session.profile)) result.telemetry={requestId,route:'quick-read',modelCalls:0,toolCalls:deterministicTools.length,totalMs:Date.now()-startedAt,trace:trace.snapshot()};
+        return result;
+      }
+      const control = !attachments.length && !transition.handled ? taskControl(userMessage) : null;
+      if (suggestionFlow) {
+        let suggestionCalls = 0;
+        event = { ...event, route: 'deterministic', routingReason: 'reviewed-suggestion-control', measurement: 'provider', modelCalls: [], tools: [] };
+        const suggestion = await processSuggestion({ session, store, provider, env, conversation: { ...conversation, suspendedTasks: currentSuspendedTasks }, conversationId: id, requestId, message: userMessage, context, now: clock(), signal,
           beforeProvider: request => increaseReservation({ store, reservation, amount: Math.ceil(Buffer.byteLength(JSON.stringify(request), "utf8") / 4) + request.max_output_tokens }),
-          onUsage: measured => { Object.assign(event, measured, { conversationId: id, route: "luna-suggestion", reasoningEffort: "low", routingReason: "user-requested-message-to-agustin", module: context.module }); },
+          onUsage: measured => { suggestionCalls++; const call = { ...measured, model: 'gpt-6-luna', route: 'luna-suggestion', reasoningEffort: 'low' }; Object.assign(event, call, { modelCalls: [call], conversationId: id, routingReason: "user-requested-message-to-agustin", module: context.module }); },
         });
         signal?.throwIfAborted();
-        const result = await saveTurn(session, id, requestId, { ...suggestion, taskState: null }, config);
+        const result = await persistTurn({ ...suggestion, taskState: null });
         await settleUsage({ store, session, reservation, event, configuration: config, result: { conversationId: id, ...(suggestion.alertId ? { alertId: suggestion.alertId } : {}) }, now: clock() });
         settled = true;
         result.usage = await usage(session, config, event);
-        if (canAccessAdministration(session.profile)) result.telemetry = { requestId, model: event.model, reasoningEffort: "low", route: event.route, modelCalls: 1, toolCalls: 0, totalMs: Date.now() - startedAt };
+        if (canAccessAdministration(session.profile)) result.telemetry = { requestId, model: event.model, reasoningEffort: suggestionCalls ? "low" : null, route: event.route, modelCalls: suggestionCalls, toolCalls: 0, totalMs: Date.now() - startedAt };
         return result;
       }
-      const progressive = !control && !attachments.length ? await progressiveStock({ previous: conversation.taskState, initialId: deterministicTaskId, message: userMessage, context, run, check: () => assertCapability(session, "prepare_stock_load"), now: clock() }) : null;
-      if (control || progressive) {
-        const task = progressive?.task || (conversation.taskState ? { ...conversation.taskState, revision: conversation.taskState.revision + 1, status: control === "cancel" ? "cancelled" : conversation.taskState.status, updatedAt: clock() } : null);
+      const deniedTask = transition.task?.status !== "cancelled" && transition.task?.intent?.startsWith("prepare_") && !capabilities(session).includes(transition.task.intent);
+      let progressive = !deniedTask && !transition.handled && !control && !attachments.length ? await progressiveStock({ previous: conversation.taskState, initialId: deterministicTaskId, message: userMessage, context, run, check: () => assertCapability(session, "prepare_stock_load"), now: clock() }) : null;
+      if (transition.directive === "resume" && transition.task?.status === "collecting" && !transition.task.missingFields.length && transition.task.intent.startsWith("prepare_")) {
+        const result = await run(transition.task.intent, transition.task.slots);
+        progressive = { task: taskFromTool(transition.task, transition.task.intent, transition.task.slots, result, clock()), result, content: result.prepared?.summary || missingQuestion(result.data?.missing || [], transition.task.intent) };
+      }
+      if (deniedTask || transition.handled || control || progressive) {
+        const task = deniedTask ? null : progressive?.task || (conversation.taskState ? { ...conversation.taskState, revision: conversation.taskState.revision + 1, status: control === "cancel" ? "cancelled" : conversation.taskState.status, updatedAt: clock() } : null);
         const prepared = progressive?.result.prepared;
         signal?.throwIfAborted();
-        const result = await saveTurn(session, id, requestId, { content: (voiceSessionId && progressive ? shortVoiceQuestion(task, progressive.content) : progressive?.content) || (control === "cancel" ? "La tarea quedó cancelada." : conversation.pendingActionId ? "Revisá y confirmá con Sí en la tarjeta. La respuesta por voz o texto no ejecuta la acción." : "Dale, seguimos cuando me indiques."), prepared, taskState: task, draft: control === "cancel" ? null : task?.slots || conversation.draft, state: control === "cancel" ? "CANCELADA" : progressive?.result.state || "INFORMACION", preservePending: control === "acknowledge" }, config);
-        event = { ...event, conversationId: id, taskId: task?.id || null, route: "deterministic", routingReason: control || "progressive-stock", measurement: "provider", modelCalls: [], tools: deterministicTools, durationMs: Date.now() - startedAt, module: context.module };
+        const result = await persistTurn({ content: deniedTask ? "Esta operación no está habilitada para tu cuenta. Podés pedirle ayuda a un administrador autorizado." : (naturalVoice && transition.directive !== 'explain' && (progressive || transition.handled) ? shortVoiceQuestion(task, progressive?.content || transition.content) : progressive?.content) || transition.content || (control === "cancel" ? "La tarea quedó cancelada." : conversation.pendingActionId ? "Revisá y confirmá con Sí en la tarjeta. La respuesta por voz o texto no ejecuta la acción." : "Dale, seguimos cuando me indiques."), prepared, taskState: task, draft: deniedTask || control === "cancel" || transition.directive === "cancel" || transition.directive === "pause" ? null : task?.slots || conversation.draft, state: deniedTask ? "RECHAZADA" : control === "cancel" || transition.directive === "cancel" ? "CANCELADA" : progressive?.result.state || "INFORMACION", preservePending: control === "acknowledge" || transition.directive === 'explain' });
+        event = { ...event, conversationId: id, taskId: task?.id || null, route: "deterministic", routingReason: deniedTask ? "permission-denied" : transition.directive || control || "progressive-stock", measurement: "provider", modelCalls: [], tools: deterministicTools, durationMs: Date.now() - startedAt, module: context.module };
         await settleUsage({ store, session, reservation, event, configuration: config, result: { conversationId: id }, now: clock() });
         settled = true;
         result.usage = await usage(session, config, event);
@@ -465,15 +579,17 @@ export function createOliviaEngine({
           },
         },
         context,
-        { message: userMessage, task: conversation.taskState, attachments },
+        { message: userMessage, task: conversation.taskState, attachments, ideaContext: conversation.ideaContext },
       );
       event.model = profile.model;
       const retrievalStarted = Date.now();
-      const [knowledgeResult, routedSkills] = await Promise.all([retrieveKnowledge({ session, query: userMessage, context, store, provider, env }), routeSkills(session, userMessage, conversation.activeSkills)]);
+      const slotContinuation = conversation.taskState?.status === "collecting" && !isTaskInterruption(userMessage) && userMessage.split(/\s+/).length <= 18 && !attachments.length;
+      const routineDataIntent=['stock.read','customer.read','stock.load','customer.create'].includes(profile.intent) && !/como|explica|guia|procedimiento|reglas|politica/i.test(userMessage);
+      const [knowledgeResult, routedSkills] = await Promise.all([assistance.pure ? { documents: [], retrieval: 'skipped-generation' } : retrieveKnowledge({ session, query: userMessage, context, store, provider, env, semantic: !slotContinuation && !(latencyEnabled(config) && routineDataIntent) }), routeSkills(session, userMessage, conversation.activeSkills, { ideaContext: conversation.ideaContext })]);
       timings.retrievalMs = Date.now() - retrievalStarted;
       const knowledge = knowledgeResult.documents;
       const activeSkills = routedSkills;
-      profile = modelProfile(config, session, context, { message: userMessage, task: conversation.taskState, skills: activeSkills, attachments });
+      profile = modelProfile(config, session, context, { message: userMessage, task: conversation.taskState, skills: activeSkills, attachments, ideaContext: conversation.ideaContext });
       event.model = profile.model;
       const intent = operationalIntent(profile.intent);
       let taskState = conversation.taskState?.status === "collecting" && conversation.taskState.intent === intent ? { ...structuredClone(conversation.taskState), route: profile, updatedAt: clock() } : { id: randomUUID(), intent, revision: 1, status: "working", slots: {}, missingFields: [], ambiguities: {}, route: profile, createdAt: clock(), updatedAt: clock() };
@@ -482,7 +598,7 @@ export function createOliviaEngine({
         const snapshot = await tx.getDocument(`oliviaConversations/${id}`);
         assertConversationOwner(session, snapshot?.data, clock());
         if (snapshot.data.busyRequestId !== requestId) throw oliviaError("request-expired", "La consulta fue reemplazada.", 409);
-        await tx.commitDocuments([{ type: "update", path: `oliviaConversations/${id}`, data: { taskState } }]);
+        await tx.commitDocuments([{ type: "update", path: `oliviaConversations/${id}`, data: { taskState, suspendedTasks: currentSuspendedTasks } }]);
       });
       Object.assign(event, { conversationId: id, taskId: taskState.id, route: profile.route, routingReason: profile.routingReason, reasoningEffort: profile.reasoningEffort, module: context.module });
       event.modelCalls = [];
@@ -496,9 +612,13 @@ export function createOliviaEngine({
             screenContext: context,
             conversationDraft: conversation.draft,
             taskState: conversation.taskState || null,
+            suspendedTasks: currentSuspendedTasks,
             selectedMetricsPeriod: conversation.metricsPeriod || null,
-            taskRequirements: Object.fromEntries(capabilities(session).filter((name) => name.startsWith("prepare_") || name === "forecast_fair").map((name) => [name, requiredFields(name)])),
+            taskRequirements: Object.fromEntries(capabilities(session).filter((name) => latencyEnabled(config) ? name===taskState.intent : name.startsWith("prepare_") || name === "forecast_fair").map((name) => [name, requiredFields(name)])),
+            taskFieldExplanations: Object.fromEntries(requiredFields(taskState.intent).map(field => [field, fieldGuidance(taskState.intent, field)])),
             memory: conversation.memory || null,
+            ideaContext: conversation.ideaContext || null,
+            naturalStyle: naturalStyleContext(conversation.messages),
             documentation: knowledge,
           }),
         },
@@ -548,8 +668,10 @@ export function createOliviaEngine({
       let prepared = null,
         draft = null,
         navigation = null,
+        guide = null,
         nextState = "INFORMACION",
         content = "",
+        spokenContent = "",
         failure = null,
         toolCallCount = 0;
       let taskRepairPending = false;
@@ -568,19 +690,23 @@ export function createOliviaEngine({
           model: profile.model,
           reasoning: { effort: profile.reasoningEffort },
           store: false,
-          instructions: OLIVIA_INSTRUCTIONS + "\n" + OLIVIA_BATCH_SALE_INSTRUCTIONS + "\n" + OLIVIA_CATALOG_STOCK_INSTRUCTIONS + "\n" + OLIVIA_METRICS_INSTRUCTIONS + (voiceSessionId ? "\n" + OLIVIA_VOICE_INSTRUCTIONS : "") + "\nAntes de pedir aclaraciones, usá update_task para conservar parámetros parciales. Consultá historia, pantalla y herramientas para resolver entidades por nombre; nunca pidas IDs al usuario. Reutilizá taskState.slots y aplicá correcciones sobre la misma tarea. Al cambiar de intención empezá una nueva tarea. Para análisis preguntá el período si falta, salvo uno explícito o elegido en la charla; nunca lo inventes. Para transferencias consultá depósitos y stock; si solo un origen autorizado alcanza, proponelo; si varios alcanzan, preguntá cuál. Nunca inventes cantidades recibidas físicamente. Una tarea creativa solo existe en marketing/social autorizados." + (activeSkills.length ? "\nProcesos versionados permitidos (no conceden permisos):\n" + activeSkills.map((skill) => skill.content).join("\n\n") : ""),
+          instructions: responseInstructions({ query: userMessage, task: taskState, loadedTools: [...loadedTools], skills: activeSkills, generationOnly: assistance.pure }),
           input,
-          tools: finalResponse ? [] : [...toolDefinitions(session, { query: userMessage, context, required: [...activeSkills.flatMap((skill) => skill.requiredTools), taskState.intent], loaded: [...loadedTools] }), taskUpdateTool(capabilities(session))],
-          ...(finalResponse ? { tool_choice: "none" } : {}),
+          tools: finalResponse || assistance.pure ? [] : [...toolDefinitions(session, { query: userMessage, context, required: [...activeSkills.flatMap((skill) => skill.requiredTools), taskState.intent], loaded: [...loadedTools] }), taskUpdateTool(capabilities(session)), taskManagementTool()],
+          ...(finalResponse || assistance.pure ? { tool_choice: "none" } : {}),
           parallel_tool_calls: true,
-          max_output_tokens: config.responseLimits.maxOutputTokens,
+          max_output_tokens: naturalVoice && latencyEnabled(config) && profile.route==='luna-normal' ? Math.min(1200,config.responseLimits.maxOutputTokens) : config.responseLimits.maxOutputTokens,
           ...(onEvent ? { stream: true } : {}),
         };
+        if (naturalVoice) {
+          bodyRequest.instructions += "\n" + OLIVIA_VOICE_INSTRUCTIONS + "\nLa respuesta se escuchará en voz alta. Cuando no haya más herramientas, devolvé una versión completa y otra hablada breve, natural, en español argentino. Conservá hechos e incertidumbres respaldados por los mismos resultados de herramientas. No leas URLs ni Markdown ni código extenso: explicá su propósito y decí que el código está en pantalla. Una confirmación hablada nunca ejecuta una acción; solo la tarjeta visual autoriza operaciones.";
+          bodyRequest.text = { format: { type: "json_schema", name: "olivia_natural_voice_reply", strict: true, schema: { type: "object", properties: { complete: { type: "string" }, spoken: { type: "string" } }, required: ["complete", "spoken"], additionalProperties: false } } };
+        }
         // UTF-8 bytes conservatively bound tokenizer input; output is capped by API.
         await increaseReservation({
           store,
           reservation,
-          amount: Buffer.byteLength(JSON.stringify(bodyRequest), "utf8") + config.responseLimits.maxOutputTokens,
+          amount: Buffer.byteLength(JSON.stringify(bodyRequest), "utf8") + bodyRequest.max_output_tokens,
         });
         const remaining = config.responseLimits.timeoutMs - (Date.now() - startedAt);
         if (remaining < 1000)
@@ -593,12 +719,14 @@ export function createOliviaEngine({
         const providerStarted = Date.now();
         timings.modelCalls++;
         try {
+          trace.mark('llm.start',{model:profile.model,reasoning:profile.reasoningEffort,requestBytes:Buffer.byteLength(JSON.stringify(bodyRequest))});
           payload = await provider("responses", bodyRequest, {
             env,
             timeoutMs: Math.min(config.responseLimits.providerTimeoutMs, remaining),
             signal,
-            onEvent: onEvent ? (frame) => { if (frame.type === "delta" && timings.firstDeltaMs == null) timings.firstDeltaMs = Date.now() - startedAt; onEvent(frame); } : undefined,
+            onEvent: onEvent ? (frame) => { if (frame.type === "delta" && timings.firstDeltaMs == null) {timings.firstDeltaMs = Date.now() - startedAt;trace.mark('llm.first_token');} if (!naturalVoice || frame.type !== "delta") onEvent(frame); } : undefined,
           });
+          trace.mark('llm.end',{model:profile.model});
           timings.providerMs += Date.now() - providerStarted;
         } catch (error) {
           event.modelCalls.push({ ...profile, conversationId: id, taskId: taskState.id, module: context.module, measurement: "unconfirmed", totalTokens: 0, actualCostUsd: null, actualCostArs: null, durationMs: Date.now() - providerStarted, errorCode: error.code || "provider-error", tools: [] });
@@ -640,7 +768,13 @@ export function createOliviaEngine({
           (item) => item.type === "function_call",
         );
         event.modelCalls.at(-1).tools = calls.map((call) => call.name);
+        if (assistance.pure && calls.length) throw oliviaError('unexpected-tool-call', 'No pude completar la propuesta de contenido. No se ejecutó ninguna herramienta.', 502);
         content = responseText(payload) || content;
+        if (naturalVoice && !calls.length && content) {
+          const dual = dualVoiceResponse(content, config.naturalVoice.maxCharactersPerTurn);
+          content = dual.complete;
+          spokenContent = dual.spoken;
+        }
         if (!calls.length) break;
         onEvent?.({ type: "phase", label: calls.some((call) => call.name.startsWith("prepare_")) ? "Preparando acción…" : "Revisando datos…", tools: calls.map((call) => call.name) });
         toolCallCount += calls.length;
@@ -652,20 +786,36 @@ export function createOliviaEngine({
           );
         input.push(...payload.output);
         const toolsStarted = Date.now();
+        let directReadAnswer=null;
         const outcomes = await executeToolBatch(calls, async (call) => {
           const args = JSON.parse(call.arguments), key = JSON.stringify([call.name, args]);
+          if (call.name === "manage_task") {
+            validateSchema(args, taskManagementTool().parameters);
+            const managed = manageConversationTask({ task: ["collecting", "prepared"].includes(taskState.status) ? taskState : conversation.taskState, suspendedTasks: currentSuspendedTasks }, args.action, args.taskId, clock());
+            if (managed.task?.status === "collecting") assertCapability(session, managed.task.intent);
+            if (managed.notFound) return { data: { found: false, message: "No se encontró la tarea pausada; pedí cuál quiere retomar." } };
+            currentSuspendedTasks = managed.suspendedTasks;
+            taskState = managed.task || { id: randomUUID(), intent: "conversation.query", revision: 1, status: "working", slots: {}, missingFields: [], createdAt: clock(), updatedAt: clock() };
+            currentTask = taskState;
+            prepared = null; draft = managed.task?.slots || null;
+            await checkpointTask(taskState);
+            return { data: { taskState: managed.task, suspendedTasks: currentSuspendedTasks, instruction: "Las propuestas anteriores ya no se pueden confirmar. Retomar exige una preparación nueva con datos vivos." } };
+          }
           if (call.name === "update_task") {
             validateSchema(args, taskUpdateTool(capabilities(session)).parameters);
             if (args.intent === "creative_brief") {
               if (profile.route !== "sol-creative") throw oliviaError("permission-denied", "El trabajo creativo requiere Marketing o Redes autorizado.", 403);
             } else assertCapability(session, args.intent);
-            taskState = updateTask(taskState.intent === args.intent ? taskState : conversation.taskState, args.intent, args.slotsJson, clock());
+            const priorTask = ["collecting", "prepared"].includes(taskState.status) ? taskState : conversation.taskState;
+            if (priorTask && priorTask.intent !== args.intent) currentSuspendedTasks = manageConversationTask({ task: priorTask, suspendedTasks: currentSuspendedTasks }, "pause", null, clock()).suspendedTasks;
+            taskState = updateTask(priorTask, args.intent, args.slotsJson, clock());
             taskRepairPending = false;
             taskState.route = profile;
             currentTask = taskState;
+            await checkpointTask(taskState);
             return { data: { taskId: taskState.id, slots: taskState.slots, missing: taskState.missingFields } };
           }
-          if (!seen.has(key)) seen.set(key, runTool({ session, name: call.name, args, store, context, now: clock(), provider: call.name === "research_web_metric" ? researchProvider : provider, env, researchOptions: { ...config.profiles.adminComplex, reasoningEffort: "high", signal } }));
+          if (!seen.has(key)) seen.set(key, trace.span('tool',{tool:call.name},()=>runTool({ session, name: call.name, args, store, context, now: clock(), provider: call.name === "research_web_metric" ? researchProvider : provider, env, researchOptions: { ...config.profiles.adminComplex, reasoningEffort: "high", signal } })));
           return seen.get(key);
         });
         timings.toolsMs += Date.now() - toolsStarted;
@@ -683,6 +833,8 @@ export function createOliviaEngine({
             for (const [key, value] of Object.entries(args)) if (/Id$/.test(key) && typeof value === "string") entityIds.add(value);
             for (const value of Object.values(result.data || {})) if (Array.isArray(value)) dataRows += value.length;
             if (call.name.startsWith("prepare_")) {
+              const priorTask = ["collecting", "prepared"].includes(taskState.status) ? taskState : conversation.taskState;
+              if (priorTask && priorTask.intent !== call.name) currentSuspendedTasks = manageConversationTask({ task: priorTask, suspendedTasks: currentSuspendedTasks }, "pause", null, clock()).suspendedTasks;
               taskState = taskFromTool(taskState.intent === call.name ? taskState : conversation.taskState, call.name, args, result, clock());
               taskState.route = profile;
               currentTask = taskState;
@@ -707,11 +859,12 @@ export function createOliviaEngine({
                 : "RECHAZADA";
               draft = args;
               content =
-                (["prepare_catalog_stock_load", "prepare_batch_sales"].includes(call.name) ? result.data?.summary : null) || (result.state === "DATOS_INCOMPLETOS" && OLIVIA_CAPABILITIES[call.name]?.module === "metrics" ? result.data?.message : null) || (result.state === "DATOS_INCOMPLETOS" ? missingQuestion(taskState.missingFields) : null) || result.data?.summary ||
+                (["prepare_catalog_stock_load", "prepare_batch_sales"].includes(call.name) ? result.data?.summary : null) || (result.state === "DATOS_INCOMPLETOS" && OLIVIA_CAPABILITIES[call.name]?.module === "metrics" ? result.data?.message : null) || (result.state === "DATOS_INCOMPLETOS" ? missingQuestion(taskState.missingFields, taskState.intent) : null) || result.data?.summary ||
                 result.data?.message ||
                 "La operación necesita revisión.";
             }
             if (result.navigation) navigation = result.navigation;
+            if (result.guide) guide = result.guide;
           } catch (e) {
             result = {
               data: {
@@ -738,6 +891,8 @@ export function createOliviaEngine({
               content = failure.message;
             }
           }
+          const directPlan=latencyEnabled(config) && calls.length===1 ? quickReadPlan(userMessage) : null;
+          if(directPlan && nextState==='INFORMACION' && !prepared)directReadAnswer=formatQuickRead(call.name,result,{priceOnly:directPlan.kind==='price'});
           const modelData = result.data?.source?.startsWith("Panel de Métricas") ? metricsForModel(result.data) : result.data || {};
           input.push({
             type: "function_call_output",
@@ -747,6 +902,12 @@ export function createOliviaEngine({
           await store.commit([{ type: "create", path: `oliviaToolEvents/${hash(`${session.uid}:${requestId}:${toolCallCount}:${outcomes.indexOf(outcome)}:${call.call_id}`)}`, data: { userId: session.uid, userName: session.profile.name || "Usuario", role: normalizedRole(session.profile), conversationId: id, requestId, tool: call.name, skills: activeSkills.map(({ name, version }) => ({ name, version })), module: context.module, mode: body.inputMode || "text", result: outcome.error ? "failed" : "completed", origin: "Asistente IA / Olivia", createdAt: clock(), expiresAt: new Date(clock().getTime() + 30 * 86400000) } }]);
         }
         // A normalized proposal is the canonical final message; no further call can execute it.
+        if(directReadAnswer){content=directReadAnswer;spokenContent=directReadAnswer;timings.answerRoundAvoided=true;break;}
+        if (!taskRepairPending && nextState === "INFORMACION" && calls.every((call) => call.name === "update_task") && taskState.status === "collecting" && taskState.missingFields.length) {
+          content = missingQuestion(taskState.missingFields, taskState.intent);
+          nextState = "DATOS_INCOMPLETOS";
+          timings.questionRoundAvoided = true;
+        }
         if (prepared) {
           content = prepared.summary;
           break;
@@ -760,19 +921,13 @@ export function createOliviaEngine({
       }
       if (taskState.status === "working") taskState = { ...taskState, status: ["ERROR", "RECHAZADA"].includes(nextState) ? "failed" : "completed", updatedAt: clock() };
       if (!prepared && taskState.status === "collecting" && taskState.missingFields.length && nextState === "INFORMACION") nextState = "DATOS_INCOMPLETOS";
-      if (voiceSessionId && !prepared && nextState === "DATOS_INCOMPLETOS") content = shortVoiceQuestion(taskState, content);
+      if (naturalVoice && !prepared && nextState === "DATOS_INCOMPLETOS") content = shortVoiceQuestion(taskState, content);
       const missingSources = [...researchSources.values()].filter((source) => !content.includes(`](${source.url})`));
       if (!prepared && missingSources.length) content += "\n\nFuentes consultadas:\n" + missingSources.map((source) => `- [${source.title.replace(/[\[\]\n]/g, " ")}](${source.url})`).join("\n");
       Object.assign(event, { conversationId: id, taskId: taskState.id, route: profile.route, reasoningEffort: profile.reasoningEffort, routingReason: profile.routingReason, module: context.module, skills: activeSkills.map(({ name, version }) => ({ name, version })), tools: [...seen.keys()].map((key) => JSON.parse(key)[0]), durationMs: Date.now() - startedAt });
       event.modelCalls.forEach((call) => { call.taskId = taskState.id; });
       signal?.throwIfAborted();
-      const result = await saveTurn(
-        session,
-        id,
-        requestId,
-        { content, prepared, draft, taskState, activeSkills, metricsPeriod, state: nextState, navigation, failure },
-        config,
-      );
+      const result = await persistTurn({ content, prepared, draft, taskState, activeSkills, metricsPeriod, guide, guideState: null, ...(assistance.pure ? { ideaContext: { kind: assistance.kind, route: profile.route, request: userMessage.slice(0, 2000), content: content.slice(0, 8000), updatedAt: clock().toISOString() } } : {}), state: nextState, navigation, failure, voiceTranscript: spokenContent });
       const budget = await settleUsage({
         store,
         session,
@@ -791,6 +946,7 @@ export function createOliviaEngine({
         config,
       );
       if (canAccessAdministration(session.profile)) result.telemetry = { requestId, taskId: taskState.id, model: profile.model, reasoningEffort: profile.reasoningEffort, route: profile.route, routingReason: profile.routingReason, calls: event.modelCalls, totalMs: Date.now() - startedAt, ...timings, toolCalls: toolCallCount, responseId: event.responseId, skills: activeSkills.map((skill) => ({ name: skill.name, version: skill.version })), retrieval: knowledgeResult.retrieval, documents: knowledge.map((doc) => ({ id: doc.id, title: doc.title })), retrievalWarning: knowledgeResult.warning || null, knowledgeStorageCostUsd: null };
+      if(canAccessAdministration(session.profile)) {trace.mark('response.complete');result.telemetry={...result.telemetry,trace:trace.snapshot()};}
       return result;
     } catch (e) {
       let failure = publicOliviaFailure(e);
@@ -801,19 +957,13 @@ export function createOliviaEngine({
       }
       if (claimed)
         try {
-          await saveTurn(
-            session,
-            id,
-            requestId,
-            {
+          await persistTurn({
               content: failure.message,
               failure,
               state: "ERROR",
               taskState: currentTask,
               ...(currentTask ? { draft: currentTask.slots } : {}),
-            },
-            config,
-          );
+            });
         } catch {
           /* Original error takes precedence. Lease expires, preventing permanent lock. */
         }
@@ -833,93 +983,6 @@ export function createOliviaEngine({
         }
       throw e;
     }
-  }
-  async function voiceCosts(session, body) {
-    assertOliviaAccess(session);
-    const id = safeId(body.conversationId), voiceId = safeId(body.realtimeSessionId, "sesión de voz");
-    const live = await store.get(`oliviaRealtime/${voiceId}`);
-    if (!live || live.userId !== session.uid || live.conversationId !== id || live.sessionBinding !== sessionBinding(session)) throw oliviaError("permission-denied", "Esta sesión de voz no está disponible.", 403);
-    const conversation = await store.get(`oliviaConversations/${id}`);
-    assertConversationOwner(session, conversation, clock());
-    const [voiceUsage, events] = await Promise.all([
-      store.get(`oliviaUsage/${session.uid}_${safeId(live.requestId)}`),
-      store.query("oliviaUsage", [["realtimeSessionId", "EQUAL", voiceId]], 101),
-    ]);
-    const owned = events.filter((event) => event.userId === session.uid && event.conversationId === id && event.requestId !== live.requestId);
-    return { voiceCosts: aggregateVoiceCosts(live, voiceUsage?.userId === session.uid ? voiceUsage : null, owned.slice(0, 100), {
-      truncated: events.length > 100,
-      backendPending: Boolean(conversation.busyRequestId && dateMs(conversation.busyUntil) > clock().getTime()),
-    }) };
-  }
-  async function requireLiveVoice(session, body, { transcript = false } = {}) {
-    assertOliviaAccess(session);
-    const config = await configuration(), id = safeId(body.conversationId);
-    if (!config.enabled) throw oliviaError("assistant-disabled", "Olivia está deshabilitada.", 503);
-    const live = await store.get(`oliviaRealtime/${safeId(body.realtimeSessionId)}`);
-    const transcriptGrace = transcript && live?.status === "closed" && dateMs(live.closedAt) + 60000 > clock().getTime();
-    if (!live || !live.nativeTools || (!transcriptGrace && (live.status !== "active" || dateMs(live.expiresAt) <= clock().getTime())) || live.userId !== session.uid || live.conversationId !== id || live.sessionBinding !== sessionBinding(session)) throw oliviaError("realtime-expired", "La sesión de voz terminó. Podés continuar escribiendo.", 409);
-    return { config, live, id };
-  }
-  async function realtimeTool(session, body) {
-    const { config, id, live } = await requireLiveVoice(session, body);
-    const freshProfile = await store.get(`users/${session.uid}`);
-    session = { ...session, profile: { ...freshProfile, id: session.uid } };
-    assertCapability(session, body.tool);
-    const requestId = safeId(body.requestId), callId = safeId(body.callId), inputId = safeId(body.inputId);
-    const callKey = hash(`${session.uid}:${body.realtimeSessionId}:${callId}`), path = `oliviaRealtimeToolCalls/${callKey}`;
-    const inputFingerprint = hash(JSON.stringify({ tool: body.tool, args: body.args, inputId, message: safeUserMessage(body.message) }));
-    const existing = await store.get(path);
-    if (existing && existing.inputFingerprint !== inputFingerprint) throw oliviaError("request-already-used", "La llamada ya corresponde a otros datos.", 409);
-    if (existing?.status === "completed") return { ...await state(session, id), data: existing.data, toolDefinitions: existing.toolDefinitions || [], nativeTools: true };
-    await store.transaction(async (tx) => {
-      const [claimed, live] = await Promise.all([tx.getDocument(path), tx.getDocument(`oliviaRealtime/${body.realtimeSessionId}`)]);
-      if (claimed) throw oliviaError("request-already-used", "Esta herramienta ya fue solicitada. Recuperá el chat.", 409);
-      if (live?.data.status !== "active" || Number(live.data.toolCalls || 0) >= 20) throw oliviaError("tool-limit", "La sesión alcanzó su límite de consultas; podés continuar por texto.", 429);
-      await tx.commitDocuments([{ type: "create", path, data: { status: "running", inputFingerprint, userId: session.uid, conversationId: id, expiresAt: new Date(clock().getTime() + 86400000), createdAt: clock() } }, { type: "update", path: `oliviaRealtime/${body.realtimeSessionId}`, data: { toolCalls: Number(live.data.toolCalls || 0) + 1 } }]);
-    });
-    let claimed = false;
-    try {
-      const userMessage = safeUserMessage(body.message);
-      await claimConversation(session, id, requestId, userMessage, "realtime", [], `${body.realtimeSessionId}_${inputId}`);
-      claimed = true;
-      const outcome = await runTool({ session, name: body.tool, args: body.args, store, context: screenContext(body.screenContext || {}), now: clock(), provider, env });
-      const available = discoverSkills(session);
-      const loadedSkills = (live.loadedSkills || []).filter((skill) => available.some((item) => item.name === skill.name && item.version === skill.version));
-      if (outcome.skill) {
-        const skill = { name: outcome.skill.name, version: outcome.skill.version };
-        await store.commit([{ type: "update", path: `oliviaRealtime/${body.realtimeSessionId}`, data: { loadedSkills: [...loadedSkills.filter((item) => item.name !== skill.name), skill] } }]);
-      }
-      if (outcome.prepared) {
-        outcome.prepared.userInput = userMessage.slice(0, 1000);
-        outcome.prepared.skill = loadedSkills.find((skill) => available.find((item) => item.name === skill.name)?.requiredTools.includes(outcome.prepared.toolName)) || null;
-      }
-      const result = await saveTurn(session, id, requestId, { content: outcome.prepared?.summary || outcome.data?.message || JSON.stringify(outcome.data).slice(0, 7000), prepared: outcome.prepared, state: outcome.state || "INFORMACION", navigation: outcome.navigation, hiddenFromChat: !outcome.prepared, preservePending: true }, config);
-      const definitions = outcome.loadTools?.length ? toolDefinitions(session, { query: "", loaded: outcome.loadTools }).map(({ strict, ...definition }) => definition) : [];
-      await store.commit([{ type: "update", path, data: { status: "completed", data: outcome.data || {}, toolDefinitions: definitions, completedAt: clock() } }, { type: "create", path: `oliviaToolEvents/${callKey}`, data: { userId: session.uid, userName: session.profile.name || "Usuario", role: normalizedRole(session.profile), conversationId: id, requestId, tool: body.tool, mode: "realtime", skill: outcome.skill?.name || outcome.prepared?.skill?.name || null, result: "completed", createdAt: clock(), expiresAt: new Date(clock().getTime() + 86400000) } }]);
-      return { ...result, data: outcome.data || {}, toolDefinitions: definitions, nativeTools: true };
-    } catch (error) {
-      if (claimed) await saveTurn(session, id, requestId, { content: error.status && error.status < 500 ? error.message : "No se pudo consultar el sistema.", state: "ERROR", preservePending: true }, config).catch(() => {});
-      await store.commit([{ type: "update", path, data: { status: "failed", code: error.code || "tool-error" } }]).catch(() => {});
-      throw error;
-    }
-  }
-  async function realtimeTranscript(session, body) {
-    const { id } = await requireLiveVoice(session, body, { transcript: true }), now = clock();
-    const text = safeUserMessage(body.text), inputId = safeId(body.inputId), responseId = safeId(body.responseId);
-    const turnKey = hash(`${session.uid}:${body.realtimeSessionId}:${responseId}`), inputKey = `${body.realtimeSessionId}_${inputId}`;
-    await store.transaction(async (tx) => {
-      const [conversation, existing] = await Promise.all([tx.getDocument(`oliviaConversations/${id}`), tx.getDocument(`oliviaRealtimeTurns/${turnKey}`)]);
-      assertConversationOwner(session, conversation?.data, now);
-      if (existing) return;
-      if (conversation.data.busyRequestId && dateMs(conversation.data.busyUntil) > now.getTime()) throw oliviaError("conversation-busy", "El chat está procesando otra consulta. La transcripción sigue visible en la sesión.", 409);
-      const messages = [...(conversation.data.messages || [])], entries = [];
-      if (!messages.some((entry) => entry.role === "user" && entry.inputId === inputKey)) {
-        const userEntry = message("user", safeUserMessage(body.message), now, "realtime"); userEntry.inputId = inputKey; messages.push(userEntry); entries.push(userEntry);
-      }
-      const assistantEntry = message("assistant", text, now, "realtime"); messages.push(assistantEntry); entries.push(assistantEntry);
-      await tx.commitDocuments([...entries.map((entry) => retainedMessage(id, entry)), { type: "create", path: `oliviaRealtimeTurns/${turnKey}`, data: { userId: session.uid, conversationId: id, createdAt: now, expiresAt: new Date(now.getTime() + 86400000) } }, { type: "update", path: `oliviaConversations/${id}`, data: { messages: trimMessages(messages), messageCount: (conversation.data.messageCount || 0) + entries.length, memory: reduceConversationMemory(conversation.data.memory, messages), updatedAt: now } }]);
-    });
-    return state(session, id);
   }
   async function confirm(session, body) {
     assertOliviaAccess(session);
@@ -1100,39 +1163,20 @@ export function createOliviaEngine({
     });
     return state(session, id);
   }
-  async function invalidateTask(session, id) {
+  async function invalidateTask(session, id, expectedRequestId = null) {
     safeId(id);
+    if(expectedRequestId)safeId(expectedRequestId);
     await store.transaction(async (tx) => {
       const snapshot = await tx.getDocument(`oliviaConversations/${id}`), conversation = snapshot?.data;
       assertConversationOwner(session, conversation, clock());
+      const requestPath=expectedRequestId?`oliviaRequests/${session.uid}_${expectedRequestId}`:null;
+      const request=requestPath?(await tx.getDocument(requestPath))?.data:null;
+      const marker=requestPath && (!request || request.status==='running')?[{type:request?'update':'create',path:requestPath,data:{userId:session.uid,requestId:expectedRequestId,interruptRequested:true,...(!request?{status:'cancelled',reservedTokens:0,createdAt:clock(),expiresAt:new Date(clock().getTime()+120000)}:{})}}]:[];
+      if(expectedRequestId && conversation.busyRequestId!==expectedRequestId){if(marker.length)await tx.commitDocuments(marker);return;}
       const pending = conversation.pendingActionId ? await tx.getDocument(`oliviaConfirmations/${conversation.pendingActionId}`) : null;
       const writes = pending?.data.status === "pending" ? [{ type: "update", path: `oliviaConfirmations/${conversation.pendingActionId}`, data: { status: "superseded", updatedAt: clock() } }] : [];
       writes.push({ type: "update", path: `oliviaConversations/${id}`, data: { pendingActionId: null, busyRequestId: null, busyUntil: null, state: "DATOS_INCOMPLETOS", taskState: conversation.taskState ? { ...conversation.taskState, revision: conversation.taskState.revision + 1, status: "collecting", updatedAt: clock() } : null } });
-      await tx.commitDocuments(writes);
-    });
-  }
-  async function recordSpeech(session, id, inputId, content, role) {
-    safeId(id); safeId(inputId); assertOliviaAccess(session);
-    content = safeUserMessage(content);
-    if (!["user", "assistant"].includes(role)) throw oliviaError("invalid-input", "Intervención inválida.");
-    await store.transaction(async (tx) => {
-      const snapshot = await tx.getDocument(`oliviaConversations/${id}`), conversation = snapshot?.data;
-      assertConversationOwner(session, conversation, clock());
-      const existing = conversation.messages?.find((entry) => entry.inputId === inputId);
-      if (existing) {
-        if (role === "user" && existing.content !== content) {
-          await tx.commitDocuments([{ type: "update", path: `oliviaConversations/${id}/messages/${existing.id}`, data: { content } }, { type: "update", path: `oliviaConversations/${id}`, data: { messages: conversation.messages.map((entry) => entry.id === existing.id ? { ...entry, content } : entry), updatedAt: clock() } }]);
-        }
-        return;
-      }
-      const entry = message(role, content, clock(), "realtime"); entry.inputId = inputId;
-      const last = conversation.messages?.at(-1);
-      // Preserve the canonical backend reply and retain its spoken version
-      // without displaying two assistant answers for one delegated turn.
-      if (role === "assistant" && last?.role === "assistant") {
-        const messages = conversation.messages.map((item) => item.id === last.id ? { ...item, voiceTranscript: content } : item);
-        await tx.commitDocuments([{ type: "update", path: `oliviaConversations/${id}/messages/${last.id}`, data: { voiceTranscript: content } }, { type: "update", path: `oliviaConversations/${id}`, data: { messages, updatedAt: clock() } }]);
-      } else await tx.commitDocuments([retainedMessage(id, entry), { type: "update", path: `oliviaConversations/${id}`, data: { messages: trimMessages([...(conversation.messages || []), entry]), messageCount: (conversation.messageCount || 0) + 1, updatedAt: clock() } }]);
+      await tx.commitDocuments([...marker,...writes]);
     });
   }
   async function requestQuotaExtension(session, body) {
@@ -1212,6 +1256,7 @@ export function createOliviaEngine({
           createdAt: r.createdAt,
         })),
       providerConfigured: Boolean(env.OPENAI_API_KEY),
+      googleTtsConfigured: hasGoogleCloudTtsCredentials(env),
       policyVersion: OLIVIA_POLICY_VERSION,
     };
   }
@@ -1296,14 +1341,10 @@ export function createOliviaEngine({
     state,
     chat,
     confirm,
-    realtimeTool,
-    realtimeTranscript,
-    voiceCosts,
     cancel,
     configuration,
     getConfiguration,
     invalidateTask,
-    recordSpeech,
     saveConfiguration,
     history,
     resumeConversation,

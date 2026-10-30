@@ -134,10 +134,10 @@ export default function ProductForm({ open, product, categories, profile, onClos
     >
       <form className="fm-form-grid fm-product-form" onSubmit={submit}>
         <FormField label="Nombre" required>
-          <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+          <input data-olivia="product.name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         </FormField>
         <FormField label="Abreviación" hint="Hasta 8 caracteres." required>
-          <input maxLength="8" value={form.abbreviation} onChange={(event) => setForm({ ...form, abbreviation: event.target.value.toUpperCase() })} />
+          <input data-olivia="product.abbreviation" maxLength="8" value={form.abbreviation} onChange={(event) => setForm({ ...form, abbreviation: event.target.value.toUpperCase() })} />
         </FormField>
         <FormField label="Categoría">
           <Select value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value, subcategoryId: "" })}>
@@ -152,7 +152,7 @@ export default function ProductForm({ open, product, categories, profile, onClos
           </Select>
         </FormField>
         <FormField label="Precio predeterminado" hint="Las ubicaciones que usen este precio se actualizarán automáticamente." required>
-          <input type="number" min="0" step="1" inputMode="numeric" value={form.defaultPrice} onChange={(event) => setForm({ ...form, defaultPrice: event.target.value })} />
+          <input data-olivia="product.price" type="number" min="0" step="1" inputMode="numeric" value={form.defaultPrice} onChange={(event) => setForm({ ...form, defaultPrice: event.target.value })} />
         </FormField>
         <FormField label="Alícuota IVA ARCA" hint="Obligatoria para emitir comprobantes automáticos. No se adivina por categoría.">
           <Select value={form.arcaVatRate} onChange={(event) => setForm({ ...form, arcaVatRate: event.target.value })}>
@@ -212,11 +212,11 @@ export default function ProductForm({ open, product, categories, profile, onClos
         </section>
 
         <label className="fm-check-row fm-form-grid__full"><input type="checkbox" checked={form.active} onChange={(event) => setForm({ ...form, active: event.target.checked })} /><span>Producto activo</span></label>
-        {state.error ? <Toast tone="error">{state.error}</Toast> : null}
+        {state.error ? <div data-olivia-error="product.form"><Toast tone="error">{state.error}</Toast></div> : null}
         <div className="fm-dialog-actions fm-form-grid__full">
           <HelpTooltip label="Cierra esta ventana sin guardar los cambios."><Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button></HelpTooltip>
           <HelpTooltip label={editing ? "Guarda los cambios del producto en el catálogo general." : "Crea este producto en el catálogo general de Flor Mía."}>
-            <Button type="submit" loading={state.busy}>{editing ? "Guardar producto" : "Crear producto"}</Button>
+            <Button data-olivia="product.save" type="submit" loading={state.busy}>{editing ? "Guardar producto" : "Crear producto"}</Button>
           </HelpTooltip>
         </div>
       </form>

@@ -13,7 +13,7 @@ function setup(role = "seller", response = suggestion, hook = () => {}) {
   return { ...f, requests };
 }
 const alerts = f => [...f.documents].filter(([path]) => path.startsWith("alerts/"));
-const send = (f, conversationId, message, requestId = "suggestion_one", extra = {}) => f.engine.chat(f.session, { conversationId, requestId, message, screenContext: { route: "/gestion", module: "dashboard" }, ...extra });
+const send = (f, conversationId, message, requestId = "suggestion_one", extra = {}) => { f.advance(1500); return f.engine.chat(f.session, { conversationId, requestId, message, screenContext: { route: "/gestion", module: "dashboard" }, ...extra }); };
 
 test("variantes de mensajes a Agustín reconocen la intención sin confundir operaciones del negocio", () => {
   for (const text of ["Olivia, ¿puedes comunicarle lo siguiente a Agustín?", "Decile a Agustín que quiero mejorar el panel", "Podés decirle a Agustín esto", "Pasale esta idea a Agustín", "Quiero enviarle una propuesta a Agustín", "Avisale a Agustín que necesito ver mejor los productos"]) assert.equal(isSuggestionRequest(text), true, text);
@@ -24,7 +24,10 @@ test("vendedores y administradores envían la reformulación y el original solo 
   for (const role of ["seller", "admin"]) {
     const f = setup(role), { conversationId } = await start(f);
     const original = "Olivia, comunicale a Agustín que acá al cargar stock quiero ver cuántas unidades quedan";
-    const result = await send(f, conversationId, original);
+    const draft = await send(f, conversationId, original);
+    assert.equal(alerts(f).length, 0);
+    assert.match(draft.messages.at(-1).content, /Todavía no envié nada/);
+    const result = await send(f, conversationId, 'Sí, enviáselo a Agustín', 'suggestion_approved');
     assert.equal(result.state, "COMPLETADA");
     assert.match(result.messages.at(-1).content, /Le envié tu sugerencia a Agustín/);
     assert.equal(alerts(f).length, 1);
@@ -55,6 +58,8 @@ test("una idea incompleta pregunta y conserva la pantalla hasta recibir el detal
   ready = true;
   f.advance(2000);
   await send(f, conversationId, "Que aparezca el stock antes de cargar unidades", "suggestion_two", { screenContext: { route: "/gestion/locations", module: "locations" } });
+  assert.equal(alerts(f).length, 0);
+  await send(f, conversationId, 'Dale', 'suggestion_approved');
   assert.equal(alerts(f).length, 1);
   assert.equal(alerts(f)[0][1].screenContext.module, "dashboard");
   assert.match(alerts(f)[0][1].originalMessage, /podés decirle algo/);
@@ -63,19 +68,22 @@ test("una idea incompleta pregunta y conserva la pantalla hasta recibir el detal
 
 test("reintentos simultáneos no duplican la notificación", async () => {
   const f = setup(), { conversationId } = await start(f);
-  const results = await Promise.allSettled([send(f, conversationId, "Comunicale a Agustín esta mejora del stock"), send(f, conversationId, "Comunicale a Agustín esta mejora del stock")]);
+  await send(f, conversationId, 'Comunicale a Agustín esta mejora del stock', 'suggestion_draft');
+  const results = await Promise.allSettled([send(f, conversationId, 'Sí'), send(f, conversationId, 'Sí')]);
   assert.ok(results.some(result => result.status === "fulfilled"));
   assert.equal(alerts(f).length, 1);
 });
 
 test("cuenta receptora inactiva, remitente inactivo y respuesta inválida nunca anuncian un envío", async () => {
   for (const variant of ["recipient", "sender", "invalid"]) {
-    const f = setup("seller", variant === "invalid" ? { ...suggestion, arbitraryRecipient: "impostor" } : suggestion, current => {
-      if (variant === "sender") current.documents.get(`users/${current.session.uid}`).active = false;
-    });
+    const f = setup("seller", variant === "invalid" ? { ...suggestion, arbitraryRecipient: "impostor" } : suggestion);
     if (variant === "recipient") f.documents.get("users/agustin").active = false;
     const { conversationId } = await start(f);
-    await assert.rejects(send(f, conversationId, "Comunicale a Agustín que quiero ver el stock"));
+    if (variant !== 'invalid') {
+      await send(f, conversationId, "Comunicale a Agustín que quiero ver el stock");
+      if (variant === 'sender') f.documents.get(`users/${f.session.uid}`).active = false;
+      await assert.rejects(send(f, conversationId, 'Sí', 'suggestion_approved'));
+    } else await assert.rejects(send(f, conversationId, "Comunicale a Agustín que quiero ver el stock"));
     assert.equal(alerts(f).length, 0);
     assert.ok(!f.documents.get(`oliviaConversations/${conversationId}`).messages.some(row => /Le envié tu sugerencia/.test(row.content)));
   }

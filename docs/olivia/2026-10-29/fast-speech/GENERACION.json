@@ -1,0 +1,16 @@
+{
+  "validatedAt": "2026-10-29T19:48:30.955Z",
+  "ready": 90,
+  "sha256Verified": 90,
+  "nonSilentPcm": 90,
+  "totalBytes": 10667520,
+  "totalDurationMs": 222240,
+  "minDurationMs": 1000,
+  "maxDurationMs": 4480,
+  "minRms": 0.08388875363912521,
+  "regeneratedOnReuse": 0,
+  "voice": "es-US-Chirp3-HD-Aoede",
+  "speakingRate": 1,
+  "estimatedCostUsd": 0.08097,
+  "sourceDeployCommit": "267d910e766170c55eaa9bdf6eabcf2c72dfa1c0"
+}

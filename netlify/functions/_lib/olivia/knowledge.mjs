@@ -108,11 +108,12 @@ export async function removeKnowledge({ session, body, store, provider = openaiR
     return { retired: true, deletionPending: false };
   } catch { return { retired: true, deletionPending: true }; }
 }
-export async function retrieveKnowledge({ session, query, context = {}, store, provider = openaiRequest, env = process.env }) {
+export async function retrieveKnowledge({ session, query, context = {}, store, provider = openaiRequest, env = process.env, semantic = true }) {
   const proposed = /soluci[oó]n propuesta|diseñad[oa]|idea futura|requisito propuesto/i.test(query);
   const fallback = proposed
     ? retrieveOliviaKnowledge(query, { role: normalizedRole(session.profile), module: context.module, limit: 4 })
     : retrieveCurrentOliviaKnowledge(query, { role: normalizedRole(session.profile), module: context.module, allowedModules: MODULES.filter(module => can(session.profile, module, "view")), limit: 4 });
+  if (!semantic) return { documents: fallback, retrieval: "curated-task-continuation", storageCostUsd: null };
   const settings = await store.get("oliviaKnowledgeSettings/global");
   if (!settings?.vectorStoreId) return { documents: fallback, retrieval: "curated", storageCostUsd: null };
   const seller = normalizedRole(session.profile) === "seller";

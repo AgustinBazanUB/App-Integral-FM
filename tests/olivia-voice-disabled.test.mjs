@@ -5,32 +5,28 @@ import vm from "node:vm";
 import { build } from "esbuild";
 import { oliviaError } from "../src/shared/oliviaContracts.mjs";
 import { json, errorResponse } from "../netlify/functions/_lib/olivia/http.mjs";
-import { canUseOliviaVoice, OLIVIA_VOICE_UNAVAILABLE_CODE, OLIVIA_VOICE_UNAVAILABLE_MESSAGE } from "../src/shared/oliviaVoiceAvailability.mjs";
+import { OLIVIA_VOICE_UNAVAILABLE_MESSAGE } from "../src/shared/oliviaVoiceAvailability.mjs";
 
 const source = await readFile(new URL("../netlify/functions/olivia.mjs", import.meta.url), "utf8");
 function endpoint(authenticated = true, identity = {}) {
   const calls = [];
   const context = vm.createContext({
     Buffer, Response, URL, console: { error() {} }, json, errorResponse, oliviaError,
-    canUseOliviaVoice, OLIVIA_VOICE_UNAVAILABLE_CODE, OLIVIA_VOICE_UNAVAILABLE_MESSAGE,
     oliviaSession: async () => { if (!authenticated) throw oliviaError("unauthenticated", "Iniciá sesión.", 401); return { uid: "fixture-admin", ...identity }; },
     createOliviaStore: () => { calls.push("store"); return {}; },
     resolveOliviaPricing: () => ({}),
     createOliviaEngine: () => new Proxy({}, { get: (_, operation) => async () => { calls.push(operation); return { operation }; } }),
-    createRealtime: () => { calls.push("realtime"); throw new Error("No debe iniciar voz"); },
-    createLive: async () => { calls.push("live"); return { voiceProtocol: "live" }; },
-    stopRealtime: async () => { calls.push("stopRealtime"); return { stopped: true }; },
   });
   vm.runInContext(source.replace(/^import .*;\r?\n/gm, "").replace("export default async function handler", "globalThis.handler = async function handler"), context);
   return { calls, request: body => context.handler(new Request("https://preview.test/.netlify/functions/olivia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })) };
 }
 
-test("la ruta pública bloquea voz normal, Mini y parámetros de activación antes de abrir servicios o reservar consumo", async () => {
-  for (const fields of [{}, { voiceMode: "realtime-mini" }, { nativeTools: true, voiceProtocol: "live", enabled: true }]) {
+test("GPT-Live, Realtime y el medidor legacy quedan retirados para cualquier cuenta", async () => {
+  for (const operation of ["realtime", "realtimeTool", "realtimeTranscript", "interruptVoice", "stopRealtime", "voiceCosts"]) {
     const h = endpoint();
-    const response = await h.request({ operation: "realtime", ...fields });
-    assert.equal(response.status, 409);
-    assert.deepEqual(await response.json(), { code: OLIVIA_VOICE_UNAVAILABLE_CODE, message: OLIVIA_VOICE_UNAVAILABLE_MESSAGE });
+    const response = await h.request({ operation, voiceMode: "realtime-mini", voiceProtocol: "live" });
+    assert.equal(response.status, 410);
+    assert.equal((await response.json()).code, "voice-mode-retired");
     assert.deepEqual(h.calls, []);
   }
 });
@@ -39,7 +35,7 @@ test("deshabilitar voz conserva la autenticación y las rutas de chat, historial
   const denied = endpoint(false);
   assert.equal((await denied.request({ operation: "realtime" })).status, 401);
   assert.deepEqual(denied.calls, []);
-  for (const [operation, expected] of [["state", "state"], ["chat", "chat"], ["history", "history"], ["configuration", "getConfiguration"], ["confirm", "confirm"], ["stopRealtime", "stopRealtime"]]) {
+  for (const [operation, expected] of [["state", "state"], ["chat", "chat"], ["history", "history"], ["configuration", "getConfiguration"], ["confirm", "confirm"]]) {
     const h = endpoint();
     const response = await h.request({ operation });
     assert.equal(response.status, 200);
@@ -47,24 +43,16 @@ test("deshabilitar voz conserva la autenticación y las rutas de chat, historial
   }
 });
 
-test("solo el correo autenticado de Agustín habilita Live; Mini y configuración cliente no cambian el transporte", async () => {
-  for (const fields of [{}, { voiceMode: "realtime-mini", voiceProtocol: "realtime", voice: "cedar" }]) {
-    const h = endpoint(true, { email: "AGSRESERVA@gmail.com" });
-    assert.equal((await h.request({ operation: "realtime", ...fields })).status, 200);
-    assert.deepEqual(h.calls, ["store", "live"]);
-  }
-  for (const identity of [{ email: "other@gmail.com", profile: { email: "agsreserva@gmail.com", role: "admin" } }, { profile: { email: "agsreserva@gmail.com" } }]) {
-    for (const operation of ["realtime", "realtimeTool", "realtimeTranscript", "interruptVoice"]) {
-      const h = endpoint(true, identity);
-      assert.equal((await h.request({ operation, email: "agsreserva@gmail.com" })).status, 409);
-      assert.deepEqual(h.calls, []);
-    }
-  }
+test("la voz nueva no se configura ni activa mediante parámetros enviados por el cliente", async () => {
+  const h = endpoint(true, { email: "agsreserva@gmail.com" });
+  const response = await h.request({ operation: "chat", inputMode: "natural-voice", voiceProtocol: "live", voiceMode: "realtime-mini" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(h.calls, ["store", "chat"]);
 });
 
 test("el handler real de la interfaz anuncia la pausa sin pedir micrófono ni crear una conexión", async () => {
   const assistant = await readFile(new URL("../src/gestion/olivia/OliviaAssistant.jsx", import.meta.url), "utf8");
-  const handler = assistant.match(/const startVoice = \(mode = "default"\) => \{[\s\S]*?\n  \};/)[0];
+  const handler = assistant.match(/const startVoice = \(\) => \{[\s\S]*?\n  \};/)[0];
   let notice = "", elapsed = 0, sequence = 0;
   const timers = new Map();
   const advance = duration => { elapsed += duration; for (const [id, timer] of timers) if (timer.at <= elapsed) { timers.delete(id); timer.callback(); } };
@@ -73,7 +61,7 @@ test("el handler real de la interfaz anuncia la pausa sin pedir micrófono ni cr
   assert.equal(notice, OLIVIA_VOICE_UNAVAILABLE_MESSAGE);
   advance(2999); assert.equal(notice, OLIVIA_VOICE_UNAVAILABLE_MESSAGE);
   advance(1); assert.equal(notice, "");
-  vm.runInContext('startVoice("realtime-mini");', context);
+  vm.runInContext("startVoice();", context);
   advance(1500); vm.runInContext('startVoice();', context);
   advance(2999); assert.equal(notice, OLIVIA_VOICE_UNAVAILABLE_MESSAGE);
   advance(1); assert.equal(notice, "");

@@ -28,3 +28,10 @@ test('unavailable exchange quote leaves peso amounts unavailable instead of zero
   assert.equal(cfg.officialDollarSellRate,null);
   assert.equal(costForUsage({model:'gpt-6-luna',inputTokens:100},cfg).actualCostArs,null);
 });
+test('latency-sensitive pricing never waits on an exchange website and can reuse a dated cached quote',async()=>{
+  let calls=0;const resolve=createPricingResolver({fetchImpl:async()=>{calls++;return {ok:true,text:async()=>html};}}),config=defaultOliviaConfiguration();
+  const fast=await resolve(config,now,{allowNetwork:false});assert.equal(calls,0);assert.equal(fast.officialDollarSellRate,null);assert.equal(fast.pricing['gpt-6-luna'].inputUsdPerMillion,.1);
+  await resolve(config,now);assert.equal(calls,1);
+  const reused=await resolve(config,now,{allowNetwork:false});assert.equal(calls,1);assert.equal(reused.officialDollarSellRate,1540);
+  const stale=await resolve(config,new Date('2026-10-15T15:00:00Z'),{allowNetwork:false});assert.equal(stale.officialDollarSellRate,null);assert.equal(calls,1);
+});

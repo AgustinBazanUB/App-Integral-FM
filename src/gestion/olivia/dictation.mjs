@@ -1,3 +1,10 @@
+export function appendTranscript(draft, transcript) {
+  const addition = String(transcript || "").trim();
+  const current = String(draft || "");
+  if (!addition) return current;
+  return current + (current && !/\s$/.test(current) ? " " : "") + addition;
+}
+
 export const DICTATION_LIMITS = Object.freeze({ maxSeconds: 60, maxBytes: 4 * 1024 * 1024 });
 export function audioBars(samples, count = 24) {
   const bars = [];
@@ -47,6 +54,7 @@ export class DictationCapture {
       this.recorder.onerror = () => { this.stop("cancel"); this.onError(new Error("La grabación se interrumpió. Podés reintentar.")); };
       this.recorder.onstop = () => {
         const audio = new Blob(this.chunks, { type: this.recorder.mimeType || "audio/webm" });
+        audio.durationSeconds = Math.max(0, Math.min(this.limits.maxSeconds, (performance.now() - this.startedAt) / 1000));
         this.chunks = []; this.release();
         if (!this.discard) this.onComplete(audio, this.action || "stop");
       };

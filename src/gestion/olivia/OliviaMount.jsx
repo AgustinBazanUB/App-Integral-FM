@@ -4,6 +4,7 @@ import { can, canAccessAdministration, canAccessSellerPanel, isPureSeller } from
 import { OliviaLauncherPortal } from "./LauncherHost";
 
 const OliviaAssistant = lazy(() => import("./OliviaAssistant"));
+const OliviaGuideHost = lazy(() => import('./OliviaGuideHost'));
 
 class OliviaBoundary extends Component {
   state = { failed: false };
@@ -17,5 +18,5 @@ class OliviaBoundary extends Component {
 export default function OliviaMount() {
   const { status, profile, user } = useAuth();
   if (status !== "ready" || (!canAccessAdministration(profile) && !(isPureSeller(profile) && canAccessSellerPanel(profile)) && !can(profile, "ai", "view"))) return null;
-  return <OliviaBoundary key={user.uid}><Suspense fallback={null}><OliviaAssistant /></Suspense></OliviaBoundary>;
+  return <OliviaBoundary key={user.uid}><Suspense fallback={null}><OliviaAssistant /><OliviaGuideHost /></Suspense></OliviaBoundary>;
 }

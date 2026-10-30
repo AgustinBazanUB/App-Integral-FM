@@ -904,7 +904,11 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow get: if isAdmin() || (activeUser() && request.auth.uid == uid);
-      allow list, create, update: if isAdmin();
+      allow list, create: if isAdmin();
+      allow update: if isAdmin()
+        && (!("archived" in resource.data) || resource.data.archived != true)
+        && (!("archived" in request.resource.data) || request.resource.data.archived != true
+          || (resource.data.active != true && request.resource.data.active == false));
       allow delete: if false;
     }
     match /roles/{roleId} {

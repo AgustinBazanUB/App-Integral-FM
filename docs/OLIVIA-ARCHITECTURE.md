@@ -1,21 +1,41 @@
 # Arquitectura de Olivia
 
-La evolución deriva de PR 31, commit `12447682e2a24afd4b847f4a96af50b7d6363ac5`, en `codex/olivia-evolution`. No cambia producción.
+Olivia conserva una única conversación para crear contenido, aprender y operar. Texto y voz terminan en el mismo motor de negocio, el mismo router Luna, los mismos permisos y los mismos servicios de dominio. Las propuestas de escritura exigen confirmación visual y revalidación transaccional.
 
-El montaje autenticado conserva la carga diferida y la barrera de errores. `OliviaAssistant` coordina conversación, cancelación e historial; `OliviaComposer` agrupa escritura, adjuntos y dictado; `OliviaVoiceControls` presenta mute/interrupción/finalización; `OliviaUsage` presenta cuotas/costos; `DictationCapture` administra recursos de audio; `OliviaLive` administra GPT-Live/WebRTC y `OliviaRealtime` conserva el protocolo anterior opcional; `OliviaDeveloperPanel` presenta observabilidad; `OliviaKnowledgeManager` gestiona publicaciones administrativas.
+## Voz
 
-Texto → endpoint `olivia` → sesión Firebase y perfil vigente → engine → Responses → herramientas explícitas → servicios/planes de dominio → respuesta SSE. GPT-Live → sideband privado → misma engine.chat → router → Luna/Sol → herramientas → resultado verificado → audio. El protocolo Realtime anterior conserva sus herramientas nativas como opción explícita.
+`OliviaAssistant` integra `NaturalVoiceConversation`, `DictationCapture` y `OliviaVoiceControls`. El chat escrito no solicita el micrófono. El dictado captura un audio y deja revisar la transcripción. La conversación natural usa VAD adaptativo y transcripción continua con `/olivia-live-transcribe` (conserva `/olivia-transcribe` para archivo), envía el texto a `engine.chat` como `natural-voice`, persiste la respuesta escrita y una versión corta hablada, y solicita `/olivia-synthesize` para recibir PCM en streaming.
 
-El backend añade modelRouter, tasks, live y liveMonitor, y separa provider, guards, tools, capabilities, toolExecution, extendedTools, operations, extendedOperations, analytics, knowledge, skills, attachments, requestBody, voice, usage, conversations y store. La confirmación ejecutora es un endpoint de aplicación, no una herramienta del modelo.
+```mermaid
+flowchart LR
+  Mic[Micrófono con VAD local] -->|Audio continuo| ASR[GPT Live Transcribe]
+  ASR -->|Texto| Core[Engine Olivia autenticado]
+  Text[Chat escrito] --> Core
+  Core --> Router[Luna NONE o MEDIUM; Sol creativo autorizado]
+  Router --> Tools[Herramientas con permisos vigentes]
+  Tools --> Verified[Respuesta verificada y tarjeta visual]
+  Verified --> Saved[Historial: respuesta escrita y texto hablado]
+  Saved -->|Solo allowlist administrativa| Chirp[Google Chirp 3 HD]
+  Chirp -->|PCM 24 kHz streaming| Player[AudioContext del navegador]
+  Player -->|Interrupción| Cancel[Cancelar playback y turno previo]
+  Cancel --> Mic
+```
 
-Los planes compartidos `stockTransferWritePlans`, `productWritePlans` y `managementWritePlans`, junto con los planes comerciales previos, permiten usar las mismas validaciones que los formularios manuales. Las propuestas conservan una huella de lecturas; la transacción vuelve a leer permisos y datos antes de escribir.
+La función de síntesis valida Firebase, allowlist, conversación, texto y cupo mensual antes de pedir audio. Google TTS y OpenAI se llaman únicamente desde el backend. La cuota registra solo caracteres, estado de proveedor y costo estimado. La captura/PCM no se conserva. Si falla TTS, la respuesta escrita guardada se mantiene.
 
-Las lecturas consecutivas independientes usan lotes de tres. Preparaciones y navegación forman barreras. Una consulta escrita admite hasta ocho rondas, doce herramientas y 45 segundos; la última ronda no ofrece herramientas. Cada llamada al proveedor tiene un límite de 20 segundos.
+GPT-Live, Realtime y la voz económica están deshabilitados como modos conversacionales. El endpoint legacy devuelve HTTP 410 y la configuración nueva elimina los perfiles antiguos al normalizar. Las funciones de medición/cierre legacy solo conservan utilidades de limpieza de sesiones ya creadas; no hay selección ni creación de sesiones GPT-Live desde la app.
 
-SSE informa aceptación, fases, deltas y resultado terminal. El cliente valida tramas, UTF-8 y finalización; cancelar corta el lector y el proveedor. Los reintentos conservan la identidad y recuperan el estado si el resultado es incierto.
+## Resto del motor
 
-El cache conserva 40 mensajes; el contexto del modelo usa 16, memoria extractiva acotada, borrador y versiones de Skills activas para seguimientos. El archivo paginado conserva la conversación completa durante su retención. Usuario, autenticación y alcance de permisos impiden reutilizar contexto después de cambios de autoridad. Chats previos sin alcance registrado requieren evidencia de rol compatible antes de recuperar contexto para un vendedor.
+El frontend autenticado valida acceso con sesión y perfil Firebase. El endpoint `olivia` coordina estado, chat, tareas en segundo plano y confirmaciones. `engine.mjs` usa el router determinístico, recuperación de conocimiento y herramientas explícitas; los servicios/planes de dominio vuelven a validar autorización y datos al preparar y confirmar.
 
-Las métricas de desarrollo distinguen render de mensaje, despacho, primer delta, finalización, retrieval, proveedor, herramientas, llamadas, documentos y Skills. En voz miden fin de habla a transcripción, transcripción a herramienta, herramienta a respuesta y respuesta a inicio del buffer de audio; no miden la salida física del altavoz.
+Las lecturas siguen acotadas y las operaciones mutables generan tarjetas. Aceptar texto hablado no ejecuta acciones. `chatJobs.mjs` publica fases y una respuesta final guardada; el cliente acelera el sondeo solo para el modo de voz natural, para iniciar la síntesis apenas queda listo el texto hablado.
 
-El [anexo vigente](OLIVIA-MODEL-ROUTER.md) contiene el diagrama completo, estado persistente, contratos mínimos y contabilidad separada de voz. Los límites anteriores son los defaults; responseLimits permite administrarlos dentro de cotas server-side.
+El historial conserva hasta 40 mensajes y el contexto usa los últimos 16, sujeto a retención y alcance de permisos. Las métricas de desarrollo de voz reportan medianas/P95 de transcripción y primer audio programado; no afirman medir sonido físico.
+
+La política de modelos y las decisiones de tareas se describen en [OLIVIA-MODEL-ROUTER.md](OLIVIA-MODEL-ROUTER.md). El contrato, límites y entorno de audio se describen en [OLIVIA-VOICE.md](OLIVIA-VOICE.md).
+
+
+## Copiloto creativo y guía visual
+
+La ruta de generación responde con ideas, nombres, textos o código sin herramientas de negocio; las consultas mixtas siguen usando datos autorizados. El registro cerrado de guías conecta `ScreenContext`, pasos visuales y controles reales con Driver.js bajo demanda, sin actuar sobre formularios. Skills internas y skill de desarrollo se distinguen en [OLIVIA-COPILOT.md](OLIVIA-COPILOT.md).
