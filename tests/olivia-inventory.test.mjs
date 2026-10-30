@@ -25,8 +25,7 @@ test("inventory continuation retains the selected type and exposes its permitted
   const f = fixture({ role: "admin", provider: async (_path, body) => {
     call++;
     if (call === 1) return functionResponse("update_task", { intent: "get_inventory_summary", slotsJson: '{"inventoryType":"warehouse","inventoryId":null}' });
-    if (call === 2) return textResponse("¿Qué depósito querés consultar?");
-    if (call === 3) {
+    if (call === 2) {
       assert.ok(body.tools.some((tool) => tool.name === "get_inventory_summary"));
       assert.deepEqual(JSON.parse(body.input[0].content).taskState.slots, { inventoryType: "warehouse", inventoryId: null });
       return functionResponse("get_inventory_summary", { inventoryType: "warehouse", inventoryId: "central" });

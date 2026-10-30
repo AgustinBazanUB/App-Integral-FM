@@ -1,4 +1,4 @@
-import { buildLocationPayload } from "../../shared/managementWritePlans.mjs";
+import { buildLocationPayload, validateLocationPrefixAvailability } from "../../shared/managementWritePlans.mjs";
 import { buildLocationStockLinePlan, locationStockQuantity } from "../../shared/operationalWritePlans.mjs";
 import {
   collection,
@@ -96,6 +96,7 @@ export async function saveManagedLocation(data, profile, locationId = null) {
   const prefix = String(data.codePrefix || "").trim().toUpperCase();
   if (!name || !/^[A-Z0-9]{1,8}$/.test(prefix)) throw new Error("Completá un nombre y un prefijo de hasta 8 letras o números.");
   if (scheduleStartAt && scheduleEndAt && scheduleStartAt >= scheduleEndAt) throw new Error("La fecha final debe ser posterior a la inicial.");
+  const matchingPrefixes = can(profile, 'locations', 'viewAllLocations') ? docsToArray(await getDocs(query(collection(db, 'locations'), where('codePrefix', '==', prefix)))) : null;
   const result = await runTransaction(db, async (transaction) => {
     const previous = await transaction.get(locationRef);
     if (locationId && (!previous.exists() || previous.data().deleted === true)) throw new Error("La ubicación no está disponible.");
@@ -104,6 +105,7 @@ export async function saveManagedLocation(data, profile, locationId = null) {
       return locationRef.id;
     }
     if (!Object.hasOwn(LOCATION_TYPES, data.type) && (!previous.exists() || previous.data().type !== data.type)) throw new Error("Elegí Local, Feria o Evento. Los depósitos se crean en su propio módulo.");
+    if (matchingPrefixes && (!previous.exists() || previous.data().codePrefix !== prefix)) validateLocationPrefixAvailability(prefix, locationRef.id, matchingPrefixes, null);
     const operatingCalendar = normalizeOperatingCalendar(data.operatingCalendar ?? (previous.exists() ? previous.data().operatingCalendar : undefined));
     transaction.set(locationRef, buildLocationPayload({ values: data, previous: previous.exists() ? previous.data() : null, profile, stamp: serverTimestamp(), startAt: scheduleStartAt, endAt: scheduleEndAt }), { merge: true });
     transaction.set(auditRef, auditFields(profile, {

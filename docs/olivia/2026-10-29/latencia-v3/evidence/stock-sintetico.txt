@@ -1,0 +1,174 @@
+- paragraph: QA local · datos y audio sintéticos
+- status "Tráfico sintético": "{\"live\":3,\"transcribe\":0,\"tts\":1,\"selector\":0,\"private\":1,\"clips\":6,\"foreground\":1}"
+- region "Módulo sintético":
+  - button "Abrir Productos de prueba"
+  - heading "Inicio" [level=1]
+- dialog "Olivia":
+  - banner:
+    - heading "Olivia" [level=2]: Olivia
+    - generic: Flor Mía · Tu asistente
+    - button "Preferencias de Olivia":
+    - button "Mis chats":
+    - button "Nueva conversación":
+    - button "Minimizar Olivia" [active]:
+  - region "Estado de Olivia":
+    - 'img "Olivia: ¿En qué te ayudo hoy?"'
+    - status: ¿En qué te ayudo hoy?
+  - log "Conversación con Olivia":
+    - article:
+      - strong: Vos
+      - paragraph: Mensaje anterior sintético 1. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Olivia
+      - paragraph: Mensaje anterior sintético 2. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Vos
+      - paragraph: Mensaje anterior sintético 3. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Olivia
+      - paragraph: Mensaje anterior sintético 4. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Vos
+      - paragraph: Mensaje anterior sintético 5. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Olivia
+      - paragraph: Mensaje anterior sintético 6. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Vos
+      - paragraph: Mensaje anterior sintético 7. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Olivia
+      - paragraph: Mensaje anterior sintético 8. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Vos
+      - paragraph: Mensaje anterior sintético 9. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Olivia
+      - paragraph: Mensaje anterior sintético 10. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Vos
+      - paragraph: Mensaje anterior sintético 11. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Olivia
+      - paragraph: Mensaje anterior sintético 12. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Vos
+      - paragraph: Mensaje anterior sintético 13. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Olivia
+      - paragraph: Mensaje anterior sintético 14. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Vos
+      - paragraph: Mensaje anterior sintético 15. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Olivia
+      - paragraph: Mensaje anterior sintético 16. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Vos
+      - paragraph: Mensaje anterior sintético 17. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Olivia
+      - paragraph: Mensaje anterior sintético 18. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Vos
+      - paragraph: Mensaje anterior sintético 19. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Olivia
+      - paragraph: Mensaje anterior sintético 20. Historial de prueba para verificar scroll sin botones.
+    - article:
+      - strong: Vos
+      - paragraph: ¿Cuántas almendras quedan?
+    - article:
+      - strong: Olivia
+      - paragraph: "Almendras: 31 unidades en el local de prueba."
+  - generic "Adjuntar archivos": +
+  - generic: Mensaje para Olivia
+  - textbox "Mensaje para Olivia":
+    - /placeholder: Escribile a Olivia…
+  - button "Dictar un mensaje":
+  - button "Conversar con Olivia por voz":
+  - button "Enviar mensaje" [disabled]:
+  - generic "Uso y costos"
+  - region "Métricas de desarrollo":
+    - heading "Métricas de desarrollo" [level=3]
+    - term: Modelo / razonamiento
+    - definition: — / —
+    - term: Ruta / motivo
+    - definition: quick-read / —
+    - term: Tarea
+    - definition: —
+    - term: Tokens próximos estimados
+    - definition: —
+    - term: Entrada / salida / total de última llamada
+    - definition: — / — / —
+    - term: Consumo / reservas
+    - definition: 0 / 0
+    - term: Último costo USD
+    - definition: Sin medición
+    - term: Click → mensaje visible (ms)
+    - definition: —
+    - term: Mensaje → request (ms)
+    - definition: "0"
+    - term: Request → primer texto (ms)
+    - definition: —
+    - term: Primer texto → completa (ms)
+    - definition: —
+    - term: Voz natural · Chirp 3 HD
+    - definition: No disponible
+    - term: Transcripción de esta sesión
+    - definition: GPT Live Transcribe
+    - term: Silencio de fin de turno · P50 / P90 / P95 (ms)
+    - definition: 707 / 707 / 707
+    - term: Detección → transcripción final · P50 / P90 / P95 (ms)
+    - definition: 31 / 31 / 31
+    - term: Fin real de voz → transcripción · P50 / P90 / P95 (ms)
+    - definition: 738 / 738 / 738
+    - term: Fin de voz → primer audio útil · P50 / P90 / P95 (ms)
+    - definition: 778 / 778 / 778
+    - term: Fin de voz → audio final completo · P50 / P90 / P95 (ms)
+    - definition: 3786 / 3786 / 3786
+    - term: Charla breve · primer audio útil P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: Lectura · primer audio útil P50 / P90 / P95 (ms)
+    - definition: 778 / 778 / 778
+    - term: Acción/consulta compleja · primer audio útil P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: HTTP hasta cabeceras · P50 / P90 / P95 (ms)
+    - definition: 0 / 1 / 1
+    - term: Servidor antes de cabeceras · P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: Transporte/cola estimados · P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: Selección de intervención · P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: Selector iniciado → clip disponible · P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: Turno confirmado → primera intervención · P50 / P90 / P95 (ms)
+    - definition: — / — / —
+    - term: Selector · costo USD estimado mediano
+    - definition: Sin medición
+    - term: Transcripción → primer audio programado · mediana / P95 (ms)
+    - definition: 41 / 41
+    - term: TTFA programado · mediana / P95 (ms)
+    - definition: 40 / 40
+    - term: Última síntesis · caracteres / costo USD estimado
+    - definition: 45 / US$ 0
+    - term: Medición de audio
+    - definition: Primer bloque programado; no mide el inicio físico del altavoz. Transporte incluye colas y es estimado.
+    - term: "Backend: retrieval / proveedor / herramientas (ms)"
+    - definition: — / — / —
+    - term: Llamadas de modelo / herramientas
+    - definition: 0 / 1
+    - term: Skills
+    - definition: Ninguna en esta consulta
+    - term: Documentos recuperados
+    - definition: Ninguno en esta consulta
+    - term: Request / response
+    - definition: — / —
+    - term: Contexto
+    - definition: 16 mensajes recientes, memoria acotada y referencias verificadas
+    - term: Costo de almacenamiento semántico
+    - definition: Sin medición del proveedor
+    - term: Cotización
+    - definition: Sin cotización
+    - generic "Traza del turno · navegador"

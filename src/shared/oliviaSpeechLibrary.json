@@ -1,0 +1,902 @@
+{
+  "schema_version": "1.0.0",
+  "project": "Olivia / Flor Mia",
+  "description": "90 clips genéricos + 10 plantillas para cache privado por usuario. No contiene archivos de audio. Codex debe sintetizar con la voz Chirp 3 HD actual de Olivia.",
+  "pre_recorded_count": 90,
+  "personalized_template_count": 10,
+  "clips": [
+    {
+      "id": "saludo_01",
+      "category": "saludo",
+      "text": "Hola, ¿cómo va?",
+      "eligibility": "turn_finalized && intent_greeting_only",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "saludo_02",
+      "category": "saludo",
+      "text": "¡Buenas! Te escucho.",
+      "eligibility": "turn_finalized && intent_greeting_only",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "saludo_03",
+      "category": "saludo",
+      "text": "Hola, ¿en qué te ayudo?",
+      "eligibility": "turn_finalized && intent_greeting_only",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "saludo_04",
+      "category": "saludo",
+      "text": "¡Hola! Acá estoy.",
+      "eligibility": "turn_finalized && intent_greeting_only",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "saludo_05",
+      "category": "saludo",
+      "text": "Buenas, contame.",
+      "eligibility": "turn_finalized && intent_greeting_only",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "saludo_06",
+      "category": "saludo",
+      "text": "Qué bueno escucharte. ¿Qué necesitás?",
+      "eligibility": "turn_finalized && intent_greeting_only",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "saludo_07",
+      "category": "saludo",
+      "text": "Hola, decime.",
+      "eligibility": "turn_finalized && intent_greeting_only",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "saludo_08",
+      "category": "saludo",
+      "text": "Dale, estoy acá.",
+      "eligibility": "turn_finalized && intent_greeting_only",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "saludo_09",
+      "category": "saludo",
+      "text": "¿Cómo andás? Te escucho.",
+      "eligibility": "turn_finalized && intent_greeting_only",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "acuse_breve_01",
+      "category": "acuse_breve",
+      "text": "Dale.",
+      "eligibility": "turn_finalized && conversational_ack_is_appropriate",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "acuse_breve_02",
+      "category": "acuse_breve",
+      "text": "Claro.",
+      "eligibility": "turn_finalized && conversational_ack_is_appropriate",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "acuse_breve_03",
+      "category": "acuse_breve",
+      "text": "Bien, te sigo.",
+      "eligibility": "turn_finalized && conversational_ack_is_appropriate",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "acuse_breve_04",
+      "category": "acuse_breve",
+      "text": "Perfecto.",
+      "eligibility": "turn_finalized && conversational_ack_is_appropriate",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "acuse_breve_05",
+      "category": "acuse_breve",
+      "text": "Entiendo.",
+      "eligibility": "turn_finalized && conversational_ack_is_appropriate",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "acuse_breve_06",
+      "category": "acuse_breve",
+      "text": "Sí, decime.",
+      "eligibility": "turn_finalized && conversational_ack_is_appropriate",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "acuse_breve_07",
+      "category": "acuse_breve",
+      "text": "Ajá, te escucho.",
+      "eligibility": "turn_finalized && conversational_ack_is_appropriate",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "acuse_breve_08",
+      "category": "acuse_breve",
+      "text": "Mmm, sí.",
+      "eligibility": "turn_finalized && conversational_ack_is_appropriate",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "acuse_breve_09",
+      "category": "acuse_breve",
+      "text": "Bien, contame.",
+      "eligibility": "turn_finalized && conversational_ack_is_appropriate",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "espera_real_01",
+      "category": "espera_real",
+      "text": "A ver, lo miro.",
+      "eligibility": "verified_processing_active && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "espera_real_02",
+      "category": "espera_real",
+      "text": "Mmm, dejame revisar.",
+      "eligibility": "verified_processing_active && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "espera_real_03",
+      "category": "espera_real",
+      "text": "Dame un segundito.",
+      "eligibility": "verified_processing_active && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "espera_real_04",
+      "category": "espera_real",
+      "text": "A ver, me fijo bien.",
+      "eligibility": "verified_processing_active && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "espera_real_05",
+      "category": "espera_real",
+      "text": "Ya estoy con eso.",
+      "eligibility": "verified_processing_active && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "espera_real_06",
+      "category": "espera_real",
+      "text": "Voy revisando.",
+      "eligibility": "verified_processing_active && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "espera_real_07",
+      "category": "espera_real",
+      "text": "Bancame un segundo.",
+      "eligibility": "verified_processing_active && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "espera_real_08",
+      "category": "espera_real",
+      "text": "Un momento, ya lo veo.",
+      "eligibility": "verified_processing_active && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "espera_real_09",
+      "category": "espera_real",
+      "text": "Dale, lo estoy chequeando.",
+      "eligibility": "verified_processing_active && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "stock_en_curso_01",
+      "category": "stock_en_curso",
+      "text": "Dale, reviso el stock.",
+      "eligibility": "verified_stock_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "stock_en_curso_02",
+      "category": "stock_en_curso",
+      "text": "Voy a mirar las existencias.",
+      "eligibility": "verified_stock_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "stock_en_curso_03",
+      "category": "stock_en_curso",
+      "text": "A ver, consulto las unidades disponibles.",
+      "eligibility": "verified_stock_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "stock_en_curso_04",
+      "category": "stock_en_curso",
+      "text": "Me fijo en el inventario.",
+      "eligibility": "verified_stock_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "stock_en_curso_05",
+      "category": "stock_en_curso",
+      "text": "Ya reviso las cantidades.",
+      "eligibility": "verified_stock_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "stock_en_curso_06",
+      "category": "stock_en_curso",
+      "text": "Voy a chequear el stock del sistema.",
+      "eligibility": "verified_stock_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "stock_en_curso_07",
+      "category": "stock_en_curso",
+      "text": "Dame un momento y miro las existencias.",
+      "eligibility": "verified_stock_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "stock_en_curso_08",
+      "category": "stock_en_curso",
+      "text": "A ver, veo cuánto queda.",
+      "eligibility": "verified_stock_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "stock_en_curso_09",
+      "category": "stock_en_curso",
+      "text": "Ya busco los productos disponibles.",
+      "eligibility": "verified_stock_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "ventas_en_curso_01",
+      "category": "ventas_en_curso",
+      "text": "Dale, reviso las ventas.",
+      "eligibility": "verified_sales_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "ventas_en_curso_02",
+      "category": "ventas_en_curso",
+      "text": "Voy a mirar esos números.",
+      "eligibility": "verified_sales_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "ventas_en_curso_03",
+      "category": "ventas_en_curso",
+      "text": "A ver, consulto las operaciones.",
+      "eligibility": "verified_sales_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "ventas_en_curso_04",
+      "category": "ventas_en_curso",
+      "text": "Ya reviso el total vendido.",
+      "eligibility": "verified_sales_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "ventas_en_curso_05",
+      "category": "ventas_en_curso",
+      "text": "Me fijo en el reporte de ventas.",
+      "eligibility": "verified_sales_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "ventas_en_curso_06",
+      "category": "ventas_en_curso",
+      "text": "Dame un momento y verifico las ventas.",
+      "eligibility": "verified_sales_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "ventas_en_curso_07",
+      "category": "ventas_en_curso",
+      "text": "Voy a consultar los movimientos.",
+      "eligibility": "verified_sales_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "ventas_en_curso_08",
+      "category": "ventas_en_curso",
+      "text": "A ver, busco esos resultados.",
+      "eligibility": "verified_sales_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "ventas_en_curso_09",
+      "category": "ventas_en_curso",
+      "text": "Ya miro los registros de ventas.",
+      "eligibility": "verified_sales_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "envios_en_curso_01",
+      "category": "envios_en_curso",
+      "text": "Dale, reviso ese envío.",
+      "eligibility": "verified_shipping_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "envios_en_curso_02",
+      "category": "envios_en_curso",
+      "text": "Voy a buscar el pedido.",
+      "eligibility": "verified_shipping_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "envios_en_curso_03",
+      "category": "envios_en_curso",
+      "text": "A ver, consulto el seguimiento.",
+      "eligibility": "verified_shipping_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "envios_en_curso_04",
+      "category": "envios_en_curso",
+      "text": "Ya reviso el estado de la entrega.",
+      "eligibility": "verified_shipping_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "envios_en_curso_05",
+      "category": "envios_en_curso",
+      "text": "Chequeo los envíos del sistema.",
+      "eligibility": "verified_shipping_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "envios_en_curso_06",
+      "category": "envios_en_curso",
+      "text": "Voy a mirar si hay novedades.",
+      "eligibility": "verified_shipping_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "envios_en_curso_07",
+      "category": "envios_en_curso",
+      "text": "Dame un segundo y consulto la entrega.",
+      "eligibility": "verified_shipping_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "envios_en_curso_08",
+      "category": "envios_en_curso",
+      "text": "A ver, busco los datos del pedido.",
+      "eligibility": "verified_shipping_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "envios_en_curso_09",
+      "category": "envios_en_curso",
+      "text": "Ya reviso dónde está ese envío.",
+      "eligibility": "verified_shipping_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "productos_en_curso_01",
+      "category": "productos_en_curso",
+      "text": "Dale, busco ese producto.",
+      "eligibility": "verified_product_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "productos_en_curso_02",
+      "category": "productos_en_curso",
+      "text": "Voy a revisar el catálogo.",
+      "eligibility": "verified_product_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "productos_en_curso_03",
+      "category": "productos_en_curso",
+      "text": "A ver, consulto los productos.",
+      "eligibility": "verified_product_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "productos_en_curso_04",
+      "category": "productos_en_curso",
+      "text": "Ya verifico los precios registrados.",
+      "eligibility": "verified_product_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "productos_en_curso_05",
+      "category": "productos_en_curso",
+      "text": "Me fijo en las variantes disponibles.",
+      "eligibility": "verified_product_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "productos_en_curso_06",
+      "category": "productos_en_curso",
+      "text": "Voy a mirar la información del producto.",
+      "eligibility": "verified_product_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "productos_en_curso_07",
+      "category": "productos_en_curso",
+      "text": "Dame un momento y reviso el catálogo.",
+      "eligibility": "verified_product_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "productos_en_curso_08",
+      "category": "productos_en_curso",
+      "text": "A ver, busco esa presentación.",
+      "eligibility": "verified_product_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "productos_en_curso_09",
+      "category": "productos_en_curso",
+      "text": "Ya compruebo los datos del artículo.",
+      "eligibility": "verified_product_query_started && response_not_ready",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "aclaracion_condicional_01",
+      "category": "aclaracion_condicional",
+      "text": "¿Querés el stock del local o del depósito?",
+      "eligibility": "turn_finalized && exact_required_slot_missing && not_already_in_context",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "aclaracion_condicional_02",
+      "category": "aclaracion_condicional",
+      "text": "¿De qué ubicación querés consultar el stock?",
+      "eligibility": "turn_finalized && exact_required_slot_missing && not_already_in_context",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "aclaracion_condicional_03",
+      "category": "aclaracion_condicional",
+      "text": "¿Para qué fecha querés las ventas?",
+      "eligibility": "turn_finalized && exact_required_slot_missing && not_already_in_context",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "aclaracion_condicional_04",
+      "category": "aclaracion_condicional",
+      "text": "¿Qué producto querés revisar?",
+      "eligibility": "turn_finalized && exact_required_slot_missing && not_already_in_context",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "aclaracion_condicional_05",
+      "category": "aclaracion_condicional",
+      "text": "¿De qué pedido estamos hablando?",
+      "eligibility": "turn_finalized && exact_required_slot_missing && not_already_in_context",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "aclaracion_condicional_06",
+      "category": "aclaracion_condicional",
+      "text": "¿Te referís al stock actual o al histórico?",
+      "eligibility": "turn_finalized && exact_required_slot_missing && not_already_in_context",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "aclaracion_condicional_07",
+      "category": "aclaracion_condicional",
+      "text": "¿Querés verlo por producto o en total?",
+      "eligibility": "turn_finalized && exact_required_slot_missing && not_already_in_context",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "aclaracion_condicional_08",
+      "category": "aclaracion_condicional",
+      "text": "¿Qué ubicación querés que tome como referencia?",
+      "eligibility": "turn_finalized && exact_required_slot_missing && not_already_in_context",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "aclaracion_condicional_09",
+      "category": "aclaracion_condicional",
+      "text": "¿Buscás las unidades disponibles o los movimientos?",
+      "eligibility": "turn_finalized && exact_required_slot_missing && not_already_in_context",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "confirmacion_condicional_01",
+      "category": "confirmacion_condicional",
+      "text": "Antes de hacerlo, necesito tu confirmación.",
+      "eligibility": "specific_action_pending_user_confirmation && not_executed",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "confirmacion_condicional_02",
+      "category": "confirmacion_condicional",
+      "text": "Te muestro el detalle para que lo revises.",
+      "eligibility": "specific_action_pending_user_confirmation && not_executed",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "confirmacion_condicional_03",
+      "category": "confirmacion_condicional",
+      "text": "¿Querés que prepare esa acción para confirmar?",
+      "eligibility": "specific_action_pending_user_confirmation && not_executed",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "confirmacion_condicional_04",
+      "category": "confirmacion_condicional",
+      "text": "Revisá los datos antes de continuar.",
+      "eligibility": "specific_action_pending_user_confirmation && not_executed",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "confirmacion_condicional_05",
+      "category": "confirmacion_condicional",
+      "text": "¿Confirmás que querés avanzar?",
+      "eligibility": "specific_action_pending_user_confirmation && not_executed",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "confirmacion_condicional_06",
+      "category": "confirmacion_condicional",
+      "text": "Te dejo la propuesta lista para revisar.",
+      "eligibility": "specific_action_pending_user_confirmation && not_executed",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "confirmacion_condicional_07",
+      "category": "confirmacion_condicional",
+      "text": "Para aplicar ese cambio necesito tu autorización.",
+      "eligibility": "specific_action_pending_user_confirmation && not_executed",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "confirmacion_condicional_08",
+      "category": "confirmacion_condicional",
+      "text": "¿Te parece bien si seguimos con eso?",
+      "eligibility": "specific_action_pending_user_confirmation && not_executed",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "confirmacion_condicional_09",
+      "category": "confirmacion_condicional",
+      "text": "Voy a mostrarte exactamente qué se cambiaría.",
+      "eligibility": "specific_action_pending_user_confirmation && not_executed",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "recuperacion_real_01",
+      "category": "recuperacion_real",
+      "text": "La conexión se cortó. Voy a intentar recuperarla.",
+      "eligibility": "verified_error_or_unresolved_request && no_ongoing_recovery_masquerading_as_success",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "recuperacion_real_02",
+      "category": "recuperacion_real",
+      "text": "No pude completar la consulta. ¿Querés reintentar?",
+      "eligibility": "verified_error_or_unresolved_request && no_ongoing_recovery_masquerading_as_success",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "recuperacion_real_03",
+      "category": "recuperacion_real",
+      "text": "Hubo un problema de conexión. Estoy verificándolo.",
+      "eligibility": "verified_error_or_unresolved_request && no_ongoing_recovery_masquerading_as_success",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "recuperacion_real_04",
+      "category": "recuperacion_real",
+      "text": "La consulta no terminó correctamente.",
+      "eligibility": "verified_error_or_unresolved_request && no_ongoing_recovery_masquerading_as_success",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "recuperacion_real_05",
+      "category": "recuperacion_real",
+      "text": "No recibí una respuesta válida. Voy a comprobar qué pasó.",
+      "eligibility": "verified_error_or_unresolved_request && no_ongoing_recovery_masquerading_as_success",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "recuperacion_real_06",
+      "category": "recuperacion_real",
+      "text": "Se interrumpió la comunicación con el sistema.",
+      "eligibility": "verified_error_or_unresolved_request && no_ongoing_recovery_masquerading_as_success",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "recuperacion_real_07",
+      "category": "recuperacion_real",
+      "text": "No puedo confirmar el resultado todavía.",
+      "eligibility": "verified_error_or_unresolved_request && no_ongoing_recovery_masquerading_as_success",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "recuperacion_real_08",
+      "category": "recuperacion_real",
+      "text": "Esta vez no pude obtener los datos.",
+      "eligibility": "verified_error_or_unresolved_request && no_ongoing_recovery_masquerading_as_success",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    },
+    {
+      "id": "recuperacion_real_09",
+      "category": "recuperacion_real",
+      "text": "Necesito recuperar la conexión antes de seguir.",
+      "eligibility": "verified_error_or_unresolved_request && no_ongoing_recovery_masquerading_as_success",
+      "kind": "pre_recorded",
+      "tts_voice": "reuse_existing_google_chirp_3_hd",
+      "language": "es-AR"
+    }
+  ],
+  "personalized_templates": [
+    {
+      "id": "personalizada_01",
+      "category": "saludo_personalizado",
+      "template": "Hola, {firstName}, ¿cómo va?",
+      "eligibility": "authenticated_user_with_display_name && permission_to_use_name && semantically_appropriate",
+      "build_policy": "generate_audio_lazily_on_server_and_cache_privately_per_user_voice_version",
+      "language": "es-AR"
+    },
+    {
+      "id": "personalizada_02",
+      "category": "saludo_personalizado",
+      "template": "¡Buenas, {firstName}! Te escucho.",
+      "eligibility": "authenticated_user_with_display_name && permission_to_use_name && semantically_appropriate",
+      "build_policy": "generate_audio_lazily_on_server_and_cache_privately_per_user_voice_version",
+      "language": "es-AR"
+    },
+    {
+      "id": "personalizada_03",
+      "category": "saludo_personalizado",
+      "template": "Hola, {firstName}. Decime.",
+      "eligibility": "authenticated_user_with_display_name && permission_to_use_name && semantically_appropriate",
+      "build_policy": "generate_audio_lazily_on_server_and_cache_privately_per_user_voice_version",
+      "language": "es-AR"
+    },
+    {
+      "id": "personalizada_04",
+      "category": "saludo_personalizado",
+      "template": "¿Cómo andás, {firstName}?",
+      "eligibility": "authenticated_user_with_display_name && permission_to_use_name && semantically_appropriate",
+      "build_policy": "generate_audio_lazily_on_server_and_cache_privately_per_user_voice_version",
+      "language": "es-AR"
+    },
+    {
+      "id": "personalizada_05",
+      "category": "acuse_personalizado",
+      "template": "Dale, {firstName}.",
+      "eligibility": "authenticated_user_with_display_name && permission_to_use_name && semantically_appropriate",
+      "build_policy": "generate_audio_lazily_on_server_and_cache_privately_per_user_voice_version",
+      "language": "es-AR"
+    },
+    {
+      "id": "personalizada_06",
+      "category": "acuse_personalizado",
+      "template": "Claro, {firstName}.",
+      "eligibility": "authenticated_user_with_display_name && permission_to_use_name && semantically_appropriate",
+      "build_policy": "generate_audio_lazily_on_server_and_cache_privately_per_user_voice_version",
+      "language": "es-AR"
+    },
+    {
+      "id": "personalizada_07",
+      "category": "espera_personalizado",
+      "template": "Un segundo, {firstName}, lo reviso.",
+      "eligibility": "authenticated_user_with_display_name && permission_to_use_name && semantically_appropriate",
+      "build_policy": "generate_audio_lazily_on_server_and_cache_privately_per_user_voice_version",
+      "language": "es-AR"
+    },
+    {
+      "id": "personalizada_08",
+      "category": "stock_personalizado",
+      "template": "Dale, {firstName}, reviso el stock.",
+      "eligibility": "authenticated_user_with_display_name && permission_to_use_name && semantically_appropriate",
+      "build_policy": "generate_audio_lazily_on_server_and_cache_privately_per_user_voice_version",
+      "language": "es-AR"
+    },
+    {
+      "id": "personalizada_09",
+      "category": "ventas_personalizado",
+      "template": "A ver, {firstName}, miro las ventas.",
+      "eligibility": "authenticated_user_with_display_name && permission_to_use_name && semantically_appropriate",
+      "build_policy": "generate_audio_lazily_on_server_and_cache_privately_per_user_voice_version",
+      "language": "es-AR"
+    },
+    {
+      "id": "personalizada_10",
+      "category": "despedida_personalizada",
+      "template": "Nos vemos, {firstName}. Que andes bien.",
+      "eligibility": "authenticated_user_with_display_name && permission_to_use_name && semantically_appropriate",
+      "build_policy": "generate_audio_lazily_on_server_and_cache_privately_per_user_voice_version",
+      "language": "es-AR"
+    }
+  ],
+  "selection_principle": "Rules enforce eligibility; GPT-6 Luna selects among eligible clips or asks for dynamic response. Pre-recorded clip only for truthful utterance."
+}

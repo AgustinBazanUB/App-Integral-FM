@@ -24,6 +24,7 @@ import {
 import { prepareOperation } from "./operations.mjs";
 import { OLIVIA_CAPABILITIES, selectCapabilities } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { runExtendedTool } from "./extendedTools.mjs";
+import { UI_GUIDES, guideAllowed } from '../../../../src/shared/oliviaUiGuides.mjs';
 const descriptions = {
   get_current_user_context:
     "Permisos y capacidades actuales del usuario autenticado, sin credenciales.",
@@ -51,7 +52,7 @@ export function toolDefinitions(session, { query, context = {}, required = [], l
     name,
     description: descriptions[name] || OLIVIA_CAPABILITIES[name]?.description,
     strict: true,
-    parameters: OLIVIA_TOOL_SCHEMAS[name] || OLIVIA_CAPABILITIES[name]?.parameters,
+    parameters: ['get_ui_guide', 'show_ui_guide'].includes(name) ? { type: 'object', additionalProperties: false, properties: { guideId: { type: 'string', enum: Object.keys(UI_GUIDES).filter(id => guideAllowed(session.profile, UI_GUIDES[id])) } }, required: ['guideId'] } : OLIVIA_TOOL_SCHEMAS[name] || OLIVIA_CAPABILITIES[name]?.parameters,
   }));
 }
 const publicStock = (product, item, location) => ({
@@ -70,11 +71,8 @@ async function liveProduct(session, args, store, context) {
       context,
       store,
     ),
-    location = await permittedLocation(session, locationId, store),
-    product = await store.get(`products/${args.productId}`),
-    item = await store.get(
-      `locationStock/${locationId}/items/${args.productId}`,
-    );
+    location = await permittedLocation(session, locationId, store);
+  const [product,item]=await Promise.all([store.get(`products/${args.productId}`),store.get(`locationStock/${locationId}/items/${args.productId}`)]);
   if (
     !product ||
     product.active === false ||
@@ -146,8 +144,7 @@ export async function runTool({
         ...new Set([q, q.charAt(0).toLocaleUpperCase("es") + q.slice(1)]),
       ];
       const result = [];
-      for (const prefix of variants) {
-        const docs = await store.query(
+      const pages=await Promise.all(variants.map(prefix=>store.query(
           "products",
           prefix
             ? [
@@ -156,7 +153,8 @@ export async function runTool({
               ]
             : [],
           30,
-        );
+        )));
+      for (const docs of pages) {
         for (const p of docs)
           if (!p.deleted && p.active !== false)
             result.push({
@@ -188,10 +186,7 @@ export async function runTool({
     const variants = [
       ...new Set([q, q.charAt(0).toLocaleUpperCase("es") + q.slice(1)]),
     ];
-    const items = [];
-    for (const prefix of variants)
-      items.push(
-        ...(await store.query(
+    const items = (await Promise.all(variants.map(prefix=>store.query(
           `locationStock/${locationId}/items`,
           prefix
             ? [
@@ -200,8 +195,7 @@ export async function runTool({
               ]
             : [],
           30,
-        )),
-      );
+        )))).flat();
     const unique = [...new Map(items.map((i) => [i.id, i])).values()]
       .filter((i) => !i.deleted && i.active !== false && !i.productDeleted)
       .slice(0, 30);

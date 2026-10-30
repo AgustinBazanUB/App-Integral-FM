@@ -111,3 +111,18 @@ test("administrative service accounts from another project are rejected before n
     { code: "firebase-project-mismatch" },
   );
 });
+
+test("staging queries and cursor references stay in staging and reject production credentials", async () => {
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048, privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
+  const project = "app-integral-fm-pruebas";
+  const env = { FIREBASE_PROJECT_ID: project, VITE_FIREBASE_PROJECT_ID: project, FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({ project_id: project, client_email: `fixture@${project}.iam.gserviceaccount.com`, private_key: privateKey }) };
+  const calls = [];
+  const store = createOliviaStore({ env, fetchImpl: async (url, init) => {
+    calls.push({ url, init });
+    return Response.json(url.includes("oauth2") ? { access_token: "staging-fixture", expires_in: 3600 } : []);
+  } });
+  await store.query("oliviaConversations/conversation/messages", [], 10, [["createdAt", "DESCENDING"], ["__name__", "DESCENDING"]], { after: { createdAt: "2026-10-28T12:00:00Z", id: "message" } });
+  assert.ok(calls[1].url.includes(`/projects/${project}/`));
+  assert.ok(JSON.parse(calls[1].init.body).structuredQuery.startAt.values[1].referenceValue.startsWith(`projects/${project}/`));
+  assert.throws(() => createOliviaStore({ env: { ...env, FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({ project_id: "app-integral-fm" }) } }), { code: "firebase-project-mismatch" });
+});

@@ -9,17 +9,17 @@ import { runTool } from "../netlify/functions/_lib/olivia/tools.mjs";
 const config = defaultOliviaConfiguration();
 const session = { profile: { role: "admin", active: true } };
 for (const [message, module, route, effort] of [
-  ["¿Cuánto stock hay?", "locations", "luna-normal", "high"],
-  ["¿Cómo nos fue este fin de semana?", "metrics", "luna-normal", "high"],
-  ["Pronóstico de Pilar sábado y domingo", "locations", "luna-complex", "xhigh"],
-  ["Compará rentabilidad de los últimos tres meses", "finance", "luna-complex", "xhigh"],
+  ["¿Cuánto stock hay?", "locations", "luna-normal", "none"],
+  ["¿Cómo nos fue este fin de semana?", "metrics", "luna-normal", "none"],
+  ["Pronóstico de Pilar sábado y domingo", "locations", "luna-complex", "medium"],
+  ["Compará rentabilidad de los últimos tres meses", "finance", "luna-complex", "medium"],
   ["Diseñame un concepto para Instagram de almendras Guara", "social", "sol-creative", "high"],
   ["Creá una campaña creativa", "marketing", "sol-creative", "high"],
-  ["Mostrame las métricas de Instagram", "social", "luna-normal", "high"],
-  ["Revisá el inbox", "social", "luna-normal", "high"],
-  ["Creá el registro de la campaña Mayo", "marketing", "luna-normal", "high"],
-  ["Diseñame un flujo de autorización de stock", "marketing", "luna-normal", "high"],
-  ["Diseñame un concepto", "warehouse", "luna-normal", "high"],
+  ["Mostrame las métricas de Instagram", "social", "luna-normal", "none"],
+  ["Revisá el inbox", "social", "luna-normal", "none"],
+  ["Creá el registro de la campaña Mayo", "marketing", "luna-normal", "none"],
+  ["Diseñame un flujo de autorización de stock", "marketing", "luna-normal", "none"],
+  ["Diseñame un concepto", "warehouse", "luna-normal", "none"],
 ]) test(`ruta: ${message}`, () => {
   const result = routeModel(config, session, { message, context: { module } });
   assert.equal(result.route, route); assert.equal(result.reasoningEffort, effort);
@@ -30,13 +30,13 @@ test("volumen, herramientas y módulos elevan Luna sin cambiar de modelo", () =>
     const result = routeModel(config, session, { message: "Revisalo", signals });
     assert.equal(result.route, "luna-complex"); assert.equal(result.model, "gpt-6-luna");
   }
-  assert.equal(routeModel(config, session, { attachments: [{}, {}] }).reasoningEffort, "xhigh");
+  assert.equal(routeModel(config, session, { attachments: [{}, {}] }).reasoningEffort, "medium");
 });
 test("la longitud sola no escala y los vendedores no usan Sol", () => {
   assert.equal(routeModel(config, session, { message: "stock ".repeat(400) }).route, "luna-normal");
   assert.equal(routeModel(config, { profile: { role: "seller", active: true } }, { message: "Diseñame una campaña", context: { module: "marketing" } }).model, "gpt-6-luna");
 });
-test("una aclaración conserva XHIGH; una tarea nueva vuelve a HIGH", () => {
+test("una aclaración compleja conserva MEDIUM; una tarea nueva vuelve a NONE", () => {
   const task = { status: "collecting", route: { route: "luna-complex" } };
   assert.equal(routeModel(config, session, { message: "Pilar", task }).route, "luna-complex");
   assert.equal(routeModel(config, session, { message: "Mostrame stock", task }).route, "luna-normal");
@@ -68,23 +68,6 @@ function stockFixture(extra = {}) {
   return f;
 }
 async function turn(f, id, message, requestId, extra = {}) { f.advance(2000); return f.engine.chat(f.session, { conversationId: id, message, requestId, screenContext: { module: "locations" }, ...extra }); }
-test("voz: Luna inicia la carga con dos datos, luego conserva producto/destino y pide solo cantidad", async () => {
-  const f = stockFixture({ provider: async (path, body, options, calls) => calls === 1 ? functionResponse("update_task", { intent: "prepare_stock_load", slotsJson: JSON.stringify({ productId: null, locationId: null, quantity: null }) }) : textResponse("Para completar esta tarea necesitamos revisar todos los datos necesarios para el proceso.") });
-  const { conversationId: id } = await start(f);
-  f.documents.set("oliviaRealtime/voice_a", { userId: f.session.uid, sessionBinding: String(f.session.authTime), conversationId: id, status: "active", expiresAt: new Date(f.clock().getTime() + 180000) });
-  const voice = { inputMode: "realtime", realtimeSessionId: "voice_a" };
-  const first = await turn(f, id, "Quiero cargar un producto", "a", voice);
-  assert.equal(first.messages.at(-1).content, "Ok. ¿Qué producto y en dónde querés cargarlo?");
-  assert.equal(f.providerRequests[0].model, "gpt-6-luna");
-  const second = await turn(f, id, "Original en Tribunales", "b", voice);
-  assert.equal(second.messages.at(-1).content, "¿Cuántas unidades querés cargar?");
-  const calls = f.providerCalls();
-  const third = await turn(f, id, "3", "c", voice);
-  assert.ok(third.pendingAction); assert.match(third.pendingAction.summary, /Stock: 4 → 7/);
-  assert.equal(f.providerCalls(), calls);
-  assert.equal(f.documents.get("locationStock/local_a/items/oil").currentStock, 4);
-  await turn(f, id, "Cancelá", "d", voice);
-});
 test("carga progresiva real: producto → destino → tarjeta, con motivo opcional y sin llamadas de modelo", async () => {
   const f = stockFixture(), { conversationId: id } = await start(f);
   const first = await turn(f, id, "Cargame 12 botellas de Original", "a");
@@ -177,17 +160,13 @@ test("ubicaciones: alias único se resuelve, coincidencias se aclaran y nombres 
   assert.equal(f.providerCalls(), 0);
 });
 
-test("voz y texto continúan exactamente la misma tarea y permisos", async () => {
-  const f = stockFixture(), { conversationId: id } = await start(f);
-  f.session.email = "agsreserva@gmail.com";
-  await turn(f, id, "Cargame 12 botellas de Original", "a");
-  f.documents.set("oliviaRealtime/live_a", { userId: f.session.uid, sessionBinding: String(f.session.authTime), conversationId: id, protocol: "live", status: "active", expiresAt: new Date(f.clock().getTime() + 60000) });
-  await turn(f, id, "Tribunales", "b", { inputMode: "realtime", realtimeSessionId: "live_a" });
-  const result = await turn(f, id, "Reposición", "c");
-  assert.ok(result.pendingAction);
-  await assert.rejects(turn(f, id, "Pilar", "d", { inputMode: "realtime", realtimeSessionId: "unknown" }), { code: "realtime-expired" });
-});
-test("una intención nueva descarta slots y vuelve a la ruta simple", async () => {
+test("GPT-Live payloads cannot enter the chat engine", async () => {
+  const f = stockFixture(), { conversationId } = await start(f);
+  for (const payload of [{ inputMode: "realtime", realtimeSessionId: "old" }, { inputMode: "live" }, { voiceSessionId: "old" }]) {
+    await assert.rejects(turn(f, conversationId, "Tribunales", `retired_${Math.random()}`, payload), { code: "voice-mode-retired" });
+  }
+  assert.equal(f.providerCalls(), 0);
+});test("una intención nueva descarta slots y vuelve a la ruta simple", async () => {
   for (const query of ["¿Cómo nos fue este fin de semana?", "Cómo nos fue este fin de semana", "Compará resultados del finde"]) {
     const f = stockFixture(), { conversationId: id } = await start(f);
     await turn(f, id, "Cargame 12 botellas de Original", "a");
@@ -208,8 +187,9 @@ test("Luna conserva los slots de un pronóstico y registra cada llamada", async 
   const task = f.documents.get(`oliviaConversations/${id}`).taskState;
   assert.equal(task.intent, "forecast_fair"); assert.deepEqual(task.missingFields, ["locationId"]);
   const usage = [...f.documents].find(([path]) => path.startsWith("oliviaUsage/"))[1];
-  assert.equal(usage.modelCalls.length, 2); assert.equal(usage.taskId, task.id);
-  assert.equal(result.telemetry.reasoningEffort, "xhigh");
+  assert.equal(usage.modelCalls.length, 1); assert.equal(usage.taskId, task.id);
+  assert.equal(result.telemetry.questionRoundAvoided, true);
+  assert.equal(result.telemetry.reasoningEffort, "medium");
 });
 for (const slotsJson of ['{"period":"este fin de semana"}', '{malformed']) test(`Luna corrige slots inválidos sin guardarlos: ${slotsJson}`, async () => {
   let calls = 0;
@@ -290,7 +270,7 @@ test("un fallo de proveedor nunca reintenta con Sol", async () => {
 test("el cliente no selecciona taskId, modelo, esfuerzo, permisos ni estado", async () => {
   const f = stockFixture(), { conversationId } = await start(f);
   const result = await turn(f, conversationId, "¿Cuánto stock tengo?", "a", { taskState: { id: "forged", slots: { quantity: 900 }, status: "completed" }, model: "gpt-6.1-sol", reasoningEffort: "xhigh", permissions: { admin: true } });
-  assert.equal(result.telemetry.model, "gpt-6-luna"); assert.equal(result.telemetry.reasoningEffort, "high");
+  assert.equal(result.telemetry.model, "gpt-6-luna"); assert.equal(result.telemetry.reasoningEffort, "none");
   const task = f.documents.get(`oliviaConversations/${conversationId}`).taskState;
   assert.notEqual(task.id, "forged"); assert.deepEqual(task.slots, {});
 });

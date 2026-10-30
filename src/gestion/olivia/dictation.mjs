@@ -54,6 +54,7 @@ export class DictationCapture {
       this.recorder.onerror = () => { this.stop("cancel"); this.onError(new Error("La grabación se interrumpió. Podés reintentar.")); };
       this.recorder.onstop = () => {
         const audio = new Blob(this.chunks, { type: this.recorder.mimeType || "audio/webm" });
+        audio.durationSeconds = Math.max(0, Math.min(this.limits.maxSeconds, (performance.now() - this.startedAt) / 1000));
         this.chunks = []; this.release();
         if (!this.discard) this.onComplete(audio, this.action || "stop");
       };

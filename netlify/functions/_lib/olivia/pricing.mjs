@@ -37,8 +37,9 @@ export function createPricingResolver({ fetchImpl = fetch } = {}) {
     })();
     try { return await pending; } finally { pending = null; }
   }
-  return async (configuration, now = new Date()) => {
-    const reference = configuration.officialDollarSellRate ? { rate: configuration.officialDollarSellRate, date: null, source: 'Configuración administrativa' } : await quote(now);
+  return async (configuration, now = new Date(), {allowNetwork=true} = {}) => {
+    const validCached=cached && now-new Date(`${cached.date}T12:00:00Z`)<=7*86400000 && now>=new Date(`${cached.date}T12:00:00Z`)?cached:null;
+    const reference = configuration.officialDollarSellRate ? { rate: configuration.officialDollarSellRate, date: null, source: 'Configuración administrativa' } : allowNetwork ? await quote(now) : validCached;
     return { ...configuration, pricing: { ...TEXT_PRICES, ...configuration.pricing }, officialDollarSellRate: reference?.rate || null, pricingReference: reference };
   };
 }

@@ -1,4 +1,5 @@
 *.pdf binary
+*.pcm binary
 # Preserve original reference bytes so manifest hashes survive checkout on any OS.
 docs/shipping-reference/v07/Prototipo_Visual_v07.html -text
 docs/shipping-reference/v07/Cambios_Visuales_v07.md -text

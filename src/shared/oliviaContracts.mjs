@@ -1,5 +1,5 @@
 /** Shared public Olivia contracts. All business authorization is server-side. */
-import { realtimeMiniCosts } from "./oliviaVoicePricing.mjs";
+import { UI_GUIDES, UI_TARGET_IDS, UI_ERROR_IDS } from './oliviaUiGuides.mjs';
 export const OLIVIA_POLICY_VERSION = "olivia-1.0.0";
 export const OLIVIA_STATES = Object.freeze([
   "INFORMACION",
@@ -70,6 +70,12 @@ export function screenContext(value = {}) {
     if (value.filters.categoryId)
       filters.categoryId = safeId(value.filters.categoryId);
     if (Object.keys(filters).length) clean.filters = filters;
+  }
+  if (value.uiGuide && UI_GUIDES[value.uiGuide.guideId]?.steps.some(step => step.id === value.uiGuide.stepId)) {
+    clean.uiGuide = { guideId: value.uiGuide.guideId, stepId: value.uiGuide.stepId,
+      status: ['active', 'waiting', 'paused'].includes(value.uiGuide.status) ? value.uiGuide.status : 'waiting',
+      errors: Array.isArray(value.uiGuide.errors) ? [...new Set(value.uiGuide.errors.filter(id => UI_ERROR_IDS.includes(id) || UI_TARGET_IDS.has(id)))].slice(0, 6) : [],
+    };
   }
   return clean;
 }
@@ -193,6 +199,9 @@ export function validateSchema(value, schema, path = "parámetros") {
       value > (schema.maximum ?? Infinity)
     )
       throw oliviaError("invalid-input", `${path} inválido.`);
+  } else if (schema.type === "number") {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < (schema.minimum ?? -Infinity) || value > (schema.maximum ?? Infinity))
+      throw oliviaError("invalid-input", `${path} inválido.`);
   } else if (schema.type === "boolean" && typeof value !== "boolean")
     throw oliviaError("invalid-input", `${path} inválido.`);
   if (schema.enum && !schema.enum.includes(value))
@@ -208,8 +217,16 @@ export function defaultOliviaConfiguration(env = {}) {
     modelPolicyVersion: 2,
     routing: { toolThreshold: 6, entityThreshold: 5, rowThreshold: 500, documentThreshold: 2 },
     responseLimits: { maxOutputTokens: 2400, maxToolCalls: 12, maxRounds: 8, timeoutMs: 45000, providerTimeoutMs: 20000 },
-    voiceProtocol: "live",
-    liveUsdPerMinute: 0.05,
+    voiceProtocol: "chirp",
+    conversationLatency: { enabled: true, transcriptionDelay: "minimal" },
+    naturalVoice: {
+      enabled: true,
+      voice: "es-US-Chirp3-HD-Aoede",
+      speakingRate: 1,
+      turnEndSilenceMs: 1900,
+      maxCharactersPerTurn: 1600,
+      maxMonthlyCharacters: 50000,
+    },
     profiles: {
       adminDefault: {
         model: env.OLIVIA_MODEL_ADMIN || "gpt-6-luna",
@@ -225,16 +242,8 @@ export function defaultOliviaConfiguration(env = {}) {
       },
       creative: { model: env.OLIVIA_MODEL_CREATIVE || "gpt-6.1-sol", reasoningEffort: "high" },
       creativeComplex: { model: env.OLIVIA_MODEL_CREATIVE || "gpt-6.1-sol", reasoningEffort: "xhigh" },
-      live: { model: env.OLIVIA_MODEL_LIVE || "gpt-live-1", voice: "marin" },
       transcription: {
-        model: env.OLIVIA_MODEL_TRANSCRIPTION || "gpt-transcribe",
-      },
-      liveTranscription: {
-        model: env.OLIVIA_MODEL_LIVE_TRANSCRIPTION || "gpt-realtime-whisper",
-      },
-      realtime: {
-        model: env.OLIVIA_MODEL_REALTIME || "gpt-realtime-2.1",
-        voice: "marin",
+        model: "gpt-transcribe",
       },
     },
     complexModules: [],
@@ -246,14 +255,21 @@ export function defaultOliviaConfiguration(env = {}) {
 }
 export function validateConfiguration(value) {
   const defaults = defaultOliviaConfiguration();
+  const legacyVoiceKeys = ["voiceProtocol", "liveUsdPerMinute"];
   if (
     !value ||
     typeof value !== "object" ||
     Array.isArray(value) ||
-    Object.keys(value).some((k) => !Object.hasOwn(defaults, k))
+    Object.keys(value).some((k) => !Object.hasOwn(defaults, k) && !legacyVoiceKeys.includes(k))
   )
     throw oliviaError("invalid-configuration", "Configuración inválida.");
   const clean = { ...defaults, ...value };
+  // The old values remain readable so an in-flight legacy session can settle,
+  // but cannot select a conversational engine. New sessions use Chirp only.
+  clean.voiceProtocol = "chirp";
+  clean.conversationLatency = { ...defaults.conversationLatency, ...clean.conversationLatency };
+  validateSchema(clean.conversationLatency, { type: "object", additionalProperties: false, required: ["enabled", "transcriptionDelay"], properties: { enabled: { type: "boolean" }, transcriptionDelay: { type: "string", enum: ["minimal", "low"] } } });
+  delete clean.liveUsdPerMinute;
   // Read-time migration only: old expensive administrative profiles cannot
   // silently survive the new policy. No production document is rewritten.
   if (value.modelPolicyVersion !== 2) {
@@ -263,7 +279,9 @@ export function validateConfiguration(value) {
   clean.modelPolicyVersion = 2;
   validateSchema(clean.responseLimits, object({ maxOutputTokens: { type: "integer", minimum: 700, maximum: 8000 }, maxToolCalls: { type: "integer", minimum: 2, maximum: 12 }, maxRounds: { type: "integer", minimum: 2, maximum: 8 }, timeoutMs: { type: "integer", minimum: 10000, maximum: 55000 }, providerTimeoutMs: { type: "integer", minimum: 5000, maximum: 30000 } }));
   validateSchema(clean.routing, object({ toolThreshold: { type: "integer", minimum: 2, maximum: 12 }, entityThreshold: { type: "integer", minimum: 2, maximum: 100 }, rowThreshold: { type: "integer", minimum: 50, maximum: 10000 }, documentThreshold: { type: "integer", minimum: 1, maximum: 4 } }));
-  if (!["live", "realtime"].includes(clean.voiceProtocol) || !Number.isFinite(clean.liveUsdPerMinute) || clean.liveUsdPerMinute <= 0 || clean.liveUsdPerMinute > 10) throw oliviaError("invalid-configuration", "Política de voz inválida.");
+  clean.naturalVoice = clean.naturalVoice && { ...clean.naturalVoice };
+  if (Number.isInteger(clean.naturalVoice?.turnEndSilenceMs) && clean.naturalVoice.turnEndSilenceMs >= 250 && clean.naturalVoice.turnEndSilenceMs <= 500) clean.naturalVoice.turnEndSilenceMs = 1900;
+  validateSchema(clean.naturalVoice, { type: "object", additionalProperties: false, required: ["enabled", "voice", "speakingRate", "turnEndSilenceMs", "maxCharactersPerTurn", "maxMonthlyCharacters"], properties: { enabled: { type: "boolean" }, voice: { type: "string", enum: ["es-US-Chirp3-HD-Aoede", "es-US-Chirp3-HD-Charon"] }, speakingRate: { type: "number", minimum: 0.9, maximum: 1.1 }, turnEndSilenceMs: { type: "integer", minimum: 1900, maximum: 4000 }, maxCharactersPerTurn: { type: "integer", minimum: 100, maximum: 3000 }, maxMonthlyCharacters: { type: "integer", minimum: 1000, maximum: 1000000 } } });
   validateSchema(clean.audioLimits, { type: "object", additionalProperties: false, required: ["maxSeconds", "maxBytes"], properties: { maxSeconds: { type: "integer", minimum: 5, maximum: 60 }, maxBytes: { type: "integer", minimum: 65536, maximum: 4194304 } } });
   validateSchema(clean.forecast, { type: "object", additionalProperties: false, required: ["safetyStockPercent"], properties: { safetyStockPercent: { type: "integer", minimum: 0, maximum: 100 } } });
   if (
@@ -331,6 +349,9 @@ export function validateConfiguration(value) {
     Object.entries(clean.userQuotas).map(([uid, q]) => [safeId(uid), quota(q)]),
   );
   clean.profiles = { ...defaults.profiles, ...clean.profiles };
+  // Remove legacy conversation engines from read and write configuration.
+  for (const key of ["live", "liveTranscription", "realtime"]) delete clean.profiles[key];
+  clean.profiles.transcription = { model: "gpt-transcribe" };
   for (const [key, p] of Object.entries(clean.profiles)) {
     if (
       !Object.hasOwn(defaults.profiles, key) ||
@@ -350,24 +371,8 @@ export function validateConfiguration(value) {
         "invalid-configuration",
         "Nivel de razonamiento inválido.",
       );
-    if (
-      ["realtime", "live"].includes(key) &&
-      ![
-        "alloy",
-        "ash",
-        "ballad",
-        "coral",
-        "echo",
-        "sage",
-        "shimmer",
-        "verse",
-        "marin",
-        "cedar",
-      ].includes(p.voice)
-    )
-      throw oliviaError("invalid-configuration", "Voz inválida.");
   }
-  if (["adminDefault", "adminComplex", "seller"].some((key) => !/^gpt-6-luna(?:-|$)/.test(clean.profiles[key].model)) || clean.profiles.adminComplex.model !== clean.profiles.adminDefault.model || !/^gpt-6\.1-sol(?:-|$)/.test(clean.profiles.creative.model) || clean.profiles.creativeComplex.model !== clean.profiles.creative.model || clean.profiles.live.model !== "gpt-live-1") throw oliviaError("invalid-configuration", "Usá Luna para operación y análisis, el mismo modelo en ambos niveles, Sol solo para creatividad y GPT-Live para voz.");
+  if (["adminDefault", "adminComplex", "seller"].some((key) => !/^gpt-6-luna(?:-|$)/.test(clean.profiles[key].model)) || clean.profiles.adminComplex.model !== clean.profiles.adminDefault.model || !/^gpt-6\.1-sol(?:-|$)/.test(clean.profiles.creative.model) || clean.profiles.creativeComplex.model !== clean.profiles.creative.model) throw oliviaError("invalid-configuration", "Usá Luna para operación y análisis, el mismo modelo en ambos niveles y Sol solo para creatividad.");
   if (
     !Array.isArray(clean.complexModules) ||
     clean.complexModules.length > 20 ||
@@ -437,21 +442,20 @@ export function retentionDate(months, now = new Date()) {
   return date;
 }
 export function costForUsage(usage, configuration) {
+  if (usage.billingUnit === "audio-seconds") {
+    const usd = Number.isFinite(usage.durationSeconds) ? usage.durationSeconds * 0.0045 / 60 : null;
+    return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null };
+  }
+  if (usage.billingUnit === "tts-characters") {
+    const usd = Number.isFinite(usage.characters) ? usage.characters * 30 / 1000000 : null;
+    return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null };
+  }
   if (usage.modelCalls?.length) {
     const calls = usage.modelCalls.map((call) => costForUsage(call, configuration));
     const usd = calls.every((call) => call.actualCostUsd != null) ? calls.reduce((total, call) => total + call.actualCostUsd, 0) : null;
     return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null };
   }
-  if (usage.billingUnit === "realtime-tokens") {
-    const costs = realtimeMiniCosts(usage);
-    const usd = costs ? costs.voiceUsd + costs.transcriptionUsd : null;
-    return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null, ...(costs ? { voiceCostUsd: costs.voiceUsd, transcriptionCostUsd: costs.transcriptionUsd, voiceCostArs: configuration.officialDollarSellRate ? costs.voiceUsd * configuration.officialDollarSellRate * 1.05 : null, transcriptionCostArs: configuration.officialDollarSellRate ? costs.transcriptionUsd * configuration.officialDollarSellRate * 1.05 : null } : {}) };
-  }
   if (usage.route === "deterministic") return { actualCostUsd: 0, actualCostArs: configuration.officialDollarSellRate ? 0 : null };
-  if (usage.operation === "live" || usage.billingUnit === "live-seconds") {
-    const usd = usage.measurement === "provider" && Number.isFinite(usage.billedSeconds) ? usage.billedSeconds * configuration.liveUsdPerMinute / 60 : null;
-    return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null };
-  }
   const rate = configuration.pricing?.[usage.model];
   if (!rate || (usage.measurement && usage.measurement !== "provider"))
     return { actualCostUsd: null, actualCostArs: null };

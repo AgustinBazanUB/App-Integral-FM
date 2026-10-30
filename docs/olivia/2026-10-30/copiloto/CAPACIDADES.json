@@ -1,0 +1,2102 @@
+{
+  "version": "2026-10-30.1",
+  "source": "Contratos y componentes del repositorio; sin datos de usuarios ni llamadas a proveedores",
+  "tools": [
+    {
+      "name": "get_sales_metrics",
+      "module": "metrics",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "startDate",
+          "explanation": "la fecha de inicio o desde cuándo querés analizar los datos"
+        },
+        {
+          "field": "endDate",
+          "explanation": "la fecha de finalización o hasta cuándo querés analizar los datos"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_sales_history",
+      "module": "metrics",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "startDate",
+          "explanation": "la fecha de inicio o desde cuándo querés analizar los datos"
+        },
+        {
+          "field": "endDate",
+          "explanation": "la fecha de finalización o hasta cuándo querés analizar los datos"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_location_metrics",
+      "module": "metrics",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "startDate",
+          "explanation": "la fecha de inicio o desde cuándo querés analizar los datos"
+        },
+        {
+          "field": "endDate",
+          "explanation": "la fecha de finalización o hasta cuándo querés analizar los datos"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "compare_locations",
+      "module": "metrics",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "startDate",
+          "explanation": "la fecha de inicio o desde cuándo querés analizar los datos"
+        },
+        {
+          "field": "endDate",
+          "explanation": "la fecha de finalización o hasta cuándo querés analizar los datos"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_product_performance",
+      "module": "metrics",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "startDate",
+          "explanation": "la fecha de inicio o desde cuándo querés analizar los datos"
+        },
+        {
+          "field": "endDate",
+          "explanation": "la fecha de finalización o hasta cuándo querés analizar los datos"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_product_sales_history",
+      "module": "metrics",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "startDate",
+          "explanation": "la fecha de inicio o desde cuándo querés analizar los datos"
+        },
+        {
+          "field": "endDate",
+          "explanation": "la fecha de finalización o hasta cuándo querés analizar los datos"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_seller_performance",
+      "module": "metrics",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "startDate",
+          "explanation": "la fecha de inicio o desde cuándo querés analizar los datos"
+        },
+        {
+          "field": "endDate",
+          "explanation": "la fecha de finalización o hasta cuándo querés analizar los datos"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_all_time_sales_metrics",
+      "module": "metrics",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "forecast_product_demand",
+      "module": "metrics",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "productId",
+          "explanation": "el nombre del producto y su presentación; por ejemplo, aceite Arbosana de 500 ml"
+        },
+        {
+          "field": "startDate",
+          "explanation": "la fecha de inicio o desde cuándo querés analizar los datos"
+        },
+        {
+          "field": "endDate",
+          "explanation": "la fecha de finalización o hasta cuándo querés analizar los datos"
+        },
+        {
+          "field": "forecastDays",
+          "explanation": "para cuántos días querés la estimación"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "research_web_metric",
+      "module": "metrics",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "topic",
+          "explanation": "qué tema público querés investigar"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_inventory_summary",
+      "module": "warehouse",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "inventoryType",
+          "explanation": "si querés consultar un depósito o una ubicación"
+        },
+        {
+          "field": "inventoryId",
+          "explanation": "el nombre del depósito o ubicación que querés consultar"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_stock_movements",
+      "module": "warehouse",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "inventoryType",
+          "explanation": "si querés consultar un depósito o una ubicación"
+        },
+        {
+          "field": "inventoryId",
+          "explanation": "el nombre del depósito o ubicación que querés consultar"
+        },
+        {
+          "field": "productId",
+          "explanation": "el nombre del producto y su presentación; por ejemplo, aceite Arbosana de 500 ml"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_transfer_history",
+      "module": "warehouse",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "list_warehouses",
+      "module": "warehouse",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "resolve_transfer_origin",
+      "module": "warehouse",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "productId",
+          "explanation": "el nombre del producto y su presentación; por ejemplo, aceite Arbosana de 500 ml"
+        },
+        {
+          "field": "quantity",
+          "explanation": "cuántas unidades querés cargar; por ejemplo, 12 botellas"
+        },
+        {
+          "field": "destinationType",
+          "explanation": "si el destino es un depósito o una ubicación"
+        },
+        {
+          "field": "destinationId",
+          "explanation": "el nombre del depósito o ubicación que recibe la mercadería"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "list_fair_events",
+      "module": "locations",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "query",
+          "explanation": "qué querés buscar o conocer"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "search_customers",
+      "module": "loyal-customers",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "query",
+          "explanation": "qué querés buscar o conocer"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_customer",
+      "module": "loyal-customers",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "customerId",
+          "explanation": "el nombre o teléfono del cliente que querés actualizar; voy a buscar su ficha"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_customer_history",
+      "module": "loyal-customers",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "customerId",
+          "explanation": "el nombre o teléfono del cliente que querés actualizar; voy a buscar su ficha"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_financial_summary",
+      "module": "finance",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "startDate",
+          "explanation": "la fecha de inicio o desde cuándo querés analizar los datos"
+        },
+        {
+          "field": "endDate",
+          "explanation": "la fecha de finalización o hasta cuándo querés analizar los datos"
+        },
+        {
+          "field": "locationId",
+          "explanation": "el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro"
+        },
+        {
+          "field": "productId",
+          "explanation": "el nombre del producto y su presentación; por ejemplo, aceite Arbosana de 500 ml"
+        },
+        {
+          "field": "sellerId",
+          "explanation": "el nombre del vendedor que querés consultar"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_expenses",
+      "module": "finance",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "startDate",
+          "explanation": "la fecha de inicio o desde cuándo querés analizar los datos"
+        },
+        {
+          "field": "endDate",
+          "explanation": "la fecha de finalización o hasta cuándo querés analizar los datos"
+        },
+        {
+          "field": "locationId",
+          "explanation": "el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro"
+        },
+        {
+          "field": "productId",
+          "explanation": "el nombre del producto y su presentación; por ejemplo, aceite Arbosana de 500 ml"
+        },
+        {
+          "field": "sellerId",
+          "explanation": "el nombre del vendedor que querés consultar"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_shipments",
+      "module": "shipping",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_alerts",
+      "module": "alerts",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_suppliers",
+      "module": "suppliers",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_orders",
+      "module": "ecommerce",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_marketing_campaigns",
+      "module": "marketing",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_social_leads",
+      "module": "social",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_audit_activity",
+      "module": "audit",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_users",
+      "module": "administration",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_configuration_summary",
+      "module": "settings",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_invoice_status",
+      "module": "quick-sales",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_whatsapp_campaigns",
+      "module": "marketing",
+      "action": "whatsappView",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "get_meta_ads_campaigns",
+      "module": "marketing",
+      "action": "metaAdsView",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "forecast_fair",
+      "module": "metrics",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "locationId",
+          "explanation": "el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro"
+        },
+        {
+          "field": "startDate",
+          "explanation": "la fecha de inicio o desde cuándo querés analizar los datos"
+        },
+        {
+          "field": "days",
+          "explanation": "cuántos días dura la feria"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_create_location",
+      "module": "locations",
+      "action": "create",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "name",
+          "explanation": "cómo querés que se llame la ubicación; por ejemplo, Local Centro"
+        },
+        {
+          "field": "codePrefix",
+          "explanation": "un código corto para identificar sus ventas; por ejemplo, LC para Local Centro (hasta 8 letras o números)"
+        },
+        {
+          "field": "type",
+          "explanation": "si se trata de un local permanente, una feria o un evento"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_update_location",
+      "module": "locations",
+      "action": "edit",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "locationId",
+          "explanation": "el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro"
+        },
+        {
+          "field": "name",
+          "explanation": "cómo querés que se llame la ubicación; por ejemplo, Local Centro"
+        },
+        {
+          "field": "codePrefix",
+          "explanation": "un código corto para identificar sus ventas; por ejemplo, LC para Local Centro (hasta 8 letras o números)"
+        },
+        {
+          "field": "type",
+          "explanation": "si se trata de un local permanente, una feria o un evento"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_stock_transfer",
+      "module": "warehouse",
+      "action": "transferStock",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "originId",
+          "explanation": "el nombre del depósito o ubicación de donde sale la mercadería"
+        },
+        {
+          "field": "destinationId",
+          "explanation": "el nombre del depósito o ubicación que recibe la mercadería"
+        },
+        {
+          "field": "lines",
+          "explanation": "los productos, cuántas unidades salen y cuántas preparaste y recibiste físicamente; si algo está pendiente, decímelo"
+        },
+        {
+          "field": "reason",
+          "explanation": "qué querés hacer o corregir y por qué"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_customer_create",
+      "module": "loyal-customers",
+      "action": "create",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "phone",
+          "explanation": "el teléfono del cliente, con código de área; sirve para encontrar su ficha y evitar duplicados"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_customer_update",
+      "module": "loyal-customers",
+      "action": "edit",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "customerId",
+          "explanation": "el nombre o teléfono del cliente que querés actualizar; voy a buscar su ficha"
+        },
+        {
+          "field": "phone",
+          "explanation": "el teléfono del cliente, con código de área; sirve para encontrar su ficha y evitar duplicados"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_expense_create",
+      "module": "finance",
+      "action": "create",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "name",
+          "explanation": "cómo querés que se llame el gasto; por ejemplo, un nombre que te resulte fácil reconocer"
+        },
+        {
+          "field": "amountCents",
+          "explanation": "el monto del gasto en pesos; por ejemplo, 12500 (yo hago la conversión interna)"
+        },
+        {
+          "field": "category",
+          "explanation": "la categoría del gasto; por ejemplo, alquiler o transporte"
+        },
+        {
+          "field": "nature",
+          "explanation": "si el gasto es fijo, variable o extraordinario"
+        },
+        {
+          "field": "accruedOn",
+          "explanation": "la fecha a la que corresponde el gasto"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_shipment_create",
+      "module": "shipping",
+      "action": "create",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "name",
+          "explanation": "el nombre con el que querés reconocer el registro"
+        }
+      ],
+      "permittedFor": []
+    },
+    {
+      "name": "prepare_shipment_update",
+      "module": "shipping",
+      "action": "edit",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        },
+        {
+          "field": "name",
+          "explanation": "el nombre con el que querés reconocer el registro"
+        }
+      ],
+      "permittedFor": []
+    },
+    {
+      "name": "prepare_alert_create",
+      "module": "alerts",
+      "action": "create",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "name",
+          "explanation": "cómo querés que se llame la alerta; por ejemplo, un nombre que te resulte fácil reconocer"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_supplier_create",
+      "module": "suppliers",
+      "action": "create",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "name",
+          "explanation": "cómo querés que se llame el proveedor; por ejemplo, un nombre que te resulte fácil reconocer"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_social_lead_create",
+      "module": "social",
+      "action": "create",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "name",
+          "explanation": "cómo querés que se llame la consulta; por ejemplo, un nombre que te resulte fácil reconocer"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_marketing_campaign",
+      "module": "marketing",
+      "action": "create",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "name",
+          "explanation": "cómo querés que se llame la campaña; por ejemplo, un nombre que te resulte fácil reconocer"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_warehouse_create",
+      "module": "warehouse",
+      "action": "create",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "name",
+          "explanation": "cómo querés que se llame el depósito; por ejemplo, un nombre que te resulte fácil reconocer"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_product_create",
+      "module": "products",
+      "action": "create",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "name",
+          "explanation": "cómo querés que se llame el producto; por ejemplo, Aceite Arbosana de 500 ml"
+        },
+        {
+          "field": "abbreviation",
+          "explanation": "una abreviación para reconocer el producto; por ejemplo, AO500 para un aceite de 500 ml (hasta 8 caracteres)"
+        },
+        {
+          "field": "defaultPrice",
+          "explanation": "el precio de venta en pesos; por ejemplo, 8500"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_catalog_stock_load",
+      "module": "locations",
+      "action": "loadStock",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "locationId",
+          "explanation": "el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro"
+        },
+        {
+          "field": "items",
+          "explanation": "los productos y sus cantidades; por ejemplo, 12 botellas de aceite de 500 ml"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_invoice_review",
+      "module": "quick-sales",
+      "action": "edit",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        },
+        {
+          "field": "reason",
+          "explanation": "qué querés hacer o corregir y por qué"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_sale_cancellation_review",
+      "module": "quick-sales",
+      "action": "edit",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        },
+        {
+          "field": "reason",
+          "explanation": "qué querés hacer o corregir y por qué"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_user_role_review",
+      "module": "administration",
+      "action": "edit",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        },
+        {
+          "field": "reason",
+          "explanation": "qué querés hacer o corregir y por qué"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_configuration_review",
+      "module": "settings",
+      "action": "edit",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "reason",
+          "explanation": "qué querés hacer o corregir y por qué"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_ecommerce_order_review",
+      "module": "ecommerce",
+      "action": "edit",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        },
+        {
+          "field": "reason",
+          "explanation": "qué querés hacer o corregir y por qué"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "search_tools",
+      "module": "core",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "query",
+          "explanation": "qué querés buscar o conocer"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "get_app_capabilities",
+      "module": "core",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "query",
+          "explanation": "qué querés buscar o conocer"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "get_ui_guide",
+      "module": "core",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "guideId",
+          "explanation": "qué procedimiento querés recorrer; por ejemplo, crear una ubicación o registrar una venta"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "show_ui_guide",
+      "module": "core",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "guideId",
+          "explanation": "qué procedimiento querés recorrer; por ejemplo, crear una ubicación o registrar una venta"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "discover_skills",
+      "module": "core",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "load_skill",
+      "module": "core",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "name",
+          "explanation": "el nombre con el que querés reconocer el registro"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "search_knowledge",
+      "module": "core",
+      "action": "view",
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "query",
+          "explanation": "qué querés buscar o conocer"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "prepare_batch_sales",
+      "module": "quick-sales",
+      "action": "create",
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "sales",
+          "explanation": "cada venta por separado, con productos, cantidades, origen, canal y pago; después te preguntaré por cliente, promociones y comprobante si faltan"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "get_current_user_context",
+      "module": "core",
+      "action": null,
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "list_locations",
+      "module": "locations",
+      "action": null,
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "search_products",
+      "module": "products",
+      "action": null,
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "query",
+          "explanation": "qué querés buscar o conocer"
+        },
+        {
+          "field": "locationId",
+          "explanation": "el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "get_stock",
+      "module": "locations",
+      "action": null,
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "locationId",
+          "explanation": "el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro"
+        },
+        {
+          "field": "productId",
+          "explanation": "el nombre del producto y su presentación; por ejemplo, aceite Arbosana de 500 ml"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "get_promotions",
+      "module": "quick-sales",
+      "action": null,
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "locationId",
+          "explanation": "el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "get_today_sales",
+      "module": "seller",
+      "action": null,
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "locationId",
+          "explanation": "el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "navigate_to_module",
+      "module": "core",
+      "action": null,
+      "kind": "read-or-ui",
+      "requiresVisualConfirmation": false,
+      "minimumFields": [
+        {
+          "field": "module",
+          "explanation": "qué sección de la aplicación querés abrir; por ejemplo, Productos o Ubicaciones"
+        },
+        {
+          "field": "entityId",
+          "explanation": "qué registro querés revisar: podés decirme su nombre o referencia; no necesitás conocer un identificador interno"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    },
+    {
+      "name": "prepare_stock_load",
+      "module": "locations",
+      "action": null,
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "locationId",
+          "explanation": "el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro"
+        },
+        {
+          "field": "productId",
+          "explanation": "el nombre del producto y su presentación; por ejemplo, aceite Arbosana de 500 ml"
+        },
+        {
+          "field": "quantity",
+          "explanation": "cuántas unidades querés cargar; por ejemplo, 12 botellas"
+        }
+      ],
+      "permittedFor": [
+        "admin"
+      ]
+    },
+    {
+      "name": "prepare_sale",
+      "module": "quick-sales",
+      "action": null,
+      "kind": "preparation",
+      "requiresVisualConfirmation": true,
+      "minimumFields": [
+        {
+          "field": "locationId",
+          "explanation": "el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro"
+        },
+        {
+          "field": "items",
+          "explanation": "los productos y sus cantidades; por ejemplo, 12 botellas de aceite de 500 ml"
+        },
+        {
+          "field": "paymentMethod",
+          "explanation": "cómo se pagó: efectivo, tarjeta, transferencia o una combinación; si combinás medios, indicá cuánto en cada uno"
+        },
+        {
+          "field": "ticketRequested",
+          "explanation": "si necesitás un comprobante; la emisión fiscal se revisa en su propio formulario"
+        },
+        {
+          "field": "customerDecision",
+          "explanation": "si asociamos un cliente a la venta o la dejamos sin cliente"
+        },
+        {
+          "field": "promotionDecision",
+          "explanation": "si aplicamos alguna promoción o dejamos la venta sin promociones"
+        }
+      ],
+      "permittedFor": [
+        "admin",
+        "seller"
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "module": "locations",
+      "title": "Ubicaciones y stock de locales",
+      "route": "/gestion/locations",
+      "assisted": "Consultar ubicaciones, productos y stock. Preparar altas/ediciones de ubicación, cargas individuales y listas de mercadería con productos existentes o faltantes, y transferencias con recepción explícita.",
+      "manual": "Fijar, pausar/restaurar ubicaciones, calendario operativo, asignaciones de vendedores/descuentos y ajustes físicos de inventario se realizan en sus formularios.",
+      "reads": [
+        "list_fair_events",
+        "list_locations",
+        "get_stock"
+      ],
+      "preparations": [
+        "prepare_create_location",
+        "prepare_update_location",
+        "prepare_catalog_stock_load",
+        "prepare_stock_load"
+      ],
+      "visualGuides": [
+        {
+          "id": "locations-create",
+          "action": "create",
+          "steps": [
+            {
+              "id": "location.create",
+              "title": "Abrí el formulario",
+              "description": "Tocá Crear ubicación. La guía no toca el botón por vos.",
+              "advanceOn": "location.name"
+            },
+            {
+              "id": "location.name",
+              "title": "Nombre de la ubicación",
+              "description": "Escribí cómo querés reconocerla, por ejemplo Local Centro."
+            },
+            {
+              "id": "location.prefix",
+              "title": "Código de ventas",
+              "description": "Usá hasta 8 letras o números, por ejemplo LC. No necesitás DNI."
+            },
+            {
+              "id": "location.type",
+              "title": "Tipo y calendario",
+              "description": "Elegí Local, Feria o Evento. Revisá las fechas y horarios si corresponde."
+            },
+            {
+              "id": "location.save",
+              "title": "Revisá antes de guardar",
+              "description": "Guardar crea la ubicación vacía. Hacelo solo cuando los datos estén bien; no agrega mercadería.",
+              "terminal": true
+            }
+          ]
+        },
+        {
+          "id": "stock-location",
+          "action": "loadStock",
+          "steps": [
+            {
+              "id": "location.open",
+              "title": "Elegí la ubicación",
+              "description": "Abrí el local donde recibiste la mercadería. Después elegí Agregar stock en el producto.",
+              "advanceOn": "location.stock"
+            },
+            {
+              "id": "location.stock",
+              "title": "Agregar stock",
+              "description": "Usá Agregar stock en el producto que recibió unidades. Si todavía no está asignado, usá Agregar producto.",
+              "advanceOn": "stock.quantity"
+            },
+            {
+              "id": "stock.quantity",
+              "title": "Cantidad recibida",
+              "description": "Escribí las unidades que recibiste; se suman al stock actual."
+            },
+            {
+              "id": "stock.save",
+              "title": "Revisá el ingreso",
+              "description": "Revisá stock actual y nuevo antes de Confirmar ingreso. La guía no altera stock.",
+              "terminal": true
+            }
+          ]
+        },
+        {
+          "id": "module-locations",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Ubicaciones y stock de locales",
+              "description": "Consultar ubicaciones, productos y stock. Preparar altas/ediciones de ubicación, cargas individuales y listas de mercadería con productos existentes o faltantes, y transferencias con recepción explícita. Fijar, pausar/restaurar ubicaciones, calendario operativo, asignaciones de vendedores/descuentos y ajustes físicos de inventario se realizan en sus formularios.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "warehouse",
+      "title": "Depósitos y transferencias",
+      "route": "/gestion/warehouse",
+      "assisted": "Consultar depósitos, inventario y movimientos; preparar depósito y transferencias entre depósitos y ubicaciones con cantidades previstas, preparadas y recibidas.",
+      "manual": "El ingreso inicial, la suma directa de stock y el ajuste por conteo físico en depósito tienen formulario manual; prepare_stock_load solo carga ubicaciones. No afirmar que ya existe esa herramienta para depósito.",
+      "reads": [
+        "get_inventory_summary",
+        "get_stock_movements",
+        "get_transfer_history",
+        "list_warehouses",
+        "resolve_transfer_origin"
+      ],
+      "preparations": [
+        "prepare_stock_transfer",
+        "prepare_warehouse_create"
+      ],
+      "visualGuides": [
+        {
+          "id": "warehouse-create",
+          "action": "create",
+          "steps": [
+            {
+              "id": "warehouse.create",
+              "title": "Nuevo depósito",
+              "description": "Abrí Nuevo depósito.",
+              "advanceOn": "warehouse.name"
+            },
+            {
+              "id": "warehouse.name",
+              "title": "Nombre del depósito",
+              "description": "Elegí un nombre para reconocer el lugar. Descripción y dirección son opcionales."
+            },
+            {
+              "id": "warehouse.save",
+              "title": "Crear depósito vacío",
+              "description": "Revisá antes de crear. Después vas a poder agregar productos y stock.",
+              "terminal": true
+            }
+          ]
+        },
+        {
+          "id": "stock-warehouse",
+          "action": "edit",
+          "steps": [
+            {
+              "id": "warehouse.open",
+              "title": "Abrí el depósito",
+              "description": "Elegí el depósito donde llegó la mercadería.",
+              "advanceOn": "warehouse.product"
+            },
+            {
+              "id": "warehouse.product",
+              "title": "Productos y stock",
+              "description": "Agregar producto permite elegir uno del catálogo y su stock inicial. Para un producto ya asignado usá su acción Agregar stock.",
+              "terminal": true
+            }
+          ]
+        },
+        {
+          "id": "stock-transfer",
+          "action": "transferStock",
+          "steps": [
+            {
+              "id": "transfer.open",
+              "title": "Transferir stock",
+              "description": "Abrí Transferir stock.",
+              "advanceOn": "transfer.origin"
+            },
+            {
+              "id": "transfer.origin",
+              "title": "Origen físico",
+              "description": "Elegí el depósito o ubicación de donde sale la mercadería."
+            },
+            {
+              "id": "transfer.destination",
+              "title": "Destino físico",
+              "description": "Elegí dónde se recibe y quién la transporta."
+            },
+            {
+              "id": "transfer.items",
+              "title": "Cantidades reales",
+              "description": "Elegí productos y cantidades previstas, preparadas y recibidas. No des por recibido lo que sigue en camino.",
+              "terminal": true
+            }
+          ]
+        },
+        {
+          "id": "module-warehouse",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Depósitos y transferencias",
+              "description": "Consultar depósitos, inventario y movimientos; preparar depósito y transferencias entre depósitos y ubicaciones con cantidades previstas, preparadas y recibidas. El ingreso inicial, la suma directa de stock y el ajuste por conteo físico en depósito tienen formulario manual; la carga asistida solo carga ubicaciones. No afirmar que ya existe esa herramienta para depósito.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "products",
+      "title": "Catálogo y categorías",
+      "route": "/gestion/products",
+      "assisted": "Buscar productos y categorías, resolver presentaciones; preparar revisión de alta y listas de catálogo/stock en ubicación.",
+      "manual": "Editar/desactivar productos, imágenes, categorías, precios y reglas locales se hace en los formularios de catálogo e inventario. Una revisión no es un producto creado.",
+      "reads": [
+        "search_products"
+      ],
+      "preparations": [
+        "prepare_product_create"
+      ],
+      "visualGuides": [
+        {
+          "id": "products-create",
+          "action": "create",
+          "steps": [
+            {
+              "id": "product.create",
+              "title": "Nuevo producto",
+              "description": "Tocá Nuevo producto para abrir su ficha.",
+              "advanceOn": "product.name"
+            },
+            {
+              "id": "product.name",
+              "title": "Nombre y presentación",
+              "description": "Usá el nombre y tamaño exactos, por ejemplo Aceite Arbosana de 500 ml."
+            },
+            {
+              "id": "product.abbreviation",
+              "title": "Abreviación",
+              "description": "Elegí hasta 8 caracteres para reconocer el producto."
+            },
+            {
+              "id": "product.price",
+              "title": "Precio",
+              "description": "Indicá el precio predeterminado en pesos. Revisá también categoría, alertas e IVA si vas a facturar."
+            },
+            {
+              "id": "product.save",
+              "title": "Revisar y crear",
+              "description": "El botón crea el producto en catálogo. El stock se carga después en cada ubicación o depósito.",
+              "terminal": true
+            }
+          ]
+        },
+        {
+          "id": "module-products",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Catálogo y categorías",
+              "description": "Buscar productos y categorías, resolver presentaciones; preparar revisión de alta y listas de catálogo/stock en ubicación. Editar/desactivar productos, imágenes, categorías, precios y reglas locales se hace en los formularios de catálogo e inventario. Una revisión no es un producto creado.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "quick-sales",
+      "title": "Ventas administrativas",
+      "route": "/gestion/quick-sales",
+      "assisted": "Consultar ventas autorizadas, preparar ventas individuales o listas de hasta veinte con origen físico, canal, productos, pagos, cliente, descuentos y decisión de comprobante. Revisión de anulación y estado fiscal.",
+      "manual": "Emisión fiscal, anulación y edición de ventas usan sus flujos de revisión. Seleccionar un pago no procesa dinero bancario.",
+      "reads": [
+        "get_invoice_status",
+        "get_promotions"
+      ],
+      "preparations": [
+        "prepare_invoice_review",
+        "prepare_sale_cancellation_review",
+        "prepare_batch_sales",
+        "prepare_sale"
+      ],
+      "visualGuides": [
+        {
+          "id": "sale-create",
+          "action": "create",
+          "steps": [
+            {
+              "id": "sale.origin",
+              "title": "Canal y origen",
+              "description": "En Canal elegí cómo llegó la venta y de dónde sale físicamente la mercadería."
+            },
+            {
+              "id": "sale.catalog",
+              "title": "Elegir productos",
+              "description": "Buscá el producto y tocá su presentación. Elegí primero un origen si el catálogo todavía no tiene stock visible."
+            },
+            {
+              "id": "sale.cart",
+              "title": "Revisar cantidades",
+              "description": "Revisá productos, cantidades y precios de la venta."
+            },
+            {
+              "id": "sale.customer",
+              "title": "Cliente y descuentos",
+              "description": "Elegí si asociás un cliente y si corresponde una promoción."
+            },
+            {
+              "id": "sale.payment",
+              "title": "Forma de pago",
+              "description": "Indicá cómo se pagó; si combinás medios, revisá sus importes."
+            },
+            {
+              "id": "sale.submit",
+              "title": "Revisión final",
+              "description": "Revisá el total y la decisión de comprobante antes de confirmar. La guía no registra ventas.",
+              "terminal": true
+            }
+          ]
+        },
+        {
+          "id": "module-quick-sales",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Ventas administrativas",
+              "description": "Consultar ventas autorizadas, preparar ventas individuales o listas de hasta veinte con origen físico, canal, productos, pagos, cliente, descuentos y decisión de comprobante. Revisión de anulación y estado fiscal. Emisión fiscal, anulación y edición de ventas usan sus flujos de revisión. Seleccionar un pago no procesa dinero bancario.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "loyal-customers",
+      "title": "Clientes y fidelización",
+      "route": "/gestion/loyal-customers",
+      "assisted": "Buscar por nombre/teléfono, consultar ficha e historial y preparar alta o enriquecimiento/edición explícita de nombre y zona. El teléfono evita duplicados.",
+      "manual": "Importar Excel, gestionar zonas, filtros de fidelización y cambio del teléfono existente se revisan en CRM. No inferir consentimiento para campañas.",
+      "reads": [
+        "search_customers",
+        "get_customer",
+        "get_customer_history"
+      ],
+      "preparations": [
+        "prepare_customer_create",
+        "prepare_customer_update"
+      ],
+      "visualGuides": [
+        {
+          "id": "customers-create",
+          "action": "create",
+          "steps": [
+            {
+              "id": "customer.create",
+              "title": "Nuevo cliente",
+              "description": "Abrí Nuevo cliente.",
+              "advanceOn": "customer.phone"
+            },
+            {
+              "id": "customer.phone",
+              "title": "Teléfono",
+              "description": "Es el único dato obligatorio. Incluí el código de área; evita duplicar al mismo cliente."
+            },
+            {
+              "id": "customer.name",
+              "title": "Datos opcionales",
+              "description": "Podés completar nombre y zona. Si el teléfono existe, se conserva su identidad."
+            },
+            {
+              "id": "customer.save",
+              "title": "Guardar ficha",
+              "description": "Revisá el teléfono y guardá cuando estés conforme.",
+              "terminal": true
+            }
+          ]
+        },
+        {
+          "id": "module-loyal-customers",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Clientes y fidelización",
+              "description": "Buscar por nombre/teléfono, consultar ficha e historial y preparar alta o enriquecimiento/edición explícita de nombre y zona. El teléfono evita duplicados. Importar Excel, gestionar zonas, filtros de fidelización y cambio del teléfono existente se revisan en CRM. No inferir consentimiento para campañas.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "metrics",
+      "title": "Métricas y proyección de demanda",
+      "route": "/gestion/metrics/sales",
+      "assisted": "Ventas, unidades, ticket, productos, ubicaciones, vendedores, períodos históricos, comparación y métricas derivadas de datos disponibles. Pronóstico de feria y estimación por presentación con forecast_product_demand. Asesoría estratégica, escenarios y supuestos explícitos.",
+      "manual": "Los filtros visuales se manejan en pantalla. Sin costos no calcular ganancia; sin base suficiente no inventar demanda ni relaciones causales.",
+      "reads": [
+        "get_sales_metrics",
+        "get_sales_history",
+        "get_location_metrics",
+        "compare_locations",
+        "get_product_performance",
+        "get_product_sales_history",
+        "get_seller_performance",
+        "get_all_time_sales_metrics",
+        "forecast_product_demand",
+        "research_web_metric",
+        "forecast_fair"
+      ],
+      "preparations": [],
+      "visualGuides": [
+        {
+          "id": "module-metrics",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Métricas y proyección de demanda",
+              "description": "Ventas, unidades, ticket, productos, ubicaciones, vendedores, períodos históricos, comparación y métricas derivadas de datos disponibles. Pronóstico de feria y estimación por presentación con forecast_product_demand. Asesoría estratégica, escenarios y supuestos explícitos. Los filtros visuales se manejan en pantalla. Sin costos no calcular ganancia; sin base suficiente no inventar demanda ni relaciones causales.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "finance",
+      "title": "Finanzas",
+      "route": "/gestion/finance",
+      "assisted": "Consultar resumen e historial financiero y preparar gastos con validación del módulo.",
+      "manual": "Editar gastos, presupuestos, parámetros y acreditar/conciliar caja y banco se hace en Finanzas; no hay movimiento bancario autónomo.",
+      "reads": [
+        "get_financial_summary",
+        "get_expenses"
+      ],
+      "preparations": [
+        "prepare_expense_create"
+      ],
+      "visualGuides": [
+        {
+          "id": "module-finance",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Finanzas",
+              "description": "Consultar resumen e historial financiero y preparar gastos con validación del módulo. Editar gastos, presupuestos, parámetros y acreditar/conciliar caja y banco se hace en Finanzas; no hay movimiento bancario autónomo.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "shipping",
+      "title": "Gestión de envíos vigente",
+      "route": "/gestion/shipping",
+      "assisted": "Leer envíos registrados y explicar el proceso vigente de preparación, repositorio, repartidor y entrega. Ayudar a identificar el envío y orientar al formulario correspondiente.",
+      "manual": "Los envíos nacen desde Venta Rápida/Panel Vendedor; no se crean con prepare_shipment_create. Aprobar origen físico, asignar preparación/repartidor, verificar domicilio en mapa, QR/etiquetas, repositorio, rutas, comprobación de retiro/entrega, incidencias y reintentos tienen controles propios. Olivia no ejecuta esas transiciones. El módulo actual ya no es una tabla genérica.",
+      "reads": [
+        "get_shipments"
+      ],
+      "preparations": [
+        "prepare_shipment_create",
+        "prepare_shipment_update"
+      ],
+      "visualGuides": [
+        {
+          "id": "module-shipping",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Gestión de envíos vigente",
+              "description": "Leer envíos registrados y explicar el proceso vigente de preparación, repositorio, repartidor y entrega. Ayudar a identificar el envío y orientar al formulario correspondiente. Los envíos nacen desde Venta Rápida/Panel Vendedor; no se crean con la carga asistida. Aprobar origen físico, asignar preparación/repartidor, verificar domicilio en mapa, QR/etiquetas, repositorio, rutas, comprobación de retiro/entrega, incidencias y reintentos tienen controles propios. Olivia no ejecuta esas transiciones. El módulo actual ya no es una tabla genérica.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "marketing",
+      "title": "Marketing, WhatsApp y Meta Ads",
+      "route": "/gestion/marketing",
+      "assisted": "Leer campañas/estados, preparar registro de campaña en borrador, analizar resultados y diseñar estrategia de venta. Producción creativa autorizada usa el router de Marketing/Redes.",
+      "manual": "Crear/operar campañas de WhatsApp, seleccionar destinatarios, iniciar/pausar emisor, aprobar teorías/planes y organizar archivos de Meta se hace en sus workspaces. Un registro genérico no publica ni envía mensajes.",
+      "reads": [
+        "get_marketing_campaigns",
+        "get_whatsapp_campaigns",
+        "get_meta_ads_campaigns"
+      ],
+      "preparations": [
+        "prepare_marketing_campaign"
+      ],
+      "visualGuides": [
+        {
+          "id": "module-marketing",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Marketing, WhatsApp y Meta Ads",
+              "description": "Leer campañas/estados, preparar registro de campaña en borrador, analizar resultados y diseñar estrategia de venta. Producción creativa autorizada usa el router de Marketing/Redes. Crear/operar campañas de WhatsApp, seleccionar destinatarios, iniciar/pausar emisor, aprobar teorías/planes y organizar archivos de Meta se hace en sus workspaces. Un registro genérico no publica ni envía mensajes.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "social",
+      "title": "Redes sociales",
+      "route": "/gestion/social",
+      "assisted": "Leer consultas/leads, preparar registro de una consulta y desarrollar conceptos, textos y propuestas creativas.",
+      "manual": "No hay publicación ni respuesta automática a bandejas externas mediante estas herramientas.",
+      "reads": [
+        "get_social_leads"
+      ],
+      "preparations": [
+        "prepare_social_lead_create"
+      ],
+      "visualGuides": [
+        {
+          "id": "module-social",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Redes sociales",
+              "description": "Leer consultas/leads, preparar registro de una consulta y desarrollar conceptos, textos y propuestas creativas. No hay publicación ni respuesta automática a bandejas externas mediante estas herramientas.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "ecommerce",
+      "title": "Pedidos y tienda",
+      "route": "/gestion/ecommerce",
+      "assisted": "Consultar pedidos registrados y abrir revisión segura del pedido.",
+      "manual": "El estado de pagos, disponibilidad pública y checkout depende de la configuración del entorno; no inferir que un proveedor de pagos está habilitado por ver el catálogo.",
+      "reads": [
+        "get_orders"
+      ],
+      "preparations": [
+        "prepare_ecommerce_order_review"
+      ],
+      "visualGuides": [
+        {
+          "id": "module-ecommerce",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Pedidos y tienda",
+              "description": "Consultar pedidos registrados y abrir revisión segura del pedido. El estado de pagos, disponibilidad pública y checkout depende de la configuración del entorno; no inferir que un proveedor de pagos está habilitado por ver el catálogo.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "alerts",
+      "title": "Alertas y sugerencias",
+      "route": "/gestion/alerts",
+      "assisted": "Leer alertas y preparar una alerta manual autorizada. Si el usuario pide enviarle una idea a Agustín, el flujo de sugerencias conserva la idea y pantalla; requiere petición explícita.",
+      "manual": "No existe una herramienta universal para resolver/reasignar todas las alertas. Ofrecer una sugerencia no significa que se haya enviado.",
+      "reads": [
+        "get_alerts"
+      ],
+      "preparations": [
+        "prepare_alert_create"
+      ],
+      "visualGuides": [
+        {
+          "id": "module-alerts",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Alertas y sugerencias",
+              "description": "Leer alertas y preparar una alerta manual autorizada. Si el usuario pide enviarle una idea a Agustín, el flujo de sugerencias conserva la idea y pantalla; requiere petición explícita. No existe una herramienta universal para resolver/reasignar todas las alertas. Ofrecer una sugerencia no significa que se haya enviado.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "suppliers",
+      "title": "Proveedores",
+      "route": "/gestion/suppliers",
+      "assisted": "Consultar proveedores y preparar un alta de registro.",
+      "manual": "No hay compra/pago automático, cuentas corrientes ni recepción de mercadería implícita.",
+      "reads": [
+        "get_suppliers"
+      ],
+      "preparations": [
+        "prepare_supplier_create"
+      ],
+      "visualGuides": [
+        {
+          "id": "module-suppliers",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Proveedores",
+              "description": "Consultar proveedores y preparar un alta de registro. No hay compra/pago automático, cuentas corrientes ni recepción de mercadería implícita.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "audit",
+      "title": "Actividad y auditoría",
+      "route": "/gestion/activity",
+      "assisted": "Consultar actividad autorizada y explicar los cambios registrados.",
+      "manual": "El historial no se edita ni se borra con Olivia; no prometer exportaciones inexistentes.",
+      "reads": [
+        "get_audit_activity"
+      ],
+      "preparations": [],
+      "visualGuides": [
+        {
+          "id": "module-audit",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Actividad y auditoría",
+              "description": "Consultar actividad autorizada y explicar los cambios registrados. El historial no se edita ni se borra con Olivia; no prometer exportaciones inexistentes.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "administration",
+      "title": "Usuarios y permisos",
+      "route": "/gestion/administration",
+      "assisted": "Consultar perfiles autorizados y preparar revisión de rol en Administración.",
+      "manual": "Crear cuentas, modificar acceso/credenciales y confirmar cambios sensibles se hace en su flujo administrativo.",
+      "reads": [
+        "get_users"
+      ],
+      "preparations": [
+        "prepare_user_role_review"
+      ],
+      "visualGuides": [
+        {
+          "id": "module-administration",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Usuarios y permisos",
+              "description": "Consultar perfiles autorizados y preparar revisión de rol en Administración. Crear cuentas, modificar acceso/credenciales y confirmar cambios sensibles se hace en su flujo administrativo.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "settings",
+      "title": "Configuración y facturación",
+      "route": "/gestion/settings",
+      "assisted": "Consultar configuración segura/estado fiscal y abrir revisión administrativa.",
+      "manual": "Credenciales, emisión ARCA y cambios de configuración requieren el formulario seguro; una tarjeta de revisión no emite un comprobante.",
+      "reads": [
+        "get_configuration_summary"
+      ],
+      "preparations": [
+        "prepare_configuration_review"
+      ],
+      "visualGuides": [
+        {
+          "id": "module-settings",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Configuración y facturación",
+              "description": "Consultar configuración segura/estado fiscal y abrir revisión administrativa. Credenciales, emisión ARCA y cambios de configuración requieren el formulario seguro; una tarjeta de revisión no emite un comprobante.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "ai",
+      "title": "Conversación de Olivia",
+      "route": "/gestion",
+      "assisted": "Texto, archivos, dictado, historial con scroll, tareas pausadas/canceladas/retomadas y guía de procesos. Voz de preview: GPT Transcribe → Luna → Chirp 3 HD con Equalizer Orb, según habilitación de la cuenta. Espera hablada breve y progreso visual; las correcciones nuevas reemplazan la respuesta en curso conservando los datos de tarea.",
+      "manual": "Conocimiento no agrega permisos ni herramientas. Las acciones comerciales requieren tarjeta Sí/No. Audio físico y ruido necesitan prueba en dispositivo. Las tareas pausadas viven dentro de esa conversación y vencen con su retención.",
+      "reads": [],
+      "preparations": [],
+      "visualGuides": [
+        {
+          "id": "module-ai",
+          "action": "view",
+          "steps": [
+            {
+              "id": "module.content",
+              "title": "Conversación de Olivia",
+              "description": "Texto, archivos, dictado, historial con scroll, tareas pausadas/canceladas/retomadas y guía de procesos. Voz de preview: GPT Transcribe → Luna → Chirp 3 HD con Equalizer Orb, según habilitación de la cuenta. Espera hablada breve y progreso visual; las correcciones nuevas reemplazan la respuesta en curso conservando los datos de tarea. Conocimiento no agrega permisos ni herramientas. Las acciones comerciales requieren tarjeta Sí/No. Audio físico y ruido necesitan prueba en dispositivo. Las tareas pausadas viven dentro de esa conversación y vencen con su retención.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module": "seller",
+      "title": "Panel Vendedor",
+      "route": "/vendedor",
+      "assisted": "Ayuda del panel, stock/precios autorizados, ventas propias de hoy y preparación de ventas individuales/listas con confirmación. Mensajes de sugerencias a Agustín cuando el vendedor lo pide.",
+      "manual": "Sin acceso administrativo, historial global, carga de stock, publicaciones ni cambios de permisos. Operaciones offline permanecen en la cola local del dispositivo.",
+      "reads": [
+        "get_today_sales"
+      ],
+      "preparations": [],
+      "visualGuides": [
+        {
+          "id": "seller-sale",
+          "action": "create",
+          "steps": [
+            {
+              "id": "seller.sale",
+              "title": "Preparar una venta",
+              "description": "Elegí tu ubicación asignada, productos, cantidades y pago. Revisá cliente, promociones y comprobante antes de confirmar. Tus ventas sin conexión quedan pendientes en el dispositivo.",
+              "terminal": true
+            }
+          ]
+        },
+        {
+          "id": "module-seller",
+          "action": "view",
+          "steps": [
+            {
+              "id": "seller.sale",
+              "title": "Panel Vendedor",
+              "description": "Ayuda del panel, stock/precios autorizados, ventas propias de hoy y preparación de ventas individuales/listas con confirmación. Mensajes de sugerencias a Agustín cuando el vendedor lo pide. Sin acceso administrativo, historial global, carga de stock, publicaciones ni cambios de permisos. Operaciones offline permanecen en la cola local del dispositivo.",
+              "terminal": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

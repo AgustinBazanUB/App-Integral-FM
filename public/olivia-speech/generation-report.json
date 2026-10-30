@@ -1,0 +1,13 @@
+{
+  "generatedAt": "2026-10-29T19:47:20.157Z",
+  "firebaseProject": "app-integral-fm-pruebas",
+  "googleProject": "app-integral-fm-olivia-preview",
+  "voice": "es-US-Chirp3-HD-Aoede",
+  "speakingRate": 1,
+  "characters": 2699,
+  "estimatedCostUsd": 0.08097,
+  "ready": 90,
+  "generated": 90,
+  "approvalHash": "67ada6893c140142f7be305daa916da27cf43363a1d5f58e7f5bd600765d3904",
+  "firestoreWrites": 0
+}

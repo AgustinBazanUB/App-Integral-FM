@@ -6,7 +6,7 @@ El catálogo combina los contratos existentes en `oliviaContracts.mjs` con `oliv
 
 | Área | Lecturas y preparaciones |
 |---|---|
-| Contexto/ayuda | Usuario, navegación, discover_skills, load_skill, search_knowledge, search_tools |
+| Contexto/ayuda | Usuario, navegación, discover_skills, load_skill, search_knowledge, search_tools, get_ui_guide y show_ui_guide |
 | Productos | Búsqueda/precios y preparación del formulario de catálogo validado |
 | Ubicaciones | Ubicaciones permitidas, ferias/eventos, alta y actualización |
 | Ventas/dashboard/métricas | Ventas de hoy, preparación de venta, períodos, comparaciones, productos, vendedores, pagos y promociones |
@@ -14,7 +14,7 @@ El catálogo combina los contratos existentes en `oliviaContracts.mjs` con `oliv
 | CRM | Búsqueda, ficha/historial, alta y actualización con identidad telefónica canónica |
 | Finanzas | Resumen, gastos, preparación de gasto |
 | Ecommerce | Pedidos y revisión del pedido seleccionado |
-| Envíos | Consulta, alta y actualización del registro |
+| Envíos | Consulta y guía del flujo vigente; las altas/ediciones genéricas están deshabilitadas |
 | Alertas/proveedores | Consulta y alta |
 | Social/marketing | Consultas y altas; borradores de campaña; estado de WhatsApp y proyectos Meta Ads |
 | Fiscal | Estado fiscal y preparación de revisión de la factura real en Configuración |
@@ -30,3 +30,6 @@ Operaciones fiscales, roles/credenciales y catálogo preparado se completan con 
 Vendedores conservan herramientas del Panel Vendedor, ubicaciones autorizadas, precios/stock, promociones, ventas propias y preparación de venta; el registro no ofrece esquemas administrativos a ese rol.
 
 Historial CRM comparte los grupos de identidad/teléfono del flujo manual: IDs actuales, anteriores y cadena de migración acotada, más snapshots telefónicos históricos. Se deduplican ventas y se informa truncamiento a 100 registros; no se pierde una compra solo porque precedió a la normalización del cliente.
+
+
+La ruta de generación no ofrece herramientas empresariales. Las guías consultan un registro tipado; ofrecer una guía no navega ni hace clic. El inventario estructurado vigente (módulos, acciones, roles representativos, datos mínimos, pasos y límites) está en [CAPACIDADES.json](olivia/2026-10-30/copiloto/CAPACIDADES.json).

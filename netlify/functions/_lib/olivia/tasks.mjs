@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { OLIVIA_TOOL_SCHEMAS, validateSchema, oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
+import { operationGuidance } from "../../../../src/shared/oliviaOperationGuide.mjs";
 
 const normalize = (text = "") => String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const productReferenceWords = (value) => normalize(value).replace(/([a-z])(\d)/g, "$1 $2").replace(/medio litro|media botella de litro/g, "500 ml").replace(/\b(\d+)\s*(?:mililitros?|cc|ml)\b/g, "$1ml").replace(/\b(?:botellas?|bidones?|de|del|la|el|los|las|aceite|oliva|por|favor)\b/g, " ").split(/\s+/).filter(Boolean);
 export const isCorrection = (text = "") => /^(no |mejor |corregi|corrigi|cambia|cancel|eran |que sean )/.test(normalize(text));
-export const operationalIntent = (intent) => ({ "stock.load": "prepare_stock_load", "stock.transfer": "prepare_stock_transfer", "stock.read": "get_stock", "fair.forecast": "forecast_fair", "metrics.analysis": "get_sales_metrics", "sales.compare": "compare_locations", "customer.create": "prepare_customer_create", "customer.read": "get_customer", "shipping.create": "prepare_shipment_create", "marketing.creative": "creative_brief", "social.creative": "creative_brief" })[intent] || intent;
-const labels = { inventoryType: "si es un depósito o una ubicación", inventoryId: "el depósito o ubicación", locationId: "la ubicación de destino", productId: "el producto y su presentación", quantity: "la cantidad", reason: "el motivo", originId: "el origen", destinationId: "el destino", paymentMethod: "el medio de pago", ticketRequested: "si necesitás factura", customerDecision: "si asociamos un cliente", promotionDecision: "si aplicamos promociones", lines: "los productos y cantidades", carrierName: "quién transporta la mercadería" };
+export const operationalIntent = (intent) => ({ "stock.load": "prepare_stock_load", "stock.transfer": "prepare_stock_transfer", "stock.read": "get_stock", "fair.forecast": "forecast_fair", "demand.forecast": "forecast_product_demand", "metrics.analysis": "get_sales_metrics", "sales.compare": "compare_locations", "customer.create": "prepare_customer_create", "customer.read": "get_customer", "shipping.create": "prepare_shipment_create", "marketing.creative": "creative_brief", "social.creative": "creative_brief" })[intent] || intent;
+const labels = { forecastDays: "para cuantos dias queres la estimacion", inventoryType: "si es un depósito o una ubicación", inventoryId: "el depósito o ubicación", locationId: "la ubicación de destino", productId: "el producto y su presentación", quantity: "la cantidad", reason: "el motivo", originId: "el origen", destinationId: "el destino", paymentMethod: "el medio de pago", ticketRequested: "si necesitás factura", customerDecision: "si asociamos un cliente", promotionDecision: "si aplicamos promociones", lines: "los productos y cantidades", carrierName: "quién transporta la mercadería" };
 export function requiredFields(intent) {
   if (intent === "forecast_fair") return ["locationId", "startDate", "days"];
+  if (intent === "forecast_product_demand") return ["productId", "startDate", "endDate", "forecastDays"];
   if (intent === "creative_brief") return ["objective", "audience", "format"];
   if (["get_sales_metrics", "get_location_metrics", "compare_locations", "get_product_performance", "get_seller_performance", "get_sales_history", "get_product_sales_history"].includes(intent)) return ["startDate", "endDate"];
   if (intent === "get_all_time_sales_metrics") return [];
@@ -17,8 +20,8 @@ export function requiredFields(intent) {
     prepare_sale: ["locationId", "items", "paymentMethod", "ticketRequested", "customerDecision", "promotionDecision"],
     prepare_batch_sales: ["sales"],
     prepare_stock_transfer: ["originId", "destinationId", "lines", "reason"],
-    prepare_create_location: ["name", "type", "codePrefix", "dniMode"],
-    prepare_update_location: ["locationId", "name", "type", "codePrefix", "dniMode"],
+    prepare_create_location: ["name", "codePrefix", "type"],
+    prepare_update_location: ["locationId", "name", "codePrefix", "type"],
     prepare_customer_create: ["phone"], prepare_customer_update: ["customerId", "phone"],
     prepare_product_create: ["name", "abbreviation", "defaultPrice"],
     prepare_expense_create: ["name", "amountCents", "category", "nature", "accruedOn"],
@@ -45,15 +48,20 @@ export function updateTask(previous, intent, slotsJson, now = new Date()) {
   const missing = requiredFields(intent).filter((key) => slots[key] == null || slots[key] === "" || (Array.isArray(slots[key]) && !slots[key].length));
   return { id: same ? previous.id : randomUUID(), intent, revision: (same ? previous.revision : 0) + 1, status: "collecting", slots, missingFields: missing, ambiguities: same && intent === "prepare_catalog_stock_load" ? previous.ambiguities || {} : {}, route: same ? previous.route || null : null, createdAt: same ? previous.createdAt : now, updatedAt: now };
 }
-export function missingQuestion(fields = []) {
+export function missingQuestion(fields = [], intent = null, options = {}) {
+  if (intent) return operationGuidance(intent, fields, options);
   const more = { startDate: "la fecha", endDate: "la fecha de cierre", days: "la cantidad de días", objective: "el objetivo", audience: "el público", format: "el formato", name: "el nombre", type: "el tipo", codePrefix: "el prefijo", dniMode: "si el DNI es obligatorio", phone: "el teléfono", amountCents: "el monto", category: "la categoría", nature: "el tipo de gasto", accruedOn: "la fecha del gasto", entityId: "el registro que querés revisar", customerId: "el cliente", items: "los productos y cantidades" };
   const names = [...new Set(fields.map((field) => /receivedQuantity/.test(field) ? "cuántas unidades llegaron físicamente" : /preparedQuantity/.test(field) ? "cuántas unidades preparaste" : labels[field] || more[field] || "un dato del registro; indicame qué querés completar") )];
   return names.length ? `Me falta ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} y ${names.at(-1)}`}.` : "Revisá la propuesta antes de confirmar.";
 }
 export function shortVoiceQuestion(task, fallback) {
+  if(task?.intent==='prepare_customer_create' && task.status==='collecting' && task.missingFields?.includes('phone'))return 'Pasame el teléfono del cliente para preparar la ficha.';
   if (task?.intent !== "prepare_stock_load" || task.status !== "collecting" || Object.values(task.ambiguities || {}).some((options) => options?.length) || /no (?:pude|encontr)/i.test(fallback || "")) return fallback;
   const missing = task.missingFields || [];
-  if (missing.includes("productId") && missing.includes("locationId")) return "Ok. ¿Qué producto y en dónde querés cargarlo?";
+  if (missing.includes("productId") && missing.includes("locationId") && missing.includes("quantity")) return "¿Qué producto, cuántas unidades y en qué ubicación querés cargarlo?";
+  if (missing.includes("productId") && missing.includes("quantity")) return "¿Qué producto y cuántas unidades querés cargar?";
+  if (missing.includes("locationId") && missing.includes("quantity")) return "¿Cuántas unidades y en qué ubicación querés cargarlo?";
+  if (missing.includes("productId") && missing.includes("locationId")) return "¿Qué producto y en qué ubicación querés cargarlo?";
   if (missing.includes("productId")) return "¿Qué producto querés cargar?";
   if (missing.includes("locationId")) return "¿En qué ubicación querés cargarlo?";
   if (missing.includes("quantity")) return "¿Cuántas unidades querés cargar?";
@@ -79,11 +87,12 @@ export function taskControl(text) {
 export async function progressiveStock({ previous, initialId, message, context, run, check = () => {}, now = new Date() }) {
   const text = normalize(message);
   const start = /^(?:cargame|carga|ingresa|ingresame|agrega|agregame)\s+(\d+)\s+(?:unidades? |botellas? |bidones? )?(?:de )?(.+)$/.exec(text);
-  const continuation = previous?.intent === "prepare_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/^(ahora|consulta|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|mandame|transferi|vende|registra|crea|disena)/.test(text);
+  const continuation = previous?.intent === "prepare_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/\b(?:cliente|cancel[a-z]*|explic[a-z]*|ensen[a-z]*|queria decir|no me cargues)\b/.test(text) && !/^(ahora|consulta|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|mandame|transferi|vende|registra|crea|disena)/.test(text);
   if (!start && !continuation) return null;
   check();
-  let task = continuation ? structuredClone(previous) : { id: initialId || randomUUID(), intent: "prepare_stock_load", revision: 0, status: "collecting", slots: { locationId: null, productId: null, quantity: null, reason: null }, missingFields: [], ambiguities: {}, route: null, createdAt: now };
+  let task = continuation ? structuredClone(previous) : { id: initialId || randomUUID(), intent: "prepare_stock_load", revision: 0, status: "collecting", slots: { locationId: context.locationId || null, productId: null, quantity: null, reason: null }, missingFields: [], ambiguities: {}, route: null, createdAt: now };
   task.revision++; task.updatedAt = now; task.status = "collecting";
+  if(!task.slots.locationId && context.locationId)task.slots.locationId=context.locationId;
   const quantityCorrection = /^(?:no )?(?:mejor |eran |son |que sean |cambia a |corregi a )?(?:de )?(\d+)(?: unidades?| botellas?)?$/.exec(text);
   let productQuery = null, locationQuery = null;
   if (start) {
@@ -105,8 +114,9 @@ export async function progressiveStock({ previous, initialId, message, context, 
       products = (await run("search_products", { query: productQuery, locationId: null })).data.products || [];
       if (!products.length) products = (await run("search_products", { query: "", locationId: null })).data.products || [];
     }
-    const words = normalize(productQuery).split(" ");
-    const matches = products.filter((product) => words.every((word) => normalize(product.name).includes(word)));
+    const selectiveWords = productReferenceWords(productQuery);
+    const words = selectiveWords.length ? selectiveWords : normalize(productQuery).split(" ");
+    const matches = products.filter((product) => words.length && words.every((word) => productReferenceWords(product.name).includes(word) || normalize(product.name).includes(word)));
     if (matches.length === 1) { task.slots.productId = matches[0].productId; task.productName = matches[0].name; delete task.ambiguities.productId; }
     else { task.ambiguities.productId = matches; task.slots.productId = null; }
   }
@@ -122,7 +132,7 @@ export async function progressiveStock({ previous, initialId, message, context, 
   if (!task.missingFields.length) {
     const result = await run(task.intent, { ...task.slots, reason: task.slots.reason ?? null });
     task = { ...task, ...taskFromTool(task, task.intent, task.slots, result, now), revision: task.revision };
-    return { task, result, content: result.prepared?.summary || missingQuestion(task.missingFields) };
+    return { task, result, content: result.prepared?.summary || missingQuestion(task.missingFields, task.intent) };
   }
   const options = task.ambiguities.productId?.map((product) => product.name) || [];
   const destinations = task.ambiguities.locationId?.map((location) => location.name) || [];

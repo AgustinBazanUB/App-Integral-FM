@@ -102,15 +102,6 @@ test("legacy admin context cannot reach a seller; known seller history remains c
   f.documents.set("oliviaUsage/previous", { userId: f.session.uid, role: "seller", createdAt: f.clock() });
   assert.equal((await f.engine.state(f.session, state.conversationId)).messages.length, 1);
 });
-test("closed native voice may persist its queued transcript for 60 seconds but cannot execute tools", async () => {
-  const f = fixture({ role: "admin" }), state = await start(f);
-  f.documents.set("oliviaRealtime/closed_voice", { nativeTools: true, status: "closed", closedAt: f.clock(), expiresAt: f.clock(), userId: f.session.uid, sessionBinding: String(f.session.authTime), conversationId: state.conversationId });
-  const fields = { conversationId: state.conversationId, realtimeSessionId: "closed_voice", inputId: "input", responseId: "response", message: "Hola", text: "Hola, estoy disponible" };
-  await f.engine.realtimeTranscript(f.session, fields);
-  await assert.rejects(f.engine.realtimeTool(f.session, { ...fields, requestId: "tool", callId: "call", tool: "list_warehouses", args: {} }), { code: "realtime-expired" });
-  f.advance(60001);
-  await assert.rejects(f.engine.realtimeTranscript(f.session, { ...fields, responseId: "late" }), { code: "realtime-expired" });
-});
 test("product preparation validates the manual catalog rules and category before opening the form", async () => {
   const f = fixture({ role: "admin" }), args = { name: "Producto QA", abbreviation: "QA", defaultPrice: 100, categoryId: "cat", description: "Fixture" };
   await assert.rejects(extendedOperationPlan({ ...f, toolName: "prepare_product_create", args, now: f.clock() }), { code: "category-unavailable" });

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { IconButton } from "../../design-system";
 
 export default function OliviaComposer({ textareaRef, draft, setDraft, sendMessage, recording, frame, stopRecording,
-  startRecording, startVoice, stopVoice, voiceAvailable = false, voiceActive, muted, toggleMute, sendingDisabled = false, disabled, busy, cancelRequest, attachments = [], addFiles, removeFile }) {
+  startRecording, startVoice, stopVoice, finishVoiceTurn, voiceRecording, voiceAvailable = false, voiceActive, muted, toggleMute, sendingDisabled = false, disabled, busy, cancelRequest, attachments = [], addFiles, removeFile }) {
   const picker = useRef(null), camera = useRef(null), menu = useRef(null);
   const selectFiles = (event) => { addFiles(Array.from(event.target.files || [])); event.target.value = ""; if (menu.current) menu.current.open = false; textareaRef.current?.focus(); };
   useEffect(() => {
@@ -19,7 +19,7 @@ export default function OliviaComposer({ textareaRef, draft, setDraft, sendMessa
     <input ref={camera} type="file" hidden accept="image/jpeg,image/png,image/webp" capture="environment" onChange={selectFiles} />
     {recording ? <div className="fm-olivia-dictation" role="status">
       <span aria-label="Duración del dictado">{String(Math.floor(frame.seconds / 60)).padStart(2, "0")}:{String(frame.seconds % 60).padStart(2, "0")}</span>
-      <div className="fm-olivia-waveform" aria-hidden="true">{frame.bars.map((level, index) => <i key={index} style={{ height: `${4 + level * 30}px` }} />)}</div>
+      <span className="fm-olivia-dictation-label">Grabando tu mensaje</span>
       <IconButton label="Cancelar dictado" icon="X" onClick={() => stopRecording(true)} />
       <IconButton label="Terminar y transcribir para revisar" icon="Square" onClick={() => stopRecording()} />
       <IconButton label="Terminar, transcribir y enviar" icon="Send" onClick={() => stopRecording(false, true)} />
@@ -29,8 +29,10 @@ export default function OliviaComposer({ textareaRef, draft, setDraft, sendMessa
       <textarea ref={textareaRef} id="fm-olivia-message" rows="1" maxLength={12000} value={draft} placeholder="Escribile a Olivia…" disabled={disabled} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); sendMessage(); } }} />
       <IconButton label={voiceActive ? muted ? "Activar micrófono" : "Silenciar micrófono" : "Dictar un mensaje"} icon={voiceActive && muted ? "MicOff" : "Mic"} aria-pressed={voiceActive ? muted : undefined} disabled={!voiceActive && (busy || disabled)} onClick={voiceActive ? toggleMute : startRecording} />
       {voiceAvailable || voiceActive ? <IconButton label={voiceActive ? "Finalizar conversación por voz" : "Conversar con Olivia por voz"} icon="AudioLines" aria-pressed={voiceActive} disabled={!voiceActive && (busy || disabled)} onClick={voiceActive ? stopVoice : startVoice} /> : null}
-      {busy ? <IconButton label="Detener respuesta" icon="Square" onClick={cancelRequest} /> : <IconButton label="Enviar mensaje" icon="Send" disabled={disabled || sendingDisabled || uploading || (!draft.trim() && !attachments.some((file) => file.id))} onClick={sendMessage} />}
+      {voiceActive && voiceRecording ? <IconButton label="Enviar turno de voz ahora" icon="Send" onClick={finishVoiceTurn} /> : null}
+      {busy ? <IconButton label="Detener respuesta" icon="Square" onClick={() => cancelRequest()} /> : null}
+      {!busy || draft.trim() ? <IconButton label={busy ? "Enviar nueva instrucción" : "Enviar mensaje"} icon="Send" disabled={disabled || sendingDisabled || uploading || (!draft.trim() && !attachments.some((file) => file.id))} onClick={sendMessage} /> : null}
     </div>}
-    {recording ? <small>Escuchando. Podés cancelar, revisar el dictado o enviarlo directamente.</small> : null}
+    {recording ? <small>Podés cancelar, revisar el dictado o enviarlo directamente.</small> : null}
   </form>;
 }

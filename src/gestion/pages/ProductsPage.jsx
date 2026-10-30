@@ -99,7 +99,7 @@ export default function ProductsPage() {
           {["admin", "general_admin"].includes(normalizedRole(profile)) ? <Button variant="secondary" onClick={() => setMergeOpen(true)}>Unificar producto</Button> : null}
           {canCreate ? (
           <HelpTooltip label="Crea un producto nuevo en el catálogo general de Flor Mía.">
-            <Button icon="Plus" onClick={openNew}>Nuevo producto</Button>
+            <Button data-olivia="product.create" icon="Plus" onClick={openNew}>Nuevo producto</Button>
           </HelpTooltip>
         ) : null}
         </>}

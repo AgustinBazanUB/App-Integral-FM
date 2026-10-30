@@ -12,7 +12,7 @@ function ownJob(session, job) {
 }
 export async function startChatJob({ store, engine, session, body, dispatch, now = new Date() }) {
   const requestId = safeId(body.requestId), conversationId = body.conversationId ? safeId(body.conversationId) : (await engine.state(session)).conversationId;
-  const payload = { operation: "chat", requestId, conversationId, message: safeUserMessage(body.message), screenContext: screenContext(body.screenContext || {}), attachmentIds: Array.isArray(body.attachmentIds) ? body.attachmentIds.map(id => safeId(id)).slice(0, 4) : [], inputMode: body.inputMode === "dictation" ? "dictation" : "text" };
+  const payload = { operation: "chat", requestId, conversationId, message: safeUserMessage(body.message), screenContext: screenContext(body.screenContext || {}), attachmentIds: Array.isArray(body.attachmentIds) ? body.attachmentIds.map(id => safeId(id)).slice(0, 4) : [], inputMode: ["dictation", "natural-voice"].includes(body.inputMode) ? body.inputMode : "text" };
   const jobId = digest([session.uid, sessionBinding(session), requestId]), path = `oliviaChatJobs/${jobId}`, fingerprint = digest(payload);
   let created = false;
   await store.transaction(async tx => {
@@ -60,7 +60,7 @@ export async function chatJobStatus({ store, session, body, now = new Date() }) 
     });
     job = await store.get(path);
   }
-  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase, text: job.text || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
+  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase,tools:(job.tools || []).filter(tool=>/^[a-z_]{1,80}$/.test(tool)).slice(0,12), text: job.text || "", voiceText: job.voiceText || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
 }
 export async function activeChatJob({ store, session, conversationId }) {
   const conversation = await store.get(`oliviaConversations/${conversationId}`);
@@ -76,7 +76,14 @@ export async function cancelChatJob({ store, session, body, now = new Date() }) 
     const job = (await tx.getDocument(path))?.data; ownJob(session, job);
     if (!live(job)) return;
     const conversationPath = `oliviaConversations/${job.payload.conversationId}`, conversation = (await tx.getDocument(conversationPath))?.data;
-    await tx.commitDocuments([{ type: "update", path, data: { status: "cancelled", updatedAt: now } }, ...(conversation?.busyRequestId === job.payload.requestId || conversation?.queuedChatRequestId === job.payload.requestId ? [{ type: "update", path: conversationPath, data: { busyRequestId: null, busyUntil: null, queuedChatRequestId: null, state: "CANCELADA", taskState: conversation.taskState ? { ...conversation.taskState, status: "cancelled", updatedAt: now } : null } }] : [])]);
+    const ownsWork = conversation?.busyRequestId === job.payload.requestId || conversation?.queuedChatRequestId === job.payload.requestId;
+    const pending = ownsWork && conversation.pendingActionId ? (await tx.getDocument(`oliviaConfirmations/${conversation.pendingActionId}`))?.data : null;
+    const preserveTask = body.preserveTask === true;
+    await tx.commitDocuments([
+      { type: "update", path, data: { status: "cancelled", interruption: preserveTask ? "new-user-instruction" : "user-stop", updatedAt: now } },
+      ...(pending?.status === "pending" ? [{ type: "update", path: `oliviaConfirmations/${conversation.pendingActionId}`, data: { status: "superseded", updatedAt: now } }] : []),
+      ...(ownsWork ? [{ type: "update", path: conversationPath, data: { busyRequestId: null, busyUntil: null, queuedChatRequestId: null, pendingActionId: null, state: preserveTask ? "DATOS_INCOMPLETOS" : "CANCELADA", taskState: conversation.taskState ? { ...conversation.taskState, status: preserveTask ? "collecting" : "cancelled", updatedAt: now } : null } }] : []),
+    ]);
   });
   return { cancelled: true };
 }
@@ -91,7 +98,7 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
   });
   if (!payload) return;
   const controller = new AbortController();
-  let progress = { phase: "Pensando…", text: "" }, changed = false, flushing = Promise.resolve();
+  let progress = { phase: "Pensando…", text: "", voiceText: "" }, changed = false, flushing = Promise.resolve();
   const flush = () => flushing = flushing.catch(() => {}).then(async () => {
     await store.transaction(async tx => {
       const job = (await tx.getDocument(path))?.data;
@@ -103,9 +110,10 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
   const timer = setTimeout(() => controller.abort(oliviaError("assistant-timeout", "La consulta alcanzó su límite de procesamiento.", 503)), 300000);
   try {
     const result = await engine.chat(session, payload, { longRunning: true, signal: controller.signal, onEvent: event => {
-      if (event.type === "accepted") progress.accepted = event.message;
-      if (event.type === "phase") { progress.phase = event.label; if (event.tools) progress.text = ""; }
+      if (event.type === "accepted") { progress.accepted = event.message; changed = true; flush().catch(() => {}); }
+      if (event.type === "phase") { progress.phase = event.label; if (event.tools) { progress.text = ""; progress.tools = event.tools; } changed = true; flush().catch(() => {}); }
       if (event.type === "delta") progress.text = (progress.text + event.delta).slice(-64000);
+      if (event.type === "voice.ready" && typeof event.text === "string") { progress.voiceText = event.text.slice(0, 3000); changed = true; flush().catch(() => {}); }
       changed = true;
     } });
     await flush();

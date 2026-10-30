@@ -1,4 +1,5 @@
 import { requireFirebaseActiveProfile } from "../firebaseAuth.mjs";
+import { configuredFirebaseProjectId } from "../firebaseProject.mjs";
 import { assertOliviaAccess } from "./guards.mjs";
 import { oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
 import { publicOliviaFailure } from "./errorReports.mjs";
@@ -27,7 +28,7 @@ export async function oliviaSession(request) {
   // accounts:lookup already validated the exact token. These claims bind a confirmation to a login, not a client-provided role.
   if (
     claims.sub !== session.uid ||
-    claims.aud !== "app-integral-fm" ||
+    claims.aud !== configuredFirebaseProjectId() ||
     !Number.isSafeInteger(claims.auth_time) ||
     claims.auth_time > Date.now() / 1000 + 60
   )

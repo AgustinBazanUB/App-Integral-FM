@@ -8,6 +8,15 @@ import {
 const NOW = new Date("2026-10-04T15:00:00.000Z");
 const PAST = new Date("2026-10-04T14:59:00.000Z");
 const FUTURE = new Date("2026-11-04T15:00:00.000Z");
+test('private personalized audio follows retention without deleting unexpired user audio',async()=>{
+  const f=memoryStore([
+    ['oliviaPrivateSpeech/old',{userId:'a',audio:'synthetic',retentionExpiresAt:PAST}],
+    ['oliviaPrivateSpeech/current',{userId:'b',audio:'synthetic',retentionExpiresAt:FUTURE}],
+  ]);
+  await runOliviaRetention({store:f.store,now:NOW});
+  assert.equal(f.data.has('oliviaPrivateSpeech/old'),false);
+  assert.equal(f.data.has('oliviaPrivateSpeech/current'),true);
+});
 function memoryStore(entries = []) {
   const data = new Map(
     entries.map(([path, value]) => [path, structuredClone(value)]),
@@ -131,7 +140,7 @@ test("hourly job erases expired conversation text, drafts and identity into day 
           {
             role: "user",
             content: "Private chat content",
-            inputMode: "realtime",
+            inputMode: "natural-voice",
           },
           { role: "assistant", content: "Private response" },
         ],
@@ -175,7 +184,7 @@ test("hourly job erases expired conversation text, drafts and identity into day 
   assert.equal(fixture.data.has("auditLogs/business-sale"), true);
   const anonymous = aggregate(fixture.data);
   assert.equal(anonymous.counts.messagesRemoved, 2);
-  assert.equal(anonymous.inputModes.realtime, 1);
+  assert.equal(anonymous.inputModes["natural-voice"], 1);
   const serialized = JSON.stringify(anonymous);
   for (const privateValue of [
     "identifiable-user",
@@ -646,6 +655,21 @@ test("expired budget identity is purged only after its reservations are settled"
   );
 });
 
+test("natural voice usage and character budgets obey Olivia's configured retention", async () => {
+  const fixture = memoryStore([
+    ["oliviaVoiceRequests/old", { userId: "private-user", status: "cancelled", retentionExpiresAt: PAST }],
+    ["oliviaVoiceRequests/streaming", { userId: "active-user", status: "streaming", retentionExpiresAt: PAST }],
+    ["oliviaVoiceBudgets/old", { userId: "private-user", characters: 2000, retentionExpiresAt: PAST }],
+  ]);
+  const result = await runOliviaRetention({ store: fixture.store, now: NOW });
+  assert.equal(result.requestsRemoved, 1);
+  assert.equal(result.budgetsRemoved, 1);
+  assert.equal(fixture.data.has("oliviaVoiceRequests/old"), false);
+  assert.equal(fixture.data.has("oliviaVoiceRequests/streaming"), true);
+  assert.equal(fixture.data.has("oliviaVoiceBudgets/old"), false);
+  assert.doesNotMatch(JSON.stringify(aggregate(fixture.data)), /private-user|active-user/);
+});
+
 test("overlapping cleanup runs aggregate deletion once", async () => {
   const fixture = memoryStore([
     ["oliviaConversations/once", { expiresAt: PAST, messages: [] }],
@@ -696,7 +720,7 @@ test("query/transaction work is bounded and interrupted runs leave backlog for n
   assert.equal(result.possibleBacklog, true);
   assert.equal(
     fixture.queries.filter((query) => !query.collection.includes("/")).length,
-    8,
+    11,
   );
   assert.ok(fixture.queries.every((query) => query.limit <= 12));
   assert.ok(

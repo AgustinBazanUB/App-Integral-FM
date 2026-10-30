@@ -33,6 +33,8 @@ export default async function handler(request) {
   } catch (error) {
     console.error("olivia.transcription_failed", {
       code: error.code || "transcription-error",
+      ...(error.providerStatus ? { providerStatus: error.providerStatus } : {}),
+      ...(error.providerErrorCode ? { providerCode: error.providerErrorCode } : {}),
     });
     return errorResponse(error);
   }

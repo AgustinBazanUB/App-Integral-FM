@@ -1,0 +1,65 @@
+Métricas de desarrollo
+Modelo / razonamiento
+— / —
+Ruta / motivo
+— / —
+Tarea
+—
+Tokens próximos estimados
+—
+Entrada / salida / total de última llamada
+— / — / —
+Consumo / reservas
+0 / 0
+Último costo USD
+Sin medición
+Click → mensaje visible (ms)
+5
+Mensaje → request (ms)
+0
+Request → primer texto (ms)
+369
+Primer texto → completa (ms)
+357
+Voz natural · Chirp 3 HD
+No disponible
+Transcripción de esta sesión
+GPT Transcribe · respaldo por turnos
+Silencio de fin de turno · P50 / P90 / P95 (ms)
+1908 / 1908 / 1908
+Detección → transcripción final · P50 / P90 / P95 (ms)
+7 / 7 / 7
+Fin real de voz → transcripción · P50 / P90 / P95 (ms)
+1915 / 1915 / 1915
+Selector Luna NONE · P50 / P90 / P95 (ms)
+— / — / —
+Selector iniciado → clip disponible · P50 / P90 / P95 (ms)
+— / — / —
+Turno confirmado → primera intervención · P50 / P90 / P95 (ms)
+136 / 136 / 136
+Selector · costo USD estimado mediano
+Sin medición
+Transcripción → primer audio programado · mediana / P95 (ms)
+727 / 727
+TTFA programado · mediana / P95 (ms)
+4 / 4
+Última síntesis · caracteres / costo USD estimado
+23 / US$ 0
+Medición de audio
+Primer bloque programado por el navegador; no mide el inicio físico del altavoz
+Backend: retrieval / proveedor / herramientas (ms)
+— / — / —
+Llamadas de modelo / herramientas
+— / —
+Skills
+Ninguna en esta consulta
+Documentos recuperados
+Ninguno en esta consulta
+Request / response
+— / —
+Contexto
+16 mensajes recientes, memoria acotada y referencias verificadas
+Costo de almacenamiento semántico
+Sin medición del proveedor
+Cotización
+Sin cotización

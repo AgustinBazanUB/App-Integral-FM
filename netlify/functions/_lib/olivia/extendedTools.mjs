@@ -12,6 +12,9 @@ import { retrieveKnowledge } from "./knowledge.mjs";
 import { customerHistoryGroups } from "../../../../src/shared/customerHistoryQueries.mjs";
 import { saleDate } from "../../../../src/modules/locations/domain/saleFacts.js";
 import { researchWebMetric } from "./research.mjs";
+import { forecastProductDemand } from "./productForecast.mjs";
+import { appCapabilities } from "./appCapabilities.mjs";
+import { getUiGuide } from '../../../../src/shared/oliviaUiGuides.mjs';
 const project = (row, fields) => Object.fromEntries(["id", ...fields].filter((key) => row[key] !== undefined).map((key) => [key, row[key]]));
 const common = ["name", "title", "code", "notes", "status", "active", "createdAt", "updatedAt", "responsibleId"];
 const sources = {
@@ -27,6 +30,13 @@ const sources = {
   get_users: ["users", ["name", "role", "active", "allowedLocationIds"]],
 };
 export async function runExtendedTool({ session, name, args, store, context, now, provider, env, researchOptions }) {
+  if (name === 'get_ui_guide' || name === 'show_ui_guide') {
+    const guide = getUiGuide(session.profile, args.guideId, context);
+    if (!guide) throw oliviaError('permission-denied', 'Esta guía no está habilitada para tu cuenta.', 403);
+    return { data: guide, ...(name === 'show_ui_guide' ? { guide: { guideId: guide.id, version: guide.version } } : {}) };
+  }
+  if (name === "get_app_capabilities") return { data: appCapabilities(session, args.query) };
+  if (name === "forecast_product_demand") return forecastProductDemand({ store, args, now });
   if (name === "research_web_metric") return researchWebMetric({ topic: args.topic, provider, env, now, ...researchOptions });
   if (name === "get_all_time_sales_metrics") return { data: await salesMetrics({ store, args: { ...args, allTime: true }, now }) };
   if (name === "search_knowledge") return { data: await retrieveKnowledge({ session, query: args.query, context, store, ...(provider ? { provider } : {}), ...(env ? { env } : {}) }) };
