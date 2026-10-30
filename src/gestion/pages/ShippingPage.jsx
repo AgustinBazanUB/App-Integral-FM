@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, DataTable, EmptyState, FilterBar, FormField, PageHeader, Panel, SearchInput, Select, Skeleton, StatCard, Tabs } from "../../design-system";
+import { Badge, Button, DataTable, EmptyState, FilterBar, FormField, Modal, PageHeader, Panel, SearchInput, Select, Skeleton, StatCard, Tabs } from "../../design-system";
 import { useAuth } from "../AuthContext";
 import { Link, useLocation, useNavigate } from "../../router";
-import { subscribeShipments, createCourierRouteAccess } from "../services/shippingService";
+import { subscribeShipments, createCourierRouteAccess, shippingRequest } from "../services/shippingService";
 import { SHIPPING_STATES, TRANSPORTS, shippingBucket } from "../../shared/shippingDomain.mjs";
 import { addArgentinaDays, argentinaDateKey, argentinaPeriodRange } from "../../modules/locations/domain/time.js";
 import { formatDateTime } from "../formatters";
+import { assignPreparersToShipments } from "../shipping/bulkAssignments.mjs";
 import ShippingTasks from "../shipping/ShippingTasks";
 import ShipmentDetail from "../shipping/ShipmentDetail";
 import ShippingRequests from "../shipping/ShippingRequests";
@@ -31,6 +32,9 @@ export default function ShippingPage() {
   const { profile } = useAuth(), location = useLocation(), navigate = useNavigate();
   const [rows, setRows] = useState(null), [error, setError] = useState(""), [tab, setTab] = useState("board"), [bucket, setBucket] = useState("all"), [filters, setFilters] = useState(() => ({ preset: "week", ...presetDates("week") })), [filtersOpen, setFiltersOpen] = useState(false);
   const [routeLeg, setRouteLeg] = useState("direct"), [selectedRouteIds, setSelectedRouteIds] = useState([]), [routeAccess, setRouteAccess] = useState(null), [routeError, setRouteError] = useState(""), [routeBusy, setRouteBusy] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]), [actionRow, setActionRow] = useState(null);
+  const [bulkOpen, setBulkOpen] = useState(false), [bulkPeople, setBulkPeople] = useState([]), [bulkPerson, setBulkPerson] = useState(""), [bulkReason, setBulkReason] = useState(""), [bulkBusy, setBulkBusy] = useState(false), [bulkNotice, setBulkNotice] = useState("");
+  const bulkAttempt = useRef(null);
   const routeAttempt = useRef(null), canManage = can(profile, "shipping", "edit");
   const selected = new URLSearchParams(location.search).get("shipment");
   useEffect(() => subscribeShipments(profile, setRows, error => setError(error.message)), [profile.id]);
@@ -72,8 +76,27 @@ export default function ShippingPage() {
     } catch (error) { setRouteError(error.message); }
     finally { setRouteBusy(false); }
   };
+  const openBulkAssign = async (row) => {
+    setActionRow(null); setBulkPerson(""); setBulkReason(""); setBulkNotice(""); setBulkOpen(true);
+    const ids = selectedIds.length > 1 ? selectedIds : [row.id];
+    bulkAttempt.current = { ids, requests: Object.fromEntries(ids.map(id => [id, crypto.randomUUID()])), signature: null };
+    try { setBulkPeople(await shippingRequest({ mode: "resources" })); }
+    catch (error) { setBulkPeople([]); setBulkNotice(error.message); }
+  };
+  const applyBulkAssign = async () => {
+    if (bulkBusy || !bulkPerson || bulkReason.trim().length < 4 || !bulkAttempt.current) return;
+    const attempt = bulkAttempt.current, signature = JSON.stringify([bulkPerson, bulkReason.trim()]);
+    if (attempt.signature && attempt.signature !== signature) attempt.requests = Object.fromEntries(attempt.ids.map(id => [id, crypto.randomUUID()]));
+    attempt.signature = signature; setBulkBusy(true); setBulkNotice("");
+    const { failures, successes } = await assignPreparersToShipments(attempt.ids, attempt.requests, bulkPerson, bulkReason.trim(), shippingRequest);
+    setSelectedIds(current => current.filter(id => !successes.includes(id)));
+    attempt.ids = failures.map(item => item.id);
+    setBulkNotice(`${successes.length} envío(s) actualizado(s). ${failures.length} con error.` + (failures.length ? ` ${failures.map(item => `${(rows || []).find(row => row.id === item.id)?.publicCode || item.id}: ${item.message}`).join(" · ")}` : ""));
+    setBulkBusy(false);
+  };
   const requests = (rows || []).filter(row => row.status === "solicitud_pendiente");
   const columns = [
+    ...(canManage ? [{ key: "select", label: "Seleccionar", render: row => <input type="checkbox" aria-label={`Seleccionar ${row.publicCode}`} checked={selectedIds.includes(row.id)} onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} onChange={event => setSelectedIds(current => event.target.checked ? [...new Set([...current, row.id])] : current.filter(id => id !== row.id))} /> }] : []),
     ...(canManage ? [{ key: "route", label: "Ruta", render: row => <div className="fm-shipping-route-cell"><input type="checkbox" aria-label={`Incluir ${row.publicCode} en el recorrido`} onClick={event => event.stopPropagation()} disabled={!routeEligible(row)} checked={selectedRouteIds.includes(row.id)} onChange={event => setSelectedRouteIds(current => event.target.checked ? [...new Set([...current, row.id])] : current.filter(id => id !== row.id))} /><RoutePreview /></div> }] : []),
     { key: "issue", label: "!", render: row => row.incident ? <span className="fm-shipping-issue-mark" title={row.incident.reason} aria-label={`Incidencia: ${row.incident.reason}`}>!</span> : <span className="fm-shipping-neutral-dot" aria-label="Sin incidencia" /> },
     { key: "code", label: "Envío", render: row => <div className="fm-shipping-row-title"><strong>Envío para {row.customerSnapshot.name}</strong><small>{row.publicCode} · {row.saleCode}</small></div> },
@@ -82,6 +105,7 @@ export default function ShippingPage() {
     { key: "status", label: "Estado", render: row => <Badge tone={row.incident ? "error" : row.status === "entregado" ? "success" : ["reparto_final", "hacia_repositorio", "recibido_repositorio"].includes(row.status) ? "info" : "warning"}>{row.incident ? "Incidencia crítica" : SHIPPING_STATES[row.status]}</Badge> },
     { key: "people", label: "Preparadores", render: row => row.preparerNames.join(", ") || "Por asignar" },
     { key: "updatedAt", label: "Actualizado", render: row => formatDateTime(row.updatedAt) },
+    ...(canManage ? [{ key: "actions", label: "Acciones", render: row => <div onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}><button type="button" aria-label={`Acciones de ${row.publicCode}`} aria-expanded={actionRow === row.id} onClick={() => setActionRow(current => current === row.id ? null : row.id)}>⋮</button>{actionRow === row.id && <button type="button" onClick={() => openBulkAssign(row)}>Asignar preparador{selectedIds.length > 1 ? ` a ${selectedIds.length} envíos` : ""}</button>}</div> }] : []),
   ];
   return <div className="fm-shipping-page">
     <nav className="fm-shipping-module-nav" aria-label="Gestión de envíos"><Tabs tabs={[{ id: "board", label: "Tablero" }, { id: "requests", label: <>Solicitudes del vendedor {requests.length > 0 && <span className="fm-shipping-tab-count">{requests.length}</span>}</> }, { id: "tasks", label: "Mis preparaciones y etiquetas" }]} active={tab} onChange={id => { setTab(id); if (selected) open(null); }} /><Link className="fm-button fm-button--primary" to="/gestion/quick-sales">Cargar un envío · Venta Rápida</Link></nav>
@@ -105,6 +129,7 @@ export default function ShippingPage() {
         </FilterBar>
         <div className="fm-shipping-filter-actions"><Button variant="secondary" onClick={() => { setFilters({ preset: "week", ...presetDates("week") }); setBucket("all"); }}>Restablecer filtros</Button><Button onClick={() => setFiltersOpen(false)}>Ver {visible.length} envíos</Button></div>
       </section>}
+      {canManage && <div className="fm-shipping-filter-toolbar"><label><input type="checkbox" checked={visible.length > 0 && visible.every(row => selectedIds.includes(row.id))} onChange={event => setSelectedIds(current => event.target.checked ? [...new Set([...current, ...visible.map(row => row.id)])] : current.filter(id => !visible.some(row => row.id === id)))} /> Seleccionar todos los envíos visibles</label><p role="status">{selectedIds.length} seleccionado(s), incluidos los que quedaron fuera del filtro.</p></div>}
       {rows === null && !error ? <Skeleton lines={6} /> : <DataTable columns={columns} rows={visible} onRowClick={row => open(row.id)} empty={<EmptyState icon="Truck" title="No hay envíos para estos filtros" description="Los envíos se generan al confirmar ventas con envío en Venta Rápida o en el Panel Vendedor." />} />}
     </Panel>
     {canManage && <Panel title="Recorrido del repartidor" description="Seleccioná pedidos compatibles para generar un QR temporal. El repartidor comparte una sola ubicación para toda la ruta.">
@@ -112,6 +137,12 @@ export default function ShippingPage() {
       {routeError && <p role="alert" className="fm-shipping-error">{routeError}</p>}
       {routeAccess && <div className="fm-shipping-route-access"><p role="status">QR de recorrido válido hasta {formatDateTime(routeAccess.expiresAt)}. El acceso reúne {routeAccess.shipmentIds?.length || selectedRouteIds.length} envío(s).</p><input readOnly aria-label="Enlace temporal del recorrido" value={routeAccess.url} /><Button variant="secondary" onClick={() => navigator.clipboard.writeText(routeAccess.url).catch(() => setRouteError("Seleccioná y copiá el enlace manualmente."))}>Copiar enlace</Button><ShippingAccessQr url={routeAccess.url} title="Abrir el recorrido en el teléfono" description="Escaneá una vez para consultar los pedidos asignados y confirmar sus etapas." /></div>}
     </Panel>}
+    <Modal open={bulkOpen} onClose={() => { if (!bulkBusy) setBulkOpen(false); }} title="Asignar preparador" description={`Se intentará actualizar ${bulkAttempt.current?.ids.length || 0} envío(s). Cada envío se valida por separado y se conserva su historial.`}>
+      <FormField label="Preparador activo" required><Select value={bulkPerson} onChange={event => setBulkPerson(event.target.value)} disabled={bulkBusy}><option value="">Elegí un preparador</option>{bulkPeople.map(person => <option key={person.id} value={person.id}>{person.label || person.name}</option>)}</Select></FormField>
+      <FormField label="Motivo del cambio" required><textarea value={bulkReason} maxLength={1000} disabled={bulkBusy} onChange={event => setBulkReason(event.target.value)} /></FormField>
+      {bulkNotice && <p role="status">{bulkNotice}</p>}
+      <div className="fm-shipping-actions"><Button loading={bulkBusy} disabled={!bulkAttempt.current?.ids.length || !bulkPerson || bulkReason.trim().length < 4} onClick={applyBulkAssign}>Confirmar {bulkAttempt.current?.ids.length || 0} envío(s)</Button><Button variant="secondary" disabled={bulkBusy} onClick={() => setBulkOpen(false)}>Cerrar</Button></div>
+    </Modal>
     <p className="fm-shipping-muted">Las incidencias se marcan en rojo dentro del pedido. Las excepciones se consultan en Todos y no cuentan como entregados.</p></>}
     </>}
   </div>;
