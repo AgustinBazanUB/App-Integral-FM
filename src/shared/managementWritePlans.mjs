@@ -6,7 +6,7 @@ export function buildLocationPayload({ values, previous, profile, stamp, startAt
   if (!Object.hasOwn(LOCATION_TYPES, values.type) && previous?.type !== values.type) throw new Error("Elegí Local, Feria o Evento.");
   if (startAt && endAt && startAt >= endAt) throw new Error("La fecha final debe ser posterior a la inicial.");
   return { name, type: values.type, codePrefix: prefix, operatingCalendar: normalizeOperatingCalendar(values.operatingCalendar ?? previous?.operatingCalendar),
-    dniMode: values.dniMode || previous?.dniMode || "optional", active: values.active !== false,
+    active: values.active !== false,
     scheduleStartAt: startAt, scheduleEndAt: endAt, startDateTime: values.scheduleStartAt || "", endDateTime: values.scheduleEndAt || "",
     updatedBy: profile.id, updatedByName: profile.name || profile.email || "Usuario", updatedAt: stamp,
     ...(!previous ? { deleted: false, createdAt: stamp, createdBy: profile.id, assignedSellerIds: [], enabledDiscountIds: [] } : {}) };

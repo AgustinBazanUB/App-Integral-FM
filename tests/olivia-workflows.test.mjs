@@ -56,7 +56,7 @@ test("permission revocation and impossible physical receipt block execution", as
   valid.documents.set("users/user_a", fixture().session.profile);
   await assert.rejects(runTool({ ...valid, session: fixture().session, name: "prepare_stock_transfer", args: transfer, context: {}, now: valid.clock() }), { code: "permission-denied" });
 });
-const location = { locationId: null, name: "Feria QA", type: "fair", codePrefix: "QA", startDate: "2026-10-10", endDate: "2026-10-11", dniMode: "recommended" };
+const location = { locationId: null, name: "Feria QA", type: "fair", codePrefix: "QA", startDate: "2026-10-10", endDate: "2026-10-11" };
 const expense = { name: "Alquiler QA", amountCents: 12345, category: "Alquiler local", nature: "fixed", locationId: null, accruedOn: "2026-10-04", dueOn: "2026-10-10", paidOn: null, cashAccount: "", notes: "Solo fixture" };
 for (const [tool, args, collection] of [
   ["prepare_create_location", location, "locations"], ["prepare_expense_create", expense, "financialEntries"],

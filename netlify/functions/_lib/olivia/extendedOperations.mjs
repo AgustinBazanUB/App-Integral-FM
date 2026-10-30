@@ -68,7 +68,7 @@ export async function extendedOperationPlan({ session, toolName, args, store, no
     const values = { ...args, scheduleStartAt: startAt?.toISOString() || "", scheduleEndAt: endAt?.toISOString() || "" };
     const payload = buildLocationPayload({ values, previous, profile, stamp: now, startAt, endAt });
     writes = [{ type: editing ? "update" : "create", path: `locations/${affectedId}`, data: payload }];
-    summary = `${editing ? "Actualizar" : "Crear"} ${args.type === "fair" ? "feria" : args.type === "event" ? "evento" : "local"} ${args.name}. Prefijo ${args.codePrefix}. Fechas ${args.startDate || "sin inicio"} → ${args.endDate || "sin fin"}. DNI ${args.dniMode}. No agrega stock ni modifica vendedores.`;
+    summary = `${editing ? "Actualizar" : "Crear"} ${args.type === "fair" ? "feria" : args.type === "event" ? "evento" : "local"} ${args.name}. Código para identificar sus ventas: ${args.codePrefix}. Fechas ${args.startDate || "sin inicio"} → ${args.endDate || "sin fin"}. No agrega stock ni modifica vendedores.`;
   } else if (["prepare_customer_create", "prepare_customer_update"].includes(toolName)) {
     const draft = buildCustomerDraft({ ...args, zoneId: args.zoneId || "" }), derivedId = await customerDocumentId(draft.phoneNormalized);
     const editing = toolName === "prepare_customer_update";

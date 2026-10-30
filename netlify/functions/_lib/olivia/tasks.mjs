@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { OLIVIA_TOOL_SCHEMAS, validateSchema, oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
+import { operationGuidance } from "../../../../src/shared/oliviaOperationGuide.mjs";
 
 const normalize = (text = "") => String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const productReferenceWords = (value) => normalize(value).replace(/([a-z])(\d)/g, "$1 $2").replace(/medio litro|media botella de litro/g, "500 ml").replace(/\b(\d+)\s*(?:mililitros?|cc|ml)\b/g, "$1ml").replace(/\b(?:botellas?|bidones?|de|del|la|el|los|las|aceite|oliva|por|favor)\b/g, " ").split(/\s+/).filter(Boolean);
@@ -19,8 +20,8 @@ export function requiredFields(intent) {
     prepare_sale: ["locationId", "items", "paymentMethod", "ticketRequested", "customerDecision", "promotionDecision"],
     prepare_batch_sales: ["sales"],
     prepare_stock_transfer: ["originId", "destinationId", "lines", "reason"],
-    prepare_create_location: ["name", "type", "codePrefix", "dniMode"],
-    prepare_update_location: ["locationId", "name", "type", "codePrefix", "dniMode"],
+    prepare_create_location: ["name", "codePrefix", "type"],
+    prepare_update_location: ["locationId", "name", "codePrefix", "type"],
     prepare_customer_create: ["phone"], prepare_customer_update: ["customerId", "phone"],
     prepare_product_create: ["name", "abbreviation", "defaultPrice"],
     prepare_expense_create: ["name", "amountCents", "category", "nature", "accruedOn"],
@@ -47,7 +48,8 @@ export function updateTask(previous, intent, slotsJson, now = new Date()) {
   const missing = requiredFields(intent).filter((key) => slots[key] == null || slots[key] === "" || (Array.isArray(slots[key]) && !slots[key].length));
   return { id: same ? previous.id : randomUUID(), intent, revision: (same ? previous.revision : 0) + 1, status: "collecting", slots, missingFields: missing, ambiguities: same && intent === "prepare_catalog_stock_load" ? previous.ambiguities || {} : {}, route: same ? previous.route || null : null, createdAt: same ? previous.createdAt : now, updatedAt: now };
 }
-export function missingQuestion(fields = []) {
+export function missingQuestion(fields = [], intent = null, options = {}) {
+  if (intent) return operationGuidance(intent, fields, options);
   const more = { startDate: "la fecha", endDate: "la fecha de cierre", days: "la cantidad de días", objective: "el objetivo", audience: "el público", format: "el formato", name: "el nombre", type: "el tipo", codePrefix: "el prefijo", dniMode: "si el DNI es obligatorio", phone: "el teléfono", amountCents: "el monto", category: "la categoría", nature: "el tipo de gasto", accruedOn: "la fecha del gasto", entityId: "el registro que querés revisar", customerId: "el cliente", items: "los productos y cantidades" };
   const names = [...new Set(fields.map((field) => /receivedQuantity/.test(field) ? "cuántas unidades llegaron físicamente" : /preparedQuantity/.test(field) ? "cuántas unidades preparaste" : labels[field] || more[field] || "un dato del registro; indicame qué querés completar") )];
   return names.length ? `Me falta ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} y ${names.at(-1)}`}.` : "Revisá la propuesta antes de confirmar.";
@@ -130,7 +132,7 @@ export async function progressiveStock({ previous, initialId, message, context, 
   if (!task.missingFields.length) {
     const result = await run(task.intent, { ...task.slots, reason: task.slots.reason ?? null });
     task = { ...task, ...taskFromTool(task, task.intent, task.slots, result, now), revision: task.revision };
-    return { task, result, content: result.prepared?.summary || missingQuestion(task.missingFields) };
+    return { task, result, content: result.prepared?.summary || missingQuestion(task.missingFields, task.intent) };
   }
   const options = task.ambiguities.productId?.map((product) => product.name) || [];
   const destinations = task.ambiguities.locationId?.map((location) => location.name) || [];

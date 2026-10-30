@@ -93,7 +93,6 @@ export async function saveLocation(data, profile, locationId = null) {
       name: data.name.trim(),
       type: data.type,
       codePrefix: data.codePrefix.trim().toUpperCase(),
-      dniMode: data.dniMode,
       active: data.active !== false,
       deleted: false,
       updatedBy: profile.id,

@@ -42,14 +42,14 @@ export function routeModel(configuration, session, { message = "", context = {},
   if ((signals.moduleCount || 0) >= 2) reasons.push("cross-module");
   // Carry the route only while collecting the same task. Completed tasks never
   // cause a following short/simple query to inherit an expensive route.
-  const continuation = task?.status === "collecting" && task?.route && text.split(/\s+/).length <= 10 && !/[?¿]/.test(message) && !/^(consulta|ahora|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|carga|manda|transfer|vende|registra|crea|disena)/.test(text) && !/stock|ventas?|estadistic|metric|inbox|gasto|deposit|transfer|factura|permis|usuarios?/.test(text);
-  if (continuation && task.route.route === "luna-complex") reasons.push("active-complex-task");
-  if (continuation && task.route.route === "sol-creative" && creativeModule && !seller) {
+  const continuation = task?.status === "collecting" && text.split(/\s+/).length <= 10 && !/[?¿]/.test(message) && !/^(consulta|ahora|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|carga|manda|transfer|vende|registra|crea|disena)/.test(text) && !/stock|ventas?|estadistic|metric|inbox|gasto|deposit|transfer|factura|permis|usuarios?/.test(text);
+  if (continuation && task.route?.route === "luna-complex") reasons.push("active-complex-task");
+  if (continuation && task.route?.route === "sol-creative" && creativeModule && !seller) {
     reasons.push("active-creative-task");
   }
   const useCreative = creativeIntent || reasons.includes("active-creative-task");
   const route = useCreative ? "sol-creative" : reasons.length ? "luna-complex" : "luna-normal";
-  const creativeComplex = reasons.some((reason) => reason !== "active-creative-task") || (continuation && task.route.reasoningEffort === "xhigh");
+  const creativeComplex = reasons.some((reason) => reason !== "active-creative-task") || (continuation && task.route?.reasoningEffort === "xhigh");
   const profile = configuration.profiles[useCreative ? creativeComplex ? "creativeComplex" : "creative" : route === "luna-complex" ? "adminComplex" : seller ? "seller" : "adminDefault"];
   const model = seller && !useCreative ? configuration.profiles.seller.model : profile.model;
   const reasoning = latencyEnabled(configuration) && model === 'gpt-6-luna' && !useCreative ? (route === 'luna-normal' ? 'none' : 'medium') : profile.reasoningEffort;

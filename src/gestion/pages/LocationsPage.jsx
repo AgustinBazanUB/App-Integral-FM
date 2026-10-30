@@ -40,7 +40,6 @@ const emptyLocation = {
   name: "",
   type: "store",
   codePrefix: "",
-  dniMode: "optional",
   active: true,
   scheduleStartAt: "",
   scheduleEndAt: "",
@@ -246,7 +245,6 @@ export default function LocationsPage() {
       name: location.name || "",
       type: location.type || "store",
       codePrefix: location.codePrefix || "",
-      dniMode: location.dniMode || "optional",
       active: location.active !== false,
       operatingCalendar: { ...emptyLocation.operatingCalendar, ...location.operatingCalendar, weekdays: location.operatingCalendar?.weekdays || [], dates: location.operatingCalendar?.dates || [] },
       scheduleStartAt: toLocalDateTimeInput(location.scheduleStartAt || location.startDateTime || location.startDate),
@@ -317,7 +315,6 @@ export default function LocationsPage() {
           <FormField label="Nombre" required><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></FormField>
           <FormField label="Tipo" required><Select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>{Object.entries({ ...LOCATION_TYPES, ...(editingId && !(form.type in LOCATION_TYPES) ? { [form.type]: locationTypeLabels[form.type] || "Tipo heredado" } : {}) }).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></FormField>
           <FormField label="Prefijo de venta" hint="Hasta 8 letras o números." required><input maxLength="8" value={form.codePrefix} onChange={(event) => setForm({ ...form, codePrefix: event.target.value.replace(/[^a-zA-Z0-9]/g, "") })} /></FormField>
-          <FormField label="Solicitud de DNI" required><Select value={form.dniMode} onChange={(event) => setForm({ ...form, dniMode: event.target.value })}><option value="disabled">Desactivado</option><option value="optional">Opcional</option><option value="recommended">Recomendado</option><option value="required">Obligatorio</option></Select></FormField>
           <FormField label="Inicio" hint="Opcional para locales permanentes."><input type="datetime-local" value={form.scheduleStartAt} onChange={(event) => setForm({ ...form, scheduleStartAt: event.target.value })} /></FormField>
           <FormField label="Finalización" hint="Opcional para locales permanentes."><input type="datetime-local" value={form.scheduleEndAt} onChange={(event) => setForm({ ...form, scheduleEndAt: event.target.value })} /></FormField>
           <fieldset className="fm-form-grid__full fm-operating-calendar"><legend>Calendario de atención (hora de Argentina)</legend><p>Definí los días y horarios de atención. Las jornadas nocturnas cierran al día siguiente.</p><div className="fm-calendar-days">{OPERATING_DAYS.map((label, index) => <label key={label}><input type="checkbox" checked={form.operatingCalendar.weekdays.includes(index + 1)} onChange={(event) => setForm((current) => ({ ...current, operatingCalendar: { ...current.operatingCalendar, weekdays: event.target.checked ? [...current.operatingCalendar.weekdays, index + 1] : current.operatingCalendar.weekdays.filter((day) => day !== index + 1) } }))} />{label}</label>)}</div><div className="fm-form-grid"><FormField label="Apertura"><input type="time" value={form.operatingCalendar.openingTime} onChange={(event) => setForm({ ...form, operatingCalendar: { ...form.operatingCalendar, openingTime: event.target.value } })} /></FormField><FormField label="Cierre"><input type="time" value={form.operatingCalendar.closingTime} onChange={(event) => setForm({ ...form, operatingCalendar: { ...form.operatingCalendar, closingTime: event.target.value } })} /></FormField></div><FormField label="Fechas específicas" hint="Para ferias/eventos: AAAA-MM-DD separadas por coma; opcional."><input value={form.operatingCalendar.dates.join(", ")} onChange={(event) => setForm({ ...form, operatingCalendar: { ...form.operatingCalendar, dates: event.target.value.split(",") } })} /></FormField></fieldset>

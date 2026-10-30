@@ -8,7 +8,8 @@ import { metricsForModel } from "./analytics.mjs";
 import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, taskSlotSchema, requiredFields, isCorrection, operationalIntent, shortVoiceQuestion } from "./tasks.mjs";
 import { aggregateRoutes } from "./modelRouter.mjs";
 import { transitionConversationTask, manageConversationTask, taskManagementTool, isTaskInterruption } from "./conversationTasks.mjs";
-import { isSuggestionRequest, processSuggestion } from "./suggestions.mjs";
+import { isSuggestionRequest, isFeedbackCaptureRequest, isSuggestionContinuation, processSuggestion } from "./suggestions.mjs";
+import { fieldGuidance } from '../../../../src/shared/oliviaOperationGuide.mjs';
 import { canUseOliviaVoice, hasGoogleCloudTtsCredentials } from "../../../../src/shared/oliviaVoiceAvailability.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { captureOliviaFailure, publicOliviaFailure } from "./errorReports.mjs";
@@ -445,9 +446,12 @@ export function createOliviaEngine({
         body.foreground===true,
       );
       claimed = true;
-      const suggestionFlow = isSuggestionRequest(userMessage) || conversation.draft?.kind === "app-suggestion";
+      const suggestionFlow = !attachments.length && (isSuggestionRequest(userMessage) || isFeedbackCaptureRequest(userMessage) || isSuggestionContinuation(conversation, userMessage));
+      // A saved improvement proposal does not monopolize later business turns.
+      if (!suggestionFlow && conversation.draft?.kind === 'app-suggestion') conversation.draft = null;
       const transition = suggestionFlow ? { ...manageConversationTask({ task: conversation.taskState, suspendedTasks: conversation.suspendedTasks || [] }, "pause", null, clock()), handled: false, directive: null } : transitionConversationTask(conversation, userMessage, clock());
       if(latencyEnabled(config) && ['start','switch'].includes(transition.directive) && transition.task?.intent==='prepare_stock_load' && context.locationId && !transition.task.slots.locationId){transition.task.slots.locationId=context.locationId;transition.task.missingFields=requiredFields(transition.task.intent).filter(key=>transition.task.slots[key]==null);}
+      if (transition.handled && ['start', 'switch'].includes(transition.directive) && transition.task) transition.content = missingQuestion(transition.task.missingFields, transition.task.intent, { starting: true });
       conversation.taskState = transition.task;
       currentSuspendedTasks = transition.suspendedTasks;
       if (transition.directive) { conversation.draft = transition.task?.slots || null; conversation.activeSkills = []; }
@@ -493,30 +497,32 @@ export function createOliviaEngine({
         return result;
       }
       const control = !attachments.length && !transition.handled ? taskControl(userMessage) : null;
-      if (!control && (isSuggestionRequest(userMessage) || conversation.draft?.kind === "app-suggestion")) {
-        const suggestion = await processSuggestion({ session, store, provider, env, conversation, conversationId: id, requestId, message: userMessage, context, now: clock(), signal,
+      if (suggestionFlow) {
+        let suggestionCalls = 0;
+        event = { ...event, route: 'deterministic', routingReason: 'reviewed-suggestion-control', measurement: 'provider', modelCalls: [], tools: [] };
+        const suggestion = await processSuggestion({ session, store, provider, env, conversation: { ...conversation, suspendedTasks: currentSuspendedTasks }, conversationId: id, requestId, message: userMessage, context, now: clock(), signal,
           beforeProvider: request => increaseReservation({ store, reservation, amount: Math.ceil(Buffer.byteLength(JSON.stringify(request), "utf8") / 4) + request.max_output_tokens }),
-          onUsage: measured => { Object.assign(event, measured, { conversationId: id, route: "luna-suggestion", reasoningEffort: "low", routingReason: "user-requested-message-to-agustin", module: context.module }); },
+          onUsage: measured => { suggestionCalls++; const call = { ...measured, model: 'gpt-6-luna', route: 'luna-suggestion', reasoningEffort: 'low' }; Object.assign(event, call, { modelCalls: [call], conversationId: id, routingReason: "user-requested-message-to-agustin", module: context.module }); },
         });
         signal?.throwIfAborted();
         const result = await persistTurn({ ...suggestion, taskState: null });
         await settleUsage({ store, session, reservation, event, configuration: config, result: { conversationId: id, ...(suggestion.alertId ? { alertId: suggestion.alertId } : {}) }, now: clock() });
         settled = true;
         result.usage = await usage(session, config, event);
-        if (canAccessAdministration(session.profile)) result.telemetry = { requestId, model: event.model, reasoningEffort: "low", route: event.route, modelCalls: 1, toolCalls: 0, totalMs: Date.now() - startedAt };
+        if (canAccessAdministration(session.profile)) result.telemetry = { requestId, model: event.model, reasoningEffort: suggestionCalls ? "low" : null, route: event.route, modelCalls: suggestionCalls, toolCalls: 0, totalMs: Date.now() - startedAt };
         return result;
       }
       const deniedTask = transition.task?.status !== "cancelled" && transition.task?.intent?.startsWith("prepare_") && !capabilities(session).includes(transition.task.intent);
       let progressive = !deniedTask && !transition.handled && !control && !attachments.length ? await progressiveStock({ previous: conversation.taskState, initialId: deterministicTaskId, message: userMessage, context, run, check: () => assertCapability(session, "prepare_stock_load"), now: clock() }) : null;
       if (transition.directive === "resume" && transition.task?.status === "collecting" && !transition.task.missingFields.length && transition.task.intent.startsWith("prepare_")) {
         const result = await run(transition.task.intent, transition.task.slots);
-        progressive = { task: taskFromTool(transition.task, transition.task.intent, transition.task.slots, result, clock()), result, content: result.prepared?.summary || missingQuestion(result.data?.missing || []) };
+        progressive = { task: taskFromTool(transition.task, transition.task.intent, transition.task.slots, result, clock()), result, content: result.prepared?.summary || missingQuestion(result.data?.missing || [], transition.task.intent) };
       }
       if (deniedTask || transition.handled || control || progressive) {
         const task = deniedTask ? null : progressive?.task || (conversation.taskState ? { ...conversation.taskState, revision: conversation.taskState.revision + 1, status: control === "cancel" ? "cancelled" : conversation.taskState.status, updatedAt: clock() } : null);
         const prepared = progressive?.result.prepared;
         signal?.throwIfAborted();
-        const result = await persistTurn({ content: deniedTask ? "Esta operación no está habilitada para tu cuenta. Podés pedirle ayuda a un administrador autorizado." : (naturalVoice && (progressive || transition.handled) ? shortVoiceQuestion(task, progressive?.content || transition.content) : progressive?.content) || transition.content || (control === "cancel" ? "La tarea quedó cancelada." : conversation.pendingActionId ? "Revisá y confirmá con Sí en la tarjeta. La respuesta por voz o texto no ejecuta la acción." : "Dale, seguimos cuando me indiques."), prepared, taskState: task, draft: deniedTask || control === "cancel" || transition.directive === "cancel" || transition.directive === "pause" ? null : task?.slots || conversation.draft, state: deniedTask ? "RECHAZADA" : control === "cancel" || transition.directive === "cancel" ? "CANCELADA" : progressive?.result.state || "INFORMACION", preservePending: control === "acknowledge" });
+        const result = await persistTurn({ content: deniedTask ? "Esta operación no está habilitada para tu cuenta. Podés pedirle ayuda a un administrador autorizado." : (naturalVoice && transition.directive !== 'explain' && (progressive || transition.handled) ? shortVoiceQuestion(task, progressive?.content || transition.content) : progressive?.content) || transition.content || (control === "cancel" ? "La tarea quedó cancelada." : conversation.pendingActionId ? "Revisá y confirmá con Sí en la tarjeta. La respuesta por voz o texto no ejecuta la acción." : "Dale, seguimos cuando me indiques."), prepared, taskState: task, draft: deniedTask || control === "cancel" || transition.directive === "cancel" || transition.directive === "pause" ? null : task?.slots || conversation.draft, state: deniedTask ? "RECHAZADA" : control === "cancel" || transition.directive === "cancel" ? "CANCELADA" : progressive?.result.state || "INFORMACION", preservePending: control === "acknowledge" || transition.directive === 'explain' });
         event = { ...event, conversationId: id, taskId: task?.id || null, route: "deterministic", routingReason: deniedTask ? "permission-denied" : transition.directive || control || "progressive-stock", measurement: "provider", modelCalls: [], tools: deterministicTools, durationMs: Date.now() - startedAt, module: context.module };
         await settleUsage({ store, session, reservation, event, configuration: config, result: { conversationId: id }, now: clock() });
         settled = true;
@@ -571,6 +577,7 @@ export function createOliviaEngine({
             suspendedTasks: currentSuspendedTasks,
             selectedMetricsPeriod: conversation.metricsPeriod || null,
             taskRequirements: Object.fromEntries(capabilities(session).filter((name) => latencyEnabled(config) ? name===taskState.intent : name.startsWith("prepare_") || name === "forecast_fair").map((name) => [name, requiredFields(name)])),
+            taskFieldExplanations: Object.fromEntries(requiredFields(taskState.intent).map(field => [field, fieldGuidance(taskState.intent, field)])),
             memory: conversation.memory || null,
             documentation: knowledge,
           }),
@@ -810,7 +817,7 @@ export function createOliviaEngine({
                 : "RECHAZADA";
               draft = args;
               content =
-                (["prepare_catalog_stock_load", "prepare_batch_sales"].includes(call.name) ? result.data?.summary : null) || (result.state === "DATOS_INCOMPLETOS" && OLIVIA_CAPABILITIES[call.name]?.module === "metrics" ? result.data?.message : null) || (result.state === "DATOS_INCOMPLETOS" ? missingQuestion(taskState.missingFields) : null) || result.data?.summary ||
+                (["prepare_catalog_stock_load", "prepare_batch_sales"].includes(call.name) ? result.data?.summary : null) || (result.state === "DATOS_INCOMPLETOS" && OLIVIA_CAPABILITIES[call.name]?.module === "metrics" ? result.data?.message : null) || (result.state === "DATOS_INCOMPLETOS" ? missingQuestion(taskState.missingFields, taskState.intent) : null) || result.data?.summary ||
                 result.data?.message ||
                 "La operación necesita revisión.";
             }
@@ -854,7 +861,7 @@ export function createOliviaEngine({
         // A normalized proposal is the canonical final message; no further call can execute it.
         if(directReadAnswer){content=directReadAnswer;spokenContent=directReadAnswer;timings.answerRoundAvoided=true;break;}
         if (!taskRepairPending && nextState === "INFORMACION" && calls.every((call) => call.name === "update_task") && taskState.status === "collecting" && taskState.missingFields.length) {
-          content = missingQuestion(taskState.missingFields);
+          content = missingQuestion(taskState.missingFields, taskState.intent);
           nextState = "DATOS_INCOMPLETOS";
           timings.questionRoundAvoided = true;
         }

@@ -10,6 +10,7 @@ let messages = [], pendingAction = null;
 const jobs = new Map();
 const state = () => ({ conversationId, messages, pendingAction, enabled: true, providerConfigured: true, googleTtsConfigured: true, voiceConversationAvailable: !params.has('voiceDisabled'), audioLimits: { maxSeconds: 60, maxBytes: 4194304 }, voiceSettings: { latencyMode:params.get('latency')==='v3',turnEndSilenceMs: 1900,voice:'es-US-Chirp3-HD-Aoede',speakingRate:1,...(params.has('live')?{transcriptionModel:'gpt-live-transcribe'}:{}) }, state: pendingAction ? 'ESPERANDO_CONFIRMACION' : 'INFORMACION', usage: { unlimited: true }, estimate: null });
 export const oliviaClient = createOliviaTransport({ getToken: async () => 'synthetic-only', pollIntervalMs: 200, fetchImpl: async (url, init) => {
+  if(params.has('contextGuide')) return fetch('/__qa/olivia-context', init);
   if(url.includes('live-transcribe')) {
     countTraffic('live');
     const body=JSON.parse(init.body);
