@@ -9,3 +9,12 @@ export async function assignPreparersToShipments(ids, requests, person, reason, 
   }
   return { successes, failures };
 }
+
+export async function changeShippingStates(ids, requests, mode, send) {
+  const successes = [], failures = [];
+  for (const id of ids) {
+    try { await send({ mode, shipmentId: id, requestId: requests[id] }); successes.push(id); }
+    catch (error) { failures.push({ id, message: error.message }); }
+  }
+  return { successes, failures };
+}
