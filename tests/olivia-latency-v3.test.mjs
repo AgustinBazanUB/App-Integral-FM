@@ -40,6 +40,9 @@ test('stock and price use fresh authorized data, no LLM, and no stock mutations'
   const second=await f.turn('Stock de almendras','stock2');assert.match(second.spokenText,/17 unidades/);
   const price=await f.turn('Precio de almendras','price');assert.match(price.spokenText,/1\.500/);assert.equal(f.calls(),0);assert.equal(f.documents.get('locationStock/local_a/items/almonds').currentStock,17);
 });
+test('starting a stock task asks all missing fields together and keeps the selected location',async()=>{
+  const f=await voiceFixture(),result=await f.turn('Cargame stock','start-stock');assert.match(result.spokenText,/producto.*cuántas unidades/);assert.doesNotMatch(result.spokenText,/ubicación/);assert.equal(f.documents.get('oliviaConversations/'+f.conversationId).taskState.slots.locationId,'local_a');assert.equal(f.calls(),0);
+});
 test('ambiguous products and missing locations ask without guessing, and reads cannot escape a seller location',async()=>{
   const f=await voiceFixture();f.documents.set('products/almonds2',{name:'Almendras tostadas',active:true,defaultPrice:2000});f.documents.set('locationStock/local_a/items/almonds2',{productName:'Almendras tostadas',currentStock:5,active:true});
   f.documents.get('products/almonds').name='Almendras Guara';f.documents.get('locationStock/local_a/items/almonds').productName='Almendras Guara';

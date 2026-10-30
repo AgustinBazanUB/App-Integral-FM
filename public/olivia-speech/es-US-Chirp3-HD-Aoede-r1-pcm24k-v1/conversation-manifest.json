@@ -1,0 +1,78 @@
+{
+  "voice": "es-US-Chirp3-HD-Aoede",
+  "speakingRate": 1,
+  "voiceVersion": "es-US-Chirp3-HD-Aoede-r1-pcm24k-v1",
+  "clips": [
+    {
+      "id": "bienestar_01",
+      "category": "conversacion",
+      "text": "¡Bien! ¿Y vos?"
+    },
+    {
+      "id": "agradecimiento_01",
+      "category": "conversacion",
+      "text": "¡De nada! Acá estoy."
+    },
+    {
+      "id": "despedida_01",
+      "category": "conversacion",
+      "text": "¡Dale, hablamos! Que estés bien."
+    }
+  ],
+  "characters": 66,
+  "estimatedCostUsd": 0.00198,
+  "libraryVersion": "1.0.0",
+  "approvalHash": "60bd4f60b8a40489b9be58315b3540712549df840c18ec7d649cc2497b58d6fb",
+  "generatedAt": "2026-10-30T00:00:00.307Z",
+  "firebaseProject": "app-integral-fm-pruebas",
+  "entries": [
+    {
+      "id": "bienestar_01",
+      "category": "conversacion",
+      "text": "¡Bien! ¿Y vos?",
+      "voice": "es-US-Chirp3-HD-Aoede",
+      "voiceVersion": "es-US-Chirp3-HD-Aoede-r1-pcm24k-v1",
+      "codec": "pcm_s16le",
+      "sampleRate": 24000,
+      "durationMs": 2120,
+      "checksum": "ce827dbd779426ce338d664570d0dff23b6749a14080b33f6045e878573c1970",
+      "textChecksum": "9a6a7826fcbc3c19b595651fa0f5de2bc34582d5ad4d2b540944bc0fd21e1b8c",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/bienestar_01.pcm",
+      "providerFirstPacketMs": 347.9246959999998,
+      "providerCompleteMs": 674.4677049999998
+    },
+    {
+      "id": "agradecimiento_01",
+      "category": "conversacion",
+      "text": "¡De nada! Acá estoy.",
+      "voice": "es-US-Chirp3-HD-Aoede",
+      "voiceVersion": "es-US-Chirp3-HD-Aoede-r1-pcm24k-v1",
+      "codec": "pcm_s16le",
+      "sampleRate": 24000,
+      "durationMs": 2880,
+      "checksum": "3ec1f9af3b8da3385641805c73c986c8557f10398d314428dd5b2ebb45ea7e55",
+      "textChecksum": "1e6cec4625c533d8693c1e748b926068dbff7439b3c77f3d52ba15cdc0a53ce6",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/agradecimiento_01.pcm",
+      "providerFirstPacketMs": 165.30642400000033,
+      "providerCompleteMs": 547.754254
+    },
+    {
+      "id": "despedida_01",
+      "category": "conversacion",
+      "text": "¡Dale, hablamos! Que estés bien.",
+      "voice": "es-US-Chirp3-HD-Aoede",
+      "voiceVersion": "es-US-Chirp3-HD-Aoede-r1-pcm24k-v1",
+      "codec": "pcm_s16le",
+      "sampleRate": 24000,
+      "durationMs": 2880,
+      "checksum": "02226282a8652b182359272e0fca0b4fcc6903b5f74181cebdd65cd428a19bf4",
+      "textChecksum": "48d403710ca4d91b45a8e905d41561ea75d081081bb498be5ae1645126ad5f35",
+      "status": "ready",
+      "url": "/olivia-speech/es-US-Chirp3-HD-Aoede-r1-pcm24k-v1/despedida_01.pcm",
+      "providerFirstPacketMs": 154.84670499999993,
+      "providerCompleteMs": 549.4216030000002
+    }
+  ]
+}

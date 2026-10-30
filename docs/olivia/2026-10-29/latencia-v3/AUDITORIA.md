@@ -68,11 +68,21 @@ Por turno se guardan en memoria marcas con `performance.now()` para inicio/últi
 
 Se mantienen los 90 audios originales. Se agregan únicamente 3 respuestas breves necesarias («bien», agradecimiento y despedida), con la misma voz Aoede/rate 1: **66 caracteres, USD 0,00198 estimados** a USD 30/M. Su generación se ejecuta en el entorno de preview verificado; después se conservan como archivos estáticos. Reproducción de caché: 0 llamadas LLM/TTS; puede consumir transferencia de Netlify. Una lectura tipada usa 0 tokens LLM; el TTS dinámico cuesta `caracteres × 30 / 1.000.000`. STT Live mantiene su costo por duración (referencia USD 0,017/min), límites y reserva. En rutas con Luna se registra el uso devuelto por el proveedor; no se presenta una factura calculada como cargo confirmado. Los presupuestos de cuota, privacidad y retención siguen vigentes.
 
+Las tres respuestas se generaron y verificaron realmente en Netlify, con Firebase/Auth/credenciales de pruebas comprobados antes de llamar a Google. Se descargaron los PCM y se verificó señal no silenciosa, duración y SHA-256 de los tres. La generación produjo 378.240 bytes. El paso temporal de generación se retiró del build: futuros despliegues reutilizan los archivos de Git. El manifiesto adicional conserva los tiempos reales de proveedor de estas tres muestras:
+
+| Clip | Primer paquete de Chirp | Audio completo recibido | Duración del audio |
+| --- | --- | --- | --- |
+| Bienestar | 348 ms | 674 ms | 2120 ms |
+| Agradecimiento | 165 ms | 548 ms | 2880 ms |
+| Despedida | 155 ms | 549 ms | 2880 ms |
+
+En esas tres muestras reales, P50/P90/P95 de primer paquete: 165/348/348 ms; de recepción completa: 549/674/674 ms. Son tiempos **del build de Netlify a Google, N=3**, con creación inicial del cliente en la primera muestra; no incluyen el micrófono, STT, navegador ni el modelo principal. Confirman que no conviene esperar la descarga completa antes de programar audio y justifican conservar el streaming existente. No constituyen una comparación aleatoria de dos implementaciones TTS ni una medición de la conversación completa.
+
 `conversationLatency.enabled` permite volver al modo anterior desde Configuración de IA mediante la confirmación y reautenticación existentes. `transcriptionDelay` permite comparar `minimal` y `low`. No se reescribe automáticamente la configuración de producción. El silencio de 1900–4000 ms se conserva para ese modo anterior.
 
 ## Validación y límites pendientes
 
-- Suite general: **1047/1047** correctas; build de Gestión correcto (aviso previo de chunks grandes). Pruebas nuevas cubren 40 expresiones, lectura fresca, permisos por ubicación, contacto con cliente existente, conservación de propuestas, cancelación por ID, eventos STT fuera de orden, privacidad de trazas, ausencia de selector, listas con pausas, renovación de Live, cotización fuera de la conversación y reversión.
+- Suite general: **1048/1048** correctas; build de Gestión correcto (aviso previo de chunks grandes). Pruebas nuevas cubren 40 expresiones, lectura fresca, permisos por ubicación, contacto con cliente existente, conservación de propuestas, cancelación por ID, eventos STT fuera de orden, privacidad de trazas, ausencia de selector, listas con pausas, renovación de Live, cotización fuera de la conversación y reversión.
 - Los proveedores no se cambian. No se regeneran los 90 audios. No se crean operaciones comerciales remotas ni se envían WhatsApp o comprobantes.
 - Falta comparar `minimal`/`low` con 30–50 grabaciones reales en español argentino, ruido del local, pausas reales, formatos/presentaciones y escritorio/iPhone/Android. Las ventanas cortas pueden separar un saludo de una continuación después de una pausa; el barge-in conserva el nuevo pedido y la opción de modo anterior permite revertir. No se garantiza precisión con ese material sin probarlo.
 - Consultas fuera del matcher estricto siguen usando Luna y pueden requerir varias herramientas. Trabajos largos mantienen worker y recuperación; la ruta rápida no convierte una acción en una escritura especulativa.

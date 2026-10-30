@@ -34,5 +34,5 @@ export function quickReadPlan(text) {
   if (!query || /\b(?:y|tambien|despues|ademas|si|cuando|comparado|compara|proyecta)\b/.test(query)) return null;
   const parts = query.split(/ en (?:el |la )?/);
   if (parts.length > 2 || !parts[0].trim()) return null;
-  return { kind, query: parts[0].replace(/^(?:el |la |los |las |de )/, '').trim(), locationQuery: parts[1]?.trim() || null };
+  return { kind, query: parts[0].replace(/^(?:(?:el|la|los|las|de|del|botellas?|unidades?|frascos?|paquetes?|bolsas?|bidones?)\s+)+/, '').trim(), locationQuery: parts[1]?.trim() || null };
 }
