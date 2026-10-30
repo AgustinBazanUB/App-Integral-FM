@@ -463,6 +463,26 @@ test("cliente nuevo y venta quedan vinculados dentro de la misma operación", as
   assert.equal((await getDoc(saleRef)).data().customerId, customerId);
 });
 
+test("un vendedor puede agregar un cliente sin zona al editar su venta", async () => {
+  const database = environment.authenticatedContext("seller-1").firestore();
+  const customerId = "customer_dddddddddddddddddddddddddddddddddddddddd";
+  const customerRef = doc(database, "customers", customerId);
+  const saleRef = doc(database, "sales", "sale-customer-without-zone");
+  await environment.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), "sales", saleRef.id), {
+    sellerId: "seller-1", locationId: "loc-1", status: "active", total: 1000, items: [{ productId: "product-1", qty: 1 }],
+  }));
+
+  await assertSucceeds(runTransaction(database, async transaction => {
+    transaction.set(customerRef, {
+      customerKey: customerId, phone: "11 3333-4444", phoneNormalized: "1133334444", zoneName: "",
+      active: true, deleted: false, source: "seller_sale", createdBy: "seller-1", lastSaleId: saleRef.id,
+    });
+    transaction.update(saleRef, { customerId });
+  }));
+  assert.equal((await getDoc(customerRef)).data().zoneName, "");
+  assert.equal((await getDoc(saleRef)).data().customerId, customerId);
+});
+
 test("el vendedor no puede crear un cliente sin una venta vinculada", async () => {
   const database = environment.authenticatedContext("seller-1").firestore();
   const customerId = "customer_cccccccccccccccccccccccccccccccccccccccc";

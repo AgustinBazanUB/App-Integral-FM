@@ -70,6 +70,15 @@ async function reset() {
     }
     await setDoc(doc(db, "productCategories/food"), { name: "Almacén", active: true, sortOrder: 1 });
     await setDoc(doc(db, "settings/keyboardShortcuts"), { sellerActions: {} });
+    if (process.env.SELLER_LAYOUT_QA === "1") {
+      for (let index = 1; index <= 4; index++) {
+        const productId = `layout-product-${index}`;
+        await setDoc(doc(db, `products/${productId}`), { name: `Producto de prueba ${index}`, abbreviation: `QA ${index}`, categoryId: "food", categoryName: "Almacén", active: true, deleted: false, defaultPrice: 1000 * index });
+        await setDoc(doc(db, `locationStock/valle/items/${productId}`), { productId, productName: `Producto de prueba ${index}`, active: true, currentStock: 20, price: 1000 * index, priceMode: "default", deleted: false, productDeleted: false });
+      }
+      const items = [{ productId: "oil", name: "Aceite de prueba", qty: 1, unitPrice: 1000, subtotal: 1000 }, ...Array.from({ length: 4 }, (_, index) => ({ productId: `layout-product-${index + 1}`, name: `Producto de prueba ${index + 1}`, qty: 1, unitPrice: 1000 * (index + 1), subtotal: 1000 * (index + 1) }))];
+      await setDoc(doc(db, "sales/layout-qa"), { saleCode: "FM-QA-LAYOUT", sellerId: seller.id, locationId: "valle", locationName: "Local Valle", createdAt: new Date(), status: "active", items, subtotal: 11000, total: 11000, discountTotal: 0, discounts: [], paymentMethod: "cash", payments: [], deleted: false });
+    }
   });
 }
 let stateInFlight, stateCached, stateCachedAt = 0;
@@ -106,7 +115,7 @@ const mocks = {
   SaleInvoicePanel: `export default()=>null;`,
   ArcaInvoicePrintAction: `export default()=>null;`,
 };
-await build({ entryPoints: ["tests/shipping-lab-client.jsx"], bundle: true, outdir, entryNames: "app", format: "esm", jsx: "automatic", sourcemap: true, external: ["/images/*"], define: { "import.meta.env": "{}" }, loader: { ".woff": "dataurl", ".woff2": "dataurl" }, plugins: [{ name: "lab-boundaries", setup(builder) {
+await build({ entryPoints: ["tests/shipping-lab-client.jsx"], bundle: true, outdir, entryNames: "app", format: "esm", jsx: "automatic", sourcemap: true, external: ["/images/*"], define: { "import.meta.env": "{}" }, loader: { ".woff": "dataurl", ".woff2": "dataurl", ".png": "dataurl", ".webp": "dataurl", ".wasm": "file" }, plugins: [{ name: "lab-boundaries", setup(builder) {
   builder.onResolve({ filter: /^lab:firebase$/ }, () => ({ path: "firebase", namespace: "lab" }));
   builder.onResolve({ filter: /(?:^|\/)(firebase|AuthContext|ScreenContext|LauncherHost|routePreload|arcaService|SaleInvoicePanel|ArcaInvoicePrintAction)$/ }, args => args.path.startsWith(".") ? ({ path: args.path.split("/").at(-1), namespace: "lab" }) : undefined);
   builder.onLoad({ filter: /.*/, namespace: "lab" }, args => ({ contents: mocks[args.path], loader: "jsx", resolveDir: process.cwd() }));
@@ -145,6 +154,7 @@ const server = createServer(async (request, response) => {
     }
     if (url.pathname.startsWith("/.netlify/functions/")) return send(response, { ok: false, message: "Servicio externo deshabilitado en laboratorio." }, 403);
     if (["/app.js", "/app.js.map", "/app.css", "/app.css.map"].includes(url.pathname)) { response.setHeader("Content-Type", url.pathname.endsWith("css") ? "text/css" : url.pathname.endsWith("map") ? "application/json" : "text/javascript"); return response.end(await readFile(path.join(outdir, url.pathname.slice(1)))); }
+    if (url.pathname.endsWith(".wasm")) { response.setHeader("Content-Type", "application/wasm"); return response.end(await readFile(path.join(outdir, path.basename(url.pathname)))); }
     if (url.pathname.startsWith("/images/")) { const target = path.resolve("public", url.pathname.slice(1)); if (!target.startsWith(path.resolve("public") + path.sep)) return send(response, {}, 403); response.setHeader("Content-Type", target.endsWith("svg") ? "image/svg+xml" : target.endsWith("jpeg") || target.endsWith("jpg") ? "image/jpeg" : "image/png"); return response.end(await readFile(target)); }
     response.setHeader("Content-Type", "text/html; charset=utf-8"); response.end(html);
   } catch (error) { send(response, { ok: false, code: error.code || "lab/error", message: error.message }, Number(error.status) || 500); }
