@@ -1,7 +1,9 @@
+import { isValidCustomerPhone } from "../gestion/customers/customerDomain";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Link } from "../router";
 import PageMeta from "../components/PageMeta";
+import PaywayPaymentForm from "../components/PaywayPaymentForm";
 import { useCart } from "../context/CartContext";
 import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import { categoryById } from "../data/categories";
@@ -23,6 +25,8 @@ function newRequestId() {
 function initialDraft() {
   return {
     requestId: newRequestId(),
+    accessToken: newRequestId().replaceAll("-", "") + newRequestId().replaceAll("-", ""),
+    street: "", number: "", floor: "", apartment: "", province: "", instructions: "", receiverName: "", receiverPhone: "", rateId: "", billingMode: "consumer_final", billingName: "", billingAddress: "",
     fullName: "",
     email: "",
     phone: "",
@@ -110,6 +114,7 @@ export default function CheckoutPage() {
   );
 
   const updateField = (event) => {
+    if (draft.pendingOrder) return;
     const { name, value, type, checked } = event.target;
     setDraft((current) => ({
       ...current,
@@ -125,7 +130,7 @@ export default function CheckoutPage() {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
         nextErrors.email = "Ingresá un email válido.";
       }
-      if (draft.phone.replace(/\D/g, "").length < 8) {
+      if (!isValidCustomerPhone(draft.phone)) {
         nextErrors.phone = "Ingresá un teléfono válido.";
       }
     }
@@ -134,7 +139,8 @@ export default function CheckoutPage() {
         nextErrors.deliveryMethod = "El retiro está PENDIENTE DE DEFINIR.";
       }
       if (draft.deliveryMethod === "delivery") {
-        nextErrors.deliveryMethod = "El costo y las reglas de envío están PENDIENTE DE DEFINIR.";
+        if (!config.deliveryEnabled) nextErrors.deliveryMethod = "El envío aún no está habilitado.";
+        for (const key of ["street", "number", "city", "province", "postalCode", "rateId"]) if (!draft[key]?.trim()) nextErrors[key] = "Completá este dato.";
       }
     }
     setErrors(nextErrors);
@@ -171,6 +177,9 @@ export default function CheckoutPage() {
 
       result = await createEcommerceOrder({
         requestId: draft.requestId,
+        accessToken: draft.accessToken,
+        billing: {mode:draft.billingMode,cuit:draft.fiscalCuit,name:draft.billingName,address:draft.billingAddress},
+        shipping: {method:draft.deliveryMethod,rateId:draft.rateId,notes:draft.notes,address:Object.fromEntries(["street","number","floor","apartment","city","province","postalCode","instructions","receiverName","receiverPhone"].map(key=>[key,draft[key]]))},
         items: items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
@@ -191,6 +200,12 @@ export default function CheckoutPage() {
       }
 
       let finalOrder = result.order;
+      if (!simulatePayment) {
+        setDraft(current => ({ ...current, pendingOrder: result.order }));
+        window.localStorage.setItem("flor-mia-last-order", JSON.stringify({ orderId: result.order.id, accessToken: draft.accessToken }));
+        setStep(3);
+        return;
+      }
       let simulation = null;
       if (simulatePayment) {
         simulation = await simulateApprovedEcommercePayment({
@@ -208,6 +223,7 @@ export default function CheckoutPage() {
 
       setOrderResult({ ...finalOrder, simulation });
       setStep(3);
+      window.localStorage.setItem("flor-mia-last-order",JSON.stringify({orderId:result.order.id,accessToken:draft.accessToken}));
       clearCart();
       window.localStorage.removeItem(DRAFT_KEY);
       setDraft(initialDraft());
@@ -234,6 +250,7 @@ export default function CheckoutPage() {
       });
     } finally {
       submitting.current = false;
+      setSubmitState(current => ({ ...current, busy: false }));
     }
   };
 
@@ -242,7 +259,7 @@ export default function CheckoutPage() {
     || hasPendingPrices
     || hasUnavailableItems
     || (draft.deliveryMethod === "pickup" && !config.pickupEnabled)
-    || draft.deliveryMethod === "delivery");
+    || (draft.deliveryMethod === "delivery" && !config.deliveryEnabled));
 
   return (
     <main id="main-content" className="page-shell checkout-page">
@@ -254,14 +271,14 @@ export default function CheckoutPage() {
             Seguir explorando
           </Link>
           <p className="eyebrow">CHECKOUT COMERCIAL</p>
-          <h1>Tu pedido, validado por el backend.</h1>
+          <h1>Tu pedido Flor Mía</h1>
           <div className="checkout-progress" aria-label={`Paso ${step + 1} de 4`}>
             {steps.map((label, index) => (
               <button
                 type="button"
                 key={label}
                 className={index <= step ? "is-active" : ""}
-                disabled={index > step || Boolean(orderResult)}
+                disabled={index > step || Boolean(orderResult) || Boolean(draft.pendingOrder)}
                 onClick={() => index < step && !orderResult && setStep(index)}
                 aria-current={index === step ? "step" : undefined}
               >
@@ -279,10 +296,11 @@ export default function CheckoutPage() {
             {orderResult ? (
               <div className="integration-state">
                 <Check size={34} aria-hidden="true" />
-                <h2>Pedido registrado.</h2>
+                <h2>{orderResult.paymentStatus === "approved" ? "Pago aprobado. Tu pedido está confirmado." : "Pedido registrado."}</h2><Link className="button button--secondary" to="/mi-pedido">Consultar estado de mi pedido</Link>
                 <p><strong>{orderResult.id}</strong></p>
                 <p>Total recalculado por el backend: <strong>{formatMoney(orderResult.total)}</strong></p>
                 <p>Pago: <strong>{orderResult.paymentStatus}</strong></p>
+                {orderResult.paymentReference && <p>Referencia Payway Sandbox: <strong>{orderResult.paymentReference}</strong></p>}
                 <p>Factura: <strong>{orderResult.invoiceStatus}</strong></p>
                 {orderResult.simulation ? (
                   <>
@@ -296,9 +314,7 @@ export default function CheckoutPage() {
                   </>
                 ) : (
                   <p>
-                    Esta etapa no procesó tarjeta ni emitió ARCA. Cuando Payway se
-                    integre, la aprobación del pago podrá confirmar la venta y
-                    descontar stock dentro de una operación server-side.
+                    Payway Sandbox confirmó el pago. La venta y el stock de prueba quedaron registrados. No se emitió un comprobante fiscal productivo.
                   </p>
                 )}
                 <Link className="button button--gold" to="/productos">Seguir comprando</Link>
@@ -309,7 +325,7 @@ export default function CheckoutPage() {
                   <form onSubmit={(event) => event.preventDefault()}>
                     <p className="eyebrow">PASO 1 DE 4</p>
                     <h2>Datos y contacto</h2>
-                    <p>Comprá como invitado. El pedido final se valida en el backend.</p>
+                    <p>Comprá como invitado. Te pedimos estos datos para coordinar tu pedido.</p>
                     {storageMessage ? <p className="field-error" role="status">{storageMessage}</p> : null}
                     <div className="form-grid">
                       <label className="field-label field-label--full">
@@ -349,8 +365,8 @@ export default function CheckoutPage() {
                           onChange={updateField}
                         />
                         <span>
-                          <strong>Retiro</strong>
-                          <small>{config.pickupEnabled ? "Habilitado comercialmente." : "PENDIENTE DE DEFINIR."}</small>
+                          <strong>{config.pickup?.name ? `Retirar por ${config.pickup.name}` : "Retiro en local"}</strong>
+                          <small>{config.pickupEnabled ? config.pickup?.address || "Habilitado comercialmente." : "Retiro aún no habilitado."}</small>
                         </span>
                       </label>
                       <label>
@@ -363,10 +379,14 @@ export default function CheckoutPage() {
                         />
                         <span>
                           <strong>Envío</strong>
-                          <small>PENDIENTE DE DEFINIR: zonas, tarifa y reglas.</small>
+                          <small>{config.deliveryEnabled ? "Consultá las zonas y tarifas disponibles." : "Envío aún no habilitado."}</small>
                         </span>
                       </label>
                     </div>
+                    {draft.deliveryMethod === "delivery" && <div className="form-grid">
+                      {[["street","Calle"],["number","Altura"],["floor","Piso (opcional)"],["apartment","Departamento (opcional)"],["city","Ciudad o localidad"],["province","Provincia"],["postalCode","Código postal"],["instructions","Indicaciones para el repartidor (opcional)"],["receiverName","Nombre del receptor si es otra persona (opcional)"],["receiverPhone","Teléfono del receptor (opcional)"]].map(([name,label])=><label className="field-label" key={name}>{label}<input name={name} value={draft[name] || ""} onChange={updateField} aria-invalid={Boolean(errors[name])}/>{errors[name] && <span className="field-error">{errors[name]}</span>}</label>)}
+                      <label className="field-label field-label--full">Zona y tarifa de envío<select name="rateId" value={draft.rateId || ""} onChange={updateField}><option value="">Elegí una tarifa para tu destino</option>{(config.deliveryRates || []).map(rate=><option key={rate.id} value={rate.id}>{rate.name} · CP {rate.postalCodes.join(", ")} · {formatMoney(rate.amount)}</option>)}</select>{errors.rateId && <span className="field-error">{errors.rateId}</span>}</label>
+                    </div>}
                     {errors.deliveryMethod ? <p className="field-error">{errors.deliveryMethod}</p> : null}
                     <label className="field-label">
                       Notas del pedido
@@ -378,15 +398,19 @@ export default function CheckoutPage() {
                 {step === 2 ? (
                   <div>
                     <p className="eyebrow">PASO 3 DE 4</p>
-                    <h2>Pago</h2>
+                    <h2>Pago y facturación</h2>
+                    <fieldset><legend>Datos de facturación</legend>
+                      <label className="checkbox-label"><input type="radio" name="billingMode" value="consumer_final" checked={draft.billingMode === "consumer_final"} onChange={updateField}/>Consumidor final / sin datos fiscales adicionales</label>
+                      <label className="checkbox-label"><input type="radio" name="billingMode" value="fiscal" checked={draft.billingMode === "fiscal"} onChange={updateField}/>Facturar con mis datos fiscales</label>
+                      {draft.billingMode === "fiscal" && <div className="form-grid"><label className="field-label">CUIT<input name="fiscalCuit" value={draft.fiscalCuit} onChange={updateField} inputMode="numeric"/></label><label className="field-label">Nombre o razón social<input name="billingName" value={draft.billingName} onChange={updateField}/></label><label className="field-label field-label--full">Domicilio fiscal<input name="billingAddress" value={draft.billingAddress} onChange={updateField}/></label></div>}
+                      <p>Emitiremos el comprobante que corresponda. La clase de factura se determina según la condición fiscal del emisor y del receptor.</p>
+                    </fieldset>
                     <div className="integration-state">
                       <LockKeyhole size={30} aria-hidden="true" />
-                      <h3>Payway todavía no procesa el cobro en esta etapa.</h3>
+                      <h3>Pagar con Payway</h3>
                       <p>
-                        Al confirmar se crea un Order y un Payment con estado
-                        <strong> pending</strong>. No se crea Sale, no se descuenta
-                        stock y no se genera Invoice hasta que exista una
-                        aprobación de pago confiable.
+                        Al confirmar reservaremos tus productos durante 15 minutos.
+                        Luego podrás pagar con Mastercard en Payway Sandbox. Usá exclusivamente una tarjeta oficial de prueba.
                       </p>
                     </div>
                     {simulationCapability.enabled ? (
@@ -397,22 +421,13 @@ export default function CheckoutPage() {
                           La acción simulará un pago aprobado.
                           Se preparará un plan fiscal de prueba sin solicitar CAE.
                         </p>
-                        <label className="field-label">
-                          CUIT para facturación (opcional)
-                          <input
-                            name="fiscalCuit"
-                            inputMode="numeric"
-                            value={draft.fiscalCuit}
-                            onChange={updateField}
-                            placeholder="Sin CUIT: Consumidor Final"
-                          />
-                        </label>
+
                       </div>
                     ) : null}
                     <div className="integration-state">
                       <ShieldCheck size={28} aria-hidden="true" />
-                      <h3>Precio y stock no vienen del navegador.</h3>
-                      <p>El backend vuelve a leer products + locationStock y recalcula el total.</p>
+                      <h3>Confirmación segura de tu pedido.</h3>
+                      <p>Comprobamos precio y disponibilidad antes de registrar tu pedido.</p>
                     </div>
                   </div>
                 ) : null}
@@ -421,33 +436,40 @@ export default function CheckoutPage() {
                   <div>
                     <p className="eyebrow">PASO 4 DE 4</p>
                     <h2>Confirmar pedido</h2>
+                    {draft.pendingOrder ? <PaywayPaymentForm order={draft.pendingOrder} accessToken={draft.accessToken}
+                      onStartNewOrder={() => { const fresh = initialDraft(); setDraft(current => ({ ...current, requestId: fresh.requestId, accessToken: fresh.accessToken, pendingOrder: null })); setStep(0); }}
+                      onUpdate={order => setDraft(current => ({ ...current, pendingOrder: { ...current.pendingOrder, ...order } }))}
+                      onApproved={result => {
+                        setOrderResult({ ...result.order, paymentReference: result.gateway.reference });
+                        clearCart();
+                        window.localStorage.removeItem(DRAFT_KEY);
+                        setDraft(initialDraft());
+                      }} /> : null}
                     {draft.pendingOrder?.fiscalRetryPending ? (
                       <p role="status">El pago simulado y la venta ya están registrados. Podés reintentar el plan fiscal para este mismo pedido.</p>
                     ) : null}
-                    {checkoutBlocked ? (
+                    {!draft.pendingOrder && checkoutBlocked ? (
                       <div className="pending-panel">
                         <strong>No se puede confirmar todavía.</strong>
                         <p>
-                          Revisá catálogo, stock, precio y configuración de entrega.
-                          No se fabricarán valores para habilitar el checkout.
+                          Revisá los productos y las opciones de entrega disponibles.
                         </p>
                       </div>
-                    ) : (
+                    ) : !draft.pendingOrder ? (
                       <div className="integration-state">
                         <Check size={30} aria-hidden="true" />
                         <h3>Listo para registrar el pedido.</h3>
                         <p>
-                          El total visible es orientativo hasta que el backend lo
-                          vuelva a calcular con la fuente comercial autoritativa.
+                          Verificaremos el total y reservaremos tus productos al confirmar.
                         </p>
                       </div>
-                    )}
+                    ) : null}
                     {submitState.error ? <p className="field-error" role="alert">{submitState.error}</p> : null}
                   </div>
                 ) : null}
 
                 <div className="checkout-actions">
-                  {step > 0 ? (
+                  {step > 0 && !draft.pendingOrder ? (
                     <button type="button" className="button button--secondary" onClick={() => setStep((current) => current - 1)} disabled={submitState.busy}>
                       Volver
                     </button>
@@ -464,7 +486,7 @@ export default function CheckoutPage() {
                       disabled={checkoutBlocked || submitState.busy || Boolean(draft.pendingOrder)}
                       onClick={() => submitOrder()}
                     >
-                      {submitState.busy ? "Registrando…" : "Crear pedido"}
+                      {submitState.busy ? "Registrando…" : "Crear pedido y continuar al pago"}
                     </button>
                     {simulationCapability.enabled ? (
                       <button
@@ -509,7 +531,8 @@ export default function CheckoutPage() {
               <span>Subtotal visible</span>
               <strong>{hasPendingPrices ? "No disponible" : formatMoney(knownSubtotal)}</strong>
             </div>
-            <p>El backend ignora precios/totales enviados por el navegador y recalcula la operación.</p>
+            {draft.deliveryMethod === "delivery" && <p>Envío: {formatMoney((config.deliveryRates || []).find(rate=>rate.id===draft.rateId)?.amount || 0)}</p>}
+            <p>Precio y disponibilidad se confirman al registrar tu pedido.</p>
           </aside>
         </div>
       </section>

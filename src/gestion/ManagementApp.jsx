@@ -31,6 +31,7 @@ const AdministrationPage = lazy(managementPageLoaders.administration);
 const ActivityPage = lazy(managementPageLoaders.actividad);
 const AuditPage = lazy(managementPageLoaders.audit);
 const GenericModulePage = lazy(managementPageLoaders.generic);
+const EcommercePage = lazy(managementPageLoaders.ecommerce);
 const LoyalCustomersPage = lazy(managementPageLoaders["loyal-customers"]);
 const LocationsPage = lazy(managementPageLoaders.locations);
 const LocationDetailPage = lazy(managementPageLoaders.locationDetail);
@@ -173,6 +174,8 @@ function ManagementRouter() {
     page = <WarehousePage warehouseId={pathParts[2] ? decodeURIComponent(pathParts[2]) : null} />;
   } else if (routeId === "quick-sales") {
     page = <QuickSalesPage />;
+  } else if (routeId === "ecommerce") {
+    page = <EcommercePage />;
   } else if (routeId === "shipping") {
     page = <ShippingPage />;
   } else if (routeId === "loyal-customers") {

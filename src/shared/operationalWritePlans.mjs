@@ -1,6 +1,7 @@
 import { effectiveLocationPrice, wholeInventoryQuantity } from "../modules/inventory/domain/inventory.js";
 import { saleStockDiscrepancies } from "../modules/locations/domain/saleStock.js";
 import { saleActivitySnapshot } from "./activitySnapshots.mjs";
+import { reservedStockQuantity } from "./stockReservations.mjs";
 
 const userName = profile => profile.name || profile.email || "Usuario";
 const validationError = message => Object.assign(new Error(message), { code: "sale/validation" });
@@ -59,6 +60,8 @@ export function buildOperationalSalePlan({ profile, location, items, stocks, cou
     if (!Number.isSafeInteger(previousStock)) throw validationError(`El stock registrado de ${item.name} no es válido.`);
     if (stockType === "warehouse" && previousStock < item.qty) throw Object.assign(new Error(`${item.name}: el stock disponible es ${previousStock}. Corregí el carrito antes de continuar.`), { code: "seller/insufficient-stock", productId: item.productId, availableStock: previousStock });
     const currentStock = previousStock - item.qty;
+    const reserved = reservedStockQuantity(stock, stamp instanceof Date ? stamp : new Date());
+    if (reserved > 0 && currentStock < reserved) throw validationError(`${item.name}: hay ${reserved} unidades reservadas para pedidos web.`);
     if (!Number.isSafeInteger(currentStock)) throw validationError("El saldo de stock supera el límite permitido.");
     return {
       productId: item.productId,
@@ -97,6 +100,7 @@ export function locationStockQuantity({ existing = {}, mode, requested }) {
   if (!Number.isSafeInteger(previousStock) || !Number.isSafeInteger(previousInitial)) throw new Error("El stock registrado no es válido.");
   const currentStock = mode === "add" ? previousStock + safeRequested : mode === "adjust" ? safeRequested : previousStock + safeRequested - previousInitial;
   if (!Number.isSafeInteger(currentStock) || currentStock < 0) throw new Error("El ajuste dejaría stock negativo o un saldo inválido.");
+  if (currentStock < reservedStockQuantity(existing)) throw new Error("El ajuste consumiría unidades reservadas para pedidos web.");
   return { requested: safeRequested, previousStock, previousInitial, currentStock };
 }
 

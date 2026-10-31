@@ -1,3 +1,4 @@
+import { localFirebaseEmulator } from "./firebaseEmulator.mjs";
 // Authenticated read fallback while a preview's Firestore rules/indexes are
 // awaiting release. It uses the same role/assignment boundaries as the module.
 import { firebaseAdminAccessToken, adminRunTransaction } from "./firestoreAdminRest.mjs";
@@ -16,7 +17,7 @@ const fields = data => Object.fromEntries(Object.entries(data).map(([key, child]
 export async function queryShippingFeedRows(kind, { env = process.env, fetchImpl = fetch } = {}) {
   const token = await firebaseAdminAccessToken({ env, fetchImpl });
   const alerts = kind === "notifications";
-  const response = await fetchImpl(`https://firestore.googleapis.com/v1/projects/${publicFirebaseProjectId()}/databases/(default)/documents:runQuery`, {
+  const response = await fetchImpl(`${localFirebaseEmulator("firestore", env) || "https://firestore.googleapis.com"}/v1/projects/${publicFirebaseProjectId()}/databases/(default)/documents:runQuery`, {
     method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ structuredQuery: { from: [{ collectionId: alerts ? "alerts" : "shipments" }], where: { fieldFilter: { field: { fieldPath: alerts ? "source" : "shippingSchemaVersion" }, op: "EQUAL", value: alerts ? { stringValue: "shipping" } : { integerValue: "1" } } }, limit: 1001 } }),
     signal: AbortSignal.timeout(10000),

@@ -1,0 +1,19 @@
+{
+  "project": "app-integral-fm-pruebas",
+  "commitTime": "2026-10-31T01:08:13.459994Z",
+  "created": [
+    "locations/qa-pr53-location",
+    "products/qa-pr53-oil",
+    "locationStock/qa-pr53-location/items/qa-pr53-oil",
+    "stockMovements/qa-pr53-initial_qa-pr53-oil",
+    "channels/ecommerce",
+    "auditLogs/qa-pr53-channel-bootstrap"
+  ],
+  "authorizedExistingAdmins": 2,
+  "initialStock": 20,
+  "unitPrice": 1000,
+  "shippingPrice": 500,
+  "transport": "manual",
+  "credentialsCreated": 0,
+  "productionWrites": 0
+}

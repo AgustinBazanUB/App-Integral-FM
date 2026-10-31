@@ -2,7 +2,7 @@ import { buildCustomerDraft, customerDocumentId, customerEnrichment, isValidCust
 
 // La transacción comercial llama a este adaptador antes del commit. No toca
 // datos fiscales, precio, pago, inventario ni identidad del usuario de ecommerce.
-export async function prepareCommerceCustomer({ customer, saleId, timestamp, getDocument, env }) {
+export async function prepareCommerceCustomer({ customer, saleId, orderId = null, simulated = false, timestamp, getDocument, env }) {
   const normalized = normalizeCustomerPhone(customer.phone);
   if (!isValidCustomerPhone(normalized)) return { customerId: null, customerPhoneNormalized: normalized, operations: [], crmLinkStatus: "phone_requires_review" };
   const draft = buildCustomerDraft({ phone: customer.phone, name: customer.fullName });
@@ -13,10 +13,13 @@ export async function prepareCommerceCustomer({ customer, saleId, timestamp, get
   const patch = customerEnrichment(stored || {}, draft).patch;
   const previousPurchase = stored?.lastPurchaseAt ? new Date(stored.lastPurchaseAt) : null;
   const latest = !previousPurchase || timestamp >= previousPurchase;
-  const data = stored ? { ...patch, ...(latest ? { lastSaleId: saleId, lastPurchaseAt: timestamp } : {}), updatedAt: timestamp, updatedBy: "ecommerce-backend" } : {
-    ...draft, customerKey: customerId, active: true, deleted: false, source: "ecommerce", createdBy: "ecommerce-backend", createdAt: timestamp, updatedAt: timestamp, lastSaleId: saleId, lastPurchaseAt: timestamp,
+  const purchase = saleId && !simulated ? { lastSaleId: saleId, lastPurchaseAt: timestamp } : {};
+  const orderFields = orderId ? { lastOrderId: orderId, lastOrderAt: timestamp } : {};
+  const consent = customer.marketingConsent === true ? { ecommerceMarketingConsent: true, ecommerceMarketingConsentAt: timestamp } : {};
+  const data = stored ? { ...patch, ...(latest ? purchase : {}), ...orderFields, ...consent, updatedAt: timestamp, updatedBy: "ecommerce-backend" } : {
+    ...draft, customerKey: customerId, active: true, deleted: false, source: "ecommerce", createdBy: "ecommerce-backend", createdAt: timestamp, updatedAt: timestamp, ...purchase, ...orderFields, ...consent,
   };
   const operations = [{ type: stored ? "update" : "create", path, data, ...(previous?.updateTime ? { currentUpdateTime: previous.updateTime } : {}) }];
-  if (!stored || Object.keys(patch).length) operations.push({ type: "create", path: `auditLogs/crm_ecommerce_${saleId}`, data: { moduleId: "loyal-customers", action: stored ? "customer.updated" : "customer.created", entityId: customerId, entityType: "customer", userId: "ecommerce-backend", userName: "Ecommerce", description: stored ? "Campos vacíos completados desde la venta online" : "Cliente comercial asociado a venta online", changedFields: Object.keys(patch), sourceSaleId: saleId, createdAt: timestamp } });
+  if (!stored || Object.keys(patch).length) operations.push({ type: "create", path: `auditLogs/crm_ecommerce_${saleId || orderId}`, data: { moduleId: "loyal-customers", action: stored ? "customer.updated" : "customer.created", entityId: customerId, entityType: "customer", userId: "ecommerce-backend", userName: "Ecommerce", description: stored ? "Campos vacíos completados desde la venta online" : "Cliente comercial asociado a venta online", changedFields: Object.keys(patch), sourceSaleId: saleId, createdAt: timestamp } });
   return { customerId, customerPhoneNormalized: normalized, crmLinkStatus: "linked", operations };
 }

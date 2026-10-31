@@ -1,5 +1,6 @@
 import { loadEcommerceCatalog } from "./_lib/ecommerce/commerceService.mjs";
 import { publicEcommerceError } from "./_lib/ecommerce/publicError.mjs";
+import { configuredFirebaseProjectId } from "./_lib/firebaseProject.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -16,7 +17,7 @@ export default async function handler(request) {
   }
   try {
     const catalog = await loadEcommerceCatalog({ env: process.env });
-    return json({ ok: true, catalog });
+    return json({ ok: true, catalog: { ...catalog, environment: { firebaseProjectId: configuredFirebaseProjectId() } } });
   } catch (error) {
     const safe = publicEcommerceError(error);
     return json({ ok: false, code: safe.code, message: safe.message }, safe.status);

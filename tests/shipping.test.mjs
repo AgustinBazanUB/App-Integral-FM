@@ -359,6 +359,71 @@ test("preparer reassignment validates the new person and preserves assignment hi
   assert.ok(s.documents.has(`sales/${s.result.id}`));
 });
 
+test("web pickup follows preparation, ready-to-pick-up and customer-code confirmation without a courier or another stock write", async () => {
+  const s = await setup(true), shipment = s.shipment(), saleId = s.result.id, pickupCode = "A1B2C3D4E5";
+  shipment.creationSource = "ecommerce"; shipment.orderId = "pickup-order-qa"; shipment.fulfillmentType = "pickup"; shipment.deliveryType = "pickup"; shipment.pickupCode = pickupCode;
+  shipment.pickupLocationId = "valle"; shipment.pickupLocationName = "Local Valle";
+  s.documents.set(`shipments/${shipment.id}`, shipment);
+  const saleDoc = s.documents.get(`sales/${saleId}`); saleDoc.sourceType = "ecommerce"; saleDoc.shipmentId = shipment.id; saleDoc.deliveryMethod = "pickup"; s.documents.set(`sales/${saleId}`, saleDoc);
+  s.documents.set("orders/pickup-order-qa", { status: "paid", saleId, shipmentId: shipment.id, shipping: { method: "pickup", amount: 0 }, pickupCode });
+  const stock = s.documents.get("locationStock/valle/items/oil").currentStock;
+  await s.op("start_preparing", {}, preparer); await s.op("ready", {}, preparer);
+  assert.equal(s.shipment().status, "listo_retirar"); assert.equal(courierAction(s.shipment()), null);
+  await assert.rejects(s.op("pickup_complete", { pickupCode: "0000000000" }), /código de retiro no coincide/);
+  await s.op("pickup_complete", { pickupCode });
+  assert.equal(s.shipment().status, "entregado"); assert.equal(shippingBucket(s.shipment()), "completed");
+  assert.equal(s.documents.get("orders/pickup-order-qa").status, "completed");
+  assert.equal(s.documents.get("orders/pickup-order-qa").fulfillmentStatus, "entregado");
+  assert.equal(s.documents.get("locationStock/valle/items/oil").currentStock, stock);
+});
+
+test("web fulfillment changes atomically switch between pickup and manual delivery without touching sale or stock", async () => {
+  const s = await setup(true), shipment = s.shipment(), saleId = s.result.id;
+  shipment.creationSource = "ecommerce"; shipment.orderId = "web-order-qa"; shipment.fulfillmentType = "delivery"; shipment.paymentStatus = "approved";
+  s.documents.set(`shipments/${shipment.id}`, shipment);
+  const saleDoc = s.documents.get(`sales/${saleId}`); saleDoc.sourceType = "ecommerce"; saleDoc.deliveryMethod = "shipping"; saleDoc.shipmentId = shipment.id;
+  s.documents.set(`sales/${saleId}`, saleDoc);
+  s.documents.set("orders/web-order-qa", { status: "paid", saleId, shipmentId: shipment.id, deliveryMethod: "shipping", pickupCode: null, shipping: { method: "delivery", amount: 500, address: { street: "Calle previa", number: "123" }, pickup: null } });
+  s.documents.set("locations/pickup-qa", { name: "Local de retiro QA", address: "Av. Prueba 123, CABA", active: true });
+  const stock = s.documents.get("locationStock/valle/items/oil").currentStock;
+  const movements = [...s.documents.keys()].filter(path => path.startsWith("stockMovements/")).length;
+  await s.op("ready", {}, preparer);
+  await createCourierSession({ body: { sessionId: "fulfillment-route", requestId: "fulfillment-route-create", shipmentIds: [shipment.id], leg: "direct", newToken: routeToken }, session: session(admin), runTransaction: s.runTransaction, now, env: {} });
+
+  await s.op("fulfillment", { fulfillmentType: "pickup", pickupLocationId: "pickup-qa", reason: "El cliente prefiere retirar" });
+  const pickup = s.shipment(), pickupOrder = s.documents.get("orders/web-order-qa");
+  assert.equal(pickup.fulfillmentType, "pickup"); assert.equal(pickup.deliveryType, "pickup"); assert.equal(pickup.pickupLocationName, "Local de retiro QA");
+  assert.equal(pickup.destination.displayAddress, "Av. Prueba 123, CABA"); assert.match(pickup.pickupCode, /^[A-F0-9]{10}$/);
+  assert.equal(pickupOrder.shipping.method, "pickup"); assert.equal(pickupOrder.shipping.address, null); assert.equal(pickupOrder.deliveryMethod, "pickup"); assert.equal(pickupOrder.pickupCode, pickup.pickupCode);
+  assert.equal(s.documents.get(`sales/${saleId}`).deliveryMethod, "pickup");
+  assert.equal(s.documents.get("deliverySessions/fulfillment-route").status, "revoked");
+
+  await s.op("fulfillment", { fulfillmentType: "delivery", deliveryType: "manual", displayAddress: "Calle nueva 456, CABA", notes: "Entregar por la tarde", reason: "El cliente cambia a envío" });
+  const delivery = s.shipment(), deliveryOrder = s.documents.get("orders/web-order-qa");
+  assert.equal(delivery.fulfillmentType, "delivery"); assert.equal(delivery.deliveryType, "manual"); assert.equal(delivery.pickupCode, null);
+  assert.equal(delivery.destination.displayAddress, "Calle nueva 456, CABA"); assert.equal(delivery.destination.notes, "Entregar por la tarde");
+  assert.equal(deliveryOrder.shipping.method, "delivery"); assert.deepEqual(deliveryOrder.shipping.address, { displayAddress: "Calle nueva 456, CABA" }); assert.equal(deliveryOrder.shipping.amount, 500);
+  assert.equal(deliveryOrder.deliveryMethod, "delivery"); assert.equal(deliveryOrder.pickupCode, null); assert.equal(s.documents.get(`sales/${saleId}`).deliveryMethod, "delivery");
+  assert.equal(s.documents.get("locationStock/valle/items/oil").currentStock, stock);
+  assert.equal([...s.documents.keys()].filter(path => path.startsWith("stockMovements/")).length, movements);
+  const event = [...s.documents.entries()].filter(([path, value]) => path.startsWith(`shipments/${shipment.id}/events/`) && value.action === "fulfillment").at(-1);
+  assert.equal(event[1].before, "pickup"); assert.equal(event[1].after, "delivery"); assert.equal(event[1].actorRole, "admin");
+});
+
+test("web fulfillment changes require an editable web order and reject invalid targets before writes", async () => {
+  const s = await setup(true), shipment = s.shipment();
+  shipment.creationSource = "ecommerce"; shipment.orderId = "web-order-qa"; shipment.fulfillmentType = "delivery";
+  s.documents.set(`shipments/${shipment.id}`, shipment);
+  const saleDoc = s.documents.get(`sales/${s.result.id}`); saleDoc.sourceType = "ecommerce"; saleDoc.shipmentId = shipment.id; s.documents.set(`sales/${s.result.id}`, saleDoc);
+  s.documents.set("orders/web-order-qa", { saleId: s.result.id, shipmentId: shipment.id, shipping: { method: "delivery" } });
+  const original = structuredClone(shipment), before = s.documents.size;
+  await assert.rejects(s.op("fulfillment", { fulfillmentType: "pickup", pickupLocationId: "missing", reason: "Cambio de entrega" }), /local activo/);
+  assert.deepEqual(s.shipment(), original); assert.equal(s.documents.size, before);
+  await assert.rejects(s.op("fulfillment", { fulfillmentType: "pickup", pickupLocationId: "valle", reason: "Cambio de entrega" }, seller), /permiso/);
+  await assert.rejects(s.op("fulfillment", { fulfillmentType: "invalid", reason: "Cambio de entrega" }), /modalidad/);
+  assert.deepEqual(s.shipment(), original); assert.equal(s.documents.size, before);
+});
+
 test("bulk courier replacement is atomic, audited, idempotent and preserves other route members", async () => {
   const store = memoryStore(), shipments = [];
   for (let i = 0; i < 3; i++) {

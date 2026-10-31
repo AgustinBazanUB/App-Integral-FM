@@ -1,6 +1,6 @@
-import { isActiveSale, saleDate, summarizeSales } from "./saleFacts.js";
+import { isCancelledSale, saleDate, summarizeSales, uniqueSales } from "./saleFacts.js";
 export { isActiveSale, saleDate } from "./saleFacts.js";
-import { saleChannelLabel } from "./channels.js";
+import { saleChannelLabel, saleChannelId } from "./channels.js";
 import { saleDiscountList, storedDiscountTotal } from "./discounts.js";
 import { salePaymentParts } from "./payments.js";
 import {
@@ -95,7 +95,7 @@ export function applyMetricsFilters(sales, filters = {}, range) {
     const date = saleDate(sale);
     if (!date || date < range.start || date >= range.end) return false;
     if (!includesAny(filters.locationIds, [sale.locationId, sale.locationName].filter(Boolean))) return false;
-    if (!includesAny(filters.channelIds, [sale.sourceChannel || "__unknown"])) return false;
+    if (!includesAny(filters.channelIds, [saleChannelId(sale)])) return false;
     if (!includesAny(filters.sellerIds, [sale.sellerId, sale.sellerName].filter(Boolean))) return false;
     if ((effectiveProducts.length || selectedCategories.size) && !(sale.items || []).some(item => effectiveProducts.includes(item.productId) || selectedCategories.has(item.categoryId))) return false;
     if (filters.productId && !(sale.items || []).some((item) => itemMatches(item, filters.productId, filters.productName))) return false;
@@ -191,7 +191,7 @@ function buildTimeline(active, range) {
 export function calculateMetrics(sales, range, filters = {}) {
   const facts = summarizeSales(sales);
   const active = facts.sales;
-  const cancelled = sales.filter((sale) => sale.deleted !== true && !isActiveSale(sale));
+  const cancelled = uniqueSales(sales).filter(isCancelledSale);
   const total = active.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
   const totalItems = active.reduce((sum, sale) => sum + (sale.items || []).reduce((itemSum, item) => itemSum + Number(item.qty || 0), 0), 0);
   const byChannel = new Map();
@@ -216,7 +216,8 @@ export function calculateMetrics(sales, range, filters = {}) {
       const hour = byHour[Number(hourFormatter.format(date))];
       hour.total += saleTotal; hour.sales += 1; hour.items += itemCount;
     }
-    const channel = row(byChannel, sale.sourceChannel || "__unknown", saleChannelLabel(sale.sourceChannel));
+    const channelId = saleChannelId(sale);
+    const channel = row(byChannel, channelId, saleChannelLabel(channelId === "__unknown" ? "" : channelId));
     channel.total += saleTotal; channel.sales += 1; channel.items += itemCount;
     const originType = sale.stockOriginType || (sale.warehouseId ? "warehouse" : "location");
     const origin = row(byStockOrigin, `${originType}:${sale.stockOriginId || sale.locationId || sale.warehouseId || "unknown"}`, sale.stockOriginName || sale.locationName || sale.warehouseName || "Origen no informado");
