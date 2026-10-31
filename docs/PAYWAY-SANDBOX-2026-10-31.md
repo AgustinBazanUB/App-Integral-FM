@@ -58,7 +58,7 @@ Cambiar a producción no consiste en poner una clave productiva: el código fall
 - Doble clic en pagar y recarga: una única venta `ecommerce_sale_34d35255-ab67-486c-bbde-b0ac7200056b`, un movimiento de -1, stock del origen ficticio `qa-pr53-location` de **20 a 19**, reserva consumida y un envío vinculado. Carrito vacío sólo tras confirmar; consulta privada del comprador muestra aprobación y referencia. No hay incidencia pendiente.
 - Logística probada en Chrome: se generó el pedido sin preparador, se asignó el usuario sintético de QA, se abrió el QR como personal asignado y se confirmó **Listo para retirar**. La preparación conserva una sola imputación de stock. Transporte manual de prueba; no se solicitó repartidor ni se realizó entrega física.
 - Canal Página web: venta y envío conservan `sandbox`/`testData:true`. El modelo de métricas confirma una venta de ensayo por ARS 1.500 y **cero contribución a ingresos/ventas reales**. Administración incluye un resumen separado de pruebas Payway. Facturación queda pendiente: no se creó comprobante ni CAE y los guardas impiden emisión fiscal productiva de esta operación.
-- Evidencia sin secretos ni datos de tarjeta: [consulta backend/proveedor y efectos](payway-evidence-2026-10-31/transaction.json), capturas `03-pago-aprobado.png`, `04-pedido-administrativo.png`, `05-seguimiento.png`, `06-preparacion-lista.png`; se conserva además el rechazo anterior. Registros sintéticos permanecen en pruebas.
+- Evidencia sin secretos ni datos de tarjeta: [consulta backend/proveedor y efectos](payway-evidence-2026-10-31/transaction.json), capturas `03-pago-aprobado.png`, `04-pedido-administrativo.png`, `05-seguimiento.png`, `06-preparacion-lista.png`, `07-metricas-sandbox.png`; se conserva además el rechazo anterior. Registros sintéticos permanecen en pruebas.
 - Timeout, respuesta inconsistente, referencias ajenas y recuperación comercial se cubren con pruebas automatizadas; no se declaran ensayados manualmente todos los fallos de red. **Mastercard ID 104 está implementada pero no se realizó una aprobación auténtica con Mastercard**: falta una tarjeta de prueba certificada y validar su habilitación para este sitio. La aprobación Visa no prueba el contrato Mastercard del establecimiento 6032049.
 
 ## Revisión y archivos
@@ -72,3 +72,56 @@ Cambiar a producción no consiste en poner una clave productiva: el código fall
 ## Alcances pendientes antes de cobros reales
 
 Esta integración está limitada deliberadamente al sandbox. Una respuesta incierta jamás habilita otro cobro automáticamente. La conciliación de esta versión es bajo consulta del cliente; no hay cron, webhook ni devolución automática. Una reserva extendida también vence: cobros tardíos que ya no puedan aplicar stock deben conservarse como incidencia para resolución supervisada, sin inventar una devolución. No se invocan repartidores, comunicaciones externas ni emisión fiscal productiva durante QA.
+
+## Criterios de aceptación comprobados
+
+- [x] Credenciales sandbox seguras, SDK oficial Node, tokenización directa, backend y checkout conectados. Verificación del destino real con frontend, credenciales de servicio, Authentication y Firestore de pruebas.
+- [x] Totales autoritativos, protección de doble pago, aprobaciones y rechazos, recuperación incierta. Pruebas de idempotencia/timeout/mismatch/recuperación, rechazo auténtico y doble clic real en Chrome.
+- [x] Compra en Chrome y aprobación auténtica, pedido, venta única, salida única de stock y canal Página web. Recibo autenticado y evidencia JSON vinculada.
+- [x] Métricas de prueba separadas, tarea logística asignable, QR y preparación hasta listo. Capturas y estado persistido en pruebas.
+- [x] Sin emisión fiscal productiva; sin claves privadas ni PAN/CVV en el código, bundle o evidencia. Escaneo de la clave privada sin coincidencias y revisión de capturas.
+- [x] Pruebas automatizadas relevantes aprobadas, documentación y PR preparados. La matriz de fallos de red no fue reproducida por completo en Chrome: esos escenarios están verificados automáticamente.
+
+El objetivo sandbox se verificó con Visa. Mastercard y la habilitación productiva siguen pendientes en los términos detallados arriba.
+
+## Manifest de esta integración
+
+Archivos agregados o modificados respecto de la dependencia PR #53 (`ed3990a`). Los archivos heredados de ese PR están en sus commits, no se atribuyen a Payway.
+
+- `.env.example`
+- `deploy/ecommerce/netlify.toml`
+- `deploy/ecommerce/prepare-preview.mjs`
+- `docs/PAYWAY-SANDBOX-2026-10-31.md`
+- `docs/payway-evidence-2026-10-31/01-checkout-sandbox.png`
+- `docs/payway-evidence-2026-10-31/02-rechazo-autentico.png`
+- `docs/payway-evidence-2026-10-31/03-pago-aprobado.png`
+- `docs/payway-evidence-2026-10-31/04-pedido-administrativo.png`
+- `docs/payway-evidence-2026-10-31/05-seguimiento.png`
+- `docs/payway-evidence-2026-10-31/06-preparacion-lista.png`
+- `docs/payway-evidence-2026-10-31/07-metricas-sandbox.png`
+- `docs/payway-evidence-2026-10-31/rejected-16182378.json`
+- `docs/payway-evidence-2026-10-31/transaction.json`
+- `netlify.toml`
+- `netlify/functions/_lib/arca/authorizer.mjs`
+- `netlify/functions/_lib/arca/invoicePersistence.mjs`
+- `netlify/functions/_lib/ecommerce/orderManagement.mjs`
+- `netlify/functions/_lib/ecommerce/paymentService.mjs`
+- `netlify/functions/_lib/ecommerce/paywayGateway.mjs`
+- `netlify/functions/_lib/ecommerce/paywayService.mjs`
+- `netlify/functions/_lib/ecommerce/publicError.mjs`
+- `netlify/functions/_lib/shipping.mjs`
+- `netlify/functions/ecommerce-admin.mjs`
+- `netlify/functions/ecommerce-order-status.mjs`
+- `netlify/functions/ecommerce-payway.mjs`
+- `package-lock.json`
+- `package.json`
+- `src/components/PaywayPaymentForm.jsx`
+- `src/gestion/pages/EcommercePage.jsx`
+- `src/modules/locations/domain/saleFacts.js`
+- `src/pages/CheckoutPage.jsx`
+- `src/pages/OrderStatusPage.jsx`
+- `src/styles.css`
+- `tests/ecommerce-channel-integral.test.mjs`
+- `tests/ecommerce-payway.test.mjs`
+- `tests/ecommerce-stage5.test.mjs`
+- `tests/ecommerce-stage6-runtime.test.mjs`
