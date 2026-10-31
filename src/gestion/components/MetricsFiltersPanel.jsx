@@ -192,7 +192,7 @@ export default function MetricsFiltersPanel({
   return (
     <div ref={rootRef} className="fm-metrics-filters" aria-busy={busy || undefined}>
       <div className={`fm-metrics-scope ${["all", "ecommerce"].includes(state.section) ? "fm-metrics-scope--single" : ""}`}>
-        <FormField label="Origen de las ventas">
+        <FormField label="Tipo de venta">
           <Select value={state.section} onChange={event => { setOpenFilter(null); onChange(changeMetricsSection(state, event.target.value)); }}>
             {METRICS_SECTIONS.map(section => <option key={section.id} value={section.id}>{section.name}</option>)}
           </Select>

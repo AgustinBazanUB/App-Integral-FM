@@ -157,7 +157,7 @@ export default function SalesMetricsPage() {
       <PageHeader
         eyebrow="Métricas generales"
         title={{ all: "Ventas generales", locations: "Ventas por ubicación", ecommerce: "Ventas de la página web", channels: "Ventas por canal" }[filters.section]}
-        description="Un único informe de ventas de productos. Elegí el origen, el período y los filtros que querés analizar."
+        description="Un único informe de ventas de productos. Elegí el tipo de venta, el período y los filtros que querés analizar."
       />
 
       <Panel title="Filtros" description="Ventas generales o una vista por ubicaciones, página web o canales." action={<Button variant="secondary" disabled={loading} onClick={() => salesResult.refresh().catch(() => {})}>Actualizar ventas</Button>}>

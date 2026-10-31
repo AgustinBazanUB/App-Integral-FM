@@ -7,7 +7,7 @@ import {
   FormField,
   Select,
 } from "../../design-system";
-import { Link } from "../../router";
+import { Link, useNavigate } from "../../router";
 import {
   ecommerceAdminRequest,
   subscribeWebCommerce,
@@ -17,7 +17,6 @@ import {
   fetchEcommerceSimulationCapability,
 } from "../../services/ecommerceService";
 import { formatMoney, formatDateTime } from "../formatters";
-import { summarizeSales } from "../../modules/locations/domain/saleFacts";
 import SaleInvoicePanel from "../components/SaleInvoicePanel";
 
 const empty = {
@@ -29,6 +28,7 @@ const empty = {
   delivery: { enabled: false, rates: [] },
 };
 export default function EcommercePage() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null),
     [channel, setChannel] = useState(empty),
     [error, setError] = useState(""),
@@ -151,6 +151,13 @@ export default function EcommercePage() {
       setError(e.message);
     }
   };
+  const openOrder = (order) => {
+    if (order.shipmentId) {
+      navigate(`/gestion/shipping?shipment=${encodeURIComponent(order.shipmentId)}`);
+      return;
+    }
+    void select(order);
+  };
   const action = (mode) =>
     run(JSON.stringify([mode, selected?.id, origin, reason]), (requestId) =>
       ecommerceAdminRequest({
@@ -161,18 +168,14 @@ export default function EcommercePage() {
         reason,
       }),
     );
-  const real = summarizeSales(data?.sales || []),
-    simulated = (data?.sales || []).filter(
-      (row) => row.simulated || row.paymentStatus === "simulated_approved",
-    );
   return (
     <div>
       <PageHeader
         title="Página web / E-commerce"
-        description="Pedidos, orígenes físicos y configuración del canal comercial."
+        description="Pedidos web, logística y configuración de e-commerce."
         actions={
           <Button onClick={edit} disabled={!data}>
-            Configurar canal
+            Configuración e-commerce
           </Button>
         }
       />
@@ -181,38 +184,14 @@ export default function EcommercePage() {
           {error}
         </p>
       )}
-      <Panel title="Métricas del canal">
-        <p>
-          Ventas reales: <strong>{real.count}</strong> · Facturación comercial:{" "}
-          <strong>{formatMoney(real.total)}</strong> · Ticket promedio:{" "}
-          <strong>{formatMoney(real.average)}</strong>
-        </p>
-        <p>
-          {simulated.length} ventas simuladas excluidas de ingresos ·{" "}
-          {
-            (data?.orders || []).filter(
-              (row) => row.status === "pending_payment",
-            ).length
-          }{" "}
-          pendientes de pago ·{" "}
-          {
-            (data?.orders || []).filter((row) => row.status === "completed")
-              .length
-          }{" "}
-          completados ·{" "}
-          {
-            (data?.orders || []).filter((row) =>
-              ["cancelled", "expired"].includes(row.status),
-            ).length
-          }{" "}
-          cancelados o vencidos
-        </p>
-        <Link to="/gestion/metrics/sales?channel=ecommerce">
-          Ver métricas por período, productos y métodos de pago
-        </Link>
-      </Panel>
       {configure && (
-        <Panel title="Configuración comercial">
+        <Panel title="Configuración e-commerce">
+          <div className="fm-ecommerce-config-toolbar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+            <p>Configurá el canal, sus orígenes y las opciones de entrega.</p>
+            <Link className="fm-button fm-button--secondary" to="/gestion/metrics/sales?channel=ecommerce">
+              Ver métricas de ventas web
+            </Link>
+          </div>
           <label>
             <input
               type="checkbox"
@@ -403,7 +382,7 @@ export default function EcommercePage() {
           </Button>
         </Panel>
       )}
-      {selected && (
+      {selected && !selected.shipmentId && (
         <Panel title={`Pedido ${selected.orderCode || selected.id}`}>
           <p>
             {selected.customer.fullName} · {selected.customer.phone} ·{" "}
@@ -498,11 +477,6 @@ export default function EcommercePage() {
                     : "Confirmar pago SIMULADO"}
                 </Button>
               )}
-            {selected.shipmentId && (
-              <Link to={`/gestion/shipping?shipment=${selected.shipmentId}`}>
-                Abrir preparación y entrega
-              </Link>
-            )}
             <Button variant="secondary" onClick={() => setSelected(null)}>
               Cerrar pedido
             </Button>
@@ -548,9 +522,9 @@ export default function EcommercePage() {
                       <td>
                         <Button
                           variant="secondary"
-                          onClick={() => select(order)}
+                          onClick={() => openOrder(order)}
                         >
-                          Abrir pedido
+                          {order.shipmentId ? "Gestionar en envíos" : "Gestionar pago"}
                         </Button>
                       </td>
                     </tr>
