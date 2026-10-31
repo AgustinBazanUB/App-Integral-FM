@@ -225,7 +225,7 @@ test("el showcase de promociones referencia productos reales sin inventar precio
 });
 
 test("los seis varietales tienen intensidad y producto de 500 cc", () => {
-  assert.equal(categories.length, 7);
+  assert.equal(categories.length, 8);
   assert.deepEqual(
     oliveProfiles.map((profile) => profile.name),
     ["Arbequina", "Arbosana", "Blend IG", "Coratina", "Picual", "Arauco"],

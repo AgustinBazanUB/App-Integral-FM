@@ -76,6 +76,21 @@ export const categories = [
     facets: ["condimento", "intensidad", "uso", "tamaño"],
   },
   {
+    id: "bundles",
+    slug: "packs",
+    name: "Packs y promociones",
+    shortName: "Packs",
+    subtitle: "Ofertas combinadas",
+    description:
+      "Packs y promociones con productos combinados para que ahorres y disfrutes más.",
+    status: "estrategica",
+    featured: false,
+    composition: true,
+    image: productImage("aceite-trio-500cc.webp"),
+    imageLabel: "Pack de productos Flor Mía",
+    facets: ["tipo", "tamaño"],
+  },
+  {
     id: "wines",
     slug: "vinos",
     name: "Vinos",

@@ -1,24 +1,11 @@
-import {
-  CreditCard,
-  Grape,
-  HeartHandshake,
-  Sprout,
-  Truck,
-  UsersRound,
-} from "lucide-react";
+import { Grape, HeartHandshake, Sprout, UsersRound } from "lucide-react";
 import { Link } from "../router";
 import { assetsManifest } from "../data/assetsManifest";
 import { brand } from "../data/brand";
-import { promotions } from "../data/promotions";
 import OliveOilGuide from "../components/OliveOilGuide";
 import PageMeta from "../components/PageMeta";
 import PromoShowcase from "../components/PromoShowcase";
 import Reveal from "../components/Reveal";
-
-const promotionIcons = {
-  truck: Truck,
-  "credit-card": CreditCard,
-};
 
 const storyValues = [
   { label: "Productos mendocinos", Icon: Grape },
@@ -147,26 +134,6 @@ export default function HomePage() {
                 </Link>
               </div>
             </div>
-          </div>
-        </section>
-
-        <section className="fm-promotions" aria-labelledby="promotions-title">
-          <h2 className="sr-only" id="promotions-title">
-            Promociones vigentes
-          </h2>
-          <div className="fm-page fm-promotions__frame">
-            {promotions.map(({ id, icon, title, subtitle }) => {
-              const Icon = promotionIcons[icon];
-              return (
-                <article className="fm-promotion" key={id}>
-                  <Icon aria-hidden="true" strokeWidth={1.35} />
-                  <div>
-                    <h3>{title}</h3>
-                    <p>{subtitle}</p>
-                  </div>
-                </article>
-              );
-            })}
           </div>
         </section>
 
