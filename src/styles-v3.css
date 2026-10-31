@@ -694,6 +694,7 @@ body::before {
 .fm-reviews-carousel__track {
   display: flex;
   gap: 20px;
+  overflow: hidden;
   animation: scroll 40s linear infinite;
 }
 
