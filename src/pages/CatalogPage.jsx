@@ -5,6 +5,7 @@ import OccasionBuilder from "../components/OccasionBuilder";
 import OliveOilGuide from "../components/OliveOilGuide";
 import PageMeta from "../components/PageMeta";
 import ProductCard from "../components/ProductCard";
+import PromoShowcase from "../components/PromoShowcase";
 import Reveal from "../components/Reveal";
 import SectionHeading from "../components/SectionHeading";
 import SensoryComparison from "../components/SensoryComparison";
@@ -253,6 +254,12 @@ export default function CatalogPage() {
             />
           </div>
         </Reveal>
+      ) : null}
+
+      {isOliveOilView ? (
+        <PromoShowcase promoType="oil" />
+      ) : !isGiftsView && !query && !activeCollection ? (
+        <PromoShowcase promoType="products" />
       ) : null}
 
       <section className="section catalog-results">

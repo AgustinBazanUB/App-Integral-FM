@@ -27,6 +27,7 @@ export const products = [
     occasions: ["gift", "everyday"],
     editorialFeatured: false,
     dataStatus: "pending",
+    promoType: "oil",
   },
   {
     id: "bundle-5l-500cc",
@@ -52,6 +53,7 @@ export const products = [
     occasions: ["gift", "everyday"],
     editorialFeatured: false,
     dataStatus: "pending",
+    promoType: "oil",
   },
   {
     id: "bundle-2kg-almendras",
@@ -77,6 +79,7 @@ export const products = [
     occasions: ["gift", "breakfast", "everyday"],
     editorialFeatured: false,
     dataStatus: "pending",
+    promoType: "products",
   },
   {
     id: "bundle-pistachos-almendras-tostados",
@@ -102,6 +105,7 @@ export const products = [
     occasions: ["picada", "gift"],
     editorialFeatured: false,
     dataStatus: "pending",
+    promoType: "products",
   },
   {
     id: "bundle-pistachos-pelados-tostados",
@@ -127,6 +131,7 @@ export const products = [
     occasions: ["picada", "gift"],
     editorialFeatured: false,
     dataStatus: "pending",
+    promoType: "products",
   },
   {
     id: "bundle-2-bidones-5l",
@@ -152,6 +157,7 @@ export const products = [
     occasions: ["gift", "everyday"],
     editorialFeatured: false,
     dataStatus: "pending",
+    promoType: "oil",
   },
   {
     id: "oil-5l",

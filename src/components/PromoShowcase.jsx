@@ -6,7 +6,7 @@ import { products } from "../data/products";
 import { useCart } from "../context/CartContext";
 import { formatPrice } from "../utils/format";
 
-export default function PromoShowcase() {
+export default function PromoShowcase({ promoType = null }) {
   const { addItem, openCart } = useCart();
   const [currentIndex, setCurrentIndex] = useState(0);
   const bundleProducts = products.filter(
@@ -14,7 +14,8 @@ export default function PromoShowcase() {
       product.categoryId === "bundles" &&
       product.active !== false &&
       typeof product.promoPrice === "number" &&
-      product.promoPrice < product.price,
+      product.promoPrice < product.price &&
+      (promoType ? product.promoType === promoType : true),
   );
 
   const visibleCount = window.innerWidth >= 900 ? 4 : window.innerWidth >= 600 ? 2 : 1;
