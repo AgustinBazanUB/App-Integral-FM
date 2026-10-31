@@ -37,7 +37,7 @@ export function paywayPublicConfig(env = process.env) {
     const { siteId, publicKey } = paywayConfig(env);
     return { enabled: true, environment: "sandbox", siteId, publicKey, tokenUrl: PAYWAY_TOKEN_URL, scriptUrl: PAYWAY_SCRIPT_URL,
       isolation: { firebaseProjectId: "app-integral-fm-pruebas", credentialProjectVerified: true, authDomain: env.VITE_PREVIEW_FIREBASE_AUTH_DOMAIN || "", arcaEnvironment: "homologation" },
-      paymentMethods: [{ id: 104, name: "Mastercard crédito Payway" }], installments: [1] };
+      paymentMethods: [{ id: 104, name: "Mastercard crédito Payway" }, { id: 1, name: "Visa crédito Sandbox" }], installments: [1] };
   } catch { return { enabled: false, environment: "sandbox" }; }
 }
 
@@ -110,12 +110,12 @@ export function verifiedPaywayReceipt(response, expected) {
   if (!response || response.site_transaction_id !== expected.operationId
       || String(response.site_id) !== String(expected.siteId)
       || Number(response.amount) !== expected.amount || String(response.currency).toUpperCase() !== "ARS"
-      || Number(response.payment_method_id) !== 104 || Number(response.installments) !== 1
+      || Number(response.payment_method_id) !== Number(expected.paymentMethodId || 104) || Number(response.installments) !== 1
       || !/^[0-9]{1,30}$/.test(String(response.id || "")))
     throw commerceError("payway-response-mismatch", "La respuesta de Payway necesita conciliación administrativa.", 409);
   const status = String(response.status || "").toLowerCase();
   const mapped = ({ approved: "approved", rejected: "rejected", cancelled: "cancelled", canceled: "cancelled" })[status] || "pending";
   return { verified: true, environment: "sandbox", siteId: String(response.site_id), operationId: response.site_transaction_id,
     providerId: String(response.id), amount: Number(response.amount), currency: "ARS",
-    status: mapped, providerStatus: status, paymentMethodId: 104, installments: 1 };
+    status: mapped, providerStatus: status, paymentMethodId: Number(response.payment_method_id), installments: 1 };
 }

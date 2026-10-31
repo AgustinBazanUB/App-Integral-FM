@@ -585,6 +585,10 @@ export default function EcommercePage() {
               ? "Retiro presencial"
               : "Envío a domicilio"}
           </p>
+          {selected.paymentEnvironment === "sandbox" && <p><Badge>PAYWAY SANDBOX · SIN INGRESO REAL</Badge></p>}
+          {selected.paywayState && <p>Payway: {selected.paywayState} · Referencia: {selected.paywayReference || "En verificación"}</p>}
+          {selected.paymentIncident && <p role="alert">Cobro aprobado pendiente de conciliación comercial. No volver a cobrar ni liberar stock. Reintentá la conciliación y revisá la incidencia si persiste.</p>}
+          {selected.paywayState && selected.paywayState !== "completed" && <Button disabled={busy} onClick={() => run(`payway:${selected.id}`, () => ecommerceAdminRequest({ mode: "payway-reconcile", orderId: selected.id }))}>Consultar y conciliar Payway</Button>}
           {selected.pickupCode && (
             <p>
               Código de retiro: <strong>{selected.pickupCode}</strong>

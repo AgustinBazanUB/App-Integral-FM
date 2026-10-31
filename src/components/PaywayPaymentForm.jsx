@@ -22,7 +22,7 @@ export async function paywayRequest(body) {
   return result;
 }
 
-export default function PaywayPaymentForm({ order, accessToken, onApproved, onUpdate }) {
+export default function PaywayPaymentForm({ order, accessToken, onApproved, onUpdate, onStartNewOrder }) {
   const form = useRef(null);
   const lock = useRef(false);
   const [config, setConfig] = useState(null);
@@ -31,6 +31,7 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
   const [result, setResult] = useState(null);
   const [checked, setChecked] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
+  const [paymentMethodId, setPaymentMethodId] = useState(104);
   const apply = (value) => {
     setResult(value);
     onUpdate?.(value.order);
@@ -71,8 +72,9 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
         form.current.reset();
         setChecked(false); // A lost POST response must recover via reconciliation.
       }
-      const value = await paywayRequest({ mode, orderId: order.id, accessToken, ...tokenData });
+      const value = await paywayRequest({ mode, orderId: order.id, accessToken, ...(mode === "pay" ? { paymentMethodId } : {}), ...tokenData });
       apply(value); setChecked(true);
+      if (value.gateway.state === "ready" && !sdkReady) { await loadPaywaySdk(); setSdkReady(true); }
     } catch (err) { setError(err.message); }
     finally { setBusy(false); lock.current = false; }
   };
@@ -82,6 +84,7 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
   return <section className="payway-payment" aria-busy={busy}>
     <p className="eyebrow">PAYWAY SANDBOX · ENTORNO DE PRUEBAS</p>
     <h3>Pagar con Payway</h3>
+    <p>Pedido: <strong>{order.id}</strong></p>
     <p>Esta compra usa dinero y stock de prueba. No se emitirá una factura fiscal productiva.</p>
     <dl className="payway-totals">
       <div><dt>Productos</dt><dd>{money(order.subtotal)}</dd></div>
@@ -92,7 +95,8 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
     {config?.enabled === false ? <p role="status">Payway está pendiente de habilitación en este entorno.</p> : null}
     {canPay ? <form ref={form} onSubmit={event => { event.preventDefault(); run("pay"); }} autoComplete="off">
       <fieldset disabled={busy}>
-        <legend>Mastercard crédito · 1 cuota</legend>
+        <legend>Tarjeta de prueba · 1 cuota</legend>
+        <label className="field-label">Tarjeta habilitada en sandbox<select value={paymentMethodId} onChange={event=>setPaymentMethodId(Number(event.target.value))}>{config.paymentMethods.map(method=><option key={method.id} value={method.id}>{method.name}</option>)}</select></label>
         <label className="field-label">Número de tarjeta de prueba<input type="password" inputMode="numeric" data-decidir="card_number" autoComplete="off" required minLength={16} maxLength={19} /></label>
         <div className="payway-fields">
           <label className="field-label">Mes de vencimiento<input inputMode="numeric" data-decidir="card_expiration_month" placeholder="MM" required pattern="0[1-9]|1[0-2]" maxLength={2} /></label>
@@ -107,10 +111,11 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
       </fieldset>
     </form> : null}
     {state && state !== "ready" ? <div role="status" className="pending-panel">
-      <strong>{finalFailure ? "El pago fue rechazado o cancelado." : state === "recovery_required" ? "Payway aprobó el pago; estamos conciliando el pedido." : "Resultado en verificación"}</strong>
-      <p>{finalFailure ? "No se registró una venta. Conservamos este pedido para consulta." : "Consultá el estado de esta operación. No ingreses otra tarjeta ni generes un nuevo pago."}</p>
+      <strong>{state === "expired" ? "La reserva de este pedido venció." : finalFailure ? "El pago fue rechazado o cancelado." : state === "recovery_required" ? "Payway aprobó el pago; estamos conciliando el pedido." : "Resultado en verificación"}</strong>
+      <p>{state === "expired" || finalFailure ? "No se registró una venta. Conservamos este pedido para consulta." : "Consultá el estado de esta operación. No ingreses otra tarjeta ni generes un nuevo pago."}</p>
       {result.gateway.reference ? <p>Referencia Payway: {result.gateway.reference}</p> : null}
     </div> : null}
+    {onStartNewOrder && (finalFailure || state === "expired") ? <button className="button button--secondary" type="button" onClick={onStartNewOrder}>Crear un nuevo pedido</button> : null}
     {error ? <p className="field-error" role="alert">{error}</p> : null}
     {config?.enabled && !canPay && !finalFailure ? <button className="button button--secondary" type="button" disabled={busy} onClick={() => run("reconcile")}>{busy ? "Verificando…" : "Consultar resultado del pago"}</button> : null}
   </section>;

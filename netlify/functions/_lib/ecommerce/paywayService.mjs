@@ -3,6 +3,7 @@ import { adminRunTransaction, adminGetDocument } from "../firestoreAdminRest.mjs
 import { commerceError } from "./commerceDomain.mjs";
 import { confirmEcommercePayment } from "./paymentService.mjs";
 import { paywayConfig, paywayAmount, createPaywayGateway, verifiedPaywayReceipt } from "./paywayGateway.mjs";
+import { canAccessAdministration } from "../../../../src/gestion/permissions.js";
 
 function denied() { return commerceError("ecommerce-order-access-denied", "El acceso privado al pedido no es válido.", 403); }
 export function assertPaywayOrderAccess(order, body) {
@@ -20,18 +21,21 @@ function publicResult(order, gateway, extra = {}) {
 }
 
 export async function processPaywayPayment({ body, env = process.env, now = new Date(), runTransaction = adminRunTransaction,
-  getDocument = adminGetDocument, gateway, confirm = confirmEcommercePayment } = {}) {
+  getDocument = adminGetDocument, gateway, confirm = confirmEcommercePayment, adminActor = null } = {}) {
   const config = paywayConfig(env);
   if (!body || !["pay", "reconcile"].includes(body.mode)) throw commerceError("payway-request-invalid", "Operación Payway inválida.", 400);
   // Allowlist the complete public request: PAN/CVV and client totals never enter SDK payloads or storage.
-  if (Object.keys(body).some(key => !["mode", "orderId", "accessToken", "token", "bin"].includes(key)))
+  if (Object.keys(body).some(key => !["mode", "orderId", "accessToken", "token", "bin", "paymentMethodId"].includes(key)))
     throw commerceError("payway-request-invalid", "La solicitud sólo admite un token de pago.", 400);
   if (!/^ecommerce_order_[A-Za-z0-9_-]{8,96}$/.test(body.orderId || "")) throw denied();
   let charge = false;
   const claimed = await runTransaction(async (tx) => {
     const snapshot = await tx.getDocument(`orders/${body.orderId}`);
     const order = snapshot?.data;
-    assertPaywayOrderAccess(order, body);
+    if (adminActor && body.mode === "reconcile") {
+      const profile = (await tx.getDocument(`users/${adminActor.uid}`))?.data;
+      if (!profile?.active || !canAccessAdministration(profile) || order?.sourceType !== "ecommerce") throw denied();
+    } else assertPaywayOrderAccess(order, body);
     const payment = (await tx.getDocument(`payments/${order.paymentId}`))?.data;
     if (!payment || payment.orderId !== body.orderId || payment.amount !== order.total || payment.currency !== "ARS")
       throw commerceError("ecommerce-payment-amount-conflict", "El pago y el pedido no coinciden.", 409);
@@ -43,6 +47,8 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
         throw commerceError("ecommerce-reservation-expired", "El pedido no tiene una reserva vigente para pagar.", 409);
       if (!/^[A-Za-z0-9_-]{16,200}$/.test(body.token || "")) throw commerceError("payway-token-invalid", "Volvé a completar los datos de tarjeta.", 400);
       if (!/^\d{6,8}$/.test(body.bin || "")) throw commerceError("payway-token-invalid", "El token no incluye un BIN válido.", 400);
+      const paymentMethodId = body.paymentMethodId ?? 104;
+      if (![104, 1].includes(paymentMethodId)) throw commerceError("payway-request-invalid", "El medio de pago no está habilitado en sandbox.", 400);
       // Check every held physical allocation again before a provider call. Extend
       // the same holds while a result is uncertain; cancellation is blocked too.
       const holdUntil = new Date(now.valueOf() + 24 * 60 * 60 * 1000);
@@ -61,7 +67,7 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
       }
       attempt = { state: "submitted", environment: "sandbox", siteId: config.siteId,
         operationId: `fm_${createHash("sha256").update(body.orderId).digest("hex").slice(0,32)}`,
-        amount: paywayAmount(order.total), currency: "ARS", submittedAt: now, reconciliationCount: 0 };
+        amount: paywayAmount(order.total), currency: "ARS", paymentMethodId, submittedAt: now, reconciliationCount: 0 };
       const operations = [...stocks].map(([path, stock]) => ({ type: "update", path, data: {
         ecommerceReservations: { ...stock.data.ecommerceReservations, [body.orderId]: { ...stock.data.ecommerceReservations[body.orderId], expiresAt: holdUntil } },
       } }));
@@ -74,7 +80,7 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
   }, { env });
   charge = claimed.charge;
   let { order, attempt } = claimed;
-  if (!attempt) return publicResult(order, null);
+  if (!attempt) return publicResult(order, { state: order.status !== "pending_payment" || new Date(order.reservationExpiresAt) <= now ? "expired" : "ready" });
   if (order.saleId || ["rejected", "cancelled"].includes(order.paymentStatus)) return publicResult(order, attempt);
   if (!attempt.receipt || attempt.receipt.status === "pending") {
     // A parallel second click does not race a query against a still-running POST.
@@ -83,8 +89,8 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
       gateway ||= createPaywayGateway(env);
       let response;
       if (charge) response = await gateway.charge({ site_transaction_id: attempt.operationId, token: body.token,
-        payment_method_id: 104, bin: body.bin, amount: attempt.amount, currency: "ARS", installments: 1,
-        payment_type: "single", sub_payments: [], site_id: config.siteId });
+        payment_method_id: attempt.paymentMethodId, bin: body.bin, amount: attempt.amount, currency: "ARS", installments: 1,
+        payment_type: "single", sub_payments: [] });
       else {
         const matches = await gateway.find(attempt.operationId);
         if (matches.length !== 1) throw commerceError("payway-uncertain", "La operación continúa en verificación.", 503);
@@ -119,7 +125,13 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
       if (previous.receipt?.status === "approved" && ((patch.receipt && patch.receipt.status !== "approved") || patch.state === "uncertain")) return previous;
       if (previous.state === "completed") return previous;
       const next = { ...previous, ...patch, updatedAt: new Date(), reconciliationCount: (previous.reconciliationCount || 0) + (charge ? 0 : 1) };
-      await tx.commitDocuments([{ type: "update", path: `payments/${order.paymentId}`, data: { gateway: next, updatedAt: new Date() } }]);
+      await tx.commitDocuments([
+        { type: "update", path: `payments/${order.paymentId}`, data: { gateway: next, updatedAt: new Date() } },
+        { type: "update", path: `orders/${order.id}`, data: { paywayState: next.state, paywayReference: next.receipt?.providerId || null,
+          paywayProviderStatus: next.receipt?.providerStatus || null,
+          paymentIncident: next.state === "recovery_required" ? { code: "payway-commercial-recovery", providerApproved: next.receipt?.status === "approved", updatedAt: new Date() } : null,
+          updatedAt: new Date() } },
+      ]);
       return next;
     }, { env });
   }

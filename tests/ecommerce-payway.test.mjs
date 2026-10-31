@@ -9,6 +9,7 @@ import { processPaywayPayment } from "../netlify/functions/_lib/ecommerce/payway
 import { paywayConfig, paywayPublicConfig, paywayAmount, verifiedPaywayReceipt } from "../netlify/functions/_lib/ecommerce/paywayGateway.mjs";
 import { summarizeSales } from "../src/modules/locations/domain/saleFacts.js";
 import { ensurePendingInvoice } from "../netlify/functions/_lib/arca/invoicePersistence.mjs";
+import { reservedStockQuantity } from "../src/shared/stockReservations.mjs";
 
 const env = { CONTEXT: "deploy-preview", FIREBASE_PROJECT_ID: "app-integral-fm-pruebas", VITE_FIREBASE_PROJECT_ID: "app-integral-fm-pruebas",
   FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({ project_id: "app-integral-fm-pruebas", client_email: "synthetic@app-integral-fm-pruebas.iam.gserviceaccount.com", private_key: "synthetic-not-a-key" }),
@@ -54,6 +55,7 @@ test("doble clic concurrente, recarga y reintento conservan un cobro/venta/salid
 for(const status of ["rejected","cancelled"]) test(`Payway ${status} no genera venta ni stock y no vuelve a cobrar`,async()=>{
   const s=await setup();s.gateway.charge=async p=>receipt(p,{status}); const r=await s.process();await s.process();
   assert.equal(r.order.paymentStatus,status); assert.equal(rows(s.db,"sales").length,0);assert.equal(s.db.documents.get("locationStock/valle/items/oil").currentStock,10);
+  assert.equal(reservedStockQuantity(s.db.documents.get("locationStock/valle/items/oil"), now), 0);
 });
 test("timeout mantiene referencia estable; consulta posterior recupera aprobación sin segundo POST",async()=>{
   const s=await setup();const original=s.gateway.charge;s.gateway.charge=async p=>{await original(p);throw Error("network timeout");};
@@ -67,7 +69,7 @@ test("consulta sin resultado nunca dispara otro cobro",async()=>{
   await s.process();const r=await s.process({now:new Date(now.valueOf()+20000)});
   assert.equal(r.gateway.state,"uncertain"); assert.equal(rows(s.db,"sales").length,0);
 });
-for(const patch of [{amount:1},{currency:"USD"},{site_id:"00000000"},{site_transaction_id:"another"},{payment_method_id:1}])
+for(const patch of [{amount:1},{currency:"USD"},{site_id:"00000000"},{site_transaction_id:"another"},{payment_method_id:31}])
 test(`respuesta alterada ${Object.keys(patch)[0]} conserva incidencia sin venta`,async()=>{
   const s=await setup();s.gateway.charge=async p=>receipt(p,patch);const r=await s.process();
   assert.equal(r.gateway.state,"uncertain");assert.equal(rows(s.db,"sales").length,0);
@@ -75,7 +77,19 @@ test(`respuesta alterada ${Object.keys(patch)[0]} conserva incidencia sin venta`
 test("aprobación durable sobrevive fallo comercial y se recupera sin cobrar otra vez",async()=>{
   const s=await setup();const r=await s.process({confirm:async()=>{throw Error("stock changed")}});
   assert.equal(r.gateway.state,"recovery_required");assert.equal(s.db.documents.get(`payments/${s.order.paymentId}`).gateway.receipt.status,"approved");
+  assert.equal(s.db.documents.get(`orders/${s.order.id}`).paymentIncident.providerApproved,true);
   const recovered=await s.process();assert.equal(recovered.order.paymentStatus,"approved");assert.equal(s.charges(),1);
+});
+test("Visa sandbox admitida explícitamente, sin alterar la ruta Mastercard",async()=>{
+  const s=await setup();const r=await s.process({body:{...s.request,paymentMethodId:1}});
+  assert.equal(s.payload().payment_method_id,1);assert.equal(r.order.paymentStatus,"approved");
+  const other=await setup();await assert.rejects(()=>other.process({body:{...other.request,paymentMethodId:31}}),{code:"payway-request-invalid"});assert.equal(other.charges(),0);
+});
+test("administrador activo puede conciliar sin clave del comprador; vendedor no",async()=>{
+  const s=await setup();await s.process({confirm:async()=>{throw Error("temporary")}});
+  await assert.rejects(()=>s.process({body:{mode:"reconcile",orderId:s.order.id},adminActor:{uid:"seller"}}),{code:"ecommerce-order-access-denied"});
+  const r=await s.process({body:{mode:"reconcile",orderId:s.order.id},adminActor:{uid:admin.id}});
+  assert.equal(r.order.paymentStatus,"approved");assert.equal(s.charges(),1);
 });
 test("un caller no puede confirmar Payway sin evidencia persistida del proveedor",async()=>{
   const s=await setup();await assert.rejects(()=>s.confirm({orderId:s.order.id,idempotencyKey:s.order.requestId,provider:"payway",status:"approved",reference:"12345",env}),{code:"payway-evidence-required"});

@@ -13,6 +13,7 @@ import { publicEcommerceError } from "./_lib/ecommerce/publicError.mjs";
 import { originStockPath } from "./_lib/ecommerce/channelService.mjs";
 import { reservedStockQuantity } from "../../src/shared/stockReservations.mjs";
 import { canAccessAdministration } from "../../src/gestion/permissions.js";
+import { processPaywayPayment } from "./_lib/ecommerce/paywayService.mjs";
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -141,7 +142,9 @@ export default async function handler(request) {
           };
         }),
       );
-    } else if (body.mode === "configure")
+    } else if (body.mode === "payway-reconcile")
+      result = await processPaywayPayment({ body: { mode: "reconcile", orderId: body.orderId }, adminActor: session });
+    else if (body.mode === "configure")
       result = await configureWebChannel({ body, session });
     else if (body.mode === "save-product")
       result = await configureWebProduct({ body, session });

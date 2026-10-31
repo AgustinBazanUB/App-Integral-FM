@@ -3,6 +3,7 @@ import PageMeta from "../components/PageMeta";
 import { Link } from "../router";
 import { SHIPPING_STATES } from "../shared/shippingDomain.mjs";
 import { ecommercePublicEndpoint } from "../services/ecommercePublicEndpoint";
+import PaywayPaymentForm from "../components/PaywayPaymentForm";
 export default function OrderStatusPage() {
   const [access, setAccess] = useState(() => {
       try {
@@ -115,7 +116,13 @@ export default function OrderStatusPage() {
             <p>
               Pago: {order.paymentStatus}
               {order.simulated ? " · SIMULACIÓN, SIN COBRO REAL" : ""}
+              {order.paymentEnvironment === "sandbox" ? " · PAYWAY SANDBOX, SIN INGRESO REAL" : ""}
             </p>
+            {order.paymentReference && <p>Referencia Payway: {order.paymentReference}</p>}
+            {order.paywayState === "recovery_required" && <p role="status">Payway confirmó el cobro de prueba. El pedido continúa en conciliación; no vuelvas a pagar.</p>}
+            {order.paymentStatus === "pending" && <PaywayPaymentForm order={order} accessToken={access.accessToken}
+              onUpdate={result=>setOrder(current=>({...current,...result}))}
+              onApproved={result=>setOrder(current=>({...current,...result.order,paymentReference:result.gateway.reference,paymentEnvironment:"sandbox"}))} />}
             <p>
               {order.deliveryMethod === "pickup"
                 ? "Retiro en local"

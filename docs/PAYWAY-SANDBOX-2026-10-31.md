@@ -29,8 +29,8 @@ Se evaluó el checkout alojado disponible en el SDK, pero requiere plantilla/con
 3. Un claim transaccional crea `payments.gateway` antes de llamar al proveedor. La referencia `fm_<hash del pedido>` no cambia. Un segundo clic o recarga no puede ejecutar otro POST de cobro. La reserva se extiende 24 horas mientras se verifica. No se guarda el token.
 4. La respuesta autenticada se valida contra operación, Site ID, moneda, importe, medio y cuotas. Sólo se conserva un recibo con campos permitidos; nunca la respuesta completa ni sus tokens/card_data/PAN. La aprobación queda durable antes de registrar la venta.
 5. El confirmador existente exige ese recibo para Payway y realiza una única transacción de pedido/pago/CRM/venta/stock/logística/auditoría. No depende de una confirmación del navegador ni de un webhook no autenticado.
-6. Timeout, respuesta inválida, ausencia o resultado incierto conservan la referencia y bloquean otro cobro. Conciliación consulta `getAllPayments` por siteOperationId + merchantId y después `paymentInfo`. Sólo una coincidencia válida puede confirmar. Si la venta falla después de una aprobación, queda `recovery_required` y se reintenta la operación comercial sin volver a cobrar.
-7. Cambios administrativos y liberación de reserva se bloquean mientras el pago está incierto. Un rechazo/cancelación confirmado no crea venta ni salida. Esta primera versión conserva un único intento de cobro por pedido; un nuevo intento tras rechazo requiere un pedido explícito nuevo, sin borrar el anterior.
+6. Timeout, respuesta inválida, ausencia o resultado incierto conservan la referencia y bloquean otro cobro. Conciliación consulta `getAllPayments` por siteOperationId + merchantId y después `paymentInfo`. Sólo una coincidencia válida puede confirmar. Si la venta falla después de una aprobación, queda `recovery_required`, una incidencia visible en el pedido administrativo y se reintenta la operación comercial sin volver a cobrar. Administración puede consultar/conciliar desde el panel, con perfil activo verificado, sin conocer la clave del comprador.
+7. Cambios administrativos y liberación de reserva se bloquean mientras el pago está incierto. Un rechazo/cancelación confirmado no crea venta ni salida y libera las reservas dentro de la confirmación transaccional. Esta primera versión conserva un único intento de cobro por pedido; un nuevo intento tras rechazo o vencimiento requiere pulsar explícitamente «Crear un nuevo pedido», sin borrar el anterior. Mi pedido permite recuperar el pago con la clave privada de consulta.
 8. Sandbox usa `paymentEnvironment:sandbox` y `testData:true` en pedido, pago, venta, stock y logística. Se excluye de ingresos comerciales reales. Se bloquea preparación/autorización fiscal productiva. No se llama ARCA en el checkout Payway.
 
 El botón queda bloqueado durante el intento; sólo se vacía el carrito después de aprobación y venta confirmadas. El pedido y los datos se conservan tras errores o recarga. La clave de consulta viaja en POST, no en URL. La CSP sólo permite el script oficial versionado y los dos orígenes sandbox; no habilita la API productiva.
@@ -45,10 +45,13 @@ Cambiar a producción no consiste en poner una clave productiva: el código fall
 
 ## Validación
 
-- 1131 pruebas Node aprobadas, incluidas 21 específicas de Payway.
+- 1133 pruebas Node aprobadas, incluidas 23 específicas de Payway.
 - Builds Gestión y E-commerce aprobados; advertencia existente de tamaño de chunks.
 - SDK Node real: consulta autenticada de sandbox aprobada, sin datos ni claves en logs.
-- Reglas, Deploy Preview, compra real en Chrome y evidencia transaccional: pendientes de finalizar en esta rama. No hay aprobación Payway declarada todavía.
+- 156 pruebas de reglas Firestore aprobadas en emulador local; sin cambios nuevos al archivo de reglas respecto del PR #53.
+- CI del primer commit y Deploy Preview #54 aprobados. Se verificaron los proyectos efectivos de Firestore y Authentication con las APIs administrativas de Google y la cuenta de servicio desde el endpoint del preview. La tienda estática contiene cero Functions. Chrome creó un pedido ficticio de ARS 1.500 (producto 1.000 + envío 500), conservado en staging, sin venta ni cobro todavía.
+- Se encontró y descargó la [guía oficial de transacción simple](https://documentacion-ventasonline.payway.com.ar/docs/gateway/526ae201ec85c-flujo-de-una-transaccion-simple) y su OpenAPI. Su ejemplo de tarjeta es Visa; no se encontró una Mastercard de prueba verificable en las fuentes oficiales consultadas. Se agrega Visa crédito (ID 1) exclusivamente a esta implementación sandbox para verificar el ejemplo oficial; la respuesta debe coincidir con el medio seleccionado y persistido. No habilita Visa comercial productiva.
+- Compra real en Chrome y evidencia transaccional: pendientes de finalizar. No hay aprobación Payway declarada todavía.
 
 ## Alcances pendientes antes de cobros reales
 

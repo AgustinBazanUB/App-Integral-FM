@@ -300,6 +300,7 @@ export default function CheckoutPage() {
                 <p><strong>{orderResult.id}</strong></p>
                 <p>Total recalculado por el backend: <strong>{formatMoney(orderResult.total)}</strong></p>
                 <p>Pago: <strong>{orderResult.paymentStatus}</strong></p>
+                {orderResult.paymentReference && <p>Referencia Payway Sandbox: <strong>{orderResult.paymentReference}</strong></p>}
                 <p>Factura: <strong>{orderResult.invoiceStatus}</strong></p>
                 {orderResult.simulation ? (
                   <>
@@ -436,6 +437,7 @@ export default function CheckoutPage() {
                     <p className="eyebrow">PASO 4 DE 4</p>
                     <h2>Confirmar pedido</h2>
                     {draft.pendingOrder ? <PaywayPaymentForm order={draft.pendingOrder} accessToken={draft.accessToken}
+                      onStartNewOrder={() => { const fresh = initialDraft(); setDraft(current => ({ ...current, requestId: fresh.requestId, accessToken: fresh.accessToken, pendingOrder: null })); setStep(0); }}
                       onUpdate={order => setDraft(current => ({ ...current, pendingOrder: { ...current.pendingOrder, ...order } }))}
                       onApproved={result => {
                         setOrderResult({ ...result.order, paymentReference: result.gateway.reference });

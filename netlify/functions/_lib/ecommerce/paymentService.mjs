@@ -326,6 +326,7 @@ export async function confirmEcommercePayment({
     if (!receipt?.verified || receipt.environment !== "sandbox" || receipt.siteId !== config.siteId
         || receipt.providerId !== confirmation.reference || receipt.status !== confirmation.paymentStatus
         || receipt.amount !== paywayAmount(order.total) || receipt.currency !== "ARS"
+        || receipt.paymentMethodId !== payment.gateway.paymentMethodId
         || receipt.operationId !== payment.gateway.operationId) {
       throw commerceError("payway-evidence-required", "Falta una confirmación autenticada de Payway.", 403);
     }
@@ -641,6 +642,14 @@ export async function confirmEcommercePayment({
     }
   }
 
+  if (!approved && sandboxPayment && ["rejected", "cancelled"].includes(confirmation.paymentStatus)) {
+    const paths = new Set();
+    for (const item of order.items || []) for (const allocation of item.stockAllocations || []) paths.add(originStockPath(allocation, item.productId));
+    for (const path of paths) {
+      const snapshot = await getDocument(path, { env });
+      if (snapshot) operations.push({ type: "update", path, data: reservationPatch(snapshot.data, safeOrderId, null, timestamp), currentUpdateTime: snapshot.updateTime || null });
+    }
+  }
   if (approved)
     operations.push({
       type: "create",
@@ -690,6 +699,7 @@ export async function confirmEcommercePayment({
       invoiceStatus: approved
         ? "pending"
         : order.invoiceStatus || "not_requested",
+      ...(!approved && sandboxPayment ? { reservationStatus: "released" } : {}),
       ...(order.channelId && approved
         ? {
             reservationStatus: "consumed",
