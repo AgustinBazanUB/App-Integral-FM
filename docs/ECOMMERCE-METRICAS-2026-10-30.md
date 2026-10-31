@@ -1,38 +1,47 @@
-# Métricas de ventas de la página web
+# Dashboard único de métricas de ventas
 
-Se incorporó un resumen propio de e-commerce dentro de **Métricas generales → Historial y análisis de ventas**, en la actualización del PR #53.
+El módulo abre por defecto en **Ventas generales**, con las métricas y gráficos comerciales comunes. El panel adicional de e-commerce y los indicadores de participación web se retiraron por la aclaración del usuario. Las capturas 15 y el primer registro de métricas quedan como evidencia de una versión anterior; las capturas 16 y 17 muestran la estructura vigente.
 
-## Comportamiento
+## Filtros vigentes
 
-- Cinco indicadores: total vendido web, cantidad de ventas, unidades, ticket promedio y participación en el total de los canales filtrados.
-- Tabla por envío a domicilio, retiro en local o modalidad histórica no informada. Separa productos después de descuentos, cargos de envío y total vendido. Si un histórico no conserva ese desglose, lo informa sin inventar importes.
-- «Ver sólo ventas web» aplica el canal al informe completo: evolución, formas de pago, productos, categorías, vendedores y orígenes. «Ver todos los canales» permite comparar nuevamente.
-- El filtro web está disponible aun cuando el período no tenga ventas. El panel presenta un estado vacío explícito.
-- «Actualizar ventas» vuelve a consultar los datos sin reutilizar la caché anterior de ventas. Se conserva el control de alcance del servicio: las consultas globales autorizadas incluyen orígenes de depósito y las selecciones explícitas limitan ubicaciones.
-- Se reconocen ventas web por `sourceChannel`, `channelId` o `sourceType`, manteniendo la compatibilidad con registros históricos.
+Arriba del período aparece **Origen de las ventas**, con cuatro opciones:
 
-Las métricas siguen tomando **sales**, sin sumar de nuevo pedidos o comprobantes. Excluyen simulaciones, ventas eliminadas/anuladas y snapshots web con pago pendiente o rechazado. Las anulaciones se deduplican y no incluyen pedidos aún no pagados. Una venta histórica activa sin el campo de estado de pago conserva su compatibilidad.
+- **Ventas generales:** todas las ventas válidas, una sola vez.
+- **Ubicaciones:** ventas presenciales. A la derecha permite elegir tipo de ubicación —Local, Feria, Evento y tipos históricos existentes— y una o varias ubicaciones. Los eventos inactivos siguen disponibles para analizar su historial.
+- **Página web:** acceso directo a las ventas web, sin elegir otro subconjunto.
+- **Canales:** ventas por canales de contacto. A la derecha permite seleccionar uno o varios, como WhatsApp, Instagram y Llamada.
+
+Debajo del período quedan únicamente **Vendedores, Productos, Descuentos y Forma de pago**. La categoría de producto permanece dentro del selector Productos. No se duplica Ubicaciones en esa fila.
+
+Cambiar de origen limpia las selecciones de ubicación/tipo/canales y conserva período y filtros comunes. Todas las vistas presentan las mismas métricas: total vendido, cantidad de ventas, unidades, ticket, descuentos y los gráficos/desgloses del informe. No hay participación web ni métricas de visitas en este dashboard.
+
+## Criterio comercial y compatibilidad
+
+Se conserva la fuente única `sales`, la deduplicación y la exclusión de simulaciones, eliminadas, anuladas y snapshots web pendientes o rechazados. Pedidos y comprobantes no se suman como nuevas ventas.
+
+Cada venta se clasifica en un origen comercial: e-commerce por sus referencias `sourceChannel`, `channelId` o `sourceType`; presencial por `in_person` y registros históricos `manual`/sin canal; los otros canales identifican ventas por contacto. El origen del inventario es un dato independiente: una compra web abastecida desde un local sigue siendo una venta web. No se reescribieron documentos históricos.
+
+Las vistas generales incluyen los registros históricos sin ubicación recuperable; al elegir tipo o ubicaciones concretas se restringen a documentos identificados. El servicio conserva el alcance permitido de cada usuario. El acceso anterior `?channel=ecommerce` abre directamente Página web.
 
 ## Verificación
 
-**1105 tests Node aprobados**, incluyendo cinco casos nuevos de conciliación, identificadores históricos, filtros, exclusión de simulaciones/pagos pendientes y ausencia de desglose. Build de Gestión aprobado. No se modificaron reglas de Firestore.
+**1107 tests Node aprobados**, con siete pruebas específicas de categorías comerciales, conciliación, tipos y selecciones múltiples, limpieza de filtros ocultos, referencias históricas y exclusión de simulaciones/pagos pendientes. Build de Gestión aprobado. No se modificaron reglas ni credenciales.
 
-En Google Chrome real, conectado a los emuladores locales del proyecto de pruebas, se verificaron tres fixtures analíticos artificiales:
+Chrome real contra emuladores locales confirmó:
 
-| Caso | Total | Unidades | Envío |
+| Vista | Total | Ventas | Unidades |
 |---|---:|---:|---:|
-| Venta web con entrega | $2.500 | 2 | $500 |
-| Venta web con retiro | $500 | 1 | $0 |
-| Venta por WhatsApp | $2.000 | 1 | $0 |
+| Ventas generales | $7.000 | 5 | 6 |
+| Ubicaciones, todas | $2.000 | 2 | 2 |
+| Feria | $1.200 | 1 | 1 |
+| Evento | $800 | 1 | 1 |
+| WhatsApp e Instagram | $2.000 | 1 | 1 |
+| Página web | $3.000 | 2 | 3 |
 
-Resultado observado: $3.000 web de $5.000 totales, dos ventas web, tres unidades, ticket $1.500 y participación 60 %. Al filtrar e-commerce, el informe general muestra $3.000 y participación 100 %. Se comprobó además el filtro sin ventas y la actualización manual. Las simulaciones de la campaña local anterior permanecieron excluidas.
+Se verificó selección múltiple de ubicaciones, cambio de tipo, selección múltiple de canales, ausencia de subconjuntos web, cuatro filtros comunes y regreso al total general sin filtros ocultos. Los tres orígenes suman $7.000 sin duplicaciones.
 
-Estos fixtures se crearon directamente en el emulador, marcados `testData:true` y `qaCampaign:ecommerce-metrics-pr53`, para probar cálculos sobre snapshots comerciales; no representan cobros ni ventas comerciales reales y no alteraron inventario. No se crearon ventas ficticiamente aprobadas en Firebase remoto. No se llamó a ARCA ni se modificó producción.
+Los ejemplos son fixtures analíticos artificiales, marcados `testData:true`, creados sólo en los emuladores. No representan cobros reales, no alteraron stock y no se copiaron a Firebase remoto. ARCA y producción permanecieron sin modificaciones.
 
-Evidencia: [captura de métricas](ecommerce-evidence-2026-10-30/15-metricas-ventas-web.jpg) y [conciliación del DOM de Chrome](ecommerce-evidence-2026-10-30/metrics-ui-verification.json).
+Evidencia: [vista general](ecommerce-evidence-2026-10-30/16-metricas-generales.jpg), [ubicaciones](ecommerce-evidence-2026-10-30/17-metricas-ubicaciones.jpg) y [conciliación de Chrome](ecommerce-evidence-2026-10-30/metrics-sections-ui-verification.json).
 
-## Revisión
-
-[Métricas web del Deploy Preview](https://deploy-preview-53--appintegralflormia.netlify.app/gestion/metrics/sales?channel=ecommerce), con autenticación administrativa y Firebase de pruebas.
-
-Los dos pedidos remotos pendientes de pago de la verificación anterior **no generan ingresos web**. El preview mostrará cero mientras no existan ventas confirmadas. El ejemplo con importes positivos corresponde exclusivamente al laboratorio local.
+[Revisar el dashboard en el Deploy Preview](https://deploy-preview-53--appintegralflormia.netlify.app/gestion/metrics/sales), con autenticación y Firebase de pruebas. Sus pedidos pendientes no generan ingresos; los importes positivos de la tabla corresponden sólo al laboratorio local.

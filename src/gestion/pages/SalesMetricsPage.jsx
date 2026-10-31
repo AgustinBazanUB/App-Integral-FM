@@ -1,11 +1,8 @@
 import { metricsByCategory } from "../../modules/locations/domain/operatingMetrics";
-import { metricsChannelOptions } from "../../modules/locations/domain/channels";
 import { useMemo, useState } from "react";
 import {
   DataTable,
   EmptyState,
-  FormField,
-  Select,
   PageHeader,
   Panel,
   Skeleton,
@@ -28,7 +25,7 @@ import { useAuth } from "../AuthContext";
 import { useLocation } from "../../router";
 import MetricsFiltersPanel from "../components/MetricsFiltersPanel";
 import BusinessMetricsCards from "../components/BusinessMetricsCards";
-import EcommerceMetricsPanel from "../components/EcommerceMetricsPanel";
+import { applyMetricsSection, metricsContactChannels } from "../../modules/locations/domain/metricsSections";
 import { PaymentDonut, SalesLineChart } from "../components/MetricsVisuals";
 import { formatMoney } from "../formatters";
 import { useAsyncData } from "../hooks";
@@ -56,6 +53,8 @@ const initialFilterState = () => {
     discountIds: [],
     paymentMethods: [],
     channelIds: [],
+    section: "all",
+    locationType: "all",
   };
 };
 
@@ -81,7 +80,7 @@ function sortableRows(rows, sortBy) {
 export default function SalesMetricsPage() {
   const { profile } = useAuth();
   const location = useLocation();
-  const [filters, setFilters] = useState(()=>({...initialFilterState(),channelIds:new URLSearchParams(location.search).get("channel") === "ecommerce" ? ["ecommerce"] : []}));
+  const [filters, setFilters] = useState(()=>({...initialFilterState(),section:new URLSearchParams(location.search).get("channel") === "ecommerce" ? "ecommerce" : "all"}));
   const [locationSort, setLocationSort] = useState("total");
   const rangeState = useMemo(() => {
     try { return { range: rangeFromState(filters), error: null }; }
@@ -100,7 +99,7 @@ export default function SalesMetricsPage() {
 
   const locations = locationsResult.data || [];
   const selectedLocations = locations.filter(location => filters.locationIds.includes(location.id));
-  const showRemainingStock = filters.locationIds.length === 1 && selectedLocations.length === 1;
+  const showRemainingStock = filters.section === "locations" && filters.locationIds.length === 1 && selectedLocations.length === 1;
   const locationIdsKey = locations.map((location) => location.id).sort().join(",");
   const selectedLocationKey = filters.locationIds.slice().sort().join(",");
   const salesQueryKey = `${profile.id}|${locationIdsKey}|${selectedLocationKey}|${rangeState.range?.start.toISOString()}|${rangeState.range?.end.toISOString()}`;
@@ -133,9 +132,7 @@ export default function SalesMetricsPage() {
 
   const filteredSales = useMemo(() => {
     if (!rangeState.range) return [];
-    return applyMetricsFilters(sales, {
-      channelIds: filters.channelIds,
-      locationIds: filters.locationIds,
+    return applyMetricsFilters(applyMetricsSection(sales, filters, locations), {
       sellerIds: filters.sellerIds,
       productIds: filters.productIds,
       categoryProductIds,
@@ -143,7 +140,7 @@ export default function SalesMetricsPage() {
       discountIds: filters.discountIds,
       paymentMethods: filters.paymentMethods,
     }, rangeState.range);
-  }, [sales, rangeState.range, filters.locationIds, filters.sellerIds, filters.productIds, categoryProductIds, filters.categoryIds, filters.discountIds, filters.paymentMethods, filters.channelIds]);
+  }, [sales, rangeState.range, filters.section, filters.locationType, locations, filters.locationIds, filters.sellerIds, filters.productIds, categoryProductIds, filters.categoryIds, filters.discountIds, filters.paymentMethods, filters.channelIds]);
 
   const metrics = useMemo(
     () => rangeState.range ? calculateMetrics(filteredSales, rangeState.range) : null,
@@ -159,16 +156,16 @@ export default function SalesMetricsPage() {
     <div className="fm-page-enter fm-metrics-page">
       <PageHeader
         eyebrow="Métricas generales"
-        title="Historial y análisis de ventas"
-        description="Las ventas comparten los filtros del período. Seleccioná una sola ubicación para consultar su stock actual."
+        title={{ all: "Ventas generales", locations: "Ventas por ubicación", ecommerce: "Ventas de la página web", channels: "Ventas por canal" }[filters.section]}
+        description="Un único informe de ventas de productos. Elegí el origen, el período y los filtros que querés analizar."
       />
 
-      <Panel title="Filtros" description="Combiná período, canal, ubicaciones, vendedores, productos, descuentos y formas de pago." action={<Button variant="secondary" disabled={loading} onClick={() => salesResult.refresh().catch(() => {})}>Actualizar ventas</Button>}>
-        <FormField label="Canal comercial"><Select value={filters.channelIds[0] || ""} onChange={event => setFilters(current => ({ ...current, channelIds: event.target.value ? [event.target.value] : [] }))}><option value="">Todos los canales</option>{metricsChannelOptions(sales).map(channel => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</Select></FormField>
+      <Panel title="Filtros" description="Ventas generales o una vista por ubicaciones, página web o canales." action={<Button variant="secondary" disabled={loading} onClick={() => salesResult.refresh().catch(() => {})}>Actualizar ventas</Button>}>
         <MetricsFiltersPanel
           state={filters}
           onChange={setFilters}
           locations={locations}
+          channels={metricsContactChannels(sales)}
           sellers={sellers}
           categories={dimensions.categories}
           products={dimensions.products}
@@ -183,7 +180,6 @@ export default function SalesMetricsPage() {
 
       {!loading && !error && metrics ? (
         <>
-          <EcommerceMetricsPanel metrics={metrics} selected={filters.channelIds.includes("ecommerce")} onSelect={() => setFilters(current => ({ ...current, channelIds: current.channelIds.includes("ecommerce") ? [] : ["ecommerce"] }))} />
           <section className="fm-stat-grid fm-metrics-summary" aria-label="Resumen de ventas filtradas" aria-live="polite">
             <StatCard label="Total vendido" value={formatMoney(metrics.total)} hint="Importe final de ventas válidas" icon="CircleDollarSign" tone="olive" />
             <StatCard label="Cantidad de ventas" value={metrics.salesCount} hint="Ventas activas filtradas" icon="ReceiptText" />

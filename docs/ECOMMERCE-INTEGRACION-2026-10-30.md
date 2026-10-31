@@ -2,7 +2,7 @@
 
 Fecha de trabajo: 30/10/2026, Argentina. Base: `origin/main` `62bd617`. Rama: `codex/ecommerce-integral-main-20261030`.
 
-**Métricas web:** se agregó el resumen de ventas e-commerce dentro del módulo de Métricas, con indicadores, desglose de envío/retiro y filtro para todo el informe. Ver [implementación y pruebas de métricas](ECOMMERCE-METRICAS-2026-10-30.md).
+**Métricas vigentes:** un único dashboard de ventas generales, con vistas por Ubicaciones, Página web o Canales y los mismos indicadores de ventas de productos. El panel web adicional se retiró. Ver [estructura y pruebas de métricas](ECOMMERCE-METRICAS-2026-10-30.md).
 
 **Continuación del PR #53:** el canal remoto de `app-integral-fm-pruebas` ya está configurado, las reglas se publicaron en staging y se verificaron en Chrome dos checkouts remotos pendientes de pago y sus consultas privadas. Ver [configuración, conciliación y evidencia remota](ECOMMERCE-PR53-STAGING-2026-10-30.md). Por indicación posterior del usuario, ARCA se dejó para una futura instancia en producción; no se ejecutaron pruebas fiscales en esta continuación. Los apartados siguientes conservan la auditoría y la campaña local original.
 
