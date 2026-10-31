@@ -1,12 +1,13 @@
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../gestion/services/firebase";
+import { ecommercePublicEndpoint } from "./ecommercePublicEndpoint";
 
 function safeJson(response) {
   return response.json().catch(() => ({}));
 }
 
 export async function fetchEcommerceCatalog({ fetchImpl = fetch } = {}) {
-  const response = await fetchImpl("/.netlify/functions/ecommerce-catalog", {
+  const response = await fetchImpl(ecommercePublicEndpoint("catalog"), {
     method: "GET",
     headers: { Accept: "application/json" },
   });
@@ -21,7 +22,7 @@ export async function fetchEcommerceCatalog({ fetchImpl = fetch } = {}) {
 }
 
 export async function createEcommerceOrder(payload, { fetchImpl = fetch } = {}) {
-  const response = await fetchImpl("/.netlify/functions/ecommerce-checkout", {
+  const response = await fetchImpl(ecommercePublicEndpoint("checkout"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

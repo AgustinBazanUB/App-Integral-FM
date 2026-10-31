@@ -2,6 +2,7 @@ import { useState } from "react";
 import PageMeta from "../components/PageMeta";
 import { Link } from "../router";
 import { SHIPPING_STATES } from "../shared/shippingDomain.mjs";
+import { ecommercePublicEndpoint } from "../services/ecommercePublicEndpoint";
 export default function OrderStatusPage() {
   const [access, setAccess] = useState(() => {
       try {
@@ -25,7 +26,7 @@ export default function OrderStatusPage() {
     setOrder(null);
     try {
       const response = await fetch(
-        "/.netlify/functions/ecommerce-order-status",
+        ecommercePublicEndpoint("order-status"),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -47,7 +48,7 @@ export default function OrderStatusPage() {
     setError("");
     try {
       const response = await fetch(
-        "/.netlify/functions/ecommerce-order-status",
+        ecommercePublicEndpoint("order-status"),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

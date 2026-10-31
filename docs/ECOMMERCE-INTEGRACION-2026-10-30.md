@@ -2,7 +2,7 @@
 
 Fecha de trabajo: 30/10/2026, Argentina. Base: `origin/main` `62bd617`. Rama: `codex/ecommerce-integral-main-20261030`.
 
-**Resultado:** circuito comercial y logístico verificado con Google Chrome real y Firebase Emulator. No se considera terminada la habilitación comercial remota: faltan configuración/publicación del sitio separado y verificación fiscal con credenciales de homologación. Payway no se integró. No se modificó producción ni se emitieron comprobantes productivos.
+**Resultado:** circuito comercial y logístico verificado con Google Chrome real y Firebase Emulator. No se considera terminada la habilitación comercial remota: faltan configuración comercial remota y verificación fiscal con credenciales de homologación. El proxy de la tienda separada se publicó y comprobó en un borrador aislado. Payway no se integró. No se modificó producción ni se emitieron comprobantes productivos.
 
 ## 1. Auditoría y problemas encontrados
 
@@ -142,6 +142,7 @@ La documentación oficial consultada confirma identificación general de CF desd
 | Consulta con clave inválida conservaba visualmente un resultado previo | Limpia el resultado al consultar otra clave; el backend siempre rechazó la clave incorrecta. |
 | Simulaciones contaminaban compras/ingresos/cancelaciones de métricas | Separación en hechos comerciales compartidos y CRM; panel general y canal en cero real. |
 | IVA del costo de envío no estaba representado fiscalmente | Línea de servicio fiscal, con IVA configurado y sin inventario. Total comercial/fiscal consistente en los tests y planes guardados. |
+| El parser de Netlify rechazaba proxies con origen `/.netlify/*` y devolvía HTML | Rutas públicas `/api/ecommerce/catalog`, `/api/ecommerce/checkout` y `/api/ecommerce/order-status`; la app unificada conserva sus Functions. Se verificaron cuatro reglas sin errores, JSON remoto y catálogo en Chrome. |
 | Dos entradas de CUIT y posible sustitución de receptor del canal | Una sección fiscal; el motor toma el snapshot del pedido, valida datos completos y conserva nombre/domicilio. |
 
 Los fallos de tests durante implementación se corrigieron: mock antiguo de paginación transaccional actualizado al contrato `runQuery`, actor de prueba sin UID y fixture compartida mutable. No se debilitaron aserciones comerciales ni de permisos.
@@ -160,7 +161,7 @@ Los fallos de tests durante implementación se corrigieron: mock antiguo de pagi
 | `src/shared/stockReservations.mjs`, `operationalWritePlans.mjs`, `shippingDomain.mjs` | Disponibilidad y protección compartida de reservas, planes operativos y retiro. |
 | `src/gestion/pages/EcommercePage.jsx`, `services/ecommerceAdminService.js`, `ManagementApp.jsx`, `routePreload.js` | Administración propia del canal y actualizaciones en tiempo real. |
 | `ShippingPage.jsx`, `ShipmentDetail.jsx`, `ShippingPublicApp.jsx`, `services/shippingService.js` | Grupo web, asignación/preparación, transporte y retiro en UI existente. |
-| `src/pages/CheckoutPage.jsx`, `OrderStatusPage.jsx`, `CatalogPage.jsx`, `Storefront.jsx` | Checkout completo, consulta privada y textos para compradores. |
+| `src/pages/CheckoutPage.jsx`, `OrderStatusPage.jsx`, `CatalogPage.jsx`, `Storefront.jsx`, `src/services/ecommerceService.js`, `ecommercePublicEndpoint.js` | Checkout completo, consulta privada y textos para compradores. |
 | `saleFacts.js`, `metrics.js`, `SalesMetricsPage.jsx`, `services/sellerService.js` | Exclusión de simulaciones, filtro por canal y protección de reservas al editar ventas. |
 | `firestore.rules` | Restricciones de reservas, canal y operaciones backend. |
 | `deploy/ecommerce/prepare-preview.mjs`, `.env.example`, `docs/DEPLOYMENT-SURFACES.md` | Proxy limitado y configuración honesta de superficies. |
@@ -185,7 +186,7 @@ Si no se dispone del snapshot, omitir `--import`: el script crea sólo datos sin
 2. Configurar y verificar frontend, Functions, Auth, Firestore y cuenta de servicio del preview remoto contra `app-integral-fm-pruebas` antes de cualquier escritura allí. Los secretos de Netlify están enmascarados; las pruebas de esta entrega son locales.
 3. Configurar `channels/ecommerce` con los documentos físicos del entorno correspondiente. En producción, validar Lavalle y su dirección real; las ubicaciones QA no se promocionan.
 4. Cargar cobertura, tarifas, IVA del envío, punto de retiro, transporte y usuarios comerciales reales. Nada de la configuración sintética se copia a producción.
-5. Configurar `ECOMMERCE_BACKEND_URL` del sitio separado y verificar sus tres endpoints públicos en JSON, incluyendo checkout y consulta privada. El sitio publicado actual aún responde HTML para el catálogo.
+5. Conservar la conexión verificada en el borrador separado; antes de publicar comercialmente configurar `ECOMMERCE_BACKEND_URL` en el contexto correspondiente y repetir checkout/consulta con escrituras sólo después de verificar el aislamiento completo. La URL publicada preexistente no se modificó.
 6. Publicar reglas revisadas en staging y comprobarlas remotamente. No se desplegaron reglas productivas en esta auditoría.
 7. Aportar credenciales y datos reales de emisor exclusivamente de homologación, ejecutar WSAA/WSFE, autorizar/consultar CAE y verificar PDF/QR fiscal, errores de red y conciliación contra el servicio oficial.
 8. Sólo considerar emisiones productivas si existen operaciones reales y se verifican todas las condiciones del permiso; no hay ninguna pendiente de emisión automática en esta entrega.
@@ -193,4 +194,17 @@ Si no se dispone del snapshot, omitir `--import`: el script crea sólo datos sin
 
 ## 15. Criterio de aceptación
 
-Canal, pedidos, CRM, venta única, reservas, orígenes, métricas sin simulaciones, logística compartida, tres transportes, QR y retiro: **implementados y comprobados localmente**. Campaña Chrome 10+2, regresión y cancelación: **ejecutadas**. Habilitación del sitio separado y homologación oficial con CAE/PDF/QR: **pendientes por configuración y credenciales verificadas**. Por esos pendientes, no se declara la integración comercial/fiscal remota completamente terminada.
+Canal, pedidos, CRM, venta única, reservas, orígenes, métricas sin simulaciones, logística compartida, tres transportes, QR y retiro: **implementados y comprobados localmente**. Campaña Chrome 10+2, regresión y cancelación: **ejecutadas**. Comunicación de la tienda separada con backend de pruebas: **publicada como borrador y verificada por HTTP y Chrome**. Habilitación comercial remota y homologación oficial con CAE/PDF/QR: **pendientes por configuración y credenciales verificadas**. Por esos pendientes, no se declara la integración comercial/fiscal remota completamente terminada.
+
+
+## Entrega para revisión: PR y previews
+
+- PR en borrador: https://github.com/AgustinBazanUB/App-Integral-FM/pull/53. Primer commit de implementación: `8f1e2d8`.
+- Gestión y backend: https://deploy-preview-53--appintegralflormia.netlify.app/gestion/ecommerce. API de catálogo identifica `app-integral-fm-pruebas`; la UI privada solicita autenticación.
+- Tienda separada, borrador sin publicación productiva: https://6ae53c75ad2c6548bf636cfc--flor-mia-ecommerce-preview.netlify.app/productos. No incluye Functions ni edge functions; Netlify procesa cuatro reglas de routing. Sólo se proxifican los tres contratos públicos.
+- Evidencia HTTP de lectura: `ecommerce-evidence-2026-10-30/preview-http.json`. Catálogo GET: JSON 200, proyecto de pruebas, `ready:false`; checkout y consulta GET: JSON 405. `/.netlify/functions/arca-authorize` en la tienda devuelve el HTML de la SPA, no ejecuta el autorizador. No se enviaron solicitudes fiscales.
+- Chrome remoto muestra un artículo sintético preexistente del staging y el aviso «La ubicación de stock Ecommerce está PENDIENTE DE DEFINIR», con compra deshabilitada. No se copió ni modificó ese artículo. Captura `10-preview-publico.jpg`.
+- La primera publicación estática detectó el rechazo de rutas reservadas `/.netlify/*`; se corrigió el código y se repitió la publicación y comprobación. El parser oficial instalado valida cuatro reglas sin errores. Referencia: https://docs.netlify.com/manage/routing/redirects/overview/.
+- GitHub CI de implementación aprobó `test-build` y `arca-test-build`; Netlify aprobó el Deploy Preview. Tras la corrección del proxy, se repitieron las 1100 pruebas y el build público con configuración de pruebas.
+
+No se fusionó a main, no se publicaron reglas productivas y no se movieron registros de los emuladores a Firebase remoto. El snapshot de la campaña Chrome permanece local y la evidencia sanitizada queda en el PR.
