@@ -520,9 +520,32 @@ body::before {
 }
 
 .fm-promo-carousel__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  display: flex;
   gap: 18px;
+  overflow-x: auto;
+  padding: 4px 0 12px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(199, 163, 90, 0.5) transparent;
+}
+
+.fm-promo-carousel__grid::-webkit-scrollbar {
+  height: 6px;
+}
+
+.fm-promo-carousel__grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fm-promo-carousel__grid::-webkit-scrollbar-thumb {
+  background: rgba(199, 163, 90, 0.5);
+  border-radius: 999px;
+}
+
+.fm-promo-card {
+  flex: 0 0 280px;
+  scroll-snap-align: start;
 }
 
 .fm-promo-card {
@@ -1719,7 +1742,12 @@ body::before {
   }
 
   .fm-promo-carousel__grid {
-    grid-template-columns: 1fr;
+    gap: 14px;
+    padding-inline: 0;
+  }
+
+  .fm-promo-card {
+    flex: 0 0 260px;
   }
 
   .product-card--compact .product-card__content {
@@ -1938,12 +1966,12 @@ body::before {
     min-width: 42px;
   }
 
-  .fm-promo-benefits {
-    grid-template-columns: 1fr;
+  .fm-promo-carousel__grid {
+    gap: 12px;
   }
 
-  .fm-promo-offer {
-    grid-template-columns: 92px minmax(0, 1fr);
+  .fm-promo-card {
+    flex: 0 0 240px;
   }
 
   .fm-kicker--line::after {
