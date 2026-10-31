@@ -1,0 +1,70 @@
+{
+  "project": "app-integral-fm-pruebas",
+  "verifiedAt": "2026-10-31T01:14:57.310Z",
+  "channelReady": true,
+  "publicProduct": {
+    "id": "qa-pr53-oil",
+    "editorialId": "aceite-oliva-500ml",
+    "slug": "aceite-qa-pr53",
+    "name": "Aceite QA PR53 - No despachar",
+    "abbreviation": "QA53",
+    "description": "Producto artificial exclusivo de pruebas del PR 53. No corresponde a existencias reales.",
+    "categoryId": "olive_oil",
+    "categoryName": "Aceites de oliva",
+    "image": "",
+    "thumb": "",
+    "price": 1000,
+    "stock": 18,
+    "stockState": "available",
+    "active": true,
+    "arcaVatRate": 21,
+    "commercialReady": true,
+    "pendingReason": null,
+    "dataStatus": "ready"
+  },
+  "orders": [
+    {
+      "id": "ecommerce_order_39e937e5-9b38-489d-a765-0bc69c3258a1",
+      "status": "pending_payment",
+      "paymentStatus": "pending",
+      "invoiceStatus": "not_requested",
+      "deliveryMethod": "pickup",
+      "total": 1000,
+      "shippingAmount": 0,
+      "saleId": null,
+      "reservationExpiresAt": "2026-10-31T01:26:34.296Z"
+    },
+    {
+      "id": "ecommerce_order_e0e77754-31af-44a6-ac12-2f12b0b45dd9",
+      "status": "pending_payment",
+      "paymentStatus": "pending",
+      "invoiceStatus": "not_requested",
+      "deliveryMethod": "delivery",
+      "total": 1500,
+      "shippingAmount": 500,
+      "saleId": null,
+      "reservationExpiresAt": "2026-10-31T01:24:58.961Z"
+    }
+  ],
+  "relatedSales": 0,
+  "relatedShipments": 0,
+  "relatedInvoices": 0,
+  "stock": {
+    "initial": 20,
+    "current": 20,
+    "reserved": 2,
+    "reservationCount": 2
+  },
+  "stockMovements": [
+    {
+      "id": "qa-pr53-initial_qa-pr53-oil",
+      "type": "initial",
+      "qty": 20,
+      "previousStock": 0,
+      "newStock": 20
+    }
+  ],
+  "unauthenticatedStockRead": 403,
+  "productionWrites": 0,
+  "arcaRequests": 0
+}

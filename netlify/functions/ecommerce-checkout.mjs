@@ -1,5 +1,6 @@
 import { createEcommerceOrder } from "./_lib/ecommerce/commerceService.mjs";
 import { publicEcommerceError } from "./_lib/ecommerce/publicError.mjs";
+import { publicCommerceBody, limitCommerceRequest } from "./_lib/ecommerce/publicRequests.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -10,12 +11,13 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
   },
 });
 
-export default async function handler(request) {
+export default async function handler(request, context = {}) {
   if (request.method !== "POST") {
     return json({ ok: false, code: "method-not-allowed" }, 405);
   }
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = await publicCommerceBody(request);
+    await limitCommerceRequest(request, context);
     const result = await createEcommerceOrder({ body, env: process.env });
     return json({
       ok: true,

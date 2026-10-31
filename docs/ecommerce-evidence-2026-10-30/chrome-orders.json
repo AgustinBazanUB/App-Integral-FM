@@ -1,0 +1,80 @@
+{
+  "browser": "Google Chrome real mediante cua_repl",
+  "firebase": "app-integral-fm-pruebas en emuladores locales",
+  "fiscalAuthorizationRequests": 0,
+  "productionWrites": 0,
+  "orders": [
+    {
+      "number": 1,
+      "id": "ecommerce_order_2d0a4c2e-8840-46ed-b1db-ea79cdf8ca03",
+      "method": "delivery"
+    },
+    {
+      "number": 2,
+      "id": "ecommerce_order_c8f3c3eb-adfe-48a8-b441-a36e95d7b49f",
+      "method": "delivery"
+    },
+    {
+      "number": 3,
+      "id": "ecommerce_order_1997200d-19c4-4331-904c-a42b369f36f1",
+      "method": "delivery"
+    },
+    {
+      "number": 4,
+      "id": "ecommerce_order_81abd5b4-ae5d-48f5-b535-7bc96c389638",
+      "method": "delivery"
+    },
+    {
+      "number": 5,
+      "id": "ecommerce_order_7d72b07a-0ad6-4e81-a436-29dbb8b5fde0",
+      "method": "delivery"
+    },
+    {
+      "number": 6,
+      "id": "ecommerce_order_6d76a055-c481-44e1-bf30-16e7179c15f5",
+      "method": "delivery"
+    },
+    {
+      "number": 7,
+      "id": "ecommerce_order_044bbc4e-ac9d-4e5a-a696-cc7613bbe598",
+      "method": "delivery"
+    },
+    {
+      "number": 8,
+      "id": "ecommerce_order_32616746-948e-4f60-a25b-35e086e8bf6f",
+      "method": "delivery"
+    },
+    {
+      "number": 9,
+      "id": "ecommerce_order_6faadc32-619e-4462-8e9b-8e8ab3e56ea9",
+      "method": "delivery"
+    },
+    {
+      "number": 10,
+      "id": "ecommerce_order_e1108ed5-bf5b-4bc9-b779-355757396c30",
+      "method": "delivery"
+    },
+    {
+      "number": 11,
+      "id": "ecommerce_order_50d8f85a-7286-40ce-9844-6be52b956a4d",
+      "method": "pickup"
+    },
+    {
+      "number": 12,
+      "id": "ecommerce_order_e6dfa48b-93d9-4f6d-a0f2-e240a01b06e2",
+      "method": "pickup"
+    },
+    {
+      "number": 13,
+      "id": "ecommerce_order_7f86185b-f0bb-4a49-aad2-561d096e88d7",
+      "method": "delivery"
+    },
+    {
+      "number": 14,
+      "id": "ecommerce_order_e585c038-031b-4fe5-b10b-257e1556a986",
+      "method": "pickup",
+      "status": "cancelled",
+      "paid": false
+    }
+  ]
+}

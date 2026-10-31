@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { reservedStockQuantity } from "../../../src/shared/stockReservations.mjs";
 import { adminRunTransaction, adminListDocuments } from "./firestoreAdminRest.mjs";
 import { can, canAccessAdministration, canAccessSellerPanel, effectiveSellerLocations, normalizedRole } from "../../../src/gestion/permissions.js";
 import { buildCustomerDraft, customerDocumentId } from "../../../src/gestion/customers/customerDomain.js";
@@ -51,6 +52,42 @@ async function notifications(transaction, shipment, event, { title, critical = f
 function eventWrite(shipment, eventId, action, actor, previous, stamp, detail = {}) {
   const leg = status => shipment.deliveryType !== "repository" ? "direct" : ["solicitud_pendiente", "aprobado", "en_preparacion", "listo_retirar", "hacia_repositorio"].includes(status) ? "origin" : "final";
   return create(`shipments/${shipment.id}/events/${eventId}`, { action, sequence: shipment.revision || 0, actorId: actor, previousStatus: previous, status: shipment.status, previousLeg: previous ? leg(previous) : null, leg: leg(shipment.status), createdAt: stamp, ...detail });
+}
+
+// The web payment already owns the Sale and stock writes. This adapter only
+// attaches the existing logistics aggregate, in that same transaction.
+export async function preparePaidEcommerceFulfillment({ transaction, order, sale, saleId, origin, actor, env, now }) {
+  const shipmentId = `shipment_${saleId}`, pickup = order.shipping.method === "pickup";
+  const stockOrigins = new Map();
+  for (const item of order.items || []) {
+    const allocations = item.stockAllocations?.length
+      ? item.stockAllocations
+      : [{ type: origin.type, id: origin.id, name: origin.name, quantity: item.quantity }];
+    for (const allocation of allocations)
+      stockOrigins.set(`${allocation.type}:${allocation.id}`, { type: allocation.type, id: allocation.id, name: allocation.name || allocation.id });
+  }
+  const publicLookupId = randomBytes(24).toString("hex");
+  const pickupCode = pickup ? randomBytes(5).toString("hex").toUpperCase() : null;
+  const address = order.shipping.address;
+  const displayAddress = pickup ? order.shipping.pickup.address : `${address.street} ${address.number}${address.floor ? `, piso ${address.floor}` : ""}${address.apartment ? `, depto. ${address.apartment}` : ""}, ${address.city}, ${address.province}, ${address.postalCode}`;
+  const shipment = {
+    id: shipmentId, shippingSchemaVersion: 1, saleId, saleCode: sale.saleCode, orderId: order.id, channelId: order.channelId,
+    publicCode: order.orderCode || sale.saleCode, publicLookupId, creationSource: "ecommerce", createdBy: actor,
+    commercialLocationId: sale.locationId, commercialLocationName: sale.locationName,
+    stockOriginType: origin.type, stockOriginId: origin.id, stockOriginName: origin.name,
+    stockOrigins: [...stockOrigins.values()],
+    stockCommitMode: "immediate", stockCommitState: "committed", stockMovementIds: [],
+    status: "aprobado", fulfillmentType: pickup ? "pickup" : "delivery", deliveryType: pickup ? "pickup" : order.defaultTransport || env.ECOMMERCE_DEFAULT_TRANSPORT || "repository",
+    customerSnapshot: { name: order.customer.fullName, phone: order.customer.phone }, itemsSnapshot: sale.items,
+    destination: { displayAddress, notes: [order.shipping.notes, address?.instructions, address?.receiverName && `Recibe: ${address.receiverName} ${address.receiverPhone || ""}`].filter(Boolean).join(" · "), verified: false }, destinationRevision: 0,
+    assignedPreparerIds: [], preparerNames: [], repository: pickup ? null : repository(env), incident: null,
+    courierVersions: { origin: 0, final: 0, direct: 0 }, trackingVersion: 0, revision: 0,
+    simulated: sale.simulated, paymentStatus: sale.paymentStatus, invoiceStatus: sale.invoiceStatus, total: sale.total,
+    pickupCode, createdAt: now, saleCreatedAt: now, updatedAt: now,
+  };
+  if (!pickup && !TRANSPORTS[shipment.deliveryType]) throw shippingError("Configurá el transporte web predeterminado.");
+  const notices = await notifications(transaction, shipment, "web_order_unassigned", { title: "Pedido web confirmado sin preparador", critical: true, stamp: now, eventId: "created" });
+  return { shipmentId, pickupCode, operations: [create(`shipments/${shipmentId}`, shipment), create(`shipmentLookups/${publicLookupId}`, { shipmentId }), eventWrite(shipment, "created", "web_order_confirmed", actor, null, now), ...notices] };
 }
 
 export async function createShippingSale({ sale, session, requestId, administrative = false, runTransaction = adminRunTransaction, env = process.env, now = new Date() }) {
@@ -185,6 +222,7 @@ export async function createCourierSession({ body, session, runTransaction = adm
     const expiresAt = new Date(now.valueOf() + hours * 3600000), updates = [], previousSessions = new Map();
     for (const shipmentId of shipmentIds) {
       const shipment = { ...(await transaction.getDocument(`shipments/${shipmentId}`))?.data, id: shipmentId };
+      assert(shipment.fulfillmentType !== "pickup", "Un retiro presencial no tiene recorrido de repartidor.");
       assert(shipment.saleId && shipment.stockCommitState === "committed" && !shipment.incident, `${shipment.publicCode || shipmentId}: el envío no está listo para asignarse.`);
       const eligible = leg === "direct"
         ? shipment.deliveryType !== "repository" && ["listo_retirar", "reparto_final"].includes(shipment.status)
@@ -365,7 +403,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
     }
     assert(!CLOSED_SHIPPING_STATES.includes(shipment.status) || body.mode === "labels" || body.mode === "retry" && shipment.status === "no_entregado", "Este envío ya está cerrado.");
     const previous = shipment.status, changes = {}, operations = [];
-    let notice = null, result = { id: shipment.id }, detail = {};
+    let notice = null, result = { id: shipment.id }, detail = {}, orderChanges = null, saleChanges = null;
     const requireEdit = () => { if (!profile || !edit(profile)) forbidden(); };
     const requireApproval = () => { if (!profile || !approve(profile)) forbidden(); };
     const reason = () => { const value = String(body.reason || "").trim(); assert(value.length >= 4 && value.length <= 1000, "Indicá un motivo de entre 4 y 1000 caracteres."); return value; };
@@ -405,7 +443,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
         const path = `${type === "warehouse" ? "warehouseStock" : "locationStock"}/${originId}/items/${id(item.productId)}`;
         const stock = (await transaction.getDocument(path))?.data;
         assert(stock && stock.active !== false && stock.deleted !== true && stock.productDeleted !== true && Number.isSafeInteger(stock.currentStock), `${item.name}: falta configurar stock en el origen.`);
-        assert(stock.currentStock >= item.qty, `${item.name}: stock insuficiente (${stock.currentStock}). Regularizá el origen antes de aprobar.`);
+        assert(stock.currentStock - reservedStockQuantity(stock, now) >= item.qty, `${item.name}: stock insuficiente o reservado (${stock.currentStock}). Regularizá el origen antes de aprobar.`);
         const movementId = `shipping_approval_${shipment.id}_${item.productId}`; movements.push(movementId);
         operations.push(update(path, { currentStock: stock.currentStock - item.qty, lastSaleId: shipment.saleId, lastMovementId: movementId, updatedAt: now }), create(`stockMovements/${movementId}`, { inventoryType: type, ...(type === "warehouse" ? { warehouseId: originId, warehouseName: origin.name } : { locationId: originId, locationName: origin.name }), productId: item.productId, productName: item.name, qty: -item.qty, previousStock: stock.currentStock, newStock: stock.currentStock - item.qty, type: "shipping_approval", saleId: shipment.saleId, shipmentId: shipment.id, userId: actor, userName: name(profile), createdAt: now, reason: "Origen aprobado para envío" }));
       }
@@ -476,8 +514,67 @@ export async function shippingOperation({ body, session = null, runTransaction =
       const assigned = await preparers(transaction, [...new Set(body.assignedPreparerIds || [])]);
       Object.assign(changes, { assignedPreparerIds: assigned.map(user => user.id), preparerNames: assigned.map(user => user.name) });
       detail = { reason: reason(), before: { assignedPreparerIds: shipment.assignedPreparerIds, preparerNames: shipment.preparerNames }, after: { assignedPreparerIds: changes.assignedPreparerIds, preparerNames: changes.preparerNames } }; notice = { event: "preparation_assigned", title: "Se actualizó tu asignación de preparación", assigned: true };
+    } else if (body.mode === "transport") {
+      requireEdit(); assert(shipment.fulfillmentType !== "pickup" && ["aprobado", "en_preparacion", "listo_retirar"].includes(previous), "El transporte sólo cambia antes de retirar un envío.");
+      assert(TRANSPORTS[body.deliveryType], "Elegí Uber, Repositorio o Manual.");
+      await revokeCourierSession("Cambio de transporte");
+      changes.deliveryType = body.deliveryType; changes.repository = body.deliveryType === "repository" ? repository(env) : null;
+      changes.courierVersions = Object.fromEntries(Object.entries(shipment.courierVersions).map(([key,value]) => [key,value+1]));
+      detail = { reason: reason(), before: shipment.deliveryType, after: body.deliveryType };
+    } else if (body.mode === "fulfillment") {
+      requireEdit();
+      assert(shipment.creationSource === "ecommerce" && shipment.orderId && shipment.stockCommitState === "committed", "Sólo se puede cambiar la modalidad de un pedido web confirmado.");
+      assert(!shipment.incident && ["aprobado", "en_preparacion", "listo_retirar"].includes(previous), "La modalidad sólo cambia antes de retirar o entregar el pedido y sin incidencias abiertas.");
+      assert(["pickup", "delivery"].includes(body.fulfillmentType) && body.fulfillmentType !== shipment.fulfillmentType, "Elegí una modalidad distinta a la actual.");
+      const orderPath = `orders/${id(shipment.orderId)}`;
+      const order = (await transaction.getDocument(orderPath))?.data;
+      const sale = (await transaction.getDocument(`sales/${id(shipment.saleId)}`))?.data;
+      assert(order?.saleId === shipment.saleId && order?.shipmentId === shipment.id && sale?.shipmentId === shipment.id, "El pedido, la venta y la entrega no coinciden.");
+      const changeReason = reason();
+      await revokeCourierSession("Se cambió la modalidad de entrega");
+      const courierVersions = Object.fromEntries(Object.entries(shipment.courierVersions || { origin: 0, final: 0, direct: 0 }).map(([key, value]) => [key, (value || 0) + 1]));
+      const courierGrantHashes = Object.fromEntries(Object.keys({ ...(shipment.courierGrantHashes || {}), ...courierVersions }).map(key => [key, null]));
+      changes.courierSessionId = null; changes.courierSessionLeg = null;
+      changes.courierVersions = courierVersions; changes.courierGrantHashes = courierGrantHashes;
+      changes.trackingVersion = (shipment.trackingVersion || 0) + 1;
+      changes.lastPosition = null; changes.activeGpsSession = null; changes.gpsTrail = [];
+      changes.deliveryException = null; changes.destinationRevision = (shipment.destinationRevision || 0) + 1;
+      if (body.fulfillmentType === "pickup") {
+        const pickupLocationId = id(body.pickupLocationId), pickupLocation = (await transaction.getDocument(`locations/${pickupLocationId}`))?.data;
+        const pickupAddress = String(pickupLocation?.address || pickupLocation?.displayAddress || "").trim();
+        assert(pickupLocation?.name && pickupLocation.active !== false && pickupLocation.deleted !== true && pickupAddress.length >= 6, "Elegí un local activo con dirección completa para el retiro.");
+        const pickupLocationName = String(pickupLocation.name).trim().slice(0, 160);
+        const pickupCode = randomBytes(5).toString("hex").toUpperCase();
+        Object.assign(changes, {
+          fulfillmentType: "pickup", deliveryType: "pickup", repository: null,
+          pickupLocationId, pickupLocationName, pickupCode,
+          destination: { displayAddress: pickupAddress.slice(0, 800), notes: "", verified: false },
+        });
+        orderChanges = { deliveryMethod: "pickup", pickupCode, shipping: { ...(order.shipping || {}), method: "pickup", address: null, pickup: { locationId: pickupLocationId, name: pickupLocationName, address: pickupAddress.slice(0, 800) }, status: "updated_after_payment" } };
+        detail = { reason: changeReason, before: shipment.fulfillmentType, after: "pickup", pickupLocationId, pickupLocationName, financialAdjustment: "Sin cobro, devolución ni cambio del importe pagado" };
+      } else {
+        const draft = cleanShippingDraft(body);
+        assert(TRANSPORTS[body.deliveryType], "Elegí el transporte para el envío a domicilio.");
+        const destination = { displayAddress: draft.displayAddress, notes: draft.notes, verified: false };
+        Object.assign(changes, {
+          fulfillmentType: "delivery", deliveryType: body.deliveryType, repository: body.deliveryType === "repository" ? repository(env) : null,
+          pickupLocationId: null, pickupLocationName: null, pickupCode: null, destination,
+        });
+        orderChanges = { deliveryMethod: "delivery", pickupCode: null, shipping: { ...(order.shipping || {}), method: "delivery", address: { displayAddress: draft.displayAddress }, pickup: null, status: "manual_after_payment" } };
+        detail = { reason: changeReason, before: shipment.fulfillmentType, after: "delivery", deliveryType: body.deliveryType, destination, financialAdjustment: "Sin cobro, devolución ni cambio del importe pagado" };
+      }
+      saleChanges = { deliveryMethod: body.fulfillmentType, updatedAt: now };
+      notice = { event: "fulfillment_changed", title: "Modalidad de entrega actualizada" };
+    } else if (body.mode === "pickup_complete") {
+      if (!profile || (!edit(profile) && !shipment.assignedPreparerIds.includes(actor))) forbidden();
+      assert(shipment.fulfillmentType === "pickup" && previous === "listo_retirar" && !shipment.incident, "El pedido no está listo para retirar por el cliente.");
+      assert(String(body.pickupCode || "").trim().toUpperCase() === shipment.pickupCode, "El código de retiro no coincide.");
+      Object.assign(changes, { status: "entregado", deliveredAt: now, deliveredBy: actor });
+      detail.proof = { method: "customer_pickup", actorId: actor, confirmedAt: now };
+      notice = { event: "pickup_completed", title: "Pedido retirado por el cliente" };
     } else if (body.mode === "issue_access") {
       requireEdit();
+      assert(shipment.fulfillmentType !== "pickup" || body.kind === "tracking", "Un retiro presencial no utiliza repartidor.");
       assert(body.kind === "courier" || body.kind === "tracking", "Tipo de acceso inválido.");
       if (body.kind === "courier") await revokeCourierSession("Se generó un acceso de reparto individual");
       if (body.kind === "courier") assert(shipment.stockCommitState === "committed", "Aprobá el origen antes de autorizar al repartidor.");
@@ -514,6 +611,12 @@ export async function shippingOperation({ body, session = null, runTransaction =
     Object.assign(changes, { updatedAt: now, revision: (shipment.revision || 0) + 1 });
     if (changes.lastPosition === null) { changes.activeGpsSession = null; changes.gpsTrail = []; }
     const next = { ...shipment, ...changes };
+    if(shipment.creationSource === "ecommerce" && shipment.orderId) {
+      const order = (await transaction.getDocument(`orders/${shipment.orderId}`))?.data;
+      assert(order?.saleId === shipment.saleId && order?.shipmentId === shipment.id, "El pedido y la venta no coinciden con la entrega.");
+      operations.push(update(`orders/${shipment.orderId}`,{fulfillmentStatus:next.status,...(orderChanges || {}),...(next.status === "entregado" ? {status:"completed",completedAt:now} : {}),updatedAt:now}));
+    }
+    if (saleChanges) operations.push(update(`sales/${shipment.saleId}`, saleChanges));
     if (notice) {
       const notices = await notifications(transaction, next, notice.event, { ...notice, stamp: now, eventId: operationId });
       operations.push(...notices);

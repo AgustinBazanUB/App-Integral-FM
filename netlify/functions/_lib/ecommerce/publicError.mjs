@@ -64,6 +64,21 @@ export function publicEcommerceError(error) {
   const code = String(error?.code || "").match(/^[A-Za-z0-9._-]{1,120}$/)?.[0] || "ecommerce-error";
   const known = CATALOG[code];
   if (known) return { code, status: known.status, message: known.message };
+  const messages = {
+    "ecommerce-channel-inactive":"La tienda todavía no está habilitada para pedidos.",
+    "ecommerce-address-incomplete":"Completá calle, altura, localidad, provincia y código postal.",
+    "ecommerce-delivery-coverage":"No hay una tarifa de envío habilitada para ese destino.",
+    "ecommerce-reservation-expired":"La reserva venció. Creá un nuevo pedido.",
+    "ecommerce-reservation-invalid":"La reserva del pedido ya no está vigente.",
+    "ecommerce-billing-invalid":"Revisá la opción de facturación, razón social y domicilio fiscal.",
+    "ecommerce-rate-limit":"Demasiados intentos. Esperá un minuto y volvé a intentar.",
+    "ecommerce-order-access-denied":"El acceso privado al pedido no es válido.",
+    "ecommerce-document-pending":"El comprobante todavía no está disponible.",
+    "ecommerce-simulation-isolation-required":"La simulación requiere Firebase de pruebas y ARCA homologación.",
+    "ecommerce-origin-not-authorized":"El origen no está autorizado para este canal.",
+    "ecommerce-management-blocked":"El pedido no admite esta operación en su estado actual.",
+  };
+  if(messages[code]) return {code,status:error.status || 409,message:messages[code]};
   const status = Number(error?.status);
   return {
     code,

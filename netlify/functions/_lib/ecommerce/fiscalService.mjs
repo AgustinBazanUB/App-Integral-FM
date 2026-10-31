@@ -151,11 +151,13 @@ export async function prepareEcommerceInvoiceFiscal({
   const sale = saleSnapshot?.data ? { ...saleSnapshot.data, id: saleId } : null;
   assertPaidEcommerceOperation({ order, payment, sale, idempotencyKey: stableKey });
 
-  const receiver = await resolveEcommerceReceiver({ cuit: receiverCuit }, {
+  const effectiveCuit = order.channelId ? order.billing?.cuit || "" : receiverCuit;
+  const resolvedReceiver = await resolveEcommerceReceiver({ cuit: effectiveCuit }, {
     env,
     getTaxpayerFn,
     inferReceiverFn,
   });
+  const receiver = { ...resolvedReceiver, ...(order.channelId && order.billing?.mode === "fiscal" ? {name:order.billing.name,address:order.billing.address} : {}) };
 
   const invoiceResult = await ensureInvoiceFn({
     sourceType: "ecommerce",

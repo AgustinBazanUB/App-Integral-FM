@@ -8,6 +8,7 @@ import StorePreviewGate from "./gestion/StorePreviewGate";
 import AboutPage from "./pages/AboutPage";
 import CatalogPage from "./pages/CatalogPage";
 import CheckoutPage from "./pages/CheckoutPage";
+import OrderStatusPage from "./pages/OrderStatusPage";
 import HomePage from "./pages/HomePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ProductPage from "./pages/ProductPage";
@@ -39,6 +40,7 @@ export default function Storefront() {
         <Route path="/producto/:slug" element={<ProductPage />} />
         <Route path="/nosotros" element={<AboutPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/mi-pedido" element={<OrderStatusPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <Footer />

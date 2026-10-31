@@ -1,0 +1,13 @@
+{
+  "environment": "local Firebase emulators only",
+  "general": "Total vendido\n\n$ 7.000\nImporte final de ventas válidas\n\nCantidad de ventas\n\n5\nVentas activas filtradas\n\nUnidades vendidas\n\n6\nSuma de cantidades\n\nTicket promedio\n\n$ 1.400\nTotal / ventas\n\nTotal descuentos\n\n$ 0\n0 ventas con descuento",
+  "locations": "Total vendido\n\n$ 2.000\nImporte final de ventas válidas\n\nCantidad de ventas\n\n2\nVentas activas filtradas\n\nUnidades vendidas\n\n2\nSuma de cantidades\n\nTicket promedio\n\n$ 1.000\nTotal / ventas\n\nTotal descuentos\n\n$ 0\n0 ventas con descuento",
+  "fair": "Total vendido\n\n$ 1.200\nImporte final de ventas válidas\n\nCantidad de ventas\n\n1\nVentas activas filtradas\n\nUnidades vendidas\n\n1\nSuma de cantidades\n\nTicket promedio\n\n$ 1.200\nTotal / ventas\n\nTotal descuentos\n\n$ 0\n0 ventas con descuento",
+  "multipleLocations": "Total vendido\n\n$ 2.000\nImporte final de ventas válidas\n\nCantidad de ventas\n\n2\nVentas activas filtradas\n\nUnidades vendidas\n\n2\nSuma de cantidades\n\nTicket promedio\n\n$ 1.000\nTotal / ventas\n\nTotal descuentos\n\n$ 0\n0 ventas con descuento",
+  "event": "Total vendido\n\n$ 800\nImporte final de ventas válidas\n\nCantidad de ventas\n\n1\nVentas activas filtradas\n\nUnidades vendidas\n\n1\nSuma de cantidades\n\nTicket promedio\n\n$ 800\nTotal / ventas\n\nTotal descuentos\n\n$ 0\n0 ventas con descuento",
+  "channels": "Total vendido\n\n$ 2.000\nImporte final de ventas válidas\n\nCantidad de ventas\n\n1\nVentas activas filtradas\n\nUnidades vendidas\n\n1\nSuma de cantidades\n\nTicket promedio\n\n$ 2.000\nTotal / ventas\n\nTotal descuentos\n\n$ 0\n0 ventas con descuento",
+  "web": "Total vendido\n\n$ 3.000\nImporte final de ventas válidas\n\nCantidad de ventas\n\n2\nVentas activas filtradas\n\nUnidades vendidas\n\n3\nSuma de cantidades\n\nTicket promedio\n\n$ 1.500\nTotal / ventas\n\nTotal descuentos\n\n$ 0\n0 ventas con descuento",
+  "webSubfilters": 0,
+  "commonFilterCount": 4,
+  "restoredGeneral": "Total vendido\n\n$ 7.000\nImporte final de ventas válidas\n\nCantidad de ventas\n\n5\nVentas activas filtradas\n\nUnidades vendidas\n\n6\nSuma de cantidades\n\nTicket promedio\n\n$ 1.400\nTotal / ventas\n\nTotal descuentos\n\n$ 0\n0 ventas con descuento"
+}
