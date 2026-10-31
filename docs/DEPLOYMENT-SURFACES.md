@@ -2,6 +2,8 @@
 
 ## Integración revisada el 30/10/2026
 
+Actualización posterior del PR #53: el canal de staging está configurado y el catálogo devuelve `ready:true`; entrega, retiro y consulta privada se probaron contra Firebase remoto. Ver [verificación del canal remoto](ECOMMERCE-PR53-STAGING-2026-10-30.md). Las referencias `ready:false` de este documento describen la inspección anterior a esa configuración.
+
 La rama de integración incorpora `channels/ecommerce`, reservas, ventas y logística transaccionales, retiro presencial y consulta privada del pedido. Ver [auditoría](ECOMMERCE-AUDITORIA-2026-10-30.md) e [informe y pruebas](ECOMMERCE-INTEGRACION-2026-10-30.md). Las descripciones del deploy del 29/09 que siguen son antecedentes, no evidencia de que ese deploy tenga el backend actual.
 
 El sitio público conserva vacía su carpeta de Functions. Su build genera rutas `/api/ecommerce/catalog`, `/api/ecommerce/checkout` y `/api/ecommerce/order-status`, con proxies limitados a `ecommerce-catalog`, `ecommerce-checkout` y `ecommerce-order-status` cuando se configura `ECOMMERCE_BACKEND_URL` con el origen HTTPS del backend Netlify autorizado. En un Deploy Preview debe ser un backend Deploy Preview aislado. No se copian secretos y no se proxifican Functions administrativas, simulación ni ARCA. El build remoto del sitio público falla si falta esa variable.

@@ -92,6 +92,8 @@ export default function OrderStatusPage() {
           <label className="field-label">
             Clave privada de consulta
             <input
+              type="password"
+              autoComplete="off"
               value={access.accessToken}
               onChange={(e) =>
                 setAccess({ ...access, accessToken: e.target.value })

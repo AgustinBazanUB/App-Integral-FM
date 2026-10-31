@@ -1,0 +1,14 @@
+{
+  "publicPreview": "https://6ae540a9a9c79311f69761d2--flor-mia-ecommerce-preview.netlify.app",
+  "status": 200,
+  "environment": {
+    "firebaseProjectId": "app-integral-fm-pruebas"
+  },
+  "ready": true,
+  "publicContracts": [
+    "/api/ecommerce/catalog",
+    "/api/ecommerce/checkout",
+    "/api/ecommerce/order-status"
+  ],
+  "privateFunctionsDeployed": false
+}

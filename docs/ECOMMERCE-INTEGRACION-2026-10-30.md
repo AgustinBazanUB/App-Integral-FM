@@ -2,6 +2,8 @@
 
 Fecha de trabajo: 30/10/2026, Argentina. Base: `origin/main` `62bd617`. Rama: `codex/ecommerce-integral-main-20261030`.
 
+**Continuación del PR #53:** el canal remoto de `app-integral-fm-pruebas` ya está configurado, las reglas se publicaron en staging y se verificaron en Chrome dos checkouts remotos pendientes de pago y sus consultas privadas. Ver [configuración, conciliación y evidencia remota](ECOMMERCE-PR53-STAGING-2026-10-30.md). Por indicación posterior del usuario, ARCA se dejó para una futura instancia en producción; no se ejecutaron pruebas fiscales en esta continuación. Los apartados siguientes conservan la auditoría y la campaña local original.
+
 **Resultado:** circuito comercial y logístico verificado con Google Chrome real y Firebase Emulator. No se considera terminada la habilitación comercial remota: faltan configuración comercial remota y verificación fiscal con credenciales de homologación. El proxy de la tienda separada se publicó y comprobó en un borrador aislado. Payway no se integró. No se modificó producción ni se emitieron comprobantes productivos.
 
 ## 1. Auditoría y problemas encontrados
