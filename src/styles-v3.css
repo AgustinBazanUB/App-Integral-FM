@@ -694,8 +694,8 @@ body::before {
 .fm-reviews-carousel__track {
   display: flex;
   gap: 20px;
-  overflow: hidden;
-  animation: scroll 40s linear infinite;
+  overflow: visible;
+  animation: scroll 60s linear infinite;
 }
 
 @keyframes scroll {
@@ -703,7 +703,7 @@ body::before {
     transform: translateX(0);
   }
   100% {
-    transform: translateX(-33.33%);
+    transform: translateX(-25%);
   }
 }
 
