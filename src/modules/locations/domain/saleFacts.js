@@ -1,8 +1,22 @@
 // Shared commercial facts. Fiscal documents are deliberately not an input.
+import { saleChannelId } from "./channels.js";
 const CANCELLED_STATUSES = new Set(["cancelled", "canceled", "deleted", "anulada", "anulado", "cancelada", "cancelado"]);
 
+export function isSimulatedSale(sale = {}) {
+  return sale.simulated === true || sale.paymentProvider === "simulation" || sale.paymentStatus === "simulated_approved";
+}
+
+export function isCancelledSale(sale = {}) {
+  return !isSimulatedSale(sale) && sale.deleted !== true && CANCELLED_STATUSES.has(String(sale.status || "").toLowerCase());
+}
+
 export function isActiveSale(sale = {}) {
-  return sale.simulated !== true && sale.paymentProvider !== "simulation" && sale.paymentStatus !== "simulated_approved"
+  const unpaidWebSale = saleChannelId(sale) === "ecommerce" && (
+    ["pending", "pending_payment", "draft"].includes(String(sale.status || "").toLowerCase())
+    || (sale.paymentStatus && sale.paymentStatus !== "approved")
+  );
+  return !isSimulatedSale(sale)
+    && !unpaidWebSale
     && sale.deleted !== true && !CANCELLED_STATUSES.has(String(sale.status || "active").toLowerCase());
 }
 

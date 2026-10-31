@@ -1,0 +1,17 @@
+{
+  "environment": "local Firebase Auth/Firestore emulators",
+  "url": "http://127.0.0.1:5186/gestion/metrics/sales",
+  "fixtureIds": [
+    "qa-metrics-web-delivery",
+    "qa-metrics-web-pickup",
+    "qa-metrics-manual"
+  ],
+  "allChannels": {
+    "web": "Total vendido web\n\n$ 3.000\nIncluye los cargos de envío\n\nVentas web\n\n2\nSin duplicar pedidos o comprobantes\n\nUnidades web\n\n3\nProductos vendidos\n\nTicket promedio web\n\n$ 1.500\nTotal web / ventas web\n\nParticipación web\n\n60 %\nDel total de los canales filtrados",
+    "general": "Total vendido\n\n$ 5.000\nImporte final de ventas válidas\n\nCantidad de ventas\n\n3\nVentas activas filtradas\n\nUnidades vendidas\n\n4\nSuma de cantidades\n\nTicket promedio\n\n$ 1.667\nTotal / ventas\n\nTotal descuentos\n\n$ 0\n0 ventas con descuento"
+  },
+  "ecommerceOnly": {
+    "web": "Total vendido web\n\n$ 3.000\nIncluye los cargos de envío\n\nVentas web\n\n2\nSin duplicar pedidos o comprobantes\n\nUnidades web\n\n3\nProductos vendidos\n\nTicket promedio web\n\n$ 1.500\nTotal web / ventas web\n\nParticipación web\n\n100 %\nDel total de los canales filtrados",
+    "general": "Total vendido\n\n$ 3.000\nImporte final de ventas válidas\n\nCantidad de ventas\n\n2\nVentas activas filtradas\n\nUnidades vendidas\n\n3\nSuma de cantidades\n\nTicket promedio\n\n$ 1.500\nTotal / ventas\n\nTotal descuentos\n\n$ 0\n0 ventas con descuento"
+  }
+}
