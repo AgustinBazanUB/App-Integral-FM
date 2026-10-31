@@ -2,7 +2,8 @@
 const CANCELLED_STATUSES = new Set(["cancelled", "canceled", "deleted", "anulada", "anulado", "cancelada", "cancelado"]);
 
 export function isActiveSale(sale = {}) {
-  return sale.deleted !== true && !CANCELLED_STATUSES.has(String(sale.status || "active").toLowerCase());
+  return sale.simulated !== true && sale.paymentProvider !== "simulation" && sale.paymentStatus !== "simulated_approved"
+    && sale.deleted !== true && !CANCELLED_STATUSES.has(String(sale.status || "active").toLowerCase());
 }
 
 export function saleDate(sale) {

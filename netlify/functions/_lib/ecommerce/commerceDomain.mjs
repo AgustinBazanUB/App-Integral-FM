@@ -1,3 +1,4 @@
+import { isValidCustomerPhone, normalizeCustomerPhone } from "../../../../src/gestion/customers/customerDomain.js";
 const SUPPORTED_VAT_RATES = new Set([0, 10.5, 21, 27]);
 export const ECOMMERCE_SOURCE_TYPE = "ecommerce";
 export const ECOMMERCE_PAYMENT_STATUSES = Object.freeze([
@@ -39,6 +40,7 @@ export function normalizeCheckoutItems(items) {
   if (!Array.isArray(items) || !items.length) {
     throw commerceError("ecommerce-cart-empty", "El carrito está vacío.", 400);
   }
+  if (items.length > 80) throw commerceError("ecommerce-cart-excessive", "El carrito admite hasta 80 productos.", 400);
   const combined = new Map();
   for (const raw of items) {
     const productId = String(raw?.productId || raw?.id || "").trim();
@@ -136,13 +138,14 @@ export function normalizeCustomer(raw = {}) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw commerceError("ecommerce-customer-email-invalid", "Ingresá un email válido.", 400);
   }
-  if (phone.replace(/\D/g, "").length < 8) {
+  if (!isValidCustomerPhone(phone) || /[^\d\s()+.-]/.test(phone)) {
     throw commerceError("ecommerce-customer-phone-invalid", "Ingresá un teléfono válido.", 400);
   }
   return {
     fullName,
     email,
     phone,
+    phoneNormalized: normalizeCustomerPhone(phone),
     marketingConsent: raw.marketingConsent === true,
   };
 }
@@ -195,10 +198,11 @@ export function prepareAuthoritativeCheckout({
   shipping,
   paymentMode = "pending",
   env = process.env,
+  resolvedShipping = null,
 } = {}) {
   const items = normalizeCheckoutItems(requestedItems);
   const normalizedCustomer = normalizeCustomer(customer);
-  const normalizedShipping = resolveShipping(shipping, env);
+  const normalizedShipping = resolvedShipping || resolveShipping(shipping, env);
   const paymentStatus = resolveRequestedPaymentStatus(paymentMode);
 
   const preparedItems = items.map(({ productId, quantity }) => {
@@ -236,6 +240,7 @@ export function prepareAuthoritativeCheckout({
   const discountTotal = 0;
   const shippingAmount = normalizedShipping.amount;
   const total = subtotal - discountTotal + shippingAmount;
+  if (!Number.isSafeInteger(total) || total <= 0) throw commerceError("ecommerce-total-invalid", "El total no es válido.", 409);
 
   return {
     sourceType: ECOMMERCE_SOURCE_TYPE,

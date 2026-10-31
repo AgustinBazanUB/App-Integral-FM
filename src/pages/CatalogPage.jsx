@@ -106,7 +106,7 @@ export default function CatalogPage() {
   const catalogDescription =
     activeCollection?.description ??
     activeCategory?.description ??
-    "Productos del catálogo maestro de Flor Mía con precio y stock validados por el backend.";
+    "Descubrí nuestra selección de productos regionales.";
 
   return (
     <main id="main-content" className="page-shell catalog-page">
@@ -118,11 +118,9 @@ export default function CatalogPage() {
       <section className="page-hero page-hero--catalog">
         <div className="container">
           <p className="eyebrow">CATÁLOGO FLOR MÍA</p>
-          <h1>Productos reales, con precio y stock comercial.</h1>
+          <h1>Productos de Flor Mía.</h1>
           <p>
-            Las descripciones e imágenes pueden ser editoriales. El ID, precio,
-            disponibilidad y dato fiscal provienen del catálogo maestro y de la
-            ubicación Ecommerce configurada.
+            Elegí productos regionales para disfrutar y compartir.
           </p>
           {!ready ? (
             <div className="pending-panel">
@@ -202,7 +200,7 @@ export default function CatalogPage() {
           {status === "error" ? (
             <div className="pending-panel">
               <strong>No se pudo cargar el catálogo comercial.</strong>
-              <p>{error?.message || "Reintentá cuando el backend esté disponible."}</p>
+              <p>{error?.message || "Volvé a intentarlo en unos minutos."}</p>
             </div>
           ) : null}
 

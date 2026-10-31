@@ -28,7 +28,15 @@ export function isLocalEcommerceRuntime(env = process.env) {
 }
 
 export function ecommerceSimulatedPaymentEnabled(env = process.env) {
-  return isTrue(env.ECOMMERCE_SIMULATED_PAYMENT_ENABLED) && isLocalEcommerceRuntime(env);
+  const isolated = env.NODE_ENV === "test" || (env.FIREBASE_PROJECT_ID === "app-integral-fm-pruebas" && env.VITE_PREVIEW_FIREBASE_PROJECT_ID === "app-integral-fm-pruebas" && env.ARCA_ENVIRONMENT === "homologation");
+  return isolated && isTrue(env.ECOMMERCE_SIMULATED_PAYMENT_ENABLED) && (isLocalEcommerceRuntime(env) || isolatedPreview(env));
+}
+
+function isolatedPreview(env) {
+  return ["deploy-preview", "branch-deploy"].includes(env.CONTEXT)
+    && env.FIREBASE_PROJECT_ID === "app-integral-fm-pruebas"
+    && env.VITE_PREVIEW_FIREBASE_PROJECT_ID === "app-integral-fm-pruebas"
+    && env.ARCA_ENVIRONMENT === "homologation";
 }
 
 export function assertEcommerceSimulationEnabled(env = process.env) {
@@ -39,13 +47,14 @@ export function assertEcommerceSimulationEnabled(env = process.env) {
       409,
     );
   }
-  if (!isLocalEcommerceRuntime(env)) {
+  if (!isLocalEcommerceRuntime(env) && !isolatedPreview(env)) {
     throw commerceError(
       "ecommerce-simulated-payment-local-only",
       "La simulación de pago sólo puede utilizarse desde un entorno local autorizado.",
       403,
     );
   }
+  if (env.NODE_ENV !== "test" && (env.FIREBASE_PROJECT_ID !== "app-integral-fm-pruebas" || env.VITE_PREVIEW_FIREBASE_PROJECT_ID !== "app-integral-fm-pruebas" || env.ARCA_ENVIRONMENT !== "homologation")) throw commerceError("ecommerce-simulation-isolation-required", "Las simulaciones requieren Firebase de pruebas y ARCA homologación.", 403);
   return true;
 }
 

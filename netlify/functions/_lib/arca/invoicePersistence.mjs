@@ -293,6 +293,7 @@ export async function ensurePendingInvoice({
 
   const saleSnapshot = await getDocument(salePathFor(sourceId), { env });
   const sale = saleSnapshot?.data || null;
+  if(sourceType === "ecommerce" && scope.environment === "production" && (sale?.simulated || sale?.paymentStatus === "simulated_approved" || sale?.paymentProvider === "simulation")) throw Object.assign(new Error("Una venta simulada sólo puede facturarse en homologación."),{code:"ecommerce-simulation-production-fiscal-denied",status:403});
   validateSaleForInvoice(sourceType, sourceId, sale);
   await assertInvoiceAssociation(invoiceId, null);
 
@@ -301,6 +302,12 @@ export async function ensurePendingInvoice({
   const fiscalProducts = sourceType === "ecommerce"
     ? sale.items.map((item) => ({productId:item.productId, exists:true, name:item.name || "", arcaVatRate:item.arcaVatRate, arcaVatRateSource:"paid-sale", active:true, deleted:false}))
     : await loadFiscalProducts(items, { getDocument, env });
+  // Freight is a fiscal service line, never an inventory product or movement.
+  if(sourceType === "ecommerce" && Number(sale.shippingAmount)>0) {
+    if(![0,10.5,21,27].includes(sale.shippingVatRate)) throw Object.assign(new Error("Falta el IVA del envío."),{code:"ecommerce-shipping-vat-required",status:409});
+    items.push({productId:"ecommerce_shipping_service",name:"Servicio de envío",abbreviation:"",qty:1,unitPrice:Number(sale.shippingAmount),subtotal:Number(sale.shippingAmount)});
+    fiscalProducts.push({productId:"ecommerce_shipping_service",exists:true,name:"Servicio de envío",arcaVatRate:sale.shippingVatRate,arcaVatRateSource:"paid-shipping",active:true,deleted:false});
+  }
   const readiness = fiscalReadiness(fiscalProducts);
   const timestamp = nowIso(now);
 
@@ -312,6 +319,7 @@ export async function ensurePendingInvoice({
     pointOfSaleSnapshot: scope.pointOfSale,
     sourceType,
     sourceId,
+    simulated: sale.simulated === true || sale.paymentProvider === "simulation",
     status: "pending",
     requestedAt: timestamp,
     requestedBy: requestedBy || null,
@@ -327,9 +335,9 @@ export async function ensurePendingInvoice({
       sellerName: sale.sellerName || null,
       sourceChannel: sale.sourceChannel || null,
       saleCreatedAt: sale.createdAt || null,
-      subtotal: Number(sale.subtotal || 0),
+      subtotal: Number(sale.subtotal || 0) + Number(sale.shippingAmount || 0),
       discountTotal: Number(sale.discountTotal || 0),
-      totalBeforeDiscounts: Number(sale.totalBeforeDiscounts ?? sale.subtotal ?? 0),
+      totalBeforeDiscounts: Number(sale.totalBeforeDiscounts ?? sale.subtotal ?? 0) + Number(sale.shippingAmount || 0),
       total: Number(sale.total || 0),
       totalItems: Number(sale.totalItems || 0),
       items,
@@ -340,6 +348,7 @@ export async function ensurePendingInvoice({
     productFiscalSnapshot: fiscalProducts,
     receiverSnapshot: receiver ? {
       ...(receiver.name ? { name: String(receiver.name).trim().slice(0, 200) } : {}),
+      ...(receiver.address ? { address: String(receiver.address).trim().slice(0, 300) } : {}),
       vatConditionId: Number(receiver.vatConditionId || 0) || null,
       documentType: Number(receiver.documentType || 0) || null,
       documentNumber: String(receiver.documentNumber || "").replace(/\D/g, "") || null,
@@ -738,10 +747,14 @@ export async function syncInvoiceToSale({
   runTransaction = adminRunTransaction,
 } = {}) {
   if (getDocument === adminGetDocument && patchDocument === adminPatchDocument) {
-    return runTransaction(async (transaction) => syncInvoiceToSale({ invoiceId, env, now,
-      getDocument: transaction.getDocument,
-      patchDocument: async (path, data, options) => transaction.commitDocuments([{ type: "update", path, data, currentUpdateTime: options.currentUpdateTime }]),
-    }), { env });
+    return runTransaction(async transaction => {
+      const operations=[];
+      const result=await syncInvoiceToSale({invoiceId,env,now,getDocument:transaction.getDocument,
+        patchDocument:async(path,data,options)=>{operations.push({type:"update",path,data,currentUpdateTime:options.currentUpdateTime});},
+      });
+      await transaction.commitDocuments(operations);
+      return result;
+    },{env});
   }
   if (!invoiceId) {
     const error = new Error("Falta identificar la solicitud fiscal.");
@@ -817,6 +830,16 @@ export async function syncInvoiceToSale({
     requireExists: true,
     currentUpdateTime: saleDocument.updateTime,
   });
+
+  if(invoice.sourceType === "ecommerce" && saleDocument.data.orderId) {
+    const orderPath=`orders/${saleDocument.data.orderId}`, order=await getDocument(orderPath,{env});
+    if(order?.data.saleId !== sourceId) throw Object.assign(new Error("La factura no corresponde al pedido."),{code:"ecommerce-sale-link-conflict",status:409});
+    await patchDocument(orderPath,{invoiceId,invoiceStatus:fiscalInvoice.status,fiscalEnvironment:fiscalInvoice.environment,updatedAt:timestamp},{env,currentUpdateTime:order.updateTime});
+    if(order.data.shipmentId) {
+      const shipmentPath=`shipments/${order.data.shipmentId}`, shipment=await getDocument(shipmentPath,{env});
+      if(shipment?.data.saleId === sourceId) await patchDocument(shipmentPath,{invoiceId,invoiceStatus:fiscalInvoice.status,updatedAt:timestamp},{env,currentUpdateTime:shipment.updateTime});
+    }
+  }
 
   return {
     invoiceId,

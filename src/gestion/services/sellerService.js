@@ -1,3 +1,4 @@
+import { reservedStockQuantity } from "../../shared/stockReservations.mjs";
 import { buildOperationalSalePlan, cleanOperationalSaleItems, customerSaleSnapshot, customerSaleWrite, resolveOperationalCustomer } from "../../shared/operationalWritePlans.mjs";
 import { saleActivitySnapshot } from "../../shared/activitySnapshots.mjs";
 import { createShippingSaleRequest } from "./shippingService";
@@ -539,6 +540,8 @@ export async function updateSellerSale({
       }
       const previousStock = Number(snapshot.data().currentStock || 0);
       const newStock = previousStock + difference;
+      const reserved = reservedStockQuantity(snapshot.data());
+      if (reserved > 0 && newStock < reserved) throw saleValidationError(`${item.name}: existen ${reserved} unidades reservadas para pedidos web.`);
       if (!Number.isInteger(previousStock)) throw saleValidationError(`El stock registrado de ${item.name} no es válido.`);
       transaction.update(stockRefs[index], stockMutationFields({
         currentStock: newStock,

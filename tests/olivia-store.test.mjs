@@ -17,6 +17,7 @@ test("catalog lists paginate completely, bind confirmation reads to the transact
     if (url === "https://oauth2.googleapis.com/token") return Response.json({ access_token: "catalog-fixture-token", expires_in: 3600 });
     if (url.endsWith(":beginTransaction")) return Response.json({ transaction: "catalog-transaction" });
     if (url.endsWith(":rollback")) return Response.json({});
+    if (url.endsWith(":runQuery")) return Response.json(["a","b"].map(id=>({document:{name:`projects/app-integral-fm/databases/(default)/documents/products/${id}`,fields:{name:{stringValue:id === "a"?"Existente":"Nuevo"}}}})));
     const second = url.includes("pageToken=page_two");
     return Response.json({ documents: [{ name: `projects/app-integral-fm/databases/(default)/documents/products/${second ? "b" : "a"}`, fields: { name: { stringValue: second ? "Nuevo" : "Existente" } } }], ...(!second ? { nextPageToken: "page_two" } : {}) });
   };
@@ -24,9 +25,13 @@ test("catalog lists paginate completely, bind confirmation reads to the transact
   assert.deepEqual((await store.list("products")).map(row => row.id), ["a", "b"]);
   const transactionRows = await store.transaction(tx => tx.listDocuments("products", { maxDocuments: 5000 }));
   assert.deepEqual(transactionRows.map(row => row.id), ["a", "b"]);
-  const transactionalReads = calls.filter(call => call.url.includes("/products?") && call.url.includes("transaction="));
-  assert.equal(transactionalReads.length, 2);
-  assert.ok(transactionalReads.every(call => call.url.includes("catalog-transaction")));
+  const transactionalReads = calls.filter(call => call.url.endsWith(":runQuery"));
+  assert.equal(transactionalReads.length, 1);
+  const query = JSON.parse(transactionalReads[0].init.body);
+  assert.equal(query.transaction,"catalog-transaction");
+  assert.equal(query.structuredQuery.from[0].collectionId,"products");
+  assert.equal(query.structuredQuery.limit,5001);
+  await assert.rejects(store.transaction(tx=>tx.listDocuments("products",{maxDocuments:1})),{code:"catalog-too-large"});
   await assert.rejects(adminListDocuments("products", { env, fetchImpl, maxDocuments: 1 }), { code: "catalog-too-large" });
 });
 

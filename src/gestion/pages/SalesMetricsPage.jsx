@@ -24,6 +24,7 @@ import {
   argentinaParts,
 } from "../../modules/locations/domain/time";
 import { useAuth } from "../AuthContext";
+import { useLocation } from "../../router";
 import MetricsFiltersPanel from "../components/MetricsFiltersPanel";
 import BusinessMetricsCards from "../components/BusinessMetricsCards";
 import { PaymentDonut, SalesLineChart } from "../components/MetricsVisuals";
@@ -78,7 +79,8 @@ function sortableRows(rows, sortBy) {
 
 export default function SalesMetricsPage() {
   const { profile } = useAuth();
-  const [filters, setFilters] = useState(initialFilterState);
+  const location = useLocation();
+  const [filters, setFilters] = useState(()=>({...initialFilterState(),channelIds:new URLSearchParams(location.search).get("channel") === "ecommerce" ? ["ecommerce"] : []}));
   const [locationSort, setLocationSort] = useState("total");
   const rangeState = useMemo(() => {
     try { return { range: rangeFromState(filters), error: null }; }

@@ -1,7 +1,7 @@
 import { collection, doc, onSnapshot, query, where, orderBy, limit } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { can } from "../permissions";
-const mutationModes = new Set(["create_sale", "create_courier_session", "activate_courier_qr", "approve", "start_preparing", "ready", "incident", "resolve", "reject", "review", "retry", "cancel", "return", "undelivered", "address", "assign", "issue_access", "revoke_access", "delivery_exception", "courier_action", "read_notification"]);
+const mutationModes = new Set(["transport", "pickup_complete","create_sale", "create_courier_session", "activate_courier_qr", "approve", "start_preparing", "ready", "incident", "resolve", "reject", "review", "retry", "cancel", "return", "undelivered", "address", "assign", "issue_access", "revoke_access", "delivery_exception", "courier_action", "read_notification"]);
 const changesChannel = typeof window !== "undefined" && typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("flor-mia-shipping-changes") : null;
 if (changesChannel) changesChannel.onmessage = event => window.dispatchEvent(new CustomEvent("shipping-changed", { detail: event.data }));
 const changed = inventoryChanged => { const detail = { inventoryChanged }; window.dispatchEvent(new CustomEvent("shipping-changed", { detail })); changesChannel?.postMessage(detail); };

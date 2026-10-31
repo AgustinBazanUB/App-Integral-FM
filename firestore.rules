@@ -981,10 +981,10 @@ service cloud.firestore {
       allow read, write: if isAdmin();
       match /items/{productId} {
         allow read: if activeUser() && allowedLocation(locationId);
-        allow create: if validOperationalLocationStockCreate(locationId, productId);
-        allow update: if validOperationalLocationStockMutation(locationId, productId)
+        allow create: if !request.resource.data.keys().hasAny(["ecommerceReservations", "reservedQuantity"]) && validOperationalLocationStockCreate(locationId, productId);
+        allow update: if preservesWebReservations() && (validOperationalLocationStockMutation(locationId, productId)
           || validSellerStockMutation(locationId, productId)
-          || validNegativeStockRecovery(locationId, productId);
+          || validNegativeStockRecovery(locationId, productId));
         allow delete: if false;
       }
     }
@@ -1002,9 +1002,9 @@ service cloud.firestore {
       allow read, write: if false;
       match /items/{productId} {
         allow read: if canModule("warehouse", "view");
-        allow create: if canModule("warehouse", "edit")
+        allow create: if !request.resource.data.keys().hasAny(["ecommerceReservations", "reservedQuantity"]) && canModule("warehouse", "edit")
           && validWarehouseStock(request.resource.data, productId);
-        allow update: if canModule("warehouse", "edit")
+        allow update: if preservesWebReservations() && canModule("warehouse", "edit")
           && validWarehouseStock(request.resource.data, productId)
           && request.resource.data.productId == resource.data.productId;
         allow delete: if false;
@@ -1146,6 +1146,16 @@ service cloud.firestore {
       allow create, update: if canModule("loyal-customers", "edit");
       allow delete: if false;
     }
+    function preservesWebReservations() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(["ecommerceReservations", "reservedQuantity"])
+        && (resource.data.get("reservedQuantity", 0) == 0 || request.resource.data.currentStock >= resource.data.reservedQuantity);
+    }
+    match /channels/{channelId} {
+      allow read: if canModule("ecommerce", "view");
+      allow write: if false;
+    }
+    match /ecommerceOperations/{operationId} { allow read, write: if false; }
+    match /ecommerceRateLimits/{bucket} { allow read, write: if false; }
     match /orders/{orderId} {
       allow get: if canModule("ecommerce", "view") || canModule("finance", "view");
       allow list: if canModule("ecommerce", "view");
