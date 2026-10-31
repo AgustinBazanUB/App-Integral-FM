@@ -50,6 +50,54 @@ const reviews = [
     platform: "instagram",
     text: "Envío rápido y productos bien embalados. Flor Mía ya es mi lugar de confianza.",
   },
+  {
+    name: "Sofía Blanco",
+    rating: 5,
+    platform: "whatsapp",
+    text: "El aceite Blend IG es perfecto para todo: cocinar y finalizar. Intensidad ideal.",
+  },
+  {
+    name: "Miguel Ángel Torres",
+    rating: 5,
+    platform: "google",
+    text: "Las aceitunas griegas son excelentes. Muy buenas para picadas y ensaladas.",
+  },
+  {
+    name: "Valentina Castro",
+    rating: 5,
+    platform: "instagram",
+    text: "Compré el pack de 2 bidones de 5L para mi restaurant. Precio y calidad imbatibles.",
+  },
+  {
+    name: "Federico García",
+    rating: 5,
+    platform: "whatsapp",
+    text: "El Coratina tiene un picante que me encanta. Ideal para carnes a la parrilla.",
+  },
+  {
+    name: "Carolina Méndez",
+    rating: 5,
+    platform: "google",
+    text: "Las almendras de 1kg son súper crocantes. Las uso para repostería y quedan ricas.",
+  },
+  {
+    name: "Alejandro Ruiz",
+    rating: 5,
+    platform: "instagram",
+    text: "El Picual es muy estable al calor. Lo uso para freír y no pierde sabor.",
+  },
+  {
+    name: "Mónica Suárez",
+    rating: 5,
+    platform: "whatsapp",
+    text: "El Arauco tiene un sabor único, muy argentino. Me encanta en ensaladas.",
+  },
+  {
+    name: "Gustavo Flores",
+    rating: 5,
+    platform: "google",
+    text: "Pack de picada fue un éxito en mi cumpleaños. Todos preguntaron dónde lo compré.",
+  },
 ];
 
 const platformLogos = {
@@ -59,7 +107,7 @@ const platformLogos = {
 };
 
 export default function ReviewsCarousel() {
-  const duplicatedReviews = [...reviews, ...reviews, ...reviews];
+  const duplicatedReviews = [...reviews, ...reviews, ...reviews, ...reviews];
 
   return (
     <Reveal
