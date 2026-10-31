@@ -399,6 +399,9 @@ export async function manageWebOrder({
       );
       const operations = [],
         changes = { updatedAt: now };
+      const paywayAttempt = (await transaction.getDocument(`payments/${order.paymentId}`))?.data?.gateway;
+      if (paywayAttempt && !paid && !["rejected", "cancelled"].includes(paywayAttempt.receipt?.status))
+        fail("El pago Payway debe conciliarse antes de modificar el pedido.");
       if (body.mode === "origin") {
         const allocatedOrigins = new Map();
         for (const item of order.items || [])
@@ -525,6 +528,7 @@ export async function manageWebOrder({
           }
         }
         Object.assign(changes, {
+          items: order.items.map(item => ({ ...item, stockAllocations: [{ ...origin, quantity: item.quantity }] })),
           stockOriginType: origin.type,
           stockOriginId: origin.id,
           stockOriginName: origin.name,
@@ -558,6 +562,9 @@ export async function manageWebOrder({
             },
           });
       } else if (["cancel", "expire"].includes(body.mode)) {
+        const paymentAttempt = (await transaction.getDocument(`payments/${order.paymentId}`))?.data?.gateway;
+        if (paymentAttempt && !["rejected", "cancelled"].includes(paymentAttempt.receipt?.status))
+          fail("El pago Payway debe conciliarse antes de cancelar o liberar la reserva.");
         if (paid)
           fail(
             "La venta ya está registrada. Usá la gestión logística y la devolución comercial/fiscal correspondiente.",

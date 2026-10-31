@@ -293,7 +293,7 @@ export async function ensurePendingInvoice({
 
   const saleSnapshot = await getDocument(salePathFor(sourceId), { env });
   const sale = saleSnapshot?.data || null;
-  if(sourceType === "ecommerce" && scope.environment === "production" && (sale?.simulated || sale?.paymentStatus === "simulated_approved" || sale?.paymentProvider === "simulation")) throw Object.assign(new Error("Una venta simulada sólo puede facturarse en homologación."),{code:"ecommerce-simulation-production-fiscal-denied",status:403});
+  if(sourceType === "ecommerce" && scope.environment === "production" && (sale?.testData || sale?.paymentEnvironment === "sandbox" || sale?.simulated || sale?.paymentStatus === "simulated_approved" || sale?.paymentProvider === "simulation")) throw Object.assign(new Error("Una venta de prueba sólo puede facturarse en homologación."),{code:"ecommerce-simulation-production-fiscal-denied",status:403});
   validateSaleForInvoice(sourceType, sourceId, sale);
   await assertInvoiceAssociation(invoiceId, null);
 
@@ -319,7 +319,8 @@ export async function ensurePendingInvoice({
     pointOfSaleSnapshot: scope.pointOfSale,
     sourceType,
     sourceId,
-    simulated: sale.simulated === true || sale.paymentProvider === "simulation",
+    simulated: sale.simulated === true || sale.paymentProvider === "simulation" || sale.paymentEnvironment === "sandbox" || sale.testData === true,
+    paymentEnvironment: sale.paymentEnvironment || null,
     status: "pending",
     requestedAt: timestamp,
     requestedBy: requestedBy || null,

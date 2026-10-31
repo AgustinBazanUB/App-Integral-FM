@@ -152,7 +152,8 @@ test("catálogo usa products como maestro y locationStock para precio/stock efec
   assert.equal(catalog.ready, true);
   assert.equal(catalog.location.id, "loc-web");
   assert.equal(catalog.products[0].price, 19900);
-  assert.equal(catalog.products[0].stock, 5);
+  assert.equal(catalog.products[0].stock, null);
+  assert.equal(catalog.products[0].stockState, "available");
   assert.equal(catalog.products[0].arcaVatRate, 21);
   assert.equal(catalog.products[0].commercialReady, true);
 });

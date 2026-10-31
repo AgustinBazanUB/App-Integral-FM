@@ -3686,3 +3686,13 @@ input::placeholder {
     transition-duration: 0.01ms !important;
   }
 }
+.payway-payment { margin: 1.5rem 0; padding: clamp(1rem, 3vw, 1.75rem); border: 1px solid var(--color-border, #d7cfbf); border-radius: 1rem; background: #faf8f2; }
+.payway-payment fieldset { border: 0; padding: 0; min-width: 0; }
+.payway-payment legend { margin: 1rem 0; font-weight: 600; }
+.payway-payment .field-label { margin-bottom: 1rem; }
+.payway-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+.payway-fields input { width: 100%; min-width: 0; }
+.payway-totals { display: grid; gap: .5rem; }
+.payway-totals > div { display: flex; justify-content: space-between; gap: 1rem; }
+.payway-totals dd { margin: 0; }
+@media (max-width: 480px) { .payway-fields { grid-template-columns: 1fr; } }

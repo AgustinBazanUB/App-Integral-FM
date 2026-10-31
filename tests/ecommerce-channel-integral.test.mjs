@@ -207,12 +207,17 @@ test("canal web reserva sin salida, vincula CRM sin compra y publica disponibili
     listDocuments: db.listDocuments,
   });
   assert.equal(catalog.config.deliveryEnabled, true);
-  assert.equal(catalog.products[0].stock, 8);
+  assert.equal(catalog.products[0].stock, null);
+  assert.equal(catalog.products[0].stockState, "available");
+  assert.equal(reservedStockQuantity(stock, now), 2);
   assert.equal(catalog.location.id, "valle");
 });
 test("reservas serializadas impiden dos compras del último producto y replay no reserva dos veces", async () => {
   const db = setup();
   db.documents.get("locationStock/valle/items/oil").currentStock = 2;
+  // This scenario intentionally has exactly one physical source with stock.
+  db.documents.get("warehouseStock/infal/items/oil").currentStock = 0;
+  db.documents.get("locationStock/other/items/oil").currentStock = 0;
   const attempts = await Promise.allSettled([
     checkout(db, request("last_item_0001")),
     checkout(db, request("last_item_0002")),

@@ -24,6 +24,7 @@ import {
 import { createHash } from "node:crypto";
 import { confirmPayment } from "./paymentContract.mjs";
 import { normalizedRole } from "../../../../src/gestion/permissions.js";
+import { paywayConfig, paywayAmount } from "./paywayGateway.mjs";
 
 function saleCodeFor(requestId) {
   return `WEB-${requestId.slice(0, 24).toUpperCase()}`;
@@ -318,6 +319,18 @@ export async function confirmEcommercePayment({
     );
   }
 
+  const sandboxPayment = confirmation.paymentProvider === "payway";
+  if (sandboxPayment) {
+    const config = paywayConfig(env);
+    const receipt = payment.gateway?.receipt;
+    if (!receipt?.verified || receipt.environment !== "sandbox" || receipt.siteId !== config.siteId
+        || receipt.providerId !== confirmation.reference || receipt.status !== confirmation.paymentStatus
+        || receipt.amount !== paywayAmount(order.total) || receipt.currency !== "ARS"
+        || receipt.operationId !== payment.gateway.operationId) {
+      throw commerceError("payway-evidence-required", "Falta una confirmación autenticada de Payway.", 403);
+    }
+  }
+
   if (replay) {
     if (
       payment.status !== confirmation.paymentStatus ||
@@ -375,7 +388,7 @@ export async function confirmEcommercePayment({
         );
     }
     if (
-      channel?.authorizedUserIds?.length &&
+      confirmation.simulated && channel?.authorizedUserIds?.length &&
       !channel.authorizedUserIds.includes(actor.uid)
     )
       throw commerceError(
@@ -477,6 +490,7 @@ export async function confirmEcommercePayment({
       schemaVersion: 2,
       sourceType: "ecommerce",
       sourceChannel: "ecommerce",
+      ...(sandboxPayment ? { paymentEnvironment: "sandbox", testData: true, paywayOperationId: payment.gateway.operationId } : {}),
       channelId: order.channelId || null,
       simulated: confirmation.simulated,
       billing: order.billing || null,
@@ -541,7 +555,7 @@ export async function confirmEcommercePayment({
     if (channel) {
       fulfillment = await preparePaidEcommerceFulfillment({
         transaction: { getDocument, listDocuments },
-        order: { ...order, id: safeOrderId },
+        order: { ...order, id: safeOrderId, ...(sandboxPayment ? { paymentEnvironment: "sandbox", testData: true } : {}) },
         sale,
         saleId,
         origin,
@@ -598,6 +612,7 @@ export async function confirmEcommercePayment({
           path: `stockMovements/${movementId}`,
           data: {
             sourceType: "ecommerce",
+            ...(sandboxPayment ? { paymentEnvironment: "sandbox", testData: true } : {}),
             orderId: safeOrderId,
             saleId,
             inventoryType: allocation.type,
@@ -632,7 +647,7 @@ export async function confirmEcommercePayment({
       path: `auditLogs/web_payment_${stableKey}`,
       data: {
         moduleId: "ecommerce",
-        action: "payment.simulated_approved",
+        action: sandboxPayment ? "payment.payway_sandbox_approved" : "payment.simulated_approved",
         entityId: safeOrderId,
         entityType: "order",
         userId: actor.uid || "backend",
@@ -670,6 +685,7 @@ export async function confirmEcommercePayment({
       paymentProvider: confirmation.paymentProvider,
       paymentStatus: confirmation.paymentStatus,
       paymentReference: confirmation.reference,
+      ...(sandboxPayment ? { paymentEnvironment: "sandbox", testData: true } : {}),
       saleId,
       invoiceStatus: approved
         ? "pending"

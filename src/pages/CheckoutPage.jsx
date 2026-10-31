@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Link } from "../router";
 import PageMeta from "../components/PageMeta";
+import PaywayPaymentForm from "../components/PaywayPaymentForm";
 import { useCart } from "../context/CartContext";
 import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import { categoryById } from "../data/categories";
@@ -113,6 +114,7 @@ export default function CheckoutPage() {
   );
 
   const updateField = (event) => {
+    if (draft.pendingOrder) return;
     const { name, value, type, checked } = event.target;
     setDraft((current) => ({
       ...current,
@@ -198,6 +200,12 @@ export default function CheckoutPage() {
       }
 
       let finalOrder = result.order;
+      if (!simulatePayment) {
+        setDraft(current => ({ ...current, pendingOrder: result.order }));
+        window.localStorage.setItem("flor-mia-last-order", JSON.stringify({ orderId: result.order.id, accessToken: draft.accessToken }));
+        setStep(3);
+        return;
+      }
       let simulation = null;
       if (simulatePayment) {
         simulation = await simulateApprovedEcommercePayment({
@@ -242,6 +250,7 @@ export default function CheckoutPage() {
       });
     } finally {
       submitting.current = false;
+      setSubmitState(current => ({ ...current, busy: false }));
     }
   };
 
@@ -269,7 +278,7 @@ export default function CheckoutPage() {
                 type="button"
                 key={label}
                 className={index <= step ? "is-active" : ""}
-                disabled={index > step || Boolean(orderResult)}
+                disabled={index > step || Boolean(orderResult) || Boolean(draft.pendingOrder)}
                 onClick={() => index < step && !orderResult && setStep(index)}
                 aria-current={index === step ? "step" : undefined}
               >
@@ -287,7 +296,7 @@ export default function CheckoutPage() {
             {orderResult ? (
               <div className="integration-state">
                 <Check size={34} aria-hidden="true" />
-                <h2>Pedido registrado.</h2><Link className="button button--secondary" to="/mi-pedido">Consultar estado de mi pedido</Link>
+                <h2>{orderResult.paymentStatus === "approved" ? "Pago aprobado. Tu pedido está confirmado." : "Pedido registrado."}</h2><Link className="button button--secondary" to="/mi-pedido">Consultar estado de mi pedido</Link>
                 <p><strong>{orderResult.id}</strong></p>
                 <p>Total recalculado por el backend: <strong>{formatMoney(orderResult.total)}</strong></p>
                 <p>Pago: <strong>{orderResult.paymentStatus}</strong></p>
@@ -304,9 +313,7 @@ export default function CheckoutPage() {
                   </>
                 ) : (
                   <p>
-                    Esta etapa no procesó tarjeta ni emitió ARCA. Cuando Payway se
-                    integre, la aprobación del pago podrá confirmar la venta y
-                    descontar stock dentro de una operación server-side.
+                    Payway Sandbox confirmó el pago. La venta y el stock de prueba quedaron registrados. No se emitió un comprobante fiscal productivo.
                   </p>
                 )}
                 <Link className="button button--gold" to="/productos">Seguir comprando</Link>
@@ -399,10 +406,10 @@ export default function CheckoutPage() {
                     </fieldset>
                     <div className="integration-state">
                       <LockKeyhole size={30} aria-hidden="true" />
-                      <h3>Tu pedido se registra pendiente de pago.</h3>
+                      <h3>Pagar con Payway</h3>
                       <p>
                         Al confirmar reservaremos tus productos durante 15 minutos.
-                        Todavía no se realizará ningún cobro.
+                        Luego podrás pagar con Mastercard en Payway Sandbox. Usá exclusivamente una tarjeta oficial de prueba.
                       </p>
                     </div>
                     {simulationCapability.enabled ? (
@@ -428,17 +435,25 @@ export default function CheckoutPage() {
                   <div>
                     <p className="eyebrow">PASO 4 DE 4</p>
                     <h2>Confirmar pedido</h2>
+                    {draft.pendingOrder ? <PaywayPaymentForm order={draft.pendingOrder} accessToken={draft.accessToken}
+                      onUpdate={order => setDraft(current => ({ ...current, pendingOrder: { ...current.pendingOrder, ...order } }))}
+                      onApproved={result => {
+                        setOrderResult({ ...result.order, paymentReference: result.gateway.reference });
+                        clearCart();
+                        window.localStorage.removeItem(DRAFT_KEY);
+                        setDraft(initialDraft());
+                      }} /> : null}
                     {draft.pendingOrder?.fiscalRetryPending ? (
                       <p role="status">El pago simulado y la venta ya están registrados. Podés reintentar el plan fiscal para este mismo pedido.</p>
                     ) : null}
-                    {checkoutBlocked ? (
+                    {!draft.pendingOrder && checkoutBlocked ? (
                       <div className="pending-panel">
                         <strong>No se puede confirmar todavía.</strong>
                         <p>
                           Revisá los productos y las opciones de entrega disponibles.
                         </p>
                       </div>
-                    ) : (
+                    ) : !draft.pendingOrder ? (
                       <div className="integration-state">
                         <Check size={30} aria-hidden="true" />
                         <h3>Listo para registrar el pedido.</h3>
@@ -446,13 +461,13 @@ export default function CheckoutPage() {
                           Verificaremos el total y reservaremos tus productos al confirmar.
                         </p>
                       </div>
-                    )}
+                    ) : null}
                     {submitState.error ? <p className="field-error" role="alert">{submitState.error}</p> : null}
                   </div>
                 ) : null}
 
                 <div className="checkout-actions">
-                  {step > 0 ? (
+                  {step > 0 && !draft.pendingOrder ? (
                     <button type="button" className="button button--secondary" onClick={() => setStep((current) => current - 1)} disabled={submitState.busy}>
                       Volver
                     </button>
@@ -469,7 +484,7 @@ export default function CheckoutPage() {
                       disabled={checkoutBlocked || submitState.busy || Boolean(draft.pendingOrder)}
                       onClick={() => submitOrder()}
                     >
-                      {submitState.busy ? "Registrando…" : "Crear pedido"}
+                      {submitState.busy ? "Registrando…" : "Crear pedido y continuar al pago"}
                     </button>
                     {simulationCapability.enabled ? (
                       <button

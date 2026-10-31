@@ -83,6 +83,7 @@ export async function preparePaidEcommerceFulfillment({ transaction, order, sale
     assignedPreparerIds: [], preparerNames: [], repository: pickup ? null : repository(env), incident: null,
     courierVersions: { origin: 0, final: 0, direct: 0 }, trackingVersion: 0, revision: 0,
     simulated: sale.simulated, paymentStatus: sale.paymentStatus, invoiceStatus: sale.invoiceStatus, total: sale.total,
+    ...(sale.paymentEnvironment === "sandbox" ? { paymentEnvironment: "sandbox", testData: true } : {}),
     pickupCode, createdAt: now, saleCreatedAt: now, updatedAt: now,
   };
   if (!pickup && !TRANSPORTS[shipment.deliveryType]) throw shippingError("Configurá el transporte web predeterminado.");

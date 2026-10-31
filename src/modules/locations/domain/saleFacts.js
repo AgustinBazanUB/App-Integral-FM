@@ -3,7 +3,7 @@ import { saleChannelId } from "./channels.js";
 const CANCELLED_STATUSES = new Set(["cancelled", "canceled", "deleted", "anulada", "anulado", "cancelada", "cancelado"]);
 
 export function isSimulatedSale(sale = {}) {
-  return sale.simulated === true || sale.paymentProvider === "simulation" || sale.paymentStatus === "simulated_approved";
+  return sale.testData === true || sale.paymentEnvironment === "sandbox" || sale.simulated === true || sale.paymentProvider === "simulation" || sale.paymentStatus === "simulated_approved";
 }
 
 export function isCancelledSale(sale = {}) {

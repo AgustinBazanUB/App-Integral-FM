@@ -65,6 +65,12 @@ export function publicEcommerceError(error) {
   const known = CATALOG[code];
   if (known) return { code, status: known.status, message: known.message };
   const messages = {
+    "payway-disabled":"Payway Sandbox todavía no está habilitado.",
+    "payway-isolation-required":"El entorno de pagos de prueba no está configurado correctamente.",
+    "payway-config-missing":"Falta completar la configuración segura de Payway Sandbox.",
+    "payway-token-invalid":"Revisá los datos de la tarjeta de prueba.",
+    "payway-request-invalid":"La solicitud de pago no es válida.",
+    "payway-evidence-required":"El pago requiere confirmación autenticada de Payway.",
     "ecommerce-channel-inactive":"La tienda todavía no está habilitada para pedidos.",
     "ecommerce-address-incomplete":"Completá calle, altura, localidad, provincia y código postal.",
     "ecommerce-delivery-coverage":"No hay una tarifa de envío habilitada para ese destino.",
