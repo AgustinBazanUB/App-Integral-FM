@@ -2,6 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { ecommercePublicEndpoint } from "../services/ecommercePublicEndpoint";
 
 let sdkPromise;
+let pageClient;
+function paywayClient(config) {
+  if (pageClient) {
+    if (pageClient.publicKey !== config.publicKey || pageClient.tokenUrl !== config.tokenUrl) throw new Error("La configuración de Payway cambió. Recargá la página antes de pagar.");
+    return pageClient.sdk;
+  }
+  const sdk = new window.Decidir(config.tokenUrl, false);
+  sdk.setTimeout(10000);
+  sdk.setPublishableKey(config.publicKey);
+  pageClient = { sdk, publicKey: config.publicKey, tokenUrl: config.tokenUrl };
+  return sdk;
+}
 export function loadPaywaySdk() {
   if (window.Decidir) return Promise.resolve();
   if (!sdkPromise) sdkPromise = new Promise((resolve, reject) => {
@@ -49,16 +61,14 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
       if (!active) return;
       apply(status);
       setChecked(true);
+      if (status.gateway.state !== "ready") return;
       await loadPaywaySdk();
       if (active) { prepareSdk(settings.payway); setSdkReady(true); }
     })().catch(err => active && setError(err.message));
     return () => { active = false; };
   }, [order.id, accessToken]);
   function prepareSdk(settings) {
-    const sdk = new window.Decidir(settings.tokenUrl, false);
-    sdk.setTimeout(10000);
-    sdk.setPublishableKey(settings.publicKey);
-    sdkRef.current = sdk;
+    sdkRef.current = paywayClient(settings);
   }
 
   const run = async (mode) => {
@@ -76,7 +86,7 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
           if ([200, 201].includes(status) && response?.id) resolve({ token: response.id, bin: response.bin, fingerprint: sdk.device_unique_identifier, payerAddress });
           else reject(new Error("Payway no pudo tokenizar la tarjeta. Revisá los datos o la conexión."));
         }));
-        // The browser sends only a short-lived token and BIN to Flor Mía.
+        // Card data stays at Payway; only token/BIN and allowed risk fields reach Flor Mía.
         form.current.reset();
         setChecked(false); // A lost POST response must recover via reconciliation.
       }

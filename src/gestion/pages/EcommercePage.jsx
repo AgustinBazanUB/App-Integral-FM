@@ -245,6 +245,7 @@ export default function EcommercePage() {
         reason,
       }),
     );
+  const sandboxSales = [...new Map((data?.sales || []).filter(sale => sale.paymentEnvironment === "sandbox" && sale.paymentStatus === "approved").map(sale => [sale.id, sale])).values()];
   return (
     <div>
       <PageHeader
@@ -673,6 +674,10 @@ export default function EcommercePage() {
           </div>
         </Panel>
       )}
+      {sandboxSales.length > 0 && <Panel title="Pruebas Payway · Canal Página web">
+        <p>Ventas de prueba confirmadas: <strong>{sandboxSales.length}</strong> · Importe de prueba: <strong>{formatMoney(sandboxSales.reduce((sum,sale)=>sum+Number(sale.total || 0),0))}</strong></p>
+        <p>Ingresos reales aportados: <strong>{formatMoney(0)}</strong>. Estas operaciones están excluidas de las métricas comerciales y de la facturación productiva.</p>
+      </Panel>}
       <Panel title="Pedidos web">
         {!data ? (
           <p>Cargando pedidos…</p>
