@@ -33,6 +33,8 @@ async function loadAuthoritativeInputs({
   requestedItems,
   locationId,
   origin,
+  channel,
+  orderItems,
   orderId,
   now,
   env,
@@ -41,40 +43,65 @@ async function loadAuthoritativeInputs({
   const uniqueProductIds = [
     ...new Set(requestedItems.map((item) => item.productId)),
   ];
-  const entries = await Promise.all(
-    uniqueProductIds.map(async (productId) => {
-      const [productSnapshot, stockSnapshot] = await Promise.all([
-        getDocument(`products/${productId}`, { env }),
-        getDocument(
-          originStockPath(
-            origin || { type: "location", id: locationId },
-            productId,
-          ),
-          { env },
-        ),
-      ]);
-      return [
-        productId,
-        productSnapshot ? { ...productSnapshot.data, id: productId } : null,
-        stockSnapshot
-          ? {
-              ...stockSnapshot.data,
-              id: productId,
-              physicalStock: stockSnapshot.data.currentStock,
-              currentStock: Math.max(
-                0,
-                Number(stockSnapshot.data.currentStock) -
-                  reservedStockQuantity(stockSnapshot.data, now, orderId),
-              ),
-              __updateTime:
-                stockSnapshot.updateTime ||
-                stockSnapshot.data?.__updateTime ||
-                null,
-            }
-          : null,
-      ];
-    }),
-  );
+  const physicalStocksByPath = {};
+  const allocationsByProduct = {};
+  const entries = await Promise.all(uniqueProductIds.map(async (productId) => {
+    const productSnapshot = await getDocument(`products/${productId}`, { env });
+    const settingSnapshot = channel
+      ? await getDocument(`ecommerceProductSettings/${productId}`, { env })
+      : null;
+    const promotionSnapshot = channel
+      ? await getDocument(`ecommercePromotions/${productId}`, { env })
+      : null;
+    const item = orderItems.find((row) => row.productId === productId);
+    const allocationRows = Array.isArray(item?.stockAllocations) && item.stockAllocations.length
+      ? item.stockAllocations
+      : [{ type: origin?.type || "location", id: origin?.id || locationId, name: origin?.name || "", quantity: item?.quantity || 0 }];
+    if (allocationRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0) !== Number(item?.quantity || 0))
+      throw commerceError("ecommerce-reservation-invalid", "La distribución de stock del pedido no coincide con sus cantidades.", 409);
+    const sourceRefs = channel?.authorizedOrigins?.length
+      ? channel.authorizedOrigins
+      : [{ type: origin?.type || "location", id: origin?.id || locationId, name: origin?.name || "" }];
+    const configuredSourceKeys = new Set(sourceRefs.map((row) => `${row.type}:${row.id}`));
+    if (allocationRows.some((row) => !configuredSourceKeys.has(`${row.type}:${row.id}`)))
+      throw commerceError("ecommerce-origin-not-authorized", "El pedido conserva una reserva en un origen que ya no está habilitado.", 409);
+    const sourceRows = [];
+    for (const sourceRef of sourceRefs) {
+      const source = channel
+        ? await resolveChannelOrigin(channel, sourceRef, { env, getDocument })
+        : { type: sourceRef.type, id: sourceRef.id, name: sourceRef.name || origin?.name || "Ecommerce" };
+      const path = originStockPath(source, productId);
+      const snapshot = await getDocument(path, { env });
+      const stock = snapshot?.data || null;
+      const available = stock && stock.active !== false && stock.deleted !== true && stock.productDeleted !== true
+        ? Math.max(0, Number(stock.currentStock || 0) - reservedStockQuantity(stock, now, orderId))
+        : 0;
+      if (snapshot) physicalStocksByPath[path] = { snapshot, origin: source, productId };
+      sourceRows.push({ origin: source, stock, snapshot, available, path });
+    }
+    const distinctSources = new Map();
+    for (const allocation of allocationRows) {
+      const key = `${allocation.type}:${allocation.id}`;
+      distinctSources.set(key, allocation);
+    }
+    allocationsByProduct[productId] = [...distinctSources.values()];
+    const pricingRow = sourceRows.find((row) => row.origin?.id === origin?.id && row.origin?.type === origin?.type && row.stock && row.stock.active !== false && row.stock.deleted !== true && row.stock.productDeleted !== true)
+      || sourceRows.find((row) => row.stock && row.stock.active !== false && row.stock.deleted !== true)
+      || null;
+    const floor = Math.max(0, Number(settingSnapshot?.data?.minimumRemainingStock) || 0);
+    const aggregateStock = {
+      ...(pricingRow?.stock || { priceMode: "default" }),
+      id: productId,
+      currentStock: Math.max(0, sourceRows.reduce((sum, row) => sum + row.available, 0) - floor),
+    };
+    return [
+      productId,
+      productSnapshot ? { ...productSnapshot.data, id: productId } : null,
+      aggregateStock,
+      settingSnapshot?.data || {},
+      promotionSnapshot?.data || null,
+    ];
+  }));
   return {
     productsById: Object.fromEntries(
       entries
@@ -83,9 +110,12 @@ async function loadAuthoritativeInputs({
     ),
     stocksById: Object.fromEntries(
       entries
-        .filter(([, , stock]) => stock)
         .map(([id, , stock]) => [id, stock]),
     ),
+    ecommerceSettingsById: Object.fromEntries(entries.map(([id, , , settings]) => [id, settings])),
+    promotionsByProductId: Object.fromEntries(entries.filter(([, , , , promotion]) => promotion).map(([id, , , , promotion]) => [id, promotion])),
+    allocationsByProduct,
+    physicalStocksByPath,
   };
 }
 
@@ -388,10 +418,12 @@ export async function confirmEcommercePayment({
     }
 
     const requestedItems = normalizeCheckoutItems(order.items);
-    const { productsById, stocksById } = await loadAuthoritativeInputs({
+    const { productsById, stocksById, ecommerceSettingsById, promotionsByProductId, allocationsByProduct, physicalStocksByPath } = await loadAuthoritativeInputs({
       requestedItems,
       locationId,
       origin,
+      channel,
+      orderItems: order.items || [],
       orderId: safeOrderId,
       now: timestamp,
       env,
@@ -404,24 +436,31 @@ export async function confirmEcommercePayment({
       customer: order.customer,
       shipping: order.shipping,
       resolvedShipping: channel ? order.shipping : null,
+      ecommerceSettingsById,
+      promotionsByProductId,
       env,
     });
     assertCommercialSnapshotMatches(order, prepared);
-    if (channel)
+    if (channel) {
       for (const item of prepared.items) {
-        const hold =
-          stocksById[item.productId]?.ecommerceReservations?.[safeOrderId];
+        for (const allocation of allocationsByProduct[item.productId] || []) {
+          const path = originStockPath(allocation, item.productId);
+          const stock = physicalStocksByPath[path]?.snapshot?.data;
+          const hold = stock?.ecommerceReservations?.[safeOrderId];
+          const expected = Number(allocation.quantity);
         if (
           !hold ||
-          hold.quantity !== item.quantity ||
+          hold.quantity !== expected ||
           new Date(hold.expiresAt) <= timestamp
         )
           throw commerceError(
             "ecommerce-reservation-invalid",
-            "La reserva del pedido no está vigente.",
+            "La reserva de stock del pedido no está vigente.",
             409,
           );
+        }
       }
+    }
 
     saleId = `ecommerce_sale_${stableKey}`;
     const crm = await prepareCommerceCustomer({
@@ -466,6 +505,8 @@ export async function confirmEcommercePayment({
         unitPrice: item.unitPrice,
         subtotal: item.subtotal,
         arcaVatRate: item.arcaVatRate,
+        promotionName: item.promotionName || null,
+        stockAllocations: allocationsByProduct[item.productId] || [],
       })),
       discounts: [],
       discountTotal: 0,
@@ -522,56 +563,66 @@ export async function confirmEcommercePayment({
     operations.push({ type: "create", path: `sales/${saleId}`, data: sale });
 
     for (const item of prepared.items) {
-      const stock = stocksById[item.productId];
-      const newStock = Number(stock.physicalStock) - item.quantity;
-      const safeProductId = createHash("sha256")
-        .update(item.productId)
-        .digest("hex")
-        .slice(0, 32);
-      const movementId = `ecommerce_${stableKey}_${safeProductId}`;
-      operations.push({
-        type: "update",
-        path: originStockPath(origin, item.productId),
-        data: {
-          currentStock: newStock,
-          ...(channel
-            ? reservationPatch(stock, safeOrderId, null, timestamp)
-            : {}),
-          lastSaleId: saleId,
-          lastMovementId: movementId,
-          updatedAt: timestamp,
-        },
-        currentUpdateTime: stock.__updateTime || null,
-      });
-      operations.push({
-        type: "create",
-        path: `stockMovements/${movementId}`,
-        data: {
-          sourceType: "ecommerce",
-          orderId: safeOrderId,
-          saleId,
-          inventoryType: origin.type,
-          inventoryId: origin.id,
-          ...(origin.type === "warehouse"
-            ? { warehouseId: origin.id, warehouseName: origin.name }
-            : { locationId: origin.id, locationName: origin.name }),
-          simulated: confirmation.simulated,
-          productId: item.productId,
-          productName: item.name,
-          type: "sale",
-          qty: -item.quantity,
-          previousStock: Number(stock.physicalStock),
-          newStock,
-          reason: `Venta Ecommerce ${sale.saleCode}`,
-          userId: confirmation.simulated
-            ? actor.uid || "ecommerce-admin-simulation"
-            : "ecommerce-payment-backend",
-          userName: confirmation.simulated
-            ? actor.name || "Administrador"
-            : "Ecommerce",
-          createdAt: timestamp,
-        },
-      });
+      for (const allocation of allocationsByProduct[item.productId] || []) {
+        const path = originStockPath(allocation, item.productId);
+        const snapshot = physicalStocksByPath[path]?.snapshot;
+        const stock = snapshot?.data;
+        if (!stock || stock.active === false || stock.deleted === true || stock.productDeleted === true)
+          throw commerceError("ecommerce-stock-inactive", `${item.name}: el stock de ${allocation.name || allocation.id} dejó de estar disponible.`, 409);
+        const newStock = Number(stock.currentStock) - Number(allocation.quantity);
+        const safeSourceId = createHash("sha256")
+          .update(`${allocation.type}:${allocation.id}`)
+          .digest("hex")
+          .slice(0, 12);
+        const safeProductId = createHash("sha256")
+          .update(item.productId)
+          .digest("hex")
+          .slice(0, 20);
+        const movementId = `ecommerce_${stableKey}_${safeProductId}_${safeSourceId}`;
+        operations.push({
+          type: "update",
+          path,
+          data: {
+            currentStock: newStock,
+            ...(channel
+              ? reservationPatch(stock, safeOrderId, null, timestamp)
+              : {}),
+            lastSaleId: saleId,
+            lastMovementId: movementId,
+            updatedAt: timestamp,
+          },
+          currentUpdateTime: snapshot.updateTime || null,
+        });
+        operations.push({
+          type: "create",
+          path: `stockMovements/${movementId}`,
+          data: {
+            sourceType: "ecommerce",
+            orderId: safeOrderId,
+            saleId,
+            inventoryType: allocation.type,
+            inventoryId: allocation.id,
+            ...(allocation.type === "warehouse"
+              ? { warehouseId: allocation.id, warehouseName: allocation.name }
+              : { locationId: allocation.id, locationName: allocation.name }),
+            simulated: confirmation.simulated,
+            productId: item.productId,
+            productName: item.name,
+            type: "sale",
+            qty: -Number(allocation.quantity),
+            previousStock: Number(stock.currentStock),
+            newStock,
+            reason: `Venta Ecommerce ${sale.saleCode}`,
+            userId: confirmation.simulated
+              ? actor.uid || "ecommerce-admin-simulation"
+              : "ecommerce-payment-backend",
+            userName: confirmation.simulated
+              ? actor.name || "Administrador"
+              : "Ecommerce",
+            createdAt: timestamp,
+          },
+        });
+      }
     }
   }
 

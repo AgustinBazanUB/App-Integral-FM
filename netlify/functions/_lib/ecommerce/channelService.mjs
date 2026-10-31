@@ -71,6 +71,13 @@ export async function resolveChannelOrigin(
       "El origen físico no está disponible.",
       409,
     );
+  if (origin.type === "location" && (snapshot.data.type || "store") !== "store") {
+    throw commerceError(
+      "ecommerce-location-type-not-allowed",
+      "La página web sólo puede tomar stock de locales activos. Las ferias y eventos quedan excluidos.",
+      409,
+    );
+  }
   return {
     ...origin,
     name: snapshot.data.name,

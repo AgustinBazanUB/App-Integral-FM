@@ -34,6 +34,9 @@ export default function EcommercePage() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [configure, setConfigure] = useState(false),
+    [configurationSection, setConfigurationSection] = useState("channel"),
+    [productDrafts, setProductDrafts] = useState({}),
+    [promotionForm, setPromotionForm] = useState(null),
     [selected, setSelected] = useState(null),
     [origin, setOrigin] = useState(""),
     [reason, setReason] = useState(""),
@@ -53,6 +56,18 @@ export default function EcommercePage() {
       .then((value) => setSimulation(value.enabled))
       .catch(() => {});
   }, []);
+  useEffect(() => {
+    if (!data) return;
+    setProductDrafts(Object.fromEntries((data.products || []).map((product) => {
+      const saved = data.productSettings?.[product.id] || {};
+      return [product.id, {
+        enabled: saved.enabled !== false,
+        priceOverride: saved.priceOverride ?? "",
+        minimumRemainingStock: saved.minimumRemainingStock ?? 0,
+        sourceAlertThresholds: { ...(saved.sourceAlertThresholds || {}) },
+      }];
+    })));
+  }, [data?.productSettings, data?.products]);
   useEffect(
     () =>
       subscribeWebCommerce(
@@ -89,11 +104,19 @@ export default function EcommercePage() {
     }
   };
   const origins = data
-    ? [
-        ...data.locations.map((row) => ({ ...row, type: "location" })),
-        ...data.warehouses.map((row) => ({ ...row, type: "warehouse" })),
-      ]
+    ? data.stockOrigins || []
     : [];
+  const channelOriginOptions = [
+    ...origins,
+    ...((channel.authorizedOrigins || [])
+      .filter((item) => !origins.some((row) => row.type === item.type && row.id === item.id))
+      .map((item) => {
+        const source = item.type === "warehouse"
+          ? data?.warehouses?.find((row) => row.id === item.id)
+          : data?.locations?.find((row) => row.id === item.id);
+        return { ...item, name: source?.name || item.id, disallowed: true };
+      })),
+  ];
   const edit = () => {
     const current = data.channel || empty;
     setChannel(structuredClone(current));
@@ -135,6 +158,38 @@ export default function EcommercePage() {
       });
       setConfigure(false);
     });
+  const updateProductDraft = (productId, key, value) =>
+    setProductDrafts((current) => ({
+      ...current,
+      [productId]: { ...(current[productId] || {}), [key]: value },
+    }));
+  const saveProduct = (productId) => {
+    const draft = productDrafts[productId] || {};
+    const settings = {
+      ...draft,
+      priceOverride: draft.priceOverride === "" ? null : Number(draft.priceOverride),
+      minimumRemainingStock: Number(draft.minimumRemainingStock || 0),
+      sourceAlertThresholds: Object.fromEntries(
+        Object.entries(draft.sourceAlertThresholds || {}).map(([key, value]) => [key, Number(value || 0)]),
+      ),
+    };
+    run(JSON.stringify(["product", productId, settings]), (requestId) =>
+      ecommerceAdminRequest({ mode: "save-product", requestId, productId, settings }),
+    );
+  };
+  const startPromotion = (promotion = null) => {
+    setPromotionForm(promotion
+      ? { productId: promotion.productId || promotion.id, name: promotion.name || "", price: String(promotion.price ?? ""), active: promotion.active === true }
+      : { productId: "", name: "", price: "", active: true });
+  };
+  const savePromotion = () => {
+    if (!promotionForm) return;
+    const promotion = { ...promotionForm, price: Number(promotionForm.price) };
+    run(JSON.stringify(["promotion", promotion]), async (requestId) => {
+      await ecommerceAdminRequest({ mode: "save-promotion", requestId, productId: promotion.productId, promotion });
+      setPromotionForm(null);
+    });
+  };
   const select = async (order) => {
     setSelected(order);
     setOrigin(`${order.stockOriginType}:${order.stockOriginId}`);
@@ -158,6 +213,28 @@ export default function EcommercePage() {
     }
     void select(order);
   };
+  const productGroups = (data?.products || []).reduce((groups, product) => {
+    const category = data.categories?.find((row) => row.id === product.categoryId);
+    const categoryName = category?.name || product.categoryName || "Sin catálogo";
+    (groups[categoryName] ||= []).push(product);
+    return groups;
+  }, {});
+  const configuredSourceKeys = new Set((data?.channel?.authorizedOrigins || []).map((row) => `${row.type}:${row.id}`));
+  const stockRowsFor = (product) => {
+    const rows = data?.stockByProduct?.[product.id] || [];
+    return origins.map((source) => rows.find((row) => row.type === source.type && row.originId === source.id)
+      || { productId: product.id, type: source.type, originId: source.id, originName: source.name, currentStock: 0, reservedStock: 0, active: false });
+  };
+  const lowStockAlerts = (data?.products || []).flatMap((product) => {
+    const thresholds = data.productSettings?.[product.id]?.sourceAlertThresholds || {};
+    return stockRowsFor(product).flatMap((row) => {
+      const threshold = Number(thresholds[`${row.type}:${row.originId}`] || 0);
+      const remaining = Math.max(0, row.currentStock - row.reservedStock);
+      return threshold > 0 && remaining <= threshold
+        ? [{ productId: product.id, productName: product.name, originName: row.originName, type: row.type, remaining, threshold }]
+        : [];
+    });
+  });
   const action = (mode) =>
     run(JSON.stringify([mode, selected?.id, origin, reason]), (requestId) =>
       ecommerceAdminRequest({
@@ -186,6 +263,14 @@ export default function EcommercePage() {
       )}
       {configure && (
         <Panel title="Configuración e-commerce">
+          <nav aria-label="Secciones de configuración e-commerce" className="fm-ecommerce-config-tabs">
+            {[["channel", "Canal y entregas"], ["promotions", "Promociones"], ["products", "Productos y stock"]].map(([key, label]) => (
+              <Button key={key} variant={configurationSection === key ? "primary" : "secondary"} onClick={() => setConfigurationSection(key)}>
+                {label}
+              </Button>
+            ))}
+          </nav>
+          {configurationSection === "channel" && <>
           <div className="fm-ecommerce-config-toolbar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
             <p>Configurá el canal, sus orígenes y las opciones de entrega.</p>
             <Link className="fm-button fm-button--secondary" to="/gestion/metrics/sales?channel=ecommerce">
@@ -203,8 +288,7 @@ export default function EcommercePage() {
             Canal activo
           </label>
           <p>
-            El canal utiliza el inventario de los orígenes seleccionados. No
-            tiene stock propio.
+            El stock web se suma automáticamente desde los locales y depósitos seleccionados. Las ferias y los eventos no pueden usarse como origen.
           </p>
           <FormField label="Transporte predeterminado">
             <Select
@@ -269,14 +353,15 @@ export default function EcommercePage() {
                   value={`${row.type}:${row.id}`}
                 >
                   {row.name} ·{" "}
-                  {row.type === "warehouse" ? "Depósito" : "Ubicación"}
+                  {row.type === "warehouse" ? "Depósito" : "Local"}
                 </option>
               ))}
             </Select>
           </FormField>
           <fieldset>
-            <legend>Orígenes autorizados</legend>
-            {origins.map((row) => (
+            <legend>Locales y depósitos que abastecen la web</legend>
+            <p>La disponibilidad combina el stock de los orígenes elegidos; el sitio sólo muestra si un producto está disponible, nunca sus unidades.</p>
+            {channelOriginOptions.map((row) => (
               <label key={`${row.type}:${row.id}`} style={{ display: "block" }}>
                 <input
                   type="checkbox"
@@ -298,7 +383,7 @@ export default function EcommercePage() {
                     })
                   }
                 />
-                {row.name}
+                {row.name}{row.disallowed ? " · origen excluido; desmarcalo" : ""}
               </label>
             ))}
           </fieldset>
@@ -380,6 +465,107 @@ export default function EcommercePage() {
           <Button loading={busy} onClick={save}>
             Guardar configuración
           </Button>
+          </>}
+          {configurationSection === "promotions" && (
+            <div className="fm-ecommerce-promotions-config">
+              <div className="fm-ecommerce-config-toolbar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+                <p>Creá precios promocionales por producto y activalos cuando quieras. Cada producto admite una promoción web.</p>
+                <Button onClick={() => startPromotion()}>Nueva promoción</Button>
+              </div>
+              {promotionForm && (
+                <Panel title={promotionForm.productId ? "Editar promoción" : "Nueva promoción"}>
+                  <FormField label="Producto">
+                    <Select value={promotionForm.productId} onChange={(e) => setPromotionForm({ ...promotionForm, productId: e.target.value })}>
+                      <option value="">Elegí un producto</option>
+                      {(data.products || []).filter((product) => !data.promotions?.[product.id] || product.id === promotionForm.productId).map((product) => (
+                        <option key={product.id} value={product.id}>{product.name}</option>
+                      ))}
+                    </Select>
+                  </FormField>
+                  <FormField label="Nombre de la promoción">
+                    <input value={promotionForm.name} maxLength={150} onChange={(e) => setPromotionForm({ ...promotionForm, name: e.target.value })} placeholder="Ej.: Promo de temporada" />
+                  </FormField>
+                  <FormField label="Precio promocional web (ARS)">
+                    <input type="number" min="1" step="1" value={promotionForm.price} onChange={(e) => setPromotionForm({ ...promotionForm, price: e.target.value })} />
+                  </FormField>
+                  <label>
+                    <input type="checkbox" checked={promotionForm.active} onChange={(e) => setPromotionForm({ ...promotionForm, active: e.target.checked })} /> Promoción habilitada
+                  </label>
+                  <div className="fm-shipping-actions">
+                    <Button loading={busy} disabled={!promotionForm.productId || !promotionForm.name.trim() || !promotionForm.price} onClick={savePromotion}>Guardar promoción</Button>
+                    <Button variant="secondary" onClick={() => setPromotionForm(null)}>Cancelar</Button>
+                  </div>
+                </Panel>
+              )}
+              {Object.keys(data.promotions || {}).length === 0 ? <p>No hay promociones configuradas.</p> : (
+                <div className="fm-table-scroll">
+                  <table className="fm-data-table">
+                    <thead><tr><th>Promoción</th><th>Producto</th><th>Precio web</th><th>Estado</th><th>Acción</th></tr></thead>
+                    <tbody>{Object.values(data.promotions).map((promotion) => {
+                      const product = data.products.find((row) => row.id === promotion.productId || row.id === promotion.id);
+                      return <tr key={promotion.id || promotion.productId}>
+                        <td>{promotion.name}</td><td>{product?.name || "Producto no disponible"}</td>
+                        <td>{formatMoney(promotion.price)}</td><td>{promotion.active ? "Habilitada" : "Deshabilitada"}</td>
+                        <td><Button variant="secondary" onClick={() => startPromotion(promotion)}>Editar</Button></td>
+                      </tr>;
+                    })}</tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+          {configurationSection === "products" && (
+            <div className="fm-ecommerce-products-config">
+              <p>Los cambios de precio y disponibilidad se aplican sólo al catálogo web. El stock se calcula con los orígenes del canal, descontando las reservas y el mínimo que quieras conservar.</p>
+              <Panel title={`Alertas de stock${lowStockAlerts.length ? ` · ${lowStockAlerts.length}` : ""}`}>
+                {lowStockAlerts.length ? <ul className="fm-ecommerce-stock-alert-list">
+                  {lowStockAlerts.map((alert) => <li key={`${alert.productId}:${alert.type}:${alert.originName}`}>
+                    <Badge tone={alert.remaining === 0 ? "error" : "warning"}>{alert.remaining === 0 ? "Sin stock" : "Stock bajo"}</Badge>
+                    <strong>{alert.productName}</strong>
+                    <span>{alert.originName} · {alert.type === "warehouse" ? "depósito" : "local"}: {alert.remaining} disponibles (aviso en {alert.threshold})</span>
+                  </li>)}
+                </ul> : <p>No hay alertas activas. Configurá umbrales por local o depósito en cada producto.</p>}
+              </Panel>
+              {Object.entries(productGroups).map(([categoryName, products]) => (
+                <Panel key={categoryName} title={categoryName}>
+                  <div className="fm-ecommerce-product-config-list">
+                    {products.map((product) => {
+                      const draft = productDrafts[product.id] || { enabled: true, priceOverride: "", minimumRemainingStock: 0, sourceAlertThresholds: {} };
+                      const stockRows = stockRowsFor(product);
+                      const totalRemaining = stockRows.filter((row) => configuredSourceKeys.has(`${row.type}:${row.originId}`)).reduce((sum, row) => sum + Math.max(0, row.currentStock - row.reservedStock), 0);
+                      const webAvailable = Math.max(0, totalRemaining - Number(draft.minimumRemainingStock || 0));
+                      return <article key={product.id} className="fm-ecommerce-product-config">
+                        <div className="fm-ecommerce-product-config__header">
+                          <div><h3>{product.name}</h3><p>{product.abbreviation || product.categoryName || "Producto del catálogo"}</p></div>
+                          <label><input type="checkbox" checked={draft.enabled !== false} onChange={(e) => updateProductDraft(product.id, "enabled", e.target.checked)} /> Disponible en la web</label>
+                        </div>
+                        <div className="fm-ecommerce-product-config__fields">
+                          <FormField label="Precio web (ARS)"><input type="number" min="1" step="1" value={draft.priceOverride} placeholder={product.defaultPrice ? `Habitual: ${formatMoney(product.defaultPrice)}` : "Ingresá un precio web"} onChange={(e) => updateProductDraft(product.id, "priceOverride", e.target.value)} /></FormField>
+                          <FormField label="Stock mínimo a conservar"><input type="number" min="0" step="1" value={draft.minimumRemainingStock} onChange={(e) => updateProductDraft(product.id, "minimumRemainingStock", e.target.value)} /></FormField>
+                          <div className="fm-ecommerce-product-config__availability">Stock ofrecible desde orígenes web: <strong>{webAvailable} unidades</strong></div>
+                        </div>
+                        <fieldset className="fm-ecommerce-product-config__sources">
+                          <legend>Alertas por origen</legend>
+                          {stockRows.length ? stockRows.map((row) => {
+                            const key = `${row.type}:${row.originId}`;
+                            const remaining = Math.max(0, row.currentStock - row.reservedStock);
+                            const threshold = Number(draft.sourceAlertThresholds?.[key] || 0);
+                            return <div key={key} className="fm-ecommerce-product-config__source">
+                              <span>{row.originName} · {row.type === "warehouse" ? "Depósito" : "Local"}: {remaining} disponibles</span>
+                              <FormField label="Avisar al llegar a"><input type="number" min="0" step="1" value={draft.sourceAlertThresholds?.[key] ?? 0} onChange={(e) => updateProductDraft(product.id, "sourceAlertThresholds", { ...draft.sourceAlertThresholds, [key]: e.target.value })} /></FormField>
+                              {threshold > 0 && remaining <= threshold ? <Badge tone="warning">Stock bajo</Badge> : null}
+                            </div>;
+                          }) : <p>Elegí locales o depósitos en “Canal y entregas” para asignar stock.</p>}
+                        </fieldset>
+                        <Button loading={busy} onClick={() => saveProduct(product.id)}>Guardar configuración web</Button>
+                      </article>;
+                    })}
+                  </div>
+                </Panel>
+              ))}
+              {!Object.keys(productGroups).length ? <p>No hay productos activos en el catálogo.</p> : null}
+            </div>
+          )}
         </Panel>
       )}
       {selected && !selected.shipmentId && (

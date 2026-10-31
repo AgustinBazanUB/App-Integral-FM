@@ -58,6 +58,14 @@ function eventWrite(shipment, eventId, action, actor, previous, stamp, detail = 
 // attaches the existing logistics aggregate, in that same transaction.
 export async function preparePaidEcommerceFulfillment({ transaction, order, sale, saleId, origin, actor, env, now }) {
   const shipmentId = `shipment_${saleId}`, pickup = order.shipping.method === "pickup";
+  const stockOrigins = new Map();
+  for (const item of order.items || []) {
+    const allocations = item.stockAllocations?.length
+      ? item.stockAllocations
+      : [{ type: origin.type, id: origin.id, name: origin.name, quantity: item.quantity }];
+    for (const allocation of allocations)
+      stockOrigins.set(`${allocation.type}:${allocation.id}`, { type: allocation.type, id: allocation.id, name: allocation.name || allocation.id });
+  }
   const publicLookupId = randomBytes(24).toString("hex");
   const pickupCode = pickup ? randomBytes(5).toString("hex").toUpperCase() : null;
   const address = order.shipping.address;
@@ -67,6 +75,7 @@ export async function preparePaidEcommerceFulfillment({ transaction, order, sale
     publicCode: order.orderCode || sale.saleCode, publicLookupId, creationSource: "ecommerce", createdBy: actor,
     commercialLocationId: sale.locationId, commercialLocationName: sale.locationName,
     stockOriginType: origin.type, stockOriginId: origin.id, stockOriginName: origin.name,
+    stockOrigins: [...stockOrigins.values()],
     stockCommitMode: "immediate", stockCommitState: "committed", stockMovementIds: [],
     status: "aprobado", fulfillmentType: pickup ? "pickup" : "delivery", deliveryType: pickup ? "pickup" : order.defaultTransport || env.ECOMMERCE_DEFAULT_TRANSPORT || "repository",
     customerSnapshot: { name: order.customer.fullName, phone: order.customer.phone }, itemsSnapshot: sale.items,

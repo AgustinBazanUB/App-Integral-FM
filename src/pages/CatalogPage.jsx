@@ -31,7 +31,7 @@ const occasions = [
 ];
 
 export default function CatalogPage() {
-  const { products, status, error, ready, pending, location } = useCommerceCatalog();
+  const { products, status, error, ready, pending } = useCommerceCatalog();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawCategory = searchParams.get("categoria") ?? "";
   const categoryId = categoryAliases[rawCategory] ?? rawCategory;
@@ -131,8 +131,6 @@ export default function CatalogPage() {
                   : "Algunas decisiones comerciales siguen pendientes."}
               </p>
             </div>
-          ) : location ? (
-            <p className="catalog-source-note">Stock Ecommerce: {location.name}</p>
           ) : null}
         </div>
       </section>

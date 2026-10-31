@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { adminRunTransaction } from "../firestoreAdminRest.mjs";
 import {
+  authoritativeUnitPrice,
   commerceError,
   currentStockQuantity,
   normalizeEcommerceRequestId,
@@ -192,6 +193,160 @@ export async function configureWebChannel({
   );
 }
 
+export async function configureWebProduct({
+  body,
+  session,
+  env = process.env,
+  runTransaction = adminRunTransaction,
+  now = new Date(),
+}) {
+  const requestId = normalizeEcommerceRequestId(body.requestId);
+  const productId = id(body.productId);
+  const settings = body.settings || {};
+  const enabled = settings.enabled !== false;
+  const priceOverride = settings.priceOverride == null || settings.priceOverride === ""
+    ? null
+    : Number(settings.priceOverride);
+  const minimumRemainingStock = Number(settings.minimumRemainingStock ?? 0);
+  const sourceAlertThresholds = settings.sourceAlertThresholds || {};
+  if (priceOverride !== null && (!Number.isSafeInteger(priceOverride) || priceOverride <= 0))
+    fail("El precio web tiene que ser un importe entero mayor que cero.", 400);
+  if (!Number.isSafeInteger(minimumRemainingStock) || minimumRemainingStock < 0 || minimumRemainingStock > 1000000)
+    fail("El stock reservado debe ser un entero entre 0 y 1.000.000.", 400);
+  if (!sourceAlertThresholds || typeof sourceAlertThresholds !== "object" || Array.isArray(sourceAlertThresholds) || Object.keys(sourceAlertThresholds).length > 100)
+    fail("Configurá hasta cien umbrales de alerta de stock.", 400);
+
+  const fingerprint = createHash("sha256")
+    .update(JSON.stringify({ productId, settings: { enabled, priceOverride, minimumRemainingStock, sourceAlertThresholds }, actor: session.uid }))
+    .digest("hex");
+  return runTransaction(async (transaction) => {
+    const profile = (await transaction.getDocument(`users/${session.uid}`))?.data;
+    if (!profile?.active || !canAccessAdministration(profile))
+      fail("Sólo administración puede configurar los productos web.", 403);
+    const receiptPath = `ecommerceOperations/product_${requestId}`;
+    const receipt = (await transaction.getDocument(receiptPath))?.data;
+    if (receipt) {
+      if (receipt.fingerprint !== fingerprint) fail("El intento corresponde a otra configuración.");
+      return receipt.result;
+    }
+    const [productSnapshot, promotionSnapshot, channelSnapshot] = await Promise.all([
+      transaction.getDocument(`products/${productId}`),
+      transaction.getDocument(`ecommercePromotions/${productId}`),
+      transaction.getDocument(`channels/${WEB_CHANNEL_ID}`),
+    ]);
+    const product = productSnapshot?.data;
+    if (!product || product.deleted === true) fail("El producto no existe en el catálogo.", 404);
+    const originRefs = [channelSnapshot?.data?.defaultOrigin, ...(channelSnapshot?.data?.authorizedOrigins || [])].filter(Boolean);
+    const uniqueOriginRefs = [...new Map(originRefs.map((row) => [`${row.type}:${row.id}`, row])).values()];
+    const stockSnapshots = await Promise.all(uniqueOriginRefs.map((row) => transaction.getDocument(originStockPath(row, productId))));
+    const preferredStock = stockSnapshots.find((snapshot) => snapshot?.data && snapshot.data.active !== false && snapshot.data.deleted !== true && snapshot.data.productDeleted !== true)?.data || { id: productId, priceMode: "default" };
+    let effectiveWebPrice = priceOverride ?? Number(product.defaultPrice);
+    try {
+      effectiveWebPrice = authoritativeUnitPrice({ ...product, id: productId }, { ...preferredStock, id: productId }, { webPriceOverride: priceOverride });
+    } catch {}
+    if (promotionSnapshot?.data?.active === true && (!Number.isSafeInteger(effectiveWebPrice) || effectiveWebPrice <= promotionSnapshot.data.price))
+      fail("El precio web debe quedar por encima de la promoción activa. Actualizá o deshabilitá esa promoción antes de guardar.", 409);
+    const cleanThresholds = {};
+    for (const [sourceKey, rawThreshold] of Object.entries(sourceAlertThresholds)) {
+      const [type, sourceId, ...extra] = String(sourceKey).split(":");
+      const threshold = Number(rawThreshold);
+      if (extra.length || !["location", "warehouse"].includes(type) || !/^[A-Za-z0-9_-]{1,150}$/.test(sourceId || "") || !Number.isSafeInteger(threshold) || threshold < 0 || threshold > 1000000)
+        fail("Cada alerta debe corresponder a un local o depósito y usar un entero entre 0 y 1.000.000.", 400);
+      const source = (await transaction.getDocument(`${type === "warehouse" ? "warehouses" : "locations"}/${sourceId}`))?.data;
+      if (!source || source.active === false || source.deleted === true || (type === "location" && (source.type || "store") !== "store"))
+        fail("Las alertas de stock sólo pueden configurarse para locales y depósitos activos.", 400);
+      cleanThresholds[`${type}:${sourceId}`] = threshold;
+    }
+    const path = `ecommerceProductSettings/${productId}`;
+    const previous = await transaction.getDocument(path);
+    const data = {
+      schemaVersion: 1,
+      productId,
+      enabled,
+      priceOverride,
+      minimumRemainingStock,
+      sourceAlertThresholds: cleanThresholds,
+      updatedAt: now,
+      updatedBy: session.uid,
+      ...(!previous ? { createdAt: now, createdBy: session.uid } : {}),
+    };
+    const result = { id: productId, ...data };
+    await transaction.commitDocuments([
+      { type: previous ? "update" : "create", path, data },
+      { type: "create", path: receiptPath, data: { fingerprint, result, createdAt: now } },
+      { type: "create", path: `auditLogs/ecommerce_product_${requestId}`, data: { moduleId: "ecommerce", action: "product.configured", entityId: productId, entityType: "product", userId: session.uid, description: `Configuración web actualizada: ${enabled ? "habilitado" : "deshabilitado"}; precio ${priceOverride ?? "habitual"}; reserva ${minimumRemainingStock} unidades`, createdAt: now } },
+    ]);
+    return result;
+  }, { env });
+}
+
+export async function configureWebPromotion({
+  body,
+  session,
+  env = process.env,
+  runTransaction = adminRunTransaction,
+  now = new Date(),
+}) {
+  const requestId = normalizeEcommerceRequestId(body.requestId);
+  const productId = id(body.productId);
+  const name = String(body.promotion?.name || "").trim().slice(0, 150);
+  const price = Number(body.promotion?.price);
+  const active = body.promotion?.active === true;
+  if (!name || !Number.isSafeInteger(price) || price <= 0)
+    fail("La promoción necesita un nombre y un precio entero mayor que cero.", 400);
+  const fingerprint = createHash("sha256")
+    .update(JSON.stringify({ productId, promotion: { name, price, active }, actor: session.uid }))
+    .digest("hex");
+  return runTransaction(async (transaction) => {
+    const profile = (await transaction.getDocument(`users/${session.uid}`))?.data;
+    if (!profile?.active || !canAccessAdministration(profile))
+      fail("Sólo administración puede configurar promociones web.", 403);
+    const receiptPath = `ecommerceOperations/promotion_${requestId}`;
+    const receipt = (await transaction.getDocument(receiptPath))?.data;
+    if (receipt) {
+      if (receipt.fingerprint !== fingerprint) fail("El intento corresponde a otra promoción.");
+      return receipt.result;
+    }
+    const [product, productSettings, channel] = await Promise.all([
+      transaction.getDocument(`products/${productId}`),
+      transaction.getDocument(`ecommerceProductSettings/${productId}`),
+      transaction.getDocument(`channels/${WEB_CHANNEL_ID}`),
+    ]);
+    if (!product?.data || product.data.deleted === true) fail("El producto no existe en el catálogo.", 404);
+    const originRefs = [channel?.data?.defaultOrigin, ...(channel?.data?.authorizedOrigins || [])].filter(Boolean);
+    const uniqueOriginRefs = [...new Map(originRefs.map((row) => [`${row.type}:${row.id}`, row])).values()];
+    const stockSnapshots = await Promise.all(uniqueOriginRefs.map((row) => transaction.getDocument(originStockPath(row, productId))));
+    const pricingStock = stockSnapshots.find((snapshot) => snapshot?.data && snapshot.data.active !== false && snapshot.data.deleted !== true && snapshot.data.productDeleted !== true)?.data || { id: productId, priceMode: "default" };
+    let basePrice = Number(productSettings?.data?.priceOverride ?? product.data.defaultPrice);
+    try {
+      basePrice = authoritativeUnitPrice({ ...product.data, id: productId }, { ...pricingStock, id: productId }, { webPriceOverride: productSettings?.data?.priceOverride });
+    } catch {}
+    if (active && (!Number.isSafeInteger(basePrice) || basePrice <= 0 || price >= basePrice))
+      fail("El precio promocional debe ser menor que un precio web habitual válido.", 400);
+    if (!Array.isArray(channel?.data?.authorizedOrigins) || !channel.data.authorizedOrigins.length)
+      fail("Configurá primero los orígenes de stock del canal web.", 409);
+    const path = `ecommercePromotions/${productId}`;
+    const previous = await transaction.getDocument(path);
+    const data = {
+      schemaVersion: 1,
+      productId,
+      name,
+      price,
+      active,
+      updatedAt: now,
+      updatedBy: session.uid,
+      ...(!previous ? { createdAt: now, createdBy: session.uid } : {}),
+    };
+    const result = { id: productId, ...data };
+    await transaction.commitDocuments([
+      { type: previous ? "update" : "create", path, data },
+      { type: "create", path: receiptPath, data: { fingerprint, result, createdAt: now } },
+      { type: "create", path: `auditLogs/ecommerce_promotion_${requestId}`, data: { moduleId: "ecommerce", action: "promotion.configured", entityId: productId, entityType: "promotion", userId: session.uid, description: `${name}: ${active ? "habilitada" : "deshabilitada"} a $${price}`, createdAt: now } },
+    ]);
+    return result;
+  }, { env });
+}
+
 export async function manageWebOrder({
   body,
   session,
@@ -245,6 +400,12 @@ export async function manageWebOrder({
       const operations = [],
         changes = { updatedAt: now };
       if (body.mode === "origin") {
+        const allocatedOrigins = new Map();
+        for (const item of order.items || [])
+          for (const allocation of item.stockAllocations || [])
+            allocatedOrigins.set(`${allocation.type}:${allocation.id}`, allocation);
+        if (allocatedOrigins.size > 1 || [...allocatedOrigins.values()].some((entry) => entry.type !== oldOrigin.type || entry.id !== oldOrigin.id))
+          fail("Este pedido distribuyó productos entre varios orígenes. Para conservar el stock y la trazabilidad, no se puede cambiar a un único origen.");
         const channel = await loadWebChannel({
           env,
           getDocument: transaction.getDocument,
@@ -409,14 +570,19 @@ export async function manageWebOrder({
         )
           fail("La reserva aún no venció.");
         for (const item of order.items) {
-          const path = originStockPath(oldOrigin, item.productId),
-            stock = await transaction.getDocument(path);
-          if (stock)
-            operations.push({
-              type: "update",
-              path,
-              data: reservationPatch(stock.data, orderId, null, now),
-            });
+          const allocations = Array.isArray(item.stockAllocations) && item.stockAllocations.length
+            ? item.stockAllocations
+            : [{ ...oldOrigin, quantity: item.quantity }];
+          for (const allocation of allocations) {
+            const path = originStockPath(allocation, item.productId);
+            const stock = await transaction.getDocument(path);
+            if (stock)
+              operations.push({
+                type: "update",
+                path,
+                data: reservationPatch(stock.data, orderId, null, now),
+              });
+          }
         }
         Object.assign(changes, {
           status: body.mode === "expire" ? "expired" : "cancelled",

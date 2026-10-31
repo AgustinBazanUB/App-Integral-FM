@@ -1154,6 +1154,8 @@ service cloud.firestore {
       allow read: if canModule("ecommerce", "view");
       allow write: if false;
     }
+    match /ecommerceProductSettings/{productId} { allow read, write: if false; }
+    match /ecommercePromotions/{productId} { allow read, write: if false; }
     match /ecommerceOperations/{operationId} { allow read, write: if false; }
     match /ecommerceRateLimits/{bucket} { allow read, write: if false; }
     match /orders/{orderId} {

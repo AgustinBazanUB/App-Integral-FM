@@ -41,26 +41,30 @@ function slugFrom(value, fallback) {
   return normalized || fallback;
 }
 
-function publicProduct(product, stock, { locationConfigured }) {
+function publicProduct(product, stock, { locationConfigured, settings = {}, promotion = null }) {
   let price = null;
   let vatRate = null;
-  let stockQuantity = null;
+  const stockQuantity = Number.isInteger(stock?.currentStock)
+    ? Math.max(0, stock.currentStock)
+    : null;
   let reason = null;
   if (!locationConfigured) {
     reason = "ecommerce-location-not-configured";
   } else {
     try {
-      price = authoritativeUnitPrice(product, stock);
+      price = authoritativeUnitPrice(product, stock, {
+        webPriceOverride: settings.priceOverride,
+        promotion,
+      });
       vatRate = authoritativeVatRate(product);
-      stockQuantity = Number(stock.currentStock);
-      if (stockQuantity <= 0) reason = "out-of-stock";
+      if (settings.enabled === false) reason = "ecommerce-product-disabled";
+      else if (stockQuantity <= 0) reason = "out-of-stock";
     } catch (error) {
       reason = error?.code || "ecommerce-product-not-ready";
-      if (stock?.id && Number.isInteger(Number(stock.currentStock))) {
-        stockQuantity = Number(stock.currentStock);
-      }
       try {
-        price = authoritativeUnitPrice(product, stock);
+        price = authoritativeUnitPrice(product, stock, {
+          webPriceOverride: settings.priceOverride,
+        });
       } catch {}
       try {
         vatRate = authoritativeVatRate(product);
@@ -83,14 +87,21 @@ function publicProduct(product, stock, { locationConfigured }) {
     image: product.imageUrl || stock?.imageUrl || "",
     thumb: product.thumbUrl || stock?.thumbUrl || product.imageUrl || "",
     price,
-    stock: stockQuantity,
+    // The API communicates availability without publishing physical quantities.
+    stock: null,
     stockState:
-      stockQuantity == null
+      settings.enabled === false
+        ? "out"
+        : stockQuantity == null
         ? "unknown"
         : stockQuantity > 0
           ? "available"
           : "out",
-    active: product.active !== false && product.deleted !== true,
+    active: product.active !== false && product.deleted !== true && settings.enabled !== false,
+    promotionName: promotion?.active === true ? promotion.name : null,
+    compareAtPrice: promotion?.active === true
+      ? (() => { try { return authoritativeUnitPrice(product, stock, { webPriceOverride: settings.priceOverride }); } catch { return null; } })()
+      : null,
     arcaVatRate: vatRate,
     commercialReady:
       !reason &&
@@ -100,6 +111,58 @@ function publicProduct(product, stock, { locationConfigured }) {
       stockQuantity > 0,
     pendingReason: reason,
     dataStatus: !reason ? "ready" : "pending",
+  };
+}
+
+const stockCollectionPath = (origin) => `${origin.type === "warehouse" ? "warehouseStock" : "locationStock"}/${origin.id}/items`;
+
+async function configuredWebOrigins(channel, { env, getDocument }) {
+  if (channel) {
+    const requested = channel.authorizedOrigins?.length
+      ? channel.authorizedOrigins
+      : [channel.defaultOrigin].filter(Boolean);
+    if (!requested.length)
+      throw commerceError("ecommerce-location-not-configured", "Configurá al menos un local o depósito para abastecer la web.", 409);
+    const origins = await Promise.all(requested.map((origin) => resolveChannelOrigin(channel, origin, { env, getDocument })));
+    const unique = new Map(origins.map((origin) => [`${origin.type}:${origin.id}`, origin]));
+    return [...unique.values()].sort((a, b) => (a.type === channel.defaultOrigin?.type && a.id === channel.defaultOrigin?.id ? -1 : b.type === channel.defaultOrigin?.type && b.id === channel.defaultOrigin?.id ? 1 : 0));
+  }
+  const locationId = ecommerceLocationId(env);
+  if (!locationId) return [];
+  const origin = { type: "location", id: locationId };
+  const snapshot = await getDocument(`locations/${locationId}`, { env });
+  if (!snapshot || snapshot.data?.deleted === true || snapshot.data?.active === false)
+    throw commerceError("ecommerce-location-unavailable", "La ubicación Ecommerce no está disponible.", 409);
+  if ((snapshot.data.type || "store") !== "store")
+    throw commerceError("ecommerce-location-type-not-allowed", "La página web sólo puede tomar stock de locales activos; las ferias y eventos quedan excluidos.", 409);
+  return [{ ...origin, name: snapshot.data?.name || "Ecommerce" }];
+}
+
+function stockAvailability(stock, now) {
+  if (!stock || stock.active === false || stock.deleted === true || stock.productDeleted === true) return 0;
+  return Math.max(0, Number(stock.currentStock || 0) - reservedStockQuantity(stock, now));
+}
+
+function allocateStock(quantity, sourceRows, productName) {
+  let remaining = quantity;
+  const allocations = [];
+  for (const row of sourceRows) {
+    const take = Math.min(remaining, row.available);
+    if (take > 0) allocations.push({ ...row.origin, quantity: take });
+    remaining -= take;
+    if (!remaining) break;
+  }
+  if (remaining > 0)
+    throw commerceError("ecommerce-stock-insufficient", `No hay stock suficiente de ${productName || "uno de los productos"}.`, 409);
+  return allocations;
+}
+
+function publicEcommerceOrder(orderId, order = {}) {
+  const { items = [], ...safeOrder } = order;
+  return {
+    ...safeOrder,
+    id: orderId,
+    items: items.map(({ stockAllocations, ...item }) => item),
   };
 }
 
@@ -161,7 +224,7 @@ export async function createEcommerceOrder({
     return {
       created: false,
       idempotent: true,
-      order: { ...existing.data, id: orderId },
+      order: publicEcommerceOrder(orderId, existing.data),
     };
   }
   const channel = await loadWebChannel({ env, getDocument });
@@ -171,49 +234,45 @@ export async function createEcommerceOrder({
       "No se pudo crear el acceso privado al pedido.",
       400,
     );
-  let origin;
-  if (channel)
-    origin = await resolveChannelOrigin(channel, null, { env, getDocument });
-  else {
-    const locationId = ecommerceLocationId(env);
-    if (!locationId)
-      throw commerceError(
-        "ecommerce-location-not-configured",
-        "Falta configurar el origen web.",
-        409,
-      );
-    const location = (await getDocument(`locations/${locationId}`, { env }))
-      ?.data;
-    if (!location || location.deleted === true || location.active === false)
-      throw commerceError(
-        "ecommerce-location-unavailable",
-        "El origen no está disponible.",
-        409,
-      );
-    origin = { type: "location", id: locationId, name: location.name };
-  }
+  const origins = await configuredWebOrigins(channel, { env, getDocument });
+  const origin = origins[0];
+  if (!origin)
+    throw commerceError(
+      "ecommerce-location-not-configured",
+      "Falta configurar los orígenes de stock web.",
+      409,
+    );
   const productsById = {},
     stocksById = {},
-    physicalStocks = {};
+    ecommerceSettingsById = {},
+    promotionsByProductId = {},
+    sourceSnapshotsByProduct = {};
   for (const item of requestedItems) {
-    const [product, stock] = await Promise.all([
+    const [product, setting, promotion, ...sourceSnapshots] = await Promise.all([
       getDocument(`products/${item.productId}`, { env }),
-      getDocument(originStockPath(origin, item.productId), { env }),
+      getDocument(`ecommerceProductSettings/${item.productId}`, { env }),
+      getDocument(`ecommercePromotions/${item.productId}`, { env }),
+      ...origins.map((source) => getDocument(originStockPath(source, item.productId), { env })),
     ]);
     if (product)
       productsById[item.productId] = { ...product.data, id: item.productId };
-    if (stock) {
-      physicalStocks[item.productId] = stock;
-      stocksById[item.productId] = {
-        ...stock.data,
-        id: item.productId,
-        currentStock: Math.max(
-          0,
-          Number(stock.data.currentStock) -
-            reservedStockQuantity(stock.data, now),
-        ),
-      };
-    }
+    ecommerceSettingsById[item.productId] = setting?.data || {};
+    if (promotion?.data) promotionsByProductId[item.productId] = promotion.data;
+    const sourceRows = origins.map((source, index) => ({
+      origin: source,
+      snapshot: sourceSnapshots[index],
+      available: stockAvailability(sourceSnapshots[index]?.data, now),
+    }));
+    const preferredStock = sourceRows.find((row) => row.origin.id === origin.id && row.origin.type === origin.type && row.snapshot?.data && row.snapshot.data.active !== false && row.snapshot.data.deleted !== true && row.snapshot.data.productDeleted !== true)?.snapshot?.data
+      || sourceRows.find((row) => row.snapshot?.data && row.snapshot.data.active !== false && row.snapshot.data.deleted !== true)?.snapshot?.data
+      || { id: item.productId, priceMode: "default" };
+    const floor = Math.max(0, Number(setting?.data?.minimumRemainingStock) || 0);
+    stocksById[item.productId] = {
+      ...preferredStock,
+      id: item.productId,
+      currentStock: Math.max(0, sourceRows.reduce((sum, row) => sum + row.available, 0) - floor),
+    };
+    sourceSnapshotsByProduct[item.productId] = sourceRows;
   }
   const shipping = channel ? channelShipping(shippingRequest, channel) : null;
   const prepared = prepareAuthoritativeCheckout({
@@ -223,8 +282,18 @@ export async function createEcommerceOrder({
     customer,
     shipping: shippingRequest,
     resolvedShipping: shipping,
+    ecommerceSettingsById,
+    promotionsByProductId,
     env,
   });
+  const itemsWithAllocations = prepared.items.map((item) => ({
+    ...item,
+    stockAllocations: allocateStock(
+      item.quantity,
+      sourceSnapshotsByProduct[item.productId] || [],
+      item.name,
+    ),
+  }));
   const reservationExpiresAt = channel
     ? new Date(now.valueOf() + 15 * 60 * 1000)
     : null;
@@ -258,7 +327,7 @@ export async function createEcommerceOrder({
     customer,
     customerId: crm?.customerId || null,
     billing,
-    items: prepared.items.map(({ availableStock, ...item }) => item),
+    items: itemsWithAllocations.map(({ availableStock, ...item }) => item),
     subtotal: prepared.subtotal,
     discountTotal: prepared.discountTotal,
     shipping: prepared.shipping,
@@ -298,22 +367,26 @@ export async function createEcommerceOrder({
     ...(crm?.operations || []),
   ];
   if (channel) {
-    for (const item of prepared.items) {
-      const stock = physicalStocks[item.productId];
-      operations.push({
-        type: "update",
-        path: originStockPath(origin, item.productId),
-        currentUpdateTime: stock.updateTime,
-        data: {
-          ...reservationPatch(
-            stock.data,
-            orderId,
-            { quantity: item.quantity, expiresAt: reservationExpiresAt },
-            now,
-          ),
-          updatedAt: now,
-        },
-      });
+    for (const item of itemsWithAllocations) {
+      for (const allocation of item.stockAllocations) {
+        const source = sourceSnapshotsByProduct[item.productId].find((row) => row.origin.type === allocation.type && row.origin.id === allocation.id)?.snapshot;
+        if (!source?.data)
+          throw commerceError("ecommerce-stock-insufficient", `${item.name}: el origen asignado dejó de tener stock.`, 409);
+        operations.push({
+          type: "update",
+          path: originStockPath(allocation, item.productId),
+          currentUpdateTime: source.updateTime,
+          data: {
+            ...reservationPatch(
+              source.data,
+              orderId,
+              { quantity: allocation.quantity, expiresAt: reservationExpiresAt },
+              now,
+            ),
+            updatedAt: now,
+          },
+        });
+      }
     }
     operations.push({
       type: "create",
@@ -330,6 +403,8 @@ export async function createEcommerceOrder({
       },
     });
   }
+  if (operations.length > 450)
+    throw commerceError("ecommerce-order-too-large", "El pedido usa demasiados orígenes de stock. Reducí productos u orígenes y volvé a intentar.", 400);
   try {
     await commitDocuments(operations, { env });
   } catch (error) {
@@ -340,7 +415,7 @@ export async function createEcommerceOrder({
         return {
           created: false,
           idempotent: true,
-          order: { ...raced.data, id: orderId },
+          order: publicEcommerceOrder(orderId, raced.data),
         };
       throw commerceError(
         "ecommerce-idempotency-conflict",
@@ -356,7 +431,7 @@ export async function createEcommerceOrder({
       );
     throw error;
   }
-  return { created: true, idempotent: false, order: { ...order, id: orderId } };
+  return { created: true, idempotent: false, order: publicEcommerceOrder(orderId, order) };
 }
 
 export async function loadEcommerceCatalog({
@@ -366,10 +441,9 @@ export async function loadEcommerceCatalog({
   getDocument = adminGetDocument,
 } = {}) {
   const channel = await loadWebChannel({ env, getDocument });
-  const origin = channel
-    ? await resolveChannelOrigin(channel, null, { env, getDocument })
-    : null;
-  const locationId = origin?.id || ecommerceLocationId(env);
+  const origins = await configuredWebOrigins(channel, { env, getDocument });
+  const origin = origins[0] || null;
+  const locationId = origin?.id || (channel ? "" : ecommerceLocationId(env));
   const products = (await listDocuments("products", { env, pageSize: 500 }))
     .filter((product) => product.deleted !== true && product.active !== false)
     .sort((a, b) =>
@@ -408,28 +482,35 @@ export async function loadEcommerceCatalog({
     );
   }
 
-  const stocks = await Promise.all(
-    products.map(async (product) => {
-      const stockSnapshot = await getDocument(
-        originStockPath(
-          origin || { type: "location", id: locationId },
-          product.id,
-        ),
-        { env },
-      );
-      return stockSnapshot
-        ? {
-            ...stockSnapshot.data,
-            currentStock: Math.max(
-              0,
-              Number(stockSnapshot.data.currentStock) -
-                reservedStockQuantity(stockSnapshot.data, now),
-            ),
-            id: stockSnapshot.path?.split("/").at(-1) || product.id,
-          }
-        : null;
-    }),
-  );
+  const configuredOrigins = origins.length ? origins : [{ type: "location", id: locationId, name: locationSnapshot.data?.name || "Ecommerce" }];
+  const [settingsRows, promotionRows, ...stockRows] = await Promise.all([
+    listDocuments("ecommerceProductSettings", { env, pageSize: 500 }),
+    listDocuments("ecommercePromotions", { env, pageSize: 500 }),
+    ...configuredOrigins.map((source) => listDocuments(stockCollectionPath(source), { env, pageSize: 500 })),
+  ]);
+  const settingsById = Object.fromEntries(settingsRows.map((row) => [row.productId || row.id, row]));
+  const promotionById = Object.fromEntries(promotionRows.map((row) => [row.productId || row.id, row]));
+  const stockRowsBySource = configuredOrigins.map((source, index) => ({
+    origin: source,
+    rows: new Map(stockRows[index].map((row) => [row.id, row])),
+  }));
+  const computedStocks = products.map((product) => {
+    const settings = settingsById[product.id] || {};
+    const sources = stockRowsBySource.map(({ origin: source, rows }) => {
+      const stock = rows.get(product.id);
+      return { origin: source, stock, available: stockAvailability(stock, now) };
+    });
+    const preferred = sources.find((row) => row.origin.id === origin?.id && row.origin.type === origin?.type && row.stock && row.stock.active !== false && row.stock.deleted !== true && row.stock.productDeleted !== true)
+      || sources.find((row) => row.stock && row.stock.active !== false && row.stock.deleted !== true)
+      || null;
+    const pricingStock = {
+      ...(preferred?.stock || {}),
+      id: product.id,
+      priceMode: preferred?.stock?.priceMode || "default",
+      currentStock: Math.max(0, sources.reduce((sum, row) => sum + row.available, 0) - Math.max(0, Number(settings.minimumRemainingStock) || 0)),
+    };
+    return { pricingStock, settings, promotion: promotionById[product.id] || null };
+  });
 
   return {
     ready: true,
@@ -440,7 +521,9 @@ export async function loadEcommerceCatalog({
         : ["PICKUP_CONFIGURATION", "DELIVERY_PRICING"],
     location: {
       id: locationId,
-      name: locationSnapshot.data?.name || "Ecommerce",
+      name: configuredOrigins.length > 1
+        ? "Locales y depósitos configurados"
+        : locationSnapshot.data?.name || "Ecommerce",
     },
     config: {
       pickupEnabled: channel
@@ -454,8 +537,10 @@ export async function loadEcommerceCatalog({
       channelId: channel?.id || null,
       paymentProvider: "pending_payway",
     },
-    products: products.map((product, index) =>
-      publicProduct(product, stocks[index], { locationConfigured: true }),
-    ),
+    products: products.map((product, index) => publicProduct(product, computedStocks[index].pricingStock, {
+      locationConfigured: true,
+      settings: computedStocks[index].settings,
+      promotion: computedStocks[index].promotion,
+    })),
   };
 }
