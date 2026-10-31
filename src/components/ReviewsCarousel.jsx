@@ -1,4 +1,4 @@
-import { MessageCircle, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import Reveal from "./Reveal";
 
 const reviews = [
@@ -17,7 +17,7 @@ const reviews = [
   {
     name: "Ana López",
     rating: 5,
-    platform: "facebook",
+    platform: "whatsapp",
     text: "El pack de aceites es ideal para regalar. Mi familia quedó encantada con la calidad.",
   },
   {
@@ -29,34 +29,33 @@ const reviews = [
   {
     name: "Laura Fernández",
     rating: 5,
-    platform: "whatsapp",
+    platform: "instagram",
     text: "Las almendras son perfectas para la merienda de los chicos. Naturales y crocantes.",
   },
   {
     name: "Diego Sánchez",
     rating: 5,
-    platform: "instagram",
+    platform: "whatsapp",
     text: "El vino Bazán es espectacular. Malbec auténtico de Mendoza, muy bien presentado.",
   },
   {
     name: "Patricia Rossi",
     rating: 5,
-    platform: "facebook",
+    platform: "google",
     text: "Las mermeladas tienen fruta real, no como otras marcas. La de pera es mi favorita.",
   },
   {
     name: "Jorge Ramírez",
     rating: 5,
-    platform: "google",
+    platform: "instagram",
     text: "Envío rápido y productos bien embalados. Flor Mía ya es mi lugar de confianza.",
   },
 ];
 
-const platformIcons = {
-  whatsapp: "💬",
-  instagram: "📷",
-  facebook: "📘",
-  google: "⭐",
+const platformLogos = {
+  whatsapp: "/images/flor-mia/whatsapp-logo.png",
+  instagram: "/images/flor-mia/instagram-logo.png",
+  google: "/images/flor-mia/google-logo.png",
 };
 
 export default function ReviewsCarousel() {
@@ -86,13 +85,16 @@ export default function ReviewsCarousel() {
                       <Star key={i} size={14} fill="#d4af37" aria-hidden="true" />
                     ))}
                   </div>
-                  <span className="fm-review-card__platform" aria-label={`Publicado en ${review.platform}`}>
-                    {platformIcons[review.platform]}
-                  </span>
+                  <img
+                    className="fm-review-card__platform"
+                    src={platformLogos[review.platform]}
+                    alt={review.platform}
+                    width={20}
+                    height={20}
+                  />
                 </div>
               </div>
               <blockquote className="fm-review-card__quote">
-                <MessageCircle size={14} className="fm-review-card__quote-icon" aria-hidden="true" />
                 "{review.text}"
               </blockquote>
             </article>
