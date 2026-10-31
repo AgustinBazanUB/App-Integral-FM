@@ -69,6 +69,7 @@ export function publicEcommerceError(error) {
     "payway-isolation-required":"El entorno de pagos de prueba no está configurado correctamente.",
     "payway-config-missing":"Falta completar la configuración segura de Payway Sandbox.",
     "payway-token-invalid":"Revisá los datos de la tarjeta de prueba.",
+    "payway-risk-data-required":"Completá el domicilio de facturación y esperá a que cargue la validación segura.",
     "payway-request-invalid":"La solicitud de pago no es válida.",
     "payway-evidence-required":"El pago requiere confirmación autenticada de Payway.",
     "ecommerce-channel-inactive":"La tienda todavía no está habilitada para pedidos.",

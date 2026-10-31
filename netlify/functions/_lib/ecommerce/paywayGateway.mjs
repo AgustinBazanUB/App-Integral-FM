@@ -56,6 +56,11 @@ function safeSdk() {
   // private logger before loading it; never replace the application's console.
   const logger = require("sdk-node-payway/lib/utils/logger.js");
   for (const key of Object.keys(logger)) logger[key] = () => {};
+  // 1.0.8's retail mapper omits the documented device identifier. Preserve it
+  // when adapting the official SDK; otherwise token and risk assessment diverge.
+  const retail = require("sdk-node-payway/lib/services/fraud_detection/cs_retail.js");
+  const originalRetail = retail.generateRetailData;
+  retail.generateRetailData = args => ({ ...originalRetail(args), device_unique_id: args.device_unique_id });
   const transport = require("node-rest-client");
   const OriginalClient = transport.Client;
   transport.Client = function SafePaywayClient() {
@@ -117,5 +122,32 @@ export function verifiedPaywayReceipt(response, expected) {
   const mapped = ({ approved: "approved", rejected: "rejected", cancelled: "cancelled", canceled: "cancelled" })[status] || "pending";
   return { verified: true, environment: "sandbox", siteId: String(response.site_id), operationId: response.site_transaction_id,
     providerId: String(response.id), amount: Number(response.amount), currency: "ARS",
-    status: mapped, providerStatus: status, paymentMethodId: Number(response.payment_method_id), installments: 1 };
+    status: mapped, providerStatus: status, paymentMethodId: Number(response.payment_method_id), installments: 1,
+    errorType: /^[a-z_]{1,60}$/.test(response.status_details?.error?.type || "") ? response.status_details.error.type : null };
+}
+
+export function paywayRetailRisk(order, { payerAddress, fingerprint, clientIp } = {}) {
+  const clean = (value, max) => typeof value === "string" ? value.trim().slice(0, max) : "";
+  const address = { street: clean(payerAddress?.street, 100), city: clean(payerAddress?.city, 50),
+    provinceCode: clean(payerAddress?.provinceCode, 1), postalCode: clean(payerAddress?.postalCode, 10) };
+  if (!address.street || !address.city || !address.postalCode || !/^[ABCDEFGHJKLMNPQRSTUVWXYZ]$/.test(address.provinceCode)
+      || !/^[A-Za-z0-9_-]{16,80}$/.test(fingerprint || "") || !clientIp)
+    throw commerceError("payway-risk-data-required", "Completá el domicilio de facturación y esperá a que cargue la validación segura.", 400);
+  const names = String(order.customer.fullName).trim().split(/\s+/);
+  const billTo = { city: address.city, country: "AR", customer_id: order.idempotencyKey,
+    email: order.customer.email, first_name: names[0], last_name: names.slice(1).join(" ") || names[0],
+    phone_number: order.customer.phone.replace(/\D/g,""), postal_code: address.postalCode,
+    state: address.provinceCode, street1: address.street };
+  const destination = order.shipping.method === "delivery" ? order.shipping.address : null;
+  const items = order.items.map(item => ({ code: item.productId, name: item.name, description: item.name,
+    sku: item.productId, total_amount: paywayAmount(item.subtotal), quantity: item.quantity, unit_price: paywayAmount(item.unitPrice) }));
+  if (order.shippingAmount > 0) items.push({ code: "shipping", name: "Envio", description: "Envio", sku: "shipping", total_amount: paywayAmount(order.shippingAmount), quantity: 1, unit_price: paywayAmount(order.shippingAmount) });
+  return { send_to_cs: true, channel: "web", device_unique_id: fingerprint, bill_to: billTo,
+    purchase_totals: { currency: "ARS", amount: paywayAmount(order.total) },
+    customer_in_site: { days_in_site: 0, is_guest: true, num_of_transactions: 0 },
+    retail_transaction_data: { dispatch_method: destination ? "homeDelivery" : "click and collect", days_to_delivery: "3",
+      tax_voucher_required: order.billing?.mode === "fiscal", items,
+      ship_to: destination ? { ...billTo, city: destination.city, postal_code: destination.postalCode,
+        street1: `${destination.street} ${destination.number}`, state: address.provinceCode } : billTo },
+  };
 }

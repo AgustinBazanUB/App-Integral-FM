@@ -27,7 +27,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' https://ventasonline.payway.com.ar/static/v2.6.4/decidir.js; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://developers.decidir.com https://developers-ventasonline.payway.com.ar; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://ventasonline.payway.com.ar/static/v2.6.4/decidir.js https://h.online-metrix.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://h.online-metrix.net; font-src 'self' data:; connect-src 'self' https://h.online-metrix.net https://developers.decidir.com https://developers-ventasonline.payway.com.ar; frame-src https://h.online-metrix.net; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
     X-Robots-Tag = "noindex, nofollow"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
     Referrer-Policy = "strict-origin-when-cross-origin"

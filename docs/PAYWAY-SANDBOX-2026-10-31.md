@@ -45,13 +45,16 @@ Cambiar a producción no consiste en poner una clave productiva: el código fall
 
 ## Validación
 
-- 1133 pruebas Node aprobadas, incluidas 23 específicas de Payway.
+- 1134 pruebas Node aprobadas, incluidas 24 específicas de Payway.
 - Builds Gestión y E-commerce aprobados; advertencia existente de tamaño de chunks.
 - SDK Node real: consulta autenticada de sandbox aprobada, sin datos ni claves en logs.
 - 156 pruebas de reglas Firestore aprobadas en emulador local; sin cambios nuevos al archivo de reglas respecto del PR #53.
 - CI del primer commit y Deploy Preview #54 aprobados. Se verificaron los proyectos efectivos de Firestore y Authentication con las APIs administrativas de Google y la cuenta de servicio desde el endpoint del preview. La tienda estática contiene cero Functions. Chrome creó un pedido ficticio de ARS 1.500 (producto 1.000 + envío 500), conservado en staging, sin venta ni cobro todavía.
 - Se encontró y descargó la [guía oficial de transacción simple](https://documentacion-ventasonline.payway.com.ar/docs/gateway/526ae201ec85c-flujo-de-una-transaccion-simple) y su OpenAPI. Su ejemplo de tarjeta es Visa; no se encontró una Mastercard de prueba verificable en las fuentes oficiales consultadas. Se agrega Visa crédito (ID 1) exclusivamente a esta implementación sandbox para verificar el ejemplo oficial; la respuesta debe coincidir con el medio seleccionado y persistido. No habilita Visa comercial productiva.
-- Compra real en Chrome y evidencia transaccional: pendientes de finalizar. No hay aprobación Payway declarada todavía.
+- Primer intento auténtico en Chrome: pedido `ecommerce_order_677a671f-751b-45ac-8b26-fdfb9c0964a1`, ARS 1.500, Visa, proveedor `16182378`, referencia estable `fm_6dd5193397fa4e67e074682fd8ced5bc`. Payway devolvió `rejected / cybersource_error`, consultado nuevamente mediante API privada (HTTP 200). Reserva liberada, stock físico 20, cero ventas, movimientos o envíos. Se conserva el intento y su evidencia; no se vuelve a cobrar sobre esa orden.
+- Se completa la evaluación antifraude Retail oficial (`send_to_cs:true`), domicilio de facturación ingresado expresamente, totales y líneas autoritativos, IP del contexto Netlify y fingerprint del SDK. Se inicializa el SDK antes de completar la tarjeta. Se permite únicamente el origen de captura `h.online-metrix.net` en CSP. El mapper Retail del SDK 1.0.8 omitía `device_unique_id`: el adaptador lo preserva sin desactivar el antifraude ni imprimir payloads.
+- La especificación descargada todavía usa un ejemplo Visa que una incidencia del repositorio oficial señala como obsoleto. Para la prueba se usó el [ejemplo corregido en esa incidencia](https://github.com/payway-ar/sdk-node-ventaonline/issues/42#issuecomment-2237502262), sin guardar su PAN/CVV en evidencia ni en el repositorio.
+- Aprobación real y circuito comercial positivo: pendientes de finalizar. No hay aprobación Payway declarada todavía.
 
 ## Alcances pendientes antes de cobros reales
 

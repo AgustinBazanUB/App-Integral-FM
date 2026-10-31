@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { adminRunTransaction, adminGetDocument } from "../firestoreAdminRest.mjs";
 import { commerceError } from "./commerceDomain.mjs";
 import { confirmEcommercePayment } from "./paymentService.mjs";
-import { paywayConfig, paywayAmount, createPaywayGateway, verifiedPaywayReceipt } from "./paywayGateway.mjs";
+import { paywayConfig, paywayAmount, createPaywayGateway, verifiedPaywayReceipt, paywayRetailRisk } from "./paywayGateway.mjs";
 import { canAccessAdministration } from "../../../../src/gestion/permissions.js";
 
 function denied() { return commerceError("ecommerce-order-access-denied", "El acceso privado al pedido no es válido.", 403); }
@@ -21,11 +21,11 @@ function publicResult(order, gateway, extra = {}) {
 }
 
 export async function processPaywayPayment({ body, env = process.env, now = new Date(), runTransaction = adminRunTransaction,
-  getDocument = adminGetDocument, gateway, confirm = confirmEcommercePayment, adminActor = null } = {}) {
+  getDocument = adminGetDocument, gateway, confirm = confirmEcommercePayment, adminActor = null, clientIp = "" } = {}) {
   const config = paywayConfig(env);
   if (!body || !["pay", "reconcile"].includes(body.mode)) throw commerceError("payway-request-invalid", "Operación Payway inválida.", 400);
   // Allowlist the complete public request: PAN/CVV and client totals never enter SDK payloads or storage.
-  if (Object.keys(body).some(key => !["mode", "orderId", "accessToken", "token", "bin", "paymentMethodId"].includes(key)))
+  if (Object.keys(body).some(key => !["mode", "orderId", "accessToken", "token", "bin", "paymentMethodId", "payerAddress", "fingerprint"].includes(key)))
     throw commerceError("payway-request-invalid", "La solicitud sólo admite un token de pago.", 400);
   if (!/^ecommerce_order_[A-Za-z0-9_-]{8,96}$/.test(body.orderId || "")) throw denied();
   let charge = false;
@@ -49,6 +49,7 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
       if (!/^\d{6,8}$/.test(body.bin || "")) throw commerceError("payway-token-invalid", "El token no incluye un BIN válido.", 400);
       const paymentMethodId = body.paymentMethodId ?? 104;
       if (![104, 1].includes(paymentMethodId)) throw commerceError("payway-request-invalid", "El medio de pago no está habilitado en sandbox.", 400);
+      const risk = paywayRetailRisk(order, { payerAddress: body.payerAddress, fingerprint: body.fingerprint, clientIp });
       // Check every held physical allocation again before a provider call. Extend
       // the same holds while a result is uncertain; cancellation is blocked too.
       const holdUntil = new Date(now.valueOf() + 24 * 60 * 60 * 1000);
@@ -74,7 +75,7 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
       operations.push({ type: "update", path: `payments/${order.paymentId}`, data: { gateway: attempt, paymentEnvironment: "sandbox", testData: true, updatedAt: now } },
         { type: "update", path: `orders/${body.orderId}`, data: { reservationExpiresAt: holdUntil, paymentEnvironment: "sandbox", testData: true, updatedAt: now } });
       await tx.commitDocuments(operations);
-      return { order: { ...order, id: body.orderId, reservationExpiresAt: holdUntil }, attempt, charge: true };
+      return { order: { ...order, id: body.orderId, reservationExpiresAt: holdUntil }, attempt, risk, charge: true };
     }
     return { order: { ...order, id: body.orderId }, attempt, charge: false };
   }, { env });
@@ -90,6 +91,7 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
       let response;
       if (charge) response = await gateway.charge({ site_transaction_id: attempt.operationId, token: body.token,
         payment_method_id: attempt.paymentMethodId, bin: body.bin, amount: attempt.amount, currency: "ARS", installments: 1,
+        customer: { id: order.idempotencyKey, email: order.customer.email, ip_address: clientIp }, fraud_detection: claimed.risk,
         payment_type: "single", sub_payments: [] });
       else {
         const matches = await gateway.find(attempt.operationId);

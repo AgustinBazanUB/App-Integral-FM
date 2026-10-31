@@ -1,0 +1,73 @@
+{
+  "verifiedAt": "2026-10-31T21:44:49.821Z",
+  "firebaseProject": "app-integral-fm-pruebas",
+  "order": {
+    "id": "ecommerce_order_677a671f-751b-45ac-8b26-fdfb9c0964a1",
+    "status": "payment_rejected",
+    "paymentStatus": "rejected",
+    "total": 1500,
+    "shippingAmount": 500,
+    "saleId": null,
+    "paymentEnvironment": "sandbox",
+    "reservationStatus": "released",
+    "invoiceStatus": "not_requested",
+    "paywayState": "completed",
+    "paymentIncident": null
+  },
+  "payment": {
+    "id": "ecommerce_payment_677a671f-751b-45ac-8b26-fdfb9c0964a1",
+    "status": "rejected",
+    "amount": 1500,
+    "currency": "ARS",
+    "gateway": {
+      "environment": "sandbox",
+      "submittedAt": "2026-10-31T21:44:17.279Z",
+      "receipt": {
+        "operationId": "fm_6dd5193397fa4e67e074682fd8ced5bc",
+        "providerStatus": "rejected",
+        "currency": "ARS",
+        "status": "rejected",
+        "verified": true,
+        "amount": 150000,
+        "paymentMethodId": 1,
+        "providerId": "16182378",
+        "siteId": "93146856",
+        "installments": 1,
+        "environment": "sandbox"
+      },
+      "state": "completed",
+      "currency": "ARS",
+      "errorCode": null,
+      "reconciliationCount": 0,
+      "siteId": "93146856",
+      "updatedAt": "2026-10-31T21:44:19.739Z",
+      "paymentMethodId": 1,
+      "operationId": "fm_6dd5193397fa4e67e074682fd8ced5bc",
+      "amount": 150000
+    }
+  },
+  "provider": {
+    "httpStatus": 200,
+    "id": 16182378,
+    "status": "rejected",
+    "siteId": "93146856",
+    "operationId": "fm_6dd5193397fa4e67e074682fd8ced5bc",
+    "amount": 150000,
+    "currency": "ars",
+    "paymentMethodId": 1,
+    "date": "2026-10-31T18:44Z",
+    "error": {
+      "type": "cybersource_error",
+      "reason": {
+        "id": -1,
+        "description": ""
+      }
+    }
+  },
+  "sale": null,
+  "stock": {
+    "currentStock": 20,
+    "movements": []
+  },
+  "shipment": null
+}

@@ -31,8 +31,8 @@ async function setup() {
   let charges = 0, payload;
   const gateway = { charge: async p => { charges++; payload = p; return receipt(p); }, find: async () => [{ id: 12345, site_transaction_id: payload.site_transaction_id }], info: async () => receipt(payload) };
   const confirm = args => db.runTransaction(tx => confirmEcommercePayment({ ...args, now, ...tx }));
-  const request = { mode: "pay", orderId: result.order.id, accessToken, token: "synthetic_token_0000000001", bin: "516844" };
-  const process = (overrides={}) => processPaywayPayment({ body: request, env, now, runTransaction: db.runTransaction, getDocument, gateway, confirm, ...overrides });
+  const request = { mode: "pay", orderId: result.order.id, accessToken, token: "synthetic_token_0000000001", bin: "516844", fingerprint: "synthetic_device_00000001", payerAddress: { street: "Calle QA 123", city: "CABA", provinceCode: "C", postalCode: "1000" } };
+  const process = (overrides={}) => processPaywayPayment({ body: request, env, now, runTransaction: db.runTransaction, getDocument, gateway, confirm, clientIp: "192.0.2.1", ...overrides });
   return { db, order: result.order, gateway, request, process, confirm, getDocument, charges:()=>charges, payload:()=>payload };
 }
 
@@ -40,6 +40,9 @@ test("Payway aprobado convierte una reserva en una venta y logística; sandbox e
   const s=await setup(); const r=await s.process();
   assert.equal(r.order.paymentStatus,"approved"); assert.ok(r.order.saleId); assert.equal(s.charges(),1);
   assert.equal(s.payload().amount,200000); assert.equal(s.payload().payment_method_id,104);
+  assert.equal(s.payload().fraud_detection.send_to_cs,true);
+  assert.equal(s.payload().fraud_detection.device_unique_id,s.request.fingerprint);
+  assert.equal(s.payload().fraud_detection.purchase_totals.amount,200000);
   assert.equal(s.db.documents.get("locationStock/valle/items/oil").currentStock,8);
   assert.equal(rows(s.db,"sales").length,1); assert.equal(rows(s.db,"shipments").length,1); assert.equal(rows(s.db,"stockMovements").length,1);
   assert.equal(rows(s.db,"sales")[0].paymentEnvironment,"sandbox");
@@ -116,6 +119,10 @@ test("aislamiento falla cerrado para producción, mezcla de Firebase y ARCA prod
 });
 test("importe se convierte una sola vez a centavos y rechaza precisión inválida",()=>{
   assert.equal(paywayAmount(1500),150000);assert.equal(paywayAmount(12.34),1234);for(const n of [0,-1,NaN,Infinity,1.001])assert.throws(()=>paywayAmount(n));
+});
+test("datos antifraude incompletos bloquean antes del claim y del cobro",async()=>{
+  const s=await setup();for(const patch of [{payerAddress:{}},{fingerprint:""}]) await assert.rejects(()=>s.process({body:{...s.request,...patch}}),{code:"payway-risk-data-required"});
+  assert.equal(s.charges(),0);assert.equal(s.db.documents.get(`payments/${s.order.paymentId}`).gateway,undefined);
 });
 test("venta sandbox bloqueada para preparación fiscal productiva",async()=>{
   const s=await setup();const r=await s.process();

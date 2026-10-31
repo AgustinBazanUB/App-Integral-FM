@@ -25,6 +25,7 @@ export async function paywayRequest(body) {
 export default function PaywayPaymentForm({ order, accessToken, onApproved, onUpdate, onStartNewOrder }) {
   const form = useRef(null);
   const lock = useRef(false);
+  const sdkRef = useRef(null);
   const [config, setConfig] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -49,10 +50,16 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
       apply(status);
       setChecked(true);
       await loadPaywaySdk();
-      if (active) setSdkReady(true);
+      if (active) { prepareSdk(settings.payway); setSdkReady(true); }
     })().catch(err => active && setError(err.message));
     return () => { active = false; };
   }, [order.id, accessToken]);
+  function prepareSdk(settings) {
+    const sdk = new window.Decidir(settings.tokenUrl, false);
+    sdk.setTimeout(10000);
+    sdk.setPublishableKey(settings.publicKey);
+    sdkRef.current = sdk;
+  }
 
   const run = async (mode) => {
     if (lock.current) return;
@@ -61,11 +68,12 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
     try {
       let tokenData;
       if (mode === "pay") {
-        const sdk = new window.Decidir(config.tokenUrl);
-        sdk.setPublishableKey(config.publicKey);
-        sdk.setTimeout(10000);
+        const sdk = sdkRef.current;
+        if (!sdk) throw new Error("Esperá a que cargue la validación segura de Payway.");
+        const fields = new FormData(form.current);
+        const payerAddress = Object.fromEntries(["street", "city", "provinceCode", "postalCode"].map(key=>[key, fields.get(`payer_${key}`)]));
         tokenData = await new Promise((resolve, reject) => sdk.createToken(form.current, (status, response) => {
-          if ([200, 201].includes(status) && response?.id) resolve({ token: response.id, bin: response.bin });
+          if ([200, 201].includes(status) && response?.id) resolve({ token: response.id, bin: response.bin, fingerprint: sdk.device_unique_identifier, payerAddress });
           else reject(new Error("Payway no pudo tokenizar la tarjeta. Revisá los datos o la conexión."));
         }));
         // The browser sends only a short-lived token and BIN to Flor Mía.
@@ -74,7 +82,7 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
       }
       const value = await paywayRequest({ mode, orderId: order.id, accessToken, ...(mode === "pay" ? { paymentMethodId } : {}), ...tokenData });
       apply(value); setChecked(true);
-      if (value.gateway.state === "ready" && !sdkReady) { await loadPaywaySdk(); setSdkReady(true); }
+      if (value.gateway.state === "ready" && !sdkReady) { await loadPaywaySdk(); prepareSdk(config); setSdkReady(true); }
     } catch (err) { setError(err.message); }
     finally { setBusy(false); lock.current = false; }
   };
@@ -106,6 +114,11 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
         <label className="field-label">Titular de la tarjeta<input data-decidir="card_holder_name" required maxLength={100} /></label>
         <input type="hidden" data-decidir="card_holder_doc_type" value="dni" />
         <label className="field-label">DNI del titular de prueba<input inputMode="numeric" data-decidir="card_holder_doc_number" required pattern="[0-9]{7,8}" maxLength={8} /></label>
+        <p>Completá el domicilio de facturación ficticio para la validación antifraude de esta compra de prueba.</p>
+        <label className="field-label">Calle y altura de facturación<input name="payer_street" required maxLength={100} /></label>
+        <label className="field-label">Localidad de facturación<input name="payer_city" required maxLength={50} /></label>
+        <label className="field-label">Provincia de facturación<select name="payer_provinceCode" required defaultValue=""><option value="">Seleccionar provincia</option>{[["C","CABA"],["B","Buenos Aires"],["K","Catamarca"],["H","Chaco"],["U","Chubut"],["X","Córdoba"],["W","Corrientes"],["E","Entre Ríos"],["P","Formosa"],["Y","Jujuy"],["L","La Pampa"],["F","La Rioja"],["M","Mendoza"],["N","Misiones"],["Q","Neuquén"],["R","Río Negro"],["A","Salta"],["J","San Juan"],["D","San Luis"],["Z","Santa Cruz"],["S","Santa Fe"],["G","Santiago del Estero"],["V","Tierra del Fuego"],["T","Tucumán"]].map(([code,name])=><option key={code} value={code}>{name}</option>)}</select></label>
+        <label className="field-label">Código postal de facturación<input name="payer_postalCode" required maxLength={10} /></label>
         <p>Los datos de tarjeta se envían directamente a Payway para generar el token de pago.</p>
         <button className="button button--gold" type="submit" disabled={busy}>{busy ? "Procesando pago…" : `Pagar ${money(order.total)} con Payway`}</button>
       </fieldset>

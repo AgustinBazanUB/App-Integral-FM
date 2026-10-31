@@ -12,6 +12,6 @@ export default async function handler(request, context = {}) {
     paywayConfig(); // Verify isolation before the rate limiter's first write.
     const body = await publicCommerceBody(request);
     await limitCommerceRequest(request, context);
-    return json({ ok: true, ...await processPaywayPayment({ body }) });
+    return json({ ok: true, ...await processPaywayPayment({ body, clientIp: context.ip || request.headers.get("x-nf-client-connection-ip") || "" }) });
   } catch (error) { const safe = publicEcommerceError(error); return json({ ok: false, ...safe }, safe.status); }
 }
