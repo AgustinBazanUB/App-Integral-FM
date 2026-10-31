@@ -6,6 +6,7 @@ import OliveOilGuide from "../components/OliveOilGuide";
 import PageMeta from "../components/PageMeta";
 import PromoShowcase from "../components/PromoShowcase";
 import Reveal from "../components/Reveal";
+import ReviewsCarousel from "../components/ReviewsCarousel";
 
 const storyValues = [
   { label: "Productos mendocinos", Icon: Grape },
@@ -140,6 +141,8 @@ export default function HomePage() {
         <PromoShowcase />
 
         <OliveOilGuide />
+
+        <ReviewsCarousel />
 
         <Reveal
           as="section"
