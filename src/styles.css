@@ -2271,6 +2271,34 @@ input::placeholder {
     var(--bg-secondary);
 }
 
+.page-hero--catalog {
+  position: relative;
+  padding: 140px 0 100px;
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(23, 25, 18, 0.72) 0%,
+      rgba(23, 25, 18, 0.6) 50%,
+      rgba(23, 25, 18, 0.72) 100%
+    ),
+    url("/images/flor-mia/catalog-hero.jpg") center / cover no-repeat;
+  color: #fff;
+}
+
+.page-hero--catalog .eyebrow {
+  color: var(--gold-soft);
+}
+
+.page-hero--catalog h1 {
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+.page-hero--catalog > .container > p {
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
+}
+
 .catalog-controls {
   position: sticky;
   z-index: 50;
