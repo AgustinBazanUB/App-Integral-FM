@@ -1,4 +1,5 @@
 import { Grape, HeartHandshake, Sprout, UsersRound } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "../router";
 import { assetsManifest } from "../data/assetsManifest";
 import { brand } from "../data/brand";
@@ -24,8 +25,11 @@ const tableProducts = [
   [assetsManifest.products.malbecSalt, "fm-table-scene__salt"],
 ];
 
-function ResponsiveStorefront({ className = "", story = false }) {
+function ResponsiveStorefront({ className = "", story = false, heroImage = null }) {
   const asset = story ? assetsManifest.local.story : assetsManifest.local.hero;
+  const src = heroImage || asset.src;
+  const srcSet = heroImage ? null : asset.srcSet;
+  const sizes = heroImage ? null : asset.sizes;
 
   if (story) {
     return (
@@ -43,9 +47,11 @@ function ResponsiveStorefront({ className = "", story = false }) {
 
   return (
     <picture className={className}>
-      <source srcSet={asset.srcSet} sizes={asset.sizes} type="image/webp" />
+      {srcSet ? (
+        <source srcSet={srcSet} sizes={sizes} type="image/webp" />
+      ) : null}
       <img
-        src={asset.fallback}
+        src={src || asset.fallback}
         width={asset.width}
         height={asset.height}
         alt={asset.alt}
@@ -57,6 +63,20 @@ function ResponsiveStorefront({ className = "", story = false }) {
 }
 
 export default function HomePage() {
+  const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  const heroImages = [
+    "/images/flor-mia/hero-1.jpg",
+    "/images/flor-mia/hero-2.jpg",
+    "/images/flor-mia/hero-3.jpg",
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentHeroIndex((prev) => (prev + 1) % heroImages.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleOilGuideScroll = () => {
     const oilGuide = document.getElementById("guia-aceites");
     if (!oilGuide) return;
@@ -109,7 +129,7 @@ export default function HomePage() {
 
       <main id="main-content" className="fm-home">
         <section className="fm-hero" aria-labelledby="hero-title">
-          <ResponsiveStorefront className="fm-hero__media" />
+          <ResponsiveStorefront className="fm-hero__media" heroImage={heroImages[currentHeroIndex]} />
           <div className="fm-hero__shade" aria-hidden="true" />
           <div className="fm-page fm-hero__inner">
             <div className="fm-hero__copy">

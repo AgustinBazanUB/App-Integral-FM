@@ -392,6 +392,13 @@ body::before {
   height: 100%;
   object-fit: cover;
   object-position: center center;
+  transition: opacity 1s ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-hero__media img {
+    transition: none;
+  }
 }
 
 .fm-hero__shade {
