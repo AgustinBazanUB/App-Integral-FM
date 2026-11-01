@@ -90,7 +90,7 @@ export default function HomePage() {
   };
 
   const heroTrackStyle = {
-    transform: `translateX(-${currentHeroIndex * 100}%)`,
+    transform: `translateX(-${currentHeroIndex * (100 / heroImages.length)}%)`,
   };
 
   const structuredData = {
