@@ -152,6 +152,7 @@ export default function OliveOilGuide({
   id = "guia-aceites",
   introCta = true,
   titleAs: TitleTag = "h2",
+  showTitle = true,
 }) {
   const [selectedIntensity, setSelectedIntensity] = useState("Suave");
   const revealRef = useReveal();
@@ -183,9 +184,11 @@ export default function OliveOilGuide({
           />
           <div className="fm-oil-guide__copy">
             <p className="fm-kicker">ACEITES DE OLIVA SELECCIONADOS</p>
-            <TitleTag id={titleId}>
-              Elegí el oliva ideal para cada ocasión.
-            </TitleTag>
+            {showTitle ? (
+              <TitleTag id={titleId}>
+                Elegí el oliva ideal para cada ocasión.
+              </TitleTag>
+            ) : null}
             <p>
               Descubrí nuestras variedades y encontrá el perfil ideal para cada
               momento.

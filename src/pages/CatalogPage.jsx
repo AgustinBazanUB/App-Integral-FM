@@ -3,6 +3,8 @@ import { Search, X } from "lucide-react";
 import { useSearchParams } from "../router";
 import OccasionBuilder from "../components/OccasionBuilder";
 import OliveOilGuide from "../components/OliveOilGuide";
+import OilHeroSelector from "../components/OilHeroSelector";
+import OilQuiz from "../components/OilQuiz";
 import PageMeta from "../components/PageMeta";
 import ProductCard from "../components/ProductCard";
 import PromoShowcase from "../components/PromoShowcase";
@@ -47,6 +49,7 @@ export default function CatalogPage() {
   const query = searchParams.get("q") ?? "";
   const [searchOpen, setSearchOpen] = useState(Boolean(query));
   const searchInputRef = useRef(null);
+  const [oilMode, setOilMode] = useState("hero"); // hero, quiz, browse
   const activeCategory =
     categoryById[categoryId] ?? virtualCatalogCategories[categoryId];
   const activeCollection = catalogCollections[collectionId];
@@ -145,11 +148,21 @@ export default function CatalogPage() {
       />
 
       {isOliveOilView ? (
-        <OliveOilGuide
-          id="guia-aceites"
-          introCta={false}
-          titleAs="h1"
-        />
+        <>
+          {oilMode === "hero" && (
+            <OilHeroSelector onSelectMode={setOilMode} />
+          )}
+          {oilMode === "quiz" && (
+            <OilQuiz onComplete={() => setOilMode("browse")} />
+          )}
+          {oilMode === "browse" && (
+            <OliveOilGuide
+              id="guia-aceites"
+              introCta={false}
+              showTitle={false}
+            />
+          )}
+        </>
       ) : isGiftsView ? (
         <section className="page-hero page-hero--gifts">
           <div className="container">

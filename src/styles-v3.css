@@ -803,6 +803,219 @@ body::before {
   }
 }
 
+.oil-hero-selector {
+  padding: 100px 0 80px;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(199, 163, 90, 0.15), transparent 42%),
+    #f7f3ea;
+  text-align: center;
+}
+
+.oil-hero-selector__inner {
+  max-width: 800px;
+}
+
+.oil-hero-selector h1 {
+  margin: 0 0 16px;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(48px, 6vw, 72px);
+  font-weight: 500;
+  color: var(--fm-text-dark);
+  line-height: 1.1;
+}
+
+.oil-hero-selector__subtitle {
+  margin: 0 0 40px;
+  font-size: 18px;
+  color: var(--fm-text-secondary);
+}
+
+.oil-hero-selector__actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.oil-quiz {
+  padding: 60px 0 80px;
+  background: #f7f3ea;
+}
+
+.oil-quiz__inner {
+  max-width: 900px;
+}
+
+.oil-quiz__header {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.oil-quiz__step {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fm-gold);
+  background: rgba(199, 163, 90, 0.1);
+  border-radius: 999px;
+}
+
+.oil-quiz h2 {
+  margin: 0;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 500;
+  color: var(--fm-text-dark);
+}
+
+.oil-quiz__grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.oil-quiz__option {
+  padding: 16px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fm-text-dark);
+  background: #fff;
+  border: 2px solid rgba(199, 163, 90, 0.3);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.oil-quiz__option:hover {
+  border-color: var(--fm-gold);
+  background: rgba(199, 163, 90, 0.05);
+}
+
+.oil-quiz__option.is-selected {
+  border-color: var(--fm-gold);
+  background: rgba(199, 163, 90, 0.1);
+  color: var(--fm-gold);
+}
+
+.oil-quiz__aromas {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.oil-quiz__aroma {
+  padding: 20px 24px;
+  text-align: left;
+  background: #fff;
+  border: 2px solid rgba(199, 163, 90, 0.3);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.oil-quiz__aroma:hover {
+  border-color: var(--fm-gold);
+  background: rgba(199, 163, 90, 0.05);
+}
+
+.oil-quiz__aroma.is-selected {
+  border-color: var(--fm-gold);
+  background: rgba(199, 163, 90, 0.1);
+}
+
+.oil-quiz__aroma h3 {
+  margin: 0 0 8px;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--fm-text-dark);
+}
+
+.oil-quiz__aroma p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--fm-text-secondary);
+}
+
+.oil-quiz__next {
+  display: block;
+  margin: 0 auto;
+  max-width: 240px;
+}
+
+.oil-quiz__results {
+  margin-bottom: 32px;
+  padding: 32px;
+  background: #fff;
+  border-radius: 16px;
+  border: 2px solid rgba(199, 163, 90, 0.3);
+}
+
+.oil-quiz__results h3 {
+  margin: 0 0 24px;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--fm-text-dark);
+  text-align: center;
+}
+
+.oil-quiz__recommendation {
+  padding: 20px;
+  margin-bottom: 16px;
+  background: rgba(199, 163, 90, 0.05);
+  border-radius: 12px;
+}
+
+.oil-quiz__recommendation:last-child {
+  margin-bottom: 0;
+}
+
+.oil-quiz__recommendation h4 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fm-gold);
+}
+
+.oil-quiz__recommendation p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--fm-text-secondary);
+}
+
+.oil-quiz__reset {
+  display: block;
+  margin: 0 auto;
+  max-width: 240px;
+}
+
+@media (max-width: 768px) {
+  .oil-quiz__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .oil-hero-selector h1 {
+    font-size: 42px;
+  }
+}
+
+@media (max-width: 480px) {
+  .oil-quiz__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .oil-hero-selector__actions {
+    flex-direction: column;
+  }
+}
+
 .product-card {
   display: flex;
   min-width: 0;
