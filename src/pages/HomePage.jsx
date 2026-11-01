@@ -89,6 +89,10 @@ export default function HomePage() {
     });
   };
 
+  const heroTrackStyle = {
+    transform: `translateX(-${currentHeroIndex * 100}%)`,
+  };
+
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [
@@ -129,7 +133,17 @@ export default function HomePage() {
 
       <main id="main-content" className="fm-home">
         <section className="fm-hero" aria-labelledby="hero-title">
-          <ResponsiveStorefront className="fm-hero__media" heroImage={heroImages[currentHeroIndex]} />
+          <div className="fm-hero__media">
+            <div className="fm-hero__track" style={heroTrackStyle}>
+              {heroImages.map((image, index) => (
+                <ResponsiveStorefront
+                  key={index}
+                  className="fm-hero__slide"
+                  heroImage={image}
+                />
+              ))}
+            </div>
+          </div>
           <div className="fm-hero__shade" aria-hidden="true" />
           <div className="fm-page fm-hero__inner">
             <div className="fm-hero__copy">
