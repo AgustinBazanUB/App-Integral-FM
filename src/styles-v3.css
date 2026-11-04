@@ -884,7 +884,11 @@ body::before {
 }
 
 .oil-quiz__option {
-  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px;
   font-size: 13px;
   font-weight: 500;
   color: var(--fm-text-dark);
@@ -893,6 +897,33 @@ body::before {
   border-radius: 12px;
   cursor: pointer;
   transition: all 200ms ease;
+  aspect-ratio: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.oil-quiz__option img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.8;
+  transition: opacity 200ms ease;
+}
+
+.oil-quiz__option span {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px 8px;
+  border-radius: 4px;
 }
 
 .oil-quiz__option:hover {
@@ -900,10 +931,22 @@ body::before {
   background: rgba(199, 163, 90, 0.05);
 }
 
+.oil-quiz__option:hover img {
+  opacity: 1;
+}
+
 .oil-quiz__option.is-selected {
   border-color: var(--fm-gold);
   background: rgba(199, 163, 90, 0.1);
-  color: var(--fm-gold);
+}
+
+.oil-quiz__option.is-selected img {
+  opacity: 1;
+}
+
+.oil-quiz__option.is-selected span {
+  background: var(--fm-gold);
+  color: #fff;
 }
 
 .oil-quiz__aromas {

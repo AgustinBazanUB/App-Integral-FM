@@ -2,18 +2,18 @@ import { useState } from "react";
 import Reveal from "./Reveal";
 
 const useCases = [
-  "ensaladas",
-  "carnes",
-  "pastas",
-  "pescados",
-  "untar en pan",
-  "sopas y cremas",
-  "verduras al horno",
-  "pizza",
-  "marinar",
-  "repostería",
-  "tomar solo",
-  "uso diario",
+  { id: "ensaladas", label: "ensaladas", image: "/images/flor-mia/products/usos/ensaladas.jpg" },
+  { id: "carnes", label: "carnes", image: "/images/flor-mia/products/usos/carnes.jpg" },
+  { id: "pastas", label: "pastas", image: "/images/flor-mia/products/usos/pastas.jpeg" },
+  { id: "pescados", label: "pescados", image: "/images/flor-mia/products/usos/pescados.jpeg" },
+  { id: "untar en pan", label: "untar en pan", image: "/images/flor-mia/products/usos/panAceiteDeOliva.jpeg" },
+  { id: "sopas y cremas", label: "sopas y cremas", image: "/images/flor-mia/products/usos/sopaDeCalabaza.jpg" },
+  { id: "verduras al horno", label: "verduras al horno", image: "/images/flor-mia/products/usos/verdurasAlHorno.jpeg" },
+  { id: "pizza", label: "pizza", image: "/images/flor-mia/products/usos/pizzaNapolitana.jpeg" },
+  { id: "marinar", label: "marinar", image: "/images/flor-mia/products/usos/marinado.jpg" },
+  { id: "reposteria", label: "repostería", image: "/images/flor-mia/products/usos/reposteria.jpg" },
+  { id: "tomar solo", label: "tomar solo", image: "/images/flor-mia/products/usos/AceiteDeOlivaSolo.jpeg" },
+  { id: "uso diario", label: "uso diario", image: "/images/flor-mia/products/usos/usoDiario.jpg" },
 ];
 
 const aromaProfiles = [
@@ -29,7 +29,7 @@ export default function OilQuiz({ onComplete }) {
 
   const toggleUse = (use) => {
     setSelectedUses((prev) =>
-      prev.includes(use) ? prev.filter((u) => u !== use) : [...prev, use]
+      prev.includes(use.id) ? prev.filter((u) => u !== use.id) : [...prev, use.id]
     );
   };
 
@@ -76,12 +76,13 @@ export default function OilQuiz({ onComplete }) {
             <div className="oil-quiz__grid">
               {useCases.map((use) => (
                 <button
-                  key={use}
+                  key={use.id}
                   type="button"
-                  className={`oil-quiz__option ${selectedUses.includes(use) ? "is-selected" : ""}`}
+                  className={`oil-quiz__option ${selectedUses.includes(use.id) ? "is-selected" : ""}`}
                   onClick={() => toggleUse(use)}
                 >
-                  {use}
+                  <img src={use.image} alt={use.label} />
+                  <span>{use.label}</span>
                 </button>
               ))}
             </div>
