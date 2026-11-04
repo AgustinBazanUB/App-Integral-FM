@@ -22,14 +22,28 @@ function safeReadCart() {
       return [];
     }
 
-    return parsed.items.filter(
-      (item) =>
-        typeof item?.lineId === "string" &&
-        typeof item?.productId === "string" &&
-        Number.isInteger(item?.quantity) &&
-        item.quantity > 0 &&
-        productById[item.productId],
-    );
+    return parsed.items
+      .filter(
+        (item) =>
+          typeof item?.lineId === "string" &&
+          typeof item?.productId === "string" &&
+          Number.isInteger(item?.quantity) &&
+          item.quantity > 0 &&
+          productById[item.productId],
+      )
+      .map((item) => {
+        const product = productById[item.productId];
+        const formatOption = product.formatOptions?.find(
+          (option) => option.label === item.format,
+        );
+        const updatedPrice =
+          product.promoPrice ??
+          (formatOption ? formatOption.price ?? product.price : product.price);
+        return {
+          ...item,
+          price: updatedPrice,
+        };
+      });
   } catch {
     return [];
   }
@@ -77,7 +91,7 @@ export function CartProvider({ children }) {
       if (existing) {
         return currentItems.map((item) =>
           item.lineId === lineId
-            ? { ...item, quantity: Math.min(item.quantity + 1, 99) }
+            ? { ...item, quantity: Math.min(item.quantity + 1, 99), price: unitPrice }
             : item,
         );
       }
