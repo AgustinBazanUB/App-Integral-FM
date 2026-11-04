@@ -70,7 +70,19 @@ export default function OilQuiz({ onComplete }) {
       ];
     }
 
-    return recommendedProducts.slice(0, 4);
+    return recommendedProducts.slice(0, 2);
+  };
+
+  const getProductDescription = (product) => {
+    const descriptions = {
+      "oil-arbequina": "Frutado dulce, notas de manzana y banana",
+      "oil-arbosana": "Piel de manzana, ideal para cocina diaria",
+      "oil-blend": "Equilibrio de 50% Arbequina, 30% Arauco, 20% Coratina",
+      "oil-arauco": "La criolla mendocina, tomate y hierbas",
+      "oil-coratina": "Alto en polifenoles, picante y alcaucil",
+      "oil-picual": "Higuera y hoja de tomate, estable al calor",
+    };
+    return descriptions[product.id] || "Aceite extra virgen de Mendoza";
   };
 
   return (
@@ -141,7 +153,15 @@ export default function OilQuiz({ onComplete }) {
               <h3>Te recomendamos:</h3>
               <div className="oil-quiz__products">
                 {getRecommendations().map((product) => (
-                  <ProductCard product={product} key={product.id} />
+                  <div key={product.id} className="oil-quiz__product-card">
+                    <div className="oil-quiz__product-visual">
+                      <ProductCard product={product} />
+                    </div>
+                    <div className="oil-quiz__product-info">
+                      <h4>{product.name}</h4>
+                      <p>{getProductDescription(product)}</p>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

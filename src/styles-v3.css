@@ -1010,9 +1010,66 @@ body::before {
 }
 
 .oil-quiz__products {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.oil-quiz__product-card {
+  display: flex;
   gap: 20px;
+  align-items: flex-start;
+}
+
+.oil-quiz__product-visual {
+  flex: 0 0 280px;
+}
+
+.oil-quiz__product-visual .product-card {
+  max-height: 350px;
+}
+
+.oil-quiz__product-visual .product-card__image-link {
+  max-height: 200px;
+}
+
+.oil-quiz__product-visual .product-card__image {
+  max-height: 200px;
+}
+
+.oil-quiz__product-info {
+  flex: 1;
+  padding-top: 8px;
+}
+
+.oil-quiz__product-info h4 {
+  margin: 0 0 8px;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--fm-text-dark);
+}
+
+.oil-quiz__product-info p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fm-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .oil-quiz__product-card {
+    flex-direction: column;
+  }
+
+  .oil-quiz__product-visual {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .oil-quiz__product-visual .product-card {
+    max-height: 280px;
+  }
 }
 
 .oil-quiz__recommendation {
