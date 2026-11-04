@@ -710,10 +710,14 @@ body::before {
   margin-bottom: 28px;
 }
 
+.fm-reviews-carousel__wrapper {
+  overflow: hidden;
+  position: relative;
+}
+
 .fm-reviews-carousel__track {
   display: flex;
   gap: 20px;
-  overflow: visible;
   animation: scroll 60s linear infinite;
 }
 

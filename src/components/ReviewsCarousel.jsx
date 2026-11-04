@@ -122,8 +122,9 @@ export default function ReviewsCarousel() {
           <span aria-hidden="true" />
         </div>
 
-        <div className="fm-reviews-carousel__track">
-          {duplicatedReviews.map((review, index) => (
+        <div className="fm-reviews-carousel__wrapper">
+          <div className="fm-reviews-carousel__track">
+            {duplicatedReviews.map((review, index) => (
             <article className="fm-review-card" key={`${review.name}-${index}`}>
               <div className="fm-review-card__header">
                 <span className="fm-review-card__name">{review.name}</span>
@@ -147,6 +148,7 @@ export default function ReviewsCarousel() {
               </blockquote>
             </article>
           ))}
+          </div>
         </div>
       </div>
     </Reveal>
