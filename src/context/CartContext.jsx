@@ -69,7 +69,7 @@ export function CartProvider({ children }) {
     );
     const unitPrice =
       product.promoPrice ??
-      (formatOption ? formatOption.price ?? null : product.price);
+      (formatOption ? formatOption.price ?? product.price : product.price);
     const lineId = makeLineId(product.id, format, variant);
 
     setItems((currentItems) => {
