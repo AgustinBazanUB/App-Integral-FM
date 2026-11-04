@@ -1011,14 +1011,16 @@ body::before {
 
 .oil-quiz__products {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 24px;
+  align-items: flex-start;
 }
 
 .oil-quiz__product-card {
   display: flex;
   gap: 20px;
   align-items: flex-start;
+  flex: 1;
 }
 
 .oil-quiz__product-visual {
@@ -1058,6 +1060,10 @@ body::before {
 }
 
 @media (max-width: 768px) {
+  .oil-quiz__products {
+    flex-direction: column;
+  }
+
   .oil-quiz__product-card {
     flex-direction: column;
   }
