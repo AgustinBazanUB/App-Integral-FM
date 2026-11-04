@@ -1,5 +1,7 @@
 import { useState } from "react";
 import Reveal from "./Reveal";
+import ProductCard from "./ProductCard";
+import { products } from "../data/products";
 
 const useCases = [
   { id: "ensaladas", label: "ensaladas", image: "/images/flor-mia/products/usos/ensaladas.jpg" },
@@ -42,23 +44,33 @@ export default function OilQuiz({ onComplete }) {
   };
 
   const getRecommendations = () => {
-    // Lógica simple de recomendación basada en selección
+    // Mapeo de aromas a productos reales
+    const productMap = {
+      suave: products.filter((p) => p.id === "oil-arbequina" || p.id === "oil-arbosana"),
+      medio: products.filter((p) => p.id === "oil-blend" || p.id === "oil-arauco"),
+      intenso: products.filter((p) => p.id === "oil-coratina" || p.id === "oil-picual"),
+    };
+
+    let recommendedProducts = [];
+    
     if (selectedAroma === "suave") {
-      return [
-        { name: "Arbequina", description: "Frutado dulce, ideal para ensaladas y untar en pan" },
-        { name: "Arbosana", description: "Cocina diaria con notas de almendra cremosa" },
+      recommendedProducts = [
+        ...productMap.suave,
+        ...productMap.medio.slice(0, 1), // Blend como segunda opción
       ];
     } else if (selectedAroma === "intenso") {
-      return [
-        { name: "Coratina", description: "Alto en polifenoles, perfecto para carnes y finales" },
-        { name: "Picual", description: "Estable al calor, ideal para cocinar" },
+      recommendedProducts = [
+        ...productMap.intenso,
+        ...productMap.medio.slice(0, 1), // Blend como segunda opción
       ];
     } else {
-      return [
-        { name: "Blend IG", description: "Equilibrio perfecto de Arbequina, Arauco y Coratina" },
-        { name: "Arauco", description: "La criolla mendocina, carácter único" },
+      recommendedProducts = [
+        ...productMap.medio,
+        ...productMap.suave.slice(0, 1), // Arbequina como segunda opción
       ];
     }
+
+    return recommendedProducts.slice(0, 4);
   };
 
   return (
@@ -127,19 +139,18 @@ export default function OilQuiz({ onComplete }) {
           <div className="oil-quiz__step">
             <div className="oil-quiz__results">
               <h3>Te recomendamos:</h3>
-              {getRecommendations().map((rec, index) => (
-                <div key={index} className="oil-quiz__recommendation">
-                  <h4>{rec.name}</h4>
-                  <p>{rec.description}</p>
-                </div>
-              ))}
+              <div className="oil-quiz__products">
+                {getRecommendations().map((product) => (
+                  <ProductCard product={product} key={product.id} />
+                ))}
+              </div>
             </div>
             <button
               className="fm-button fm-button--black oil-quiz__reset"
               type="button"
               onClick={() => onComplete()}
             >
-              VER TIENDA
+              VER TODOS LOS ACEITES
             </button>
           </div>
         )}

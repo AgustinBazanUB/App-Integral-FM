@@ -998,10 +998,6 @@ body::before {
 
 .oil-quiz__results {
   margin-bottom: 32px;
-  padding: 32px;
-  background: #fff;
-  border-radius: 16px;
-  border: 2px solid rgba(199, 163, 90, 0.3);
 }
 
 .oil-quiz__results h3 {
@@ -1011,6 +1007,12 @@ body::before {
   font-weight: 500;
   color: var(--fm-text-dark);
   text-align: center;
+}
+
+.oil-quiz__products {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
 }
 
 .oil-quiz__recommendation {
