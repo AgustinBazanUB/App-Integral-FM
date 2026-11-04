@@ -5,9 +5,11 @@ import { assetsManifest } from "../data/assetsManifest";
 import { brand } from "../data/brand";
 import OliveOilGuide from "../components/OliveOilGuide";
 import PageMeta from "../components/PageMeta";
+import ProductCard from "../components/ProductCard";
 import PromoShowcase from "../components/PromoShowcase";
 import Reveal from "../components/Reveal";
 import ReviewsCarousel from "../components/ReviewsCarousel";
+import { products } from "../data/products";
 
 const storyValues = [
   { label: "Productos mendocinos", Icon: Grape },
@@ -173,6 +175,29 @@ export default function HomePage() {
         </section>
 
         <PromoShowcase />
+
+        <Reveal as="section" className="section" aria-labelledby="home-products-title">
+          <div className="fm-page">
+            <div className="fm-rule-heading">
+              <span aria-hidden="true" />
+              <h2 id="home-products-title">PRODUCTOS DESTACADOS</h2>
+              <span aria-hidden="true" />
+            </div>
+            <div className="catalog-grid">
+              {products
+                .filter((p) => p.active !== false && p.categoryId !== "bundles")
+                .slice(0, 6)
+                .map((product) => (
+                  <ProductCard product={product} key={product.id} />
+                ))}
+            </div>
+            <div style={{ textAlign: "center", marginTop: "32px" }}>
+              <Link className="fm-button fm-button--gold" to="/productos">
+                VER TODO EL CATÁLOGO
+              </Link>
+            </div>
+          </div>
+        </Reveal>
 
         <OliveOilGuide />
 
