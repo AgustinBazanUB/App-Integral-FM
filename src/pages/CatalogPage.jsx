@@ -258,31 +258,46 @@ export default function CatalogPage() {
       <section className="section catalog-results">
         <div className="container">
           {!query && !collectionId ? (
-            [...categories]
-              .filter((cat) => cat.id !== "bundles")
-              .sort((a, b) => {
-                if (a.id === "olive_oil") return 1;
-                if (b.id === "olive_oil") return -1;
-                return 0;
-              })
-              .map((category) => {
-                const categoryProducts = products.filter(
-                  (p) => p.categoryId === category.id && p.active !== false
-                );
-                if (categoryProducts.length === 0) return null;
-                return (
-                  <div key={category.id} className="catalog-category-section">
-                    <Reveal>
-                      <h2 className="catalog-category-section__title">{category.name}</h2>
-                      <div className="catalog-grid">
-                        {categoryProducts.map((product) => (
-                          <ProductCard product={product} key={product.id} />
-                        ))}
-                      </div>
-                    </Reveal>
+            isOliveOilView ? (
+              <div className="catalog-category-section">
+                <Reveal>
+                  <h2 className="catalog-category-section__title">Aceites de Oliva</h2>
+                  <div className="catalog-grid">
+                    {products
+                      .filter((p) => p.categoryId === "olive_oil" && p.active !== false)
+                      .map((product) => (
+                        <ProductCard product={product} key={product.id} />
+                      ))}
                   </div>
-                );
-              })
+                </Reveal>
+              </div>
+            ) : (
+              [...categories]
+                .filter((cat) => cat.id !== "bundles")
+                .sort((a, b) => {
+                  if (a.id === "olive_oil") return 1;
+                  if (b.id === "olive_oil") return -1;
+                  return 0;
+                })
+                .map((category) => {
+                  const categoryProducts = products.filter(
+                    (p) => p.categoryId === category.id && p.active !== false
+                  );
+                  if (categoryProducts.length === 0) return null;
+                  return (
+                    <div key={category.id} className="catalog-category-section">
+                      <Reveal>
+                        <h2 className="catalog-category-section__title">{category.name}</h2>
+                        <div className="catalog-grid">
+                          {categoryProducts.map((product) => (
+                            <ProductCard product={product} key={product.id} />
+                          ))}
+                        </div>
+                      </Reveal>
+                    </div>
+                  );
+                })
+            )
           ) : filteredProducts.length ? (
             <Reveal className="catalog-grid" stagger>
               {filteredProducts.map((product) => (
