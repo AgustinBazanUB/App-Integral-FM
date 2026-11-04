@@ -1020,6 +1020,26 @@ body::before {
   }
 }
 
+.catalog-category-section {
+  padding: 40px 0;
+}
+
+.catalog-category-section__title {
+  margin: 0 0 24px;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--fm-text-dark);
+}
+
+.catalog-category-section:first-child {
+  padding-top: 0;
+}
+
+.catalog-category-section:last-child {
+  padding-bottom: 0;
+}
+
 .product-card {
   display: flex;
   min-width: 0;

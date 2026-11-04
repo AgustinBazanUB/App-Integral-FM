@@ -189,63 +189,43 @@ export default function CatalogPage() {
       )}
 
       {!isOliveOilView ? (
-      <section className="catalog-controls" aria-label="Filtros del catálogo">
-        <div className="container">
-          <div className="catalog-category-pills" aria-label="Categorías">
-            <button
-              type="button"
-              className={!categoryId && !collectionId ? "is-selected" : ""}
-              onClick={clearCatalogView}
-            >
-              Todo
-            </button>
-            {categories.map((category) => (
+        <section className="catalog-controls" aria-label="Buscar en el catálogo">
+          <div className="container">
+            {searchOpen ? (
+              <div className="catalog-search">
+                <div className="search-field">
+                  <Search size={18} aria-hidden="true" />
+                  <input
+                    ref={searchInputRef}
+                    id="catalog-search"
+                    type="search"
+                    value={query}
+                    onChange={(event) => updateParam("q", event.target.value)}
+                    placeholder="Aceite, pistachos, aceitunas…"
+                    aria-label="Buscar en el catálogo"
+                  />
+                  <button
+                    type="button"
+                    className="catalog-search__close"
+                    onClick={closeSearch}
+                    aria-label="Cerrar búsqueda"
+                  >
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            ) : (
               <button
                 type="button"
-                className={categoryId === category.id ? "is-selected" : ""}
-                onClick={() => updateCategory(category.id)}
-                key={category.id}
+                className="catalog-search-toggle"
+                onClick={openSearch}
+                aria-label="Buscar en el catálogo"
               >
-                {category.shortName}
-              </button>
-            ))}
-          </div>
-
-          {searchOpen ? (
-            <div className="catalog-search">
-              <div className="search-field">
                 <Search size={18} aria-hidden="true" />
-                <input
-                  ref={searchInputRef}
-                  id="catalog-search"
-                  type="search"
-                  value={query}
-                  onChange={(event) => updateParam("q", event.target.value)}
-                  placeholder="Aceite, pistachos, aceitunas…"
-                  aria-label="Buscar en el catálogo"
-                />
-                <button
-                  type="button"
-                  className="catalog-search__close"
-                  onClick={closeSearch}
-                  aria-label="Cerrar búsqueda"
-                >
-                  <X size={16} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="catalog-search-toggle"
-              onClick={openSearch}
-              aria-label="Buscar en el catálogo"
-            >
-              <Search size={18} aria-hidden="true" />
-            </button>
-          )}
-        </div>
-      </section>
+              </button>
+            )}
+          </div>
+        </section>
       ) : null}
 
       {isGiftsView ? (
@@ -277,7 +257,33 @@ export default function CatalogPage() {
 
       <section className="section catalog-results">
         <div className="container">
-          {filteredProducts.length ? (
+          {!query && !collectionId ? (
+            [...categories]
+              .filter((cat) => cat.id !== "bundles")
+              .sort((a, b) => {
+                if (a.id === "olive_oil") return 1;
+                if (b.id === "olive_oil") return -1;
+                return 0;
+              })
+              .map((category) => {
+                const categoryProducts = products.filter(
+                  (p) => p.categoryId === category.id && p.active !== false
+                );
+                if (categoryProducts.length === 0) return null;
+                return (
+                  <div key={category.id} className="catalog-category-section">
+                    <Reveal>
+                      <h2 className="catalog-category-section__title">{category.name}</h2>
+                      <div className="catalog-grid">
+                        {categoryProducts.map((product) => (
+                          <ProductCard product={product} key={product.id} />
+                        ))}
+                      </div>
+                    </Reveal>
+                  </div>
+                );
+              })
+          ) : filteredProducts.length ? (
             <Reveal className="catalog-grid" stagger>
               {filteredProducts.map((product) => (
                 <ProductCard product={product} key={product.id} />
