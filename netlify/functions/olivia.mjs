@@ -69,6 +69,8 @@ export default async function handler(request) {
       result = await engine.getConfiguration(session);
     else if (body.operation === "saveConfiguration")
       result = await engine.saveConfiguration(session, body);
+    else if (body.operation === "geminiDirectTurn")
+      result = await engine.recordGeminiDirectTurn(session, body);
     else throw oliviaError("invalid-operation", "Operación no disponible.");
     if (["state", "resume"].includes(body.operation) && result.conversationId) result.activeChatJob = await activeChatJob({ store, session, conversationId: result.conversationId });
     return timed(json(result));

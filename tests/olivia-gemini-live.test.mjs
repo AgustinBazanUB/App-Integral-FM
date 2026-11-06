@@ -1,0 +1,201 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  defaultOliviaConfiguration,
+  validateConfiguration,
+} from "../src/shared/oliviaContracts.mjs";
+import {
+  estimateGeminiLiveAudioCost,
+  geminiLiveMonthlyProjection,
+  geminiLiveProviderCost,
+  geminiLiveRawSetup,
+  GEMINI_LIVE_MODEL,
+} from "../src/shared/oliviaGeminiLive.mjs";
+import { assertGeminiLivePreview } from "../netlify/functions/olivia-gemini-live.mjs";
+import { GeminiLiveSession, resamplePcm16 } from "../src/gestion/olivia/geminiLive.mjs";
+import { classifyGeminiLiveTurn } from "../src/shared/oliviaConversationRouter.mjs";
+
+test("configuration defaults keep the hybrid voice disabled outside the gated preview", () => {
+  assert.equal(defaultOliviaConfiguration().hybridVoice.enabled, false);
+  assert.equal(defaultOliviaConfiguration({ OLIVIA_HYBRID_LIVE_ENABLED: "true" }).hybridVoice.enabled, true);
+  assert.equal(validateConfiguration(defaultOliviaConfiguration()).hybridVoice.hardLimitUsd, 10);
+  const invalid = defaultOliviaConfiguration();
+  invalid.hybridVoice.warningUsd = 4;
+  assert.throws(() => validateConfiguration(invalid), /objetivo, aviso y techo/);
+});
+
+test("preview guard requires Deploy Preview, staging Firebase, a secret key and paid-tier attestation", () => {
+  const env = { CONTEXT: "deploy-preview", OLIVIA_HYBRID_LIVE_ENABLED: "true", GEMINI_API_KEY: "test-only", GEMINI_API_BILLING_TIER: "paid" };
+  assert.doesNotThrow(() => assertGeminiLivePreview({ env, projectId: "app-integral-fm-pruebas" }));
+  assert.throws(() => assertGeminiLivePreview({ env: { ...env, CONTEXT: "production" }, projectId: "app-integral-fm" }), (error) => error.code === "gemini-live-disabled");
+  assert.throws(() => assertGeminiLivePreview({ env: { ...env, GEMINI_API_BILLING_TIER: "free" }, projectId: "app-integral-fm-pruebas" }), (error) => error.code === "gemini-live-billing-unverified");
+  assert.throws(() => assertGeminiLivePreview({ env: { ...env, GEMINI_API_KEY: "" }, projectId: "app-integral-fm-pruebas" }), (error) => error.code === "gemini-live-unconfigured");
+});
+
+test("provider usage costs include accumulated audio and text tokens by modality", () => {
+  const result = geminiLiveProviderCost({
+    promptTokensDetails: [{ modality: "AUDIO", tokenCount: 1500 }, { modality: "TEXT", tokenCount: 1000 }],
+    responseTokensDetails: [{ modality: "AUDIO", tokenCount: 1000 }, { modality: "TEXT", tokenCount: 200 }],
+  });
+  assert.equal(result.measurement, "provider-forwarded");
+  assert.equal(result.inputTokens, 2500);
+  assert.equal(result.outputTokens, 1200);
+  assert.equal(result.costUsd, 0.01815);
+  const withToolPrompt = geminiLiveProviderCost({
+    promptTokensDetails: [{ modality: "AUDIO", tokenCount: 1500 }, { modality: "TEXT", tokenCount: 1000 }],
+    toolUsePromptTokensDetails: [{ modality: "TEXT", tokenCount: 500 }],
+    responseTokensDetails: [{ modality: "AUDIO", tokenCount: 1000 }, { modality: "TEXT", tokenCount: 200 }],
+  });
+  assert.equal(withToolPrompt.costUsd, 0.018525);
+  assert.equal(geminiLiveProviderCost({ totalTokenCount: 200 }).costUsd, null);
+});
+
+test("audio-only estimates state that accumulated context is excluded", () => {
+  const result = estimateGeminiLiveAudioCost({ inputAudioSeconds: 60, outputAudioSeconds: 30 });
+  assert.ok(Math.abs(result.estimatedCostUsd - 0.014) < 1e-12);
+  assert.equal(result.excludesAccumulatedContext, true);
+  assert.equal(geminiLiveMonthlyProjection({ spendUsd: 5, queryCount: 660 }).projectionAt660Usd, 5);
+});
+
+test("raw Live setup fixes model, voice, tool policy, compression and modalities", () => {
+  const setup = geminiLiveRawSetup();
+  assert.equal(setup.model, `models/${GEMINI_LIVE_MODEL}`);
+  assert.deepEqual(setup.generationConfig.responseModalities, ["AUDIO"]);
+  assert.equal(setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, "Aoede");
+  assert.equal(setup.contextWindowCompression.slidingWindow.targetTokens, 1200);
+  assert.equal(setup.tools[0].functionDeclarations[0].name, "delegate_to_olivia");
+  assert.equal(setup.thinkingLevel, undefined);
+});
+
+test("backend direct route is limited to exact conversational phrases", () => {
+  assert.equal(classifyGeminiLiveTurn("Hola, ¿cómo estás?").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Muchísimas gracias").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Hola, ¿cuánto stock queda?").route, "delegate");
+  assert.equal(classifyGeminiLiveTurn("Gracias, registrá una venta").route, "delegate");
+});
+
+test("48 kHz capture resamples to 16 kHz signed PCM", () => {
+  const input = new Float32Array(480).fill(0.5), output = resamplePcm16(input, 48000);
+  assert.equal(output.length, 160);
+  assert.ok(output.every((sample) => sample > 0));
+});
+
+test("Live session sends short PCM chunks, plays audio and reports one direct turn", async (t) => {
+  class FakeSocket {
+    static OPEN = 1;
+    static instances = [];
+    constructor(url) { this.url = url; this.readyState = 0; this.sent = []; FakeSocket.instances.push(this); }
+    send(data) { this.sent.push(JSON.parse(data)); }
+    close() { this.readyState = 3; this.onclose?.(); }
+  }
+  const context = {
+    sampleRate: 48000, currentTime: 0, destination: {},
+    createMediaStreamSource: () => ({ connect() {}, disconnect() {} }),
+    createScriptProcessor: () => ({ connect() {}, disconnect() {}, onaudioprocess: null }),
+    createGain: () => ({ gain: { value: 1 }, connect() {}, disconnect() {} }),
+    createBuffer: (_channels, length) => ({ duration: length / 24000, getChannelData: () => new Float32Array(length) }),
+    createBufferSource: () => ({ connect() {}, disconnect() {}, start() { played++; }, stop() {} }),
+  };
+  const operations = [], turns = [], usage = [], transcripts = [];
+  let played = 0;
+  const live = new GeminiLiveSession({
+    request: async (payload) => {
+      operations.push(payload.operation);
+      if (payload.operation === "token") return { token: "auth_tokens/example", sessionId: "session-1", expiresAt: new Date(Date.now() + 60000).toISOString(), maxSessionSeconds: 600 };
+      if (payload.operation === "classify") return { route: "direct", direct: true };
+      if (payload.operation === "usage") return { measurement: "provider-forwarded", spendUsd: 0.001, shouldStop: false };
+      return { closed: true };
+    },
+    conversationId: "conversation-1", audioContext: context,
+    WebSocket: FakeSocket,
+    onTranscript: (text) => transcripts.push(text),
+    onTurnComplete: (turn) => turns.push(turn),
+    onUsage: (record) => usage.push(record),
+  });
+  t.after(() => live.close());
+  const started = live.start({});
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const socket = FakeSocket.instances[0];
+  assert.match(socket.url, /BidiGenerateContentConstrained\?access_token=auth_tokens%2Fexample/);
+  socket.readyState = FakeSocket.OPEN; socket.onopen();
+  socket.onmessage({ data: JSON.stringify({ setupComplete: {} }) });
+  await started;
+  assert.equal(live.handlesTurns, true);
+  live.setListening(true);
+  live.processor.onaudioprocess({ inputBuffer: { getChannelData: () => new Float32Array(1024).fill(0.25) } });
+  const audioMessage = socket.sent.find((item) => item.realtimeInput?.audio);
+  assert.equal(audioMessage.realtimeInput.audio.mimeType, "audio/pcm;rate=16000");
+  live.setListening(false);
+  assert.equal(socket.sent.at(-1).realtimeInput.audioStreamEnd, true);
+  const audio = btoa(String.fromCharCode(1, 0, 2, 0));
+  socket.onmessage({ data: JSON.stringify({ serverContent: { inputTranscription: { text: "Hola Olivia" }, outputTranscription: { text: "Hola, ¿cómo estás?" }, modelTurn: { parts: [{ inlineData: { mimeType: "audio/pcm;rate=24000", data: audio } }] } }, usageMetadata: { promptTokensDetails: [{ modality: "AUDIO", tokenCount: 10 }], responseTokensDetails: [{ modality: "AUDIO", tokenCount: 10 }] } }) });
+  assert.equal(played, 0, "generated audio stays buffered until the backend classifies the request");
+  assert.deepEqual(transcripts, [], "assistant text stays hidden until the backend classifies the request");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(played, 1, "authorized audio streams before the model turn completes");
+  assert.deepEqual(transcripts, ["Hola, ¿cómo estás?"]);
+  socket.onmessage({ data: JSON.stringify({ serverContent: { turnComplete: true } }) });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(turns.length, 1);
+  assert.equal(turns[0].userText, "Hola Olivia");
+  assert.equal(turns[0].assistantText, "Hola, ¿cómo estás?");
+  assert.equal(usage.length, 1);
+  assert.equal(played, 1);
+  assert.deepEqual(transcripts, ["Hola, ¿cómo estás?"]);
+  assert.ok(operations.includes("classify"));
+  assert.ok(operations.includes("usage"));
+  live.close();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.ok(operations.includes("close"));
+});
+
+test("business turns suppress an unverified Gemini answer and delegate to Olivia", async (t) => {
+  class FakeSocket {
+    static OPEN = 1;
+    static instances = [];
+    constructor() { this.readyState = 0; this.sent = []; FakeSocket.instances.push(this); }
+    send(data) { this.sent.push(JSON.parse(data)); }
+    close() { this.readyState = 3; this.onclose?.(); }
+  }
+  let played = 0;
+  const context = {
+    sampleRate: 48000, currentTime: 0, destination: {},
+    createMediaStreamSource: () => ({ connect() {}, disconnect() {} }),
+    createScriptProcessor: () => ({ connect() {}, disconnect() {}, onaudioprocess: null }),
+    createGain: () => ({ gain: { value: 1 }, connect() {}, disconnect() {} }),
+    createBuffer: (_channels, length) => ({ duration: length / 24000, getChannelData: () => new Float32Array(length) }),
+    createBufferSource: () => ({ connect() {}, disconnect() {}, start() { played++; }, stop() {} }),
+  };
+  const completed = [], transcripts = [], operations = [];
+  const live = new GeminiLiveSession({
+    request: async (payload) => {
+      operations.push(payload.operation);
+      if (payload.operation === "token") return { token: "auth_tokens/business", sessionId: "session-business", expiresAt: new Date(Date.now() + 60000).toISOString(), maxSessionSeconds: 600 };
+      if (payload.operation === "classify") return { route: "delegate", direct: false };
+      if (payload.operation === "usage") return { measurement: "provider-forwarded", shouldStop: false };
+      return { closed: true };
+    },
+    conversationId: "conversation-business", audioContext: context, WebSocket: FakeSocket,
+    onToolCall: async (_call, request) => `Resultado verificado para: ${request}`,
+    onTranscript: (text) => transcripts.push(text), onTurnComplete: (turn) => completed.push(turn),
+  });
+  t.after(() => live.close());
+  const started = live.start({});
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const socket = FakeSocket.instances[0]; socket.readyState = FakeSocket.OPEN; socket.onopen();
+  socket.onmessage({ data: JSON.stringify({ setupComplete: {} }) }); await started;
+  live.setListening(true); live.setListening(false);
+  const audio = btoa(String.fromCharCode(1, 0, 2, 0));
+  socket.onmessage({ data: JSON.stringify({ serverContent: { inputTranscription: { text: "¿Cuánto stock queda?" }, outputTranscription: { text: "Hay doce unidades" }, modelTurn: { parts: [{ inlineData: { data: audio } }] } }, usageMetadata: { promptTokensDetails: [{ modality: "AUDIO", tokenCount: 10 }], responseTokensDetails: [{ modality: "AUDIO", tokenCount: 10 }] } }) });
+  assert.equal(played, 0);
+  assert.deepEqual(transcripts, []);
+  socket.onmessage({ data: JSON.stringify({ serverContent: { turnComplete: true } }) });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(played, 0, "discarded Gemini audio must never play for a business question");
+  assert.equal(completed[0].delegated, true);
+  assert.equal(completed[0].noAudio, true);
+  assert.equal(completed[0].assistantText, "Resultado verificado para: ¿Cuánto stock queda?");
+  assert.deepEqual(transcripts, ["Resultado verificado para: ¿Cuánto stock queda?"]);
+  assert.ok(operations.includes("classify"));
+  live.close();
+});

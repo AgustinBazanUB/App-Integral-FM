@@ -1,4 +1,4 @@
-import { normalizeSpeech } from './oliviaFastSpeech.mjs';
+import { isGreetingOnly, normalizeSpeech } from './oliviaFastSpeech.mjs';
 
 // Small, exact matchers. A partial, combined request, correction or bare confirmation
 // must continue through the authenticated task engine.
@@ -14,6 +14,11 @@ export function instantConversation(text) {
   if (/^(?:muchas |muchisimas )?gracias(?: por tu ayuda)?$/.test(value)) return { ...conversationClips[1], intent: 'thanks' };
   if (/^(?:chau|hasta luego|nos vemos|hasta manana|adios)$/.test(value)) return { ...conversationClips[2], intent: 'goodbye' };
   return null;
+}
+export function classifyGeminiLiveTurn(text) {
+  const normalized = String(text || '').trim();
+  if (isGreetingOnly(normalized) || instantConversation(normalized)) return { route: 'direct' };
+  return { route: 'delegate' };
 }
 export function quickReadPlan(text) {
   const value = normalizeSpeech(text).replace(/^olivia /, '').replace(/ por favor$/, '');
