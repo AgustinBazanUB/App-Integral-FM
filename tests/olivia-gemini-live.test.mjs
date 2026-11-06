@@ -26,9 +26,10 @@ test("configuration defaults keep the hybrid voice disabled outside the gated pr
 });
 
 test("preview guard requires Deploy Preview, staging Firebase, a secret key and paid-tier attestation", () => {
-  const env = { CONTEXT: "deploy-preview", OLIVIA_HYBRID_LIVE_ENABLED: "true", GEMINI_API_KEY: "test-only", GEMINI_API_BILLING_TIER: "paid" };
+  const env = { OLIVIA_DEPLOY_PREVIEW_CONTEXT: "deploy-preview", OLIVIA_HYBRID_LIVE_ENABLED: "true", GEMINI_API_KEY: "test-only", GEMINI_API_BILLING_TIER: "paid" };
   assert.doesNotThrow(() => assertGeminiLivePreview({ env, projectId: "app-integral-fm-pruebas" }));
-  assert.throws(() => assertGeminiLivePreview({ env: { ...env, CONTEXT: "production" }, projectId: "app-integral-fm" }), (error) => error.code === "gemini-live-disabled");
+  assert.throws(() => assertGeminiLivePreview({ env: { ...env, OLIVIA_DEPLOY_PREVIEW_CONTEXT: "" }, projectId: "app-integral-fm" }), (error) => error.code === "gemini-live-disabled");
+  assert.throws(() => assertGeminiLivePreview({ env: { ...env, CONTEXT: "production" }, projectId: "app-integral-fm-pruebas" }), (error) => error.code === "gemini-live-disabled");
   assert.throws(() => assertGeminiLivePreview({ env: { ...env, GEMINI_API_BILLING_TIER: "free" }, projectId: "app-integral-fm-pruebas" }), (error) => error.code === "gemini-live-billing-unverified");
   assert.throws(() => assertGeminiLivePreview({ env: { ...env, GEMINI_API_KEY: "" }, projectId: "app-integral-fm-pruebas" }), (error) => error.code === "gemini-live-unconfigured");
 });

@@ -1,8 +1,15 @@
 import { canAccessAdministration } from "../gestion/permissions.js";
 
+// Netlify exposes CONTEXT during builds but not inside Functions at runtime.
+// Configure this marker only for the Deploy Previews context in Netlify.
+export function isOliviaDeployPreview(env = process.env) {
+  return env.OLIVIA_DEPLOY_PREVIEW_CONTEXT === "deploy-preview"
+    && (!env.CONTEXT || env.CONTEXT === "deploy-preview");
+}
+
 export function canUseOliviaVoice(identity, env = process.env) {
   const ownerTrial = typeof identity?.email === "string" && identity.email.trim().toLowerCase() === "agsreserva@gmail.com";
-  const stagingAdminTrial = env.CONTEXT === "deploy-preview"
+  const stagingAdminTrial = isOliviaDeployPreview(env)
     && env.OLIVIA_HYBRID_LIVE_ENABLED === "true"
     && env.GEMINI_API_BILLING_TIER === "paid"
     && Boolean(env.GEMINI_API_KEY)

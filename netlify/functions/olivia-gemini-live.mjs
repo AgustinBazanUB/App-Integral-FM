@@ -4,7 +4,7 @@ import { createOliviaStore } from "./_lib/olivia/store.mjs";
 import { oliviaSession, json, errorResponse } from "./_lib/olivia/http.mjs";
 import { configuredFirebaseProjectId, STAGING_FIREBASE_PROJECT_ID } from "./_lib/firebaseProject.mjs";
 import { assertConversationOwner } from "./_lib/olivia/conversations.mjs";
-import { canUseOliviaVoice } from "../../src/shared/oliviaVoiceAvailability.mjs";
+import { canUseOliviaVoice, isOliviaDeployPreview } from "../../src/shared/oliviaVoiceAvailability.mjs";
 import { classifyGeminiLiveTurn } from "../../src/shared/oliviaConversationRouter.mjs";
 import { estimateGeminiLiveAudioCost, geminiLiveProviderCost, geminiLiveMonthlyProjection, GEMINI_LIVE_MODEL, GEMINI_LIVE_MONTHLY_QUERY_CAP, geminiLiveSetupConfig } from "../../src/shared/oliviaGeminiLive.mjs";
 import { defaultOliviaConfiguration, oliviaError, safeId, validateConfiguration } from "../../src/shared/oliviaContracts.mjs";
@@ -12,7 +12,7 @@ import { defaultOliviaConfiguration, oliviaError, safeId, validateConfiguration 
 const TOKEN_EXPIRES_MS = 30 * 60 * 1000;
 
 export function assertGeminiLivePreview({ env = process.env, projectId = configuredFirebaseProjectId(env) } = {}) {
-  if (env.CONTEXT !== "deploy-preview" || env.OLIVIA_HYBRID_LIVE_ENABLED !== "true" || projectId !== STAGING_FIREBASE_PROJECT_ID)
+  if (!isOliviaDeployPreview(env) || env.OLIVIA_HYBRID_LIVE_ENABLED !== "true" || projectId !== STAGING_FIREBASE_PROJECT_ID)
     throw oliviaError("gemini-live-disabled", "Gemini Live solo está habilitado en Deploy Preview con Firebase de pruebas.", 403);
   if (!env.GEMINI_API_KEY) throw oliviaError("gemini-live-unconfigured", "Falta configurar GEMINI_API_KEY en el entorno seguro del Deploy Preview.", 503);
   if (env.GEMINI_API_BILLING_TIER !== "paid") throw oliviaError("gemini-live-billing-unverified", "La prueba requiere un proyecto Gemini con facturación paga verificada para proteger los datos de negocio.", 503);

@@ -406,7 +406,7 @@ test("admin Gemini readiness reports only safe gate booleans", async () => {
   const f = fixture({
     role: "admin",
     env: {
-      CONTEXT: "deploy-preview",
+      OLIVIA_DEPLOY_PREVIEW_CONTEXT: "deploy-preview",
       OLIVIA_HYBRID_LIVE_ENABLED: "true",
       GEMINI_API_BILLING_TIER: "paid",
       GEMINI_API_KEY: "must-not-leak",

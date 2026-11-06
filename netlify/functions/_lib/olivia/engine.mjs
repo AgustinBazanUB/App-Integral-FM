@@ -13,7 +13,7 @@ import { fieldGuidance } from '../../../../src/shared/oliviaOperationGuide.mjs';
 import { assistiveIntent } from '../../../../src/shared/oliviaAssistiveIntent.mjs';
 import { guideForMessage, getUiGuide } from '../../../../src/shared/oliviaUiGuides.mjs';
 import { chooseExpression, naturalStyleContext } from '../../../../src/shared/oliviaExpressions.mjs';
-import { canUseOliviaVoice, hasGoogleCloudTtsCredentials } from "../../../../src/shared/oliviaVoiceAvailability.mjs";
+import { canUseOliviaVoice, hasGoogleCloudTtsCredentials, isOliviaDeployPreview } from "../../../../src/shared/oliviaVoiceAvailability.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { captureOliviaFailure, publicOliviaFailure } from "./errorReports.mjs";
 import { randomUUID, createHash, timingSafeEqual } from "node:crypto";
@@ -119,7 +119,7 @@ export function createOliviaEngine({
     return resolveCosts ? pricingResolver(config, clock(),{allowNetwork:allowPricingNetwork || !latencyEnabled(config)}) : config;
   }
   const geminiLiveEnabled = (session, config) => Boolean(
-    env.CONTEXT === "deploy-preview" &&
+    isOliviaDeployPreview(env) &&
     env.OLIVIA_HYBRID_LIVE_ENABLED === "true" &&
     env.GEMINI_API_KEY &&
     env.GEMINI_API_BILLING_TIER === "paid" &&
@@ -133,7 +133,7 @@ export function createOliviaEngine({
     const ownerTrial = typeof session?.email === "string" && session.email.trim().toLowerCase() === "agsreserva@gmail.com";
     const authorizedAdministrator = session?.profile?.active === true && canAccessAdministration(session.profile);
     return {
-      deployPreview: env.CONTEXT === "deploy-preview",
+      deployPreview: isOliviaDeployPreview(env),
       previewFlag: env.OLIVIA_HYBRID_LIVE_ENABLED === "true",
       apiKeyConfigured: Boolean(env.GEMINI_API_KEY),
       paidBillingTier: env.GEMINI_API_BILLING_TIER === "paid",
@@ -144,7 +144,7 @@ export function createOliviaEngine({
   };
   async function geminiLiveUsageSummary(session, config) {
     if (!canAccessAdministration(session.profile)) return null;
-    if (env.CONTEXT !== "deploy-preview" || env.OLIVIA_HYBRID_LIVE_ENABLED !== "true" || configuredFirebaseProjectId(env) !== "app-integral-fm-pruebas") return null;
+    if (!isOliviaDeployPreview(env) || env.OLIVIA_HYBRID_LIVE_ENABLED !== "true" || configuredFirebaseProjectId(env) !== "app-integral-fm-pruebas") return null;
     const period = clock().toISOString().slice(0, 7), budget = await store.get(`oliviaGeminiLiveBudgets/${period}`);
     const spendUsd = Number(budget?.usedUsd || 0), reservedUsd = Number(budget?.reservedUsd || 0), targetUsd = Number(budget?.targetUsd || config.hybridVoice.targetUsd || 5), warningUsd = Number(budget?.warningUsd || config.hybridVoice.warningUsd || 6), hardLimitUsd = Number(budget?.hardLimitUsd || config.hybridVoice.hardLimitUsd || 10);
     const lunaSol = budget?.lunaSol || { estimatedUsd: 0, unconfirmedCalls: 0, calls: 0, inputTokens: 0, outputTokens: 0 };
