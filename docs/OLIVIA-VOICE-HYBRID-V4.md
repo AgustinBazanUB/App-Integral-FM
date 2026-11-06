@@ -4,6 +4,8 @@
 
 Esta actualización se desarrolla en `codex/olivia-voz-hibrida-v4`, desde `origin/main` en `62bd617e8e452d25aa8fa5ff26bdee796d5ccf00`. La rama anterior de Olivia ya estaba integrada en `main`; esta rama no contiene cambios exclusivos de esa rama anterior. La integración permanece apagada fuera del Deploy Preview aislado y no despliega ni modifica datos de producción.
 
+PR: [#55](https://github.com/AgustinBazanUB/App-Integral-FM/pull/55). Preview: [deploy-preview-55--appintegralflormia.netlify.app](https://deploy-preview-55--appintegralflormia.netlify.app/), compilado desde `04f4d0121372b01ca7949ea37214433444a90811`.
+
 ## Arquitectura auditada
 
 La ruta anterior reutiliza `NaturalVoiceConversation`, VAD/endpointing local, `LiveTranscription` por WebRTC para `gpt-live-transcribe`, el motor autorizado de `netlify/functions/_lib/olivia/engine.mjs`, el router Luna/Sol y Google Chirp 3 HD. El backend prepara lecturas rápidas tipadas cuando `quickReadPlan` las reconoce; las demás consultas conservan sus rutas, herramientas, permisos y tarjeta de confirmación.
@@ -52,9 +54,12 @@ También deben continuar configuradas las variables web de Firebase de pruebas, 
 - La prueba focalizada nueva cubre configuración, límites de preview, costos por modalidad y tool prompt, clasificación, remuestreo, audio retenido, delegación y ausencia de audio Gemini ante un caso comercial.
 - Después de la integración: `npm test` pasó 1092/1092; `npm run build:surfaces` pasó para Gestión y ecommerce; `npm audit` quedó sin vulnerabilidades; `node --check` para los módulos nuevos y `git diff --check` pasaron. Las compilaciones conservan la advertencia previa de bundles mayores a 500 kB.
 - `npm run test:rules` no pudo iniciar el emulador local porque esta PC no tiene Java (`Could not spawn java -version`). No se desplegaron reglas ni se contactó Firebase remoto; no hubo pruebas con escrituras.
+- GitHub Actions pasó `npm ci`, `npm test`, las reglas Firestore con el emulador `demo-flor-mia-integral` y `npm run build`.
 - El repositorio no declara scripts independientes de lint o typecheck.
 - La comparación real de Aoede Gemini/Chirp, los percentiles P50/P90/P95 de 30–50 interacciones, ruido, interrupciones físicas y reproducción en altavoz requieren una Deploy Preview habilitada, credencial Gemini de tier pago y Chrome con micrófono. Ningún test simulado sustituye esas comprobaciones.
-- El entorno de Netlify observado para esta auditoría muestra un aviso de pago del equipo vencido. La integración de Gemini está bloqueada además por la ausencia de `GEMINI_API_KEY` y del feature flag en Deploy Preview. No se modificó billing, se creó una clave, se consumió Gemini ni se alteraron secretos. La disponibilidad del preview de Netlify y la prueba de micrófono siguen pendientes hasta resolverlo.
+- Netlify muestra un aviso de pago del equipo vencido; aun así, el Deploy Preview se construyó y su pantalla de login carga en Chrome. El valor público `VITE_PREVIEW_FIREBASE_PROJECT_ID` se verificó como `app-integral-fm-pruebas`. Los valores server-side permanecen ocultos y no se expusieron; su correspondencia efectiva con staging no se pudo verificar desde la sesión de navegador disponible.
+- En Deploy Preview no existen `GEMINI_API_KEY`, `OLIVIA_HYBRID_LIVE_ENABLED` ni `GEMINI_API_BILLING_TIER`. Por eso Gemini no está habilitado. No se modificó billing, se creó una clave, se consumió Gemini ni se alteraron secretos; no se inició sesión ni se pidió acceso al micrófono. Para proteger los datos de negocio no se hicieron pruebas que generen o persistan conversaciones hasta verificar el proyecto y las credenciales backend de staging.
+- No se hicieron pruebas reales de conversación, voz o A/B. Para realizarlas faltan las variables indicadas, verificar sin revelar secretos que Functions/Auth/Firestore usan `app-integral-fm-pruebas` y disponer de un usuario administrador de prueba autorizado en ese proyecto.
 - No hay script de typecheck/lint declarado. La auditoría npm inicial señaló la dependencia transitiva `re2js`; se actualizó dentro del rango permitido (`2.8.6` → `2.9.1`) y la auditoría final encontró cero vulnerabilidades.
 
 ## Referencias oficiales
