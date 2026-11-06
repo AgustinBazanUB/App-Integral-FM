@@ -40,8 +40,8 @@ function errorMessage(event) {
 }
 
 export class GeminiLiveSession {
-  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now() }) {
-    Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, WebSocket, now, clock });
+  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000 }) {
+    Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, WebSocket, now, clock, connectTimeoutMs });
     this.closed = false; this.failed = false; this.handlesTurns = false; this.listening = false; this.isPlaying = false; this.turnIndex = 0; this.sources = new Set(); this.finalizingTurns = new Set(); this.currentTurn = this.createTurn();
   }
 
@@ -56,7 +56,10 @@ export class GeminiLiveSession {
     if (!this.tokenResult?.token || !this.tokenResult?.sessionId) throw new Error("No se recibió un token efímero de Gemini Live.");
     this.sessionId = this.tokenResult.sessionId;
     this.tokenExpiresAt = Date.parse(this.tokenResult.expiresAt);
-    this.connectTimer = setTimeout(() => this.fail(new Error("Gemini Live tardó demasiado en conectar; continúo con el circuito anterior.")), 12000);
+    this.connectTimer = setTimeout(() => {
+      const socketState = ({ 0: "CONNECTING", 1: "OPEN", 2: "CLOSING", 3: "CLOSED" })[this.socket?.readyState] || "UNKNOWN";
+      this.fail(new Error(`Gemini Live no respondió al handshake dentro del plazo (WebSocket ${socketState}); continúo con el circuito anterior.`));
+    }, this.connectTimeoutMs);
     try { await this.openSocket(null); }
     catch (error) { this.fail(error); throw error; }
     if (this.closed || this.failed) throw new DOMException("Sesión cerrada", "AbortError");

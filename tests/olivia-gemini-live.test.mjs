@@ -126,6 +126,31 @@ test("Live connection diagnostics retain the WebSocket close code and end in fal
   assert.equal(live.failed, true);
 });
 
+test("Live handshake timeout reports whether the WebSocket opened", async (t) => {
+  class FakeSocket {
+    static OPEN = 1;
+    static instances = [];
+    constructor() { this.readyState = 0; FakeSocket.instances.push(this); }
+    send() {}
+    close() { this.readyState = 3; }
+  }
+  const failures = [];
+  const live = new GeminiLiveSession({
+    request: async (payload) => payload.operation === "token"
+      ? { token: "auth_tokens/diagnostic", sessionId: "diagnostic", expiresAt: new Date(Date.now() + 60000).toISOString(), maxSessionSeconds: 600 }
+      : { closed: true },
+    conversationId: "diagnostic", audioContext: { createScriptProcessor() {} }, WebSocket: FakeSocket,
+    connectTimeoutMs: 10, onUnavailable: (error) => failures.push(error.message),
+  });
+  t.after(() => live.close());
+  const started = live.start({});
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const socket = FakeSocket.instances[0];
+  socket.readyState = FakeSocket.OPEN; socket.onopen();
+  await assert.rejects(started, /WebSocket OPEN/);
+  assert.deepEqual(failures, ["Gemini Live no respondió al handshake dentro del plazo (WebSocket OPEN); continúo con el circuito anterior."]);
+});
+
 test("Live session sends short PCM chunks, plays audio and reports one direct turn", async (t) => {
   class FakeSocket {
     static OPEN = 1;
