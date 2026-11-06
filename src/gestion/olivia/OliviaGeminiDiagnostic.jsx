@@ -8,6 +8,7 @@ export default function OliviaGeminiDiagnostic({ conversationId, disabled, onAct
   callbacks.current = { onActive, onDelegate, onDirect };
   const [status, setStatus] = useState("Desconectado"), [connected, setConnected] = useState(false), [working, setWorking] = useState(false);
   const [text, setText] = useState("Hola, Olivia"), [rows, setRows] = useState([]), [connectionMs, setConnectionMs] = useState(null);
+  const [protocol, setProtocol] = useState([]);
   const update = (fields) => {
     const id = activeRow.current?.id;
     setRows(current => current.map(row => row.id === id ? { ...row, ...fields } : row));
@@ -26,6 +27,7 @@ export default function OliviaGeminiDiagnostic({ conversationId, disabled, onAct
       context.current = new AudioContext(); await context.current.resume();
       const live = new GeminiLiveSession({
         request: payload => oliviaClient.hybridLive(payload), conversationId, audioContext: context.current,
+        onProtocol: event => setProtocol(current => [...current.slice(-19), event]),
         onClassification: result => update({ route: result.route, classificationMs: result.durationMs }),
         onFirstAudio: at => update({ textToScheduledAudioMs: at - activeRow.current.started }),
         onTranscript: response => update({ response }),
@@ -62,6 +64,6 @@ export default function OliviaGeminiDiagnostic({ conversationId, disabled, onAct
     <button type="button" disabled={!session.current} onClick={() => { close(); setStatus("Desconectado"); }}>Cerrar prueba Gemini</button>
     <label>Consulta de prueba Gemini<textarea aria-label="Consulta de prueba Gemini" value={text} maxLength={12000} onChange={event => setText(event.target.value)} disabled={working || disabled} /></label>
     <button type="button" disabled={!connected || working || disabled || !text.trim() || rows.length >= 50} onClick={send}>Enviar prueba Gemini</button>
-    <details open><summary>Resultados de prueba Gemini ({rows.length})</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify({ evidence: "real-provider-text-input-not-microphone", connectionMs, turns: rows.map(({ started, ...row }) => row) }, null, 2)}</pre></details>
+    <details open><summary>Resultados de prueba Gemini ({rows.length})</summary><pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify({ evidence: "real-provider-text-input-not-microphone", connectionMs, audioContextState: context.current?.state, turns: rows.map(({ started, ...row }) => row), protocol }, null, 2)}</pre></details>
   </section>;
 }

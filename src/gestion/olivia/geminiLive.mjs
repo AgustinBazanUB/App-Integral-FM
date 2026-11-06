@@ -40,8 +40,8 @@ function errorMessage(event) {
 }
 
 export class GeminiLiveSession {
-  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000 }) {
-    Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, WebSocket, now, clock, connectTimeoutMs });
+  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000 }) {
+    Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, onProtocol, WebSocket, now, clock, connectTimeoutMs });
     this.closed = false; this.failed = false; this.handlesTurns = false; this.listening = false; this.isPlaying = false; this.turnIndex = 0; this.sources = new Set(); this.finalizingTurns = new Set(); this.currentTurn = this.createTurn();
   }
 
@@ -95,6 +95,7 @@ export class GeminiLiveSession {
       };
       socket.onmessage = ({ data }) => {
         let event; try { event = JSON.parse(typeof data === "string" ? data : new TextDecoder().decode(data)); } catch { return; }
+        this.onProtocol({ keys: Object.keys(event), contentKeys: Object.keys(event.serverContent || {}), parts: (event.serverContent?.modelTurn?.parts || []).map(part => ({ keys: Object.keys(part), mimeType: part.inlineData?.mimeType, encodedAudioLength: part.inlineData?.data?.length })), turnComplete: event.serverContent?.turnComplete, generationComplete: event.serverContent?.generationComplete });
         if (event.setupComplete) {
           settled = true; this.pendingReject = null; clearTimeout(this.connectTimer); resolve(this);
           if (this.reconnecting) { this.reconnecting = false; this.listening = this.resumeListening; this.onState(this.listening ? "listening" : "processing"); }

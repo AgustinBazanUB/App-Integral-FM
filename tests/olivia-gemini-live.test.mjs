@@ -154,7 +154,7 @@ test("Live handshake timeout reports whether the WebSocket opened", async (t) =>
 test("closing during token issuance releases the late reservation without opening a socket", async () => {
   let resolveToken;
   const operations=[];
-  const live=new GeminiLiveSession({conversationId:'late-token',audioContext:{},request:body=>{
+  const live=new GeminiLiveSession({conversationId:'late-token',audioContext:{},WebSocket:class { constructor(){throw new Error('A cancelled session must not open a socket');} },request:body=>{
     operations.push(body);
     return body.operation==='token' ? new Promise(resolve=>{resolveToken=resolve;}) : Promise.resolve({closed:true});
   }});
