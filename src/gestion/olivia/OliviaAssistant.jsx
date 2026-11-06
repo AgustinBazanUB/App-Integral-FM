@@ -689,7 +689,7 @@ export default function OliviaAssistant() {
             },
             onUsage:usage=>{setSnapshot(current=>({...current,geminiLiveUsage:{...(current.geminiLiveUsage || {}),...usage}}));setVoiceMetrics(current=>({...current,geminiLiveLastUsage:usage}));},
             onNotice:notice=>{if(mounted.current && voiceRef.current===connection){setVoiceNotice(notice);setVoiceMetrics(current=>({...current,geminiLiveStatus:'reconnecting'}));}},
-            onUnavailable:failure=>{if(mounted.current && voiceRef.current===connection){setVoiceMetrics(current=>({...current,geminiLiveStatus:'fallback',geminiLiveFallback:failure?.message || 'provider-error'}));setVoiceNotice('Gemini Live se interrumpió; continúo con el circuito de voz anterior.');}},
+            onUnavailable:failure=>{if(mounted.current && voiceRef.current===connection){setVoiceState(requestRef.current?'processing':mutedRef.current?'muted':'listening');setVoiceMetrics(current=>({...current,geminiLiveStatus:'fallback',geminiLiveFallback:failure?.message || 'provider-error'}));setVoiceNotice('Gemini Live se interrumpió; continúo con el circuito de voz anterior.');}},
           });
           signal.addEventListener('abort',()=>live.close(),{once:true});
           if(signal.aborted){live.close();throw new DOMException('Finalizada','AbortError');}
@@ -797,7 +797,7 @@ export default function OliviaAssistant() {
       {admin && developer && snapshot.voiceSettings?.hybridLiveAvailable && snapshot.voiceSettings?.hybridLiveEnabled ? <OliviaGeminiDiagnostic
         conversationId={snapshot.conversationId} disabled={busy || recording || voiceActive || !snapshot.conversationId || unavailable || exhausted}
         onActive={setGeminiDiagnosticActive}
-        onDirect={async turn => apply(await oliviaClient.request({operation:'geminiDirectTurn',conversationId:conversationRef.current,requestId:turn.turnId,userText:turn.userText,assistantText:turn.assistantText}))}
+        onDirect={async turn => { const id=conversationRef.current; const result=await oliviaClient.request({operation:'geminiDirectTurn',conversationId:id,requestId:turn.turnId,userText:turn.userText,assistantText:turn.assistantText}); if(conversationRef.current===id)apply(result); }}
         onDelegate={async (call,input) => {
           const result=await perform('chat',{message:input || call.args?.request || '',inputMode:'natural-voice',deferVoice:true},requestId());
           if(result.pendingAction)return `Preparé la operación «${result.pendingAction.summary}». Revisá la tarjeta en pantalla; todavía no se ejecutó.`;

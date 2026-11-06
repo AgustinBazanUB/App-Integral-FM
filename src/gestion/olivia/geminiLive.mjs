@@ -40,8 +40,8 @@ function errorMessage(event) {
 }
 
 export class GeminiLiveSession {
-  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000 }) {
-    Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, onProtocol, WebSocket, now, clock, connectTimeoutMs });
+  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000, turnTimeoutMs = 45000, completionGraceMs = 2000 }) {
+    Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, onProtocol, WebSocket, now, clock, connectTimeoutMs, turnTimeoutMs, completionGraceMs });
     this.closed = false; this.failed = false; this.handlesTurns = false; this.listening = false; this.isPlaying = false; this.turnIndex = 0; this.sources = new Set(); this.finalizingTurns = new Set(); this.currentTurn = this.createTurn();
   }
 
@@ -151,6 +151,7 @@ export class GeminiLiveSession {
     this.listening = next;
     if (!next && this.socket?.readyState === this.WebSocket.OPEN && this.ready) {
       try { this.socket.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } })); } catch { this.fail(new Error("No se pudo cerrar el tramo de audio de Gemini.")); }
+      if (this.currentTurn.pending) this.armTurnTimeout(this.currentTurn);
     }
     if (next) {
       if (this.finalizingTurns.size) {
@@ -173,6 +174,14 @@ export class GeminiLiveSession {
   }
 
   beginTurn() { this.setListening(true); }
+  armTurnTimeout(turn) {
+    clearTimeout(turn.responseTimer);
+    turn.responseTimer = setTimeout(() => {
+      if (this.closed || this.failed || !turn.pending || turn.cancelled) return;
+      if (turn.toolPending) { this.armTurnTimeout(turn); return; }
+      this.fail(new Error("Gemini no completó el turno dentro del plazo; la voz continúa con el circuito de respaldo."));
+    }, this.turnTimeoutMs);
+  }
   sendText(text) {
     if (!this.textInputOnly || !this.ready || this.closed || this.failed) throw new Error("La prueba de texto no está conectada.");
     if (this.currentTurn.pending || this.finalizingTurns.size || this.isPlaying) throw new Error("Esperá a que termine el turno actual.");
@@ -185,6 +194,7 @@ export class GeminiLiveSession {
     this.ignoreOutputUntilInput = false;
     void this.authorizeTurn(this.currentTurn);
     this.socket.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: input }] }], turnComplete: true } }));
+    this.armTurnTimeout(this.currentTurn);
   }
   discardTurn() { this.setListening(false); this.interrupt(); }
   commit() { this.setListening(false); return Promise.resolve(null); }
@@ -221,6 +231,17 @@ export class GeminiLiveSession {
       void this.handleTools(event.toolCall.functionCalls, turn);
     }
     if (event.goAway && this.resumeHandle && !this.reconnecting) this.reconnect();
+    if (content?.generationComplete && !interrupted && !ignoreOutput) {
+      clearTimeout(turn.completionTimer);
+      turn.completionTimer = setTimeout(() => {
+        if (this.closed || this.failed || !turn.pending || turn.completeReceived || turn.toolPending || turn.awaitingToolResponse || turn.cancelled) return;
+        // Generation ended but Google never closed its audio turn. Finalize the
+        // validated text, request Chirp fallback and retire this broken socket.
+        turn.providerIncomplete = true;
+        this.stopPlayback();
+        void this.finishTurn(turn).finally(() => this.fail(new Error("Gemini terminó la generación sin cerrar el turno de audio; continúo con el respaldo.")));
+      }, this.completionGraceMs);
+    }
     if (content?.turnComplete && !interrupted && !ignoreOutput && !turn.toolPending && !turn.awaitingToolResponse) {
       turn.completeReceived = true;
       if (turn.toolTurn || turn.transcriptComplete) void this.finishTurn(turn);
@@ -272,6 +293,7 @@ export class GeminiLiveSession {
     if (this.socket?.readyState === this.WebSocket.OPEN) {
       this.socket.send(JSON.stringify({ toolResponse: { functionResponses } }));
       turn.toolPending = false; turn.awaitingToolResponse = true; turn.outputAuthorized = true;
+      this.armTurnTimeout(turn);
     } else this.fail(new Error("La conexión de Gemini se cerró antes de responder a Olivia."));
   }
 
@@ -304,8 +326,9 @@ export class GeminiLiveSession {
   }
 
   interrupt() {
-    for (const turn of this.finalizingTurns) { turn.cancelled = true; turn.pendingAudio = []; }
+    for (const turn of this.finalizingTurns) { turn.cancelled = true; turn.pendingAudio = []; clearTimeout(turn.responseTimer); clearTimeout(turn.completionTimer); }
     if (this.currentTurn) {
+      clearTimeout(this.currentTurn.responseTimer); clearTimeout(this.currentTurn.completionTimer);
       this.currentTurn.pendingAudio = [];
       if (!this.listening && this.currentTurn.pending) { this.currentTurn.cancelled = true; this.currentTurn.pending = false; }
     }
@@ -335,6 +358,7 @@ export class GeminiLiveSession {
 
   async finishTurn(turn = this.currentTurn) {
     if (this.closed || this.failed || !turn.pending || turn.finalizing) return;
+    clearTimeout(turn.responseTimer); clearTimeout(turn.completionTimer);
     clearTimeout(turn.noTranscriptTimer); turn.noTranscriptTimer = null;
     turn.pending = false; turn.completed = true; turn.finalizing = true; turn.turnId ||= globalThis.crypto.randomUUID(); turn.turnIndex ||= ++this.turnIndex;
     if (this.currentTurn === turn) this.currentTurn = this.createTurn();
@@ -349,7 +373,7 @@ export class GeminiLiveSession {
             turn.outputAuthorized = true;
             if (turn.outputText && turn.outputText !== turn.publishedOutputText) { this.onTranscript(turn.outputText); turn.publishedOutputText = turn.outputText; }
             this.flushPendingAudio(turn);
-            if (turn.inputText && turn.outputText) Promise.resolve(this.onTurnComplete({ turnId: turn.turnId, turnIndex: turn.turnIndex, userText: turn.inputText, assistantText: turn.outputText, delegated: false, noAudio: !turn.heardAudio, usageMetadata: turn.usageMetadata })).catch((error) => this.onNotice(error?.message || "No se pudo guardar la conversación de voz."));
+            if (turn.inputText && turn.outputText) Promise.resolve(this.onTurnComplete({ turnId: turn.turnId, turnIndex: turn.turnIndex, userText: turn.inputText, assistantText: turn.outputText, delegated: false, noAudio: !turn.heardAudio || Boolean(turn.providerIncomplete), providerIncomplete: Boolean(turn.providerIncomplete), usageMetadata: turn.usageMetadata })).catch((error) => this.onNotice(error?.message || "No se pudo guardar la conversación de voz."));
             else if (turn.generatedAudio) this.onNotice("Gemini Live devolvió una respuesta sin transcripción completa; la marqué para revisión en el panel Developer.");
           } else if (!turn.cancelled && !this.closed && !this.failed && turn.inputText) {
             turn.pendingAudio = []; turn.outputAuthorized = false; this.onState("processing");
@@ -368,7 +392,7 @@ export class GeminiLiveSession {
         } else {
           if (turn.outputText && turn.outputText !== turn.publishedOutputText) { this.onTranscript(turn.outputText); turn.publishedOutputText = turn.outputText; }
           this.flushPendingAudio(turn);
-          Promise.resolve(this.onTurnComplete({ turnId: turn.turnId, turnIndex: turn.turnIndex, userText: turn.inputText, assistantText: turn.outputText, delegated: true, noAudio: !turn.heardAudio, usageMetadata: turn.usageMetadata })).catch((error) => this.onNotice(error?.message || "No se pudo registrar el turno delegado."));
+          Promise.resolve(this.onTurnComplete({ turnId: turn.turnId, turnIndex: turn.turnIndex, userText: turn.inputText, assistantText: turn.outputText, delegated: true, noAudio: !turn.heardAudio || Boolean(turn.providerIncomplete), providerIncomplete: Boolean(turn.providerIncomplete), usageMetadata: turn.usageMetadata })).catch((error) => this.onNotice(error?.message || "No se pudo registrar el turno delegado."));
         }
       }
 
@@ -394,7 +418,7 @@ export class GeminiLiveSession {
     this.pendingReject?.(error); this.pendingReject = null;
     try { this.socket?.close(); } catch {}
     this.stopCapture();
-    if (this.sessionId) void this.request({ operation: "close", sessionId: this.sessionId }).catch(() => {});
+    if (this.sessionId) void this.releaseBudget();
     this.onNotice(error.message || "Gemini Live no está disponible; sigo con el circuito anterior."); this.onUnavailable(error);
   }
 
@@ -404,12 +428,24 @@ export class GeminiLiveSession {
     this.processor = null; this.captureSource = null; this.zeroGain = null;
   }
 
+  releaseBudget() {
+    if (this.stopping || !this.sessionId) return this.stopping;
+    const turns = [this.currentTurn, ...this.finalizingTurns];
+    this.stopping = (async () => {
+      for (const turn of turns) {
+        if (turn.inputText || turn.inputAudioSeconds || turn.outputAudioSeconds || turn.usageMetadata) await this.reportUsage(turn, { includeProviderUsage: turn.completed });
+      }
+      await this.request({ operation: "close", sessionId: this.sessionId }).catch(() => {});
+    })();
+    return this.stopping;
+  }
+
   close() {
     if (this.closed) return;
     this.closed = true; this.handlesTurns = false; this.ready = false; this.listening = false; clearTimeout(this.connectTimer); clearTimeout(this.sessionTimer); clearTimeout(this.socketErrorTimer); this.interrupt();
     this.pendingReject?.(new DOMException("Sesión cerrada", "AbortError")); this.pendingReject = null;
     try { this.socket?.close(1000, "Olivia session closed"); } catch {}
     this.stopCapture();
-    if (this.sessionId) void this.request({ operation: "close", sessionId: this.sessionId }).catch(() => {});
+    if (this.sessionId) void this.releaseBudget();
   }
 }

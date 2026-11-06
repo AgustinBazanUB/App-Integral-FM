@@ -88,6 +88,8 @@ test("raw Live setup fixes model, voice, tool policy, compression and modalities
 test("backend direct route is limited to exact conversational phrases", () => {
   assert.equal(classifyGeminiLiveTurn("Hola, ¿cómo estás?").route, "direct");
   assert.equal(classifyGeminiLiveTurn("Muchísimas gracias").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Perfecto, gracias").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Perfecto, gracias; registrá una venta").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Hola, ¿cuánto stock queda?").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Gracias, registrá una venta").route, "delegate");
 });
@@ -205,6 +207,45 @@ test("binary Live frames complete the handshake and a text diagnostic turn witho
   assert.equal(turns[0].delegated,false);
   assert.equal(reports[0].inputAudioSeconds,0);
   assert.equal(reports[0].usageMetadata.promptTokensDetails[0].modality,'TEXT');
+  live.sendText('Gracias');
+  live.close();
+  await live.stopping;
+  assert.equal(reports.length,2,'unfinished paid turns must be reported before releasing the reservation');
+  assert.equal(reports[1].usageMetadata,null,'unfinished usage stays unconfirmed instead of becoming a zero-cost success');
+});
+
+test("silent generation without turnComplete finalizes once for fallback and retires the socket", async (t) => {
+  let socket;
+  class Socket {
+    static OPEN=1;
+    constructor(){socket=this;this.readyState=0;}
+    send(){}
+    close(){this.readyState=3;}
+    receive(event){this.onmessage({data:JSON.stringify(event)});}
+  }
+  const turns=[],failures=[],operations=[];
+  const live=new GeminiLiveSession({conversationId:'silent-provider',audioContext:{currentTime:0},WebSocket:Socket,completionGraceMs:5,
+    request:async body=>{operations.push(body.operation);if(body.operation==='token')return {token:'auth_tokens/silent',sessionId:'silent',expiresAt:new Date(Date.now()+60000).toISOString(),maxSessionSeconds:60};if(body.operation==='classify')return {direct:true,route:'direct'};return {shouldStop:false};},
+    onTurnComplete:turn=>turns.push(turn),onUnavailable:error=>failures.push(error.message),
+  });
+  t.after(()=>live.close());
+  const started=live.start(null,{textInputOnly:true});await new Promise(resolve=>setImmediate(resolve));
+  socket.readyState=1;socket.onopen();socket.receive({setupComplete:{}});await started;
+  live.sendText('Hola');
+  socket.receive({serverContent:{modelTurn:{parts:[{inlineData:{mimeType:'audio/pcm;rate=24000',data:'AAA='}}]},outputTranscription:{text:'Hola, ¿cómo estás?'}}});
+  socket.receive({serverContent:{generationComplete:true}});
+  await new Promise(resolve=>setTimeout(resolve,30));
+  await live.stopping;
+  assert.equal(turns.length,1);
+  assert.equal(turns[0].noAudio,true);
+  assert.equal(turns[0].providerIncomplete,true);
+  assert.equal(turns[0].assistantText,'Hola, ¿cómo estás?');
+  assert.equal(live.failed,true);
+  assert.match(failures[0],/sin cerrar el turno/);
+  assert.equal(operations.filter(op=>op==='usage').length,1);
+  assert.equal(operations.at(-1),'close');
+  socket.receive({serverContent:{turnComplete:true}});
+  assert.equal(turns.length,1,'a late completion cannot deliver or charge a second answer');
 });
 
 test("Live session sends short PCM chunks, plays audio and reports one direct turn", async (t) => {

@@ -17,7 +17,7 @@ export function instantConversation(text) {
 }
 export function classifyGeminiLiveTurn(text) {
   const normalized = String(text || '').trim();
-  if (isGreetingOnly(normalized) || instantConversation(normalized)) return { route: 'direct' };
+  if (isGreetingOnly(normalized) || instantConversation(normalized) || /^(?:perfecto|dale|bueno|ok) gracias$/.test(normalizeSpeech(normalized))) return { route: 'direct' };
   return { route: 'delegate' };
 }
 export function quickReadPlan(text) {

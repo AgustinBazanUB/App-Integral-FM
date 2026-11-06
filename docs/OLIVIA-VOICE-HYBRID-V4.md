@@ -76,6 +76,12 @@ Se identificó un defecto en la lectura del WebSocket: `JSON.parse` recibía los
 
 Las pruebas físicas de micrófono, reconocimiento, ruido y barge-in, así como la comparación de voz humana anterior/híbrida, continúan pendientes de un dispositivo de entrada. No se declaran cumplidos sus objetivos por probar texto.
 
+El handshake real pasó en Chrome tras corregir los frames binarios (5413 ms y 3342 ms en dos sesiones). La segunda sesión completó seis turnos de entrada escrita, con clasificación y registros de consumo; el séptimo quedó sin cierre de audio. La evidencia está en [chrome-text-session-2.json](olivia/2026-11-06/hybrid-v4/chrome-text-session-2.json). Se observaron fragmentos PCM de dos bytes, transcripción completa y `generationComplete` sin `turnComplete`; son observaciones del transporte, no una certificación de un fallo general de Google ni de calidad audible.
+
+La recuperación ahora espera dos segundos después de `generationComplete`; si falta `turnComplete`, finaliza el texto sujeto a la política backend, marca el audio como incompleto para usar Chirp y retira la sesión rota. Un plazo independiente de 45 segundos evita dejar un turno del proveedor esperando indefinidamente; una herramienta aún trabajando no se cancela por ese plazo. Al cerrar una sesión, los turnos incompletos se reportan antes de liberar la reserva y se conservan como uso sin confirmar cuando no hay contadores utilizables. No se presenta ese consumo como cero.
+
+La prueba detectó que «Perfecto, gracias» se derivaba innecesariamente al motor (13152 ms hasta resultado). Se amplió exclusivamente la coincidencia exacta de ese agradecimiento y variantes breves; una frase que agrega una orden comercial sigue delegándose. Los tests cubren además el cierre tardío, el turno silencioso, la recuperación sin doble respuesta y los frames binarios. La suite actual pasa 1103/1103 y el build pasa con la advertencia previa de bundles mayores a 500 kB. La confirmación remota de estas últimas correcciones se hará en el nuevo preview.
+
 ### Fuentes del diagnóstico
 
 - [Entrada de texto en Live API](https://ai.google.dev/gemini-api/docs/live-api/capabilities)

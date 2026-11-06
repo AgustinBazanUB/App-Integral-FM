@@ -32,11 +32,11 @@ export default function OliviaGeminiDiagnostic({ conversationId, disabled, onAct
         onFirstAudio: at => update({ textToScheduledAudioMs: at - activeRow.current.started }),
         onTranscript: response => update({ response }),
         onTurnComplete: turn => {
-          update({ response: turn.assistantText, delegated: turn.delegated, noAudio: turn.noAudio, textToResultMs: performance.now() - activeRow.current.started });
+          update({ response: turn.assistantText, delegated: turn.delegated, noAudio: turn.noAudio, providerIncomplete: turn.providerIncomplete, textToResultMs: performance.now() - activeRow.current.started });
           if (!turn.delegated) void callbacks.current.onDirect(turn).catch(error => setStatus(error.message));
         },
         onToolCall: (call, input) => callbacks.current.onDelegate(call, input),
-        onUsage: usage => { update({ usage }); if (!live.isPlaying) { clearTimeout(timer.current); setWorking(false); setStatus("Listo · entrada por texto"); } },
+        onUsage: usage => { update({ usage }); if (session.current === live && !live.closed && !live.failed && !live.isPlaying) { clearTimeout(timer.current); setWorking(false); setStatus("Listo · entrada por texto"); } },
         onAudioComplete: () => { clearTimeout(timer.current); setWorking(false); setStatus("Listo · entrada por texto"); },
         onNotice: notice => setStatus(notice),
         onUnavailable: error => { update({ error: error.message }); close(); setStatus(error.message); },
