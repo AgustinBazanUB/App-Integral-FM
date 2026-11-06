@@ -207,6 +207,10 @@ test("binary Live frames complete the handshake and a text diagnostic turn witho
   assert.equal(turns[0].delegated,false);
   assert.equal(reports[0].inputAudioSeconds,0);
   assert.equal(reports[0].usageMetadata.promptTokensDetails[0].modality,'TEXT');
+  socket.receive({serverContent:{outputTranscription:{text:'Late old output'},modelTurn:{parts:[{inlineData:{data:'AQACAA=='}}]}},usageMetadata:{totalTokenCount:99}});
+  assert.equal(live.currentTurn.outputText,'');
+  assert.equal(live.currentTurn.usageMetadata,null);
+  assert.equal(live.currentTurn.outputAudioSeconds,0,'late frames cannot create a phantom paid turn');
   socket.receive({serverContent:{generationComplete:true}});
   live.sendText('Gracias');
   await new Promise(resolve=>setTimeout(resolve,10));

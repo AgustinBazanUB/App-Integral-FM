@@ -205,6 +205,13 @@ export default function OliviaAssistant() {
     setVoiceMetrics(current => ({...current,...Object.fromEntries(Object.keys(samples).map(name=>[name,summary(name)])),ttfaScheduled:summary('ttfa')}));
   };
 
+  const updateGeminiUsage = usage => setSnapshot(current => {
+    const next = {...(current.geminiLiveUsage || {}), ...usage};
+    const providers = Number(next.lunaSol?.estimatedUsd || 0) + Number(next.chirp?.estimatedUsd || 0);
+    return {...current, geminiLiveUsage:{...next, combinedEstimatedSpendUsd:Number(next.spendUsd || 0) + providers,
+      combinedUnconfirmedCount:Number(next.unconfirmedQueryCount || 0) + Number(next.lunaSol?.unconfirmedCalls || 0) + Number(next.chirp?.unconfirmedRequests || 0)}};
+  });
+
   const playNaturalText = async (text) => {
     if (!text || !voiceRef.current || voiceRef.current.closed) return;
     acknowledgementRef.current?.cancel();
@@ -687,7 +694,7 @@ export default function OliviaAssistant() {
               if(result.pendingAction)return `Preparé la operación «${result.pendingAction.summary}». Revisá la tarjeta en pantalla y confirmala si corresponde; todavía no se ejecutó.`;
               return last?.voiceTranscript || last?.content || 'Olivia no devolvió una respuesta final.';
             },
-            onUsage:usage=>{setSnapshot(current=>({...current,geminiLiveUsage:{...(current.geminiLiveUsage || {}),...usage}}));setVoiceMetrics(current=>({...current,geminiLiveLastUsage:usage}));},
+            onUsage:usage=>{updateGeminiUsage(usage);setVoiceMetrics(current=>({...current,geminiLiveLastUsage:usage}));},
             onNotice:notice=>{if(mounted.current && voiceRef.current===connection){setVoiceNotice(notice);setVoiceMetrics(current=>({...current,geminiLiveStatus:'reconnecting'}));}},
             onUnavailable:failure=>{if(mounted.current && voiceRef.current===connection){setVoiceState(requestRef.current?'processing':mutedRef.current?'muted':'listening');setVoiceMetrics(current=>({...current,geminiLiveStatus:'fallback',geminiLiveFallback:failure?.message || 'provider-error'}));setVoiceNotice('Gemini Live se interrumpió; continúo con el circuito de voz anterior.');}},
           });
@@ -797,6 +804,7 @@ export default function OliviaAssistant() {
       {admin && developer && snapshot.voiceSettings?.hybridLiveAvailable && snapshot.voiceSettings?.hybridLiveEnabled ? <OliviaGeminiDiagnostic
         conversationId={snapshot.conversationId} disabled={busy || recording || voiceActive || !snapshot.conversationId || unavailable || exhausted}
         onActive={setGeminiDiagnosticActive}
+        onUsage={updateGeminiUsage}
         onDirect={async turn => { const id=conversationRef.current; const result=await oliviaClient.request({operation:'geminiDirectTurn',conversationId:id,requestId:turn.turnId,userText:turn.userText,assistantText:turn.assistantText}); if(conversationRef.current===id)apply(result); }}
         onDelegate={async (call,input) => {
           const result=await perform('chat',{message:input || call.args?.request || '',inputMode:'natural-voice',deferVoice:true},requestId());

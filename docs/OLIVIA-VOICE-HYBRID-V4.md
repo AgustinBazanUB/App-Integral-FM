@@ -88,6 +88,8 @@ En Chrome se preparó una carga ficticia de 30 unidades: la tarjeta mostró `19 
 
 ### Fuentes del diagnóstico
 
+El [informe de 30 interacciones sin micrófono](olivia/2026-11-06/hybrid-v4/VALIDACION-SIN-MICROFONO.md) consolida las verificaciones posteriores, incluida la repetición correcta de las 19 unidades, los percentiles de entrada escrita, los fallos y los límites de costo. Mantiene separada la aceptación física de voz.
+
 - [Entrada de texto en Live API](https://ai.google.dev/gemini-api/docs/live-api/capabilities)
 - [SDK oficial: tratamiento de frames WebSocket](https://github.com/googleapis/js-genai/blob/main/src/live.ts)
 

@@ -3,9 +3,9 @@ import { GeminiLiveSession } from "./geminiLive.mjs";
 import { oliviaClient } from "./service";
 
 // Only mounted in the administrative developer panel of the isolated preview.
-export default function OliviaGeminiDiagnostic({ conversationId, disabled, onActive, onDelegate, onDirect }) {
+export default function OliviaGeminiDiagnostic({ conversationId, disabled, onActive, onDelegate, onDirect, onUsage }) {
   const session = useRef(null), context = useRef(null), timer = useRef(null), activeRow = useRef(null), callbacks = useRef({});
-  callbacks.current = { onActive, onDelegate, onDirect };
+  callbacks.current = { onActive, onDelegate, onDirect, onUsage };
   const [status, setStatus] = useState("Desconectado"), [connected, setConnected] = useState(false), [working, setWorking] = useState(false);
   const [text, setText] = useState("Hola, Olivia"), [rows, setRows] = useState([]), [connectionMs, setConnectionMs] = useState(null);
   const [protocol, setProtocol] = useState([]);
@@ -36,7 +36,7 @@ export default function OliviaGeminiDiagnostic({ conversationId, disabled, onAct
           if (!turn.delegated) void callbacks.current.onDirect(turn).catch(error => setStatus(error.message));
         },
         onToolCall: (call, input) => callbacks.current.onDelegate(call, input),
-        onUsage: usage => { update({ usage }); if (session.current === live && !live.closed && !live.failed && !live.isPlaying) { clearTimeout(timer.current); setWorking(false); setStatus("Listo · entrada por texto"); } },
+        onUsage: usage => { update({ usage }); callbacks.current.onUsage(usage); if (session.current === live && !live.closed && !live.failed && !live.isPlaying) { clearTimeout(timer.current); setWorking(false); setStatus("Listo · entrada por texto"); } },
         onAudioComplete: () => { clearTimeout(timer.current); setWorking(false); setStatus("Listo · entrada por texto"); },
         onNotice: notice => setStatus(notice),
         onUnavailable: error => { update({ error: error.message }); close(); setStatus(error.message); },

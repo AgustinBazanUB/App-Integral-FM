@@ -203,7 +203,11 @@ export class GeminiLiveSession {
   receive(event) {
     if (this.closed || this.failed) return;
     if (event.sessionResumptionUpdate?.resumable && event.sessionResumptionUpdate.newHandle) this.resumeHandle = event.sessionResumptionUpdate.newHandle;
+    if (event.goAway && this.resumeHandle && !this.reconnecting) this.reconnect();
     const turn = this.currentTurn, content = event.serverContent, interrupted = Boolean(content?.interrupted);
+    // Provider frames can arrive while a completed turn is being accounted for.
+    // They must not create audio or a second billable turn on the idle placeholder.
+    if (!turn.pending) return;
     if (interrupted) { this.stopPlayback(); this.onState("recording"); }
     const interimText = content?.interimInputTranscription?.text;
     if (interimText) { turn.interimText = String(interimText); this.onPartial(turn.interimText); }
@@ -231,7 +235,6 @@ export class GeminiLiveSession {
       this.onClassification({ direct: false, route: "model-tool", turnIndex: turn.turnIndex });
       void this.handleTools(event.toolCall.functionCalls, turn);
     }
-    if (event.goAway && this.resumeHandle && !this.reconnecting) this.reconnect();
     if (content?.generationComplete && turn.pending && !interrupted && !ignoreOutput) {
       clearTimeout(turn.completionTimer);
       turn.completionTimer = setTimeout(() => {
