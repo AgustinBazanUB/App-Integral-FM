@@ -132,6 +132,9 @@ export function createOliviaEngine({
     if (env.CONTEXT !== "deploy-preview" || env.OLIVIA_HYBRID_LIVE_ENABLED !== "true" || configuredFirebaseProjectId(env) !== "app-integral-fm-pruebas") return null;
     const period = clock().toISOString().slice(0, 7), budget = await store.get(`oliviaGeminiLiveBudgets/${period}`);
     const spendUsd = Number(budget?.usedUsd || 0), reservedUsd = Number(budget?.reservedUsd || 0), targetUsd = Number(budget?.targetUsd || config.hybridVoice.targetUsd || 5), warningUsd = Number(budget?.warningUsd || config.hybridVoice.warningUsd || 6), hardLimitUsd = Number(budget?.hardLimitUsd || config.hybridVoice.hardLimitUsd || 10);
+    const lunaSol = budget?.lunaSol || { estimatedUsd: 0, unconfirmedCalls: 0, calls: 0, inputTokens: 0, outputTokens: 0 };
+    const chirp = budget?.chirp || { estimatedUsd: 0, unconfirmedRequests: 0, requests: 0, characters: 0 };
+    const providerEstimatedUsd = Number(lunaSol.estimatedUsd || 0) + Number(chirp.estimatedUsd || 0);
     return {
       ...(budget || {}),
       period,
@@ -141,9 +144,13 @@ export function createOliviaEngine({
       warningUsd,
       hardLimitUsd,
       maxQueries: GEMINI_LIVE_MONTHLY_QUERY_CAP,
-      providerReportedUsd: Number(budget?.providerReportedUsd || 0),
+      usageMetadataEstimatedUsd: Number(budget?.usageMetadataEstimatedUsd || 0),
       estimatedUsd: Number(budget?.estimatedUsd || 0),
       unconfirmedQueryCount: Number(budget?.unconfirmedQueryCount || 0),
+      lunaSol,
+      chirp,
+      combinedEstimatedSpendUsd: spendUsd + providerEstimatedUsd,
+      combinedUnconfirmedCount: Number(budget?.unconfirmedQueryCount || 0) + Number(lunaSol.unconfirmedCalls || 0) + Number(chirp.unconfirmedRequests || 0),
       warningReached: spendUsd + reservedUsd >= warningUsd,
       queryLimitReached: Number(budget?.queryCount || 0) >= GEMINI_LIVE_MONTHLY_QUERY_CAP,
       queryCount: Number(budget?.queryCount || 0),

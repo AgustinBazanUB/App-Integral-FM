@@ -12,6 +12,7 @@ import {
   GEMINI_LIVE_MODEL,
 } from "../src/shared/oliviaGeminiLive.mjs";
 import { assertGeminiLivePreview } from "../netlify/functions/olivia-gemini-live.mjs";
+import { addProviderSpend } from "../netlify/functions/_lib/olivia/usage.mjs";
 import { GeminiLiveSession, resamplePcm16 } from "../src/gestion/olivia/geminiLive.mjs";
 import { classifyGeminiLiveTurn } from "../src/shared/oliviaConversationRouter.mjs";
 
@@ -40,6 +41,8 @@ test("provider usage costs include accumulated audio and text tokens by modality
   assert.equal(result.measurement, "provider-forwarded");
   assert.equal(result.inputTokens, 2500);
   assert.equal(result.outputTokens, 1200);
+  assert.deepEqual(result.inputTokensByModality, { AUDIO: 1500, TEXT: 1000 });
+  assert.deepEqual(result.outputTokensByModality, { AUDIO: 1000, TEXT: 200 });
   assert.equal(result.costUsd, 0.01815);
   const withToolPrompt = geminiLiveProviderCost({
     promptTokensDetails: [{ modality: "AUDIO", tokenCount: 1500 }, { modality: "TEXT", tokenCount: 1000 }],
@@ -55,6 +58,20 @@ test("audio-only estimates state that accumulated context is excluded", () => {
   assert.ok(Math.abs(result.estimatedCostUsd - 0.014) < 1e-12);
   assert.equal(result.excludesAccumulatedContext, true);
   assert.equal(geminiLiveMonthlyProjection({ spendUsd: 5, queryCount: 660 }).projectionAt660Usd, 5);
+});
+
+test("monthly provider rollup distinguishes tariff-based estimates and unconfirmed costs", () => {
+  const now = new Date("2026-11-06T12:00:00.000Z");
+  let ledger = addProviderSpend(null, { provider: "lunaSol", period: "2026-11", costUsd: 0.0015, inputTokens: 100, outputTokens: 25 }, now);
+  ledger = addProviderSpend(ledger, { provider: "lunaSol", period: "2026-11", costUsd: null, inputTokens: 10, outputTokens: 4 }, now);
+  ledger = addProviderSpend(ledger, { provider: "chirp", period: "2026-11", costUsd: 0.00003, characters: 1000 }, now);
+  assert.equal(ledger.lunaSol.estimatedUsd, 0.0015);
+  assert.equal(ledger.lunaSol.unconfirmedCalls, 1);
+  assert.equal(ledger.lunaSol.calls, 2);
+  assert.equal(ledger.lunaSol.inputTokens, 110);
+  assert.equal(ledger.chirp.estimatedUsd, 0.00003);
+  assert.equal(ledger.chirp.characters, 1000);
+  assert.equal(Object.hasOwn(ledger, "userId"), false);
 });
 
 test("raw Live setup fixes model, voice, tool policy, compression and modalities", () => {
@@ -103,7 +120,7 @@ test("Live session sends short PCM chunks, plays audio and reports one direct tu
       operations.push(payload.operation);
       if (payload.operation === "token") return { token: "auth_tokens/example", sessionId: "session-1", expiresAt: new Date(Date.now() + 60000).toISOString(), maxSessionSeconds: 600 };
       if (payload.operation === "classify") return { route: "direct", direct: true };
-      if (payload.operation === "usage") return { measurement: "provider-forwarded", spendUsd: 0.001, shouldStop: false };
+      if (payload.operation === "usage") return { measurement: "provider-forwarded", spendUsd: 0.001, inputTokensByModality: { AUDIO: 10 }, outputTokensByModality: { AUDIO: 10 }, shouldStop: false };
       return { closed: true };
     },
     conversationId: "conversation-1", audioContext: context,
@@ -140,6 +157,8 @@ test("Live session sends short PCM chunks, plays audio and reports one direct tu
   assert.equal(turns[0].userText, "Hola Olivia");
   assert.equal(turns[0].assistantText, "Hola, ¿cómo estás?");
   assert.equal(usage.length, 1);
+  assert.deepEqual(usage[0].inputTokensByModality, { AUDIO: 10 });
+  assert.deepEqual(usage[0].outputTokensByModality, { AUDIO: 10 });
   assert.equal(played, 1);
   assert.deepEqual(transcripts, ["Hola, ¿cómo estás?"]);
   assert.ok(operations.includes("classify"));

@@ -4,7 +4,7 @@
 
 Esta actualización se desarrolla en `codex/olivia-voz-hibrida-v4`, desde `origin/main` en `62bd617e8e452d25aa8fa5ff26bdee796d5ccf00`. La rama anterior de Olivia ya estaba integrada en `main`; esta rama no contiene cambios exclusivos de esa rama anterior. La integración permanece apagada fuera del Deploy Preview aislado y no despliega ni modifica datos de producción.
 
-PR: [#55](https://github.com/AgustinBazanUB/App-Integral-FM/pull/55). Preview: [deploy-preview-55--appintegralflormia.netlify.app](https://deploy-preview-55--appintegralflormia.netlify.app/), compilado desde `04f4d0121372b01ca7949ea37214433444a90811`.
+PR: [#55](https://github.com/AgustinBazanUB/App-Integral-FM/pull/55). Preview: [deploy-preview-55--appintegralflormia.netlify.app](https://deploy-preview-55--appintegralflormia.netlify.app/).
 
 ## Arquitectura auditada
 
@@ -30,7 +30,9 @@ La configuración de Live fija Aoede, español argentino, audio nativo, función
 
 Valores iniciales editables desde Configuración de Olivia: objetivo USD 5, aviso USD 6 y techo preventivo USD 10. Hay un máximo de 660 turnos por mes y una reserva preventiva de USD 0,50 por sesión activa, con sesiones de hasta 10 minutos. La nueva sesión se rechaza si el gasto registrado, las reservas activas y la nueva reserva superarían el techo. Una sesión se cierra al alcanzar su reserva, al llegar al tope mensual o al faltar una medición. El aviso se calcula sobre gasto registrado más reserva.
 
-El panel separa costo reportado por `usageMetadata`, estimación por duración de audio y turnos sin confirmar. La estimación por duración excluye el contexto acumulado. El navegador reenvía `usageMetadata` recibido de Google; el servidor no lo reconcilia directamente con la factura del proveedor. Google cobra contexto reutilizado en turnos posteriores, por lo que la suma informada por turno puede aumentar con la sesión. Las reservas, el contador y la revisión después de cada turno reducen el riesgo, pero el token directo y el retraso de los reportes impiden prometer un corte monetario absoluto.
+El panel separa el costo calculado con los tokens de `usageMetadata`, la estimación por duración de audio cuando faltan esos tokens y los turnos sin costo calculable. Los importes aplican las tarifas configuradas/oficiales a los contadores de uso; no son importes de factura conciliados. La estimación por duración excluye el contexto acumulado. Google cobra contexto reutilizado en turnos posteriores, por lo que el costo calculado desde `usageMetadata` puede incluirlo. Las reservas, el contador y la revisión después de cada turno reducen el riesgo, pero el token directo y el retraso de los reportes impiden prometer un corte monetario absoluto.
+
+El panel también muestra Luna/Sol usando sus contadores de tokens y tarifas configuradas, y Chirp con una estimación por caracteres. Los totales y contadores mensuales de proveedores se guardan en un único documento agregado, sin transcripciones ni identificadores de solicitudes. Las escrituras reutilizan las transacciones de contabilización existentes y el estado de Olivia lee ese mismo documento mensual; el consolidado no añade una lectura separada de Firestore.
 
 La proyección de USD para 660 turnos es `costo promedio registrado × 660`, no una predicción de precisión facturable. Para alcanzar USD 5–6, el promedio registrado debe quedar aproximadamente entre USD 0,00758 y USD 0,00909 por turno. La tarifa de audio de entrada/salida no alcanza para estimar ese costo completo porque el contexto también se cobra.
 
@@ -51,10 +53,10 @@ También deben continuar configuradas las variables web de Firebase de pruebas, 
 ## Medición, automatización y límites
 
 - La auditoría v3 conserva las referencias de endpointing, TTS y QA simulada. No son mediciones reales de Gemini ni percentiles end-to-end.
-- La prueba focalizada nueva cubre configuración, límites de preview, costos por modalidad y tool prompt, clasificación, remuestreo, audio retenido, delegación y ausencia de audio Gemini ante un caso comercial.
-- Después de la integración: `npm test` pasó 1092/1092; `npm run build:surfaces` pasó para Gestión y ecommerce; `npm audit` quedó sin vulnerabilidades; `node --check` para los módulos nuevos y `git diff --check` pasaron. Las compilaciones conservan la advertencia previa de bundles mayores a 500 kB.
+- Las pruebas focalizadas cubren configuración, límites de preview, costos por modalidad, acumulados estimados de Luna/Sol y Chirp sin doble contabilización al reintentar, tool prompt, clasificación, remuestreo, audio retenido y delegación.
+- Con el consolidado final: `npm test` pasó 1093/1093; `npm run build:surfaces` compiló Gestión y ecommerce; `npm audit --audit-level=moderate` encontró cero vulnerabilidades; `node --check` y `git diff --check` pasaron. Las compilaciones conservan la advertencia previa de bundles mayores a 500 kB.
 - `npm run test:rules` no pudo iniciar el emulador local porque esta PC no tiene Java (`Could not spawn java -version`). No se desplegaron reglas ni se contactó Firebase remoto; no hubo pruebas con escrituras.
-- GitHub Actions pasó `npm ci`, `npm test`, las reglas Firestore con el emulador `demo-flor-mia-integral` y `npm run build`.
+- GitHub Actions pasó `npm ci`, `npm test`, las reglas Firestore con el emulador `demo-flor-mia-integral` y `npm run build` en el commit anterior de la rama; el último commit se verificará en el PR antes de entregar.
 - El repositorio no declara scripts independientes de lint o typecheck.
 - La comparación real de Aoede Gemini/Chirp, los percentiles P50/P90/P95 de 30–50 interacciones, ruido, interrupciones físicas y reproducción en altavoz requieren una Deploy Preview habilitada, credencial Gemini de tier pago y Chrome con micrófono. Ningún test simulado sustituye esas comprobaciones.
 - Netlify muestra un aviso de pago del equipo vencido; aun así, el Deploy Preview se construyó y su pantalla de login carga en Chrome. El valor público `VITE_PREVIEW_FIREBASE_PROJECT_ID` se verificó como `app-integral-fm-pruebas`. Los valores server-side permanecen ocultos y no se expusieron; su correspondencia efectiva con staging no se pudo verificar desde la sesión de navegador disponible.

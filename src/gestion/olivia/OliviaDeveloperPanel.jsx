@@ -1,6 +1,8 @@
 export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceConfiguration, geminiLiveUsage, telemetry, turnTrace, money }) {
   const ms = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
   const percentiles=value=>`${ms(value?.medianMs)} / ${ms(value?.p90Ms)} / ${ms(value?.p95Ms)}`;
+  const modalityTokens=value=>value && Object.keys(value).length ? Object.entries(value).map(([modality,count])=>`${modality} ${Number(count).toLocaleString('es-AR')}`).join(' · ') : 'No informado por el proveedor';
+  const geminiMeasurement=value=>({ 'provider-forwarded':'Tarifa aplicada a usageMetadata', 'estimated-audio-context-excluded':'Estimado por duración, sin contexto', unconfirmed:'Sin confirmar' }[value] || value || 'Sin medición');
   const rows = [
     ...(voiceConfiguration ? [["Modelo de conversación", voiceConfiguration.model], ["Cerebro y acciones de voz", `${voiceConfiguration.backendModel} / ${voiceConfiguration.reasoningEffort}`], ["Voz fija de Olivia", voiceConfiguration.voice]] : []),
     ["Modelo / razonamiento", `${telemetry?.model || estimate?.model || "—"} / ${telemetry?.reasoningEffort || estimate?.reasoningEffort || "—"}`],
@@ -24,13 +26,19 @@ export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMe
     ['Gemini · fin de voz → primer audio programado · P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.geminiVoiceEndToUsefulAudio)],
     ['Gemini · primer turno de sesión · TTFA P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.geminiFirstTurnVoiceEndToUsefulAudio)],
     ['Gemini · turnos posteriores · TTFA P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.geminiLaterTurnVoiceEndToUsefulAudio)],
-    ['Gemini · último consumo',`${voiceMetrics?.geminiLiveLastUsage?.measurement || 'Sin medición'} · ${voiceMetrics?.geminiLiveLastUsage?.inputTokens ?? '—'} entrada / ${voiceMetrics?.geminiLiveLastUsage?.outputTokens ?? '—'} salida`],
-    ['Gemini · costo informado/estimado último turno',money(voiceMetrics?.geminiLiveLastUsage?.costUsd,'USD')],
-    ['Gemini · gasto mensual registrado + reserva',`${money(geminiLiveUsage?.spendUsd,'USD')} + ${money(geminiLiveUsage?.reservedUsd,'USD')}`],
-    ['Gemini · consumo reportado / estimado / sin confirmar',`${money(geminiLiveUsage?.providerReportedUsd,'USD')} / ${money(geminiLiveUsage?.estimatedUsd,'USD')} / ${geminiLiveUsage?.unconfirmedQueryCount ?? '—'} turnos`],
+    ['Gemini · último consumo',`${geminiMeasurement(voiceMetrics?.geminiLiveLastUsage?.measurement)} · ${voiceMetrics?.geminiLiveLastUsage?.inputTokens ?? '—'} entrada / ${voiceMetrics?.geminiLiveLastUsage?.outputTokens ?? '—'} salida`],
+    ['Gemini · tokens de entrada/salida por modalidad',`${modalityTokens(voiceMetrics?.geminiLiveLastUsage?.inputTokensByModality)} / ${modalityTokens(voiceMetrics?.geminiLiveLastUsage?.outputTokensByModality)} · entrada incluye contexto según usageMetadata`],
+    ['Gemini · costo calculado desde usageMetadata · último turno',money(voiceMetrics?.geminiLiveLastUsage?.costUsd,'USD')],
+    ['Gemini · costo calculado acumulado de esta sesión',money(voiceMetrics?.geminiLiveLastUsage?.sessionSpendUsd,'USD')],
+    ['Gemini · gasto calculado + reserva preventiva',`${money(geminiLiveUsage?.spendUsd,'USD')} + ${money(geminiLiveUsage?.reservedUsd,'USD')}`],
+    ['Gemini · costo por tokens de usageMetadata / estimado solo por audio / sin confirmar',`${money(geminiLiveUsage?.usageMetadataEstimatedUsd,'USD')} / ${money(geminiLiveUsage?.estimatedUsd,'USD')} / ${geminiLiveUsage?.unconfirmedQueryCount ?? '—'} turnos`],
     ['Gemini · turnos / tope 660 / promedio / proyección',`${geminiLiveUsage?.queryCount ?? '—'} / ${geminiLiveUsage?.maxQueries ?? 660} / ${money(geminiLiveUsage?.averageUsdPerQuery,'USD')} / ${money(geminiLiveUsage?.projectionAt660Usd,'USD')}`],
     ['Gemini · presupuesto objetivo / aviso / techo',`${money(geminiLiveUsage?.targetUsd ?? 5,'USD')} / ${money(geminiLiveUsage?.warningUsd ?? 6,'USD')} / ${money(geminiLiveUsage?.hardLimitUsd ?? 10,'USD')}`],
     ['Gemini · estado preventivo',geminiLiveUsage?.hardLimitReached ? 'Techo mensual alcanzado' : geminiLiveUsage?.queryLimitReached ? 'Tope de turnos alcanzado' : geminiLiveUsage?.warningReached ? 'Aviso mensual alcanzado' : 'Dentro de los límites registrados'],
+    ['Luna/Sol · costo estimado por tarifas / llamadas sin confirmar',`${money(geminiLiveUsage?.lunaSol?.estimatedUsd,'USD')} / ${geminiLiveUsage?.lunaSol?.unconfirmedCalls ?? '—'}`],
+    ['Luna/Sol · llamadas y tokens de entrada/salida del mes',`${geminiLiveUsage?.lunaSol?.calls ?? '—'} · ${geminiLiveUsage?.lunaSol?.inputTokens ?? '—'} / ${geminiLiveUsage?.lunaSol?.outputTokens ?? '—'}`],
+    ['Chirp · costo mensual estimado / caracteres / solicitudes',`${money(geminiLiveUsage?.chirp?.estimatedUsd,'USD')} / ${geminiLiveUsage?.chirp?.characters ?? '—'} / ${geminiLiveUsage?.chirp?.requests ?? '—'}`],
+    ['Proveedores · total mensual estimado / costos sin confirmar',`${money(geminiLiveUsage?.combinedEstimatedSpendUsd,'USD')} / ${geminiLiveUsage?.combinedUnconfirmedCount ?? '—'}`],
     ["Silencio de fin de turno · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.silence)],
     ["Detección → transcripción final · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.turnToTranscript)],
     ["Fin real de voz → transcripción · P50 / P90 / P95 (ms)",percentiles(voiceMetrics?.voiceEndToTranscript)],
@@ -49,7 +57,7 @@ export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMe
     ["Transcripción → primer audio programado · mediana / P95 (ms)", `${ms(voiceMetrics?.transcriptToVoice?.medianMs)} / ${ms(voiceMetrics?.transcriptToVoice?.p95Ms)}`],
     ["TTFA programado · mediana / P95 (ms)", `${ms(voiceMetrics?.ttfaScheduled?.medianMs)} / ${ms(voiceMetrics?.ttfaScheduled?.p95Ms)}`],
     ["Última síntesis · caracteres / costo USD estimado", `${voiceMetrics?.lastCharacters ?? "—"} / ${money(voiceMetrics?.lastEstimatedCostUsd, "USD")}`],
-    ["Medición de audio", "Gemini: proveedor reenviado desde el navegador o estimación de audio que excluye contexto. Chirp: primer bloque programado; no mide el inicio físico del altavoz."],
+    ["Medición de audio", "Gemini: tokens de usageMetadata tarifados o estimación por duración que excluye contexto; ningún importe reconcilia la factura. Chirp: primer bloque programado; no mide el inicio físico del altavoz."],
     ["Backend: retrieval / proveedor / herramientas (ms)", `${ms(telemetry?.retrievalMs)} / ${ms(telemetry?.providerMs)} / ${ms(telemetry?.toolsMs)}`],
     ["Llamadas de modelo / herramientas", `${telemetry?.modelCalls ?? "—"} / ${telemetry?.toolCalls ?? "—"}`],
     ["Skills", telemetry?.skills?.map((skill) => `${skill.name}@${skill.version}`).join(", ") || "Ninguna en esta consulta"],

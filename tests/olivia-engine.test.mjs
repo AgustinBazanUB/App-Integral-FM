@@ -777,12 +777,18 @@ test("quota reservations account for concurrent requests and release only their 
       inputTokens: 100,
       outputTokens: 20,
       totalTokens: 120,
+      modelCalls: [{ model: "gpt-6-luna", measurement: "provider", actualCostUsd: 0.004, inputTokens: 100, outputTokens: 20 }],
     },
     configuration: f.config,
     now: initialNow,
   });
   assert.equal(result.usedTokens, 120);
   assert.equal(result.reservedTokens, 0);
+  const providerPath = `oliviaGeminiLiveBudgets/${initialNow.toISOString().slice(0, 7)}`;
+  assert.equal(f.documents.get(providerPath).lunaSol.estimatedUsd, 0.004);
+  assert.equal(f.documents.get(providerPath).lunaSol.calls, 1);
+  await settleUsage({ store: f.store, session: f.session, reservation, event: { modelCalls: [{ model: "gpt-6-luna", measurement: "provider", actualCostUsd: 0.004 }] }, configuration: f.config, now: initialNow });
+  assert.equal(f.documents.get(providerPath).lunaSol.calls, 1, "settled provider usage is not double-counted on retry");
 });
 
 test("measured progress releases only the completed request's excess reservation", async () => {
