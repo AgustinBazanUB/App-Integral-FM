@@ -13,6 +13,7 @@ import { oliviaClient } from "./service";
 import { DictationCapture } from "./dictation.mjs";
 import OliviaComposer from "./OliviaComposer";
 import OliviaDeveloperPanel from "./OliviaDeveloperPanel";
+import OliviaGeminiDiagnostic from "./OliviaGeminiDiagnostic";
 import { NaturalVoiceConversation, latencyPercentile } from "./naturalVoice.mjs";
 import { FastSpeechPlayer } from "./fastSpeechPlayer.mjs";
 import { SpeechClipCache } from "./speechClips.mjs";
@@ -53,6 +54,7 @@ export default function OliviaAssistant() {
   const drawerRef = useOverlay(open, minimizeChat, closeButtonRef);
   const [snapshot, setSnapshot] = useState({ messages: [], state: "information", pendingAction: null, usage: null });
   const [developer, setDeveloper] = useState(false);
+  const [geminiDiagnosticActive, setGeminiDiagnosticActive] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(false);
   const [chats, setChats] = useState([]);
   const [chatsCursor, setChatsCursor] = useState(null);
@@ -642,7 +644,7 @@ export default function OliviaAssistant() {
       return;
     }
     setVoiceNotice("");
-    if (busy || recording || voiceRef.current || exhausted || unavailable || snapshot.pendingAction || !conversationRef.current) return;
+    if (geminiDiagnosticActive || busy || recording || voiceRef.current || exhausted || unavailable || snapshot.pendingAction || !conversationRef.current) return;
     setError(""); setCaption(""); setMuted(false); setVoiceRetryType(""); setVoiceFailure(false); setPermissionDenied(false); setSessionNotice(""); lastVoiceBlob.current = null; voiceTurnTiming.current = null;
     const hybridLive = Boolean(snapshot.voiceSettings?.hybridLiveAvailable && snapshot.voiceSettings?.hybridLiveEnabled);
     voiceStartAt.current = performance.now(); voiceTrace.current = latencyTrace({ id: requestId() }); voiceTrace.current.mark("voice.connect.start", {}, voiceStartAt.current);
@@ -790,8 +792,18 @@ export default function OliviaAssistant() {
       {unavailable ? <div className="fm-olivia-error" role="status"><p>{!online ? "Olivia necesita conexión a Internet." : snapshot.enabled === false ? "Olivia está deshabilitada por el Administrador." : "Olivia todavía necesita configurar su conexión con OpenAI."}</p><small>Podés continuar operando desde tu panel.</small>{admin && online ? <Button variant="secondary" onClick={() => navigate("/gestion/settings")}>Abrir configuración</Button> : null}</div> : null}
       {error ? <div className="fm-olivia-error" role="alert"><p>{error}</p>{reportNotice ? <p>{reportNotice}</p> : null}{errorReportId ? <Button className="fm-olivia-report-error" variant="secondary" loading={reportState === "sending"} disabled={reportState === "sent"} onClick={reportError}>{reportState === "sent" ? "Enviado a Agustín" : "Enviar error a Agustín"}</Button> : ["conversation-not-found", "session-changed", "permission-scope-changed", "conversation-expired"].includes(errorCode) ? <Button variant="secondary" disabled={busy} onClick={newConversation}>Iniciar nueva conversación</Button> : retryRef.current && !busy ? <Button variant="secondary" onClick={() => { const retry = retryRef.current; perform(retry.operation, retry.fields, retry.identity).then(() => { if (retry.operation === "chat") setDraft(""); }).catch(() => {}); }}>{retryRef.current.operation === "resume" ? "Recuperar conversación" : errorCode === "request-already-used" ? "Actualizar conversación" : "Reintentar solicitud"}</Button> : null}</div> : null}
       {voiceNotice ? <div className="fm-olivia-recovery" role="status"><p>{voiceNotice}</p>{voiceRetryType === "audio" ? <Button variant="secondary" onClick={retryVoiceAudio}>Reintentar audio</Button> : null}{voiceRetryType === "transcription" ? <Button variant="secondary" onClick={retryVoiceTranscription}>Reintentar transcripción</Button> : null}{!voiceActive && snapshot.voiceConversationAvailable && !permissionDenied ? <Button variant="secondary" disabled={unavailable} onClick={startVoice}>Volver a conectar</Button> : null}</div> : null}
-      <OliviaComposer textareaRef={textareaRef} draft={draft} setDraft={setDraft} sendMessage={sendMessage} recording={recording} frame={audioFrame} stopRecording={stopRecording} startRecording={startRecording} startVoice={startVoice} stopVoice={endVoiceSession} finishVoiceTurn={() => voiceRef.current?.finishTurn()} voiceRecording={voiceState === "recording"} voiceAvailable={snapshot.voiceConversationAvailable === true} voiceActive={voiceActive} muted={muted} toggleMute={toggleMute} disabled={exhausted || unavailable || !conversationRef.current} busy={busy} sendingDisabled={voiceState === "connecting"} cancelRequest={cancelRequest} attachments={attachments} addFiles={addFiles} removeFile={removeFile} />
+      <OliviaComposer textareaRef={textareaRef} draft={draft} setDraft={setDraft} sendMessage={sendMessage} recording={recording} frame={audioFrame} stopRecording={stopRecording} startRecording={startRecording} startVoice={startVoice} stopVoice={endVoiceSession} finishVoiceTurn={() => voiceRef.current?.finishTurn()} voiceRecording={voiceState === "recording"} voiceAvailable={snapshot.voiceConversationAvailable === true} voiceActive={voiceActive} muted={muted} toggleMute={toggleMute} disabled={exhausted || unavailable || !conversationRef.current || geminiDiagnosticActive} busy={busy} sendingDisabled={voiceState === "connecting"} cancelRequest={cancelRequest} attachments={attachments} addFiles={addFiles} removeFile={removeFile} />
       <details className="fm-olivia-usage-details"><summary>Uso y costos</summary><OliviaUsage quota={quota} estimate={estimate} money={money} compact={viewport?.height < 500} exhausted={exhausted} /></details>
+      {admin && developer && snapshot.voiceSettings?.hybridLiveAvailable && snapshot.voiceSettings?.hybridLiveEnabled ? <OliviaGeminiDiagnostic
+        conversationId={snapshot.conversationId} disabled={busy || recording || voiceActive || !snapshot.conversationId || unavailable || exhausted}
+        onActive={setGeminiDiagnosticActive}
+        onDirect={async turn => apply(await oliviaClient.request({operation:'geminiDirectTurn',conversationId:conversationRef.current,requestId:turn.turnId,userText:turn.userText,assistantText:turn.assistantText}))}
+        onDelegate={async (call,input) => {
+          const result=await perform('chat',{message:input || call.args?.request || '',inputMode:'natural-voice',deferVoice:true},requestId());
+          if(result.pendingAction)return `Preparé la operación «${result.pendingAction.summary}». Revisá la tarjeta en pantalla; todavía no se ejecutó.`;
+          const last=result.messages?.filter(entry=>entry.role==='assistant').at(-1);
+          return last?.voiceTranscript || last?.content || 'Olivia no devolvió una respuesta final.';
+        }} /> : null}
       {admin && developer ? <OliviaDeveloperPanel estimate={estimate} quota={quota} latency={latency} voiceMetrics={voiceMetrics} voiceConfiguration={snapshot.voiceConfiguration} geminiLiveUsage={snapshot.geminiLiveUsage} telemetry={snapshot.telemetry} turnTrace={turnTrace} money={money} /> : null}
       {!admin && exhausted ? <div className="fm-olivia-quota-request"><Button variant="secondary" disabled={busy || !online || quotaRequested} onClick={() => setQuotaRequestOpen(true)}>{quotaRequested ? "Ampliación solicitada" : "Solicitar ampliación"}</Button>{quotaNotice ? <p role="status">{quotaNotice}</p> : null}</div> : null}
     </aside></div> : null}

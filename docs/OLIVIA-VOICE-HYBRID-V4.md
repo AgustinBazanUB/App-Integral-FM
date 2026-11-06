@@ -64,6 +64,23 @@ También deben continuar configuradas las variables web de Firebase de pruebas, 
 - No se hicieron pruebas reales de conversación, voz o A/B. Para realizarlas faltan las variables indicadas, verificar sin revelar secretos que Functions/Auth/Firestore usan `app-integral-fm-pruebas` y disponer de un usuario administrador de prueba autorizado en ese proyecto.
 - No hay script de typecheck/lint declarado. La auditoría npm inicial señaló la dependencia transitiva `re2js`; se actualizó dentro del rango permitido (`2.8.6` → `2.9.1`) y la auditoría final encontró cero vulnerabilidades.
 
+## Continuación del diagnóstico · 6 de noviembre de 2026
+
+Las limitaciones de configuración descritas en la auditoría inicial de arriba son históricas. El usuario configuró las variables Gemini y compró créditos de AI Studio. La interfaz del preview ya informa disponibilidad híbrida, Firebase `app-integral-fm-pruebas` y autenticación configurada; la Function mantiene las validaciones de proyecto, credenciales y propietario antes de reservar una sesión. No se promueve esta actualización a producción.
+
+Chrome tiene permiso de micrófono para el preview, pero Windows muestra cero micrófonos físicos; únicamente presenta Stereo Mix deshabilitado. El usuario confirmó que no tiene micrófono y autorizó continuar las pruebas sin él. No se habilita Stereo Mix ni se cuenta audio del sistema como voz humana.
+
+Se añadió una prueba administrativa dentro del panel Developer, visible únicamente cuando el backend habilita Gemini en el preview aislado. Utiliza la misma emisión de tokens, WebSocket, clasificación, herramientas, reproducción y presupuesto que la conversación de voz; envía `clientContent` escrito y no solicita `getUserMedia`. Conserva las confirmaciones operativas del motor y limita el diagnóstico a 50 turnos. Registra conexión, texto enviado → primer audio programado, texto enviado → resultado y uso. Esas mediciones no son fin del habla → audio ni demuestran reconocimiento de voz. El costo con entrada de texto tampoco es una proyección válida del costo mensual de entrada de audio.
+
+Se identificó un defecto en la lectura del WebSocket: `JSON.parse` recibía los frames binarios como Blob y los descartaba, incluido `setupComplete`. El socket ahora solicita ArrayBuffer y decodifica sus bytes UTF-8. Una regresión automatizada reproduce handshake y respuesta binarios y verifica un turno de texto sin abrir captura. La confirmación con Google real y los resultados del diagnóstico se registrarán después del despliegue.
+
+Las pruebas físicas de micrófono, reconocimiento, ruido y barge-in, así como la comparación de voz humana anterior/híbrida, continúan pendientes de un dispositivo de entrada. No se declaran cumplidos sus objetivos por probar texto.
+
+### Fuentes del diagnóstico
+
+- [Entrada de texto en Live API](https://ai.google.dev/gemini-api/docs/live-api/capabilities)
+- [SDK oficial: tratamiento de frames WebSocket](https://github.com/googleapis/js-genai/blob/main/src/live.ts)
+
 ## Referencias oficiales
 
 - [Modelo Gemini 3.8 Live](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-live)

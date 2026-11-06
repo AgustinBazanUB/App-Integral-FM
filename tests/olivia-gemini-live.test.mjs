@@ -151,6 +151,62 @@ test("Live handshake timeout reports whether the WebSocket opened", async (t) =>
   assert.deepEqual(failures, ["Gemini Live no respondió al handshake dentro del plazo (WebSocket OPEN); continúo con el circuito anterior."]);
 });
 
+test("closing during token issuance releases the late reservation without opening a socket", async () => {
+  let resolveToken;
+  const operations=[];
+  const live=new GeminiLiveSession({conversationId:'late-token',audioContext:{},request:body=>{
+    operations.push(body);
+    return body.operation==='token' ? new Promise(resolve=>{resolveToken=resolve;}) : Promise.resolve({closed:true});
+  }});
+  const started=live.start(null,{textInputOnly:true});
+  live.close();
+  resolveToken({token:'auth_tokens/late',sessionId:'late-session'});
+  await assert.rejects(started,{name:'AbortError'});
+  assert.deepEqual(operations.map(item=>item.operation),['token','close']);
+  assert.equal(operations[1].sessionId,'late-session');
+  assert.equal(live.socket,undefined);
+});
+
+test("binary Live frames complete the handshake and a text diagnostic turn without opening a microphone", async (t) => {
+  let socket;
+  class BinarySocket {
+    static OPEN = 1;
+    constructor() { socket = this; this.readyState = 0; this.sent = []; }
+    send(data) { this.sent.push(JSON.parse(data)); }
+    close() { this.readyState = 3; }
+    receive(event) { this.onmessage({data:new TextEncoder().encode(JSON.stringify(event)).buffer}); }
+  }
+  const turns = [], reports = [];
+  const live = new GeminiLiveSession({
+    conversationId:'diagnostic-text', audioContext:{currentTime:0}, WebSocket:BinarySocket,
+    request:async body => {
+      if(body.operation==='token')return {token:'auth_tokens/test',sessionId:'text-only',expiresAt:new Date(Date.now()+60000).toISOString(),maxSessionSeconds:60};
+      if(body.operation==='classify')return {route:'direct',direct:true};
+      if(body.operation==='usage'){reports.push(body);return {measurement:'provider-forwarded',shouldStop:false};}
+      return {closed:true};
+    },
+    onTurnComplete:turn=>turns.push(turn),
+  });
+  t.after(()=>live.close());
+  const started=live.start(null,{textInputOnly:true});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(socket.binaryType,'arraybuffer');
+  socket.readyState=1;socket.onopen();socket.receive({setupComplete:{}});
+  await started;
+  assert.equal(live.captureSource,undefined);
+  live.sendText('Hola, Olivia');
+  assert.throws(()=>live.sendText('Otra consulta'),/turno actual/);
+  assert.deepEqual(socket.sent.at(-1),{clientContent:{turns:[{role:'user',parts:[{text:'Hola, Olivia'}]}],turnComplete:true}});
+  socket.receive({serverContent:{outputTranscription:{text:'Hola, ¿cómo estás?'},turnComplete:true},usageMetadata:{promptTokensDetails:[{modality:'TEXT',tokenCount:10}],responseTokensDetails:[{modality:'TEXT',tokenCount:8}]}});
+  await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(turns.length,1);
+  assert.equal(turns[0].userText,'Hola, Olivia');
+  assert.equal(turns[0].assistantText,'Hola, ¿cómo estás?');
+  assert.equal(turns[0].delegated,false);
+  assert.equal(reports[0].inputAudioSeconds,0);
+  assert.equal(reports[0].usageMetadata.promptTokensDetails[0].modality,'TEXT');
+});
+
 test("Live session sends short PCM chunks, plays audio and reports one direct turn", async (t) => {
   class FakeSocket {
     static OPEN = 1;

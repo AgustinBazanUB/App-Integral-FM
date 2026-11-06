@@ -49,12 +49,17 @@ export class GeminiLiveSession {
     return { pending: false, finalizing: false, completed: false, completeReceived: false, transcriptComplete: false, cancelled: false, inputText: "", interimText: "", outputText: "", publishedOutputText: "", usageMetadata: null, inputAudioSeconds: 0, outputAudioSeconds: 0, generatedAudio: false, heardAudio: false, pendingAudio: [], toolTurn: false, toolPending: false, awaitingToolResponse: false, outputAuthorized: false, classificationPromise: null, noTranscriptTimer: null };
   }
 
-  async start(stream) {
-    if (!this.WebSocket || !this.audioContext?.createScriptProcessor) throw new Error("Este navegador no admite el audio de Gemini Live.");
+  async start(stream, { textInputOnly = false } = {}) {
+    if (!this.WebSocket || !this.audioContext || (!textInputOnly && !this.audioContext.createScriptProcessor)) throw new Error("Este navegador no admite el audio de Gemini Live.");
+    this.textInputOnly = textInputOnly;
     this.stream = stream;
     this.tokenResult = await this.request({ operation: "token", conversationId: this.conversationId });
     if (!this.tokenResult?.token || !this.tokenResult?.sessionId) throw new Error("No se recibió un token efímero de Gemini Live.");
     this.sessionId = this.tokenResult.sessionId;
+    if (this.closed) {
+      await this.request({ operation: "close", sessionId: this.sessionId }).catch(() => {});
+      throw new DOMException("Sesión cerrada", "AbortError");
+    }
     this.tokenExpiresAt = Date.parse(this.tokenResult.expiresAt);
     this.connectTimer = setTimeout(() => {
       const socketState = ({ 0: "CONNECTING", 1: "OPEN", 2: "CLOSING", 3: "CLOSED" })[this.socket?.readyState] || "UNKNOWN";
@@ -63,7 +68,7 @@ export class GeminiLiveSession {
     try { await this.openSocket(null); }
     catch (error) { this.fail(error); throw error; }
     if (this.closed || this.failed) throw new DOMException("Sesión cerrada", "AbortError");
-    this.attachCapture(stream);
+    if (!textInputOnly) this.attachCapture(stream);
     this.handlesTurns = true;
     this.ready = true;
     this.sessionTimer = setTimeout(() => this.fail(new Error("La sesión híbrida llegó a su límite preventivo; continúo con el circuito anterior.")), this.tokenResult.maxSessionSeconds * 1000);
@@ -77,6 +82,9 @@ export class GeminiLiveSession {
       const url = `${SOCKET_URL}?access_token=${encodeURIComponent(this.tokenResult.token)}`;
       let socket;
       try { socket = new this.WebSocket(url); } catch (error) { reject(error); return; }
+      // Google can send JSON in binary frames. Chrome otherwise exposes a Blob,
+      // which JSON.parse silently rejected, including the setupComplete event.
+      socket.binaryType = "arraybuffer";
       this.socket = socket;
       let settled = false;
       const failReady = (error) => { if (settled) return; settled = true; this.pendingReject = null; reject(error); };
@@ -86,7 +94,7 @@ export class GeminiLiveSession {
         catch (error) { failReady(error); }
       };
       socket.onmessage = ({ data }) => {
-        let event; try { event = JSON.parse(data); } catch { return; }
+        let event; try { event = JSON.parse(typeof data === "string" ? data : new TextDecoder().decode(data)); } catch { return; }
         if (event.setupComplete) {
           settled = true; this.pendingReject = null; clearTimeout(this.connectTimer); resolve(this);
           if (this.reconnecting) { this.reconnecting = false; this.listening = this.resumeListening; this.onState(this.listening ? "listening" : "processing"); }
@@ -164,6 +172,19 @@ export class GeminiLiveSession {
   }
 
   beginTurn() { this.setListening(true); }
+  sendText(text) {
+    if (!this.textInputOnly || !this.ready || this.closed || this.failed) throw new Error("La prueba de texto no está conectada.");
+    if (this.currentTurn.pending || this.finalizingTurns.size || this.isPlaying) throw new Error("Esperá a que termine el turno actual.");
+    const input = String(text || "").trim().slice(0, 12000);
+    if (!input) throw new Error("Escribí una consulta de prueba.");
+    this.beginTurn();
+    this.listening = false;
+    this.currentTurn.inputText = input;
+    this.currentTurn.transcriptComplete = true;
+    this.ignoreOutputUntilInput = false;
+    void this.authorizeTurn(this.currentTurn);
+    this.socket.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: input }] }], turnComplete: true } }));
+  }
   discardTurn() { this.setListening(false); this.interrupt(); }
   commit() { this.setListening(false); return Promise.resolve(null); }
 
