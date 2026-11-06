@@ -402,6 +402,32 @@ test("admin usage reports reserved estimates honestly while seller usage stays p
   assert.deepEqual(Object.keys(seller).sort(), ["lastCost", "period", "remainingPercent", "renewsAt"]);
 });
 
+test("admin Gemini readiness reports only safe gate booleans", async () => {
+  const f = fixture({
+    role: "admin",
+    env: {
+      CONTEXT: "deploy-preview",
+      OLIVIA_HYBRID_LIVE_ENABLED: "true",
+      GEMINI_API_BILLING_TIER: "paid",
+      GEMINI_API_KEY: "must-not-leak",
+      FIREBASE_PROJECT_ID: "app-integral-fm-pruebas",
+    },
+  });
+  f.config.hybridVoice.enabled = true;
+  const result = await f.engine.getConfiguration(f.session);
+  assert.equal(result.geminiLiveConfigured, true);
+  assert.deepEqual(result.geminiLiveReadiness, {
+    deployPreview: true,
+    previewFlag: true,
+    apiKeyConfigured: true,
+    paidBillingTier: true,
+    hybridVoiceEnabled: true,
+    isolatedFirebaseProject: true,
+    authorizedVoiceAccount: true,
+  });
+  assert.equal(JSON.stringify(result.geminiLiveReadiness).includes("must-not-leak"), false);
+});
+
 test("malicious seller provider cannot invoke admin tool even when it ignores supplied tools", async () => {
   const f = fixture({
     provider: () =>

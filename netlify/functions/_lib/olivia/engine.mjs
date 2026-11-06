@@ -124,9 +124,24 @@ export function createOliviaEngine({
     env.GEMINI_API_KEY &&
     env.GEMINI_API_BILLING_TIER === "paid" &&
     config.hybridVoice?.enabled &&
-    canUseOliviaVoice(session) &&
+    canUseOliviaVoice(session, env) &&
     configuredFirebaseProjectId(env) === "app-integral-fm-pruebas",
   );
+  const geminiLiveReadiness = (session, config) => {
+    let isolatedFirebaseProject = false;
+    try { isolatedFirebaseProject = configuredFirebaseProjectId(env) === "app-integral-fm-pruebas"; } catch { /* keep the diagnostic closed without exposing configuration details */ }
+    const ownerTrial = typeof session?.email === "string" && session.email.trim().toLowerCase() === "agsreserva@gmail.com";
+    const authorizedAdministrator = session?.profile?.active === true && canAccessAdministration(session.profile);
+    return {
+      deployPreview: env.CONTEXT === "deploy-preview",
+      previewFlag: env.OLIVIA_HYBRID_LIVE_ENABLED === "true",
+      apiKeyConfigured: Boolean(env.GEMINI_API_KEY),
+      paidBillingTier: env.GEMINI_API_BILLING_TIER === "paid",
+      hybridVoiceEnabled: config.hybridVoice?.enabled === true,
+      isolatedFirebaseProject,
+      authorizedVoiceAccount: ownerTrial || authorizedAdministrator,
+    };
+  };
   async function geminiLiveUsageSummary(session, config) {
     if (!canAccessAdministration(session.profile)) return null;
     if (env.CONTEXT !== "deploy-preview" || env.OLIVIA_HYBRID_LIVE_ENABLED !== "true" || configuredFirebaseProjectId(env) !== "app-integral-fm-pruebas") return null;
@@ -239,19 +254,19 @@ export function createOliviaEngine({
       enabled: config.enabled,
       audioLimits: config.audioLimits,
       voiceProtocol: "chirp",
-      voiceConversationAvailable: Boolean(config.naturalVoice.enabled && canUseOliviaVoice(session) && env.OPENAI_API_KEY && hasGoogleCloudTtsCredentials(env)),
+      voiceConversationAvailable: Boolean(config.naturalVoice.enabled && canUseOliviaVoice(session, env) && env.OPENAI_API_KEY && hasGoogleCloudTtsCredentials(env)),
       voiceTrialAvailable: false,
       geminiLiveAvailable: geminiLiveEnabled(session, config),
-      ...(canAccessAdministration(session.profile) && canUseOliviaVoice(session) ? { geminiLiveUsage: await geminiLiveUsageSummary(session, config) } : {}),
-      ...(config.naturalVoice.enabled && canUseOliviaVoice(session) ? { voiceSettings: { turnEndSilenceMs: config.naturalVoice.turnEndSilenceMs, latencyMode:latencyEnabled(config),transcriptionDelay:config.conversationLatency.transcriptionDelay,transcriptionModel:'gpt-live-transcribe', voice:config.naturalVoice.voice, speakingRate:config.naturalVoice.speakingRate, hybridLiveAvailable:geminiLiveEnabled(session, config), hybridLiveEnabled:config.hybridVoice.enabled } } : {}),
-      ...(canAccessAdministration(session.profile) && canUseOliviaVoice(session) ? { voiceConfiguration: { model: geminiLiveEnabled(session, config) ? "Gemini 3.8 Live · Google Chirp 3 HD de respaldo" : "Google Chirp 3 HD", backendModel: latencyEnabled(config)?"GPT-6 Luna / Sol · rutas instantánea / lectura / controlada":"GPT-6 Luna · modo anterior", reasoningEffort: latencyEnabled(config)?"NONE / MEDIUM según complejidad":"HIGH/XHIGH", voice: config.naturalVoice.voice } } : {}),
+      ...(canAccessAdministration(session.profile) && canUseOliviaVoice(session, env) ? { geminiLiveUsage: await geminiLiveUsageSummary(session, config) } : {}),
+      ...(config.naturalVoice.enabled && canUseOliviaVoice(session, env) ? { voiceSettings: { turnEndSilenceMs: config.naturalVoice.turnEndSilenceMs, latencyMode:latencyEnabled(config),transcriptionDelay:config.conversationLatency.transcriptionDelay,transcriptionModel:'gpt-live-transcribe', voice:config.naturalVoice.voice, speakingRate:config.naturalVoice.speakingRate, hybridLiveAvailable:geminiLiveEnabled(session, config), hybridLiveEnabled:config.hybridVoice.enabled } } : {}),
+      ...(canAccessAdministration(session.profile) && canUseOliviaVoice(session, env) ? { voiceConfiguration: { model: geminiLiveEnabled(session, config) ? "Gemini 3.8 Live · Google Chirp 3 HD de respaldo" : "Google Chirp 3 HD", backendModel: latencyEnabled(config)?"GPT-6 Luna / Sol · rutas instantánea / lectura / controlada":"GPT-6 Luna · modo anterior", reasoningEffort: latencyEnabled(config)?"NONE / MEDIUM según complejidad":"HIGH/XHIGH", voice: config.naturalVoice.voice } } : {}),
       policyVersion: OLIVIA_POLICY_VERSION,
       ...(estimate ? { estimate } : {}),
     };
   }
   async function recordGeminiDirectTurn(session, body) {
     assertOliviaAccess(session);
-    if (!canUseOliviaVoice(session)) throw oliviaError("voice-not-enabled", "La conversación por voz sigue limitada a la prueba administrativa.", 403);
+    if (!canUseOliviaVoice(session, env)) throw oliviaError("voice-not-enabled", "La conversación por voz sigue limitada a la prueba administrativa.", 403);
     const config = await configuration({ resolveCosts: false });
     if (!config.enabled || !config.naturalVoice.enabled || !geminiLiveEnabled(session, config))
       throw oliviaError("gemini-live-disabled", "La voz híbrida solo está habilitada para un Deploy Preview aislado.", 403);
@@ -475,7 +490,7 @@ export function createOliviaEngine({
         "Olivia está deshabilitada. La aplicación sigue disponible manualmente.",
         503,
       );
-    if (naturalVoice && (!config.naturalVoice.enabled || !canUseOliviaVoice(session) || !env.OPENAI_API_KEY || !hasGoogleCloudTtsCredentials(env)))
+    if (naturalVoice && (!config.naturalVoice.enabled || !canUseOliviaVoice(session, env) || !env.OPENAI_API_KEY || !hasGoogleCloudTtsCredentials(env)))
       throw oliviaError("voice-not-enabled", "La conversación natural por voz no está disponible para esta cuenta.", 403);
     if (["realtime", "live"].includes(body.inputMode) || body.voiceSessionId || body.realtimeSessionId)
       throw oliviaError("voice-mode-retired", "GPT-Live fue retirado. Usá la conversación natural por voz de Olivia.", 410);
@@ -1332,6 +1347,7 @@ export function createOliviaEngine({
       providerConfigured: Boolean(env.OPENAI_API_KEY),
       googleTtsConfigured: hasGoogleCloudTtsCredentials(env),
       geminiLiveConfigured: geminiLiveEnabled(session, config),
+      geminiLiveReadiness: geminiLiveReadiness(session, config),
       geminiLiveUsage: await geminiLiveUsageSummary(session, config),
       policyVersion: OLIVIA_POLICY_VERSION,
     };
