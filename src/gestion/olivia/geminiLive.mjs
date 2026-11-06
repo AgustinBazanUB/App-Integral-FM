@@ -96,16 +96,22 @@ export class GeminiLiveSession {
         this.receive(event);
       };
       socket.onerror = () => {
-        const error = new Error("Se interrumpió la conexión segura con Gemini Live.");
-        if (!this.reconnecting) this.fail(error);
+        clearTimeout(this.socketErrorTimer);
+        this.socketErrorTimer = setTimeout(() => {
+          if (!this.reconnecting) this.fail(new Error("Se interrumpió la conexión segura con Gemini Live."));
+        }, 1000);
       };
-      socket.onclose = () => {
+      socket.onclose = (event) => {
+        clearTimeout(this.socketErrorTimer);
         if (this.closed || this.failed) return;
         if (this.reconnecting) {
           const handleToResume = this.resumeHandle;
           this.resumeHandle = null;
           this.openSocket(handleToResume).catch((error) => this.fail(error));
-        } else this.fail(new Error("Gemini Live cerró la conexión; continúo con el circuito anterior."));
+        } else {
+          const code = Number.isFinite(event?.code) ? ` (código ${event.code})` : "";
+          this.fail(new Error(`Gemini Live cerró la conexión${code}; continúo con el circuito anterior.`));
+        }
       };
       if (handle) this.reconnecting = true;
     });
@@ -359,12 +365,12 @@ export class GeminiLiveSession {
 
   fail(error) {
     if (this.closed || this.failed) return;
-    this.failed = true; this.handlesTurns = false; this.ready = false; this.listening = false; clearTimeout(this.connectTimer); clearTimeout(this.sessionTimer); this.interrupt();
+    this.failed = true; this.handlesTurns = false; this.ready = false; this.listening = false; clearTimeout(this.connectTimer); clearTimeout(this.sessionTimer); clearTimeout(this.socketErrorTimer); this.interrupt();
     this.pendingReject?.(error); this.pendingReject = null;
     try { this.socket?.close(); } catch {}
     this.stopCapture();
     if (this.sessionId) void this.request({ operation: "close", sessionId: this.sessionId }).catch(() => {});
-    this.onUnavailable(error); this.onNotice(error.message || "Gemini Live no está disponible; sigo con el circuito anterior.");
+    this.onNotice(error.message || "Gemini Live no está disponible; sigo con el circuito anterior."); this.onUnavailable(error);
   }
 
   stopCapture() {
@@ -375,7 +381,7 @@ export class GeminiLiveSession {
 
   close() {
     if (this.closed) return;
-    this.closed = true; this.handlesTurns = false; this.ready = false; this.listening = false; clearTimeout(this.connectTimer); clearTimeout(this.sessionTimer); this.interrupt();
+    this.closed = true; this.handlesTurns = false; this.ready = false; this.listening = false; clearTimeout(this.connectTimer); clearTimeout(this.sessionTimer); clearTimeout(this.socketErrorTimer); this.interrupt();
     this.pendingReject?.(new DOMException("Sesión cerrada", "AbortError")); this.pendingReject = null;
     try { this.socket?.close(1000, "Olivia session closed"); } catch {}
     this.stopCapture();

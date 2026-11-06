@@ -19,6 +19,7 @@ export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMe
     ["Voz natural · Chirp 3 HD", voiceConfiguration?.voice || "No disponible"],
     ['Transcripción de esta sesión',voiceMetrics?.transcriptionMode || 'Sin iniciar'],
     ['Ruta de voz Gemini Live',voiceMetrics?.geminiLiveStatus || (voiceConfiguration?.model?.includes('Gemini') ? 'Preparado' : 'Modo anterior')],
+    ['Gemini · último error/fallback',voiceMetrics?.geminiLiveFallback || 'Sin fallas registradas'],
     ['Gemini · conexión desde micrófono listo (ms)',ms(voiceMetrics?.geminiConnect?.medianMs)],
     ['Gemini · click → sesión lista (ms)',ms(voiceMetrics?.clickToGeminiReady?.medianMs)],
     ['Gemini · ruta del último turno',`${voiceMetrics?.geminiLastRoute || 'Sin clasificar'} · turno ${voiceMetrics?.geminiLastTurnIndex ?? '—'}`],

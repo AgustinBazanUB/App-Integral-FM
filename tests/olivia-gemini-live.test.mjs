@@ -98,6 +98,34 @@ test("48 kHz capture resamples to 16 kHz signed PCM", () => {
   assert.ok(output.every((sample) => sample > 0));
 });
 
+test("Live connection diagnostics retain the WebSocket close code and end in fallback", async (t) => {
+  class FakeSocket {
+    static OPEN = 1;
+    static instances = [];
+    constructor() { this.readyState = 0; FakeSocket.instances.push(this); }
+    send() {}
+    close() { this.readyState = 3; }
+  }
+  const failures = [], notices = [];
+  const live = new GeminiLiveSession({
+    request: async (payload) => payload.operation === "token"
+      ? { token: "auth_tokens/diagnostic", sessionId: "diagnostic", expiresAt: new Date(Date.now() + 60000).toISOString(), maxSessionSeconds: 600 }
+      : { closed: true },
+    conversationId: "diagnostic", audioContext: { createScriptProcessor() {} }, WebSocket: FakeSocket,
+    onUnavailable: (error) => failures.push(error.message), onNotice: (message) => notices.push(message),
+  });
+  t.after(() => live.close());
+  const started = live.start({});
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const socket = FakeSocket.instances[0];
+  socket.onerror();
+  socket.onclose({ code: 1008 });
+  await assert.rejects(started, /código 1008/);
+  assert.deepEqual(failures, ["Gemini Live cerró la conexión (código 1008); continúo con el circuito anterior."]);
+  assert.equal(notices.at(-1), failures[0]);
+  assert.equal(live.failed, true);
+});
+
 test("Live session sends short PCM chunks, plays audio and reports one direct turn", async (t) => {
   class FakeSocket {
     static OPEN = 1;
