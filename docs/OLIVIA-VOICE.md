@@ -1,5 +1,7 @@
 # Voz natural de Olivia
 
+La integración de voz híbrida Gemini Live está en la rama `codex/olivia-voz-hibrida-v4`; no se activa para usuarios de producción. La arquitectura, las variables y las verificaciones pendientes del preview están en [Olivia Voz Híbrida V4](OLIVIA-VOICE-HYBRID-V4.md).
+
 ## Ruta vigente (revisión 30/10/2026)
 
 Una conversación usa micrófono/VAD local → GPT Live Transcribe (`gpt-live-transcribe`) por WebRTC → motor y herramientas de Olivia → texto canónico y resumen hablado → Google Cloud TTS Chirp 3 HD/Aoede, PCM mono a 24 kHz. GPT Transcribe (`gpt-transcribe`) conserva la ruta de archivo cuando corresponde; no se incorporó otro proveedor. Los antiguos modos Live conversacional/Realtime multimodal siguen retirados; la transcripción Live actual es una sesión dedicada a STT.

@@ -1,0 +1,509 @@
+{
+  "commit": "2d3802e",
+  "url": "https://deploy-preview-55--appintegralflormia.netlify.app/gestion/settings",
+  "evidence": "real-provider-text-input-not-microphone",
+  "connectionMs": 3341.5,
+  "turns": [
+    {
+      "id": "e09704a1-b7cc-4817-9d67-92d817d744ed",
+      "input": "Buen día",
+      "inputMode": "diagnostic-text",
+      "route": "direct",
+      "classificationMs": 1314.6000000238419,
+      "response": "¡Buen día! ¿Cómo estás? ¿En qué te puedo ayudar hoy?",
+      "textToScheduledAudioMs": 1350.6000000238419,
+      "delegated": false,
+      "noAudio": false,
+      "textToResultMs": 1860.2000000476837,
+      "usage": {
+        "duplicate": false,
+        "measurement": "provider-forwarded",
+        "costUsd": 0.002188,
+        "sessionSpendUsd": 0.002188,
+        "spendUsd": 0.002188,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.002188,
+        "estimatedUsd": 0,
+        "unconfirmedQueryCount": 0,
+        "queryCount": 1,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": 687,
+        "outputTokens": 103,
+        "inputTokensByModality": {
+          "TEXT": 493,
+          "AUDIO": 194
+        },
+        "outputTokensByModality": {
+          "AUDIO": 103
+        },
+        "inputAudioSeconds": 0,
+        "outputAudioSeconds": 0.74,
+        "shouldStop": false,
+        "includesAccumulatedContext": true,
+        "averageUsdPerQuery": 0.002188,
+        "projectionAt660Usd": 1.4440799999999998,
+        "projectedMonthEndUsd": 0.010939999999999998
+      }
+    },
+    {
+      "id": "aff1fe5d-e1b6-4931-9498-52a151e16b58",
+      "input": "¿Cómo estás?",
+      "inputMode": "diagnostic-text",
+      "route": "direct",
+      "classificationMs": 2447.300000011921,
+      "response": "¡Muy bien, gracias por preguntar! ¿Y vos, cómo estás?",
+      "textToScheduledAudioMs": 2452.600000023842,
+      "delegated": false,
+      "noAudio": false,
+      "textToResultMs": 3657.100000023842,
+      "usage": {
+        "duplicate": false,
+        "measurement": "provider-forwarded",
+        "costUsd": 0.002032,
+        "sessionSpendUsd": 0.00422,
+        "spendUsd": 0.00422,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.00422,
+        "estimatedUsd": 0,
+        "unconfirmedQueryCount": 0,
+        "queryCount": 2,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": 810,
+        "outputTokens": 63,
+        "inputTokensByModality": {
+          "TEXT": 513,
+          "AUDIO": 297
+        },
+        "outputTokensByModality": {
+          "AUDIO": 63
+        },
+        "inputAudioSeconds": 0,
+        "outputAudioSeconds": 2.39,
+        "shouldStop": false,
+        "includesAccumulatedContext": true,
+        "averageUsdPerQuery": 0.00211,
+        "projectionAt660Usd": 1.3925999999999998,
+        "projectedMonthEndUsd": 0.021099999999999997
+      }
+    },
+    {
+      "id": "3aa27892-9cad-4454-b8f6-cc4065344178",
+      "input": "Gracias",
+      "inputMode": "diagnostic-text",
+      "route": "direct",
+      "classificationMs": 1881.800000011921,
+      "response": "De nada. ¡Un placer!",
+      "textToScheduledAudioMs": 1887,
+      "delegated": false,
+      "noAudio": false,
+      "textToResultMs": 2556.600000023842,
+      "usage": {
+        "duplicate": false,
+        "measurement": "provider-forwarded",
+        "costUsd": 0.002101,
+        "sessionSpendUsd": 0.006321,
+        "spendUsd": 0.006321,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.006321,
+        "estimatedUsd": 0,
+        "unconfirmedQueryCount": 0,
+        "queryCount": 3,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": 889,
+        "outputTokens": 52,
+        "inputTokensByModality": {
+          "TEXT": 529,
+          "AUDIO": 360
+        },
+        "outputTokensByModality": {
+          "AUDIO": 52
+        },
+        "inputAudioSeconds": 0,
+        "outputAudioSeconds": 1.8000000000000003,
+        "shouldStop": false,
+        "includesAccumulatedContext": true,
+        "averageUsdPerQuery": 0.002107,
+        "projectionAt660Usd": 1.39062,
+        "projectedMonthEndUsd": 0.031605
+      }
+    },
+    {
+      "id": "e7a03aa6-28f6-4701-aa22-8c6aa9f62a13",
+      "input": "Muchas gracias",
+      "inputMode": "diagnostic-text",
+      "route": "direct",
+      "classificationMs": 818.5,
+      "response": "¡Por nada! Estoy acá para lo que necesites.",
+      "textToScheduledAudioMs": 823.8000000119209,
+      "delegated": false,
+      "noAudio": false,
+      "textToResultMs": 3438.5,
+      "usage": {
+        "duplicate": false,
+        "measurement": "provider-forwarded",
+        "costUsd": 0.002696,
+        "sessionSpendUsd": 0.009017,
+        "spendUsd": 0.009017,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.009017,
+        "estimatedUsd": 0,
+        "unconfirmedQueryCount": 0,
+        "queryCount": 4,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": 950,
+        "outputTokens": 88,
+        "inputTokensByModality": {
+          "TEXT": 538,
+          "AUDIO": 412
+        },
+        "outputTokensByModality": {
+          "AUDIO": 88
+        },
+        "inputAudioSeconds": 0,
+        "outputAudioSeconds": 2.7199999999999998,
+        "shouldStop": false,
+        "includesAccumulatedContext": true,
+        "averageUsdPerQuery": 0.00225425,
+        "projectionAt660Usd": 1.487805,
+        "projectedMonthEndUsd": 0.045085
+      }
+    },
+    {
+      "id": "e64c2f11-5687-467b-b94f-f3f1853522e4",
+      "input": "Perfecto, gracias",
+      "inputMode": "diagnostic-text",
+      "route": "backend-delegate",
+      "classificationMs": 792.8000000119209,
+      "response": "¡De nada!",
+      "delegated": true,
+      "noAudio": true,
+      "textToResultMs": 13151.699999988079,
+      "usage": {
+        "duplicate": false,
+        "measurement": "provider-forwarded",
+        "costUsd": 0.002852,
+        "sessionSpendUsd": 0.011869,
+        "spendUsd": 0.011869,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.011869,
+        "estimatedUsd": 0,
+        "unconfirmedQueryCount": 0,
+        "queryCount": 5,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": 1054,
+        "outputTokens": 78,
+        "inputTokensByModality": {
+          "TEXT": 554,
+          "AUDIO": 500
+        },
+        "outputTokensByModality": {
+          "AUDIO": 78
+        },
+        "inputAudioSeconds": 0,
+        "outputAudioSeconds": 2.48,
+        "shouldStop": false,
+        "includesAccumulatedContext": true,
+        "averageUsdPerQuery": 0.0023737999999999997,
+        "projectionAt660Usd": 1.5667079999999998,
+        "projectedMonthEndUsd": 0.059345
+      }
+    },
+    {
+      "id": "9a63810e-5230-469f-b7fe-9df3982097c9",
+      "input": "¿Cuánto stock tenemos de Arbequina?",
+      "inputMode": "diagnostic-text",
+      "route": "model-tool",
+      "classificationMs": 1849.699999988079,
+      "response": "Para poder ayudarte, necesito que me digas en qué ubicación querés consultar el stock y el producto específico con su presentación.",
+      "textToScheduledAudioMs": 17311.099999964237,
+      "delegated": true,
+      "noAudio": false,
+      "textToResultMs": 22559.69999998808,
+      "usage": {
+        "duplicate": false,
+        "measurement": "provider-forwarded",
+        "costUsd": 0.003913,
+        "sessionSpendUsd": 0.015782,
+        "spendUsd": 0.015782,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.015782,
+        "estimatedUsd": 0,
+        "unconfirmedQueryCount": 0,
+        "queryCount": 6,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": 1243,
+        "outputTokens": 140,
+        "inputTokensByModality": {
+          "TEXT": 665,
+          "AUDIO": 578
+        },
+        "outputTokensByModality": {
+          "AUDIO": 140
+        },
+        "inputAudioSeconds": 0,
+        "outputAudioSeconds": 5.28,
+        "shouldStop": false,
+        "includesAccumulatedContext": true,
+        "averageUsdPerQuery": 0.0026303333333333335,
+        "projectionAt660Usd": 1.7360200000000001,
+        "projectedMonthEndUsd": 0.07891000000000001
+      }
+    },
+    {
+      "id": "13cac956-bbda-41d9-8c33-5d3501e9a8b1",
+      "input": "¿Cuál es el precio del aceite de 500 mililitros?",
+      "inputMode": "diagnostic-text",
+      "route": "model-tool",
+      "classificationMs": 1859.6000000238419,
+      "response": "No encuentro un precio confiable para ese aceite de 500 ml.",
+      "error": "Prueba detenida tras 60 segundos sin completar el turno."
+    }
+  ],
+  "protocol": [
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "generationComplete"
+      ],
+      "parts": [],
+      "generationComplete": true
+    },
+    {
+      "keys": [
+        "serverContent",
+        "usageMetadata"
+      ],
+      "contentKeys": [
+        "turnComplete"
+      ],
+      "parts": [],
+      "turnComplete": true
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn",
+        "outputTranscription"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 4
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 4
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 4
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn",
+        "outputTranscription"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 4
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 4
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 4
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn",
+        "outputTranscription"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 4
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "outputTranscription"
+      ],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "generationComplete"
+      ],
+      "parts": [],
+      "generationComplete": true
+    }
+  ]
+}

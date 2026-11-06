@@ -13,10 +13,13 @@ export class NaturalVoiceConversation {
   async start() {
     try {
       if (!this.mediaDevices?.getUserMedia || !this.Recorder || !this.AudioContext) throw new Error("Este navegador no admite conversación por voz. Podés dictar o escribir.");
+      const startedAt = this.now();
+      this.onTrace({ stage: "voice.capture.start", at: startedAt });
       this.context = new this.AudioContext();
       await this.context.resume();
       this.stream = await this.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       if (this.closed) return this.release();
+      this.onTrace({ stage: "voice.mic.ready", at: this.now() });
       this.onMediaInterrupted = () => {
         if (this.closed) return;
         this.onError(new Error("El navegador interrumpió el micrófono o el audio. Volvé a conectar la voz para continuar."));
@@ -28,13 +31,18 @@ export class NaturalVoiceConversation {
       this.source = this.context.createMediaStreamSource(this.stream);
       this.analyser = this.context.createAnalyser(); this.analyser.fftSize = 1024; this.source.connect(this.analyser);
       this.samples = new Float32Array(this.analyser.fftSize);
-      if(this.createTranscriber) {
-        try { this.transcriber=await this.createTranscriber(this.stream,text=>{if(text!==this.partial)this.partialChangedAt=this.now();this.partial=text;this.onPartial(text);},this.captureController.signal); }
-        catch { if(!this.closed)this.onNotice('La transcripción en vivo no pudo conectarse. La voz continúa con dictado por turnos.'); }
-        if(this.closed){this.transcriber?.close();return this.release();}
-      }
       this.startRecorder();
       this.startedAt = this.now(); this.onState("listening"); this.loop();
+      if (this.createTranscriber) {
+        const readyAt = this.now();
+        this.transcriberReady = Promise.resolve().then(() => this.createTranscriber(this.stream, text => { if (text !== this.partial) this.partialChangedAt = this.now(); this.partial = text; this.onPartial(text); }, this.captureController.signal))
+          .then(transcriber => {
+            if (this.closed) { transcriber?.close(); return; }
+            this.transcriber = transcriber;
+            this.onTrace({ stage: transcriber?.handlesTurns ? "gemini.session.ready" : "transcription.session.ready", at: this.now(), startedAt: readyAt });
+          })
+          .catch(() => { if (!this.closed) this.onNotice("La transcripción en vivo no pudo conectarse. La voz continúa con dictado por turnos."); });
+      }
     } catch (error) { this.onError(error); this.close(); }
   }
 
@@ -91,23 +99,24 @@ export class NaturalVoiceConversation {
     recorder.onerror = () => { this.discardTurn = true; this.finishTurn(); this.onError(new Error("La grabación se interrumpió. Podés volver a hablar.")); };
     recorder.onstop = () => {
       clearTimeout(this.turnTimer);
-      const wasTurn = this.recordingTurn, chunks = this.chunks || [], durationSeconds = wasTurn ? Math.max(0.1, (this.now() - this.recordingStartedAt) / 1000) : 0, actualType = recorder.mimeType || type || "audio/webm", discard = this.discardTurn;
+      const wasTurn = this.recordingTurn, chunks = this.chunks || [], durationSeconds = wasTurn ? Math.max(0.1, (this.now() - this.recordingStartedAt) / 1000) : 0, actualType = recorder.mimeType || type || "audio/webm", discard = this.discardTurn, turnTranscriber = this.turnTranscriber, handledByLive = Boolean(this.turnLive && turnTranscriber?.handlesTurns && !turnTranscriber.failed);
       this.recorder = null; this.recordingTurn = false; this.finishing = false; this.chunks = []; this.bytes = 0; this.discardTurn = false;
       if (!this.closed) this.startRecorder();
       if (!wasTurn || discard || this.closed) { if(discard && !this.transcriber?.closed)this.transcriber?.discardTurn?.(); return; }
       const blob = new Blob(chunks, { type: actualType }); blob.durationSeconds = Math.min(this.maxSeconds, durationSeconds);
       const metadata={durationSeconds:blob.durationSeconds,endedAt:this.now(),voiceEndedAt:this.lastSpeechAt,turnId:this.turnId,endpointWindowMs:this.endpointWindowMs};
       this.onTrace({stage:'audio.commit',at:metadata.endedAt,turnId:this.turnId});
+      this.onTrace({stage:'voice.turn.end',at:metadata.endedAt,voiceEndedAt:metadata.voiceEndedAt,turnId:this.turnId});
       this.onState("processing");
       const ready=(async()=>{
-        if(this.transcriber && !this.transcriber.closed) {
-          try { metadata.transcript=await this.transcriber.commit(metadata); }
+        if(turnTranscriber && !turnTranscriber.closed) {
+          try { metadata.transcript=await turnTranscriber.commit(metadata); }
           catch { if(!this.closed)this.onNotice('Recupero este turno con el audio grabado.'); }
         }
       })();
       const deliver=async()=>{
         await ready;
-        if(!this.closed)await this.onTurn?.(blob,metadata);
+        if(!this.closed && !handledByLive)await this.onTurn?.(blob,metadata);
       };
       this.deliveryQueue=this.deliveryQueue.catch(()=>{}).then(deliver).catch(error=>this.onError(error));
     };
@@ -123,8 +132,10 @@ export class NaturalVoiceConversation {
       this.partialChangedAt=now;this.turnId=globalThis.crypto.randomUUID();
       if(this.transcriber && !this.transcriber.closed) {try{this.transcriber.beginTurn();}catch{this.transcriber.close();}}
       clearTimeout(this.turnTimer); this.turnTimer = setTimeout(() => this.finishTurn(), this.maxSeconds * 1000);
-      const bargeIn = this.sources?.size > 0;
-      if (bargeIn) this.stopPlayback();
+      const bargeIn = this.sources?.size > 0 || Boolean(this.transcriber?.isPlaying);
+      this.turnTranscriber = this.transcriber;
+      this.turnLive = Boolean(this.turnTranscriber?.handlesTurns && this.turnTranscriber?.ready);
+      if (bargeIn) { this.stopPlayback(); this.transcriber?.interrupt?.(); }
       this.onSpeechStart({ at: now, bargeIn, turnId:this.turnId }); this.onState("recording");
     } catch (error) { this.onError(error); }
   }

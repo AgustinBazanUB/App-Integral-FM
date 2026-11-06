@@ -104,6 +104,10 @@ test("Chirp synthesis authorizes owner, enforces monthly character quota and str
   const usage = docs.get(`oliviaUsage/${uid}_${requestId}`);
   assert.equal(usage.characters, 4);
   assert.equal(usage.actualCostUsd, 4 * 30 / 1_000_000);
+  const monthlyProviderRollup = docs.get("oliviaGeminiLiveBudgets/2026-10");
+  assert.equal(monthlyProviderRollup.chirp.estimatedUsd, 4 * 30 / 1_000_000);
+  assert.equal(monthlyProviderRollup.chirp.characters, 4);
+  assert.equal(monthlyProviderRollup.chirp.requests, 1);
   assert.ok(usage.retentionExpiresAt instanceof Date);
   assert.ok(docs.get(`oliviaVoiceRequests/${uid}_${requestId}`).retentionExpiresAt instanceof Date);
   assert.ok([...docs].find(([path]) => path.startsWith(`oliviaVoiceBudgets/${uid}_`))[1].retentionExpiresAt instanceof Date);
