@@ -21,7 +21,7 @@ export function classifyGeminiLiveTurn(text) {
   return { route: 'delegate' };
 }
 export function quickReadPlan(text) {
-  const value = normalizeSpeech(text).replace(/^olivia /, '').replace(/ por favor$/, '');
+  const value = normalizeSpeech(text).replace(/^olivia /, '').replace(/ por favor$/, '').replace(/^cuanto stock (?:de |del )?/, 'cuantas unidades de ');
   if (/\b(?:carga|cargame|cargues|crea|creame|registra|agrega|ingresa|vende|cobra|manda|envia|borra|elimina|cambia|modifica|queria decir|en realidad)\b/.test(value)) return null;
   if (/^(?:quiero |necesito )?hablar con (?:un |el )?cliente$/.test(value)) return { kind: 'customer', query: '' };
   const customer = /^(?:(?:busca|buscame|buscar|mostrame|consulta)(?: al| el)? cliente |(?:quiero |necesito )?hablar con (?:el cliente |cliente ))(.+)$/.exec(value);

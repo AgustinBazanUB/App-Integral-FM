@@ -180,7 +180,7 @@ test("binary Live frames complete the handshake and a text diagnostic turn witho
   }
   const turns = [], reports = [];
   const live = new GeminiLiveSession({
-    conversationId:'diagnostic-text', audioContext:{currentTime:0}, WebSocket:BinarySocket,
+    conversationId:'diagnostic-text', audioContext:{currentTime:0}, WebSocket:BinarySocket, completionGraceMs:5,
     request:async body => {
       if(body.operation==='token')return {token:'auth_tokens/test',sessionId:'text-only',expiresAt:new Date(Date.now()+60000).toISOString(),maxSessionSeconds:60};
       if(body.operation==='classify')return {route:'direct',direct:true};
@@ -207,7 +207,10 @@ test("binary Live frames complete the handshake and a text diagnostic turn witho
   assert.equal(turns[0].delegated,false);
   assert.equal(reports[0].inputAudioSeconds,0);
   assert.equal(reports[0].usageMetadata.promptTokensDetails[0].modality,'TEXT');
+  socket.receive({serverContent:{generationComplete:true}});
   live.sendText('Gracias');
+  await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(live.failed,false,'a trailing event from the previous turn must not arm a deadline on the next turn');
   live.close();
   await live.stopping;
   assert.equal(reports.length,2,'unfinished paid turns must be reported before releasing the reservation');

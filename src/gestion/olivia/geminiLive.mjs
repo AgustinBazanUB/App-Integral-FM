@@ -40,7 +40,7 @@ function errorMessage(event) {
 }
 
 export class GeminiLiveSession {
-  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000, turnTimeoutMs = 45000, completionGraceMs = 2000 }) {
+  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000, turnTimeoutMs = 45000, completionGraceMs = 5000 }) {
     Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, onProtocol, WebSocket, now, clock, connectTimeoutMs, turnTimeoutMs, completionGraceMs });
     this.closed = false; this.failed = false; this.handlesTurns = false; this.listening = false; this.isPlaying = false; this.turnIndex = 0; this.sources = new Set(); this.finalizingTurns = new Set(); this.currentTurn = this.createTurn();
   }
@@ -169,6 +169,7 @@ export class GeminiLiveSession {
         this.currentTurn = this.createTurn();
       }
       const turn = this.currentTurn;
+      clearTimeout(turn.completionTimer); clearTimeout(turn.responseTimer);
       turn.turnId = globalThis.crypto.randomUUID(); turn.turnIndex = ++this.turnIndex; turn.pending = true; turn.inputText = ""; turn.interimText = ""; turn.outputText = ""; turn.publishedOutputText = ""; turn.usageMetadata = null; turn.inputAudioSeconds = 0; turn.outputAudioSeconds = 0; turn.generatedAudio = false; turn.heardAudio = false; turn.pendingAudio = []; turn.toolTurn = false; turn.toolPending = false; turn.awaitingToolResponse = false; turn.outputAuthorized = false; turn.classificationPromise = null; turn.completeReceived = false; turn.transcriptComplete = false; turn.noTranscriptTimer = null;
     }
   }
@@ -231,7 +232,7 @@ export class GeminiLiveSession {
       void this.handleTools(event.toolCall.functionCalls, turn);
     }
     if (event.goAway && this.resumeHandle && !this.reconnecting) this.reconnect();
-    if (content?.generationComplete && !interrupted && !ignoreOutput) {
+    if (content?.generationComplete && turn.pending && !interrupted && !ignoreOutput) {
       clearTimeout(turn.completionTimer);
       turn.completionTimer = setTimeout(() => {
         if (this.closed || this.failed || !turn.pending || turn.completeReceived || turn.toolPending || turn.awaitingToolResponse || turn.cancelled) return;
@@ -240,7 +241,7 @@ export class GeminiLiveSession {
         turn.providerIncomplete = true;
         this.stopPlayback();
         void this.finishTurn(turn).finally(() => this.fail(new Error("Gemini terminó la generación sin cerrar el turno de audio; continúo con el respaldo.")));
-      }, this.completionGraceMs);
+      }, Math.max(0, ((this.nextAudioAt || 0) - (this.audioContext?.currentTime || 0)) * 1000) + this.completionGraceMs);
     }
     if (content?.turnComplete && !interrupted && !ignoreOutput && !turn.toolPending && !turn.awaitingToolResponse) {
       turn.completeReceived = true;
