@@ -34,6 +34,21 @@ La formulación larga de preparación de stock exigió aclarar nombre y cantidad
 
 ## Comprobaciones automatizadas y aceptación
 
+### Repetición en `eca2c87`
+
+Después de las 30 consultas anteriores se hicieron otras dos, para un total de **32 entradas reales escritas: 16 Gemini y 16 chat habitual**. No se cuentan los clics de conectar/cerrar ni la cancelación de la tarjeta como entradas conversacionales. El [registro final](chrome-text-session-5.json) confirmó:
+
+| Consulta | Ruta | Texto → primer audio programado | Texto → resultado | Costo calculado Gemini |
+| --- | --- | ---: | ---: | ---: |
+| Precio del Aceite QA PR53 | Herramienta de Olivia | 8107 ms | 14120 ms | USD 0,002926 |
+| Perfecto, gracias | Gemini directo | 1962 ms | 3490 ms | USD 0,002550 |
+
+Ambos turnos recibieron cierre normal, uso y audio programado. La respuesta comercial fue completa: «El precio del Aceite QA PR53 en QA PR53 es de mil pesos». Esto verifica el dato y el cierre del flujo; no constituye evaluación auditiva física.
+
+Gemini quedó con USD 0,033508 registrados (USD 0,032518 calculados desde uso y USD 0,000990 estimados), un uso sin confirmar y 15 turnos contabilizados, incluyendo la imputación histórica de frames tardíos descrita arriba. Configuración confirmó **USD 0,0000 reservados** tras cerrar. El consolidado mensual visible fue aproximadamente USD 0,0277 Luna/Sol + USD 0,00402 Chirp + USD 0,0335 Gemini = USD 0,0652; incluye actividad previa y no es el costo exacto de esta batería ni una factura.
+
+Se comprobó otra discrepancia de presentación: el backend ya liberaba la reserva, pero el panel conservaba USD 0,50 hasta recargar. El cierre ahora propaga el resumen confirmado a la interfaz, conservando el uso por turno. La regresión verifica esa notificación; se repetirá el ciclo de conexión/cierre después del despliegue de esta corrección visual. El inventario fresco siguió en 19 unidades ([captura final](stock-final.png)).
+
 La suite local pasa **1104/1104** y el build compila; mantiene el aviso previo de bundles mayores a 500 kB. Las pruebas focalizadas reproducen frames binarios, costo por modalidad, límites de staging, clasificación, audio retenido, cierre incompleto, uso sin confirmar y frames tardíos.
 
 Pendientes: prueba física del micrófono y reconocimiento, ruido, barge-in real, comparación audible Gemini/Chirp, percentiles desde el fin del habla y costo de entrada de audio. Los tests simulados de esos mecanismos están separados de la evidencia de proveedor real. La integración sigue en preview y su aceptación de voz completa permanece pendiente.

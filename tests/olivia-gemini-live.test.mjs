@@ -178,16 +178,17 @@ test("binary Live frames complete the handshake and a text diagnostic turn witho
     close() { this.readyState = 3; }
     receive(event) { this.onmessage({data:new TextEncoder().encode(JSON.stringify(event)).buffer}); }
   }
-  const turns = [], reports = [];
+  const turns = [], reports = [], closedBudgets = [];
   const live = new GeminiLiveSession({
     conversationId:'diagnostic-text', audioContext:{currentTime:0}, WebSocket:BinarySocket, completionGraceMs:5,
     request:async body => {
       if(body.operation==='token')return {token:'auth_tokens/test',sessionId:'text-only',expiresAt:new Date(Date.now()+60000).toISOString(),maxSessionSeconds:60};
       if(body.operation==='classify')return {route:'direct',direct:true};
       if(body.operation==='usage'){reports.push(body);return {measurement:'provider-forwarded',shouldStop:false};}
-      return {closed:true};
+      return {closed:true,reservedUsd:0};
     },
     onTurnComplete:turn=>turns.push(turn),
+    onSessionClosed:budget=>closedBudgets.push(budget),
   });
   t.after(()=>live.close());
   const started=live.start(null,{textInputOnly:true});
@@ -217,6 +218,7 @@ test("binary Live frames complete the handshake and a text diagnostic turn witho
   assert.equal(live.failed,false,'a trailing event from the previous turn must not arm a deadline on the next turn');
   live.close();
   await live.stopping;
+  assert.equal(closedBudgets.at(-1).reservedUsd,0,'the visible budget gets the confirmed release without replacing per-turn usage');
   assert.equal(reports.length,2,'unfinished paid turns must be reported before releasing the reservation');
   assert.equal(reports[1].usageMetadata,null,'unfinished usage stays unconfirmed instead of becoming a zero-cost success');
 });

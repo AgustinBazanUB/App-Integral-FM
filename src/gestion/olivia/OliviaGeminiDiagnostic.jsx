@@ -28,6 +28,7 @@ export default function OliviaGeminiDiagnostic({ conversationId, disabled, onAct
       const live = new GeminiLiveSession({
         request: payload => oliviaClient.hybridLive(payload), conversationId, audioContext: context.current,
         onProtocol: event => setProtocol(current => [...current.slice(-19), event]),
+        onSessionClosed: usage => callbacks.current.onUsage(usage),
         onClassification: result => update({ route: result.route, classificationMs: result.durationMs }),
         onFirstAudio: at => update({ textToScheduledAudioMs: at - activeRow.current.started }),
         onTranscript: response => update({ response }),

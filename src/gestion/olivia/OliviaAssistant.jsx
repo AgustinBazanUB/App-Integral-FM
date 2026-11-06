@@ -695,6 +695,7 @@ export default function OliviaAssistant() {
               return last?.voiceTranscript || last?.content || 'Olivia no devolvió una respuesta final.';
             },
             onUsage:usage=>{updateGeminiUsage(usage);setVoiceMetrics(current=>({...current,geminiLiveLastUsage:usage}));},
+            onSessionClosed:updateGeminiUsage,
             onNotice:notice=>{if(mounted.current && voiceRef.current===connection){setVoiceNotice(notice);setVoiceMetrics(current=>({...current,geminiLiveStatus:'reconnecting'}));}},
             onUnavailable:failure=>{if(mounted.current && voiceRef.current===connection){setVoiceState(requestRef.current?'processing':mutedRef.current?'muted':'listening');setVoiceMetrics(current=>({...current,geminiLiveStatus:'fallback',geminiLiveFallback:failure?.message || 'provider-error'}));setVoiceNotice('Gemini Live se interrumpió; continúo con el circuito de voz anterior.');}},
           });

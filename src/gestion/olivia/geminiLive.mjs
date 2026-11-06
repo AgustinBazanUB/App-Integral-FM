@@ -40,8 +40,8 @@ function errorMessage(event) {
 }
 
 export class GeminiLiveSession {
-  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000, turnTimeoutMs = 45000, completionGraceMs = 5000 }) {
-    Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, onProtocol, WebSocket, now, clock, connectTimeoutMs, turnTimeoutMs, completionGraceMs });
+  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, onSessionClosed = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000, turnTimeoutMs = 45000, completionGraceMs = 5000 }) {
+    Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, onProtocol, onSessionClosed, WebSocket, now, clock, connectTimeoutMs, turnTimeoutMs, completionGraceMs });
     this.closed = false; this.failed = false; this.handlesTurns = false; this.listening = false; this.isPlaying = false; this.turnIndex = 0; this.sources = new Set(); this.finalizingTurns = new Set(); this.currentTurn = this.createTurn();
   }
 
@@ -57,7 +57,8 @@ export class GeminiLiveSession {
     if (!this.tokenResult?.token || !this.tokenResult?.sessionId) throw new Error("No se recibió un token efímero de Gemini Live.");
     this.sessionId = this.tokenResult.sessionId;
     if (this.closed) {
-      await this.request({ operation: "close", sessionId: this.sessionId }).catch(() => {});
+      const summary = await this.request({ operation: "close", sessionId: this.sessionId }).catch(() => null);
+      if (summary) this.onSessionClosed(summary);
       throw new DOMException("Sesión cerrada", "AbortError");
     }
     this.tokenExpiresAt = Date.parse(this.tokenResult.expiresAt);
@@ -439,7 +440,8 @@ export class GeminiLiveSession {
       for (const turn of turns) {
         if (turn.inputText || turn.inputAudioSeconds || turn.outputAudioSeconds || turn.usageMetadata) await this.reportUsage(turn, { includeProviderUsage: turn.completed });
       }
-      await this.request({ operation: "close", sessionId: this.sessionId }).catch(() => {});
+      const summary = await this.request({ operation: "close", sessionId: this.sessionId }).catch(() => null);
+      if (summary) this.onSessionClosed(summary);
     })();
     return this.stopping;
   }
