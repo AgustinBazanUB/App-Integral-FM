@@ -6,6 +6,10 @@ import { oliviaError,safeId } from "../../src/shared/oliviaContracts.mjs";
 import { chatStream } from "./_lib/olivia/stream.mjs";
 import { startChatJob, chatJobStatus, activeChatJob, cancelChatJob } from "./_lib/olivia/chatJobs.mjs";
 import { captureOliviaFailure, sendOliviaErrorReport } from "./_lib/olivia/errorReports.mjs";
+import { startDelegatedTask, listDelegatedTasks, controlDelegatedTask } from './_lib/olivia/delegatedTasks.mjs';
+import { assertGeminiLivePreview } from './olivia-gemini-live.mjs';
+import { configuredFirebaseProjectId } from './_lib/firebaseProject.mjs';
+import { canUseOliviaVoice } from '../../src/shared/oliviaVoiceAvailability.mjs';
 export default async function handler(request) {
   const receivedAt=Date.now(),timed=response=>{response.headers.set('X-Olivia-Server-Ms',String(Date.now()-receivedAt));return response;};
   if (request.method !== "POST")
@@ -32,15 +36,23 @@ export default async function handler(request) {
       throw oliviaError("voice-mode-retired", "GPT-Live fue retirado. La única conversación por voz disponible es la voz natural de Olivia.", 410);
     store = createOliviaStore();
     const engine = createOliviaEngine({ store, pricingResolver: resolveOliviaPricing });
+    const dispatch = async jobId => {
+      const response = await fetch(new URL('/.netlify/functions/olivia-chat-background',request.url),{method:'POST',headers:{Authorization:`Bearer ${session.idToken}`,'Content-Type':'application/json'},body:JSON.stringify({jobId}),signal:AbortSignal.timeout(10000)});
+      if(response.status!==202)throw oliviaError('chat-dispatch-failed','No pude iniciar la consulta.',503);
+    };
+    if(['delegatedTask','delegatedTaskStatus','delegatedTaskControl'].includes(body.operation)){
+      assertGeminiLivePreview({env:process.env,projectId:configuredFirebaseProjectId(process.env)});
+      if(!canUseOliviaVoice(session))throw oliviaError('voice-not-enabled','La voz sigue limitada a la prueba administrativa.',403);
+      const args={store,engine,session,body,dispatch};
+      const result=body.operation==='delegatedTask'?await startDelegatedTask(args):body.operation==='delegatedTaskControl'?await controlDelegatedTask(args):{tasks:await listDelegatedTasks({...args,parent:safeId(body.conversationId)})};
+      return timed(json(result));
+    }
     if (body.operation === "chat" && body.stream === true) {
       const stream = chatStream((options) => engine.chat(session, body, options));
       return timed(new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } }));
     }
     let result;
-    if (body.operation === "startChat") result = await startChatJob({ store, engine, session, body, dispatch: async jobId => {
-      const response = await fetch(new URL("/.netlify/functions/olivia-chat-background", request.url), { method: "POST", headers: { Authorization: `Bearer ${session.idToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ jobId }), signal: AbortSignal.timeout(10000) });
-      if (response.status !== 202) throw oliviaError("chat-dispatch-failed", "No pude iniciar la consulta.", 503);
-    } });
+    if (body.operation === "startChat") result = await startChatJob({ store, engine, session, body, dispatch });
     else if (body.operation === "chatStatus") result = await chatJobStatus({ store, session, body });
     else if (body.operation === "cancelChat") result = await cancelChatJob({ store, session, body });
     else if (body.operation === 'cancelTurn') {await engine.invalidateTask(session,body.conversationId,safeId(body.requestId));result={cancelled:true};}

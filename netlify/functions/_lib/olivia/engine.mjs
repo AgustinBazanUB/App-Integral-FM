@@ -243,6 +243,7 @@ export function createOliviaEngine({
           ? "RECHAZADA"
           : conversation.state,
       pendingAction,
+      conversationContext: { collectingTask: conversation.taskState?.status === 'collecting' || Boolean(conversation.delegatedContext?.collectingTask), activeTask: Boolean(conversation.busyRequestId || conversation.queuedChatRequestId || conversation.delegatedContext?.activeTask), pendingAction: Boolean(pendingAction || conversation.delegatedContext?.pendingAction) },
       guide: conversation.guide || null,
       failure: conversation.lastFailure || null,
       usage: await usage(session, config),
@@ -268,16 +269,16 @@ export function createOliviaEngine({
       throw oliviaError("gemini-live-disabled", "La voz híbrida solo está habilitada para un Deploy Preview aislado.", 403);
     const id = safeId(body.conversationId), requestId = safeId(body.requestId), userText = String(body.userText || "").trim().slice(0, 12000), assistantText = String(body.assistantText || "").trim().slice(0, 12000), now = clock();
     if (!userText || !assistantText) throw oliviaError("invalid-input", "El turno de voz necesita transcripción de usuario y respuesta.");
-    if (classifyGeminiLiveTurn(userText).route !== "direct") throw oliviaError("gemini-direct-not-authorized", "Esta consulta debe pasar por el motor autorizado de Olivia.", 403);
     const result = await store.transaction(async (tx) => {
       const path = `oliviaConversations/${id}`, snapshot = await tx.getDocument(path), conversation = snapshot?.data;
       assertConversationOwner(session, conversation, now);
-      if (conversation.busyRequestId && dateMs(conversation.busyUntil) > now.getTime()) throw oliviaError("conversation-busy", "Olivia está procesando otra consulta en esta conversación.", 409);
+      const routingContext = { pendingAction:conversation.delegatedContext?.pendingAction, pendingActionId: conversation.pendingActionId, collectingTask: conversation.taskState?.status === 'collecting' || Boolean(conversation.delegatedContext?.collectingTask), activeTask: Boolean(conversation.busyRequestId || conversation.queuedChatRequestId || conversation.delegatedContext?.activeTask) };
+      if (classifyGeminiLiveTurn(userText, routingContext).route !== "direct") throw oliviaError("gemini-direct-not-authorized", "Esta consulta debe pasar por el motor autorizado de Olivia.", 403);
       const turnPath = `oliviaGeminiLiveTurns/${session.uid}_${requestId}`, prior = await tx.getDocument(turnPath);
       if (prior) return prior.data.result;
       const userEntry = message("user", userText, now, "natural-voice"), assistantEntry = message("assistant", assistantText, now, "natural-voice");
       const messages = trimMessages([...(conversation.messages || []), userEntry, assistantEntry]);
-      const next = { ...conversation, messages, title: conversation.title || userText.replace(/\s+/g, " ").slice(0, 80), messageCount: (conversation.messageCount || 0) + (messages.includes(userEntry) ? 1 : 0) + (messages.includes(assistantEntry) ? 1 : 0), state: "INFORMACION", updatedAt: now, expiresAt: retentionDate(config.retentionMonths, now) };
+      const next = { ...conversation, messages, title: conversation.title || userText.replace(/\s+/g, " ").slice(0, 80), messageCount: (conversation.messageCount || 0) + (messages.includes(userEntry) ? 1 : 0) + (messages.includes(assistantEntry) ? 1 : 0), state: routingContext.activeTask || routingContext.pendingActionId || routingContext.collectingTask ? conversation.state : "INFORMACION", updatedAt: now, expiresAt: retentionDate(config.retentionMonths, now) };
       await tx.commitDocuments([
         ...(messages.includes(userEntry) ? [retainedMessage(id, userEntry)] : []),
         ...(messages.includes(assistantEntry) ? [retainedMessage(id, assistantEntry)] : []),

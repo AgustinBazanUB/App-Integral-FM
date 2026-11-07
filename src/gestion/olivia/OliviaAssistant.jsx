@@ -31,6 +31,8 @@ import { OLIVIA_VOICE_UNAVAILABLE_MESSAGE } from "../../shared/oliviaVoiceAvaila
 import "./olivia.css";
 import { OliviaLauncherPortal } from "./LauncherHost";
 import { getUiGuide, UI_GUIDE_VERSION } from '../../shared/oliviaUiGuides.mjs';
+import { DelegatedTaskClient } from './delegatedTaskClient.mjs';
+import OliviaDelegatedTasks from './OliviaDelegatedTasks';
 
 export default function OliviaAssistant() {
   const { user, profile } = useAuth();
@@ -50,7 +52,13 @@ export default function OliviaAssistant() {
   const closeButtonRef = useRef(null);
   const drawerRef = useOverlay(open, minimizeChat, closeButtonRef);
   const [snapshot, setSnapshot] = useState({ messages: [], state: "information", pendingAction: null, usage: null });
-  const snapshotRef = useRef(snapshot); snapshotRef.current = snapshot;
+  const snapshotRef=useRef(snapshot);snapshotRef.current=snapshot;
+  const [delegatedTasks,setDelegatedTasks]=useState([]);
+  const delegatedTasksRef=useRef([]);delegatedTasksRef.current=delegatedTasks;
+  const delegatedClient=useRef(null);
+  const [taskControlId,setTaskControlId]=useState(null);
+  const turnTimings=useRef(new Map());
+  const turnTraces=useRef(new Map());
   const [developer, setDeveloper] = useState(false);
   const [geminiDiagnosticActive, setGeminiDiagnosticActive] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(false);
@@ -185,11 +193,10 @@ export default function OliviaAssistant() {
     }
   }, [navigate, user.uid, setReview, setGuideCommand]);
 
-  const recordVoiceMetric = (key, duration) => {
+  const recordVoiceMetric = (key, duration, flow = voiceTurnTiming.current?.flow) => {
     if (!Number.isFinite(duration) || duration < 0) return;
     const samples = voiceMetricsSamples.current;
     samples[key] = [...(samples[key] || []), duration].slice(-100);
-    const flow=voiceTurnTiming.current?.flow;
     if(flow && ['silence','voiceEndToUsefulAudio','voiceEndToComplete'].includes(key)){const grouped=flow+'.'+key;samples[grouped]=[...(samples[grouped] || []),duration].slice(-100);}
     const summary = (name) => ({ medianMs: latencyPercentile(samples[name] || [], 0.5), p90Ms: latencyPercentile(samples[name] || [], 0.9), p95Ms: latencyPercentile(samples[name] || [], 0.95), count: (samples[name] || []).length });
     setVoiceMetrics(current => ({...current,...Object.fromEntries(Object.keys(samples).map(name=>[name,summary(name)])),ttfaScheduled:summary('ttfa')}));
@@ -207,9 +214,10 @@ export default function OliviaAssistant() {
     });
   };
   const markTurnTrace = (stage, metadata = {}, at = performance.now()) => {
-    if (!voiceTrace.current && metadata.turnId) voiceTrace.current = latencyTrace({ id: metadata.turnId, origin: "client" });
-    voiceTrace.current?.mark(stage, metadata, at);
-    saveTurnTrace();
+    let trace=metadata.turnId?turnTraces.current.get(metadata.turnId):voiceTrace.current;
+    if(!trace && metadata.turnId){trace=latencyTrace({id:metadata.turnId,origin:'client'});turnTraces.current.set(metadata.turnId,trace);if(turnTraces.current.size>100)turnTraces.current.delete(turnTraces.current.keys().next().value);}
+    trace?.mark(stage, metadata, at);
+    saveTurnTrace(trace);
   };
   const markConnectionTrace = (stage, metadata = {}, at = performance.now()) => {
     connectionTrace.current?.mark(stage, metadata, at);
@@ -222,6 +230,26 @@ export default function OliviaAssistant() {
     return {...current, geminiLiveUsage:{...next, combinedEstimatedSpendUsd:Number(next.spendUsd || 0) + providers,
       combinedUnconfirmedCount:Number(next.unconfirmedQueryCount || 0) + Number(next.lunaSol?.unconfirmedCalls || 0)}};
   });
+
+  useEffect(()=>{
+    if(!snapshot.conversationId || !snapshot.voiceConversationAvailable)return;
+    const client=new DelegatedTaskClient({request:(payload)=>oliviaClient.request(payload),conversationId:snapshot.conversationId,
+      onChange:tasks=>{if(!mounted.current)return;setDelegatedTasks(tasks);for(const task of tasks)voiceRef.current?.transcriber?.notifyTaskUpdate?.(task);},
+      onTrace:(stage,metadata)=>markTurnTrace(stage,metadata)});
+    delegatedClient.current=client;
+    setDelegatedTasks([]);
+    client.refresh().catch(()=>{});
+    const timer=setInterval(()=>{if(!client.runningRequests && client.tasks.some(t=>['queued','dispatching','running'].includes(t.status)))client.refresh().catch(()=>{});},3000);
+    return()=>{clearInterval(timer);client.close();if(delegatedClient.current===client)delegatedClient.current=null;};
+  },[snapshot.conversationId,snapshot.voiceConversationAvailable]);
+
+  const controlTask=async(task,action)=>{
+    if(!delegatedClient.current)return;
+    setTaskControlId(task.id);
+    try{await delegatedClient.current.control({taskId:task.id,action,visualConfirmation:action==='confirm',actionId:task.pendingAction?.id,confirmationToken:task.pendingAction?.confirmationToken});}
+    catch(error){setVoiceNotice(error.message);}
+    finally{setTaskControlId(null);}
+  };
 
   const perform = useCallback(async (operation, fields = {}, identity = requestId(), hooks = {}) => {
     if (requestRef.current) throw new Error("Esperá a que termine la solicitud actual.");
@@ -584,6 +612,7 @@ export default function OliviaAssistant() {
     const hybridLive = Boolean(snapshot.voiceSettings?.hybridLiveAvailable && snapshot.voiceSettings?.hybridLiveEnabled);
     if (!hybridLive) { setVoiceNotice("Gemini Live no está disponible en este preview. Podés seguir por escrito o intentar más tarde."); return; }
     setError(""); setCaption(""); setMuted(false); setVoiceFailure(false); setPermissionDenied(false); setSessionNotice(""); voiceTurnTiming.current = null;
+    voiceMetricsSamples.current={};setVoiceMetrics({geminiLiveStatus:'connecting',geminiLiveFallback:null});turnTimings.current.clear();turnTraces.current.clear();
     voiceStartAt.current = performance.now(); connectionTrace.current = latencyTrace({ id: requestId(), origin: "client" });
     connectionTrace.current.mark("voice.connect.start", {}, voiceStartAt.current); voiceTrace.current = null; visibleTranscriptTurns.current.clear();
     setVoiceTurnTraces([]); setTurnTrace(null); setConnectionTraceView(connectionTrace.current.snapshot());
@@ -596,13 +625,15 @@ export default function OliviaAssistant() {
         else markTurnTrace(stage,{...safeMetadata,...(turnId?{turnId}:{}),...(Number.isFinite(endpointMs)?{endpointMs}:{}),...(Number.isFinite(voiceEndedAt)?{durationMs:at-voiceEndedAt}:{})},at);
         if(stage==='voice.mic.ready' && Number.isFinite(voiceStartAt.current))recordVoiceMetric('micReady',at-voiceStartAt.current);
         if(stage==='gemini.session.ready' && Number.isFinite(startedAt)){recordVoiceMetric('geminiConnect',at-startedAt);recordVoiceMetric('clickToGeminiReady',at-(voiceStartAt.current || at));setVoiceMetrics(current=>({...current,geminiLiveStatus:'connected'}));}
-        if(stage==='voice.turn.end')voiceTurnTiming.current={turnId,endedAt:at,voiceEndedAt:Number.isFinite(voiceEndedAt)?voiceEndedAt:at,endpointMs,flow:hybridLive?'gemini':'controlled'};
+        if(stage==='voice.turn.end'){voiceTurnTiming.current={turnId,endedAt:at,voiceEndedAt:Number.isFinite(voiceEndedAt)?voiceEndedAt:at,endpointMs,flow:hybridLive?'gemini':'controlled'};turnTimings.current.set(turnId,voiceTurnTiming.current);if(turnTimings.current.size>100)turnTimings.current.delete(turnTimings.current.keys().next().value);}
       },
       createTranscriber: async(stream,onPartial,signal)=>{
         const live=new GeminiLiveSession({
             request:(payload,options)=>oliviaClient.hybridLive(payload,options),
             conversationId:conversationRef.current,
             audioContext:connection.context,
+            backgroundTools:true,
+            getConversationContext:()=>({...snapshotRef.current.conversationContext,pendingAction:Boolean(snapshotRef.current.pendingAction)||delegatedTasksRef.current.some(t=>t.status==='awaiting-confirmation'),collectingTask:Boolean(snapshotRef.current.conversationContext?.collectingTask)||delegatedTasksRef.current.some(t=>t.status==='needs-input'),activeTask:Boolean(snapshotRef.current.conversationContext?.activeTask)||delegatedTasksRef.current.some(t=>['queued','running','dispatching','confirming','cancelling'].includes(t.status))}),
             onTrace:event=>{
               const {stage,at,...metadata}=event;
               const sessionStage=stage.startsWith('gemini.token.') || stage.startsWith('gemini.websocket.') || stage.startsWith('gemini.setup.') || stage==='gemini.capture.ready';
@@ -611,51 +642,31 @@ export default function OliviaAssistant() {
             },
             onState:state=>{if(mounted.current && voiceRef.current===connection)setVoiceState(state);},
             onPartial:text=>{onPartial(text);if(mounted.current && text)setCaption(text);},
-            onTranscript:(text,{turnId,turnIndex}={})=>{if(mounted.current){if(turnId && !visibleTranscriptTurns.current.has(turnId)){visibleTranscriptTurns.current.add(turnId);markTurnTrace('assistant.text.visible.first',{turnId,turnIndex,source:'gemini'},performance.now());}setCaption(text);setVoiceState('speaking');}},
-            onClassification:({durationMs,direct,route,kind,source,turnIndex})=>{
+            onTranscript:(text,{turnId,turnIndex}={})=>{if(mounted.current){if(turnId && !visibleTranscriptTurns.current.has(turnId)){visibleTranscriptTurns.current.add(turnId);markTurnTrace('assistant.text.visible.first',{turnId,turnIndex,source:'gemini'},performance.now());}setCaption(text);}},
+            onClassification:({durationMs,direct,route,kind,source,turnIndex,turnId})=>{
               recordVoiceMetric(source==='local-policy'?'geminiLocalClassification':'geminiClassification',durationMs);
               const label=route==='local-direct'?'Gemini directo · política local':route==='model-tool'?'Delegado con herramienta Gemini':route==='local-policy-delegate'?'Delegado por política local':'Delegado por política backend';
               setVoiceMetrics(current=>({...current,geminiLastRoute:label,geminiLastTurnIndex:turnIndex}));
-              markTurnTrace('gemini.classification',{route:route || (direct?'direct':'delegate'),kind,source,durationMs,turnIndex},performance.now());
+              markTurnTrace('gemini.classification',{turnId,route:route || (direct?'direct':'delegate'),kind,source,durationMs,turnIndex},performance.now());
             },
-            onFirstAudio:(at,{turnId,turnIndex})=>{if(mounted.current && voiceRef.current===connection){setVoiceState('speaking');if(voiceTurnTiming.current){const duration=at-voiceTurnTiming.current.voiceEndedAt;recordVoiceMetric('voiceEndToUsefulAudio',duration);recordVoiceMetric('geminiVoiceEndToUsefulAudio',duration);recordVoiceMetric(turnIndex===1?'geminiFirstTurnVoiceEndToUsefulAudio':'geminiLaterTurnVoiceEndToUsefulAudio',duration);}}},
-            onAudioComplete:(at,{turnId,turnIndex}={})=>{if(voiceTurnTiming.current)recordVoiceMetric('voiceEndToComplete',at-voiceTurnTiming.current.voiceEndedAt);if(mounted.current && voiceRef.current===connection && !connection.recordingTurn)setVoiceState(requestRef.current?'processing':mutedRef.current?'muted':'listening');},
+            onFirstAudio:(at,{turnId,sourceTurnId,taskId,turnIndex,acknowledgement})=>{if(mounted.current && voiceRef.current===connection){setVoiceState('speaking');const timing=turnTimings.current.get(sourceTurnId || turnId);if(timing){const duration=at-timing.voiceEndedAt;if(acknowledgement)recordVoiceMetric('voiceEndToAcknowledgement',duration,'delegate');else if(taskId)recordVoiceMetric('delegatedVoiceEndToResult',duration,'delegate');else{recordVoiceMetric('voiceEndToUsefulAudio',duration,'gemini');recordVoiceMetric('geminiVoiceEndToUsefulAudio',duration);recordVoiceMetric(turnIndex===1?'geminiFirstTurnVoiceEndToUsefulAudio':'geminiLaterTurnVoiceEndToUsefulAudio',duration);}}}},
+            onAudioComplete:(at,{turnId,sourceTurnId,taskId}={})=>{const timing=turnTimings.current.get(sourceTurnId || turnId);if(timing)recordVoiceMetric(taskId?'delegatedVoiceEndToComplete':'voiceEndToComplete',at-timing.voiceEndedAt,taskId?'delegate':'gemini');if(mounted.current && voiceRef.current===connection && !connection.recordingTurn && !connection.transcriber?.currentTurn?.pending)setVoiceState(mutedRef.current?'muted':'listening');},
             onTurnComplete:turn=>{
               markTurnTrace('assistant.result.complete',{turnId:turn.turnId,turnIndex:turn.turnIndex,route:turn.delegated?'delegate':'direct',status:turn.providerIncomplete?'provider-incomplete':'complete'},performance.now());
-              if(turn.delegated){if(turn.noAudio && turn.assistantText){setCaption(turn.assistantText);setVoiceNotice('Gemini devolvió el resultado en texto, pero no generó audio. El texto quedó en pantalla; volvé a conectar para seguir por voz.');}return;}
+              if(turn.delegated){if(!turn.pendingTask && turn.noAudio && turn.assistantText){setCaption(turn.assistantText);setVoiceNotice('Gemini devolvió el resultado en texto, pero no generó audio. El texto quedó en pantalla; volvé a conectar para seguir por voz.');}return;}
               if(!turn.userText || !turn.assistantText)return;
               setCaption(turn.assistantText);
               if(turn.noAudio)setVoiceNotice('Gemini devolvió texto, pero no generó audio. El texto quedó en pantalla; volvé a conectar para seguir por voz.');
               const persistStartedAt=performance.now();markTurnTrace('history.persist.start',{turnId:turn.turnId,turnIndex:turn.turnIndex,operation:'geminiDirectTurn'},persistStartedAt);
               void oliviaClient.request({operation:'geminiDirectTurn',conversationId:conversationRef.current,requestId:turn.turnId,userText:turn.userText,assistantText:turn.assistantText}).then(result=>{markTurnTrace('history.persist.end',{turnId:turn.turnId,turnIndex:turn.turnIndex,durationMs:performance.now()-persistStartedAt,status:'ok'},performance.now());if(mounted.current && voiceRef.current===connection)apply(result);}).catch(failure=>{markTurnTrace('history.persist.end',{turnId:turn.turnId,turnIndex:turn.turnIndex,durationMs:performance.now()-persistStartedAt,status:'error'},performance.now());if(mounted.current)setVoiceNotice(failure.message || 'No se pudo guardar la transcripción de Gemini en este chat.');});
             },
-            onToolCall:async(_call,inputText,context={})=>{
-              if(context.transcriptComplete !== true || !String(inputText || '').trim())throw new Error('No se recibió una transcripción final verificada; repetí la solicitud para que Olivia la procese.');
-              const message=String(inputText).trim();
-              if(!message)throw new Error('No pude recuperar la solicitud del audio para derivarla a Olivia.');
-              const turnMetadata={turnId:context.turnId,turnIndex:context.turnIndex};
-              const delegateStartedAt=performance.now();markTurnTrace('olivia.delegate.start',{...turnMetadata,route:'policy'},delegateStartedAt);
-              setCaption('Consultando información autorizada…');
-              let result;
-              try {
-                result=await perform('chat',{message,inputMode:'natural-voice',deferVoice:true},requestId(),{
-                  onAccepted:()=>{
-                    markTurnTrace('olivia.delegate.accepted',{...turnMetadata,status:'accepted'},performance.now());
-                  },
-                });
-              } catch(error) {
-                markTurnTrace('olivia.delegate.complete',{...turnMetadata,durationMs:performance.now()-delegateStartedAt,status:'error'},performance.now());
-                throw error;
-              }
-              const telemetry=result.telemetry || {};
-              markTurnTrace('olivia.delegate.complete',{...turnMetadata,durationMs:performance.now()-delegateStartedAt,route:telemetry.route || 'policy',status:'ok'},performance.now());
-              for(const providerCall of telemetry.calls || [])markTurnTrace('olivia.provider.complete',{...turnMetadata,provider:providerCall.model || 'luna',model:providerCall.model || 'gpt-6-luna',durationMs:providerCall.durationMs,costUsd:providerCall.actualCostUsd,status:providerCall.measurement || 'unconfirmed'});
-              if(Number.isFinite(telemetry.toolsMs))markTurnTrace('olivia.tools.complete',{...turnMetadata,durationMs:telemetry.toolsMs,status:'ok'});
-              const last=result.messages?.filter(entry=>entry.role==='assistant').at(-1);
-              if(result.pendingAction){markTurnTrace('operation.prepared',{...turnMetadata,route:'visual-confirmation',status:'prepared'});return `Preparé la operación «${result.pendingAction.summary}». Revisá la tarjeta en pantalla y confirmala si corresponde; todavía no se ejecutó.`;}
-              return last?.voiceTranscript || last?.content || 'Olivia no devolvió una respuesta final.';
+            onToolCall:async(call,inputText,context={})=>{
+              if(context.transcriptComplete!==true || !String(inputText || '').trim())throw new Error('No se recibió la transcripción final; repetí la solicitud.');
+              if(!delegatedClient.current)throw new Error('La cola de tareas todavía no está lista.');
+              return delegatedClient.current.run(call,String(inputText).trim(),{...context,requestId:requestId(),screenContext:contextRef.current,
+                onAccepted:task=>{markTurnTrace('olivia.delegate.accepted',{turnId:context.turnId,taskId:task.id,jobId:task.jobId,status:task.status});context.onAccepted?.(task);}});
             },
-            onUsage:usage=>{updateGeminiUsage(usage);setVoiceMetrics(current=>({...current,geminiLiveLastUsage:usage}));markTurnTrace('provider.usage',{turnId:voiceTurnTiming.current?.turnId,provider:'gemini',model:'gemini-3.8-live',costUsd:usage.costUsd,inputTokens:usage.inputTokens,outputTokens:usage.outputTokens,status:usage.measurement || 'unconfirmed'});},
+            onUsage:(usage,correlation={})=>{updateGeminiUsage(usage);setVoiceMetrics(current=>({...current,geminiLiveLastUsage:usage}));markTurnTrace('provider.usage',{...correlation,provider:'gemini',model:'gemini-3.8-live',costUsd:usage.costUsd,inputTokens:usage.inputTokens,outputTokens:usage.outputTokens,status:usage.measurement || 'unconfirmed'});},
             onSessionClosed:updateGeminiUsage,
             onNotice:notice=>{if(mounted.current && voiceRef.current===connection){setVoiceNotice(notice);setVoiceMetrics(current=>({...current,geminiLiveStatus:'reconnecting'}));}},
             onUnavailable:failure=>{if(mounted.current && voiceRef.current===connection){setVoiceMetrics(current=>({...current,geminiLiveStatus:'unavailable',geminiLiveFallback:failure?.message || 'provider-error'}));setVoiceNotice('Gemini Live se interrumpió. Volvé a conectar para continuar por voz.');connection.close();voiceRef.current=null;}},
@@ -664,6 +675,7 @@ export default function OliviaAssistant() {
         if(signal.aborted){live.close();throw new DOMException('Finalizada','AbortError');}
         try {
           const ready=await live.start(stream);
+          live.watchTasks(delegatedTasksRef.current);
           if(mounted.current && voiceRef.current===connection)setVoiceMetrics(current=>({...current,transcriptionMode:'Gemini Live · audio nativo',geminiLiveStatus:'connected'}));
           return ready;
         } catch(error) { live.close(); throw error; }
@@ -676,6 +688,7 @@ export default function OliviaAssistant() {
       onState: (state) => { if (state === "ended" && voiceRef.current === connection) voiceRef.current = null; if (mounted.current) setVoiceState(state); },
       onSpeechStart: ({ at,bargeIn,turnId }) => {
         if(!voiceTrace.current || voiceTrace.current.snapshot().id!==turnId)voiceTrace.current=latencyTrace({id:turnId,origin:'client'});
+        turnTraces.current.set(turnId,voiceTrace.current);
         markTurnTrace('voice.start',{turnId,kind:'microphone'},Number.isFinite(at)?at:performance.now());
         if(bargeIn)markTurnTrace('voice.barge_in',{turnId,source:'microphone'},Number.isFinite(at)?at:performance.now());
         if (mounted.current) { setVoiceNotice(""); setVoiceFailure(false); }
@@ -731,6 +744,7 @@ export default function OliviaAssistant() {
       {error ? <div className="fm-olivia-error" role="alert"><p>{error}</p>{reportNotice ? <p>{reportNotice}</p> : null}{errorReportId ? <Button className="fm-olivia-report-error" variant="secondary" loading={reportState === "sending"} disabled={reportState === "sent"} onClick={reportError}>{reportState === "sent" ? "Enviado a Agustín" : "Enviar error a Agustín"}</Button> : ["conversation-not-found", "session-changed", "permission-scope-changed", "conversation-expired"].includes(errorCode) ? <Button variant="secondary" disabled={busy} onClick={newConversation}>Iniciar nueva conversación</Button> : retryRef.current && !busy ? <Button variant="secondary" onClick={() => { const retry = retryRef.current; perform(retry.operation, retry.fields, retry.identity).then(() => { if (retry.operation === "chat") setDraft(""); }).catch(() => {}); }}>{retryRef.current.operation === "resume" ? "Recuperar conversación" : errorCode === "request-already-used" ? "Actualizar conversación" : "Reintentar solicitud"}</Button> : null}</div> : null}
       {voiceNotice ? <div className="fm-olivia-recovery" role="status"><p>{voiceNotice}</p>{!voiceActive && snapshot.voiceConversationAvailable && !permissionDenied ? <Button variant="secondary" disabled={unavailable} onClick={startVoice}>Volver a conectar</Button> : null}</div> : null}
       <OliviaComposer textareaRef={textareaRef} draft={draft} setDraft={setDraft} sendMessage={sendMessage} recording={recording} frame={audioFrame} stopRecording={stopRecording} startRecording={startRecording} startVoice={startVoice} stopVoice={endVoiceSession} finishVoiceTurn={() => voiceRef.current?.finishTurn()} voiceRecording={voiceState === "recording"} voiceAvailable={snapshot.voiceConversationAvailable === true} voiceActive={voiceActive} muted={muted} toggleMute={toggleMute} disabled={exhausted || unavailable || !conversationRef.current || geminiDiagnosticActive} busy={busy} sendingDisabled={voiceState === "connecting"} cancelRequest={cancelRequest} attachments={attachments} addFiles={addFiles} removeFile={removeFile} />
+      <OliviaDelegatedTasks tasks={delegatedTasks} onControl={controlTask} busyId={taskControlId} />
       <details className="fm-olivia-usage-details"><summary>Uso y costos</summary><OliviaUsage quota={quota} estimate={estimate} money={money} compact={viewport?.height < 500} exhausted={exhausted} /></details>
       {admin && developer && snapshot.voiceSettings?.hybridLiveAvailable && snapshot.voiceSettings?.hybridLiveEnabled ? <OliviaGeminiDiagnostic
         conversationId={snapshot.conversationId} disabled={busy || recording || voiceActive || !snapshot.conversationId || unavailable || exhausted}

@@ -1,4 +1,4 @@
-const allowed = new Set(['route','kind','tool','operation','model','reasoning','count','status','mode','sampleRate','requestBytes','pending','delay','turnId','turnIndex','provider','durationMs','queueMs','costUsd','inputTokens','outputTokens','endpointMs','silenceMs','authorized','source','fallback','configurationMs','conversationMs','reservationMs','providerMs']);
+const allowed = new Set(['route','kind','tool','operation','model','reasoning','count','status','mode','sampleRate','requestBytes','pending','delay','turnId','turnIndex','provider','durationMs','queueMs','costUsd','inputTokens','outputTokens','endpointMs','silenceMs','authorized','source','fallback','configurationMs','conversationMs','reservationMs','providerMs','taskId','jobId','sessionId','sourceTurnId','requestId']);
 export function latencyTrace({ id, now = () => performance.now(), origin = 'client', maxEvents = 100 } = {}) {
   const startedAt = now(), events = [];let requestId=null;
   const mark = (stage, metadata = {}, at = now()) => {
@@ -23,7 +23,7 @@ export function tracedStore(source, trace) {
   return wrap(source,'firestore');
 }
 
-const csvFields = ['turnIndex','route','kind','provider','model','operation','reasoning','status','mode','source','fallback','authorized','sampleRate','requestBytes','pending','delay','count','durationMs','queueMs','endpointMs','silenceMs','costUsd','inputTokens','outputTokens','configurationMs','conversationMs','reservationMs','providerMs'];
+const csvFields = ['turnIndex','taskId','jobId','sessionId','sourceTurnId','route','kind','provider','model','operation','reasoning','status','mode','source','fallback','authorized','sampleRate','requestBytes','pending','delay','count','durationMs','queueMs','endpointMs','silenceMs','costUsd','inputTokens','outputTokens','configurationMs','conversationMs','reservationMs','providerMs'];
 const safeIdentifier = value => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(value) ? value : null;
 
 export function sanitizeLatencyTrace(trace) {

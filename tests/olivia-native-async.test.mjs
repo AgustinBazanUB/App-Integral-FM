@@ -1,0 +1,73 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { GeminiLiveSession } from '../src/gestion/olivia/geminiLive.mjs';
+import { classifyGeminiLiveTurn } from '../src/shared/oliviaConversationRouter.mjs';
+const tick=()=>new Promise(r=>setImmediate(r));
+function session(t,options={}){
+  const sent=[],turns=[],states=[],audio=[];
+  const live=new GeminiLiveSession({backgroundTools:true,audioContext:{currentTime:0,createBufferSource(){const source={connect(){},disconnect(){},start(){},stop(){}};audio.push(source);return source;}},WebSocket:{OPEN:1},onTurnComplete:turn=>turns.push(turn),onState:s=>states.push(s),...options});
+  Object.assign(live,{ready:true,textInputOnly:true,socket:{readyState:1,send:data=>sent.push(JSON.parse(data)),close(){}}});
+  t.after(()=>live.close());return {live,sent,turns,states,audio};
+}
+test('social grammar stays native while contextual controls and free-form task slots use the authenticated engine',()=>{
+  for(const text of ['Hola, Olivia. ¿Cómo estás?','Muy bien, ¿y vos?','Perfecto, muchas gracias.','Qué bueno.','¿Me escuchás bien?','¿Te puedo pedir algo?','No, dejá.','Sí, dale.','Contame algo lindo','¿Por qué el cielo es azul?'])assert.equal(classifyGeminiLiveTurn(text).route,'direct',text);
+  for(const text of ['Sí, dale.','No, dejá.'])assert.equal(classifyGeminiLiveTurn(text,{pendingAction:true}).route,'delegate',text);
+  for(const text of ['Agustín Bazán','Pistachos de doscientos gramos','Dos unidades','En el local'])assert.equal(classifyGeminiLiveTurn(text,{collectingTask:true}).route,'delegate',text);
+  assert.equal(classifyGeminiLiveTurn('¿Me escuchás bien?',{activeTask:true,collectingTask:true}).route,'direct');
+  assert.equal(classifyGeminiLiveTurn('Gracias, también creá un cliente').route,'delegate');
+});
+test('a slow tool releases its voice turn, lets social conversation continue and notifies one verified result',async t=>{
+  let complete;const {live,sent,turns}=session(t,{onToolCall:async(_call,text,context)=>{
+    assert.equal(text,'Stock de aceite');context.onAccepted({id:'task_a',status:'running',jobId:'job_a'});
+    return new Promise(resolve=>{complete=resolve;});
+  }});
+  live.sendText('Stock de aceite');const original=live.currentTurn.turnId;
+  live.receive({toolCall:{functionCalls:[{id:'call_a',name:'delegate_to_olivia',args:{action:'new'}}]},serverContent:{turnComplete:true}});
+  await tick();assert.equal(live.currentTurn.pending,false);assert.equal(turns[0].pendingTask,true);
+  assert.equal(sent.find(e=>e.toolResponse)?.toolResponse.functionResponses[0].willContinue,true);
+  live.sendText('Perfecto, muchas gracias');
+  live.notifyTaskUpdate({id:'task_a',requestId:'request_a',status:'completed',summary:'Stock verificado: 4 unidades'});
+  complete({id:'task_a',requestId:'request_a',status:'completed',summary:'Stock verificado: 4 unidades'});
+  await tick();assert.equal(sent.filter(e=>e.toolResponse?.functionResponses[0].scheduling==='WHEN_IDLE').length,0,'result waits while the user turn is active');
+  live.receive({serverContent:{outputTranscription:{text:'¡De nada!'},turnComplete:true}});
+  await tick();await new Promise(r=>setTimeout(r,5));
+  const notifications=sent.filter(e=>e.toolResponse?.functionResponses[0].scheduling==='WHEN_IDLE');
+  assert.equal(notifications.length,1);assert.equal(live.currentTurn.sourceTurnId,original);
+  assert.equal(live.currentTurn.taskId,'task_a');
+});
+test('a model tool call cannot turn a clear social utterance into a backend operation',async t=>{
+  const {live,sent}=session(t,{onToolCall:()=>assert.fail('social delegation')});
+  live.sendText('¿Me escuchás bien?');
+  live.receive({toolCall:{functionCalls:[{id:'wrong',name:'delegate_to_olivia'}]}});await tick();
+  assert.match(sent.at(-1).toolResponse.functionResponses[0].response.result,/conversacional/);
+  live.receive({serverContent:{outputTranscription:{text:'Sí, perfecto.'},turnComplete:true}});await tick();
+});
+test('a synchronous task error produces a bounded result rather than an unhandled promise or stuck state',async t=>{
+  const {live,sent}=session(t,{onToolCall:()=>{throw new Error('backend unavailable');}});
+  live.sendText('Stock de aceite');
+  live.receive({toolCall:{functionCalls:[{id:'error',name:'delegate_to_olivia'}]},serverContent:{turnComplete:true}});
+  await tick();await new Promise(r=>setTimeout(r,5));
+  assert.match(JSON.stringify(sent.at(-1)),/backend unavailable/);
+});
+test('acknowledgement and final answer have independent audio marks with the source turn preserved',t=>{
+  const first=[];const {live}=session(t,{onFirstAudio:(at,context)=>first.push(context)});
+  const turn=live.createTurn();Object.assign(turn,{turnId:'turn_a',sourceTurnId:'source_a',taskId:'task_a',acknowledgementAuthorized:true});
+  live.scheduleAudio({duration:0.01},turn);turn.acknowledgementAuthorized=false;
+  live.scheduleAudio({duration:0.01},turn);
+  assert.deepEqual(first.map(c=>c.acknowledgement),[true,false]);
+  assert.ok(first.every(c=>c.sourceTurnId==='source_a'));
+});
+test('a completed voice turn becomes available before slow usage bookkeeping finishes',async t=>{
+  let release;const {live,states}=session(t);
+  live.sessionId='test';live.request=async()=>new Promise(r=>{release=r;});
+  live.sendText('Hola');live.receive({serverContent:{outputTranscription:{text:'¡Hola!'},turnComplete:true}});
+  await tick();await new Promise(r=>setTimeout(r,5));
+  assert.equal(states.at(-1),'listening');assert.equal(live.currentTurn.pending,false);
+  release({measurement:'provider-forwarded'});await tick();live.sessionId=null;
+});
+test('resumed tasks use an internal backend notification without a stale function response ID',async t=>{
+  const {live,sent}=session(t);live.watchTasks([{id:'restored',status:'running'}]);
+  live.notifyTaskUpdate({id:'restored',status:'completed',summary:'Resultado verificado'});
+  assert.equal(sent.at(-1).toolResponse,undefined);assert.match(JSON.stringify(sent.at(-1)),/Evento interno/);
+  assert.equal(live.currentTurn.notification,true);
+});

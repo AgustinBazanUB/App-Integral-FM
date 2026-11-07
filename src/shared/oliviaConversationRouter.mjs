@@ -1,7 +1,7 @@
 import { isGreetingOnly, normalizeSpeech } from './oliviaSpeechText.mjs';
 
-// Small, exact matchers. A partial, combined request, correction or bare confirmation
-// must continue through the authenticated task engine.
+// These short canned replies remain for the written task engine. Native Live
+// conversation uses the contextual policy below rather than this exact list.
 export const conversationClips = [
   { id: 'bienestar_01', category: 'conversacion', text: '¡Bien! ¿Y vos?' },
   { id: 'agradecimiento_01', category: 'conversacion', text: '¡De nada! Acá estoy.' },
@@ -22,14 +22,23 @@ export function isConversationalFollowUp(text) {
     .replace(/ olivia$/, '');
   return /^(?:te acordas (?:de )?(?:lo que|que) te pregunte(?: recien| antes)?|te acordas (?:de )?(?:lo que|que) te dije(?: recien| antes)?|que te pregunte(?: recien| antes)|de que (?:estabamos|veniamos) hablando(?: recien)?)$/.test(value);
 }
-export function classifyGeminiLiveTurn(text) {
-  const normalized = normalizeSpeech(text)
-    .replace(/^olivia /, '')
-    .replace(/^hola olivia /, 'hola ')
-    .replace(/ olivia$/, '');
-  const socialOnly = /^(?:(?:muy |re )?(?:bien(?: por suerte)?|todo bien|todo tranqui|joya|genial|de diez)(?: y vos(?: como (?:estas|andas))?| que (?:andas haciendo|estas haciendo|haces))?|bien por suerte que (?:andas haciendo|estas haciendo|haces)|me alegro|que bueno|y vos(?: como (?:estas|andas))?|que (?:andas haciendo|estas haciendo|haces|onda)(?: hoy)?|como va tu dia|(?:muchas |muchisimas |mil )?gracias(?: por tu ayuda| olivia)?|todo bien gracias|te agradezco|contame algo(?: lindo| divertido| interesante)?|decime algo(?: lindo| divertido| interesante)?|dale me gusto|buenisimo|bueno hablamos(?: luego| mas tarde)?|hasta la proxima)$/.test(normalized.replace(/\s+/g, ' '));
-  if (isGreetingOnly(text) || instantConversation(text) || socialOnly || isConversationalFollowUp(text)) return { route: 'direct', kind: 'small-talk' };
-  return { route: 'delegate', kind: 'data-or-operation' };
+export function classifyGeminiLiveTurn(text, context = {}) {
+  const normalized = normalizeSpeech(text);
+  if (!normalized) return { route: 'delegate', kind: 'missing-transcript' };
+  // This is a business-data boundary, not a phrase whitelist or a second LLM.
+  // Gemini understands ordinary language/context; only the authenticated engine
+  // can supply business facts, collect operational slots or prepare mutations.
+  const business = /\b(?:stock|inventario|mercaderia|productos?|presentaciones?|precios?|vendimos|vendido|ventas?|factur\w*|comprobantes?|clientes?|proveedores?|depositos?|ubicaciones?|pedidos?|envios?|transfer\w*|gastos?|caja|cobros?|pagos?|saldos?|ganancias?|reportes?|metricas?|tareas?|lavalle|registr\w*|carg\w*|agreg\w*|crea(?:r|me)?|borra\w*|elimina\w*|modifica\w*|actualiza\w*)\b/.test(normalized) || /\b(?:cuanto (?:sale|cuesta)|cuantas? unidades|cuantos? quedan)\b/.test(normalized);
+  if (business) return { route: 'delegate', kind: 'data-or-operation' };
+  const control = /^(?:(?:si|no|dale|bueno|perfecto|listo)(?:\s+(?:dale|deja|dejalo|gracias|por favor|segui|continua))*|cancel\w*(?:\s+(?:eso|la tarea|la solicitud|por favor))*|espera(?:\s+.*)?|corri\w*(?:\s+.*)?)$/.test(normalized);
+  const taskActive = Boolean(context.pendingAction || context.pendingActionId || context.collectingTask || context.activeTask);
+  if (taskActive && control) return { route: 'delegate', kind: 'task-control' };
+  // Elliptical slot answers belong to their task. Explicit social speech is
+  // still conversational while an unrelated background job is running.
+  const social = /\b(?:hola|chau|gracias|escuch\w*|pedir algo|bien|bueno|vos|convers\w*|habl\w*|acord\w*)\b/.test(normalized) || /\b(?:como (?:estas|andas)|que tal|me (?:podes|podrias) ayudar|me ayudas|necesito ayuda)\b/.test(normalized);
+  const slotAnswer=/^(?:\d|un(?:a|o)?\b|dos\b|tres\b|cuatro\b|cinco\b|en\b|local\b|deposito\b|se llama\b|el\b|la\b)/.test(normalized);
+  if (context.collectingTask && !social && (slotAnswer || !control)) return { route: 'delegate', kind: 'task-continuation' };
+  return { route: 'direct', kind: control ? 'conversation-control' : social ? 'social' : 'conversation' };
 }
 export function quickReadPlan(text) {
   const value = normalizeSpeech(text).replace(/^olivia /, '').replace(/ por favor$/, '').replace(/^cuanto stock (?:de |del )?/, 'cuantas unidades de ');

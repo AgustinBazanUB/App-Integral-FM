@@ -99,12 +99,14 @@ test("Gemini Live keeps consecutive everyday conversation direct and business in
   assert.equal(classifyGeminiLiveTurn("Muchísimas gracias").route, "direct");
   assert.equal(classifyGeminiLiveTurn("¿Te acordás de lo que te pregunté recién?").route, "direct");
   assert.equal(classifyGeminiLiveTurn("¿De qué veníamos hablando recién?").route, "direct");
-  assert.equal(classifyGeminiLiveTurn("Perfecto, gracias").route, "delegate");
+  assert.equal(classifyGeminiLiveTurn("Perfecto, gracias").route, "direct");
   assert.equal(classifyGeminiLiveTurn("Bien, por suerte. ¿Qué andás haciendo?").route, "direct");
   assert.equal(classifyGeminiLiveTurn("¿Qué onda hoy?").route, "direct");
-  assert.equal(classifyGeminiLiveTurn("Dale, gracias").route, "delegate", "an ambiguous confirmation is handled by Olivia's task engine");
+  assert.equal(classifyGeminiLiveTurn("Dale, gracias").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Dale, gracias",{pendingAction:true}).route, "delegate", "a contextual confirmation is handled by Olivia's task engine");
   assert.equal(classifyGeminiLiveTurn("Dale, cargá una venta").route, "delegate");
-  assert.equal(classifyGeminiLiveTurn("Sí").route, "delegate");
+  assert.equal(classifyGeminiLiveTurn("Sí").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Sí",{collectingTask:true}).route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Perfecto, gracias; registrá una venta").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Dale, cargá 20 unidades de aceite").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Hola, ¿cuánto stock queda?").route, "delegate");
