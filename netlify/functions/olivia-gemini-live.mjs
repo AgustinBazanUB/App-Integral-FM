@@ -60,8 +60,11 @@ async function releaseSession({ store, id, now, status = "closed" }) {
 }
 
 async function issueToken({ store, session, config, env, now }) {
+  const reservationStartedAt = performance.now();
   const sessionInfo = await reserveSession({ store, session: { ...session, conversationId: session.conversationId }, config, now });
+  const reservationMs = Math.round(performance.now() - reservationStartedAt);
   try {
+    const providerStartedAt = performance.now();
     const client = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
     const token = await client.authTokens.create({ config: {
       uses: 1,
@@ -70,7 +73,7 @@ async function issueToken({ store, session, config, env, now }) {
       liveConnectConstraints: { model: GEMINI_LIVE_MODEL, config: geminiLiveSetupConfig() },
     } });
     if (!token?.name) throw oliviaError("gemini-live-token-error", "Google no emitió un token efímero válido.", 503);
-    return { token: token.name, sessionId: sessionInfo.id, model: GEMINI_LIVE_MODEL, voice: "Aoede", maxSessionSeconds: sessionInfo.maxSessionSeconds, expiresAt: new Date(now.getTime() + TOKEN_EXPIRES_MS).toISOString(), reservedUsd: sessionInfo.reservation };
+    return { token: token.name, sessionId: sessionInfo.id, model: GEMINI_LIVE_MODEL, voice: "Aoede", maxSessionSeconds: sessionInfo.maxSessionSeconds, expiresAt: new Date(now.getTime() + TOKEN_EXPIRES_MS).toISOString(), reservedUsd: sessionInfo.reservation, timings: { reservationMs, providerTokenMs: Math.round(performance.now() - providerStartedAt) } };
   } catch (error) {
     await releaseSession({ store, id: sessionInfo.id, now, status: "token-error" }).catch(() => {});
     if (error.code) throw error;
@@ -126,13 +129,14 @@ export default async function handler(request) {
     if (Buffer.byteLength(raw) > 65000) throw oliviaError("request-too-large", "La solicitud supera el límite.", 413);
     const body = (() => { try { return JSON.parse(raw); } catch { return null; } })();
     if (!body || typeof body !== "object") throw oliviaError("invalid-json", "Solicitud inválida.");
-    const store = createOliviaStore({ env }), now = new Date(), configDoc = await store.get("oliviaConfiguration/global"), defaults = defaultOliviaConfiguration(env), saved = Object.fromEntries(Object.keys(defaults).filter(key => configDoc?.[key] !== undefined).map(key => [key, configDoc[key]])), configuration = validateConfiguration({ ...defaults, ...saved }, env), config = configuration.hybridVoice;
+    const store = createOliviaStore({ env }), now = new Date(), configurationStartedAt = performance.now(), configDoc = await store.get("oliviaConfiguration/global"), configurationReadMs = Math.round(performance.now() - configurationStartedAt), defaults = defaultOliviaConfiguration(env), saved = Object.fromEntries(Object.keys(defaults).filter(key => configDoc?.[key] !== undefined).map(key => [key, configDoc[key]])), configuration = validateConfiguration({ ...defaults, ...saved }, env), config = configuration.hybridVoice;
     if (body.operation === "token") {
       if (!config.enabled) throw oliviaError("gemini-live-disabled", "El modo híbrido está desactivado en la configuración de Olivia.", 403);
-      const conversationId = safeId(body.conversationId), conversation = await store.get(`oliviaConversations/${conversationId}`);
+      const conversationId = safeId(body.conversationId), conversationStartedAt = performance.now(), conversation = await store.get(`oliviaConversations/${conversationId}`), conversationReadMs = Math.round(performance.now() - conversationStartedAt);
       assertConversationOwner(session, conversation, now);
       session.conversationId = conversationId;
-      return json(await issueToken({ store, session, config, env, now }));
+      const token = await issueToken({ store, session, config, env, now });
+      return json({ ...token, timings: { configurationReadMs, conversationReadMs, ...token.timings } });
     }
     if (body.operation === "classify") return json(await classifyTurn({ store, session, body, now }));
     if (body.operation === "usage") return json(await reportTurn({ store, session, body, now, config }));

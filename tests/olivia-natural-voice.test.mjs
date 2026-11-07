@@ -33,7 +33,7 @@ test("spoken answer removes markdown and truncates at a readable boundary", () =
 });
 
 test("browser VAD sends a bounded turn with a short in-memory pre-roll and releases the microphone", async () => {
-  const frames = [], records = [], states = [], turns = [], speechStarts = [];
+  const frames = [], records = [], states = [], turns = [], speechStarts = [], traces = [];
   let now = 0, amplitude = 0;
   class Recorder {
     static isTypeSupported() { return true; }
@@ -51,9 +51,13 @@ test("browser VAD sends a bounded turn with a short in-memory pre-roll and relea
   const voice = new NaturalVoiceConversation({
     mediaDevices: { getUserMedia: async (constraints) => { assert.equal(constraints.audio.echoCancellation, true); assert.equal(constraints.audio.noiseSuppression, true); return stream; } },
     Recorder, AudioContext: class { constructor() { return context; } }, frame: (callback) => { frames.push(callback); return frames.length; }, cancelFrame() {}, now: () => now,
-    onTurn: async (blob, metadata) => turns.push({ text: await blob.text(), metadata }), onState: (state) => states.push(state), onSpeechStart: (data) => speechStarts.push(data),
+    onTurn: async (blob, metadata) => turns.push({ text: await blob.text(), metadata }), onState: (state) => states.push(state), onSpeechStart: (data) => speechStarts.push(data), onTrace: event => traces.push(event),
   });
   await voice.start();
+  assert.ok(traces.some(event => event.stage === 'microphone.request.start'));
+  assert.ok(traces.some(event => event.stage === 'microphone.request.end' && event.status === 'ok'));
+  assert.ok(traces.some(event => event.stage === 'audio.context.resume.end'));
+  assert.ok(traces.some(event => event.stage === 'voice.capture.ready'));
   const recorder = records[0];
   for (const chunk of ["header", "old-1", "old-2"]) recorder.ondataavailable({ data: new Blob([chunk]) });
   now = 100; amplitude = 0.1; frames.shift()();
@@ -65,6 +69,7 @@ test("browser VAD sends a bounded turn with a short in-memory pre-roll and relea
   assert.equal(turns.length, 1);
   assert.equal(turns[0].text, "headerold-1old-2speechtail");
   assert.equal(turns[0].metadata.durationSeconds, 2);
+  assert.ok(traces.some(event => event.stage === 'voice.turn.end' && Number.isFinite(event.endpointMs) && event.turnId));
   assert.ok(states.includes("recording"));
   voice.close();
   assert.equal(track.stopped, true);

@@ -150,6 +150,20 @@ test('clip warmup loads only three common clips, verifies checksums and avoids p
   assert.equal(await corrupt.get('saludo_01'),null);corrupt.dispose();
 });
 
+test('local acknowledgement uses a prewarmed clip and never starts selector or fallback synthesis',async()=>{
+  const played=[],selections=[],metrics=[];
+  const response=new Response(new Uint8Array([1,0,2,0]));
+  const cache={warm:async()=>assert.fail('acknowledgement does not warm on the critical path'),peek:id=>id==='espera_real_01'?new Uint8Array([1,0]):null,get:async()=>assert.fail('a prewarmed acknowledgement must not fetch'),response:async choice=>{selections.push(choice);return response.clone();},dispose(){}};
+  const player=new FastSpeechPlayer({cache,select:async()=>assert.fail('acknowledgement does not call the selector'),loadFallback:async()=>assert.fail('acknowledgement does not synthesize fallback speech'),play:async(audio,options)=>played.push({audio,options}),onMetric:(name,value)=>metrics.push([name,value])});
+  assert.equal(await player.acknowledge(()=>true),true);
+  await next();
+  assert.deepEqual(selections,[{clip_id:'espera_real_01',intent:'general'}]);
+  assert.equal(played.length,1);
+  assert.ok(played[0].options.text);
+  assert.deepEqual(metrics.filter(([name])=>['selection','selectionCostUsd'].includes(name)),[['selection',0],['selectionCostUsd',0]]);
+  player.dispose();
+});
+
 test('fast greeting is local, partials only prefetch, and a ready main answer cancels intermediate audio',async()=>{
   const callbacks=[],played=[],prefetched=[];let resolveClip,current=true,selected=0;
   const cache={warm:async()=>{},manifest:async()=>({entries:[{status:'ready'}]}),get:async id=>prefetched.push(id),response:async()=>new Response(new Uint8Array([0,0])),dispose(){}};

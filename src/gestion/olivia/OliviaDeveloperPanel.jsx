@@ -1,6 +1,8 @@
-export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceConfiguration, geminiLiveUsage, telemetry, turnTrace, money }) {
+import { latencyTracesCsv, latencyTracesJson } from '../../shared/oliviaLatencyTrace.mjs';
+
+export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceConfiguration, geminiLiveUsage, telemetry, turnTrace, connectionTrace, turnTraces = [], money }) {
   const ms = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
-  const percentiles=value=>`${ms(value?.medianMs)} / ${ms(value?.p90Ms)} / ${ms(value?.p95Ms)}`;
+  const percentiles=value=>`${ms(value?.medianMs)} / ${ms(value?.p90Ms)} / ${ms(value?.p95Ms)} · n=${value?.count ?? 0}`;
   const modalityTokens=value=>value && Object.keys(value).length ? Object.entries(value).map(([modality,count])=>`${modality} ${Number(count).toLocaleString('es-AR')}`).join(' · ') : 'No informado por el proveedor';
   const geminiMeasurement=value=>({ 'provider-forwarded':'Tarifa aplicada a usageMetadata', 'estimated-audio-context-excluded':'Estimado por duración, sin contexto', unconfirmed:'Sin confirmar' }[value] || value || 'Sin medición');
   const rows = [
@@ -23,7 +25,8 @@ export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMe
     ['Gemini · conexión desde micrófono listo (ms)',ms(voiceMetrics?.geminiConnect?.medianMs)],
     ['Gemini · click → sesión lista (ms)',ms(voiceMetrics?.clickToGeminiReady?.medianMs)],
     ['Gemini · ruta del último turno',`${voiceMetrics?.geminiLastRoute || 'Sin clasificar'} · turno ${voiceMetrics?.geminiLastTurnIndex ?? '—'}`],
-    ['Gemini · ida y vuelta de clasificación · P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.geminiClassification)],
+    ['Gemini · clasificación backend · P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.geminiClassification)],
+    ['Gemini · política local determinística · P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.geminiLocalClassification)],
     ['Gemini · fin de voz → primer audio programado · P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.geminiVoiceEndToUsefulAudio)],
     ['Gemini · primer turno de sesión · TTFA P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.geminiFirstTurnVoiceEndToUsefulAudio)],
     ['Gemini · turnos posteriores · TTFA P50 / P90 / P95 (ms)',percentiles(voiceMetrics?.geminiLaterTurnVoiceEndToUsefulAudio)],
@@ -68,5 +71,18 @@ export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMe
     ["Costo de almacenamiento semántico", "Sin medición del proveedor"],
     ["Cotización", estimate?.reference ? `${money(estimate.reference.rate)} por USD · ${estimate.reference.date || "Manual"}` : "Sin cotización"],
   ];
-  return <section className="fm-olivia-developer" aria-label="Métricas de desarrollo"><h3>Métricas de desarrollo</h3><dl>{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>{[turnTrace,telemetry?.trace].filter(Boolean).map(trace=><details key={trace.origin}><summary>Traza del turno · {trace.origin==='client'?'navegador':'servidor'}</summary><p>Turno: {trace.id} · Solicitud: {trace.requestId || trace.id}</p><ol>{trace.events.map((event,index)=><li key={index}>{event.stage}: {ms(event.ms)} ms{event.tool?` · ${event.tool}`:''}{event.model?` · ${event.model}`:''}</li>)}</ol></details>)}{telemetry?.retrievalWarning ? <p>{telemetry.retrievalWarning}</p> : null}{estimate?.reference?.source?.startsWith("https://") ? <a href={estimate.reference.source} target="_blank" rel="noreferrer">Fuente de cotización</a> : null}</section>;
+  const traces=[connectionTrace,...turnTraces].filter(Boolean);
+  const exportFile=(extension,content,type)=>{
+    const url=URL.createObjectURL(new Blob([content],{type})),anchor=document.createElement('a');
+    anchor.href=url;anchor.download=`olivia-voz-trazas-${new Date().toISOString().slice(0,10)}.${extension}`;anchor.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  const eventDetail=event=>[
+    event.route?`ruta ${event.route}`:null,event.kind?`tipo ${event.kind}`:null,event.source?`origen ${event.source}`:null,
+    event.provider?`proveedor ${event.provider}`:null,event.model?`modelo ${event.model}`:null,
+    Number.isFinite(event.durationMs)?`${ms(event.durationMs)} ms`:null,event.status?`estado ${event.status}`:null,
+    Number.isFinite(event.costUsd)?`USD ${event.costUsd}`:null,
+  ].filter(Boolean).join(' · ');
+  const renderTrace=trace=><details key={`${trace.origin}-${trace.id}`}><summary>{trace.origin==='client'?'Navegador':'Servidor'} · {trace.id}</summary><p>Turno: {trace.id} · Solicitud: {trace.requestId || trace.id} · reloj {trace.clock}</p><ol>{trace.events.map((event,index)=><li key={`${event.stage}-${index}`}>{event.stage}: {ms(event.ms)} ms{eventDetail(event)?` · ${eventDetail(event)}`:''}</li>)}</ol></details>;
+  return <section className="fm-olivia-developer" aria-label="Métricas de desarrollo"><h3>Métricas de desarrollo</h3><dl>{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><div className="fm-olivia-trace-export"><button type="button" onClick={()=>exportFile('json',latencyTracesJson(traces),'application/json')}>Exportar trazas JSON sanitizadas</button><button type="button" onClick={()=>exportFile('csv',latencyTracesCsv(traces),'text/csv;charset=utf-8')}>Exportar trazas CSV sanitizadas</button><small>Hasta 100 turnos en memoria por sesión; no se exportan transcripciones ni argumentos.</small></div>{connectionTrace?renderTrace(connectionTrace):null}{turnTraces.map(renderTrace)}{turnTrace && !turnTraces.some(trace=>trace.id===turnTrace.id)?renderTrace(turnTrace):null}{telemetry?.trace?renderTrace(telemetry.trace):null}{telemetry?.retrievalWarning ? <p>{telemetry.retrievalWarning}</p> : null}{estimate?.reference?.source?.startsWith("https://") ? <a href={estimate.reference.source} target="_blank" rel="noreferrer">Fuente de cotización</a> : null}</section>;
 }

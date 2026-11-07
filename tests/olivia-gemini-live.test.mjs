@@ -15,6 +15,7 @@ import { assertGeminiLivePreview } from "../netlify/functions/olivia-gemini-live
 import { addProviderSpend } from "../netlify/functions/_lib/olivia/usage.mjs";
 import { GeminiLiveSession, resamplePcm16 } from "../src/gestion/olivia/geminiLive.mjs";
 import { classifyGeminiLiveTurn } from "../src/shared/oliviaConversationRouter.mjs";
+import { latencyTrace, latencyTracesCsv, latencyTracesJson } from "../src/shared/oliviaLatencyTrace.mjs";
 
 test("configuration defaults keep the hybrid voice disabled outside the gated preview", () => {
   assert.equal(defaultOliviaConfiguration().hybridVoice.enabled, false);
@@ -82,16 +83,42 @@ test("raw Live setup fixes model, voice, tool policy, compression and modalities
   assert.equal(setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, "Aoede");
   assert.equal(setup.contextWindowCompression.slidingWindow.targetTokens, 1200);
   assert.equal(setup.tools[0].functionDeclarations[0].name, "delegate_to_olivia");
+  assert.equal(setup.realtimeInputConfig.automaticActivityDetection.disabled, false);
+  assert.equal(setup.realtimeInputConfig.automaticActivityDetection.silenceDurationMs, 2000);
+  assert.equal(setup.realtimeInputConfig.activityHandling, "START_OF_ACTIVITY_INTERRUPTS");
   assert.equal(setup.thinkingLevel, undefined);
 });
 
 test("backend direct route is limited to exact conversational phrases", () => {
   assert.equal(classifyGeminiLiveTurn("Hola, ¿cómo estás?").route, "direct");
   assert.equal(classifyGeminiLiveTurn("Muchísimas gracias").route, "direct");
-  assert.equal(classifyGeminiLiveTurn("Perfecto, gracias").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Perfecto, gracias").route, "delegate");
+  assert.equal(classifyGeminiLiveTurn("Bien, por suerte. ¿Qué andás haciendo?").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("¿Qué onda hoy?").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Dale, gracias").route, "delegate", "an ambiguous confirmation is handled by Olivia's task engine");
+  assert.equal(classifyGeminiLiveTurn("Dale, cargá una venta").route, "delegate");
+  assert.equal(classifyGeminiLiveTurn("Sí").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Perfecto, gracias; registrá una venta").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Hola, ¿cuánto stock queda?").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Gracias, registrá una venta").route, "delegate");
+});
+
+test("latency trace exports are sanitized and reject unsafe event stages", () => {
+  let now = 100;
+  const trace = latencyTrace({ id: "turn_1", now: () => now++ });
+  trace.mark("gemini.turn.start", { route: "delegate", userText: "No exportar texto privado" });
+  trace.mark("assistant.text\nmalicious", { status: "ok" });
+  const unsafe = { id: "turn_2", requestId: "request_2", origin: "client", clock: "performance", events: [
+    { stage: "gemini.turn.complete", ms: 4, turnIndex: 2, route: "direct" },
+    { stage: "x\nuserText=secret", ms: 5, status: "ok" },
+    { stage: "gemini.delegate", ms: 6, userText: "Venta de 3 unidades", args: { secret: "never" } },
+  ] };
+  const json = latencyTracesJson([trace.snapshot(), unsafe]);
+  const csv = latencyTracesCsv([trace.snapshot(), unsafe]);
+  assert.doesNotMatch(json, /No exportar texto privado|Venta de 3 unidades|userText|secret|args/);
+  assert.doesNotMatch(csv, /No exportar texto privado|Venta de 3 unidades|userText|secret|args/);
+  assert.match(json, /gemini\.turn\.complete/);
+  assert.match(csv, /turnIndex/);
 });
 
 test("48 kHz capture resamples to 16 kHz signed PCM", () => {
@@ -279,7 +306,6 @@ test("Live session sends short PCM chunks, plays audio and reports one direct tu
     request: async (payload) => {
       operations.push(payload.operation);
       if (payload.operation === "token") return { token: "auth_tokens/example", sessionId: "session-1", expiresAt: new Date(Date.now() + 60000).toISOString(), maxSessionSeconds: 600 };
-      if (payload.operation === "classify") return { route: "direct", direct: true };
       if (payload.operation === "usage") return { measurement: "provider-forwarded", spendUsd: 0.001, inputTokensByModality: { AUDIO: 10 }, outputTokensByModality: { AUDIO: 10 }, shouldStop: false };
       return { closed: true };
     },
@@ -306,10 +332,10 @@ test("Live session sends short PCM chunks, plays audio and reports one direct tu
   assert.equal(socket.sent.at(-1).realtimeInput.audioStreamEnd, true);
   const audio = btoa(String.fromCharCode(1, 0, 2, 0));
   socket.onmessage({ data: JSON.stringify({ serverContent: { inputTranscription: { text: "Hola Olivia" }, outputTranscription: { text: "Hola, ¿cómo estás?" }, modelTurn: { parts: [{ inlineData: { mimeType: "audio/pcm;rate=24000", data: audio } }] } }, usageMetadata: { promptTokensDetails: [{ modality: "AUDIO", tokenCount: 10 }], responseTokensDetails: [{ modality: "AUDIO", tokenCount: 10 }] } }) });
-  assert.equal(played, 0, "generated audio stays buffered until the backend classifies the request");
-  assert.deepEqual(transcripts, [], "assistant text stays hidden until the backend classifies the request");
+  assert.equal(played, 1, "safe social audio is authorized by the shared local policy without a round trip");
+  assert.deepEqual(transcripts, ["Hola, ¿cómo estás?"], "safe social text is released by the local policy");
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(played, 1, "authorized audio streams before the model turn completes");
+  assert.equal(played, 1, "one audio chunk is scheduled");
   assert.deepEqual(transcripts, ["Hola, ¿cómo estás?"]);
   socket.onmessage({ data: JSON.stringify({ serverContent: { turnComplete: true } }) });
   await new Promise((resolve) => setTimeout(resolve, 10));
@@ -321,7 +347,7 @@ test("Live session sends short PCM chunks, plays audio and reports one direct tu
   assert.deepEqual(usage[0].outputTokensByModality, { AUDIO: 10 });
   assert.equal(played, 1);
   assert.deepEqual(transcripts, ["Hola, ¿cómo estás?"]);
-  assert.ok(operations.includes("classify"));
+  assert.equal(operations.includes("classify"), false, "direct social turns skip the classify HTTP request");
   assert.ok(operations.includes("usage"));
   live.close();
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -350,7 +376,6 @@ test("business turns suppress an unverified Gemini answer and delegate to Olivia
     request: async (payload) => {
       operations.push(payload.operation);
       if (payload.operation === "token") return { token: "auth_tokens/business", sessionId: "session-business", expiresAt: new Date(Date.now() + 60000).toISOString(), maxSessionSeconds: 600 };
-      if (payload.operation === "classify") return { route: "delegate", direct: false };
       if (payload.operation === "usage") return { measurement: "provider-forwarded", shouldStop: false };
       return { closed: true };
     },
@@ -375,6 +400,53 @@ test("business turns suppress an unverified Gemini answer and delegate to Olivia
   assert.equal(completed[0].noAudio, true);
   assert.equal(completed[0].assistantText, "Resultado verificado para: ¿Cuánto stock queda?");
   assert.deepEqual(transcripts, ["Resultado verificado para: ¿Cuánto stock queda?"]);
-  assert.ok(operations.includes("classify"));
+  assert.equal(operations.includes("classify"), false, "business input is delegated without a classify round trip");
   live.close();
+});
+
+test("Gemini tool calls wait for final user transcription and never use model arguments as a substitute", async (t) => {
+  class FakeSocket {
+    static OPEN = 1;
+    static instances = [];
+    constructor() { this.readyState = 0; this.sent = []; FakeSocket.instances.push(this); }
+    send(data) { this.sent.push(JSON.parse(data)); }
+    close() { this.readyState = 3; this.onclose?.(); }
+    receive(event) { this.onmessage({ data: JSON.stringify(event) }); }
+  }
+  const calls = [], operations = [];
+  const live = new GeminiLiveSession({
+    request: async payload => {
+      operations.push(payload.operation);
+      if (payload.operation === "token") return { token: "auth_tokens/tool", sessionId: "tool", expiresAt: new Date(Date.now() + 60000).toISOString(), maxSessionSeconds: 60 };
+      if (payload.operation === "usage") return { shouldStop: false };
+      return { closed: true };
+    },
+    conversationId: "tool-transcript", audioContext: { currentTime: 0 }, WebSocket: FakeSocket, transcriptWaitMs: 20,
+    onToolCall: async (call, text, context) => { calls.push({ call, text, context }); return `Verified: ${text}`; },
+  });
+  t.after(() => live.close());
+  const started = live.start(null, { textInputOnly: true });
+  await new Promise(resolve => setImmediate(resolve));
+  const socket = FakeSocket.instances[0]; socket.readyState = FakeSocket.OPEN; socket.onopen(); socket.receive({ setupComplete: {} }); await started;
+
+  live.beginTurn("turn_has_final");
+  const completeTranscriptTurn = live.currentTurn;
+  const handler = live.handleTools([{ id: "function-1", name: "delegate_to_olivia", args: { request: "texto inventado por el modelo" } }], completeTranscriptTurn);
+  socket.receive({ serverContent: { inputTranscription: { text: "¿Cuánto stock queda?" } } });
+  await handler;
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].text, "¿Cuánto stock queda?");
+  assert.deepEqual(calls[0].context, { turnId: "turn_has_final", turnIndex: 1, transcriptComplete: true });
+  const response = socket.sent.find(message => message.toolResponse)?.toolResponse.functionResponses[0];
+  assert.equal(response.response.result, "Verified: ¿Cuánto stock queda?");
+
+  live.beginTurn("turn_missing_final");
+  const missingTranscriptTurn = live.currentTurn;
+  await live.handleTools([{ id: "function-2", name: "delegate_to_olivia", args: { request: "NO ejecutar desde args" } }], missingTranscriptTurn);
+  assert.equal(calls.length, 1, "no engine write path is called without authoritative transcription");
+  const missingToolResponse = socket.sent.find(message => message.toolResponse?.functionResponses?.some(item => item.id === "function-2"));
+  assert.ok(missingToolResponse, JSON.stringify({ failed: live.failed, closed: live.closed, cancelled: missingTranscriptTurn.cancelled, sent: socket.sent }));
+  const errorResponse = missingToolResponse.toolResponse.functionResponses[0];
+  assert.match(errorResponse.response.error, /transcripción final/);
+  assert.equal(operations.includes("classify"), false);
 });

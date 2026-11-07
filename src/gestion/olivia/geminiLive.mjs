@@ -1,4 +1,5 @@
 import { GEMINI_LIVE_MODEL, geminiLiveRawSetup } from "../../shared/oliviaGeminiLive.mjs";
+import { classifyGeminiLiveTurn } from "../../shared/oliviaConversationRouter.mjs";
 
 const SOCKET_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained";
 
@@ -40,20 +41,32 @@ function errorMessage(event) {
 }
 
 export class GeminiLiveSession {
-  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, onSessionClosed = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000, turnTimeoutMs = 45000, completionGraceMs = 5000 }) {
-    Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, onProtocol, onSessionClosed, WebSocket, now, clock, connectTimeoutMs, turnTimeoutMs, completionGraceMs });
+  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, onTrace = () => {}, onSessionClosed = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000, turnTimeoutMs = 45000, completionGraceMs = 5000, transcriptWaitMs = 3000 }) {
+    Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, onProtocol, onTrace, onSessionClosed, WebSocket, now, clock, connectTimeoutMs, turnTimeoutMs, completionGraceMs, transcriptWaitMs });
     this.closed = false; this.failed = false; this.handlesTurns = false; this.listening = false; this.isPlaying = false; this.turnIndex = 0; this.sources = new Set(); this.finalizingTurns = new Set(); this.currentTurn = this.createTurn();
   }
 
+  trace(stage, metadata = {}) { this.onTrace({ stage, at: this.now(), ...metadata }); }
+
   createTurn() {
-    return { pending: false, finalizing: false, completed: false, completeReceived: false, transcriptComplete: false, cancelled: false, inputText: "", interimText: "", outputText: "", publishedOutputText: "", usageMetadata: null, inputAudioSeconds: 0, outputAudioSeconds: 0, generatedAudio: false, heardAudio: false, pendingAudio: [], toolTurn: false, toolPending: false, awaitingToolResponse: false, outputAuthorized: false, classificationPromise: null, noTranscriptTimer: null };
+    return { pending: false, finalizing: false, completed: false, completeReceived: false, transcriptComplete: false, transcriptWaiters: new Set(), cancelled: false, inputText: "", interimText: "", outputText: "", publishedOutputText: "", usageMetadata: null, inputAudioSeconds: 0, outputAudioSeconds: 0, generatedAudio: false, heardAudio: false, pendingAudio: [], toolTurn: false, toolPending: false, awaitingToolResponse: false, outputAuthorized: false, classificationPromise: null, noTranscriptTimer: null };
   }
 
   async start(stream, { textInputOnly = false } = {}) {
     if (!this.WebSocket || !this.audioContext || (!textInputOnly && !this.audioContext.createScriptProcessor)) throw new Error("Este navegador no admite el audio de Gemini Live.");
     this.textInputOnly = textInputOnly;
     this.stream = stream;
-    this.tokenResult = await this.request({ operation: "token", conversationId: this.conversationId });
+    const tokenStartedAt = this.now(); this.trace("gemini.token.request.start");
+    try { this.tokenResult = await this.request({ operation: "token", conversationId: this.conversationId }); }
+    catch (error) { this.trace("gemini.token.request.end", { durationMs: this.now() - tokenStartedAt, status: "error" }); throw error; }
+    this.trace("gemini.token.request.end", { durationMs: this.now() - tokenStartedAt, status: "ok" });
+    const serverTiming = this.tokenResult?.timings;
+    if (serverTiming && typeof serverTiming === "object") this.trace("gemini.token.server", {
+      configurationMs: serverTiming.configurationReadMs,
+      conversationMs: serverTiming.conversationReadMs,
+      reservationMs: serverTiming.reservationMs,
+      providerMs: serverTiming.providerTokenMs,
+    });
     if (!this.tokenResult?.token || !this.tokenResult?.sessionId) throw new Error("No se recibió un token efímero de Gemini Live.");
     this.sessionId = this.tokenResult.sessionId;
     if (this.closed) {
@@ -80,6 +93,8 @@ export class GeminiLiveSession {
   openSocket(handle) {
     if (this.closed || this.failed) return Promise.reject(new DOMException("Sesión cerrada", "AbortError"));
     return new Promise((resolve, reject) => {
+      const socketStartedAt = this.now();
+      this.trace(handle ? "gemini.websocket.resume.start" : "gemini.websocket.start");
       const url = `${SOCKET_URL}?access_token=${encodeURIComponent(this.tokenResult.token)}`;
       let socket;
       try { socket = new this.WebSocket(url); } catch (error) { reject(error); return; }
@@ -91,6 +106,7 @@ export class GeminiLiveSession {
       const failReady = (error) => { if (settled) return; settled = true; this.pendingReject = null; reject(error); };
       this.pendingReject = failReady;
       socket.onopen = () => {
+        this.trace(handle ? "gemini.websocket.resume.open" : "gemini.websocket.open", { durationMs: this.now() - socketStartedAt, status: "ok" });
         try { socket.send(JSON.stringify({ setup: geminiLiveRawSetup(GEMINI_LIVE_MODEL, handle) })); }
         catch (error) { failReady(error); }
       };
@@ -98,6 +114,7 @@ export class GeminiLiveSession {
         let event; try { event = JSON.parse(typeof data === "string" ? data : new TextDecoder().decode(data)); } catch { return; }
         this.onProtocol({ keys: Object.keys(event), contentKeys: Object.keys(event.serverContent || {}), parts: (event.serverContent?.modelTurn?.parts || []).map(part => ({ keys: Object.keys(part), mimeType: part.inlineData?.mimeType, encodedAudioLength: part.inlineData?.data?.length })), turnComplete: event.serverContent?.turnComplete, generationComplete: event.serverContent?.generationComplete });
         if (event.setupComplete) {
+          this.trace(handle ? "gemini.setup.resume.complete" : "gemini.setup.complete", { durationMs: this.now() - socketStartedAt, status: "ok" });
           settled = true; this.pendingReject = null; clearTimeout(this.connectTimer); resolve(this);
           if (this.reconnecting) { this.reconnecting = false; this.listening = this.resumeListening; this.onState(this.listening ? "listening" : "processing"); }
         }
@@ -143,9 +160,10 @@ export class GeminiLiveSession {
       this.socket.send(JSON.stringify({ realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: toBase64(samples) } } }));
     };
     this.captureSource.connect(this.processor); this.processor.connect(this.zeroGain); this.zeroGain.connect(context.destination);
+    this.trace("gemini.capture.ready", { sampleRate: context.sampleRate });
   }
 
-  setListening(value) {
+  setListening(value, turnId = null) {
     if (this.closed || this.failed) return;
     const next = Boolean(value), wasListening = this.listening;
     if (next === this.listening) return;
@@ -159,23 +177,26 @@ export class GeminiLiveSession {
         for (const turn of this.finalizingTurns) { turn.cancelled = true; turn.pendingAudio = []; }
         this.ignoreOutputUntilInput = true;
       }
-      const previous = this.currentTurn;
+      const previous = this.currentTurn, replacePrevious = previous.pending || previous.finalizing || previous.completed;
       if (previous.pending && !wasListening) {
         previous.cancelled = true; previous.pending = false; previous.pendingAudio = [];
+        this.cancelTranscriptWaiters(previous);
+        clearTimeout(previous.responseTimer); clearTimeout(previous.completionTimer); clearTimeout(previous.noTranscriptTimer);
         void this.reportUsage(previous, { includeProviderUsage: false });
         this.ignoreOutputUntilInput = true;
       }
-      if (previous.pending || previous.finalizing || previous.completed) {
+      if (replacePrevious) {
         if (previous.finalizing) { previous.cancelled = true; previous.pendingAudio = []; }
         this.currentTurn = this.createTurn();
       }
       const turn = this.currentTurn;
       clearTimeout(turn.completionTimer); clearTimeout(turn.responseTimer);
-      turn.turnId = globalThis.crypto.randomUUID(); turn.turnIndex = ++this.turnIndex; turn.pending = true; turn.inputText = ""; turn.interimText = ""; turn.outputText = ""; turn.publishedOutputText = ""; turn.usageMetadata = null; turn.inputAudioSeconds = 0; turn.outputAudioSeconds = 0; turn.generatedAudio = false; turn.heardAudio = false; turn.pendingAudio = []; turn.toolTurn = false; turn.toolPending = false; turn.awaitingToolResponse = false; turn.outputAuthorized = false; turn.classificationPromise = null; turn.completeReceived = false; turn.transcriptComplete = false; turn.noTranscriptTimer = null;
+      turn.turnId = turnId || globalThis.crypto.randomUUID(); turn.turnIndex = ++this.turnIndex; turn.pending = true; turn.inputText = ""; turn.interimText = ""; turn.outputText = ""; turn.publishedOutputText = ""; turn.usageMetadata = null; turn.inputAudioSeconds = 0; turn.outputAudioSeconds = 0; turn.generatedAudio = false; turn.heardAudio = false; turn.pendingAudio = []; turn.pendingAudioStartedAt = null; turn.firstPcmAt = null; turn.toolTurn = false; turn.toolPending = false; turn.awaitingToolResponse = false; turn.outputAuthorized = false; turn.classificationPromise = null; turn.classifiedText = ""; turn.completeReceived = false; turn.transcriptComplete = false; turn.transcriptWaiters = new Set(); turn.noTranscriptTimer = null;
+      this.trace("gemini.turn.start", { turnId: turn.turnId, turnIndex: turn.turnIndex, mode: this.textInputOnly ? "diagnostic-text" : "microphone" });
     }
   }
 
-  beginTurn() { this.setListening(true); }
+  beginTurn(turnId) { this.setListening(true, turnId); }
   armTurnTimeout(turn) {
     clearTimeout(turn.responseTimer);
     turn.responseTimer = setTimeout(() => {
@@ -214,18 +235,21 @@ export class GeminiLiveSession {
     if (interimText) { turn.interimText = String(interimText); this.onPartial(turn.interimText); }
     const inputText = content?.inputTranscription?.text;
     if (inputText) {
+      const previousInput = turn.inputText;
       turn.inputText = mergeTranscript(turn.inputText, inputText); turn.transcriptComplete = true; this.ignoreOutputUntilInput = false; this.onPartial(turn.inputText);
+      if (turn.inputText !== previousInput) this.trace("gemini.transcript.final", { turnId: turn.turnId, turnIndex: turn.turnIndex });
       void this.authorizeTurn(turn);
+      this.resolveTranscriptWaiters(turn);
       clearTimeout(turn.noTranscriptTimer); turn.noTranscriptTimer = null;
     }
     const ignoreOutput = Boolean(this.ignoreOutputUntilInput);
     const outputText = content?.outputTranscription?.text;
-    if (outputText && !ignoreOutput) { turn.outputText = mergeTranscript(turn.outputText, outputText); if (turn.outputAuthorized && turn.outputText !== turn.publishedOutputText) { this.onTranscript(turn.outputText); turn.publishedOutputText = turn.outputText; } }
+    if (outputText && !ignoreOutput) { turn.outputText = mergeTranscript(turn.outputText, outputText); if (turn.outputAuthorized && turn.outputText !== turn.publishedOutputText) { this.publishTranscript(turn); } }
     const parts = content?.modelTurn?.parts || [];
     if (!ignoreOutput) {
       if (turn.awaitingToolResponse && (parts.length || outputText)) turn.awaitingToolResponse = false;
       for (const part of parts) {
-        if (part.text) { turn.outputText = mergeTranscript(turn.outputText, part.text); if (turn.outputAuthorized && turn.outputText !== turn.publishedOutputText) { this.onTranscript(turn.outputText); turn.publishedOutputText = turn.outputText; } }
+        if (part.text) { turn.outputText = mergeTranscript(turn.outputText, part.text); if (turn.outputAuthorized && turn.outputText !== turn.publishedOutputText) { this.publishTranscript(turn); } }
         const audioData = part.inlineData?.data;
         if (audioData) this.playPcm(audioData, turn);
       }
@@ -254,27 +278,61 @@ export class GeminiLiveSession {
     }
   }
 
+  publishTranscript(turn) {
+    if (!turn.outputText || turn.outputText === turn.publishedOutputText) return;
+    if (!turn.publishedOutputText) this.trace("gemini.transcript.output.first", { turnId: turn.turnId, turnIndex: turn.turnIndex });
+    this.onTranscript(turn.outputText, { turnId: turn.turnId, turnIndex: turn.turnIndex }); turn.publishedOutputText = turn.outputText;
+  }
+
+  resolveTranscriptWaiters(turn) {
+    for (const waiter of turn.transcriptWaiters || []) {
+      clearTimeout(waiter.timer);
+      waiter.resolve(String(turn.inputText || "").trim() || null);
+    }
+    turn.transcriptWaiters?.clear();
+  }
+
+  cancelTranscriptWaiters(turn) {
+    for (const waiter of turn.transcriptWaiters || []) {
+      clearTimeout(waiter.timer);
+      waiter.resolve(null);
+    }
+    turn.transcriptWaiters?.clear();
+  }
+
+  waitForFinalTranscript(turn) {
+    if (turn.transcriptComplete) return Promise.resolve(String(turn.inputText || "").trim() || null);
+    return new Promise((resolve) => {
+      const waiter = { resolve, timer: null };
+      waiter.timer = setTimeout(() => {
+        turn.transcriptWaiters?.delete(waiter);
+        this.trace("gemini.transcript.wait.timeout", { turnId: turn.turnId, turnIndex: turn.turnIndex, durationMs: this.transcriptWaitMs, status: "missing" });
+        resolve(null);
+      }, this.transcriptWaitMs);
+      turn.transcriptWaiters.add(waiter);
+    });
+  }
+
   authorizeTurn(turn) {
-    if (!turn.inputText || turn.classificationPromise) return turn.classificationPromise;
-    const classifyStartedAt = this.now();
-    turn.classificationPromise = this.request({ operation: "classify", sessionId: this.sessionId, userText: turn.inputText })
-      .then((authorization) => {
-        turn.directAuthorized = authorization?.direct === true && authorization?.route === "direct" && !turn.toolTurn;
-        this.onClassification({ durationMs: this.now() - classifyStartedAt, direct: turn.directAuthorized, route: turn.directAuthorized ? "direct" : turn.toolTurn ? "model-tool" : "backend-delegate", turnIndex: turn.turnIndex });
-        if (turn.cancelled || this.closed || this.failed) return false;
-        if (turn.directAuthorized) {
-          turn.outputAuthorized = true;
-          if (turn.outputText && turn.outputText !== turn.publishedOutputText) { this.onTranscript(turn.outputText); turn.publishedOutputText = turn.outputText; }
-          this.flushPendingAudio(turn);
-        } else turn.pendingAudio = [];
-        return turn.directAuthorized;
-      })
-      .catch(() => {
-        turn.directAuthorized = false;
-        this.onClassification({ durationMs: this.now() - classifyStartedAt, direct: false, route: "backend-delegate", turnIndex: turn.turnIndex });
-        turn.pendingAudio = [];
-        return false;
-      });
+    const userText = String(turn.inputText || "").trim();
+    if (!userText || userText === turn.classifiedText) return turn.classificationPromise;
+    const startedAt = this.now(), previousDirect = turn.directAuthorized === true;
+    const decision = classifyGeminiLiveTurn(userText);
+    turn.classifiedText = userText;
+    turn.directAuthorized = decision.route === "direct" && !turn.toolTurn;
+    turn.classificationPromise = Promise.resolve(turn.directAuthorized);
+    this.onClassification({ durationMs: this.now() - startedAt, direct: turn.directAuthorized, route: turn.directAuthorized ? "local-direct" : turn.toolTurn ? "model-tool" : "local-policy-delegate", kind: decision.kind, source: "local-policy", turnIndex: turn.turnIndex });
+    this.trace("gemini.classification.local", { turnId: turn.turnId, turnIndex: turn.turnIndex, route: turn.directAuthorized ? "direct" : turn.toolTurn ? "tool" : "delegate", kind: decision.kind });
+    if (turn.cancelled || this.closed || this.failed) return turn.classificationPromise;
+    if (turn.directAuthorized) {
+      turn.outputAuthorized = true;
+      if (turn.outputText && turn.outputText !== turn.publishedOutputText) this.publishTranscript(turn);
+      this.flushPendingAudio(turn);
+    } else {
+      turn.outputAuthorized = false;
+      turn.pendingAudio = [];
+      if (previousDirect && turn.heardAudio) this.stopPlayback();
+    }
     return turn.classificationPromise;
   }
 
@@ -282,13 +340,21 @@ export class GeminiLiveSession {
     if (this.closed || this.failed || turn.cancelled) return;
     turn.toolTurn = true; this.listening = false; turn.outputAuthorized = false; turn.outputText = ""; turn.publishedOutputText = ""; turn.pendingAudio = []; this.stopPlayback(); this.onState("processing");
     const functionResponses = [];
+    const transcriptStartedAt = this.now();
+    const finalTranscript = await this.waitForFinalTranscript(turn);
+    this.trace("gemini.tool.transcript", { turnId: turn.turnId, turnIndex: turn.turnIndex, durationMs: this.now() - transcriptStartedAt, status: finalTranscript ? "ok" : "missing" });
+    if (this.closed || this.failed || turn.cancelled) return;
     for (const call of calls) {
       if (call.name !== "delegate_to_olivia") {
         functionResponses.push({ id: call.id, name: call.name, response: { error: "Herramienta no autorizada." } });
         continue;
       }
+      if (!finalTranscript) {
+        functionResponses.push({ id: call.id, name: call.name, response: { error: "No se recibió la transcripción final del usuario; pedile que repita la solicitud." } });
+        continue;
+      }
       try {
-        const result = await this.onToolCall(call, turn.inputText);
+        const result = await this.onToolCall(call, finalTranscript, { turnId: turn.turnId, turnIndex: turn.turnIndex, transcriptComplete: true });
         functionResponses.push({ id: call.id, name: call.name, response: { result: String(result || "Olivia no devolvió una respuesta.").slice(0, 12000) } });
       } catch (error) {
         functionResponses.push({ id: call.id, name: call.name, response: { error: String(error?.message || "La consulta delegada falló.").slice(0, 800) } });
@@ -310,8 +376,9 @@ export class GeminiLiveSession {
     const audio = this.audioContext.createBuffer(1, samples.length, 24000), channel = audio.getChannelData(0);
     for (let index = 0; index < samples.length; index++) channel[index] = samples[index] / 32768;
     turn.outputAudioSeconds += audio.duration; turn.generatedAudio = true;
+    if (!turn.firstPcmAt) { turn.firstPcmAt = this.now(); this.trace("gemini.audio.first_pcm", { turnId: turn.turnId, turnIndex: turn.turnIndex }); }
     if (turn.outputAuthorized) this.scheduleAudio(audio, turn);
-    else turn.pendingAudio.push(audio);
+    else { if (!turn.pendingAudioStartedAt) { turn.pendingAudioStartedAt = this.now(); this.trace("gemini.audio.held", { turnId: turn.turnId, turnIndex: turn.turnIndex }); } turn.pendingAudio.push(audio); }
   }
 
   scheduleAudio(audio, turn) {
@@ -319,7 +386,7 @@ export class GeminiLiveSession {
     const source = this.audioContext.createBufferSource(); source.buffer = audio; source.connect(this.audioContext.destination);
     const at = Math.max(this.nextAudioAt || this.audioContext.currentTime + 0.035, this.audioContext.currentTime + 0.005);
     source.start(at); this.nextAudioAt = at + audio.duration; this.sources.add(source); turn.heardAudio = true; this.isPlaying = true;
-    if (!this.firstAudioAt) { this.firstAudioAt = this.now() + Math.max(0, at - this.audioContext.currentTime) * 1000; this.onFirstAudio(this.firstAudioAt, { turnIndex: turn.turnIndex }); }
+    if (!this.firstAudioAt) { this.firstAudioAt = this.now() + Math.max(0, at - this.audioContext.currentTime) * 1000; this.trace("gemini.audio.first_scheduled", { turnId: turn.turnId, turnIndex: turn.turnIndex }); this.onFirstAudio(this.firstAudioAt, { turnId: turn.turnId, turnIndex: turn.turnIndex }); }
     source.onended = () => { this.sources.delete(source); source.disconnect?.(); if (!this.sources.size) this.isPlaying = false; };
     this.onState("speaking");
   }
@@ -327,15 +394,16 @@ export class GeminiLiveSession {
   flushPendingAudio(turn) {
     turn.outputAuthorized = true;
     const pending = turn.pendingAudio.splice(0);
+    if (pending.length) this.trace("gemini.audio.released", { turnId: turn.turnId, turnIndex: turn.turnIndex, count: pending.length, delayMs: turn.pendingAudioStartedAt == null ? 0 : this.now() - turn.pendingAudioStartedAt });
     for (const audio of pending) this.scheduleAudio(audio, turn);
   }
 
   interrupt() {
-    for (const turn of this.finalizingTurns) { turn.cancelled = true; turn.pendingAudio = []; clearTimeout(turn.responseTimer); clearTimeout(turn.completionTimer); }
+    for (const turn of this.finalizingTurns) { turn.cancelled = true; turn.pendingAudio = []; this.cancelTranscriptWaiters(turn); clearTimeout(turn.responseTimer); clearTimeout(turn.completionTimer); }
     if (this.currentTurn) {
       clearTimeout(this.currentTurn.responseTimer); clearTimeout(this.currentTurn.completionTimer);
       this.currentTurn.pendingAudio = [];
-      if (!this.listening && this.currentTurn.pending) { this.currentTurn.cancelled = true; this.currentTurn.pending = false; }
+      if (!this.listening && this.currentTurn.pending) { this.currentTurn.cancelled = true; this.currentTurn.pending = false; this.cancelTranscriptWaiters(this.currentTurn); }
     }
     if (this.listening) this.ignoreOutputUntilInput = true;
     this.stopPlayback();
@@ -355,8 +423,9 @@ export class GeminiLiveSession {
       responseTokensDetails: turn.usageMetadata.responseTokensDetails,
       totalTokenCount: turn.usageMetadata.totalTokenCount,
     } : null : null, inputAudioSeconds: turn.inputAudioSeconds, outputAudioSeconds: turn.outputAudioSeconds };
+    const startedAt = this.now();
     try {
-      const usage = await this.request(report); this.onUsage(usage);
+      const usage = await this.request(report); this.trace("gemini.usage.report", { turnId: turn.turnId, turnIndex: turn.turnIndex, durationMs: this.now() - startedAt, status: usage.measurement || "ok", costUsd: usage.costUsd }); this.onUsage(usage);
       if (usage.shouldStop) this.fail(new Error("Se alcanzó el límite preventivo de esta sesión Gemini; continúo con el circuito anterior."));
     } catch { this.onUsage({ measurement: "unconfirmed", message: "No se pudo registrar el consumo de Gemini en el presupuesto mensual." }); }
   }
@@ -366,6 +435,7 @@ export class GeminiLiveSession {
     clearTimeout(turn.responseTimer); clearTimeout(turn.completionTimer);
     clearTimeout(turn.noTranscriptTimer); turn.noTranscriptTimer = null;
     turn.pending = false; turn.completed = true; turn.finalizing = true; turn.turnId ||= globalThis.crypto.randomUUID(); turn.turnIndex ||= ++this.turnIndex;
+    this.trace("gemini.turn.complete", { turnId: turn.turnId, turnIndex: turn.turnIndex, route: turn.toolTurn ? "tool" : turn.directAuthorized ? "direct" : "delegate" });
     if (this.currentTurn === turn) this.currentTurn = this.createTurn();
     this.finalizingTurns.add(turn);
     try {
@@ -376,18 +446,18 @@ export class GeminiLiveSession {
           const direct = turn.directAuthorized === true;
           if (!turn.cancelled && !this.closed && !this.failed && direct) {
             turn.outputAuthorized = true;
-            if (turn.outputText && turn.outputText !== turn.publishedOutputText) { this.onTranscript(turn.outputText); turn.publishedOutputText = turn.outputText; }
+            if (turn.outputText && turn.outputText !== turn.publishedOutputText) this.publishTranscript(turn);
             this.flushPendingAudio(turn);
             if (turn.inputText && turn.outputText) Promise.resolve(this.onTurnComplete({ turnId: turn.turnId, turnIndex: turn.turnIndex, userText: turn.inputText, assistantText: turn.outputText, delegated: false, noAudio: !turn.heardAudio || Boolean(turn.providerIncomplete), providerIncomplete: Boolean(turn.providerIncomplete), usageMetadata: turn.usageMetadata })).catch((error) => this.onNotice(error?.message || "No se pudo guardar la conversación de voz."));
             else if (turn.generatedAudio) this.onNotice("Gemini Live devolvió una respuesta sin transcripción completa; la marqué para revisión en el panel Developer.");
           } else if (!turn.cancelled && !this.closed && !this.failed && turn.inputText) {
             turn.pendingAudio = []; turn.outputAuthorized = false; this.onState("processing");
             let assistantText;
-            try { assistantText = await this.onToolCall({ name: "delegate_to_olivia", args: { request: turn.inputText } }, turn.inputText); }
+            try { assistantText = await this.onToolCall({ name: "delegate_to_olivia", args: { request: turn.inputText } }, turn.inputText, { turnId: turn.turnId, turnIndex: turn.turnIndex, transcriptComplete: true }); }
             catch (error) { assistantText = error?.message || "No pude validar la respuesta. Repetí la consulta para que Olivia pueda revisarla."; }
             if (!turn.cancelled && !this.closed && !this.failed) {
               turn.outputText = String(assistantText || "").trim();
-              if (turn.outputText && turn.outputText !== turn.publishedOutputText) { this.onTranscript(turn.outputText); turn.publishedOutputText = turn.outputText; }
+              if (turn.outputText && turn.outputText !== turn.publishedOutputText) this.publishTranscript(turn);
               Promise.resolve(this.onTurnComplete({ turnId: turn.turnId, turnIndex: turn.turnIndex, userText: turn.inputText, assistantText: turn.outputText, delegated: true, noAudio: true, usageMetadata: turn.usageMetadata })).catch((error) => this.onNotice(error?.message || "No se pudo registrar el turno delegado."));
             }
           } else {
@@ -403,7 +473,7 @@ export class GeminiLiveSession {
 
       await this.reportUsage(turn, { includeProviderUsage: turn.completed });
       const waitMs = Math.max(0, ((this.nextAudioAt || 0) - (this.audioContext?.currentTime || 0)) * 1000);
-      setTimeout(() => { if (!this.closed && !this.failed && !this.isPlaying) this.onState(this.listening ? "recording" : "listening"); if (turn.heardAudio && !turn.cancelled && !this.closed) this.onAudioComplete(this.now()); }, waitMs);
+      setTimeout(() => { if (!this.closed && !this.failed && !this.isPlaying) this.onState(this.listening ? "recording" : "listening"); if (turn.heardAudio && !turn.cancelled && !this.closed) this.onAudioComplete(this.now(), { turnId: turn.turnId, turnIndex: turn.turnIndex }); }, waitMs);
       this.onPartial(""); this.firstAudioAt = null;
     } finally { turn.finalizing = false; this.finalizingTurns.delete(turn); }
   }

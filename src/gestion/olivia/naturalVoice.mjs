@@ -15,9 +15,20 @@ export class NaturalVoiceConversation {
       if (!this.mediaDevices?.getUserMedia || !this.Recorder || !this.AudioContext) throw new Error("Este navegador no admite conversación por voz. Podés dictar o escribir.");
       const startedAt = this.now();
       this.onTrace({ stage: "voice.capture.start", at: startedAt });
+      const contextCreatedAt = this.now();
+      this.onTrace({ stage: "audio.context.create.start", at: contextCreatedAt });
       this.context = new this.AudioContext();
-      await this.context.resume();
-      this.stream = await this.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      this.onTrace({ stage: "audio.context.create.end", at: this.now(), durationMs: this.now() - contextCreatedAt, status: "ok" });
+      const resumeStartedAt = this.now();
+      this.onTrace({ stage: "audio.context.resume.start", at: resumeStartedAt });
+      const resumeContext = Promise.resolve(this.context.resume()).then(() => this.onTrace({ stage: "audio.context.resume.end", at: this.now(), durationMs: this.now() - resumeStartedAt, status: "ok" }));
+      const microphoneStartedAt = this.now();
+      this.onTrace({ stage: "microphone.request.start", at: microphoneStartedAt });
+      const requestMicrophone = this.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
+        .then((stream) => { this.onTrace({ stage: "microphone.request.end", at: this.now(), durationMs: this.now() - microphoneStartedAt, status: "ok" }); if (this.closed) stream.getTracks().forEach((track) => track.stop()); return stream; })
+        .catch((error) => { this.onTrace({ stage: "microphone.request.end", at: this.now(), durationMs: this.now() - microphoneStartedAt, status: "error" }); throw error; });
+      const [, stream] = await Promise.all([resumeContext, requestMicrophone]);
+      this.stream = stream;
       if (this.closed) return this.release();
       this.onTrace({ stage: "voice.mic.ready", at: this.now() });
       this.onMediaInterrupted = () => {
@@ -32,6 +43,7 @@ export class NaturalVoiceConversation {
       this.analyser = this.context.createAnalyser(); this.analyser.fftSize = 1024; this.source.connect(this.analyser);
       this.samples = new Float32Array(this.analyser.fftSize);
       this.startRecorder();
+      this.onTrace({ stage: "voice.capture.ready", at: this.now() });
       this.startedAt = this.now(); this.onState("listening"); this.loop();
       if (this.createTranscriber) {
         const readyAt = this.now();
@@ -106,7 +118,7 @@ export class NaturalVoiceConversation {
       const blob = new Blob(chunks, { type: actualType }); blob.durationSeconds = Math.min(this.maxSeconds, durationSeconds);
       const metadata={durationSeconds:blob.durationSeconds,endedAt:this.now(),voiceEndedAt:this.lastSpeechAt,turnId:this.turnId,endpointWindowMs:this.endpointWindowMs};
       this.onTrace({stage:'audio.commit',at:metadata.endedAt,turnId:this.turnId});
-      this.onTrace({stage:'voice.turn.end',at:metadata.endedAt,voiceEndedAt:metadata.voiceEndedAt,turnId:this.turnId});
+      this.onTrace({stage:'voice.turn.end',at:metadata.endedAt,voiceEndedAt:metadata.voiceEndedAt,turnId:this.turnId,endpointMs:metadata.endpointWindowMs});
       this.onState("processing");
       const ready=(async()=>{
         if(turnTranscriber && !turnTranscriber.closed) {
@@ -130,7 +142,7 @@ export class NaturalVoiceConversation {
       this.chunks = preRoll; this.bytes = preRoll.reduce((total, chunk) => total + chunk.size, 0); this.discardTurn = false; this.recordingTurn = true; this.recordingStartedAt = now; this.lastSpeechAt = now; this.pauseResumes = 0;
       this.partial='';
       this.partialChangedAt=now;this.turnId=globalThis.crypto.randomUUID();
-      if(this.transcriber && !this.transcriber.closed) {try{this.transcriber.beginTurn();}catch{this.transcriber.close();}}
+      if(this.transcriber && !this.transcriber.closed) {try{this.transcriber.beginTurn(this.turnId);}catch{this.transcriber.close();}}
       clearTimeout(this.turnTimer); this.turnTimer = setTimeout(() => this.finishTurn(), this.maxSeconds * 1000);
       const bargeIn = this.sources?.size > 0 || Boolean(this.transcriber?.isPlaying);
       this.turnTranscriber = this.transcriber;

@@ -24,6 +24,17 @@ export function geminiLiveSetupConfig() {
     }] }],
     inputAudioTranscription: {},
     outputAudioTranscription: {},
+    realtimeInputConfig: {
+      automaticActivityDetection: {
+        disabled: false,
+        endOfSpeechSensitivity: "END_SENSITIVITY_LOW",
+        // NaturalVoiceConversation closes short turns locally at 500–950 ms
+        // and keeps lists open up to 2 s. Align Gemini's own VAD ceiling with
+        // the longest local window so its earlier default cannot split lists.
+        silenceDurationMs: 2000,
+      },
+      activityHandling: "START_OF_ACTIVITY_INTERRUPTS",
+    },
     sessionResumption: {},
     contextWindowCompression: { triggerTokens: 3000, slidingWindow: { targetTokens: 1200 } },
   };
@@ -43,6 +54,7 @@ export function geminiLiveRawSetup(model = GEMINI_LIVE_MODEL, handle = null) {
     tools: config.tools,
     inputAudioTranscription: config.inputAudioTranscription,
     outputAudioTranscription: config.outputAudioTranscription,
+    realtimeInputConfig: config.realtimeInputConfig,
     sessionResumption: handle ? { handle } : {},
     contextWindowCompression: config.contextWindowCompression,
   };

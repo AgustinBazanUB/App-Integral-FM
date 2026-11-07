@@ -16,9 +16,13 @@ export function instantConversation(text) {
   return null;
 }
 export function classifyGeminiLiveTurn(text) {
-  const normalized = String(text || '').trim();
-  if (isGreetingOnly(normalized) || instantConversation(normalized) || /^(?:perfecto|dale|bueno|ok) gracias$/.test(normalizeSpeech(normalized))) return { route: 'direct' };
-  return { route: 'delegate' };
+  const normalized = normalizeSpeech(text)
+    .replace(/^olivia /, '')
+    .replace(/^hola olivia /, 'hola ')
+    .replace(/ olivia$/, '');
+  const socialOnly = /^(?:(?:muy |re )?(?:bien(?: por suerte)?|todo bien|todo tranqui|joya|genial|de diez)(?: y vos(?: como (?:estas|andas))?| que (?:andas haciendo|estas haciendo|haces))?|bien por suerte que (?:andas haciendo|estas haciendo|haces)|me alegro|que bueno|y vos(?: como (?:estas|andas))?|que (?:andas haciendo|estas haciendo|haces|onda)(?: hoy)?|como va tu dia|(?:muchas |muchisimas |mil )?gracias(?: por tu ayuda| olivia)?|todo bien gracias|te agradezco)$/.test(normalized.replace(/\s+/g, ' '));
+  if (isGreetingOnly(text) || instantConversation(text) || socialOnly) return { route: 'direct', kind: 'small-talk' };
+  return { route: 'delegate', kind: 'data-or-operation' };
 }
 export function quickReadPlan(text) {
   const value = normalizeSpeech(text).replace(/^olivia /, '').replace(/ por favor$/, '').replace(/^cuanto stock (?:de |del )?/, 'cuantas unidades de ');
