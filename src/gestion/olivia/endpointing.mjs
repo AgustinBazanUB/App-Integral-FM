@@ -1,5 +1,5 @@
 import { isGreetingOnly, normalizeSpeech } from '../../shared/oliviaFastSpeech.mjs';
-import { instantConversation, quickReadPlan } from '../../shared/oliviaConversationRouter.mjs';
+import { instantConversation, isConversationalFollowUp, quickReadPlan } from '../../shared/oliviaConversationRouter.mjs';
 
 export function endpointingWindow({ partial = '', stableMs = 0, pauseResumes = 0, legacySilenceMs = 1900, enabled = true } = {}) {
   const text = normalizeSpeech(partial);
@@ -11,7 +11,7 @@ export function endpointingWindow({ partial = '', stableMs = 0, pauseResumes = 0
   if (unfinished || enumeration) return 2000;
   // Keep the conversational fast path responsive without ending under the
   // provider's documented 500 ms safety floor for manually closed turns.
-  if (stableMs >= 140 && (isGreetingOnly(text) || instantConversation(text))) return 500;
+  if (stableMs >= 140 && (isGreetingOnly(text) || instantConversation(text) || isConversationalFollowUp(text))) return 500;
   if (mutation) return !pauseResumes && /\ben (?:el |la )?\S+/.test(text) && stableMs>=220 ? 900 : 1800;
   if (pauseResumes > 1) return 1700;
   if (stableMs >= 180 && quickReadPlan(text)) return pauseResumes ? 900 : 700;

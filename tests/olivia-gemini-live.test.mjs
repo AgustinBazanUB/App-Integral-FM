@@ -92,6 +92,8 @@ test("raw Live setup fixes model, voice, tool policy, compression and modalities
 test("backend direct route is limited to exact conversational phrases", () => {
   assert.equal(classifyGeminiLiveTurn("Hola, ¿cómo estás?").route, "direct");
   assert.equal(classifyGeminiLiveTurn("Muchísimas gracias").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("¿Te acordás de lo que te pregunté recién?").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("¿De qué veníamos hablando recién?").route, "direct");
   assert.equal(classifyGeminiLiveTurn("Perfecto, gracias").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Bien, por suerte. ¿Qué andás haciendo?").route, "direct");
   assert.equal(classifyGeminiLiveTurn("¿Qué onda hoy?").route, "direct");
@@ -100,6 +102,7 @@ test("backend direct route is limited to exact conversational phrases", () => {
   assert.equal(classifyGeminiLiveTurn("Sí").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Perfecto, gracias; registrá una venta").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Hola, ¿cuánto stock queda?").route, "delegate");
+  assert.equal(classifyGeminiLiveTurn("¿Qué precio me dijiste recién para el aceite?").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Gracias, registrá una venta").route, "delegate");
 });
 

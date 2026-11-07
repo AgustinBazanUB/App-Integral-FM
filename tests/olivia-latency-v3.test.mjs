@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fixture,start,textResponse} from './helpers/olivia-fixture.mjs';
 import {createOliviaEngine} from '../netlify/functions/_lib/olivia/engine.mjs';
-import {instantConversation,quickReadPlan} from '../src/shared/oliviaConversationRouter.mjs';
+import {instantConversation,isConversationalFollowUp,quickReadPlan} from '../src/shared/oliviaConversationRouter.mjs';
 import {endpointingWindow} from '../src/gestion/olivia/endpointing.mjs';
 import {latencyTrace} from '../src/shared/oliviaLatencyTrace.mjs';
 import {routeModel} from '../netlify/functions/_lib/olivia/modelRouter.mjs';
@@ -19,6 +19,12 @@ for(const entry of latencyCases)test('endpointing y ruta: '+entry.text,()=>{
   if(entry.kind==='read'){assert.ok(quickReadPlan(entry.text));assert.ok(window<=entry.maxWindow);}
   if(entry.kind==='controlled'){assert.equal(instantConversation(entry.text),null);assert.equal(quickReadPlan(entry.text),null);}
   if(entry.kind==='unfinished')assert.ok(window>=entry.minWindow);
+});
+test('contextual conversation follow-ups use the short but safe endpoint window',()=>{
+  const text='¿Te acordás de lo que te pregunté recién?';
+  assert.equal(isConversationalFollowUp(text),true);
+  assert.equal(endpointingWindow({partial:text,stableMs:400}),500);
+  assert.equal(isConversationalFollowUp('¿Qué precio me dijiste recién para el aceite?'),false);
 });
 async function voiceFixture(){
   const f=fixture({role:'admin'});f.session.email='agsreserva@gmail.com';const {conversationId}=await start(f);let calls=0;
