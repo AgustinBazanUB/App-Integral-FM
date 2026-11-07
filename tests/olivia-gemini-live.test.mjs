@@ -62,17 +62,15 @@ test("audio-only estimates state that accumulated context is excluded", () => {
   assert.equal(geminiLiveMonthlyProjection({ spendUsd: 5, queryCount: 660 }).projectionAt660Usd, 5);
 });
 
-test("monthly provider rollup distinguishes tariff-based estimates and unconfirmed costs", () => {
+test("monthly provider rollup tracks Luna only and rejects the retired speech provider", () => {
   const now = new Date("2026-11-06T12:00:00.000Z");
   let ledger = addProviderSpend(null, { provider: "lunaSol", period: "2026-11", costUsd: 0.0015, inputTokens: 100, outputTokens: 25 }, now);
   ledger = addProviderSpend(ledger, { provider: "lunaSol", period: "2026-11", costUsd: null, inputTokens: 10, outputTokens: 4 }, now);
-  ledger = addProviderSpend(ledger, { provider: "chirp", period: "2026-11", costUsd: 0.00003, characters: 1000 }, now);
   assert.equal(ledger.lunaSol.estimatedUsd, 0.0015);
   assert.equal(ledger.lunaSol.unconfirmedCalls, 1);
   assert.equal(ledger.lunaSol.calls, 2);
   assert.equal(ledger.lunaSol.inputTokens, 110);
-  assert.equal(ledger.chirp.estimatedUsd, 0.00003);
-  assert.equal(ledger.chirp.characters, 1000);
+  assert.throws(() => addProviderSpend(ledger, { provider: "chirp", period: "2026-11", costUsd: 0.00003 }, now), { code: "invalid-provider" });
   assert.equal(Object.hasOwn(ledger, "userId"), false);
 });
 
@@ -89,8 +87,15 @@ test("raw Live setup fixes model, voice, tool policy, compression and modalities
   assert.equal(setup.thinkingLevel, undefined);
 });
 
-test("backend direct route is limited to exact conversational phrases", () => {
+test("Gemini Live keeps consecutive everyday conversation direct and business intent delegated", () => {
   assert.equal(classifyGeminiLiveTurn("Hola, ¿cómo estás?").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Muy bien, ¿y vos?").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Todo bien, gracias").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("¿Qué andás haciendo?").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Qué bueno").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Contame algo lindo").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Dale, me gustó").route, "direct");
+  assert.equal(classifyGeminiLiveTurn("Bueno, hablamos luego").route, "direct");
   assert.equal(classifyGeminiLiveTurn("Muchísimas gracias").route, "direct");
   assert.equal(classifyGeminiLiveTurn("¿Te acordás de lo que te pregunté recién?").route, "direct");
   assert.equal(classifyGeminiLiveTurn("¿De qué veníamos hablando recién?").route, "direct");
@@ -101,6 +106,7 @@ test("backend direct route is limited to exact conversational phrases", () => {
   assert.equal(classifyGeminiLiveTurn("Dale, cargá una venta").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Sí").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Perfecto, gracias; registrá una venta").route, "delegate");
+  assert.equal(classifyGeminiLiveTurn("Dale, cargá 20 unidades de aceite").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Hola, ¿cuánto stock queda?").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("¿Qué precio me dijiste recién para el aceite?").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Gracias, registrá una venta").route, "delegate");
@@ -130,7 +136,7 @@ test("48 kHz capture resamples to 16 kHz signed PCM", () => {
   assert.ok(output.every((sample) => sample > 0));
 });
 
-test("Live connection diagnostics retain the WebSocket close code and end in fallback", async (t) => {
+test("Live connection diagnostics retain the WebSocket close code and request reconnect", async (t) => {
   class FakeSocket {
     static OPEN = 1;
     static instances = [];
@@ -153,7 +159,7 @@ test("Live connection diagnostics retain the WebSocket close code and end in fal
   socket.onerror();
   socket.onclose({ code: 1008 });
   await assert.rejects(started, /código 1008/);
-  assert.deepEqual(failures, ["Gemini Live cerró la conexión (código 1008); continúo con el circuito anterior."]);
+  assert.deepEqual(failures, ["Gemini Live cerró la conexión (código 1008); volvé a conectar para continuar por voz."]);
   assert.equal(notices.at(-1), failures[0]);
   assert.equal(live.failed, true);
 });
@@ -180,7 +186,7 @@ test("Live handshake timeout reports whether the WebSocket opened", async (t) =>
   const socket = FakeSocket.instances[0];
   socket.readyState = FakeSocket.OPEN; socket.onopen();
   await assert.rejects(started, /WebSocket OPEN/);
-  assert.deepEqual(failures, ["Gemini Live no respondió al handshake dentro del plazo (WebSocket OPEN); continúo con el circuito anterior."]);
+  assert.deepEqual(failures, ["Gemini Live no respondió al handshake dentro del plazo (WebSocket OPEN); volvé a conectar para continuar por voz."]);
 });
 
 test("closing during token issuance releases the late reservation without opening a socket", async () => {
@@ -253,7 +259,75 @@ test("binary Live frames complete the handshake and a text diagnostic turn witho
   assert.equal(reports[1].usageMetadata,null,'unfinished usage stays unconfirmed instead of becoming a zero-cost success');
 });
 
-test("silent generation without turnComplete finalizes once for fallback and retires the socket", async (t) => {
+test("one persistent Gemini session keeps ten consecutive social turns direct", async (t) => {
+  class FakeSocket {
+    static OPEN = 1;
+    static instances = [];
+    constructor() { this.readyState = 0; this.sent = []; FakeSocket.instances.push(this); }
+    send(data) { this.sent.push(JSON.parse(data)); }
+    close() { this.readyState = 3; }
+    receive(event) { this.onmessage({ data: JSON.stringify(event) }); }
+  }
+  const operations = [], turns = [], classifications = [];
+  const inputs = [
+    "Hola, Olivia",
+    "¿Cómo estás?",
+    "Muy bien, ¿y vos?",
+    "Todo bien, gracias",
+    "¿Qué andás haciendo?",
+    "¿Te acordás de lo que te pregunté recién?",
+    "Contame algo lindo",
+    "Dale, me gustó",
+    "Muchas gracias",
+    "Bueno, hablamos luego",
+  ];
+  const live = new GeminiLiveSession({
+    conversationId: "ten-turn-social-session",
+    audioContext: { currentTime: 0 },
+    WebSocket: FakeSocket,
+    request: async ({ operation }) => {
+      operations.push(operation);
+      if (operation === "token") return { token: "auth_tokens/social", sessionId: "social-session", expiresAt: new Date(Date.now() + 60000).toISOString(), maxSessionSeconds: 600 };
+      if (operation === "usage") return { measurement: "provider-forwarded", shouldStop: false };
+      return { closed: true };
+    },
+    onTurnComplete: turn => turns.push(turn),
+    onClassification: decision => classifications.push(decision),
+  });
+  t.after(() => live.close());
+
+  const started = live.start(null, { textInputOnly: true });
+  await new Promise(resolve => setImmediate(resolve));
+  const socket = FakeSocket.instances?.[0];
+  assert.ok(socket, "one persistent WebSocket is opened for the whole sequence");
+  socket.readyState = FakeSocket.OPEN; socket.onopen(); socket.receive({ setupComplete: {} }); await started;
+
+  for (const [index, input] of inputs.entries()) {
+    const complete = new Promise(resolve => {
+      const prior = live.onTurnComplete;
+      live.onTurnComplete = turn => { prior(turn); if (turn.turnIndex === index + 1) resolve(turn); };
+    });
+    live.sendText(input);
+    assert.equal(live.currentTurn.directAuthorized, true, `turn ${index + 1} is locally authorized as everyday conversation`);
+    socket.receive({ serverContent: { outputTranscription: { text: "Dale, te sigo." }, turnComplete: true } });
+    const turn = await complete;
+    assert.equal(turn.delegated, false, `turn ${index + 1} stays on Gemini Live`);
+    await new Promise(resolve => setImmediate(resolve));
+  }
+
+  assert.equal(turns.length, 10);
+  assert.equal(turns[5].userText, "¿Te acordás de lo que te pregunté recién?");
+  assert.ok(classifications.every(item => item.route === "local-direct"));
+  assert.equal(operations.filter(operation => operation === "classify").length, 0, "no HTTP classification is requested during the persistent conversation");
+  assert.equal(operations.filter(operation => operation === "token").length, 1, "the session is not reconnected between turns");
+  assert.equal(operations.filter(operation => operation === "usage").length, 10, "usage is accounted once per turn");
+  assert.equal(live.failed, false);
+  live.close();
+  await live.stopping;
+  assert.equal(operations.filter(operation => operation === "close").length, 1);
+});
+
+test("silent generation without turnComplete finalizes once without switching voice providers", async (t) => {
   let socket;
   class Socket {
     static OPEN=1;
@@ -405,6 +479,59 @@ test("business turns suppress an unverified Gemini answer and delegate to Olivia
   assert.deepEqual(transcripts, ["Resultado verificado para: ¿Cuánto stock queda?"]);
   assert.equal(operations.includes("classify"), false, "business input is delegated without a classify round trip");
   live.close();
+});
+
+test("Gemini speaks only an exact neutral acknowledgement while Olivia processes a delegated turn", async (t) => {
+  class FakeSocket {
+    static OPEN = 1;
+    static instances = [];
+    constructor() { this.readyState = 0; this.sent = []; FakeSocket.instances.push(this); }
+    send(data) { this.sent.push(JSON.parse(data)); }
+    close() { this.readyState = 3; this.onclose?.(); }
+    receive(event) { this.onmessage({ data: JSON.stringify(event) }); }
+  }
+  let played = 0, finishTool;
+  const turns = [], transcripts = [], operations = [];
+  const context = {
+    currentTime: 0, destination: {},
+    createBuffer: (_channels, length) => ({ duration: length / 24000, getChannelData: () => new Float32Array(length) }),
+    createBufferSource: () => ({ connect() {}, disconnect() {}, start() { played++; }, stop() {} }),
+  };
+  const live = new GeminiLiveSession({
+    request: async payload => { operations.push(payload.operation); if (payload.operation === "token") return { token: "auth_tokens/ack", sessionId: "ack", expiresAt: new Date(Date.now() + 60000).toISOString(), maxSessionSeconds: 60 }; if (payload.operation === "usage") return { shouldStop: false }; return { closed: true }; },
+    conversationId: "acknowledgement", audioContext: context, WebSocket: FakeSocket,
+    onToolCall: async () => new Promise(resolve => { finishTool = resolve; }),
+    onTranscript: text => transcripts.push(text), onTurnComplete: turn => turns.push(turn),
+  });
+  t.after(() => live.close());
+  const started = live.start(null, { textInputOnly: true });
+  await new Promise(resolve => setImmediate(resolve));
+  const socket = FakeSocket.instances[0]; socket.readyState = FakeSocket.OPEN; socket.onopen(); socket.receive({ setupComplete: {} }); await started;
+  live.sendText("¿Cuánto stock queda?");
+  socket.receive({
+    toolCall: { functionCalls: [{ id: "call-ack", name: "delegate_to_olivia", args: { request: "modelo no confiable" } }] },
+    serverContent: { outputTranscription: { text: "Dale, lo reviso." }, modelTurn: { parts: [{ inlineData: { mimeType: "audio/pcm;rate=24000", data: "AQACAA==" } }] } },
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(typeof finishTool, "function");
+  assert.equal(played, 1, "the exact acknowledgement is scheduled before the backend tool returns");
+  assert.deepEqual(transcripts, ["Dale, lo reviso."]);
+  assert.equal(turns.length, 0, "the acknowledgement is not mistaken for a completed business answer");
+  finishTool("Almendras: 31 unidades en Tribunales.");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(socket.sent.at(-1).toolResponse.functionResponses[0].response.result, "Almendras: 31 unidades en Tribunales.");
+  socket.receive({ serverContent: { outputTranscription: { text: "Almendras: 31 unidades en Tribunales." }, modelTurn: { parts: [{ inlineData: { mimeType: "audio/pcm;rate=24000", data: "AQACAA==" } }] } } });
+  socket.receive({ serverContent: { turnComplete: true } });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(played, 2, "Gemini also voices the verified result when it returns audio");
+  assert.equal(turns.length, 1);
+  assert.equal(turns[0].delegated, true);
+  assert.equal(turns[0].noAudio, false);
+  assert.equal(turns[0].acknowledgementHeard, true);
+  assert.match(turns[0].assistantText, /31 unidades/);
+  assert.equal(operations.includes("classify"), false);
+  live.close();
+  await live.stopping;
 });
 
 test("Gemini tool calls wait for final user transcription and never use model arguments as a substitute", async (t) => {

@@ -75,17 +75,19 @@ function voiceFixture({ denied = false, adaptiveEndpointing = false } = {}) {
   return { voice, turns, levels, errors, tracks, context, trackEvents, contextEvents, requested: () => requested, tick(t, a) { now = t; amplitude = a; frames.shift()?.(); } };
 }
 
-test('microphone capture becomes available while the live provider is still connecting', async () => {
+test('Live connection finishes before listening and does not make a duplicate local recording', async () => {
   const f = voiceFixture(); let resolveProvider;
   f.voice.createTranscriber = () => new Promise(resolve => { resolveProvider = resolve; });
-  await f.voice.start();
+  const starting = f.voice.start();
+  while (!resolveProvider) await new Promise(resolve => setImmediate(resolve));
   assert.equal(f.requested(), 1);
   assert.equal(f.voice.closed, false);
-  assert.equal(f.voice.recorder.state, 'recording');
+  assert.equal(f.voice.recorder, undefined);
   assert.equal(f.voice.transcriber, undefined);
   resolveProvider({ handlesTurns: true, ready: true, close() { this.closed = true; } });
-  await f.voice.transcriberReady;
+  await starting;
   assert.equal(f.voice.transcriber.handlesTurns, true);
+  assert.equal(Boolean(f.voice.recordingTurn), false);
   f.voice.close();
 });
 
@@ -125,11 +127,11 @@ test('incomplete live partials extend silence and final live text bypasses dupli
   assert.equal(commits,1);assert.equal(f.turns[0].metadata.transcript.text,'Necesito el stock de aceite');assert.equal(f.requested(),1);f.voice.close();
 });
 
-test('live setup failure preserves the same authorized capture and releases setup when ended',async()=>{
-  const f=voiceFixture(),notices=[];
-  f.voice.createTranscriber=async()=>{throw Error('Unavailable');};f.voice.onNotice=text=>notices.push(text);
-  await f.voice.start();await f.voice.transcriberReady;assert.equal(f.requested(),1);assert.equal(f.voice.closed,false);assert.equal(notices.length,1);
-  f.tick(100,.1);f.voice.finishTurn();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.turns.length,1);assert.equal(f.turns[0].metadata.transcript,undefined);f.voice.close();
+test('Live setup failure ends the capture and never switches to local recording',async()=>{
+  const f=voiceFixture(),errors=[];
+  f.voice.createTranscriber=async()=>{throw Error('Unavailable');};f.voice.onError=error=>errors.push(error.message);
+  await f.voice.start();assert.equal(f.requested(),1);assert.equal(f.voice.closed,true);assert.deepEqual(errors,['Unavailable']);
+  assert.equal(f.voice.recorder,undefined);assert.equal(f.turns.length,0);f.voice.close();
 });
 
 test('out-of-order live finals are delivered chronologically and mute discards provider input',async()=>{

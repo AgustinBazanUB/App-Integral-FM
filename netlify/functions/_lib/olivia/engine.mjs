@@ -1,6 +1,5 @@
 import { executeToolBatch } from "./toolExecution.mjs";
-import { chooseLocalGreeting } from '../../../../src/shared/oliviaFastSpeech.mjs';
-import { classifyGeminiLiveTurn, instantConversation, quickReadPlan, latencyEnabled } from '../../../../src/shared/oliviaConversationRouter.mjs';
+import { classifyGeminiLiveTurn, quickReadPlan, latencyEnabled } from '../../../../src/shared/oliviaConversationRouter.mjs';
 import { latencyTrace, tracedStore } from '../../../../src/shared/oliviaLatencyTrace.mjs';
 import { fastConversationRead, formatQuickRead } from './fastConversation.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -13,7 +12,7 @@ import { fieldGuidance } from '../../../../src/shared/oliviaOperationGuide.mjs';
 import { assistiveIntent } from '../../../../src/shared/oliviaAssistiveIntent.mjs';
 import { guideForMessage, getUiGuide } from '../../../../src/shared/oliviaUiGuides.mjs';
 import { chooseExpression, naturalStyleContext } from '../../../../src/shared/oliviaExpressions.mjs';
-import { canUseOliviaVoice, hasGoogleCloudTtsCredentials, isOliviaDeployPreview } from "../../../../src/shared/oliviaVoiceAvailability.mjs";
+import { canUseOliviaVoice, isOliviaDeployPreview } from "../../../../src/shared/oliviaVoiceAvailability.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { captureOliviaFailure, publicOliviaFailure } from "./errorReports.mjs";
 import { randomUUID, createHash, timingSafeEqual } from "node:crypto";
@@ -146,12 +145,12 @@ export function createOliviaEngine({
     if (!canAccessAdministration(session.profile)) return null;
     if (!isOliviaDeployPreview(env) || env.OLIVIA_HYBRID_LIVE_ENABLED !== "true" || configuredFirebaseProjectId(env) !== "app-integral-fm-pruebas") return null;
     const period = clock().toISOString().slice(0, 7), budget = await store.get(`oliviaGeminiLiveBudgets/${period}`);
+    const currentBudget = Object.fromEntries(Object.entries(budget || {}).filter(([key]) => key !== "chirp"));
     const spendUsd = Number(budget?.usedUsd || 0), reservedUsd = Number(budget?.reservedUsd || 0), targetUsd = Number(budget?.targetUsd || config.hybridVoice.targetUsd || 5), warningUsd = Number(budget?.warningUsd || config.hybridVoice.warningUsd || 6), hardLimitUsd = Number(budget?.hardLimitUsd || config.hybridVoice.hardLimitUsd || 10);
     const lunaSol = budget?.lunaSol || { estimatedUsd: 0, unconfirmedCalls: 0, calls: 0, inputTokens: 0, outputTokens: 0 };
-    const chirp = budget?.chirp || { estimatedUsd: 0, unconfirmedRequests: 0, requests: 0, characters: 0 };
-    const providerEstimatedUsd = Number(lunaSol.estimatedUsd || 0) + Number(chirp.estimatedUsd || 0);
+    const providerEstimatedUsd = Number(lunaSol.estimatedUsd || 0);
     return {
-      ...(budget || {}),
+      ...currentBudget,
       period,
       spendUsd,
       reservedUsd,
@@ -163,9 +162,8 @@ export function createOliviaEngine({
       estimatedUsd: Number(budget?.estimatedUsd || 0),
       unconfirmedQueryCount: Number(budget?.unconfirmedQueryCount || 0),
       lunaSol,
-      chirp,
       combinedEstimatedSpendUsd: spendUsd + providerEstimatedUsd,
-      combinedUnconfirmedCount: Number(budget?.unconfirmedQueryCount || 0) + Number(lunaSol.unconfirmedCalls || 0) + Number(chirp.unconfirmedRequests || 0),
+      combinedUnconfirmedCount: Number(budget?.unconfirmedQueryCount || 0) + Number(lunaSol.unconfirmedCalls || 0),
       warningReached: spendUsd + reservedUsd >= warningUsd,
       queryLimitReached: Number(budget?.queryCount || 0) >= GEMINI_LIVE_MONTHLY_QUERY_CAP,
       queryCount: Number(budget?.queryCount || 0),
@@ -250,16 +248,14 @@ export function createOliviaEngine({
       usage: await usage(session, config),
       capabilities: capabilities(session),
       providerConfigured: Boolean(env.OPENAI_API_KEY),
-      googleTtsConfigured: hasGoogleCloudTtsCredentials(env),
       enabled: config.enabled,
       audioLimits: config.audioLimits,
-      voiceProtocol: "chirp",
-      voiceConversationAvailable: Boolean(config.naturalVoice.enabled && canUseOliviaVoice(session, env) && env.OPENAI_API_KEY && hasGoogleCloudTtsCredentials(env)),
+      voiceConversationAvailable: Boolean(config.naturalVoice.enabled && geminiLiveEnabled(session, config)),
       voiceTrialAvailable: false,
       geminiLiveAvailable: geminiLiveEnabled(session, config),
       ...(canAccessAdministration(session.profile) && canUseOliviaVoice(session, env) ? { geminiLiveUsage: await geminiLiveUsageSummary(session, config) } : {}),
-      ...(config.naturalVoice.enabled && canUseOliviaVoice(session, env) ? { voiceSettings: { turnEndSilenceMs: config.naturalVoice.turnEndSilenceMs, latencyMode:latencyEnabled(config),transcriptionDelay:config.conversationLatency.transcriptionDelay,transcriptionModel:'gpt-live-transcribe', voice:config.naturalVoice.voice, speakingRate:config.naturalVoice.speakingRate, hybridLiveAvailable:geminiLiveEnabled(session, config), hybridLiveEnabled:config.hybridVoice.enabled } } : {}),
-      ...(canAccessAdministration(session.profile) && canUseOliviaVoice(session, env) ? { voiceConfiguration: { model: geminiLiveEnabled(session, config) ? "Gemini 3.8 Live · Google Chirp 3 HD de respaldo" : "Google Chirp 3 HD", backendModel: latencyEnabled(config)?"GPT-6 Luna / Sol · rutas instantánea / lectura / controlada":"GPT-6 Luna · modo anterior", reasoningEffort: latencyEnabled(config)?"NONE / MEDIUM según complejidad":"HIGH/XHIGH", voice: config.naturalVoice.voice } } : {}),
+      ...(config.naturalVoice.enabled && canUseOliviaVoice(session, env) ? { voiceSettings: { turnEndSilenceMs: config.naturalVoice.turnEndSilenceMs, latencyMode:latencyEnabled(config), hybridLiveAvailable:geminiLiveEnabled(session, config), hybridLiveEnabled:config.hybridVoice.enabled } } : {}),
+      ...(canAccessAdministration(session.profile) && canUseOliviaVoice(session, env) ? { voiceConfiguration: { model: geminiLiveEnabled(session, config) ? "Gemini 3.8 Live" : "Gemini Live deshabilitado fuera del preview aislado", backendModel: latencyEnabled(config)?"GPT-6 Luna / Sol · rutas instantánea / lectura / controlada":"GPT-6 Luna · modo anterior", reasoningEffort: latencyEnabled(config)?"NONE / MEDIUM según complejidad":"HIGH/XHIGH", voice: "Aoede" } } : {}),
       policyVersion: OLIVIA_POLICY_VERSION,
       ...(estimate ? { estimate } : {}),
     };
@@ -277,7 +273,6 @@ export function createOliviaEngine({
       const path = `oliviaConversations/${id}`, snapshot = await tx.getDocument(path), conversation = snapshot?.data;
       assertConversationOwner(session, conversation, now);
       if (conversation.busyRequestId && dateMs(conversation.busyUntil) > now.getTime()) throw oliviaError("conversation-busy", "Olivia está procesando otra consulta en esta conversación.", 409);
-      if (conversation.pendingActionId) throw oliviaError("confirmation-required", "Revisá primero la confirmación pendiente.", 409);
       const turnPath = `oliviaGeminiLiveTurns/${session.uid}_${requestId}`, prior = await tx.getDocument(turnPath);
       if (prior) return prior.data.result;
       const userEntry = message("user", userText, now, "natural-voice"), assistantEntry = message("assistant", assistantText, now, "natural-voice");
@@ -345,7 +340,7 @@ export function createOliviaEngine({
           )
         : null;
       const writes = [];
-      const repeatedInput = taskControl(userMessage) === "acknowledge" || (!attachments.length && inputMode==='natural-voice' && (instantConversation(userMessage) || chooseLocalGreeting(userMessage)));
+      const repeatedInput = taskControl(userMessage) === "acknowledge" || (!attachments.length && inputMode==='natural-voice' && classifyGeminiLiveTurn(userMessage).route === 'direct');
       if (previous?.data.status === "pending" && !repeatedInput)
         writes.push({
           type: "update",
@@ -490,7 +485,7 @@ export function createOliviaEngine({
         "Olivia está deshabilitada. La aplicación sigue disponible manualmente.",
         503,
       );
-    if (naturalVoice && (!config.naturalVoice.enabled || !canUseOliviaVoice(session, env) || !env.OPENAI_API_KEY || !hasGoogleCloudTtsCredentials(env)))
+    if (naturalVoice && (!config.naturalVoice.enabled || !geminiLiveEnabled(session, config)))
       throw oliviaError("voice-not-enabled", "La conversación natural por voz no está disponible para esta cuenta.", 403);
     if (["realtime", "live"].includes(body.inputMode) || body.voiceSessionId || body.realtimeSessionId)
       throw oliviaError("voice-mode-retired", "GPT-Live fue retirado. Usá la conversación natural por voz de Olivia.", 410);
@@ -518,7 +513,6 @@ export function createOliviaEngine({
         ? spokenFallback(turn.voiceTranscript || turn.prepared?.summary || turn.content, config.naturalVoice.maxCharactersPerTurn)
         : null;
       const saved = await saveTurn(session, id, requestId, { ...turn, ...(currentSuspendedTasks !== undefined ? { suspendedTasks: currentSuspendedTasks } : {}), ...(naturalVoice ? { voiceTranscript } : {}) }, config, () => {
-        if (naturalVoice && voiceTranscript) { timings.voiceReadyMs = Date.now() - startedAt; trace.mark('response.voice_ready');onEvent?.({ type: "voice.ready", text: voiceTranscript, requestId }); }
       });
       if (naturalVoice && voiceTranscript) {
         saved.spokenText = voiceTranscript;
@@ -589,17 +583,6 @@ export function createOliviaEngine({
         await tx.commitDocuments([{ type: "update", path: `oliviaConversations/${id}`, data: { taskState: task, suspendedTasks: currentSuspendedTasks, draft: task?.slots || null } }]);
       });
       onEvent?.({ type: "accepted", conversationId: id, message: conversation.messages.at(-1) });
-      const greeting=naturalVoice && !attachments.length ? (latencyEnabled(config) ? instantConversation(userMessage) : null) || chooseLocalGreeting(userMessage) : null;
-      if(greeting) {
-        signal?.throwIfAborted();
-        const result=await persistTurn({content:greeting.text,taskState:conversation.taskState || null,draft:conversation.draft,state:'INFORMACION',preservePending:true});
-        event={...event,route:'deterministic',routingReason:'greeting-only',measurement:'provider',modelCalls:[],tools:[],durationMs:Date.now()-startedAt};
-        await settleUsage({store,session,reservation,event,configuration:config,result:{conversationId:id},now:clock()});settled=true;
-        result.usage=await usage(session,config,event);
-        trace.mark('response.complete',{route:'instant'});
-        if(canAccessAdministration(session.profile)) result.telemetry={requestId,route:'instant',modelCalls:0,toolCalls:0,totalMs:Date.now()-startedAt,trace:trace.snapshot()};
-        return result;
-      }
       const deterministicTools = [];
       const deterministicTaskId = conversation.taskState?.intent === "prepare_stock_load" && !["completed", "cancelled"].includes(conversation.taskState.status) ? conversation.taskState.id : randomUUID();
       const run = async (name, args) => {
@@ -612,7 +595,7 @@ export function createOliviaEngine({
       };
       trace.mark('router.start');
       const readPlan = latencyEnabled(config) && !attachments.length && !conversation.pendingActionId && !transition.handled ? quickReadPlan(userMessage) : null;
-      trace.mark('router.end',{route:readPlan?'quick-read':greeting?'instant':'controlled'});
+      trace.mark('router.end',{route:readPlan?'quick-read':'controlled'});
       const quick = readPlan ? await fastConversationRead({plan:readPlan,context,previous:conversation.taskState,run,check:name=>assertCapability(session,name),signal,now:clock()}) : null;
       if(quick?.content) {
         signal?.throwIfAborted();
@@ -1345,7 +1328,6 @@ export function createOliviaEngine({
           createdAt: r.createdAt,
         })),
       providerConfigured: Boolean(env.OPENAI_API_KEY),
-      googleTtsConfigured: hasGoogleCloudTtsCredentials(env),
       geminiLiveConfigured: geminiLiveEnabled(session, config),
       geminiLiveReadiness: geminiLiveReadiness(session, config),
       geminiLiveUsage: await geminiLiveUsageSummary(session, config),

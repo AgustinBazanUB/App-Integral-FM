@@ -42,9 +42,6 @@ export class NaturalVoiceConversation {
       this.source = this.context.createMediaStreamSource(this.stream);
       this.analyser = this.context.createAnalyser(); this.analyser.fftSize = 1024; this.source.connect(this.analyser);
       this.samples = new Float32Array(this.analyser.fftSize);
-      this.startRecorder();
-      this.onTrace({ stage: "voice.capture.ready", at: this.now() });
-      this.startedAt = this.now(); this.onState("listening"); this.loop();
       if (this.createTranscriber) {
         const readyAt = this.now();
         this.transcriberReady = Promise.resolve().then(() => this.createTranscriber(this.stream, text => { if (text !== this.partial) this.partialChangedAt = this.now(); this.partial = text; this.onPartial(text); }, this.captureController.signal))
@@ -52,9 +49,13 @@ export class NaturalVoiceConversation {
             if (this.closed) { transcriber?.close(); return; }
             this.transcriber = transcriber;
             this.onTrace({ stage: transcriber?.handlesTurns ? "gemini.session.ready" : "transcription.session.ready", at: this.now(), startedAt: readyAt });
-          })
-          .catch(() => { if (!this.closed) this.onNotice("La transcripción en vivo no pudo conectarse. La voz continúa con dictado por turnos."); });
+          });
+        await this.transcriberReady;
       }
+      if (this.closed) return;
+      if (!this.transcriber?.handlesTurns) this.startRecorder();
+      this.onTrace({ stage: "voice.capture.ready", at: this.now() });
+      this.startedAt = this.now(); this.onState("listening"); this.loop();
     } catch (error) { this.onError(error); this.close(); }
   }
 
@@ -90,7 +91,7 @@ export class NaturalVoiceConversation {
       const next=await this.createTranscriber(this.stream,text=>{if(text!==this.partial)this.partialChangedAt=this.now();this.partial=text;this.onPartial(text);},this.captureController.signal);
       if(this.closed){next.close();return;}
       this.transcriber=next;
-    } catch {if(!this.closed)this.onNotice('Continúo con dictado por turnos. Podés reconectar la voz cuando quieras.');}
+    } catch {if(!this.closed){this.onNotice('Gemini Live se interrumpió. Volvé a conectar para continuar por voz.');this.close();}}
     finally {this.renewing=false;}
   }
 
@@ -137,7 +138,7 @@ export class NaturalVoiceConversation {
 
   beginTurn(now) {
     try {
-      if (!this.recorder) this.startRecorder();
+      if (!this.recorder && !this.transcriber?.handlesTurns) this.startRecorder();
       const preRoll = [...new Set([this.idleHeader, ...(this.idleRing || [])].filter(Boolean))];
       this.chunks = preRoll; this.bytes = preRoll.reduce((total, chunk) => total + chunk.size, 0); this.discardTurn = false; this.recordingTurn = true; this.recordingStartedAt = now; this.lastSpeechAt = now; this.pauseResumes = 0;
       this.partial='';
@@ -153,7 +154,22 @@ export class NaturalVoiceConversation {
   }
 
   finishTurn() {
-    if (!this.recorder || !this.recordingTurn || this.finishing || this.recorder.state === "inactive") return;
+    if (!this.recordingTurn || this.finishing) return;
+    const liveSession = this.turnTranscriber;
+    if (liveSession?.handlesTurns && liveSession?.ready) {
+      this.finishing = true;
+      clearTimeout(this.turnTimer);
+      const endedAt = this.now(), metadata = { durationSeconds: Math.min(this.maxSeconds, Math.max(0.1, (endedAt - this.recordingStartedAt) / 1000)), endedAt, voiceEndedAt: this.lastSpeechAt, turnId: this.turnId, endpointWindowMs: this.endpointWindowMs };
+      const discard = this.discardTurn;
+      this.recordingTurn = false; this.discardTurn = false; this.finishing = false;
+      if (discard) { liveSession.discardTurn?.(); return; }
+      this.onTrace({ stage: "audio.commit", at: endedAt, turnId: this.turnId });
+      this.onTrace({ stage: "voice.turn.end", at: endedAt, voiceEndedAt: metadata.voiceEndedAt, turnId: this.turnId, endpointMs: metadata.endpointWindowMs });
+      this.onState("processing");
+      Promise.resolve(liveSession.commit(metadata)).catch(error => { if (!this.closed) this.onError(error); });
+      return;
+    }
+    if (!this.recorder || this.recorder.state === "inactive") return;
     this.finishing = true;
     try { this.recorder.stop(); } catch (error) { this.recorder = null; this.finishing = false; this.recordingTurn = false; this.onError(error); if (!this.closed) this.startRecorder(); }
   }

@@ -60,7 +60,7 @@ export async function chatJobStatus({ store, session, body, now = new Date() }) 
     });
     job = await store.get(path);
   }
-  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase,tools:(job.tools || []).filter(tool=>/^[a-z_]{1,80}$/.test(tool)).slice(0,12), text: job.text || "", voiceText: job.voiceText || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
+  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase,tools:(job.tools || []).filter(tool=>/^[a-z_]{1,80}$/.test(tool)).slice(0,12), text: job.text || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
 }
 export async function activeChatJob({ store, session, conversationId }) {
   const conversation = await store.get(`oliviaConversations/${conversationId}`);
@@ -98,7 +98,7 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
   });
   if (!payload) return;
   const controller = new AbortController();
-  let progress = { phase: "Pensando…", text: "", voiceText: "" }, changed = false, flushing = Promise.resolve();
+  let progress = { phase: "Pensando…", text: "" }, changed = false, flushing = Promise.resolve();
   const flush = () => flushing = flushing.catch(() => {}).then(async () => {
     await store.transaction(async tx => {
       const job = (await tx.getDocument(path))?.data;
@@ -113,7 +113,6 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
       if (event.type === "accepted") { progress.accepted = event.message; changed = true; flush().catch(() => {}); }
       if (event.type === "phase") { progress.phase = event.label; if (event.tools) { progress.text = ""; progress.tools = event.tools; } changed = true; flush().catch(() => {}); }
       if (event.type === "delta") progress.text = (progress.text + event.delta).slice(-64000);
-      if (event.type === "voice.ready" && typeof event.text === "string") { progress.voiceText = event.text.slice(0, 3000); changed = true; flush().catch(() => {}); }
       changed = true;
     } });
     await flush();

@@ -1,4 +1,4 @@
-import { isGreetingOnly, normalizeSpeech } from '../../shared/oliviaFastSpeech.mjs';
+import { isGreetingOnly, normalizeSpeech } from '../../shared/oliviaSpeechText.mjs';
 import { instantConversation, isConversationalFollowUp, quickReadPlan } from '../../shared/oliviaConversationRouter.mjs';
 
 export function endpointingWindow({ partial = '', stableMs = 0, pauseResumes = 0, legacySilenceMs = 1900, enabled = true } = {}) {

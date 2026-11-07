@@ -40,6 +40,11 @@ function errorMessage(event) {
   return message.slice(0, 240) || "Gemini Live interrumpió la sesión.";
 }
 
+function isSafeDelegationAcknowledgement(text) {
+  const normalized = String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[¿?¡!.,;:]/g, " ").replace(/\s+/g, " ").trim();
+  return ["dale lo reviso", "un segundo lo reviso", "voy a revisar eso"].includes(normalized);
+}
+
 export class GeminiLiveSession {
   constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, onTrace = () => {}, onSessionClosed = () => {}, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000, turnTimeoutMs = 45000, completionGraceMs = 5000, transcriptWaitMs = 3000 }) {
     Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, onProtocol, onTrace, onSessionClosed, WebSocket, now, clock, connectTimeoutMs, turnTimeoutMs, completionGraceMs, transcriptWaitMs });
@@ -49,7 +54,7 @@ export class GeminiLiveSession {
   trace(stage, metadata = {}) { this.onTrace({ stage, at: this.now(), ...metadata }); }
 
   createTurn() {
-    return { pending: false, finalizing: false, completed: false, completeReceived: false, transcriptComplete: false, transcriptWaiters: new Set(), cancelled: false, inputText: "", interimText: "", outputText: "", publishedOutputText: "", usageMetadata: null, inputAudioSeconds: 0, outputAudioSeconds: 0, generatedAudio: false, heardAudio: false, pendingAudio: [], toolTurn: false, toolPending: false, awaitingToolResponse: false, outputAuthorized: false, classificationPromise: null, noTranscriptTimer: null };
+    return { pending: false, finalizing: false, completed: false, completeReceived: false, transcriptComplete: false, transcriptWaiters: new Set(), cancelled: false, inputText: "", interimText: "", outputText: "", publishedOutputText: "", usageMetadata: null, inputAudioSeconds: 0, outputAudioSeconds: 0, generatedAudio: false, heardAudio: false, acknowledgementAuthorized: false, acknowledgementHeard: false, delegatedResponseHeardAudio: false, pendingAudio: [], toolTurn: false, toolPending: false, awaitingToolResponse: false, outputAuthorized: false, classificationPromise: null, noTranscriptTimer: null };
   }
 
   async start(stream, { textInputOnly = false } = {}) {
@@ -77,7 +82,7 @@ export class GeminiLiveSession {
     this.tokenExpiresAt = Date.parse(this.tokenResult.expiresAt);
     this.connectTimer = setTimeout(() => {
       const socketState = ({ 0: "CONNECTING", 1: "OPEN", 2: "CLOSING", 3: "CLOSED" })[this.socket?.readyState] || "UNKNOWN";
-      this.fail(new Error(`Gemini Live no respondió al handshake dentro del plazo (WebSocket ${socketState}); continúo con el circuito anterior.`));
+      this.fail(new Error(`Gemini Live no respondió al handshake dentro del plazo (WebSocket ${socketState}); volvé a conectar para continuar por voz.`));
     }, this.connectTimeoutMs);
     try { await this.openSocket(null); }
     catch (error) { this.fail(error); throw error; }
@@ -85,7 +90,7 @@ export class GeminiLiveSession {
     if (!textInputOnly) this.attachCapture(stream);
     this.handlesTurns = true;
     this.ready = true;
-    this.sessionTimer = setTimeout(() => this.fail(new Error("La sesión híbrida llegó a su límite preventivo; continúo con el circuito anterior.")), this.tokenResult.maxSessionSeconds * 1000);
+    this.sessionTimer = setTimeout(() => this.fail(new Error("La sesión Gemini Live llegó a su límite preventivo; volvé a conectar para continuar por voz.")), this.tokenResult.maxSessionSeconds * 1000);
     this.onState("listening");
     return this;
   }
@@ -140,7 +145,7 @@ export class GeminiLiveSession {
           this.openSocket(handleToResume).catch((error) => this.fail(error));
         } else {
           const code = Number.isFinite(event?.code) ? ` (código ${event.code})` : "";
-          this.fail(new Error(`Gemini Live cerró la conexión${code}; continúo con el circuito anterior.`));
+          this.fail(new Error(`Gemini Live cerró la conexión${code}; volvé a conectar para continuar por voz.`));
         }
       };
       if (handle) this.reconnecting = true;
@@ -191,7 +196,7 @@ export class GeminiLiveSession {
       }
       const turn = this.currentTurn;
       clearTimeout(turn.completionTimer); clearTimeout(turn.responseTimer);
-      turn.turnId = turnId || globalThis.crypto.randomUUID(); turn.turnIndex = ++this.turnIndex; turn.pending = true; turn.inputText = ""; turn.interimText = ""; turn.outputText = ""; turn.publishedOutputText = ""; turn.usageMetadata = null; turn.inputAudioSeconds = 0; turn.outputAudioSeconds = 0; turn.generatedAudio = false; turn.heardAudio = false; turn.pendingAudio = []; turn.pendingAudioStartedAt = null; turn.firstPcmAt = null; turn.toolTurn = false; turn.toolPending = false; turn.awaitingToolResponse = false; turn.outputAuthorized = false; turn.classificationPromise = null; turn.classifiedText = ""; turn.completeReceived = false; turn.transcriptComplete = false; turn.transcriptWaiters = new Set(); turn.noTranscriptTimer = null;
+      turn.turnId = turnId || globalThis.crypto.randomUUID(); turn.turnIndex = ++this.turnIndex; turn.pending = true; turn.inputText = ""; turn.interimText = ""; turn.outputText = ""; turn.publishedOutputText = ""; turn.usageMetadata = null; turn.inputAudioSeconds = 0; turn.outputAudioSeconds = 0; turn.generatedAudio = false; turn.heardAudio = false; turn.acknowledgementAuthorized = false; turn.acknowledgementHeard = false; turn.delegatedResponseHeardAudio = false; turn.pendingAudio = []; turn.pendingAudioStartedAt = null; turn.firstPcmAt = null; turn.toolTurn = false; turn.toolPending = false; turn.awaitingToolResponse = false; turn.outputAuthorized = false; turn.classificationPromise = null; turn.classifiedText = ""; turn.completeReceived = false; turn.transcriptComplete = false; turn.transcriptWaiters = new Set(); turn.noTranscriptTimer = null;
       this.trace("gemini.turn.start", { turnId: turn.turnId, turnIndex: turn.turnIndex, mode: this.textInputOnly ? "diagnostic-text" : "microphone" });
     }
   }
@@ -202,7 +207,7 @@ export class GeminiLiveSession {
     turn.responseTimer = setTimeout(() => {
       if (this.closed || this.failed || !turn.pending || turn.cancelled) return;
       if (turn.toolPending) { this.armTurnTimeout(turn); return; }
-      this.fail(new Error("Gemini no completó el turno dentro del plazo; la voz continúa con el circuito de respaldo."));
+      this.fail(new Error("Gemini no completó el turno dentro del plazo; volvé a conectar para continuar por voz."));
     }, this.turnTimeoutMs);
   }
   sendText(text) {
@@ -265,10 +270,10 @@ export class GeminiLiveSession {
       turn.completionTimer = setTimeout(() => {
         if (this.closed || this.failed || !turn.pending || turn.completeReceived || turn.toolPending || turn.awaitingToolResponse || turn.cancelled) return;
         // Generation ended but Google never closed its audio turn. Finalize the
-        // validated text, request Chirp fallback and retire this broken socket.
+        // validated text and retire the broken socket; the UI keeps it visible.
         turn.providerIncomplete = true;
         this.stopPlayback();
-        void this.finishTurn(turn).finally(() => this.fail(new Error("Gemini terminó la generación sin cerrar el turno de audio; continúo con el respaldo.")));
+        void this.finishTurn(turn).finally(() => this.fail(new Error("Gemini terminó la generación sin cerrar el turno de audio; volvé a conectar para continuar por voz.")));
       }, Math.max(0, ((this.nextAudioAt || 0) - (this.audioContext?.currentTime || 0)) * 1000) + this.completionGraceMs);
     }
     if (content?.turnComplete && !interrupted && !ignoreOutput && !turn.toolPending && !turn.awaitingToolResponse) {
@@ -330,7 +335,6 @@ export class GeminiLiveSession {
       this.flushPendingAudio(turn);
     } else {
       turn.outputAuthorized = false;
-      turn.pendingAudio = [];
       if (previousDirect && turn.heardAudio) this.stopPlayback();
     }
     return turn.classificationPromise;
@@ -338,12 +342,24 @@ export class GeminiLiveSession {
 
   async handleTools(calls, turn) {
     if (this.closed || this.failed || turn.cancelled) return;
-    turn.toolTurn = true; this.listening = false; turn.outputAuthorized = false; turn.outputText = ""; turn.publishedOutputText = ""; turn.pendingAudio = []; this.stopPlayback(); this.onState("processing");
+    const candidateAcknowledgement = turn.outputText;
+    turn.toolTurn = true; this.listening = false; turn.outputAuthorized = false; this.stopPlayback(); this.onState("processing");
     const functionResponses = [];
     const transcriptStartedAt = this.now();
     const finalTranscript = await this.waitForFinalTranscript(turn);
     this.trace("gemini.tool.transcript", { turnId: turn.turnId, turnIndex: turn.turnIndex, durationMs: this.now() - transcriptStartedAt, status: finalTranscript ? "ok" : "missing" });
     if (this.closed || this.failed || turn.cancelled) return;
+    turn.outputText = ""; turn.publishedOutputText = "";
+    if (finalTranscript && turn.directAuthorized === false && isSafeDelegationAcknowledgement(candidateAcknowledgement)) {
+      turn.outputText = candidateAcknowledgement;
+      turn.acknowledgementAuthorized = true;
+      turn.outputAuthorized = true;
+      this.publishTranscript(turn);
+      this.flushPendingAudio(turn);
+      this.trace("gemini.acknowledgement.authorized", { turnId: turn.turnId, turnIndex: turn.turnIndex, route: "delegate", source: "exact-neutral-phrase" });
+      turn.outputText = ""; turn.publishedOutputText = "";
+      turn.acknowledgementAuthorized = false; turn.outputAuthorized = false;
+    } else turn.pendingAudio = [];
     for (const call of calls) {
       if (call.name !== "delegate_to_olivia") {
         functionResponses.push({ id: call.id, name: call.name, response: { error: "Herramienta no autorizada." } });
@@ -363,7 +379,7 @@ export class GeminiLiveSession {
     if (turn.cancelled) return;
     if (this.socket?.readyState === this.WebSocket.OPEN) {
       this.socket.send(JSON.stringify({ toolResponse: { functionResponses } }));
-      turn.toolPending = false; turn.awaitingToolResponse = true; turn.outputAuthorized = true;
+      turn.pendingAudio = []; turn.toolPending = false; turn.awaitingToolResponse = true; turn.outputAuthorized = true;
       this.armTurnTimeout(turn);
     } else this.fail(new Error("La conexión de Gemini se cerró antes de responder a Olivia."));
   }
@@ -385,7 +401,10 @@ export class GeminiLiveSession {
     if (turn.cancelled || this.closed || this.failed) return;
     const source = this.audioContext.createBufferSource(); source.buffer = audio; source.connect(this.audioContext.destination);
     const at = Math.max(this.nextAudioAt || this.audioContext.currentTime + 0.035, this.audioContext.currentTime + 0.005);
-    source.start(at); this.nextAudioAt = at + audio.duration; this.sources.add(source); turn.heardAudio = true; this.isPlaying = true;
+    source.start(at); this.nextAudioAt = at + audio.duration; this.sources.add(source); turn.heardAudio = true;
+    if (turn.acknowledgementAuthorized) turn.acknowledgementHeard = true;
+    else if (turn.toolTurn) turn.delegatedResponseHeardAudio = true;
+    this.isPlaying = true;
     if (!this.firstAudioAt) { this.firstAudioAt = this.now() + Math.max(0, at - this.audioContext.currentTime) * 1000; this.trace("gemini.audio.first_scheduled", { turnId: turn.turnId, turnIndex: turn.turnIndex }); this.onFirstAudio(this.firstAudioAt, { turnId: turn.turnId, turnIndex: turn.turnIndex }); }
     source.onended = () => { this.sources.delete(source); source.disconnect?.(); if (!this.sources.size) this.isPlaying = false; };
     this.onState("speaking");
@@ -426,7 +445,7 @@ export class GeminiLiveSession {
     const startedAt = this.now();
     try {
       const usage = await this.request(report); this.trace("gemini.usage.report", { turnId: turn.turnId, turnIndex: turn.turnIndex, durationMs: this.now() - startedAt, status: usage.measurement || "ok", costUsd: usage.costUsd }); this.onUsage(usage);
-      if (usage.shouldStop) this.fail(new Error("Se alcanzó el límite preventivo de esta sesión Gemini; continúo con el circuito anterior."));
+      if (usage.shouldStop) this.fail(new Error("Se alcanzó el límite preventivo de esta sesión Gemini; volvé a conectar para continuar por voz."));
     } catch { this.onUsage({ measurement: "unconfirmed", message: "No se pudo registrar el consumo de Gemini en el presupuesto mensual." }); }
   }
 
@@ -467,7 +486,7 @@ export class GeminiLiveSession {
         } else {
           if (turn.outputText && turn.outputText !== turn.publishedOutputText) { this.onTranscript(turn.outputText); turn.publishedOutputText = turn.outputText; }
           this.flushPendingAudio(turn);
-          Promise.resolve(this.onTurnComplete({ turnId: turn.turnId, turnIndex: turn.turnIndex, userText: turn.inputText, assistantText: turn.outputText, delegated: true, noAudio: !turn.heardAudio || Boolean(turn.providerIncomplete), providerIncomplete: Boolean(turn.providerIncomplete), usageMetadata: turn.usageMetadata })).catch((error) => this.onNotice(error?.message || "No se pudo registrar el turno delegado."));
+            Promise.resolve(this.onTurnComplete({ turnId: turn.turnId, turnIndex: turn.turnIndex, userText: turn.inputText, assistantText: turn.outputText, delegated: true, noAudio: !turn.delegatedResponseHeardAudio || Boolean(turn.providerIncomplete), acknowledgementHeard: turn.acknowledgementHeard, providerIncomplete: Boolean(turn.providerIncomplete), usageMetadata: turn.usageMetadata })).catch((error) => this.onNotice(error?.message || "No se pudo registrar el turno delegado."));
         }
       }
 
@@ -494,7 +513,7 @@ export class GeminiLiveSession {
     try { this.socket?.close(); } catch {}
     this.stopCapture();
     if (this.sessionId) void this.releaseBudget();
-    this.onNotice(error.message || "Gemini Live no está disponible; sigo con el circuito anterior."); this.onUnavailable(error);
+    this.onNotice(error.message || "Gemini Live no está disponible. Volvé a conectar para continuar por voz."); this.onUnavailable(error);
   }
 
   stopCapture() {

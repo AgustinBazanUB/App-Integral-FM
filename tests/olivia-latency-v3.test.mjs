@@ -2,13 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fixture,start,textResponse} from './helpers/olivia-fixture.mjs';
 import {createOliviaEngine} from '../netlify/functions/_lib/olivia/engine.mjs';
-import {instantConversation,isConversationalFollowUp,quickReadPlan} from '../src/shared/oliviaConversationRouter.mjs';
+import {instantConversation,isConversationalFollowUp,quickReadPlan,classifyGeminiLiveTurn} from '../src/shared/oliviaConversationRouter.mjs';
 import {endpointingWindow} from '../src/gestion/olivia/endpointing.mjs';
 import {latencyTrace} from '../src/shared/oliviaLatencyTrace.mjs';
 import {routeModel} from '../netlify/functions/_lib/olivia/modelRouter.mjs';
 import {defaultOliviaConfiguration,validateConfiguration} from '../src/shared/oliviaContracts.mjs';
 import {LiveTranscription} from '../src/gestion/olivia/liveTranscription.mjs';
-import {FastSpeechPlayer} from '../src/gestion/olivia/fastSpeechPlayer.mjs';
 import {latencyCases} from './fixtures/olivia-latency-cases.mjs';
 import {NaturalVoiceConversation} from '../src/gestion/olivia/naturalVoice.mjs';
 import {measuredVoice,measureEndpoint} from './helpers/olivia-latency-voice.mjs';
@@ -27,18 +26,18 @@ test('contextual conversation follow-ups use the short but safe endpoint window'
   assert.equal(isConversationalFollowUp('¿Qué precio me dijiste recién para el aceite?'),false);
 });
 async function voiceFixture(){
-  const f=fixture({role:'admin'});f.session.email='agsreserva@gmail.com';const {conversationId}=await start(f);let calls=0;
-  const engine=createOliviaEngine({store:f.store,clock:f.clock,env:{OPENAI_API_KEY:'fixture',GOOGLE_APPLICATION_CREDENTIALS:'/fixture-only'},provider:async(_path,body)=>{calls++;assert.equal(body.reasoning.effort,'none');return textResponse('Respuesta de prueba');}});
+  const f=fixture({role:'admin'});f.session.email='agsreserva@gmail.com';f.config.hybridVoice.enabled=true;f.documents.set('oliviaConfiguration/global',f.config);const {conversationId}=await start(f);let calls=0;
+  const engine=createOliviaEngine({store:f.store,clock:f.clock,env:{OPENAI_API_KEY:'fixture',CONTEXT:'deploy-preview',OLIVIA_DEPLOY_PREVIEW_CONTEXT:'deploy-preview',OLIVIA_HYBRID_LIVE_ENABLED:'true',GEMINI_API_KEY:'synthetic-preview-key',GEMINI_API_BILLING_TIER:'paid',FIREBASE_PROJECT_ID:'app-integral-fm-pruebas'},provider:async(_path,body)=>{calls++;assert.equal(body.reasoning.effort,'none');return textResponse('Respuesta de prueba');}});
   f.documents.set('products/almonds',{name:'Almendras',active:true,defaultPrice:1500});f.documents.set('locations/local_a',{name:'Tribunales',active:true});f.documents.set('locationStock/local_a/items/almonds',{productName:'Almendras',productId:'almonds',currentStock:31,active:true});
   const turn=(message,id,extra={})=>{f.advance(2000);return engine.chat(f.session,{message,conversationId,requestId:id,inputMode:'natural-voice',foreground:true,screenContext:{module:'locations',locationId:'local_a'},...extra});};
   return {...f,engine,conversationId,turn,calls:()=>calls};
 }
-test('wellbeing is the actual answer, has zero model calls, preserves a task and exposes only timing metadata',async()=>{
+test('Gemini Live directly answers wellbeing and persists it without a model call',async()=>{
   const f=await voiceFixture(),saved=f.documents.get('oliviaConversations/'+f.conversationId);saved.taskState={id:'task',intent:'prepare_stock_load',status:'collecting',slots:{productId:'almonds'},missingFields:['quantity','locationId'],revision:1};
-  const result=await f.turn('Olivia, ¿cómo estás?','wellbeing');
-  assert.equal(result.messages.at(-1).content,'¡Bien! ¿Y vos?');assert.equal(f.calls(),0);assert.equal(result.telemetry.route,'instant');
+  assert.equal(classifyGeminiLiveTurn('Olivia, ¿cómo estás?').route,'direct');
+  const result=await f.engine.recordGeminiDirectTurn(f.session,{conversationId:f.conversationId,requestId:'wellbeing',userText:'Olivia, ¿cómo estás?',assistantText:'¡Bien! ¿Y vos?'});
+  assert.equal(result.messages.at(-1).content,'¡Bien! ¿Y vos?');assert.equal(f.calls(),0);
   const persisted=f.documents.get('oliviaConversations/'+f.conversationId);assert.ok(persisted.taskState?.slots.productId==='almonds'||persisted.suspendedTasks?.some(t=>t.slots.productId==='almonds'));
-  const trace=JSON.stringify(result.telemetry.trace);assert.ok(trace.includes('firestore'));assert.ok(!trace.includes('Almendras'));assert.ok(!trace.includes('customers/'));assert.ok(!trace.includes('agsreserva'));
 });
 test('stock and price use fresh authorized data, no LLM, and no stock mutations',async()=>{
   const f=await voiceFixture();const first=await f.turn('¿Cuántas almendras quedan?','stock');assert.match(first.spokenText,/31 unidades en Tribunales/);assert.equal(first.telemetry.modelCalls,0);
@@ -71,7 +70,7 @@ test('contacting an existing client never starts an add-client task or demands a
 });
 test('a conversation response or a spoken yes cannot execute or invalidate a pending proposal',async()=>{
   const f=await voiceFixture();const prepared=await f.turn('Cargame 20 unidades de almendras','prepare');assert.ok(prepared.pendingAction);
-  const wellbeing=await f.turn('¿Cómo estás?','during-proposal');assert.equal(wellbeing.pendingAction.id,prepared.pendingAction.id);
+  const wellbeing=await f.engine.recordGeminiDirectTurn(f.session,{conversationId:f.conversationId,requestId:'during-proposal',userText:'¿Cómo estás?',assistantText:'¡Bien! ¿Y vos?'});assert.equal(wellbeing.pendingAction.id,prepared.pendingAction.id);
   const yes=await f.turn('Sí','spoken-yes');assert.equal(yes.pendingAction.id,prepared.pendingAction.id);assert.equal(f.documents.get('locationStock/local_a/items/almonds').currentStock,31);
 });
 test('an obsolete foreground request cannot cancel a newer one, and cancelling before claim prevents a late response',async()=>{
@@ -95,13 +94,6 @@ test('final arriving before committed is correlated by item id and is never lost
   const live=new LiveTranscription({connect:async()=>{},stop:async()=>{}});live.channel={readyState:'open',send(){},close(){}};live.track={enabled:true,stop(){}};
   const pending=live.commit();live.receive({type:'conversation.item.input_audio_transcription.completed',item_id:'one',transcript:'hola'});live.receive({type:'input_audio_buffer.committed',item_id:'one'});assert.equal((await pending).text,'hola');
   live.beginTurn();live.receive({type:'conversation.item.input_audio_transcription.delta',item_id:'one',delta:'texto viejo'});assert.equal(live.partial,'');live.close();
-});
-test('new filler waits for real accepted work, uses no selector model, and stays silent for a quick final answer',async()=>{
-  const timers=[];let select=0,plays=0;const cache={peek:()=>new ArrayBuffer(2),get:async()=>{},response:async()=>new Response(new Uint8Array([0,1])),dispose(){}};
-  const player=new FastSpeechPlayer({latencyMode:true,cache,select:async()=>{select++;},loadFallback:async()=>{},play:async()=>{plays++;},setTimer:(fn,ms)=>{timers.push({fn,ms});return timers.length;},clearTimer(){}});
-  player.start(()=>true,{text:'Stock de almendras'});assert.equal(timers[0].ms,850);await timers.shift().fn();assert.equal(plays,0);assert.equal(select,0);
-  player.start(()=>true,{text:'Stock de almendras'});player.updateFacts({accepted:true,tools:['get_stock']});await timers.shift().fn();assert.equal(plays,1);assert.equal(select,0);
-  player.start(()=>false,{text:'Stock de almendras'});player.updateFacts({accepted:true});await timers.shift().fn();assert.equal(plays,1);player.dispose();
 });
 test('the actual microphone loop closes a complete greeting early but keeps a paused product list in one turn',async()=>{
   const greeting=await measureEndpoint(NaturalVoiceConversation,'Olivia, ¿cómo estás?');assert.ok(greeting.silenceMs<=550);

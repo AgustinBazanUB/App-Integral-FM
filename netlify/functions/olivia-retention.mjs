@@ -11,6 +11,7 @@ const OPERATIONS = new Set([
   "text",
   "transcription",
   "natural-voice",
+  // Keep expiring historical usage documents; the Chirp endpoint was removed in V5.
   "chirp-synthesis",
   "sale",
   "stock_load",

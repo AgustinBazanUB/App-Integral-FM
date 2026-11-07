@@ -1,4 +1,4 @@
-import { normalizeSpeech } from '../../../../src/shared/oliviaFastSpeech.mjs';
+import { normalizeSpeech } from '../../../../src/shared/oliviaSpeechText.mjs';
 
 const normalize = value => normalizeSpeech(value).replace(/\b(?:el|la|los|las|de|del)\b/g,' ').replace(/\s+/g,' ').trim();
 export function formatQuickRead(tool, result, { priceOnly = false } = {}) {

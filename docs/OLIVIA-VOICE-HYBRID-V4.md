@@ -1,3 +1,5 @@
+> Documento histórico de V4. Su integración Chirp y sus pasos de configuración quedaron retirados en V5; consultar [OLIVIA-VOICE.md](OLIVIA-VOICE.md) para la arquitectura vigente. Este registro conserva el estado y las decisiones de aquella versión.
+
 # Olivia: voz híbrida Gemini Live
 
 ## Alcance y estado

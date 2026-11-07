@@ -9,8 +9,8 @@ import { canAccessAdministration } from "../../../../src/gestion/permissions.js"
 const nonNegative = (value) => Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : 0;
 
 /** Adds a privacy-minimized monthly provider rollup to the caller's existing ledger. */
-export function addProviderSpend(current, { provider, period, costUsd = null, inputTokens = 0, outputTokens = 0, characters = 0 }, now = new Date(), retentionExpiresAt = null) {
-  if (!['lunaSol', 'chirp'].includes(provider)) throw oliviaError('invalid-provider', 'Proveedor de uso inválido.');
+export function addProviderSpend(current, { provider, period, costUsd = null, inputTokens = 0, outputTokens = 0 }, now = new Date(), retentionExpiresAt = null) {
+  if (provider !== 'lunaSol') throw oliviaError('invalid-provider', 'Proveedor de uso inválido.');
   const source = current || {}, prior = source[provider] || {};
   const next = {
     ...source,
@@ -22,19 +22,11 @@ export function addProviderSpend(current, { provider, period, costUsd = null, in
   };
   const bucket = next[provider], amount = Number(costUsd);
   const hasCost = costUsd != null && Number.isFinite(amount) && amount >= 0;
-  if (provider === 'lunaSol') {
-    bucket.calls = nonNegative(bucket.calls) + 1;
-    bucket.inputTokens = nonNegative(bucket.inputTokens) + nonNegative(inputTokens);
-    bucket.outputTokens = nonNegative(bucket.outputTokens) + nonNegative(outputTokens);
-    if (hasCost) {
-      bucket.estimatedUsd = nonNegative(bucket.estimatedUsd) + amount;
-    } else bucket.unconfirmedCalls = nonNegative(bucket.unconfirmedCalls) + 1;
-  } else {
-    bucket.requests = nonNegative(bucket.requests) + 1;
-    bucket.characters = nonNegative(bucket.characters) + nonNegative(characters);
-    if (hasCost) bucket.estimatedUsd = nonNegative(bucket.estimatedUsd) + amount;
-    else bucket.unconfirmedRequests = nonNegative(bucket.unconfirmedRequests) + 1;
-  }
+  bucket.calls = nonNegative(bucket.calls) + 1;
+  bucket.inputTokens = nonNegative(bucket.inputTokens) + nonNegative(inputTokens);
+  bucket.outputTokens = nonNegative(bucket.outputTokens) + nonNegative(outputTokens);
+  if (hasCost) bucket.estimatedUsd = nonNegative(bucket.estimatedUsd) + amount;
+  else bucket.unconfirmedCalls = nonNegative(bucket.unconfirmedCalls) + 1;
   return next;
 }
 

@@ -1581,24 +1581,33 @@ test("tool failures retain the report button after reloading a conversation", as
   assert.equal(recovered.failure.reportId, result.failure.reportId);
   assert.equal(newBusinessSales(f).length, 0);
 });
-test("natural voice uses a structured Luna answer, persists the spoken version and rejects legacy input modes", async () => {
-  const f = fixture({
-    role: "admin",
-    env: { GOOGLE_APPLICATION_CREDENTIALS_JSON: JSON.stringify({ project_id: "fixture", client_email: "tts@example.test", private_key: "fixture-private-key" }) },
-    provider: async () => textResponse(JSON.stringify({ complete: "Respuesta completa verificada.", spoken: "Respuesta breve hablada." })),
+test("Gemini Live delegates verified business speech to a structured Luna answer without a TTS provider", async () => {
+  const f = fixture({ role: "admin" });
+  let providerRequest;
+  f.config.hybridVoice.enabled = true;
+  f.documents.set("oliviaConfiguration/global", f.config);
+  f.documents.set("oliviaGeminiLiveBudgets/2026-10", { usedUsd: 0.2, chirp: { estimatedUsd: 0.1, requests: 2, characters: 120 } });
+  const engine = createOliviaEngine({
+    store: f.store,
+    clock: f.clock,
+    env: { OPENAI_API_KEY: "fake-key-for-local-fixtures", CONTEXT: "deploy-preview", OLIVIA_DEPLOY_PREVIEW_CONTEXT: "deploy-preview", OLIVIA_HYBRID_LIVE_ENABLED: "true", GEMINI_API_KEY: "synthetic-preview-key", GEMINI_API_BILLING_TIER: "paid", FIREBASE_PROJECT_ID: "app-integral-fm-pruebas" },
+    provider: async (_path, body) => { providerRequest = body; return textResponse(JSON.stringify({ complete: "Respuesta completa verificada.", spoken: "Respuesta breve hablada." })); },
   });
   f.session.email = "AGSRESERVA@gmail.com";
   f.documents.set("users/user_a", { ...f.documents.get("users/user_a"), role: "admin" });
-  const initial = await start(f);
+  const initial = await start({ ...f, engine });
   assert.equal(initial.voiceConversationAvailable, true);
+  assert.equal(initial.googleTtsConfigured, undefined);
+  assert.equal(initial.voiceConfiguration.voice, "Aoede");
+  assert.equal(initial.geminiLiveUsage.chirp, undefined, "historical Chirp ledger fields stay internal and are not exposed as active provider usage");
   const events = [];
-  const result = await f.engine.chat(f.session, { conversationId: initial.conversationId, requestId: "natural_voice_1", message: "Consultá el stock", inputMode: "natural-voice" }, { onEvent: (event) => events.push(event) });
-  assert.equal(f.providerRequests[0].text.format.type, "json_schema");
+  const result = await engine.chat(f.session, { conversationId: initial.conversationId, requestId: "natural_voice_1", message: "Consultá el stock", inputMode: "natural-voice" }, { onEvent: (event) => events.push(event) });
+  assert.equal(providerRequest.text.format.type, "json_schema");
   assert.equal(result.messages.at(-1).content, "Respuesta completa verificada.");
   assert.equal(result.messages.at(-1).voiceTranscript, "Respuesta breve hablada.");
   assert.equal(result.spokenText, "Respuesta breve hablada.");
-  assert.equal(events.some((event) => event.type === "voice.ready" && event.text === "Respuesta breve hablada."), true);
-  await assert.rejects(f.engine.chat(f.session, { conversationId: initial.conversationId, requestId: "legacy_voice_1", message: "Hola", inputMode: "realtime" }), { code: "voice-mode-retired" });
+  assert.equal(events.some((event) => event.type === "voice.ready"), false);
+  await assert.rejects(engine.chat(f.session, { conversationId: initial.conversationId, requestId: "legacy_voice_1", message: "Hola", inputMode: "realtime" }), { code: "voice-mode-retired" });
 
   const unavailable = fixture(); unavailable.session.email = "agsreserva@gmail.com";
   await assert.rejects(unavailable.engine.chat(unavailable.session, { requestId: "voice_missing_credentials", message: "Hola", inputMode: "natural-voice" }), { code: "voice-not-enabled" });
