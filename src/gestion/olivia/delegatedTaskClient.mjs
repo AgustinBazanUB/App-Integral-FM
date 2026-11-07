@@ -28,7 +28,7 @@ export class DelegatedTaskClient {
       if(!/\b(?:cancel\w*|deja|dejalo|olvida\w*|detene\w*|no sigas|no continues)\b/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Pedí que aclare si desea cancelar; no se detuvo ninguna tarea.',tasks:this.tasks};
       const candidates=(await this.refresh()).filter(t=>!['completed','cancelled','failed'].includes(t.status));
       if(candidates.length>1 && /^(?:no )?(?:deja|dejalo|cancela|cancelalo|olvidalo)(?: por favor)?$/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Hay varias tareas. Preguntá cuál debe cancelarse.',tasks:candidates};
-      return this.control({action:'cancel',taskId});
+      return this.control({action:'cancel',taskId},{onAccepted:context.onAccepted});
     }
     const identity=context.requestId || globalThis.crypto.randomUUID(),at=this.now();
     const payload={operation:'delegatedTask',conversationId:this.conversationId,requestId:identity,message:text,...(taskId?{taskId}:{}),priority:args.priority || 'normal',dependsOn:args.dependsOn || [],screenContext:context.screenContext || {}};
@@ -51,11 +51,13 @@ export class DelegatedTaskClient {
     this.onTrace('task.result',{turnId:context.turnId,sessionId:context.sessionId,taskId:task.id,jobId:task.jobId,requestId:identity,durationMs:this.now()-at,status:task.status});
     return task;
   }
-  async control(fields){
+  async control(fields,hooks={}){
     const key=[fields.taskId,fields.action,fields.actionId || ''].join(':');
     if(!this.controlIds.has(key))this.controlIds.set(key,globalThis.crypto.randomUUID());
     const result=await this.request({operation:'delegatedTaskControl',conversationId:this.conversationId,requestId:this.controlIds.get(key),...fields});
-    this.publish(result.tasks || []);return {tasks:this.tasks,task:this.tasks.find(t=>t.id===fields.taskId)};
+    const task=result.tasks?.find(t=>t.id===fields.taskId);
+    if(task)hooks.onAccepted?.(task);
+    this.publish(result.tasks || []);return {tasks:this.tasks,task};
   }
   close(){this.closed=true;}
 }

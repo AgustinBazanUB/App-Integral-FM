@@ -146,3 +146,9 @@ test('an ambiguous task control asks for its target and sends no cancellation',a
   assert.equal((await client.run({args:{action:'cancel'}},'No, dejá')).needsClarification,true);
   assert.ok(payloads.every(p=>p.operation==='delegatedTaskStatus'));
 });
+test('a voice cancellation rebinds its notification before publishing the terminal task',async()=>{
+  const order=[];
+  const client=new DelegatedTaskClient({conversationId:'root',onChange:tasks=>{if(tasks[0]?.status==='cancelled')order.push('published');},request:async payload=>({tasks:[{id:'a',status:payload.operation==='delegatedTaskControl'?'cancelled':'running'}]})});
+  await client.run({args:{action:'cancel',taskId:'a'}},'Cancelá la tarea',{onAccepted:()=>order.push('bound')});
+  assert.deepEqual(order,['bound','published']);
+});

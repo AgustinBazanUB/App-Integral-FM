@@ -404,9 +404,10 @@ export class GeminiLiveSession {
     if(this.closed || this.failed || turn.cancelled)return;
     const decision=classifyGeminiLiveTurn(transcript,this.getConversationContext());
     // A model tool request is not authority to turn social speech into a job.
-    if(transcript && ['social','conversation-control'].includes(decision.kind)){
+    if(transcript && decision.route==='direct'){
       turn.toolPending=false;turn.toolTurn=false;turn.outputAuthorized=true;
-      this.socket.send(JSON.stringify({toolResponse:{functionResponses:calls.map(call=>({id:call.id,name:call.name,scheduling:'WHEN_IDLE',response:{result:'Esta intervención es conversacional. Respondé directamente sin herramientas; no hay operación de negocio.'}}))}}));
+      const result=['social','conversation-control'].includes(decision.kind)?'Esta intervención es conversacional. Respondé directamente sin herramientas; no hay operación de negocio.':'No se identificó una solicitud comercial ni una continuación operativa. Si es una consulta general, respondela directamente. Si resulta ambigua o incompleta, pedí una aclaración sin inventar datos del negocio ni ejecutar acciones.';
+      this.socket.send(JSON.stringify({toolResponse:{functionResponses:calls.map(call=>({id:call.id,name:call.name,scheduling:'WHEN_IDLE',response:{result}}))}}));
       return;
     }
     turn.toolTurn=true;turn.backgroundToolPending=true;turn.toolPending=false;
@@ -427,8 +428,9 @@ export class GeminiLiveSession {
         if(this.closed || this.failed)return;
         const previous=this.pendingTaskCalls.get(task.id);
         if(previous?.call && previous.call.id!==call.id)this.socket.send(JSON.stringify({toolResponse:{functionResponses:[{id:previous.call.id,name:previous.call.name,willContinue:false,scheduling:'SILENT',response:{status:'continued'}}]}}));
+        this.toolResultQueue=this.toolResultQueue.filter(item=>item.taskId!==task.id);
         binding.taskId=task.id;this.pendingTaskCalls.set(task.id,binding);
-        this.socket.send(JSON.stringify({toolResponse:{functionResponses:[{id:call.id,name:call.name,willContinue:true,scheduling:'SILENT',response:{taskId:task.id,status:task.status,instruction:'Solicitud aceptada, aún no terminada. Continuá escuchando; no afirmes resultados.'}}]}}));
+        this.socket.send(JSON.stringify({toolResponse:{functionResponses:[{id:call.id,name:call.name,willContinue:true,scheduling:'SILENT',response:{taskId:task.id,status:'accepted',instruction:'La solicitud fue recibida. Continuá escuchando; el resultado verificado se comunica por separado.'}}]}}));
         this.trace('task.accepted',{taskId:task.id,jobId:task.jobId,turnId:turn.turnId,status:task.status});
       };
       // Deliberately detached from the voice turn: barge-in stops speech, not

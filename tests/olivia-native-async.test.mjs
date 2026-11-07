@@ -53,6 +53,13 @@ test('a synchronous task error produces a bounded result rather than an unhandle
   await tick();await new Promise(r=>setTimeout(r,5));
   assert.match(JSON.stringify(sent.at(-1)),/backend unavailable/);
 });
+test('an ambiguous fragment outside an operational context asks for clarification without a Luna request',async t=>{
+  const {live,sent}=session(t,{onToolCall:()=>assert.fail('ambiguous fragment was delegated')});
+  live.sendText('Lo de antes por esa línea');
+  live.receive({toolCall:{functionCalls:[{id:'ambiguous',name:'delegate_to_olivia'}]}});await tick();
+  assert.match(sent.at(-1).toolResponse.functionResponses[0].response.result,/pedí una aclaración/);
+  live.receive({serverContent:{outputTranscription:{text:'¿Me aclarás qué necesitás?'},turnComplete:true}});await tick();
+});
 test('acknowledgement and final answer have independent audio marks with the source turn preserved',t=>{
   const first=[];const {live}=session(t,{onFirstAudio:(at,context)=>first.push(context)});
   const turn=live.createTurn();Object.assign(turn,{turnId:'turn_a',sourceTurnId:'source_a',taskId:'task_a',acknowledgementAuthorized:true});
