@@ -1,8 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GeminiLiveSession } from '../src/gestion/olivia/geminiLive.mjs';
+import { GeminiLiveSession, geminiTaskResult } from '../src/gestion/olivia/geminiLive.mjs';
 import { classifyGeminiLiveTurn } from '../src/shared/oliviaConversationRouter.mjs';
 const tick=()=>new Promise(r=>setImmediate(r));
+test('Gemini receives task facts without confirmation tokens, internal scopes or telemetry',()=>{
+  const result=JSON.stringify(geminiTaskResult({id:'a',status:'awaiting-confirmation',summary:'Propuesta revisada',pendingAction:{confirmationToken:'secret-token'},scopeId:'internal',telemetry:{private:'diagnostics'}}));
+  assert.match(result,/requiresVisualConfirmation/);assert.doesNotMatch(result,/secret-token|internal|diagnostics|confirmationToken/);
+});
 function session(t,options={}){
   const sent=[],turns=[],states=[],audio=[];
   const live=new GeminiLiveSession({backgroundTools:true,audioContext:{currentTime:0,createBufferSource(){const source={connect(){},disconnect(){},start(){},stop(){}};audio.push(source);return source;}},WebSocket:{OPEN:1},onTurnComplete:turn=>turns.push(turn),onState:s=>states.push(s),...options});

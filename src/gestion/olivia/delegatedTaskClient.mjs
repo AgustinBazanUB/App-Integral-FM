@@ -24,7 +24,12 @@ export class DelegatedTaskClient {
       if(candidates.length!==1)return {needsClarification:true,summary:'Preguntá a cuál tarea se refiere; no se ejecutó ni canceló ninguna.',tasks:candidates};
       taskId=candidates[0].id;
     }
-    if(args.action==='cancel')return this.control({action:'cancel',taskId});
+    if(args.action==='cancel'){
+      if(!/\b(?:cancel\w*|deja|dejalo|olvida\w*|detene\w*|no sigas|no continues)\b/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Pedí que aclare si desea cancelar; no se detuvo ninguna tarea.',tasks:this.tasks};
+      const candidates=(await this.refresh()).filter(t=>!['completed','cancelled','failed'].includes(t.status));
+      if(candidates.length>1 && /^(?:no )?(?:deja|dejalo|cancela|cancelalo|olvidalo)(?: por favor)?$/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Hay varias tareas. Preguntá cuál debe cancelarse.',tasks:candidates};
+      return this.control({action:'cancel',taskId});
+    }
     const identity=context.requestId || globalThis.crypto.randomUUID(),at=this.now();
     const payload={operation:'delegatedTask',conversationId:this.conversationId,requestId:identity,message:text,...(taskId?{taskId}:{}),priority:args.priority || 'normal',dependsOn:args.dependsOn || [],screenContext:context.screenContext || {}};
     let task;
@@ -54,3 +59,4 @@ export class DelegatedTaskClient {
   }
   close(){this.closed=true;}
 }
+import { normalizeSpeech } from '../../shared/oliviaSpeechText.mjs';
