@@ -234,7 +234,7 @@ export default function OliviaAssistant() {
   useEffect(()=>{
     if(!snapshot.conversationId || !snapshot.voiceConversationAvailable)return;
     const client=new DelegatedTaskClient({request:(payload)=>oliviaClient.request(payload),conversationId:snapshot.conversationId,
-      onChange:tasks=>{if(!mounted.current)return;setDelegatedTasks(tasks);for(const task of tasks)voiceRef.current?.transcriber?.notifyTaskUpdate?.(task);},
+      onChange:tasks=>{if(!mounted.current)return;setDelegatedTasks(tasks);for(const task of tasks){voiceRef.current?.transcriber?.notifyTaskUpdate?.(task);if(task.telemetry?.trace)saveTurnTrace({...task.telemetry.trace,events:task.telemetry.trace.events.map(event=>({...event,taskId:task.id,jobId:task.jobId}))});}},
       onTrace:(stage,metadata)=>markTurnTrace(stage,metadata)});
     delegatedClient.current=client;
     setDelegatedTasks([]);

@@ -316,12 +316,17 @@ export function createOliviaEngine({
     context = null,
     leaseMs = 120000,
     cancelGuard = false,
+    jobGuard = null,
   ) {
     const now = clock();
     return store.transaction(async (tx) => {
       const snapshot = await tx.getDocument(`oliviaConversations/${id}`);
       const conversation = snapshot ? { ...snapshot.data, id } : null;
       assertConversationOwner(session, conversation, now);
+      if(jobGuard){
+        const job=(await tx.getDocument(`oliviaChatJobs/${safeId(jobGuard)}`))?.data;
+        if(job?.status!=='running' || job.userId!==session.uid || job.payload?.requestId!==requestId || job.payload?.conversationId!==id)throw oliviaError('request-expired','El trabajo ya no está autorizado para iniciar este turno.',409);
+      }
       if(cancelGuard && (await tx.getDocument(`oliviaRequests/${session.uid}_${requestId}`))?.data?.interruptRequested) throw oliviaError('request-expired','Esta consulta fue reemplazada.',409);
       await verifyLegacyConversationScope(session, conversation, store);
       if (conversation.queuedChatRequestId && conversation.queuedChatRequestId !== requestId)
@@ -341,7 +346,8 @@ export function createOliviaEngine({
           )
         : null;
       const writes = [];
-      const repeatedInput = taskControl(userMessage) === "acknowledge" || (!attachments.length && inputMode==='natural-voice' && classifyGeminiLiveTurn(userMessage).route === 'direct');
+      const voiceDecision=classifyGeminiLiveTurn(userMessage,{pendingAction:Boolean(previous?.data.status==='pending'),collectingTask:conversation.taskState?.status==='collecting'});
+      const repeatedInput = taskControl(userMessage) === "acknowledge" || (!attachments.length && inputMode==='natural-voice' && voiceDecision.route === 'direct' && ['social','conversation-control'].includes(voiceDecision.kind));
       if (previous?.data.status === "pending" && !repeatedInput)
         writes.push({
           type: "update",
@@ -469,7 +475,7 @@ export function createOliviaEngine({
     const trace = latencyTrace({ id: body.requestId, origin: 'server', now: () => Date.now() });
     return traceContext.run(trace, () => chatTurn(session, body, options));
   }
-  async function chatTurn(session, body, { onEvent, signal, longRunning = false } = {}) {
+  async function chatTurn(session, body, { onEvent, signal, longRunning = false, jobId = null } = {}) {
     const trace = traceContext.getStore();
     trace.mark('request.start');
     const startedAt = Date.now(), timings = { modelCalls: 0, providerMs: 0, toolsMs: 0 }, naturalVoice = body.inputMode === "natural-voice";
@@ -537,6 +543,7 @@ export function createOliviaEngine({
         context,
         longRunning ? 360000 : 120000,
         body.foreground===true,
+        jobId,
       );
       claimed = true;
       const assistance = assistiveIntent(userMessage, conversation.ideaContext);

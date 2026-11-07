@@ -433,7 +433,7 @@ export class GeminiLiveSession {
       };
       // Deliberately detached from the voice turn: barge-in stops speech, not
       // an independently accepted backend job. The job survives reconnection.
-      Promise.resolve().then(()=>this.onToolCall(call,transcript,{turnId:turn.turnId,turnIndex:turn.turnIndex,transcriptComplete:true,onAccepted})).then(result=>{
+      Promise.resolve().then(()=>this.onToolCall(call,transcript,{turnId:turn.turnId,turnIndex:turn.turnIndex,sessionId:this.sessionId,transcriptComplete:true,onAccepted})).then(result=>{
         if(this.closed || this.failed)return;
         this.enqueueToolResult({...binding,result});
       }).catch(error=>{

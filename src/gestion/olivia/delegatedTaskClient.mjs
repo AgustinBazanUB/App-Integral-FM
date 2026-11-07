@@ -40,7 +40,7 @@ export class DelegatedTaskClient {
       }
     }
     this.publish([...this.tasks.filter(t=>t.id!==task.id),task]);
-    this.onTrace('task.accepted',{taskId:task.id,jobId:task.jobId,requestId:identity,durationMs:this.now()-at,status:task.status});
+    this.onTrace('task.accepted',{turnId:context.turnId,sessionId:context.sessionId,taskId:task.id,jobId:task.jobId,requestId:identity,durationMs:this.now()-at,status:task.status});
     context.onAccepted?.(task);
     while(running(task)){
       if(this.closed)throw aborted();
@@ -48,7 +48,7 @@ export class DelegatedTaskClient {
       const tasks=await this.refresh();task=tasks.find(t=>t.id===task.id);
       if(!task)throw new Error('La tarea ya no está disponible.');
     }
-    this.onTrace('task.result',{taskId:task.id,jobId:task.jobId,requestId:identity,durationMs:this.now()-at,status:task.status});
+    this.onTrace('task.result',{turnId:context.turnId,sessionId:context.sessionId,taskId:task.id,jobId:task.jobId,requestId:identity,durationMs:this.now()-at,status:task.status});
     return task;
   }
   async control(fields){

@@ -103,6 +103,14 @@ test('an interrupted dispatch lease resumes the same job rather than creating an
   assert.equal(f.dispatched.length,2);
   assert.equal([...f.documents.keys()].filter(p=>p.startsWith('oliviaChatJobs/')).length,1);
 });
+test('cancellation before the engine claim prevents even a late deterministic proposal from being created',async()=>{
+  const f=await setup(),task=await f.create('late_claim','Cargame 2 unidades de aceite');
+  const workerEngine={chat:async(...args)=>{await f.control(task,'cancel');return f.engine.chat(...args);}};
+  await runChatJob({store:f.store,engine:workerEngine,session:f.session,jobId:task.jobId,clock:f.clock});
+  assert.equal((await f.list())[0].status,'cancelled');
+  assert.equal([...f.documents.keys()].filter(p=>p.startsWith('oliviaConfirmations/')).length,0);
+  assert.equal(f.documents.get('locationStock/local_a/items/oil').currentStock,4);
+});
 
 test('task access rejects another user, changed session, expired parent and internal task roots',async()=>{
   const f=await setup(),task=await f.create('ownership');

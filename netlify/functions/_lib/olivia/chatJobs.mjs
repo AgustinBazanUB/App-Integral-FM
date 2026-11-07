@@ -109,7 +109,7 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
   const interval = setInterval(() => { flush().catch(() => {}); }, 2000);
   const timer = setTimeout(() => controller.abort(oliviaError("assistant-timeout", "La consulta alcanzó su límite de procesamiento.", 503)), 300000);
   try {
-    const options = { longRunning: true, signal: controller.signal, onEvent: event => {
+    const options = { longRunning: true, jobId, signal: controller.signal, onEvent: event => {
       if (event.type === "accepted") { progress.accepted = event.message; changed = true; flush().catch(() => {}); }
       if (event.type === "phase") { progress.phase = event.label; if (event.tools) { progress.text = ""; progress.tools = event.tools; } changed = true; flush().catch(() => {}); }
       if (event.type === "delta") progress.text = (progress.text + event.delta).slice(-64000);
