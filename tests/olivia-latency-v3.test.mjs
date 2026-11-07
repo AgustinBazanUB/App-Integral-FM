@@ -40,6 +40,14 @@ test('stock and price use fresh authorized data, no LLM, and no stock mutations'
   const second=await f.turn('Stock de almendras','stock2');assert.match(second.spokenText,/17 unidades/);
   const price=await f.turn('Precio de almendras','price');assert.match(price.spokenText,/1\.500/);assert.equal(f.calls(),0);assert.equal(f.documents.get('locationStock/local_a/items/almonds').currentStock,17);
 });
+test('cuánto stock de a named product does not search for stock as part of its name',async()=>{
+  const f=await voiceFixture();
+  const result=await f.turn('¿Cuánto stock de almendras hay en Tribunales?','stock-quantity');
+  assert.match(result.spokenText,/31 unidades en Tribunales/);
+  assert.equal(f.calls(),0);
+  assert.equal(f.documents.get('locationStock/local_a/items/almonds').currentStock,31);
+  assert.equal(quickReadPlan('¿Cuánto stock de almendras hay y cargá 30 más?'),null);
+});
 test('starting a stock task asks all missing fields together and keeps the selected location',async()=>{
   const f=await voiceFixture(),result=await f.turn('Cargame stock','start-stock');assert.match(result.spokenText,/producto.*cuántas unidades/);assert.doesNotMatch(result.spokenText,/ubicación/);assert.equal(f.documents.get('oliviaConversations/'+f.conversationId).taskState.slots.locationId,'local_a');assert.equal(f.calls(),0);
 });

@@ -2,6 +2,7 @@ import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 import { quotaPeriod, safeId, oliviaError, costForUsage, retentionDate } from "../../../../src/shared/oliviaContracts.mjs";
 import { canUseOliviaVoice, hasGoogleCloudTtsCredentials } from "../../../../src/shared/oliviaVoiceAvailability.mjs";
 import { assertConversationOwner } from "./engine.mjs";
+import { addProviderSpend } from "./usage.mjs";
 
 const RATE_USD_PER_MILLION_CHARS = 30;
 let cachedClient = null;
@@ -25,19 +26,24 @@ export function chirpClient(env = process.env, Client = TextToSpeechClient) {
 async function reserveCharacters({ store, session, config, requestId, characters, now }) {
   const period = quotaPeriod("monthly", now),
     usagePath = `oliviaVoiceBudgets/${session.uid}_${period.key}`,
-    requestPath = `oliviaVoiceRequests/${session.uid}_${requestId}`;
+    requestPath = `oliviaVoiceRequests/${session.uid}_${requestId}`,
+    providerPeriod = now.toISOString().slice(0, 7),
+    providerSpendPath = `oliviaGeminiLiveBudgets/${providerPeriod}`;
   await store.transaction(async (tx) => {
-    const [prior, current] = await Promise.all([tx.getDocument(requestPath), tx.getDocument(usagePath)]);
+    const [prior, current, providerSnapshot] = await Promise.all([tx.getDocument(requestPath), tx.getDocument(usagePath), tx.getDocument(providerSpendPath)]);
     if (prior) throw oliviaError("request-already-used", "Este audio ya fue procesado.", 409);
     const used = Number(current?.data?.characters || 0);
     if (used + characters > config.naturalVoice.maxMonthlyCharacters)
       throw oliviaError("voice-quota-exhausted", "Se alcanzó el cupo mensual de voz. Podés continuar escribiendo o dictando.", 429);
     const expiresAt = retentionDate(config.retentionMonths, now);
+    const estimatedCostUsd = characters * RATE_USD_PER_MILLION_CHARS / 1_000_000;
     const next = { userId: session.uid, period: period.key, characters: used + characters, updatedAt: now, renewsAt: period.renewsAt, retentionExpiresAt: expiresAt };
+    const providerSpend = addProviderSpend(providerSnapshot?.data || null, { provider: "chirp", period: providerPeriod, costUsd: estimatedCostUsd, characters }, now, expiresAt);
     await tx.commitDocuments([
       { type: current ? "update" : "create", path: usagePath, data: next },
-      { type: "create", path: requestPath, data: { userId: session.uid, operation: "chirp-synthesis", model: "Google Chirp 3 HD", characters, estimatedCostUsd: characters * RATE_USD_PER_MILLION_CHARS / 1_000_000, status: "streaming", createdAt: now, period: period.key, retentionExpiresAt: expiresAt } },
+      { type: "create", path: requestPath, data: { userId: session.uid, operation: "chirp-synthesis", model: "Google Chirp 3 HD", characters, estimatedCostUsd, status: "streaming", createdAt: now, period: period.key, retentionExpiresAt: expiresAt } },
       { type: "create", path: `oliviaUsage/${session.uid}_${requestId}`, data: { userId: session.uid, role: session.profile.role, origin: "Olivia · voz natural", operation: "chirp-synthesis", requestId, model: "Google Chirp 3 HD", billingUnit: "tts-characters", characters, measurement: "provider-request", success: true, createdAt: now, retentionExpiresAt: expiresAt, ...costForUsage({ billingUnit: "tts-characters", characters }, config) } },
+      { type: providerSnapshot ? "update" : "create", path: providerSpendPath, data: providerSpend },
     ]);
   });
   return { requestPath, period };

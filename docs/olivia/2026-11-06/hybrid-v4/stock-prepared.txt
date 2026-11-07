@@ -1,0 +1,606 @@
+Olivia
+Flor Mía · Tu asistente
+Revisá la operación y confirmá en la tarjeta
+VOS
+
+Hola, Olivia
+
+OLIVIA
+
+¡Hola! ¿En qué te puedo ayudar?
+
+VOS
+
+¿Cuántas ventas hicimos hoy?
+
+OLIVIA
+
+Hoy, 6 de noviembre, llevan 0 ventas registradas. El total cobrado es $0; el ticket promedio no aplica porque no hubo operaciones.
+
+VOS
+
+Buen día
+
+OLIVIA
+
+¡Buen día! ¿Cómo estás? ¿En qué te puedo ayudar hoy?
+
+VOS
+
+¿Cómo estás?
+
+OLIVIA
+
+¡Muy bien, gracias por preguntar! ¿Y vos, cómo estás?
+
+VOS
+
+Gracias
+
+OLIVIA
+
+De nada. ¡Un placer!
+
+VOS
+
+Muchas gracias
+
+OLIVIA
+
+¡Por nada! Estoy acá para lo que necesites.
+
+VOS
+
+Perfecto, gracias
+
+OLIVIA
+
+¡De nada!
+
+VOS
+
+¿Cuánto stock tenemos de Arbequina?
+
+OLIVIA
+
+Vamos con lo que falta. Pasame estos datos:
+
+El nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro.
+El nombre del producto y su presentación; por ejemplo, aceite Arbosana de 500 ml.
+
+Podés decírmelo con tus palabras y seguimos desde ahí.
+
+VOS
+
+¿Cuál es el precio del aceite de 500 mililitros?
+
+OLIVIA
+
+No encuentro un precio verificable para un aceite de 500 ml: la búsqueda solo devolvió “Aceite QA PR53 - No despachar”, con precio $1.000, pero no indica presentación y parece ser un producto de prueba. Si me decís el nombre del aceite, lo busco con más precisión.
+
+VOS
+
+Perfecto, gracias
+
+OLIVIA
+
+De nada. ¡Cualquier otra cosa que necesites, avisame!
+
+VOS
+
+Hola, Olivia
+
+OLIVIA
+
+¡Hola! ¿Cómo estás? ¿En qué te puedo ayudar hoy?
+
+VOS
+
+¿Cuánto stock de Aceite QA PR53 - No despachar hay en QA PR53 - Local ficticio - No despachar?
+
+OLIVIA
+
+No pude identificar ese producto en la búsqueda acotada. Decime el nombre o la presentación.
+
+VOS
+
+Prepará una carga de 30 unidades de Aceite QA PR53 - No despachar en QA PR53 - Local ficticio - No despachar. Solo prepará la operación para revisar; todavía no la ejecutes.
+
+OLIVIA
+
+No pude identificar el producto. Decime su nombre o presentación.
+
+VOS
+
+El producto es Aceite QA PR53. La ubicación es QA PR53. Son 30 unidades.
+
+OLIVIA
+
+No pude identificar el producto. Decime su nombre o presentación.
+
+VOS
+
+Aceite QA PR53
+
+OLIVIA
+
+Me falta la cantidad.
+
+VOS
+
+30 unidades
+
+OLIVIA
+
+Agregar 30 unidades de Aceite QA PR53 - No despachar en QA PR53 - Local ficticio - No despachar. Stock: 19 → 49.
+
+¿Confirmar esta acción?
+
+Agregar 30 unidades de Aceite QA PR53 - No despachar en QA PR53 - Local ficticio - No despachar. Stock: 19 → 49.
+
+SÍ
+NO
+La acción se ejecuta únicamente al tocar Sí. Podés corregir los datos escribiendo.
++
+Mensaje para Olivia
+Uso y costos
+Prueba Gemini sin micrófono · solo preview
+
+Entrada escrita y salida de audio real. No mide captura, reconocimiento ni latencia desde el fin del habla. Máximo 50 turnos; utiliza el presupuesto de Gemini.
+
+Gemini terminó la generación sin cerrar el turno de audio; continúo con el respaldo. · conexión 4363 ms
+
+Conectar prueba Gemini Cerrar prueba GeminiConsulta de prueba GeminiEnviar prueba Gemini
+Resultados de prueba Gemini (2)
+{
+  "evidence": "real-provider-text-input-not-microphone",
+  "connectionMs": 4362.699999988079,
+  "turns": [
+    {
+      "id": "1cd60c56-70d3-41cc-b9b0-608481953e17",
+      "input": "Perfecto, gracias",
+      "inputMode": "diagnostic-text",
+      "route": "direct",
+      "classificationMs": 1593.8999999761581,
+      "response": "De nada. ¡Cualquier otra cosa que necesites, avisame!",
+      "textToScheduledAudioMs": 1629.7000000476837,
+      "delegated": false,
+      "noAudio": false,
+      "providerIncomplete": false,
+      "textToResultMs": 3262.400000035763,
+      "usage": {
+        "duplicate": false,
+        "measurement": "provider-forwarded",
+        "costUsd": 0.001781,
+        "sessionSpendUsd": 0.001781,
+        "spendUsd": 0.017563,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.017563,
+        "estimatedUsd": 0,
+        "unconfirmedQueryCount": 0,
+        "queryCount": 7,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": 689,
+        "outputTokens": 69,
+        "inputTokensByModality": {
+          "TEXT": 495,
+          "AUDIO": 194
+        },
+        "outputTokensByModality": {
+          "AUDIO": 69
+        },
+        "inputAudioSeconds": 0,
+        "outputAudioSeconds": 2.5199999999999996,
+        "shouldStop": false,
+        "includesAccumulatedContext": true,
+        "averageUsdPerQuery": 0.002509,
+        "projectionAt660Usd": 1.65594,
+        "projectedMonthEndUsd": 0.08781499999999999
+      }
+    },
+    {
+      "id": "05b54d78-7b78-4080-ac1a-414eae1a485d",
+      "input": "Hola, Olivia",
+      "inputMode": "diagnostic-text",
+      "route": "direct",
+      "classificationMs": 799.9000000357628,
+      "response": "¡Hola! ¿Cómo estás? ¿En qué te puedo ayudar hoy?",
+      "textToScheduledAudioMs": 805.1999999880791,
+      "delegated": false,
+      "noAudio": true,
+      "providerIncomplete": true,
+      "textToResultMs": 3111.600000023842,
+      "usage": {
+        "duplicate": false,
+        "measurement": "unconfirmed",
+        "costUsd": null,
+        "sessionSpendUsd": 0.002771,
+        "spendUsd": 0.018553,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.017563,
+        "estimatedUsd": 0.00099,
+        "unconfirmedQueryCount": 1,
+        "queryCount": 9,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": null,
+        "outputTokens": null,
+        "inputTokensByModality": null,
+        "outputTokensByModality": null,
+        "inputAudioSeconds": null,
+        "outputAudioSeconds": null,
+        "shouldStop": true,
+        "includesAccumulatedContext": false,
+        "averageUsdPerQuery": 0.0020614444444444443,
+        "projectionAt660Usd": 1.3605533333333333,
+        "projectedMonthEndUsd": 0.092765
+      },
+      "error": "Gemini terminó la generación sin cerrar el turno de audio; continúo con el respaldo."
+    }
+  ],
+  "protocol": [
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 2560
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn",
+        "outputTranscription"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 23040
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 12800
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 28160
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn",
+        "outputTranscription"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 25600
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 20480
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 25600
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 23040
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 5120
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "generationComplete"
+      ],
+      "parts": [],
+      "generationComplete": true
+    },
+    {
+      "keys": [
+        "serverContent",
+        "usageMetadata"
+      ],
+      "contentKeys": [
+        "turnComplete"
+      ],
+      "parts": [],
+      "turnComplete": true
+    }
+  ]
+}
+Métricas de desarrollo
+Modelo de conversación
+Gemini 3.8 Live · Google Chirp 3 HD de respaldo
+Cerebro y acciones de voz
+GPT-6 Luna / Sol · rutas instantánea / lectura / controlada / NONE / MEDIUM según complejidad
+Voz fija de Olivia
+es-US-Chirp3-HD-Aoede
+Modelo / razonamiento
+gpt-6-luna / none
+Ruta / motivo
+deterministic / progressive-stock
+Tarea
+92efee4e-28a3-41d4-b0f2-1bad16659849
+Tokens próximos estimados
+12568
+Entrada / salida / total de última llamada
+0 / 0 / 0
+Consumo / reservas
+235376 / 0
+Último costo USD
+US$ 0
+Click → mensaje visible (ms)
+36
+Mensaje → request (ms)
+0
+Request → primer texto (ms)
+—
+Primer texto → completa (ms)
+—
+Voz natural · Chirp 3 HD
+es-US-Chirp3-HD-Aoede
+Transcripción de esta sesión
+Sin iniciar
+Ruta de voz Gemini Live
+Preparado
+Gemini · último error/fallback
+Sin fallas registradas
+Gemini · conexión desde micrófono listo (ms)
+—
+Gemini · click → sesión lista (ms)
+—
+Gemini · ruta del último turno
+Sin clasificar · turno —
+Gemini · ida y vuelta de clasificación · P50 / P90 / P95 (ms)
+— / — / —
+Gemini · fin de voz → primer audio programado · P50 / P90 / P95 (ms)
+— / — / —
+Gemini · primer turno de sesión · TTFA P50 / P90 / P95 (ms)
+— / — / —
+Gemini · turnos posteriores · TTFA P50 / P90 / P95 (ms)
+— / — / —
+Gemini · último consumo
+Sin medición · — entrada / — salida
+Gemini · tokens de entrada/salida por modalidad
+No informado por el proveedor / No informado por el proveedor · entrada incluye contexto según usageMetadata
+Gemini · costo calculado desde usageMetadata · último turno
+Sin medición
+Gemini · costo calculado acumulado de esta sesión
+Sin medición
+Gemini · gasto calculado + reserva preventiva
+US$ 0,0186 + US$ 0
+Gemini · costo por tokens de usageMetadata / estimado solo por audio / sin confirmar
+US$ 0,0176 / US$ 0,00099 / 1 turnos
+Gemini · turnos / tope 660 / promedio / proyección
+9 / 660 / US$ 0,00206 / US$ 1,36
+Gemini · presupuesto objetivo / aviso / techo
+US$ 5 / US$ 6 / US$ 10
+Gemini · estado preventivo
+Dentro de los límites registrados
+Luna/Sol · costo estimado por tarifas / llamadas sin confirmar
+US$ 0,0162 / —
+Luna/Sol · llamadas y tokens de entrada/salida del mes
+18 · 155782 / 1281
+Chirp · costo mensual estimado / caracteres / solicitudes
+US$ 0,00402 / 134 / 2
+Proveedores · total mensual estimado / costos sin confirmar
+US$ 0,0388 / 1
+Silencio de fin de turno · P50 / P90 / P95 (ms)
+— / — / —
+Detección → transcripción final · P50 / P90 / P95 (ms)
+— / — / —
+Fin real de voz → transcripción · P50 / P90 / P95 (ms)
+— / — / —
+Fin de voz → primer audio útil · P50 / P90 / P95 (ms)
+— / — / —
+Fin de voz → audio final completo · P50 / P90 / P95 (ms)
+— / — / —
+Charla breve · primer audio útil P50 / P90 / P95 (ms)
+— / — / —
+Lectura · primer audio útil P50 / P90 / P95 (ms)
+— / — / —
+Acción/consulta compleja · primer audio útil P50 / P90 / P95 (ms)
+— / — / —
+HTTP hasta cabeceras · P50 / P90 / P95 (ms)
+— / — / —
+Servidor antes de cabeceras · P50 / P90 / P95 (ms)
+— / — / —
+Transporte/cola estimados · P50 / P90 / P95 (ms)
+— / — / —
+Selección de intervención · P50 / P90 / P95 (ms)
+— / — / —
+Selector iniciado → clip disponible · P50 / P90 / P95 (ms)
+— / — / —
+Turno confirmado → primera intervención · P50 / P90 / P95 (ms)
+— / — / —
+Selector · costo USD estimado mediano
+Sin medición
+Transcripción → primer audio programado · mediana / P95 (ms)
+— / —
+TTFA programado · mediana / P95 (ms)
+— / —
+Última síntesis · caracteres / costo USD estimado
+— / Sin medición
+Medición de audio
+Gemini: tokens de usageMetadata tarifados o estimación por duración que excluye contexto; ningún importe reconcilia la factura. Chirp: primer bloque programado; no mide el inicio físico del altavoz.
+Backend: retrieval / proveedor / herramientas (ms)
+— / — / —
+Llamadas de modelo / herramientas
+0 / 1
+Skills
+Ninguna en esta consulta
+Documentos recuperados
+Ninguno en esta consulta
+Request / response
+02cf886b-ea1b-4e6c-8874-bed35ab6b7b2 / —
+Contexto
+16 mensajes recientes, memoria acotada y referencias verificadas
+Costo de almacenamiento semántico
+Sin medición del proveedor
+Cotización
+Sin cotización

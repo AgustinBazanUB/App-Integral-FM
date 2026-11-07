@@ -1,5 +1,5 @@
 import { VoiceAcknowledgement } from './voiceAcknowledgement.mjs';
-import { chooseLocalGreeting, speechIntent, eligibleSpeechClips } from '../../shared/oliviaFastSpeech.mjs';
+import { chooseLocalGreeting, speechIntent, eligibleSpeechClips, speechClips } from '../../shared/oliviaFastSpeech.mjs';
 import { instantConversation } from '../../shared/oliviaConversationRouter.mjs';
 
 export class FastSpeechPlayer {
@@ -8,6 +8,20 @@ export class FastSpeechPlayer {
     this.fallback=new VoiceAcknowledgement({load:loadFallback,play,delayMs:0});
   }
   async warm(){await this.cache.warm();const manifest=await this.cache.manifest();if(!manifest?.entries?.some(item=>item.status==='ready'))await this.fallback.warm();}
+  warmLocal(){return this.cache.warm();}
+  async acknowledge(isCurrent=()=>true) {
+    this.cancel();
+    const generation=this.generation,started=this.now();
+    const candidates=['espera_real_01','espera_real_02'].filter(candidate=>!this.recent.slice(-2).includes(candidate));
+    const id=candidates.find(candidate=>this.cache.peek?.(candidate)) || candidates[0];
+    if(!id || (!this.cache.peek?.(id) && !(await this.cache.get(id))))return false;
+    const clip=speechClips.find(item=>item.id===id),response=await this.cache.response({clip_id:id,intent:'general'});
+    if(!response || generation!==this.generation || !isCurrent())return false;
+    this.recent.push(id);this.recent=this.recent.slice(-8);this.intervened=true;
+    this.onMetric('selection',0);this.onMetric('selectionCostUsd',0);this.onMetric('fastAudioAvailable',this.now()-started);
+    void this.playClip(response,clip,isCurrent,generation);
+    return true;
+  }
   anticipate(text){const clip=(this.latencyMode?instantConversation(text):null)||chooseLocalGreeting(text,this.recent);if(clip)void this.cache.get(clip.id);}
   async greeting(text,isCurrent=()=>true) {
     const instant=this.latencyMode?instantConversation(text):null,clip=instant||chooseLocalGreeting(text,this.recent);if(!clip)return false;

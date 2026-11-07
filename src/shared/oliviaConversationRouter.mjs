@@ -1,4 +1,4 @@
-import { normalizeSpeech } from './oliviaFastSpeech.mjs';
+import { isGreetingOnly, normalizeSpeech } from './oliviaFastSpeech.mjs';
 
 // Small, exact matchers. A partial, combined request, correction or bare confirmation
 // must continue through the authenticated task engine.
@@ -15,8 +15,17 @@ export function instantConversation(text) {
   if (/^(?:chau|hasta luego|nos vemos|hasta manana|adios)$/.test(value)) return { ...conversationClips[2], intent: 'goodbye' };
   return null;
 }
+export function classifyGeminiLiveTurn(text) {
+  const normalized = normalizeSpeech(text)
+    .replace(/^olivia /, '')
+    .replace(/^hola olivia /, 'hola ')
+    .replace(/ olivia$/, '');
+  const socialOnly = /^(?:(?:muy |re )?(?:bien(?: por suerte)?|todo bien|todo tranqui|joya|genial|de diez)(?: y vos(?: como (?:estas|andas))?| que (?:andas haciendo|estas haciendo|haces))?|bien por suerte que (?:andas haciendo|estas haciendo|haces)|me alegro|que bueno|y vos(?: como (?:estas|andas))?|que (?:andas haciendo|estas haciendo|haces|onda)(?: hoy)?|como va tu dia|(?:muchas |muchisimas |mil )?gracias(?: por tu ayuda| olivia)?|todo bien gracias|te agradezco)$/.test(normalized.replace(/\s+/g, ' '));
+  if (isGreetingOnly(text) || instantConversation(text) || socialOnly) return { route: 'direct', kind: 'small-talk' };
+  return { route: 'delegate', kind: 'data-or-operation' };
+}
 export function quickReadPlan(text) {
-  const value = normalizeSpeech(text).replace(/^olivia /, '').replace(/ por favor$/, '');
+  const value = normalizeSpeech(text).replace(/^olivia /, '').replace(/ por favor$/, '').replace(/^cuanto stock (?:de |del )?/, 'cuantas unidades de ');
   if (/\b(?:carga|cargame|cargues|crea|creame|registra|agrega|ingresa|vende|cobra|manda|envia|borra|elimina|cambia|modifica|queria decir|en realidad)\b/.test(value)) return null;
   if (/^(?:quiero |necesito )?hablar con (?:un |el )?cliente$/.test(value)) return { kind: 'customer', query: '' };
   const customer = /^(?:(?:busca|buscame|buscar|mostrame|consulta)(?: al| el)? cliente |(?:quiero |necesito )?hablar con (?:el cliente |cliente ))(.+)$/.exec(value);

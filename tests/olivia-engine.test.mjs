@@ -402,6 +402,32 @@ test("admin usage reports reserved estimates honestly while seller usage stays p
   assert.deepEqual(Object.keys(seller).sort(), ["lastCost", "period", "remainingPercent", "renewsAt"]);
 });
 
+test("admin Gemini readiness reports only safe gate booleans", async () => {
+  const f = fixture({
+    role: "admin",
+    env: {
+      OLIVIA_DEPLOY_PREVIEW_CONTEXT: "deploy-preview",
+      OLIVIA_HYBRID_LIVE_ENABLED: "true",
+      GEMINI_API_BILLING_TIER: "paid",
+      GEMINI_API_KEY: "must-not-leak",
+      FIREBASE_PROJECT_ID: "app-integral-fm-pruebas",
+    },
+  });
+  f.config.hybridVoice.enabled = true;
+  const result = await f.engine.getConfiguration(f.session);
+  assert.equal(result.geminiLiveConfigured, true);
+  assert.deepEqual(result.geminiLiveReadiness, {
+    deployPreview: true,
+    previewFlag: true,
+    apiKeyConfigured: true,
+    paidBillingTier: true,
+    hybridVoiceEnabled: true,
+    isolatedFirebaseProject: true,
+    authorizedVoiceAccount: true,
+  });
+  assert.equal(JSON.stringify(result.geminiLiveReadiness).includes("must-not-leak"), false);
+});
+
 test("malicious seller provider cannot invoke admin tool even when it ignores supplied tools", async () => {
   const f = fixture({
     provider: () =>
@@ -777,12 +803,18 @@ test("quota reservations account for concurrent requests and release only their 
       inputTokens: 100,
       outputTokens: 20,
       totalTokens: 120,
+      modelCalls: [{ model: "gpt-6-luna", measurement: "provider", actualCostUsd: 0.004, inputTokens: 100, outputTokens: 20 }],
     },
     configuration: f.config,
     now: initialNow,
   });
   assert.equal(result.usedTokens, 120);
   assert.equal(result.reservedTokens, 0);
+  const providerPath = `oliviaGeminiLiveBudgets/${initialNow.toISOString().slice(0, 7)}`;
+  assert.equal(f.documents.get(providerPath).lunaSol.estimatedUsd, 0.004);
+  assert.equal(f.documents.get(providerPath).lunaSol.calls, 1);
+  await settleUsage({ store: f.store, session: f.session, reservation, event: { modelCalls: [{ model: "gpt-6-luna", measurement: "provider", actualCostUsd: 0.004 }] }, configuration: f.config, now: initialNow });
+  assert.equal(f.documents.get(providerPath).lunaSol.calls, 1, "settled provider usage is not double-counted on retry");
 });
 
 test("measured progress releases only the completed request's excess reservation", async () => {
