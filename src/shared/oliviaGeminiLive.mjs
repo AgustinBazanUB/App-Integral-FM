@@ -7,7 +7,9 @@ export function geminiLiveSetupConfig() {
   return {
     responseModalities: ["AUDIO"],
     speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } },
-    maxOutputTokens: 512,
+    // Keep a bounded ceiling, but allow a spoken readback of 20 items. The
+    // 512-token sessions cut the measured 10/20-item readbacks mid-list.
+    maxOutputTokens: 1024,
     temperature: 0.5,
     systemInstruction: { parts: [{ text: [
       "Sos Olivia, la asistente de Flor Mía. Hablá en español argentino natural, breve, claro y cálido.",

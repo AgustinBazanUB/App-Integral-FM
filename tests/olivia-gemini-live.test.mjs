@@ -78,6 +78,7 @@ test("raw Live setup fixes model, voice, tool policy, compression and modalities
   const setup = geminiLiveRawSetup();
   assert.equal(setup.model, `models/${GEMINI_LIVE_MODEL}`);
   assert.deepEqual(setup.generationConfig.responseModalities, ["AUDIO"]);
+  assert.equal(setup.generationConfig.maxOutputTokens, 1024);
   assert.equal(setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, "Aoede");
   assert.equal(setup.contextWindowCompression.slidingWindow.targetTokens, 1200);
   assert.equal(setup.tools[0].functionDeclarations[0].name, "delegate_to_olivia");
