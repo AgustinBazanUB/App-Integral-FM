@@ -521,6 +521,21 @@ export class GeminiLiveSession {
     if(turn.completeReceived)void this.finishTurn(turn);
   }
 
+  startPolicyTask(turn) {
+    if(turn.policyFallbackStarted || turn.cancelled || !turn.transcriptComplete)return;
+    turn.policyFallbackStarted=true;turn.backgroundToolPending=true;
+    const context=this.getConversationContext(),decision=classifyGeminiLiveTurn(turn.inputText,context);
+    const action=['task-status','task-control'].includes(decision.kind)?'status':context.collectingTask || context.pendingAction || context.pendingActionId?'continue':'new';
+    const binding={call:null,sourceTurnId:turn.turnId,turnIndex:turn.turnIndex};
+    this.trace('task.policy_fallback',{turnId:turn.turnId,kind:decision.kind,source:'local-policy'});
+    const onAccepted=task=>{binding.taskId=task.id;this.pendingTaskCalls.set(task.id,{...binding});this.trace('task.accepted',{turnId:turn.turnId,taskId:task.id,jobId:task.jobId,status:task.status,source:'local-policy'});};
+    // Same authenticated client, task engine and visual confirmation. This has
+    // no invented provider call ID and never blocks the conversational turn.
+    Promise.resolve().then(()=>this.onToolCall({name:'delegate_to_olivia',args:{action,request:turn.inputText}},turn.inputText,{turnId:turn.turnId,turnIndex:turn.turnIndex,sessionId:this.sessionId,requestId:turn.turnId,transcriptComplete:true,onAccepted})).then(result=>{
+      if(!this.closed && !this.failed)this.enqueueToolResult({...binding,result:decision.kind==='task-control'?{...result,needsClarification:true,summary:'Pedí que indique qué tarea y qué control quiere realizar. No se modificó ninguna tarea.'}:result});
+    }).catch(error=>{if(!this.closed && !this.failed)this.enqueueToolResult({...binding,result:{error:'No pude completar esa solicitud. Podemos seguir conversando.',outcome:taskOutcome({status:'failed',failure:{code:error?.code || 'task-error'}})}});});
+  }
+
   notifyTaskUpdate(task){
     if(task.notification && (!task.notification.eligible || task.notification.delivered))return;
     const binding=this.pendingTaskCalls.get(task.id);
@@ -671,10 +686,8 @@ export class GeminiLiveSession {
           } else if (!turn.cancelled && !this.closed && !this.failed && turn.inputText) {
             turn.pendingAudio = []; turn.outputAuthorized = false; this.onState("processing");
             if(this.backgroundTools){
-              // No invented call IDs and no hidden synchronous fallback. The
-              // native model must request the authenticated business tool.
-              this.onNotice('No pude revisar esa solicitud. No se ejecutó ninguna operación; podés repetirla.');
-              this.onTurnComplete({turnId:turn.turnId,turnIndex:turn.turnIndex,userText:turn.inputText,delegated:true,noAudio:true,missingTool:true});
+              this.startPolicyTask(turn);
+              this.onTurnComplete({turnId:turn.turnId,turnIndex:turn.turnIndex,userText:turn.inputText,delegated:true,noAudio:true,pendingTask:true,missingTool:true,policyFallback:true});
             }else{
             let assistantText;
             try { assistantText = await this.onToolCall({ name: "delegate_to_olivia", args: { request: turn.inputText } }, turn.inputText, { turnId: turn.turnId, turnIndex: turn.turnIndex, transcriptComplete: true }); }

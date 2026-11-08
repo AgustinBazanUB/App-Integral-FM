@@ -48,9 +48,9 @@ export class DelegatedTaskClient {
         await this.delay(500*(attempt+1));
       }
     }
+    context.onAccepted?.(task);
     this.publish([...this.tasks.filter(t=>t.id!==task.id),task]);
     this.onTrace('task.accepted',{turnId:context.turnId,sessionId:context.sessionId,taskId:task.id,jobId:task.jobId,requestId:identity,durationMs:this.now()-at,status:task.status});
-    context.onAccepted?.(task);
     while(running(task)){
       if(this.closed)throw aborted();
       await this.delay(1500);

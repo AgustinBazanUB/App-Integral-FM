@@ -664,7 +664,7 @@ export default function OliviaAssistant() {
             onToolCall:async(call,inputText,context={})=>{
               if(context.transcriptComplete!==true || !String(inputText || '').trim())throw new Error('No se recibió la transcripción final; repetí la solicitud.');
               if(!delegatedClient.current)throw new Error('La cola de tareas todavía no está lista.');
-              return delegatedClient.current.run(call,String(inputText).trim(),{...context,requestId:requestId(),screenContext:contextRef.current,
+              return delegatedClient.current.run(call,String(inputText).trim(),{...context,requestId:context.requestId || requestId(),screenContext:contextRef.current,
                 onAccepted:task=>{markTurnTrace('olivia.delegate.accepted',{turnId:context.turnId,taskId:task.id,jobId:task.jobId,status:task.status});context.onAccepted?.(task);}});
             },
             onUsage:(usage,correlation={})=>{updateGeminiUsage(usage);setVoiceMetrics(current=>({...current,geminiLiveLastUsage:usage}));markTurnTrace('provider.usage',{...correlation,provider:'gemini',model:'gemini-3.8-live',costUsd:usage.costUsd,inputTokens:usage.inputTokens,outputTokens:usage.outputTokens,status:usage.measurement || 'unconfirmed'});},

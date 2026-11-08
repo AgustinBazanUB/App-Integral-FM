@@ -175,6 +175,19 @@ test('provider interruption of an old buffer preserves the current endpointed us
   assert.equal(turn.cancelled,false);assert.equal(turn.pending,true);
   live.receive({toolCall:{functionCalls:[{id:'stock',name:'delegate_to_olivia',args:{action:'new'}}]}});await tick();assert.equal(called,true);
 });
+
+test('missing native business tool uses one visible asynchronous policy fallback without provider call IDs',async t=>{
+  let release,calls=0;const {live,sent,turns}=session(t,{onToolCall:async(call,text,context)=>{
+    calls++;assert.equal(text,'Precio del aceite');assert.equal(call.id,undefined);assert.equal(context.requestId,context.turnId);
+    context.onAccepted({id:'price',status:'running'});return new Promise(r=>{release=r;});
+  }});
+  live.sendText('Precio del aceite');live.receive({serverContent:{outputTranscription:{text:'Son cien pesos inventados.'},turnComplete:true}});await tick();
+  assert.equal(calls,1);assert.equal(turns[0].policyFallback,true);assert.equal(turns[0].pendingTask,true);assert.equal(live.currentTurn.pending,false);
+  assert.equal(sent.some(e=>e.toolResponse),false,'no provider function ID is fabricated');
+  live.sendText('Gracias');live.receive({serverContent:{outputTranscription:{text:'De nada'},turnComplete:true}});await tick();assert.equal(calls,1);
+  release({id:'price',status:'completed',summary:'Precio verificado: 200 pesos'});await tick();
+  await new Promise(r=>setTimeout(r,5));assert.ok(sent.some(e=>e.clientContent?.turns[0].parts[0].text.includes('Precio verificado')));
+});
 test('resumed tasks use an internal backend notification without a stale function response ID',async t=>{
   const {live,sent}=session(t);live.watchTasks([{id:'restored',status:'running'}]);
   live.notifyTaskUpdate({id:'restored',status:'completed',summary:'Resultado verificado'});
