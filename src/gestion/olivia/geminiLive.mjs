@@ -779,7 +779,7 @@ export class GeminiLiveSession {
           await this.waitNetwork(this.recoveryAbort.signal);
           await this.waitRecovery(recoveryBackoff(attempt,this.random),this.recoveryAbort.signal);
           if(this.closed)return false;
-          const handle=!fresh && attempt===1 && this.resumeHandle && this.clock()<Math.min(this.tokenExpiresAt,this.newSessionExpiresAt) && this.clock()<(this.sessionDeadline || Infinity)?this.resumeHandle:null;
+          const handle=!fresh && Number(this.tokenResult?.uses)!==1 && attempt===1 && this.resumeHandle && this.clock()<Math.min(this.tokenExpiresAt,this.newSessionExpiresAt) && this.clock()<(this.sessionDeadline || Infinity)?this.resumeHandle:null;
           if(!handle){
             if(this.sessionId){const released=await this.releaseBudget();this.stopping=null;if(!released?.closed)throw new Error('No se pudo cerrar la reserva anterior.');this.sessionId=null;}
             if(this.closed || this.failed)return false;

@@ -108,6 +108,14 @@ test('expired connection-opening window avoids a resumption attempt with otherwi
   assert.equal(f.recovery.at(-1).resumed,false);assert.equal(f.recovery.at(-1).attempt,1);
 });
 
+test('single-use ephemeral credentials are replaced instead of reused even inside the opening window',async t=>{
+ const f=fixture(t);await f.live.start(null,{textInputOnly:true});f.live.tokenResult.uses=1;f.live.resumeHandle='handle';
+ await f.live.reconnect();
+ assert.equal(f.sockets.length,2);assert.deepEqual(f.sockets[1].sent[0].setup.sessionResumption,{});
+ assert.deepEqual(f.requests.filter(r=>r.operation!=='usage').map(r=>r.operation),['token','close','token']);
+ assert.equal(f.recovery.at(-1).attempt,1);
+});
+
 test('budget denial is terminal and does not request more credentials',async t=>{
   const f=fixture(t);await f.live.start(null,{textInputOnly:true});
   await f.live.recover(Object.assign(new Error('quota'),{status:429}));
