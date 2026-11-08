@@ -127,6 +127,27 @@ test('provider completion waits for local speech endpoint before releasing or re
   live.flushPendingAudio(turn);await live.finishTurn(turn);assert.equal(turn.pending,true);
   live.setListening(false);await tick();assert.equal(turn.completed,true);
 });
+
+test('unrecognized input releases thinking without disconnecting or cancelling accepted work',async t=>{
+  const {live,states}=session(t,{transcriptWaitMs:5});live.pendingTaskCalls.set('accepted',{taskId:'accepted'});
+  live.beginTurn('noise');live.setListening(false);await new Promise(r=>setTimeout(r,12));
+  assert.equal(live.currentTurn.pending,false);assert.equal(live.failed,false);assert.equal(states.at(-1),'listening');
+  assert.equal(live.pendingTaskCalls.has('accepted'),true);
+  live.sendText('Hola');assert.equal(live.currentTurn.pending,true);
+  live.receive({serverContent:{outputTranscription:{text:'Hola'},turnComplete:true}});await tick();
+});
+
+test('a late empty completion from the interrupted clause cannot retire a continuing voice segment',async t=>{
+  let requested;const {live}=session(t,{onToolCall:async(_call,text)=>{requested=text;return {tasks:[]};}});
+  live.beginTurn('second-clause');const turn=live.currentTurn;
+  live.receive({serverContent:{inputTranscription:{text:'¿Qué métricas hay?'}}});
+  live.receive({serverContent:{interrupted:true}});live.receive({serverContent:{turnComplete:true}});
+  assert.equal(turn.completeReceived,false);assert.equal(turn.pending,true);
+  live.setListening(false);assert.equal(turn.pending,true);
+  live.receive({serverContent:{inputTranscription:{text:'Explicá qué está disponible.'}}});
+  live.receive({toolCall:{functionCalls:[{id:'metrics',name:'delegate_to_olivia',args:{action:'new'}}]}});await tick();
+  assert.match(requested,/métricas hay.*disponible/);
+});
 test('resumed tasks use an internal backend notification without a stale function response ID',async t=>{
   const {live,sent}=session(t);live.watchTasks([{id:'restored',status:'running'}]);
   live.notifyTaskUpdate({id:'restored',status:'completed',summary:'Resultado verificado'});

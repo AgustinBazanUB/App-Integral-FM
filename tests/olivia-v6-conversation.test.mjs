@@ -8,6 +8,7 @@ import { DelegatedTaskClient } from '../src/gestion/olivia/delegatedTaskClient.m
 import { appendTaskProgress } from '../netlify/functions/_lib/olivia/taskProgress.mjs';
 
 test('task status questions use state without treating social follow-ups as tasks',()=>{
+  assert.equal(classifyGeminiLiveTurn('Sí, dale. Pero recordá que esto no autoriza ninguna modificación: solo seguimos conversando.',{pendingAction:true}).route,'direct');
   for(const text of ['¿Cómo venís?','¿Qué te falta?','¿Ya terminaste?','¿Qué tareas estás haciendo?'])assert.equal(classifyGeminiLiveTurn(text).kind,'task-status',text);
   for(const text of ['Muy bien, ¿y vos?','¿Cómo estás?','Gracias'])assert.equal(classifyGeminiLiveTurn(text,{activeTask:true}).route,'direct');
   assert.equal(selectStatusTasks([{id:'a',status:'running'},{id:'b',status:'needs-input'}]).needsClarification,true);

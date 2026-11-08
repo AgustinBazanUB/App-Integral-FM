@@ -1,6 +1,6 @@
 import { GEMINI_LIVE_MODEL, geminiLiveRawSetup } from "../../shared/oliviaGeminiLive.mjs";
 import { classifyGeminiLiveTurn } from "../../shared/oliviaConversationRouter.mjs";
-import { compactVoiceTask } from '../../shared/oliviaTaskConversation.mjs';
+import { compactVoiceTask, taskOutcome } from '../../shared/oliviaTaskConversation.mjs';
 import { recoveryAllowed, recoveryBackoff, recoveryWait } from './liveRecovery.mjs';
 import { ConversationNotifications } from './conversationNotifications.mjs';
 
@@ -53,7 +53,7 @@ export function geminiTaskResult(value) {
   const task=compactVoiceTask;
   if(value?.tasks)return {tasks:value.tasks.slice(-20).map(t=>({...task(t),summary:String(t.summary || '').slice(0,400)})),...(value.needsClarification?{needsClarification:true,summary:value.summary}:{}),...(value.task?{task:task(value.task)}:{})};
   if(value?.id)return task(value);
-  return {error:String(value?.error || 'No se recibió un resultado verificable.').slice(0,800)};
+  return {error:String(value?.error || 'No se recibió un resultado verificable.').slice(0,800),...(value?.outcome?{outcome:{kind:value.outcome.kind,retryable:value.outcome.retryable,nextStep:value.outcome.nextStep}}:{})};
 }
 
 export class GeminiLiveSession {
@@ -206,6 +206,18 @@ export class GeminiLiveSession {
       if(this.currentTurn.outputAuthorized)this.flushPendingAudio(this.currentTurn);
       if(this.currentTurn.completeReceived)void this.finishTurn(this.currentTurn);
       else if (this.currentTurn.pending) this.armTurnTimeout(this.currentTurn);
+      const turn=this.currentTurn;
+      if(turn.pending && !turn.transcriptComplete && !turn.toolTurn){
+        clearTimeout(turn.noTranscriptTimer);
+        turn.noTranscriptTimer=setTimeout(()=>{
+          if(this.closed || this.failed || this.currentTurn!==turn || !turn.pending || turn.transcriptComplete || this.listening || turn.toolPending)return;
+          this.trace('gemini.input.unrecognized',{turnId:turn.turnId,durationMs:this.transcriptWaitMs,status:'no-transcript'});
+          turn.cancelled=true;turn.pending=false;turn.pendingAudio=[];clearTimeout(turn.responseTimer);clearTimeout(turn.completionTimer);
+          this.cancelTranscriptWaiters(turn);void this.reportUsage(turn,{includeProviderUsage:false});
+          this.currentTurn=this.createTurn();this.ignoreOutputUntilInput=true;this.onPartial('');this.onState('listening');
+          this.onNotice('No pude entender esa última frase. Podés repetirla; sigo escuchando.');
+        },this.transcriptWaitMs);
+      }
     }
     if (next) {
       this.holdNotificationsUntilInput=false;
@@ -321,6 +333,10 @@ export class GeminiLiveSession {
       }, Math.max(0, ((this.nextAudioAt || 0) - (this.audioContext?.currentTime || 0)) * 1000) + this.completionGraceMs);
     }
     if (content?.turnComplete && !interrupted && !ignoreOutput) {
+      // An empty completion from the interrupted generation can follow its
+      // late input transcript while the next local voice segment is open.
+      // It must not retire that segment before its own tool/audio arrives.
+      if(this.listening && !turn.outputText && !turn.generatedAudio && !turn.toolTurn && !turn.toolPending){this.trace('gemini.completion.stale',{turnId:turn.turnId,status:'input-open'});return;}
       turn.completeReceived = true;
       if (turn.toolPending || turn.awaitingToolResponse) return;
       if (turn.toolTurn || turn.transcriptComplete) void this.finishTurn(turn);
@@ -481,7 +497,7 @@ export class GeminiLiveSession {
         this.enqueueToolResult({...binding,result});
       }).catch(error=>{
         if(this.closed || this.failed)return;
-        this.enqueueToolResult({...binding,result:{error:'No pude completar esa tarea. Podemos seguir conversando.',outcome:{kind:'task-error',retryable:false}}});
+        this.enqueueToolResult({...binding,result:{error:'No pude completar esa tarea. Podemos seguir conversando.',outcome:taskOutcome({status:'failed',failure:{code:error?.code || 'task-error'}})}});
       });
     }
     if(turn.completeReceived)void this.finishTurn(turn);
@@ -567,7 +583,7 @@ export class GeminiLiveSession {
     for (const turn of this.finalizingTurns) { this.notifications.interrupted(turn);turn.cancelled = true; turn.pendingAudio = []; this.cancelTranscriptWaiters(turn); clearTimeout(turn.responseTimer); clearTimeout(turn.completionTimer); }
     if (this.currentTurn) {
       this.notifications.interrupted(this.currentTurn);
-      clearTimeout(this.currentTurn.responseTimer); clearTimeout(this.currentTurn.completionTimer);
+      clearTimeout(this.currentTurn.responseTimer); clearTimeout(this.currentTurn.completionTimer); clearTimeout(this.currentTurn.noTranscriptTimer);
       this.currentTurn.pendingAudio = [];
       if (!this.listening && this.currentTurn.pending) { this.currentTurn.cancelled = true; this.currentTurn.pending = false; this.cancelTranscriptWaiters(this.currentTurn); }
     }

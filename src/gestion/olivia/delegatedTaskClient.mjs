@@ -28,9 +28,12 @@ export class DelegatedTaskClient {
     if(['pause','resume'].includes(args.action)){
       const allowed=args.action==='pause'?/\b(?:pausa\w*|para despues|deja\w*.*despues)\b/:/\b(?:retoma\w*|segui|continua\w*|reanuda\w*)\b/;
       if(!allowed.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Pedí que aclare si desea pausar o retomar; no se cambió la tarea.',tasks:this.tasks};
+      const tasks=await this.refresh(),target=tasks.find(t=>t.id===taskId);
+      if(!target || ['completed','cancelled','failed'].includes(target.status))return {needsClarification:true,summary:'Esa solicitud ya terminó o no está disponible. Preguntá cuál de las solicitudes pendientes quiere controlar; no se cambió ninguna.',tasks:tasks.filter(t=>!['completed','cancelled','failed'].includes(t.status))};
       return this.control({action:args.action,taskId},{onAccepted:context.onAccepted});
     }
     if(args.action==='cancel'){
+      if(/\b(?:no cancel\w*|no quiero cancelar|sin cancelar)\b/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'No se canceló ninguna tarea. Pedí que aclare qué necesita.',tasks:this.tasks};
       if(!/\b(?:cancel\w*|deja|dejalo|olvida\w*|detene\w*|no sigas|no continues)\b/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Pedí que aclare si desea cancelar; no se detuvo ninguna tarea.',tasks:this.tasks};
       const candidates=(await this.refresh()).filter(t=>!['completed','cancelled','failed'].includes(t.status));
       if(candidates.length>1 && /^(?:no )?(?:deja|dejalo|cancela|cancelalo|olvidalo)(?: por favor)?$/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Hay varias tareas. Preguntá cuál debe cancelarse.',tasks:candidates};
