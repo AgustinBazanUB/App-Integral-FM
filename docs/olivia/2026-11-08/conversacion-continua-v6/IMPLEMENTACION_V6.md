@@ -30,7 +30,7 @@ Los backchannels se mantienen conservadores mediante instrucciones nativas; no s
 
 ## Validación local
 
-`npm test`: 1142 pruebas aprobadas, incluidas 19 nuevas V6. `npm run build`: aprobado, conserva aviso conocido por tamaño de chunks. Se requiere repetir si cambian estos módulos. Reglas y permisos de Firestore no se modifican.
+`npm test`: 1143 pruebas aprobadas, incluidas 20 nuevas V6. `npm run build`: aprobado, conserva aviso conocido por tamaño de chunks. Se requiere repetir si cambian estos módulos. Reglas y permisos de Firestore no se modifican.
 
 ## Fuentes de contrato
 
@@ -52,3 +52,5 @@ Un token de un uso puede reanudar su sesión dentro de su vigencia según el con
 - Una entrada sin transcripción vuelve a escuchar tras el plazo existente de 3 s; no cancela tareas ni atribuye intencionalidad a un ruido. La reanudación semántica automática de toda interrupción accidental sigue pendiente.
 
 Las verificaciones de cada SHA y sus fallos se detallan en los resultados; compilar o pasar tests locales no certifica los criterios pendientes.
+
+- Las esperas de respuesta y la ausencia de cierre de un turno generado entran ahora en la misma recuperación automática acotada con sesión fresca. El guard de consumo desconocido sigue siendo terminal. Se preserva una entrada ya finalizada localmente cuando el proveedor interrumpe buffers de una generación anterior.

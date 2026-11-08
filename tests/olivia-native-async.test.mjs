@@ -167,6 +167,14 @@ test('unconfirmed notification usage still triggers the original preventive stop
   live.beginTurn('next');await new Promise(r=>setTimeout(r,15));
   assert.equal(live.failed,true);assert.ok(reports.some(p=>p.operation==='usage' && p.turnId==='notice'));live.sessionId=null;
 });
+
+test('provider interruption of an old buffer preserves the current endpointed user request',async t=>{
+  let called=false;const {live}=session(t,{onToolCall:async()=>{called=true;return {tasks:[]};}});
+  const turn=live.currentTurn;Object.assign(turn,{pending:true,turnId:'current',inputAudioSeconds:.5,inputText:'Stock de aceite',transcriptComplete:true,outputAuthorized:true});
+  live.scheduleAudio({duration:.01},turn);live.receive({serverContent:{interrupted:true}});
+  assert.equal(turn.cancelled,false);assert.equal(turn.pending,true);
+  live.receive({toolCall:{functionCalls:[{id:'stock',name:'delegate_to_olivia',args:{action:'new'}}]}});await tick();assert.equal(called,true);
+});
 test('resumed tasks use an internal backend notification without a stale function response ID',async t=>{
   const {live,sent}=session(t);live.watchTasks([{id:'restored',status:'running'}]);
   live.notifyTaskUpdate({id:'restored',status:'completed',summary:'Resultado verificado'});

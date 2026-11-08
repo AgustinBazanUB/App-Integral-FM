@@ -348,23 +348,23 @@ test("one persistent Gemini session keeps ten consecutive social turns direct", 
 });
 
 test("silent generation without turnComplete finalizes once without switching voice providers", async (t) => {
-  let socket;
+  let socket,count=0;
   class Socket {
     static OPEN=1;
-    constructor(){socket=this;this.readyState=0;}
+    constructor(){socket=this;this.readyState=0;if(++count>1)queueMicrotask(()=>{this.readyState=1;this.onopen();this.receive({setupComplete:{}});});}
     send(){}
     close(){this.readyState=3;}
     receive(event){this.onmessage({data:JSON.stringify(event)});}
   }
-  const turns=[],failures=[],operations=[];
-  const live=new GeminiLiveSession({conversationId:'silent-provider',audioContext:{currentTime:0},WebSocket:Socket,completionGraceMs:5,
-    request:async body=>{operations.push(body.operation);if(body.operation==='token')return {token:'auth_tokens/silent',sessionId:'silent',expiresAt:new Date(Date.now()+60000).toISOString(),maxSessionSeconds:60};if(body.operation==='classify')return {direct:true,route:'direct'};return {shouldStop:false};},
+  const turns=[],failures=[],operations=[],recoveries=[];
+  const live=new GeminiLiveSession({conversationId:'silent-provider',audioContext:{currentTime:0},WebSocket:Socket,completionGraceMs:5,waitRecovery:async()=>{},onRecovery:r=>recoveries.push(r),
+    request:async body=>{operations.push(body.operation);if(body.operation==='token')return {token:'auth_tokens/silent',sessionId:'silent',expiresAt:new Date(Date.now()+60000).toISOString(),maxSessionSeconds:60};if(body.operation==='classify')return {direct:true,route:'direct'};return {closed:true,shouldStop:false};},
     onTurnComplete:turn=>turns.push(turn),onUnavailable:error=>failures.push(error.message),
   });
   t.after(()=>live.close());
   const started=live.start(null,{textInputOnly:true});await new Promise(resolve=>setImmediate(resolve));
   socket.readyState=1;socket.onopen();socket.receive({setupComplete:{}});await started;
-  live.sendText('Hola');
+  const initialSocket=socket;live.sendText('Hola');
   socket.receive({serverContent:{modelTurn:{parts:[{inlineData:{mimeType:'audio/pcm;rate=24000',data:'AAA='}}]},outputTranscription:{text:'Hola, ¿cómo estás?'}}});
   socket.receive({serverContent:{generationComplete:true}});
   await new Promise(resolve=>setTimeout(resolve,30));
@@ -373,11 +373,11 @@ test("silent generation without turnComplete finalizes once without switching vo
   assert.equal(turns[0].noAudio,true);
   assert.equal(turns[0].providerIncomplete,true);
   assert.equal(turns[0].assistantText,'Hola, ¿cómo estás?');
-  assert.equal(live.failed,true);
-  assert.match(failures[0],/sin cerrar el turno/);
+  assert.equal(live.failed,false);assert.deepEqual(failures,[]);
+  assert.equal(recoveries.at(-1).status,"connected");assert.equal(recoveries.at(-1).resumed,false);
   assert.equal(operations.filter(op=>op==='usage').length,1);
-  assert.equal(operations.at(-1),'close');
-  socket.receive({serverContent:{turnComplete:true}});
+  assert.equal(operations.at(-1),'token');assert.ok(operations.includes('close'));
+  initialSocket.receive({serverContent:{turnComplete:true}});
   assert.equal(turns.length,1,'a late completion cannot deliver or charge a second answer');
 });
 

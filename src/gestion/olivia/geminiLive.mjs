@@ -255,7 +255,7 @@ export class GeminiLiveSession {
     turn.responseTimer = setTimeout(() => {
       if (this.closed || this.failed || !turn.pending || turn.cancelled) return;
       if (turn.toolPending) { this.armTurnTimeout(turn); return; }
-      this.fail(new Error("Gemini no completó el turno dentro del plazo; volvé a conectar para continuar por voz."));
+      void this.recover(new Error("Gemini no completó el turno dentro del plazo."),{fresh:true});
     }, this.turnTimeoutMs);
   }
   sendText(text) {
@@ -304,7 +304,7 @@ export class GeminiLiveSession {
       clearTimeout(turn.completionTimer);turn.completeReceived=false;
       turn.outputText='';turn.publishedOutputText='';turn.pendingAudio=[];
       turn.generatedAudio=false;turn.outputAuthorized=false;turn.acknowledgementAuthorized=false;
-      if(this.listening)turn.cancelled=false;
+      if(this.listening || (!turn.notification && turn.inputAudioSeconds>0))turn.cancelled=false;
       this.onState("recording");
     }
     const interimText = content?.interimInputTranscription?.text;
@@ -347,7 +347,7 @@ export class GeminiLiveSession {
         // validated text and retire the broken socket; the UI keeps it visible.
         turn.providerIncomplete = true;
         this.stopPlayback();
-        void this.finishTurn(turn).finally(() => this.fail(new Error("Gemini terminó la generación sin cerrar el turno de audio; volvé a conectar para continuar por voz.")));
+        void this.finishTurn(turn).finally(() => this.recover(new Error("Gemini terminó la generación sin cerrar el turno de audio."),{fresh:true}));
       }, Math.max(0, ((this.nextAudioAt || 0) - (this.audioContext?.currentTime || 0)) * 1000) + this.completionGraceMs);
     }
     if (content?.turnComplete && !interrupted && !ignoreOutput) {
