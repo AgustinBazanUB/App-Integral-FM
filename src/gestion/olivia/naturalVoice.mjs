@@ -78,7 +78,24 @@ export class NaturalVoiceConversation {
 
   evaluateVoice(rms,now) {
     if (!this.muted) {
-      if (!this.recordingTurn && rms > 0.025) this.beginTurn(now);
+      if (!this.recordingTurn) {
+        const playing=this.sources?.size>0 || Boolean(this.transcriber?.isPlaying);
+        if(rms>0.025){
+          if(!playing)this.beginTurn(now);
+          else {
+            // A measured 150 ms non-speech pulse stopped the full answer.
+            // Validate a short sustained candidate before destroying playback;
+            // the existing 200 ms input pre-roll retains this speech onset.
+            this.bargeCandidate ||= {startedAt:now,lastAt:now};
+            this.bargeCandidate.lastAt=now;
+            if(now-this.bargeCandidate.startedAt>=160){this.bargeCandidate=null;this.beginTurn(now);}
+          }
+        } else if(this.bargeCandidate && now-this.bargeCandidate.lastAt>60){
+          this.onTrace({stage:'voice.barge_in.rejected',at:now,durationMs:now-this.bargeCandidate.startedAt,kind:'short-energy-pulse'});
+          this.bargeCandidate=null;
+        }
+        if(!playing)this.bargeCandidate=null;
+      }
       if (this.recordingTurn) {
         if (rms > 0.016) {
           if (now - this.lastSpeechAt >= 350) this.pauseResumes++;

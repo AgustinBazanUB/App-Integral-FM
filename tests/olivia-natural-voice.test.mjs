@@ -53,6 +53,24 @@ test('Live endpointing follows audio callbacks when animation frames are throttl
   feed(5600,0);assert.equal(voice.recordingTurn,false);assert.equal(commits.length,2);assert.equal(starts.length,2);voice.close();
 });
 
+test('a brief playback-time noise pulse leaves the answer running while sustained speech still interrupts',()=>{
+  const starts=[],traces=[];let interrupted=0;
+  const live={isPlaying:true,handlesTurns:true,ready:true,beginTurn:id=>starts.push(id),interrupt:()=>interrupted++};
+  const voice=new NaturalVoiceConversation({onTrace:e=>traces.push(e),onState(){},onSpeechStart(){}});
+  voice.transcriber=live;
+  for(let t=100;t<=240;t+=20)voice.evaluateVoice(.05,t);
+  voice.evaluateVoice(0,260);voice.evaluateVoice(0,320);
+  assert.equal(starts.length,0,'the 150 ms pulse never opens a turn or stops playback');
+  assert.equal(interrupted,0);assert.equal(traces[0].stage,'voice.barge_in.rejected');
+  for(let t=500;t<=660;t+=20)voice.evaluateVoice(.05,t);
+  assert.equal(starts.length,1);assert.equal(interrupted,1);
+  clearTimeout(voice.turnTimer);
+  voice.recordingTurn=false;live.isPlaying=false;
+  voice.evaluateVoice(.05,1000);
+  assert.equal(starts.length,2,'idle speech retains the immediate local start');
+  clearTimeout(voice.turnTimer);
+});
+
 test("browser VAD sends a bounded turn with a short in-memory pre-roll and releases the microphone", async () => {
   const frames = [], records = [], states = [], turns = [], speechStarts = [], traces = [];
   let now = 0, amplitude = 0;
