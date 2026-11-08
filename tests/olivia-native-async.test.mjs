@@ -141,12 +141,31 @@ test('a late empty completion from the interrupted clause cannot retire a contin
   let requested;const {live}=session(t,{onToolCall:async(_call,text)=>{requested=text;return {tasks:[]};}});
   live.beginTurn('second-clause');const turn=live.currentTurn;
   live.receive({serverContent:{inputTranscription:{text:'¿Qué métricas hay?'}}});
+  live.receive({serverContent:{outputTranscription:{text:'Dale, lo'}}});
   live.receive({serverContent:{interrupted:true}});live.receive({serverContent:{turnComplete:true}});
   assert.equal(turn.completeReceived,false);assert.equal(turn.pending,true);
+  assert.equal(turn.outputText,'','partial acknowledgement from the cancelled clause is discarded');
   live.setListening(false);assert.equal(turn.pending,true);
   live.receive({serverContent:{inputTranscription:{text:'Explicá qué está disponible.'}}});
   live.receive({toolCall:{functionCalls:[{id:'metrics',name:'delegate_to_olivia',args:{action:'new'}}]}});await tick();
   assert.match(requested,/métricas hay.*disponible/);
+});
+
+test('interrupted zero-audio notification waits for provider usage without attributing it to the next input',async t=>{
+  const reports=[];const {live}=session(t,{transcriptWaitMs:30,request:async p=>{reports.push(p);return p.operation==='usage'?{measurement:'provider-forwarded'}:{closed:true};}});
+  live.sessionId='session';Object.assign(live.currentTurn,{pending:true,notification:true,turnId:'notice'});
+  live.beginTurn('next');assert.equal(reports.length,0);
+  const usage={promptTokensDetails:[{modality:'TEXT',tokenCount:10}],responseTokensDetails:[{modality:'TEXT',tokenCount:2}]};
+  live.receive({usageMetadata:usage,serverContent:{interrupted:true}});await tick();
+  assert.equal(reports[0].turnId,'notice');assert.deepEqual(reports[0].usageMetadata.promptTokensDetails,usage.promptTokensDetails);assert.deepEqual(reports[0].usageMetadata.responseTokensDetails,usage.responseTokensDetails);
+  assert.equal(live.currentTurn.usageMetadata,null);assert.equal(live.failed,false);live.sessionId=null;
+});
+
+test('unconfirmed notification usage still triggers the original preventive stop after the bounded wait',async t=>{
+  const reports=[];const {live}=session(t,{transcriptWaitMs:5,request:async p=>{reports.push(p);return p.operation==='usage'?{measurement:'unconfirmed',shouldStop:true}:{closed:true};}});
+  live.sessionId='session';Object.assign(live.currentTurn,{pending:true,notification:true,turnId:'notice'});
+  live.beginTurn('next');await new Promise(r=>setTimeout(r,15));
+  assert.equal(live.failed,true);assert.ok(reports.some(p=>p.operation==='usage' && p.turnId==='notice'));live.sessionId=null;
 });
 test('resumed tasks use an internal backend notification without a stale function response ID',async t=>{
   const {live,sent}=session(t);live.watchTasks([{id:'restored',status:'running'}]);

@@ -30,7 +30,7 @@ Los backchannels se mantienen conservadores mediante instrucciones nativas; no s
 
 ## Validación local
 
-`npm test`: 1135 pruebas aprobadas, incluidas 12 nuevas V6. `npm run build`: aprobado, conserva aviso conocido por tamaño de chunks. Se requiere repetir si cambian estos módulos. Reglas y permisos de Firestore no se modifican.
+`npm test`: 1142 pruebas aprobadas, incluidas 19 nuevas V6. `npm run build`: aprobado, conserva aviso conocido por tamaño de chunks. Se requiere repetir si cambian estos módulos. Reglas y permisos de Firestore no se modifican.
 
 ## Fuentes de contrato
 
@@ -39,3 +39,16 @@ Los backchannels se mantienen conservadores mediante instrucciones nativas; no s
 - Tipos del SDK `@google/genai` 2.32.0 instalado.
 
 Un token de un uso puede reanudar su sesión dentro de su vigencia según el contrato oficial; si falla se cierra la reserva anterior y se solicita otro. No se reproducen operaciones comerciales ni function calls antiguas.
+
+
+## Hallazgos de pruebas reales e iteraciones
+
+- Diez turnos sociales consecutivos sin herramientas ni Luna; no demuestra aún toda la batería funcional.
+- Un dictado virtual de veinte elementos se verificó también mediante ASR offline del PCM programado (29,76 s). La muestra física presentó segmentación y actividad adicional; no se acepta una latencia física de ella.
+- Una desconexión de transporte rechazó la reanudación y recuperó con token nuevo en aproximadamente 7,1 s. Una frase enviada durante recuperación se perdió y debió repetirse.
+- El alta de un cliente ficticio se inició por audio, se preparó en tarjeta y se ejecutó solo después del clic visual; luego se comprobó el documento en Firestore aislado.
+- Una pregunta dividida en dos cláusulas reveló que una finalización tardía con acuse parcial podía retirar el segundo segmento. Se descarta el estado de generación interrumpido y se preserva la entrada en curso.
+- Una notificación interrumpida antes de generar PCM podía contabilizarse inmediatamente sin usageMetadata. Se espera hasta el mismo plazo acotado de transcripción por un frame del proveedor anterior a la nueva transcripción. Si no aparece una medición atribuible, el freno preventivo continúa vigente. No se rebajan cuotas ni se inventa consumo cero.
+- Una entrada sin transcripción vuelve a escuchar tras el plazo existente de 3 s; no cancela tareas ni atribuye intencionalidad a un ruido. La reanudación semántica automática de toda interrupción accidental sigue pendiente.
+
+Las verificaciones de cada SHA y sus fallos se detallan en los resultados; compilar o pasar tests locales no certifica los criterios pendientes.

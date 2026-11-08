@@ -231,7 +231,7 @@ export class GeminiLiveSession {
         previous.cancelled = true; previous.pending = false; previous.pendingAudio = [];
         this.cancelTranscriptWaiters(previous);
         clearTimeout(previous.responseTimer); clearTimeout(previous.completionTimer); clearTimeout(previous.noTranscriptTimer);
-        void this.reportUsage(previous, { includeProviderUsage: false });
+        this.accountInterruptedUsage(previous);
         this.ignoreOutputUntilInput = true;
       }
       if (replacePrevious) {
@@ -277,6 +277,14 @@ export class GeminiLiveSession {
 
   receive(event) {
     if (this.closed || this.failed) return;
+    // An interrupted notification has no captured user audio to estimate. Wait
+    // briefly for its actual usage frame while the next input is untranscribed.
+    // Do not attach those tokens to the next user turn or suppress unknown cost.
+    if(event.usageMetadata && this.interruptedUsage && (this.ignoreOutputUntilInput || event.serverContent?.interrupted)){
+      const held=this.interruptedUsage;this.interruptedUsage=null;
+      held.turn.usageMetadata=event.usageMetadata;held.turn.interruptionUsageMatched=true;this.trace("gemini.usage.interrupted.matched",{turnId:held.turn.turnId,status:"provider-frame-before-new-transcript"});held.settle();
+      event={...event,usageMetadata:undefined};
+    }
     // Provider interruption cancels its response IDs, not accepted backend work.
     for(const id of event.toolCallCancellation?.ids || []){
       for(const binding of this.pendingTaskCalls.values())if(binding.call?.id===id)binding.call=null;
@@ -288,7 +296,17 @@ export class GeminiLiveSession {
     // Provider frames can arrive while a completed turn is being accounted for.
     // They must not create audio or a second billable turn on the idle placeholder.
     if (!turn.pending) return;
-    if (interrupted) { this.stopPlayback(); this.onState("recording"); }
+    if (interrupted) {
+      this.stopPlayback();
+      // The next local segment can already own this turn when Google's late
+      // interruption retires the prior clause. Its partial acknowledgement and
+      // generation deadline must not complete/cancel the continuing input.
+      clearTimeout(turn.completionTimer);turn.completeReceived=false;
+      turn.outputText='';turn.publishedOutputText='';turn.pendingAudio=[];
+      turn.generatedAudio=false;turn.outputAuthorized=false;turn.acknowledgementAuthorized=false;
+      if(this.listening)turn.cancelled=false;
+      this.onState("recording");
+    }
     const interimText = content?.interimInputTranscription?.text;
     if (interimText) { turn.interimText = String(interimText); this.onPartial(turn.interimText); }
     const inputText = content?.inputTranscription?.text;
@@ -601,7 +619,7 @@ export class GeminiLiveSession {
   async reportUsage(turn, { includeProviderUsage = true } = {}) {
     if (turn.usageReported || !this.sessionId) return;
     turn.usageReported = true;
-    const report = { operation: "usage", sessionId: this.sessionId, turnId: turn.turnId || globalThis.crypto.randomUUID(), turnIndex: turn.turnIndex, usageMetadata: includeProviderUsage && (turn.completed || !turn.cancelled) ? turn.usageMetadata ? {
+    const report = { operation: "usage", sessionId: this.sessionId, turnId: turn.turnId || globalThis.crypto.randomUUID(), turnIndex: turn.turnIndex, usageMetadata: includeProviderUsage && (turn.completed || !turn.cancelled || turn.interruptionUsageMatched) ? turn.usageMetadata ? {
       promptTokensDetails: turn.usageMetadata.promptTokensDetails,
       toolUsePromptTokensDetails: turn.usageMetadata.toolUsePromptTokensDetails,
       responseTokensDetails: turn.usageMetadata.responseTokensDetails,
@@ -614,6 +632,20 @@ export class GeminiLiveSession {
       this.trace("gemini.usage.report", { turnId: turn.turnId, turnIndex: turn.turnIndex, durationMs: this.now() - startedAt, status: usage.measurement || "ok", costUsd: usage.costUsd }); this.onUsage(usage,{turnId:turn.turnId,sessionId:report.sessionId});
       if (usage.shouldStop) this.fail(Object.assign(new Error('Se alcanzó el límite preventivo de voz.'),{code:'gemini-budget-stop'}));
     } catch { this.onUsage({ measurement: "unconfirmed", message: "No se pudo registrar el consumo de Gemini en el presupuesto mensual." }); }
+  }
+
+  accountInterruptedUsage(turn) {
+    if(!turn.notification || turn.inputAudioSeconds || turn.outputAudioSeconds || turn.usageMetadata){void this.reportUsage(turn,{includeProviderUsage:Boolean(turn.usageMetadata)});return;}
+    this.interruptedUsage?.settle();
+    let resolve;
+    const pending=new Promise(r=>{resolve=r;});this.pendingUsage.add(pending);
+    const held={turn,settled:false,settle:()=>{
+      if(held.settled)return;held.settled=true;clearTimeout(held.timer);
+      if(this.interruptedUsage===held)this.interruptedUsage=null;
+      void this.reportUsage(turn,{includeProviderUsage:Boolean(turn.usageMetadata)}).finally(()=>{this.pendingUsage.delete(pending);resolve();});
+    }};
+    this.interruptedUsage=held;
+    held.timer=setTimeout(held.settle,this.transcriptWaitMs);
   }
 
   async finishTurn(turn = this.currentTurn) {

@@ -45,6 +45,13 @@ test('status client uses cheap recent cache and never submits a job',async()=>{
   assert.deepEqual(calls,['delegatedTaskStatus']);client.close();
 });
 
+test('task control asks for clarification when the model selects a completed task or negates cancellation',async()=>{
+  const calls=[];const client=new DelegatedTaskClient({conversationId:'c',request:async body=>{calls.push(body.operation);return {tasks:[{id:'done',status:'completed'},{id:'waiting',status:'needs-input'}]};}});
+  assert.equal((await client.run({args:{action:'pause',taskId:'done'}},'Pausá la tarea')).needsClarification,true);
+  assert.equal((await client.run({args:{action:'cancel',taskId:'waiting'}},'No canceles la tarea')).needsClarification,true);
+  assert.deepEqual(calls,['delegatedTaskStatus']);client.close();
+});
+
 test('typed outcomes keep missing information, permission and retryable failures separate',()=>{
   assert.equal(taskOutcome({status:'needs-input'}).kind,'missing-information');
   assert.equal(taskOutcome({status:'failed',failure:{code:'permission-denied'}}).retryable,false);
