@@ -63,7 +63,7 @@ export class GeminiLiveSession {
     Object.assign(this,{onRecovery,waitRecovery,random,maxRecoveryAttempts,maxRecoveries,onNotificationDelivered});
     this.recoveryAbort=new AbortController();this.recoveryCount=0;this.pendingUsage=new Set();
     this.notifications=new ConversationNotifications({now});
-    this.closed = false; this.failed = false; this.handlesTurns = false; this.listening = false; this.isPlaying = false; this.turnIndex = 0; this.sources = new Set(); this.finalizingTurns = new Set(); this.currentTurn = this.createTurn(); this.pendingTaskCalls = new Map(); this.toolResultQueue = []; this.queuedToolResults = new Set();
+    this.closed = false; this.failed = false; this.handlesTurns = false; this.listening = false; this.isPlaying = false; this.turnIndex = 0; this.sources = new Set(); this.playbackTurns = new Set(); this.finalizingTurns = new Set(); this.currentTurn = this.createTurn(); this.pendingTaskCalls = new Map(); this.toolResultQueue = []; this.queuedToolResults = new Set();
   }
 
   trace(stage, metadata = {}) { this.onTrace({ stage, at: this.now(), ...metadata }); }
@@ -545,7 +545,7 @@ export class GeminiLiveSession {
     if (turn.cancelled || this.closed || this.failed) return;
     const source = this.audioContext.createBufferSource(); source.buffer = audio; source.connect(this.audioContext.destination);
     const at = Math.max(this.nextAudioAt || this.audioContext.currentTime + 0.035, this.audioContext.currentTime + 0.005);
-    source.start(at); this.nextAudioAt = at + audio.duration; this.sources.add(source); turn.heardAudio = true;
+    source.start(at); this.nextAudioAt = at + audio.duration; this.sources.add(source); this.playbackTurns.add(turn); turn.heardAudio = true;
     if (turn.acknowledgementAuthorized) turn.acknowledgementHeard = true;
     else if (turn.toolTurn) turn.delegatedResponseHeardAudio = true;
     this.isPlaying = true;
@@ -576,6 +576,8 @@ export class GeminiLiveSession {
   }
 
   stopPlayback() {
+    for(const turn of this.playbackTurns){turn.cancelled=true;this.notifications.interrupted(turn);}
+    this.playbackTurns.clear();
     for (const source of this.sources) { try { source.stop(); } catch {} source.disconnect?.(); }
     this.sources.clear(); this.isPlaying = false; this.nextAudioAt = this.audioContext?.currentTime || 0; this.firstAudioAt = null;
   }
@@ -662,6 +664,8 @@ export class GeminiLiveSession {
             }).catch(()=>this.trace('task.notification.delivered',{turnId:turn.turnId,taskId:turn.taskId,status:'unconfirmed'}));
           }
         }else if(turn.notification)this.notifications.interrupted(turn);
+        if(turn.notification && turn.providerIncomplete)this.notifications.interrupted(turn);
+        this.playbackTurns.delete(turn);
         this.drainToolResults();
       },waitMs);
       this.onPartial("");

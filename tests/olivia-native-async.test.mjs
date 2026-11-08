@@ -111,6 +111,22 @@ test('generated audio queued beyond the response deadline retains its playback c
   live.receive({serverContent:{outputTranscription:{text:'Hola, acá estoy.'},turnComplete:true}});
   await tick();assert.equal(turns.length,1);assert.equal(live.failed,false);
 });
+
+test('barge-in after bookkeeping completed does not acknowledge an interrupted notification',async t=>{
+  let delivered=0;const {live}=session(t,{onNotificationDelivered:async()=>{delivered++;return {acknowledged:true};}});
+  const turn=live.createTurn();Object.assign(turn,{pending:true,toolTurn:true,outputAuthorized:true,notification:true,notificationKey:'n',taskId:'a',notificationStatus:'completed'});
+  live.currentTurn=turn;live.scheduleAudio({duration:.04},turn);await live.finishTurn(turn);
+  assert.equal(live.finalizingTurns.size,0,'usage bookkeeping has already ended');
+  live.interrupt();await new Promise(r=>setTimeout(r,90));
+  assert.equal(turn.cancelled,true);assert.equal(delivered,0);
+});
+
+test('provider completion waits for local speech endpoint before releasing or retiring output',async t=>{
+  const {live}=session(t);live.setListening(true,'dictation');const turn=live.currentTurn;
+  Object.assign(turn,{toolTurn:true,outputAuthorized:true,outputText:'Te escucho',completeReceived:true});
+  live.flushPendingAudio(turn);await live.finishTurn(turn);assert.equal(turn.pending,true);
+  live.setListening(false);await tick();assert.equal(turn.completed,true);
+});
 test('resumed tasks use an internal backend notification without a stale function response ID',async t=>{
   const {live,sent}=session(t);live.watchTasks([{id:'restored',status:'running'}]);
   live.notifyTaskUpdate({id:'restored',status:'completed',summary:'Resultado verificado'});
