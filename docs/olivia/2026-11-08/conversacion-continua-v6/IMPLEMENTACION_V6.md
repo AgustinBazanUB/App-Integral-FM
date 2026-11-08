@@ -1,6 +1,6 @@
 # Olivia V6 — implementación y diagnóstico
 
-Estado: candidata en desarrollo; la aceptación acústica y funcional requiere el registro de pruebas de este directorio.
+Estado: candidata de preview con aceptación parcial. No está aprobada para producción; ver RESULTADOS_PRUEBAS_V6.md y RESULTADOS_PARA_CHATGPT_V6.md.
 
 ## Punto de partida
 
@@ -13,12 +13,12 @@ Estado: candidata en desarrollo; la aceptación acústica y funcional requiere e
 
 | Hallazgo demostrado en código | Impacto | Cambio | Verificación |
 |---|---|---|---|
-| Al cerrar WebSocket se termina la voz y se pide reconectar manualmente | Conversación discontinua | Recuperación limitada, reanudación privada y renovación de credenciales/contexto | Tests con sockets controlados; prueba de proveedor pendiente |
+| Al cerrar WebSocket se termina la voz y se pide reconectar manualmente | Conversación discontinua | Recuperación limitada y renovación de credenciales/contexto | Tests y cortes reales; recuperación final 5762,4 ms desde volver la red |
 | Preguntas elípticas de progreso podían quedar como charla sin consultar estado | Riesgo de respuesta no fundamentada | Ruta task-status y cliente con caché de 1,5 s / estado autenticado | Tests sin llamadas al motor de trabajo |
 | Progreso limitado a fase/texto sin revisión estructurada | No hay evento verificable que anunciar | Diario acotado de aceptación, procesamiento e inicio/fin de herramientas reales | Tests de contrato; no porcentajes |
 | Resultados de tareas sin recibo persistente de reproducción | Avisos repetidos o perdidos entre conexiones | Clave por revisión, coalescencia, entrega acotada y recibo autenticado | Tests de revisiones obsoletas y propietario |
-| Detalles de cola/costos técnicos en vista normal | Interfaz distrae y expone implementación | Actividad discreta y tarjetas de datos/confirmación; detalles solo administrador desarrollador | Build; revisión Chrome pendiente |
-| Pausa de tarea no disponible desde contrato de voz | Control incompleto | Pausa/reanudación de fases seguras, rechazo explícito si ya ejecuta | Tests persistentes e idempotencia |
+| Detalles de cola/costos técnicos en vista normal | Interfaz distrae y expone implementación | Actividad discreta y tarjetas de datos/confirmación; detalles solo administrador desarrollador | Revisión Chrome normal/Developer y exportación sanitizada |
+| Pausa de tarea no disponible desde contrato de voz | Control incompleto | Pausa/reanudación de fases seguras, rechazo explícito si ya ejecuta | Tests y carga QA pausada/retomada por voz; redacción aún pendiente |
 
 ## Arquitectura
 
@@ -30,7 +30,7 @@ Los backchannels se mantienen conservadores mediante instrucciones nativas; no s
 
 ## Validación local
 
-`npm test`: 1146 pruebas aprobadas, incluidas 23 nuevas V6. `npm run build`: aprobado, conserva aviso conocido por tamaño de chunks. Se requiere repetir si cambian estos módulos. Reglas y permisos de Firestore no se modifican.
+Código final validado: `3c43f1e2cb43a7f752f4a5775cc891f6a686292b`. `npm test`: 1150 pruebas aprobadas. `npm run build`: aprobado, conserva aviso conocido por tamaño de chunks. Reglas y permisos de Firestore no se modifican. Los tests locales no sustituyen los resultados reales detallados en el informe.
 
 ## Fuentes de contrato
 
@@ -58,3 +58,15 @@ Las verificaciones de cada SHA y sus fallos se detallan en los resultados; compi
 - Si Gemini omite una herramienta en una intervención que la política local ya exige validar, se inicia un respaldo asíncrono por el mismo cliente autenticado. No se reproduce el texto comercial sin verificar ni se inventa un function-call ID. Se correlaciona con el ID del turno, conserva las tarjetas visuales y no crea otra cola/modelo. Una continuación ambigua pide aclaración; un control sin herramienta solo consulta estado y pide precisar la acción. La ruta se marca `task.policy_fallback` y se mide por separado. Se notifica aceptación antes de publicar la tarea para impedir avisos sin su correlación.
 
 - Una afirmación de nombre/registro ficticio, sin consulta ni acción ni recolección activa, disparó innecesariamente un trabajo que usó una llamada Luna y cero herramientas. Se agregó la intención estructural `provided-context`: Gemini conserva ese dato en la charla. La misma frase sigue pasando al motor si hay datos/confirmación pendientes; preguntas y acciones se mantienen autenticadas. No se agrega un clasificador remoto.
+
+- El evento `offline` del panel cerraba la conversación antes de la recuperación de Gemini. Ahora deja a la sesión esperar el evento `online` hasta 30 s, con aborto al cerrar y fallo terminal al vencer ese plazo. `pagehide` sigue liberando recursos. Se reprodujo y repitió el corte real de pestaña de aproximadamente 12 s en Chrome.
+- El proveedor rechazó reutilizar un token de un uso incluso dentro de su ventana de apertura. La Function informa el mismo `uses:1` con el que lo emite y el cliente solicita una credencial nueva antes de reconectar. No se aumentan usos, duración ni privilegios. La repetición final eliminó ese intento rechazado.
+- Los avisos normales de error se mantienen legibles. El detalle de Developer filtra query strings, claves y credenciales efímeras antes de mostrarlo.
+
+## Elección de infraestructura
+
+Se revisaron los repositorios primarios de [Pipecat](https://github.com/pipecat-ai/pipecat), [LiveKit Agents](https://github.com/livekit/agents), [Async Deep Agents](https://github.com/langchain-ai/async-deep-agents) y [LiteLLM](https://github.com/BerriAI/litellm). No se instalaron en la aplicación.
+
+Pipecat ofrece flujos de audio y Gemini Live, y LiveKit un runtime de agentes de voz. Serían candidatos para una futura migración de transporte; incorporarlos aquí implicaría operar otro runtime y verificar de nuevo autorización y audio. Async Deep Agents sirve como referencia de trabajos con IDs, consulta y cancelación, pero su ejemplo usa LangSmith/LangGraph: se conserva el motor persistente que ya tiene la aplicación. LiteLLM aporta una puerta común a proveedores; esta corrección necesita el protocolo bidireccional nativo y una integración Luna ya existente. Agregar un proxy no resuelve por sí solo los fallos observados. Estas conclusiones son decisiones de diseño, no benchmarks de esas alternativas. No se midió ni se promete ahorro de sus servicios.
+
+No hay cambios de dependencias de la aplicación. Las herramientas ASR/diagnóstico se instalaron solo en el entorno privado de pruebas de la PC, fuera del repositorio.
