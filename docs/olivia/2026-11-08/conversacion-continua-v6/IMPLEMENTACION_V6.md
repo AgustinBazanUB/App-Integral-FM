@@ -30,7 +30,7 @@ Los backchannels se mantienen conservadores mediante instrucciones nativas; no s
 
 ## Validación local
 
-`npm test`: 1145 pruebas aprobadas, incluidas 22 nuevas V6. `npm run build`: aprobado, conserva aviso conocido por tamaño de chunks. Se requiere repetir si cambian estos módulos. Reglas y permisos de Firestore no se modifican.
+`npm test`: 1146 pruebas aprobadas, incluidas 23 nuevas V6. `npm run build`: aprobado, conserva aviso conocido por tamaño de chunks. Se requiere repetir si cambian estos módulos. Reglas y permisos de Firestore no se modifican.
 
 ## Fuentes de contrato
 
@@ -56,3 +56,5 @@ Las verificaciones de cada SHA y sus fallos se detallan en los resultados; compi
 - Las esperas de respuesta y la ausencia de cierre de un turno generado entran ahora en la misma recuperación automática acotada con sesión fresca. El guard de consumo desconocido sigue siendo terminal. Se preserva una entrada ya finalizada localmente cuando el proveedor interrumpe buffers de una generación anterior.
 
 - Si Gemini omite una herramienta en una intervención que la política local ya exige validar, se inicia un respaldo asíncrono por el mismo cliente autenticado. No se reproduce el texto comercial sin verificar ni se inventa un function-call ID. Se correlaciona con el ID del turno, conserva las tarjetas visuales y no crea otra cola/modelo. Una continuación ambigua pide aclaración; un control sin herramienta solo consulta estado y pide precisar la acción. La ruta se marca `task.policy_fallback` y se mide por separado. Se notifica aceptación antes de publicar la tarea para impedir avisos sin su correlación.
+
+- Una afirmación de nombre/registro ficticio, sin consulta ni acción ni recolección activa, disparó innecesariamente un trabajo que usó una llamada Luna y cero herramientas. Se agregó la intención estructural `provided-context`: Gemini conserva ese dato en la charla. La misma frase sigue pasando al motor si hay datos/confirmación pendientes; preguntas y acciones se mantienen autenticadas. No se agrega un clasificador remoto.

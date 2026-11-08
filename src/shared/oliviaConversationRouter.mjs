@@ -32,6 +32,10 @@ export function classifyGeminiLiveTurn(text, context = {}) {
   const mutation = /\b(?:crea\w*|carga\w*|registra\w*|agrega\w*|transfi\w*|borra\w*|elimina\w*|modifica\w*|actualiza\w*|cancela\w*)\b/.test(normalized);
   if(/\b(?:no autorizo|no autoriza|sin autorizar)\b/.test(normalized) && /\b(?:solo|solamente) (?:seguimos )?(?:conversando|hablando)\b/.test(normalized) && !/\b(?:crea|creame|carga|cargame|registra|registrame|borra|elimina|transferi|cancela)\b/.test(normalized))return {route:'direct',kind:'conversation-authorization-boundary'};
   const taskActive = Boolean(context.pendingAction || context.pendingActionId || context.collectingTask || context.activeTask);
+  const requestingData=/[¿?]/.test(String(text)) || /\b(?:cuanto\w*|cual\w*|como|donde|podes|podrias|quiero|necesito|busca\w*|consulta\w*|mostra\w*|envia\w*|manda\w*)\b/.test(normalized);
+  // A supplied name/example is conversational context unless a task is
+  // collecting it. It is not a request to verify or create a business record.
+  if(!context.collectingTask && !context.pendingAction && !context.pendingActionId && !mutation && !requestingData && /^(?:el|la)\b/.test(normalized) && /\b(?:se llama|registro ficticio)\b/.test(normalized))return {route:'direct',kind:'provided-context'};
   if (!mutation && /^(?:(?:olivia )?(?:como (?:venis|vas)|que te falta|ya terminaste|en que (?:vas|quedaste)|que estas haciendo|que tareas estas haciendo))(?: con .+)?$/.test(normalized)) return { route: 'delegate', kind: 'task-status' };
   if (taskActive && /\b(?:pausa\w*|retoma\w*|reanuda\w*|para despues)\b/.test(normalized)) return {route:'delegate',kind:'task-control'};
   if (/^espera\b/.test(normalized) && !mutation && !/\b(?:stock|precio|ventas?|clientes?)\b/.test(normalized)) return { route: 'direct', kind: 'conversation-hold' };

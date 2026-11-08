@@ -15,6 +15,16 @@ test('task status questions use state without treating social follow-ups as task
   assert.equal(selectStatusTasks([{id:'a',status:'completed'}],'foreign').needsClarification,true);
 });
 
+test('supplied facts stay conversational outside collection without weakening data requests or actions',()=>{
+  const statement='El cliente se llama QA Olivia. Es un registro ficticio; no le envíes mensajes.';
+  assert.equal(classifyGeminiLiveTurn(statement).kind,'provided-context');
+  assert.equal(classifyGeminiLiveTurn(statement,{activeTask:true}).route,'direct');
+  assert.equal(classifyGeminiLiveTurn(statement,{collectingTask:true}).route,'delegate');
+  assert.equal(classifyGeminiLiveTurn(statement,{pendingAction:true}).route,'delegate');
+  assert.equal(classifyGeminiLiveTurn('El cliente se llama QA Olivia, ¿cuánto debe?').route,'delegate');
+  assert.equal(classifyGeminiLiveTurn('El cliente se llama QA Olivia; crealo.').route,'delegate');
+});
+
 test('fresh-session context contains bounded history and task facts without confirmation secrets',()=>{
   const context=compactVoiceContext({messages:Array.from({length:15},(_,i)=>({role:'user',content:`m${i}`})),pendingActionId:'private'},[{id:'a',status:'awaiting-confirmation',summary:'Revisar',pendingAction:{confirmationToken:'secret'},telemetry:{secret:'private'}}]);
   assert.equal(context.messages.length,8);assert.equal(context.messages[0].text,'m7');
