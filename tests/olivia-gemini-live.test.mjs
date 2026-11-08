@@ -180,7 +180,7 @@ test("Live connection diagnostics retain the WebSocket close code and request re
   socket.onclose({ code: 1008 });
   await assert.rejects(started, /código 1008/);
   assert.deepEqual(failures, ["Gemini Live cerró la conexión (código 1008); volvé a conectar para continuar por voz."]);
-  assert.equal(notices.at(-1), failures[0]);
+  assert.match(notices.at(-1), /seguir escribiendo/);assert.doesNotMatch(notices.at(-1), /Gemini|1008|WebSocket/);
   assert.equal(live.failed, true);
 });
 

@@ -3,12 +3,14 @@ import { assertConversationOwner, message, retainedMessage, trimMessages } from 
 import { startChatJob, chatJobStatus, cancelChatJob } from './chatJobs.mjs';
 import { safeId, oliviaError } from '../../../../src/shared/oliviaContracts.mjs';
 import { safeUserMessage } from './provider.mjs';
+import { taskOutcome } from '../../../../src/shared/oliviaTaskConversation.mjs';
 
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const pathFor = (parent, id) => `oliviaConversations/${parent}/delegatedTasks/${id}`;
 const active = task => ['queued','dispatching','running'].includes(task.status);
 const dateMs = value => new Date(value).getTime();
-const publicTask = task => ({ id:task.id, requestId:task.requestId, jobId:task.jobId || null, status:task.status, phase:task.phase || '', summary:task.summary || '', pendingAction:task.pendingAction || null, priority:task.priority, dependsOn:task.dependsOn || [], createdAt:task.createdAt, updatedAt:task.updatedAt, failure:task.failure || null, telemetry:task.telemetry || null });
+const notificationKey=task=>hash([task.requestId,task.status,active(task)?task.progress?.revision || 0:0]);
+const publicTask = task => ({ id:task.id, requestId:task.requestId, jobId:task.jobId || null, status:task.status, phase:task.phase || '', summary:task.summary || '', progress:task.progress || null,outcome:taskOutcome(task),notification:{key:notificationKey(task),eligible:task.notificationProtocol===1,delivered:task.voiceDeliveryKey===notificationKey(task)},pendingAction:task.pendingAction || null, priority:task.priority, dependsOn:task.dependsOn || [], createdAt:task.createdAt, updatedAt:task.updatedAt, failure:task.failure || null, telemetry:task.telemetry || null });
 async function ownedRoot(store, session, id, now) {
   const root = await store.get(`oliviaConversations/${safeId(id)}`);
   assertConversationOwner(session, root, now);
@@ -51,7 +53,7 @@ export async function startDelegatedTask({store,engine,session,body,dispatch,now
     const writes=[];
     if(!previous)writes.push({type:'create',path:`oliviaConversations/${scopeId}`,data:{id:scopeId,userId:root.userId,sessionBinding:root.sessionBinding,roleBinding:root.roleBinding,permissionScope:root.permissionScope,historyStorageVersion:root.historyStorageVersion || 1,internalTask:true,parentConversationId:parent,delegatedTaskIds:[],messages:(root.messages || []).slice(-8),messageCount:0,state:'INFORMACION',taskState:null,memory:null,draft:null,pendingActionId:null,activeChatJobId:null,queuedChatRequestId:null,busyRequestId:null,busyUntil:null,title:text.slice(0,80),createdAt:now,updatedAt:now,expiresAt:root.expiresAt}});
     const requests={...(previous?.requests || {}),[attemptKey]:fingerprint};
-    writes.push({type:previous?'update':'create',path,data:{id,parentConversationId:parent,scopeId,requestId,fingerprint,requests,message:text,screenContext:body.screenContext || {},status:'queued',phase:'En cola',priority:['low','high'].includes(body.priority)?body.priority:'normal',dependsOn:dependencies,jobId:null,pendingAction:null,summary:previous?.summary || '',attempt:(previous?.attempt || 0)+1,createdAt:previous?.createdAt || now,updatedAt:now,expiresAt:root.expiresAt}});
+    writes.push({type:previous?'update':'create',path,data:{id,parentConversationId:parent,scopeId,requestId,fingerprint,requests,message:text,screenContext:body.screenContext || {},status:'queued',phase:'En cola',priority:['low','high'].includes(body.priority)?body.priority:'normal',dependsOn:dependencies,jobId:null,pendingAction:null,summary:'',progress:null,notificationProtocol:1,attempt:(previous?.attempt || 0)+1,createdAt:previous?.createdAt || now,updatedAt:now,expiresAt:root.expiresAt}});
     if(!previous)writes.push({type:'update',path:`oliviaConversations/${parent}`,data:{delegatedTaskIds:[...(root.delegatedTaskIds || []),id]}});
     await tx.commitDocuments(writes);
   });
@@ -71,8 +73,9 @@ export async function listDelegatedTasks({store,engine,session,parent,dispatch,n
     await store.transaction(async tx=>{
       const current=(await tx.getDocument(pathFor(parent,id)))?.data;
       if(current?.jobId!==task.jobId || !active(current))return;
+      if(current.status===nextStatus && current.phase===status.phase && (current.progress?.revision || 0)===(status.progress?.revision || 0) && current.summary===summary)return;
       const rootDoc=(await tx.getDocument(`oliviaConversations/${parent}`))?.data;
-      const writes=[{type:'update',path:pathFor(parent,id),data:{status:nextStatus,phase:status.phase,summary,pendingAction:result?.pendingAction || null,failure:status.failure || result?.failure || null,telemetry:result?.telemetry || null,updatedAt:now}}];
+      const writes=[{type:'update',path:pathFor(parent,id),data:{status:nextStatus,phase:status.phase,progress:status.progress || null,notificationProtocol:1,summary,pendingAction:result?.pendingAction || null,failure:status.failure || result?.failure || null,telemetry:result?.telemetry || null,updatedAt:now}}];
       if(!['queued','running'].includes(status.status) && current.recordedJobId!==task.jobId){
         const userEntry=message('user',current.message,now,'natural-voice');
         const assistantEntry=message('assistant',summary || 'La tarea terminó sin respuesta disponible.',now,'natural-voice');
@@ -131,6 +134,20 @@ export async function pumpDelegatedTasks({store,engine,session,parent,dispatch,n
 export async function controlDelegatedTask({store,engine,session,body,dispatch,now=new Date()}) {
   const parent=safeId(body.conversationId),id=safeId(body.taskId);
   await ownedTask(store,session,parent,id,now);
+  if(['pause','resume'].includes(body.action)){
+    let blocked=false;
+    await store.transaction(async tx=>{
+      const path=pathFor(parent,id),task=(await tx.getDocument(path))?.data,controlId=safeId(body.requestId),key=hash(controlId);
+      if(task.controlReceipts?.[key]){if(task.controlReceipts[key]!==body.action)throw oliviaError('request-already-used','El control ya corresponde a otra acción.',409);return;}
+      if(['running','dispatching','confirming','cancelling'].includes(task.status)){blocked=true;return;}
+      if(['completed','cancelled','failed'].includes(task.status))throw oliviaError('task-terminal','La tarea ya terminó.',409);
+      if(body.action==='resume' && task.status!=='paused')return;
+      if(body.action==='pause' && task.status==='paused')return;
+      const receipts=Object.fromEntries([...Object.entries(task.controlReceipts || {}),[key,body.action]].slice(-20));
+      await tx.commitDocuments([{type:'update',path,data:{status:body.action==='pause'?'paused':task.pausePreviousStatus || 'needs-input',pausePreviousStatus:body.action==='pause'?task.status:null,notificationProtocol:1,controlReceipts:receipts,updatedAt:now}}]);
+    });
+    return {tasks:await listDelegatedTasks({store,engine,session,parent,dispatch,now}),...(blocked?{needsClarification:true,summary:'Esa tarea ya está ejecutándose. No la pausé ni revertí operaciones; podemos esperar su resultado o consultar su estado.'}:{})};
+  }
   const confirming=body.action==='confirm', cancelling=body.action==='cancel';
   if(!confirming && !cancelling)throw oliviaError('invalid-operation','Control de tarea no disponible.');
   const controlId=safeId(body.requestId), controlStatus=confirming?'confirming':'cancelling';
@@ -173,4 +190,18 @@ export async function controlDelegatedTask({store,engine,session,body,dispatch,n
     ]);
   });
   return {tasks:await listDelegatedTasks({store,engine,session,parent,dispatch,now})};
+}
+
+export async function acknowledgeTaskNotification({store,session,body,now=new Date()}) {
+  const parent=safeId(body.conversationId),id=safeId(body.taskId);
+  await ownedTask(store,session,parent,id,now);
+  let acknowledged=false;
+  await store.transaction(async tx=>{
+    const path=pathFor(parent,id),task=(await tx.getDocument(path))?.data;
+    if(body.notificationKey!==notificationKey(task))return;
+    acknowledged=true;
+    if(task.voiceDeliveryKey===body.notificationKey)return;
+    await tx.commitDocuments([{type:'update',path,data:{voiceDeliveryKey:body.notificationKey,voiceDeliveryAt:now,voiceDeliveryChannel:'scheduled-audio-completed'}}]);
+  });
+  return {acknowledged};
 }

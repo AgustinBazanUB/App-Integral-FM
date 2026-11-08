@@ -1,11 +1,13 @@
 import { latencyTracesCsv, latencyTracesJson } from '../../shared/oliviaLatencyTrace.mjs';
 
-export default function OliviaDeveloperPanel({ estimate, quota, latency, voiceMetrics, voiceConfiguration, geminiLiveUsage, telemetry, turnTrace, connectionTrace, turnTraces = [], money }) {
+export default function OliviaDeveloperPanel({ tasks = [], estimate, quota, latency, voiceMetrics, voiceConfiguration, geminiLiveUsage, telemetry, turnTrace, connectionTrace, turnTraces = [], money }) {
   const ms = (value) => Number.isFinite(value) ? value.toFixed(0) : "—";
   const percentiles=value=>`${ms(value?.medianMs)} / ${ms(value?.p90Ms)} / ${ms(value?.p95Ms)} · n=${value?.count ?? 0}`;
   const modalityTokens=value=>value && Object.keys(value).length ? Object.entries(value).map(([modality,count])=>`${modality} ${Number(count).toLocaleString('es-AR')}`).join(' · ') : 'No informado por el proveedor';
   const geminiMeasurement=value=>({ 'provider-forwarded':'Tarifa aplicada a usageMetadata', 'estimated-audio-context-excluded':'Estimado por duración, sin contexto', unconfirmed:'Sin confirmar' }[value] || value || 'Sin medición');
   const rows = [
+    ['Recuperación de voz',JSON.stringify(voiceMetrics?.geminiRecovery || {status:'sin recuperaciones'})],
+    ['Tareas y avisos persistentes',tasks.map(t=>`${t.id}: ${t.status} / ${t.progress?.label || 'sin progreso'} / aviso ${t.notification?.delivered?'entregado':'pendiente'}`).join(' · ') || 'Sin tareas'],
     ...(voiceConfiguration ? [["Modelo de conversación", voiceConfiguration.model], ["Cerebro y acciones de voz", `${voiceConfiguration.backendModel} / ${voiceConfiguration.reasoningEffort}`], ["Voz de Gemini Live", voiceConfiguration.voice]] : []),
     ["Modelo / razonamiento", `${telemetry?.model || estimate?.model || "—"} / ${telemetry?.reasoningEffort || estimate?.reasoningEffort || "—"}`],
     ["Ruta / motivo", `${telemetry?.route || estimate?.route || "—"} / ${telemetry?.routingReason || estimate?.routingReason || "—"}`],

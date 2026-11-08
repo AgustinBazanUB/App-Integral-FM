@@ -76,6 +76,11 @@ export class NaturalVoiceConversation {
     this.evaluateVoice(rms,Number.isFinite(at)?at:this.now());
   }
 
+  resetInputTurn() {
+    clearTimeout(this.turnTimer);this.recordingTurn=false;this.finishing=false;
+    this.bargeCandidate=null;this.partial='';this.turnTranscriber=null;
+  }
+
   evaluateVoice(rms,now) {
     if (!this.muted) {
       if (!this.recordingTurn) {

@@ -30,6 +30,9 @@ export function classifyGeminiLiveTurn(text, context = {}) {
   const background = /^mientras\s+(?:revis[aá]s|trabaj[aá]s|proces[aá]s|termin[aá]s)\b[^,;]*[,;]\s*(.+)$/i.exec(String(text).trim());
   if (background) return classifyGeminiLiveTurn(background[1], context);
   const mutation = /\b(?:crea\w*|carga\w*|registra\w*|agrega\w*|transfi\w*|borra\w*|elimina\w*|modifica\w*|actualiza\w*|cancela\w*)\b/.test(normalized);
+  const taskActive = Boolean(context.pendingAction || context.pendingActionId || context.collectingTask || context.activeTask);
+  if (!mutation && /^(?:(?:olivia )?(?:como (?:venis|vas)|que te falta|ya terminaste|en que (?:vas|quedaste)|que estas haciendo|que tareas estas haciendo))(?: con .+)?$/.test(normalized)) return { route: 'delegate', kind: 'task-status' };
+  if (taskActive && /\b(?:pausa\w*|retoma\w*|reanuda\w*|para despues)\b/.test(normalized)) return {route:'delegate',kind:'task-control'};
   if (/^espera\b/.test(normalized) && !mutation && !/\b(?:stock|precio|ventas?|clientes?)\b/.test(normalized)) return { route: 'direct', kind: 'conversation-hold' };
   if (/^(?:avisame|notificame) cuando (?:termines|finalices)\b/.test(normalized) && !mutation) return { route: 'direct', kind: 'conversation-notification-preference' };
   const noteOnly = /^toma nota (?:en (?:esta|la) conversacion|para (?:esta|la) charla)\b/.test(normalized);
@@ -40,7 +43,6 @@ export function classifyGeminiLiveTurn(text, context = {}) {
   const business = /\b(?:stock|inventario|mercaderia|productos?|presentaciones?|precios?|vendimos|vendido|ventas?|factur\w*|comprobantes?|clientes?|proveedores?|depositos?|ubicaciones?|pedidos?|envios?|transfer\w*|gastos?|caja|cobros?|pagos?|saldos?|ganancias?|reportes?|metricas?|tareas?|lavalle|registr\w*|carg\w*|agreg\w*|crea(?:r|me)?|borra\w*|elimina\w*|modifica\w*|actualiza\w*)\b/.test(normalized) || /\b(?:cuanto (?:sale|cuesta)|cuantas? unidades|cuantos? quedan)\b/.test(normalized);
   if (business) return { route: 'delegate', kind: 'data-or-operation' };
   const control = /^(?:(?:si|no|dale|bueno|perfecto|listo)(?:\s+(?:dale|deja|dejalo|gracias|por favor|segui|continua))*|cancel\w*(?:\s+(?:eso|la tarea|la solicitud|por favor))*|espera(?:\s+.*)?|corri\w*(?:\s+.*)?)$/.test(normalized);
-  const taskActive = Boolean(context.pendingAction || context.pendingActionId || context.collectingTask || context.activeTask);
   if (taskActive && control) return { route: 'delegate', kind: 'task-control' };
   // Elliptical slot answers belong to their task. Explicit social speech is
   // still conversational while an unrelated background job is running.

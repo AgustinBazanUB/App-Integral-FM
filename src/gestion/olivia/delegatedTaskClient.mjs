@@ -1,3 +1,4 @@
+import { selectStatusTasks } from '../../shared/oliviaTaskConversation.mjs';
 const running = task => ['queued','dispatching','running'].includes(task.status);
 const aborted = () => new DOMException('La vista se cerró; las tareas persistidas se conservan.','AbortError');
 export class DelegatedTaskClient {
@@ -8,7 +9,7 @@ export class DelegatedTaskClient {
   async refresh(){
     if(this.closed)throw aborted();
     if(this.refreshing)return this.refreshing;
-    this.refreshing=this.request({operation:'delegatedTaskStatus',conversationId:this.conversationId}).then(r=>{this.publish(r.tasks || []);return this.tasks;}).finally(()=>{this.refreshing=null;});
+    this.refreshing=this.request({operation:'delegatedTaskStatus',conversationId:this.conversationId}).then(r=>{this.refreshedAt=this.now();this.publish(r.tasks || []);return this.tasks;}).finally(()=>{this.refreshing=null;});
     return this.refreshing;
   }
   async run(call,text,context={}) {
@@ -17,12 +18,17 @@ export class DelegatedTaskClient {
   }
   async runTask(call,text,context={}) {
     const args=call.args || {};
-    if(args.action==='status')return {tasks:await this.refresh()};
+    if(args.action==='status')return selectStatusTasks(this.refreshedAt!=null && this.now()-this.refreshedAt<1500?this.tasks:await this.refresh(),args.taskId);
     let taskId=args.action==='new'?null:args.taskId || null;
-    if(['continue','cancel'].includes(args.action) && !taskId){
+    if(['continue','cancel','pause','resume'].includes(args.action) && !taskId){
       const candidates=(await this.refresh()).filter(t=>!['completed','cancelled','failed'].includes(t.status));
       if(candidates.length!==1)return {needsClarification:true,summary:'Preguntá a cuál tarea se refiere; no se ejecutó ni canceló ninguna.',tasks:candidates};
       taskId=candidates[0].id;
+    }
+    if(['pause','resume'].includes(args.action)){
+      const allowed=args.action==='pause'?/\b(?:pausa\w*|para despues|deja\w*.*despues)\b/:/\b(?:retoma\w*|segui|continua\w*|reanuda\w*)\b/;
+      if(!allowed.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Pedí que aclare si desea pausar o retomar; no se cambió la tarea.',tasks:this.tasks};
+      return this.control({action:args.action,taskId},{onAccepted:context.onAccepted});
     }
     if(args.action==='cancel'){
       if(!/\b(?:cancel\w*|deja|dejalo|olvida\w*|detene\w*|no sigas|no continues)\b/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Pedí que aclare si desea cancelar; no se detuvo ninguna tarea.',tasks:this.tasks};
@@ -52,7 +58,8 @@ export class DelegatedTaskClient {
     return task;
   }
   async control(fields,hooks={}){
-    const key=[fields.taskId,fields.action,fields.actionId || ''].join(':');
+    const taskState=this.tasks.find(t=>t.id===fields.taskId);
+    const key=[fields.taskId,fields.action,fields.actionId || '',...(['pause','resume'].includes(fields.action)?[taskState?.status,taskState?.updatedAt]:[])].join(':');
     if(!this.controlIds.has(key))this.controlIds.set(key,globalThis.crypto.randomUUID());
     const result=await this.request({operation:'delegatedTaskControl',conversationId:this.conversationId,requestId:this.controlIds.get(key),...fields});
     const task=result.tasks?.find(t=>t.id===fields.taskId);
@@ -60,5 +67,10 @@ export class DelegatedTaskClient {
     this.publish(result.tasks || []);return {tasks:this.tasks,task};
   }
   close(){this.closed=true;}
+  async acknowledge({taskId,notificationKey}){
+    const result=await this.request({operation:'delegatedTaskDelivery',conversationId:this.conversationId,taskId,notificationKey});
+    if(result.acknowledged){const task=this.tasks.find(t=>t.id===taskId);if(task?.notification?.key===notificationKey)task.notification.delivered=true;}
+    return result;
+  }
 }
 import { normalizeSpeech } from '../../shared/oliviaSpeechText.mjs';

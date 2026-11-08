@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fixture, start } from './helpers/olivia-fixture.mjs';
-import { startDelegatedTask, listDelegatedTasks, controlDelegatedTask, pumpDelegatedTasks } from '../netlify/functions/_lib/olivia/delegatedTasks.mjs';
+import { startDelegatedTask, listDelegatedTasks, controlDelegatedTask, pumpDelegatedTasks, acknowledgeTaskNotification } from '../netlify/functions/_lib/olivia/delegatedTasks.mjs';
 import { runChatJob } from '../netlify/functions/_lib/olivia/chatJobs.mjs';
 import { DelegatedTaskClient } from '../src/gestion/olivia/delegatedTaskClient.mjs';
 import { createOliviaEngine } from '../netlify/functions/_lib/olivia/engine.mjs';
@@ -151,4 +151,27 @@ test('a voice cancellation rebinds its notification before publishing the termin
   const client=new DelegatedTaskClient({conversationId:'root',onChange:tasks=>{if(tasks[0]?.status==='cancelled')order.push('published');},request:async payload=>({tasks:[{id:'a',status:payload.operation==='delegatedTaskControl'?'cancelled':'running'}]})});
   await client.run({args:{action:'cancel',taskId:'a'}},'Cancelá la tarea',{onAccepted:()=>order.push('bound')});
   assert.deepEqual(order,['bound','published']);
+});
+
+
+test('pause preserves pending slots and confirmation while active execution refuses a false pause',async()=>{
+  const f=await setup();const task=await f.create('v6_pause');
+  const blocked=await f.control(task,'pause');assert.equal(blocked.needsClarification,true);
+  assert.equal(blocked.tasks[0].status,'running');
+  await f.run(task);const waiting=(await f.list())[0];
+  assert.equal(waiting.status,'needs-input');
+  const paused=await f.control(waiting,'pause');assert.equal(paused.tasks[0].status,'paused');
+  await f.control(waiting,'pause');assert.equal((await f.list())[0].status,'paused','same receipt is idempotent');
+  const resumed=await f.control(waiting,'resume');assert.equal(resumed.tasks[0].status,'needs-input');
+});
+
+test('voice delivery receipts reject stale revisions and foreign owners without modifying business state',async()=>{
+  const f=await setup();const task=await f.create('v6_delivery');await f.run(task);const current=(await f.list())[0];
+  const body={conversationId:f.parent,taskId:task.id,notificationKey:current.notification.key};
+  const ack=()=>acknowledgeTaskNotification({...f.args(),body});
+  assert.equal((await acknowledgeTaskNotification({...f.args(),body:{...body,notificationKey:'stale'}})).acknowledged,false);
+  await assert.rejects(acknowledgeTaskNotification({...f.args(),session:{...f.session,uid:'foreign'},body}));
+  assert.equal((await ack()).acknowledged,true);assert.equal((await ack()).acknowledged,true);
+  assert.equal((await f.list())[0].notification.delivered,true);
+  assert.equal(f.documents.get('locationStock/local_a/items/oil').currentStock,4);
 });

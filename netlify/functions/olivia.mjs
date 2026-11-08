@@ -6,7 +6,7 @@ import { oliviaError,safeId } from "../../src/shared/oliviaContracts.mjs";
 import { chatStream } from "./_lib/olivia/stream.mjs";
 import { startChatJob, chatJobStatus, activeChatJob, cancelChatJob } from "./_lib/olivia/chatJobs.mjs";
 import { captureOliviaFailure, sendOliviaErrorReport } from "./_lib/olivia/errorReports.mjs";
-import { startDelegatedTask, listDelegatedTasks, controlDelegatedTask } from './_lib/olivia/delegatedTasks.mjs';
+import { startDelegatedTask, listDelegatedTasks, controlDelegatedTask, acknowledgeTaskNotification } from './_lib/olivia/delegatedTasks.mjs';
 import { assertGeminiLivePreview } from './olivia-gemini-live.mjs';
 import { configuredFirebaseProjectId } from './_lib/firebaseProject.mjs';
 import { canUseOliviaVoice } from '../../src/shared/oliviaVoiceAvailability.mjs';
@@ -40,10 +40,11 @@ export default async function handler(request) {
       const response = await fetch(new URL('/.netlify/functions/olivia-chat-background',request.url),{method:'POST',headers:{Authorization:`Bearer ${session.idToken}`,'Content-Type':'application/json'},body:JSON.stringify({jobId}),signal:AbortSignal.timeout(10000)});
       if(response.status!==202)throw oliviaError('chat-dispatch-failed','No pude iniciar la consulta.',503);
     };
-    if(['delegatedTask','delegatedTaskStatus','delegatedTaskControl'].includes(body.operation)){
+    if(['delegatedTask','delegatedTaskStatus','delegatedTaskControl','delegatedTaskDelivery'].includes(body.operation)){
       assertGeminiLivePreview({env:process.env,projectId:configuredFirebaseProjectId(process.env)});
       if(!canUseOliviaVoice(session))throw oliviaError('voice-not-enabled','La voz sigue limitada a la prueba administrativa.',403);
       const args={store,engine,session,body,dispatch};
+      if(body.operation==='delegatedTaskDelivery')return timed(json(await acknowledgeTaskNotification(args)));
       const result=body.operation==='delegatedTask'?await startDelegatedTask(args):body.operation==='delegatedTaskControl'?await controlDelegatedTask(args):{tasks:await listDelegatedTasks({...args,parent:safeId(body.conversationId)})};
       return timed(json(result));
     }

@@ -6,6 +6,7 @@ import { configuredFirebaseProjectId, STAGING_FIREBASE_PROJECT_ID } from "./_lib
 import { assertConversationOwner } from "./_lib/olivia/conversations.mjs";
 import { canUseOliviaVoice, isOliviaDeployPreview } from "../../src/shared/oliviaVoiceAvailability.mjs";
 import { classifyGeminiLiveTurn } from "../../src/shared/oliviaConversationRouter.mjs";
+import { compactVoiceContext } from '../../src/shared/oliviaTaskConversation.mjs';
 import { estimateGeminiLiveAudioCost, geminiLiveProviderCost, geminiLiveMonthlyProjection, GEMINI_LIVE_MODEL, GEMINI_LIVE_MONTHLY_QUERY_CAP, geminiLiveSetupConfig } from "../../src/shared/oliviaGeminiLive.mjs";
 import { defaultOliviaConfiguration, oliviaError, safeId, validateConfiguration } from "../../src/shared/oliviaContracts.mjs";
 
@@ -135,8 +136,9 @@ export default async function handler(request) {
       const conversationId = safeId(body.conversationId), conversationStartedAt = performance.now(), conversation = await store.get(`oliviaConversations/${conversationId}`), conversationReadMs = Math.round(performance.now() - conversationStartedAt);
       assertConversationOwner(session, conversation, now);
       session.conversationId = conversationId;
+      const tasks=await Promise.all((conversation.delegatedTaskIds || []).slice(-20).map(id=>store.get(`oliviaConversations/${conversationId}/delegatedTasks/${safeId(id)}`)));
       const token = await issueToken({ store, session, config, env, now });
-      return json({ ...token, timings: { configurationReadMs, conversationReadMs, ...token.timings } });
+      return json({ ...token, context:compactVoiceContext(conversation,tasks.filter(Boolean)), timings: { configurationReadMs, conversationReadMs, ...token.timings } });
     }
     if (body.operation === "classify") return json(await classifyTurn({ store, session, body, now }));
     if (body.operation === "usage") return json(await reportTurn({ store, session, body, now, config }));

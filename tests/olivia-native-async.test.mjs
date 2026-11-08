@@ -75,7 +75,7 @@ test('a synchronous task error produces a bounded result rather than an unhandle
   live.sendText('Stock de aceite');
   live.receive({toolCall:{functionCalls:[{id:'error',name:'delegate_to_olivia'}]},serverContent:{turnComplete:true}});
   await tick();await new Promise(r=>setTimeout(r,5));
-  assert.match(JSON.stringify(sent.at(-1)),/backend unavailable/);
+  assert.match(JSON.stringify(sent.at(-1)),/Podemos seguir conversando/);assert.equal(live.failed,false);
 });
 test('an ambiguous fragment outside an operational context asks for clarification without a Luna request',async t=>{
   const {live,sent}=session(t,{onToolCall:()=>assert.fail('ambiguous fragment was delegated')});

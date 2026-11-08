@@ -868,6 +868,7 @@ export function createOliviaEngine({
         const toolsStarted = Date.now();
         let directReadAnswer=null;
         const outcomes = await executeToolBatch(calls, async (call) => {
+          onEvent?.({type:'progress',kind:'tool-started',tool:call.name});
           const args = JSON.parse(call.arguments), key = JSON.stringify([call.name, args]);
           if (call.name === "manage_task") {
             validateSchema(args, taskManagementTool().parameters);
@@ -906,6 +907,7 @@ export function createOliviaEngine({
             if (outcome.error) throw outcome.error;
             const args = JSON.parse(call.arguments);
             result = outcome.value;
+            onEvent?.({type:'progress',kind:'tool-finished',tool:call.name});
             if (OLIVIA_CAPABILITIES[call.name]?.module === "metrics" && result.data?.period && !result.state) metricsPeriod = { ...result.data.period, chosenAt: clock() };
             for (const source of result.sources || []) researchSources.set(source.url, source);
             const toolModule = OLIVIA_CAPABILITIES[call.name]?.module || (call.name === "update_task" ? "core" : "locations");

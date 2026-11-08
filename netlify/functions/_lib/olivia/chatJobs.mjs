@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { appendTaskProgress } from './taskProgress.mjs';
 import { safeId, oliviaError, screenContext } from "../../../../src/shared/oliviaContracts.mjs";
 import { safeUserMessage } from "./provider.mjs";
 import { taskControl } from "./tasks.mjs";
@@ -60,7 +61,7 @@ export async function chatJobStatus({ store, session, body, now = new Date() }) 
     });
     job = await store.get(path);
   }
-  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase,tools:(job.tools || []).filter(tool=>/^[a-z_]{1,80}$/.test(tool)).slice(0,12), text: job.text || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
+  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase,progress:job.progress || null,tools:(job.tools || []).filter(tool=>/^[a-z_]{1,80}$/.test(tool)).slice(0,12), text: job.text || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
 }
 export async function activeChatJob({ store, session, conversationId }) {
   const conversation = await store.get(`oliviaConversations/${conversationId}`);
@@ -110,6 +111,9 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
   const timer = setTimeout(() => controller.abort(oliviaError("assistant-timeout", "La consulta alcanzó su límite de procesamiento.", 503)), 300000);
   try {
     const options = { longRunning: true, jobId, signal: controller.signal, onEvent: event => {
+      if(event.type==='progress')progress.progress=appendTaskProgress(progress.progress,event,clock());
+      if(event.type==='accepted')progress.progress=appendTaskProgress(progress.progress,{kind:'accepted'},clock());
+      if(event.type==='phase')progress.progress=appendTaskProgress(progress.progress,{kind:'processing'},clock());
       if (event.type === "accepted") { progress.accepted = event.message; changed = true; flush().catch(() => {}); }
       if (event.type === "phase") { progress.phase = event.label; if (event.tools) { progress.text = ""; progress.tools = event.tools; } changed = true; flush().catch(() => {}); }
       if (event.type === "delta") progress.text = (progress.text + event.delta).slice(-64000);
