@@ -25,6 +25,15 @@ export function isConversationalFollowUp(text) {
 export function classifyGeminiLiveTurn(text, context = {}) {
   const normalized = normalizeSpeech(text);
   if (!normalized) return { route: 'delegate', kind: 'missing-transcript' };
+  // A background clause describes context; classify the actual request after
+  // it. Business requests in that second clause still cross the same boundary.
+  const background = /^mientras\s+(?:revis[aá]s|trabaj[aá]s|proces[aá]s|termin[aá]s)\b[^,;]*[,;]\s*(.+)$/i.exec(String(text).trim());
+  if (background) return classifyGeminiLiveTurn(background[1], context);
+  const mutation = /\b(?:crea\w*|carga\w*|registra\w*|agrega\w*|transfi\w*|borra\w*|elimina\w*|modifica\w*|actualiza\w*|cancela\w*)\b/.test(normalized);
+  if (/^espera\b/.test(normalized) && !mutation && !/\b(?:stock|precio|ventas?|clientes?)\b/.test(normalized)) return { route: 'direct', kind: 'conversation-hold' };
+  if (/^(?:avisame|notificame) cuando (?:termines|finalices)\b/.test(normalized) && !mutation) return { route: 'direct', kind: 'conversation-notification-preference' };
+  const noteOnly = /^toma nota (?:en (?:esta|la) conversacion|para (?:esta|la) charla)\b/.test(normalized);
+  if (noteOnly && !context.collectingTask && !context.pendingAction && !context.pendingActionId && !mutation && !/\b(?:cuanto\w*|cual\w*|stock|precio\w*|vendimos|ventas?)\b/.test(normalized)) return { route: 'direct', kind: 'conversation-note' };
   // This is a business-data boundary, not a phrase whitelist or a second LLM.
   // Gemini understands ordinary language/context; only the authenticated engine
   // can supply business facts, collect operational slots or prepare mutations.

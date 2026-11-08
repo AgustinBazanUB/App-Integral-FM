@@ -425,8 +425,12 @@ export class GeminiLiveSession {
     // A model tool request is not authority to turn social speech into a job.
     if(transcript && decision.route==='direct'){
       turn.toolPending=false;turn.toolTurn=false;turn.outputAuthorized=true;
+      // The function response starts another provider generation. The original
+      // tool-only turnComplete must not retire its input before that answer.
+      turn.awaitingToolResponse=true;turn.completeReceived=false;
       const result=['social','conversation-control'].includes(decision.kind)?'Esta intervención es conversacional. Respondé directamente sin herramientas; no hay operación de negocio.':'No se identificó una solicitud comercial ni una continuación operativa. Si es una consulta general, respondela directamente. Si resulta ambigua o incompleta, pedí una aclaración sin inventar datos del negocio ni ejecutar acciones.';
       this.socket.send(JSON.stringify({toolResponse:{functionResponses:calls.map(call=>({id:call.id,name:call.name,scheduling:'WHEN_IDLE',response:{result}}))}}));
+      this.armTurnTimeout(turn);
       return;
     }
     turn.toolTurn=true;turn.backgroundToolPending=true;turn.toolPending=false;

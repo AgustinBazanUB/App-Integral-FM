@@ -46,6 +46,30 @@ test('a model tool call cannot turn a clear social utterance into a backend oper
   assert.match(sent.at(-1).toolResponse.functionResponses[0].response.result,/conversacional/);
   live.receive({serverContent:{outputTranscription:{text:'Sí, perfecto.'},turnComplete:true}});await tick();
 });
+
+test('a rejected conversational tool call retains its turn across the tool-only completion',async t=>{
+  const {live,turns}=session(t,{onToolCall:()=>assert.fail('conversation was delegated')});
+  live.sendText('Me corrijo, eran cuatro frascos, no tres.');
+  const original=live.currentTurn;
+  live.receive({toolCall:{functionCalls:[{id:'wrong',name:'delegate_to_olivia',args:{action:'continue'}}]},serverContent:{turnComplete:true}});
+  await tick();
+  assert.equal(live.currentTurn,original);
+  assert.equal(original.pending,true);
+  assert.equal(turns.length,0,'a tool-only completion is not a conversational answer');
+  live.receive({serverContent:{outputTranscription:{text:'Corregido: cuatro frascos.'},turnComplete:true}});
+  await tick();
+  assert.equal(turns.length,1);
+  assert.equal(turns[0].assistantText,'Corregido: cuatro frascos.');
+  assert.equal(turns[0].delegated,false);
+});
+
+test('background social requests and dictation holds stay direct without weakening business controls',()=>{
+  for(const text of ['Mientras revisás esa tarea, ¿me escuchás bien?','Esperá, quiero corregir lo que estaba diciendo.','Avisame cuando termines cada tarea verificada.'])assert.equal(classifyGeminiLiveTurn(text,{collectingTask:true,activeTask:true}).route,'direct',text);
+  assert.equal(classifyGeminiLiveTurn('Tomá nota en esta conversación: una caja de prueba, dos bolsas y tres frascos.').route,'direct');
+  for(const text of ['Mientras trabajás en eso, creá un cliente','Esperá, cancelá la tarea','Tomá nota en esta conversación: registrá una venta','Tomá nota en esta conversación: ¿cuánto stock tenemos?'])assert.equal(classifyGeminiLiveTurn(text).route,'delegate',text);
+  assert.equal(classifyGeminiLiveTurn('Tomá nota en esta conversación: dos productos',{collectingTask:true}).route,'delegate');
+  assert.equal(classifyGeminiLiveTurn('Sí',{pendingAction:true}).route,'delegate');
+});
 test('a synchronous task error produces a bounded result rather than an unhandled promise or stuck state',async t=>{
   const {live,sent}=session(t,{onToolCall:()=>{throw new Error('backend unavailable');}});
   live.sendText('Stock de aceite');
