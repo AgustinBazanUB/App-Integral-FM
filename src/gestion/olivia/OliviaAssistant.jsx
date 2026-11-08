@@ -33,6 +33,7 @@ import { OliviaLauncherPortal } from "./LauncherHost";
 import { getUiGuide, UI_GUIDE_VERSION } from '../../shared/oliviaUiGuides.mjs';
 import { DelegatedTaskClient } from './delegatedTaskClient.mjs';
 import OliviaDelegatedTasks from './OliviaDelegatedTasks';
+import { recoveryDiagnostic } from './liveRecovery.mjs';
 
 export default function OliviaAssistant() {
   const { user, profile } = useAuth();
@@ -672,7 +673,7 @@ export default function OliviaAssistant() {
             onRecovery:recovery=>{if(mounted.current && voiceRef.current===connection){if(recovery.status==='recovering')connection.resetInputTurn();setVoiceMetrics(current=>({...current,geminiLiveStatus:recovery.status,geminiRecovery:recovery}));if(recovery.status==='connected')setVoiceState(mutedRef.current?'muted':'listening');}},
             onNotificationDelivered:payload=>delegatedClient.current.acknowledge(payload),
             onNotice:notice=>{if(mounted.current && voiceRef.current===connection)setVoiceNotice(notice);},
-            onUnavailable:failure=>{if(mounted.current && voiceRef.current===connection){setVoiceMetrics(current=>({...current,geminiLiveStatus:'unavailable',geminiLiveFallback:failure?.message || 'provider-error'}));setVoiceNotice('No pude recuperar la voz. Podés seguir escribiendo o volver a intentarlo.');setVoiceState('idle');connection.close();voiceRef.current=null;}},
+            onUnavailable:failure=>{if(mounted.current && voiceRef.current===connection){setVoiceMetrics(current=>({...current,geminiLiveStatus:'unavailable',geminiLiveFallback:recoveryDiagnostic(failure)}));setVoiceNotice('No pude recuperar la voz. Podés seguir escribiendo o volver a intentarlo.');setVoiceState('idle');connection.close();voiceRef.current=null;}},
         });
         signal.addEventListener('abort',()=>live.close(),{once:true});
         if(signal.aborted){live.close();throw new DOMException('Finalizada','AbortError');}
@@ -700,7 +701,7 @@ export default function OliviaAssistant() {
     });
     voiceRef.current = connection;
     setVoiceState("connecting");
-    connection.start().catch((failure) => { if (mounted.current) setVoiceNotice(failure.message); });
+    connection.start().catch((failure) => { if (mounted.current) setVoiceNotice(failure.name==="NotAllowedError"?"Permití el micrófono para conversar por voz.":"No pude iniciar la voz. Podés seguir escribiendo o volver a intentarlo."); });
   };
 
   const pending = snapshot.pendingAction;

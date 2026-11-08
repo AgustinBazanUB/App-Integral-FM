@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { recoveryDiagnostic } from '../src/gestion/olivia/liveRecovery.mjs';
 import { ConversationNotifications } from '../src/gestion/olivia/conversationNotifications.mjs';
 import { compactVoiceContext, selectStatusTasks, taskOutcome } from '../src/shared/oliviaTaskConversation.mjs';
 import { classifyGeminiLiveTurn } from '../src/shared/oliviaConversationRouter.mjs';
@@ -120,4 +121,10 @@ test('recovery retries are bounded and closing during backoff prevents token all
   const g=fixture(t);await g.live.start(null,{textInputOnly:true});
   g.live.waitRecovery=async()=>g.live.close();await g.live.recover(new Error('network'));
   assert.equal(g.requests.filter(r=>r.operation==='token').length,1);
+});
+
+
+test('developer connection diagnostics never expose token URLs or ephemeral credentials',()=>{
+ const message=recoveryDiagnostic(new Error('WebSocket 1008 wss://example.test/live?access_token=secret123 auth_tokens/private-token key=another-secret'));
+ assert.match(message,/1008/);assert.doesNotMatch(message,/secret123|private-token|another-secret/);
 });
