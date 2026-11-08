@@ -1,31 +1,37 @@
-# Incidencias y correcciones — validación Olivia V5
+# Incidencias y correcciones — Olivia V5
 
-Estado: validación en curso. Base `ef5485643c516ade20c1bfdaeba7eb0449b6e377`. Las pruebas con entrada virtual no se consideran equivalentes a micrófono físico.
+Referencia: `ef54856`. Código final evaluado: `b1e1c6f72048339955e2aa9c6e8bda840f6d1431`. Modalidad: entrada virtual y proveedor real; aceptación acústica física pendiente.
 
-## Laboratorio
+| Problema / evidencia | Causa demostrada o hipótesis delimitada | Corrección | Verificación y límite |
+|---|---|---|---|
+| VAD irregular y dos saludos sin Hola | El detector dependía de requestAnimationFrame; se midieron intervalos cercanos a 1 s. Antes del umbral se descartaba el inicio | RMS del callback de captura; pre-roll máximo de 200 ms, transmitido solo al abrir un turno | Tres saludos completos después; pruebas de captura, orden y no transmisión en silencio. No es certificación física |
+| Nota social delegada, 20,9 s | La frontera comercial encontraba caja en una nota explícita de conversación | Ruta de nota contextual acotada, conservando bloqueos de operaciones/datos comerciales | RE-15 sin herramienta, 1,6 s; no se debilitan confirmaciones |
+| Corrección produce tool calls y queda sin voz | El turnComplete original podía retirar el turno antes de la regeneración posterior a rechazar una herramienta conversacional | awaitingToolResponse y plazo de respuesta conservado | Regresión automatizada reproduce ese orden; proveedor real respondió las correcciones directamente después del ajuste |
+| Pausas, pedidos de avisar y charla sobre tarea quedan mudos | Palabras de negocio en la frase de contexto forzaban ruta delegada aunque el pedido real fuera conversacional | Clasificar la cláusula solicitada tras mientras; pausas y preferencia de aviso directas | RE-18/30/33/36 con audio; RE-30 no certifica una tarea simultánea real |
+| Acuses variados silenciados | El prompt ofrecía una frase como ejemplo, pero el reproductor autorizaba solo frases neutrales exactas | Pedir exactamente Dale, lo reviso; se conserva la validación de seguridad | Hay acuses válidos identificados; no se certificó cero omisiones en toda tarea nueva |
+| Listas de diez/veinte sin repetición completa | Instrucción de brevedad y techo bajo de salida eran candidatos; no se recibió un finish reason que permita atribuir cada corte a uno solo | Excepción de brevedad para enumeraciones y techo acotado 2.048, tras ensayos con 512/1.024 | Veinte confirmados por PCM en aed3c1b y en un ensayo b1e1c6f; otra repetición b1e1c6f tuvo audio parcial. Estabilidad pendiente |
+| Audio largo detenido con sesión en reproducción | El timer original de 45 s seguía activo después de generationComplete; coincidió con el cierre antes del fin de buffers | Cambiar al plazo de reproducción pendiente más gracia acotada de turnComplete al terminar generación | 1.123 tests; dos ensayos nuevos de lista cerraron normalmente. El contenido de uno fue parcial: cerrar bien no basta |
+| Ruido de 150 ms corta una explicación | Un solo frame RMS alto abría turno y detenía fuentes | Candidato sostenido de 160 ms solo durante reproducción, con tolerancia breve de caída; conserva el pre-roll y el inicio inmediato cuando está disponible | Antes once buffers detenidos; después cero en dos repeticiones, ninguna entrada nueva y tema completado. No clasifica intención humana ni rechaza música sostenida |
+| Indicador pensando tras terminar una interrupción | El cierre local podía ocurrir después del cierre nativo y sobrescribir speaking/listening con processing | finishTurn conserva el estado ya resuelto de Gemini | Interrupción final en b1e1c6f volvió a Te escucho; regresión cubre speaking/listening/processing |
+| Texto de veinte productos con PCM parcial | En CHECKED se reconocieron cinco productos, energía solo hasta 7,415 s y salida programada de 51,74 s | Sin corrección causal todavía | Otra repetición con niveles crudos del proveedor confirmó veinte y 35,90 s. La muestra mala no tiene niveles crudos equivalentes; origen por localizar |
+| Música sin voz activa turno | RMS local mide energía, no identidad ni intención | Se filtran picos breves durante reproducción; no es solución para sonido sostenido | Control de 3 s original abrió turno sin ASR; rechazo general pendiente |
+| Comunicación de tareas y concurrencia | Caso 25 habló de error pese a needs-input; 31 falló; 32 coexistió con avisos previos | Se conservan IDs/sourceTurnId y se impide certificar texto por último turno | Integración asíncrona real sigue pendiente; no se declara arreglada por tests |
 
-Micrófono físico Intel y parlantes Realtek, 48 kHz, dos canales; permiso de Chrome concedido. La medición de nivel, sin guardar ni transcribir contenido, dio RMS mediano 0,047 y 201/302 ventanas por encima del umbral de inicio local 0,025. El circuito físico se dejó bloqueado por ambiente no controlado. No se instalaron controladores ni se cambiaron permisos, facturación o protecciones de Windows.
+## Archivos y commits
 
-Se preparó un MediaStream sintético temporal en Chrome, mediante el AudioContext y DevTools autorizados. Conserva el audio de entrada, el VAD y la sesión real de Gemini; evita conectar el micrófono físico. Las frases se generaron desde el guion original de 37 casos. El audio pregrabado es el estímulo, nunca una respuesta atribuida a Gemini. Las respuestas provienen de la API real.
+- `6991b36`: `naturalVoice.mjs`, `geminiLive.mjs`, `OliviaAssistant.jsx`, pruebas de captura/VAD y registro inicial.
+- `1802d0c`: `oliviaConversationRouter.mjs`, `oliviaGeminiLive.mjs`, `geminiLive.mjs` y pruebas de controles/regeneración.
+- `8cb5140` / `aed3c1b`: ensayos de techo de salida de 1.024 / 2.048; el último es el valor vigente.
+- `31ff41d`: filtro de pico durante reproducción en `NaturalVoiceConversation.evaluateVoice` y su regresión.
+- `dd29437`: transición de estado de `NaturalVoiceConversation.finishTurn`.
+- `b1e1c6f`: plazo de finalización de `GeminiLiveSession.receive` después de generationComplete.
 
-## VAD ligado al refresco visual
+No se cambiaron el modelo, la voz, la integración con Luna, los límites mensuales, permisos ni reglas de producción. La documentación de Google indica que `thinking_config`/`thinking_level` no están soportados en gemini-3.8-live estándar; no se añadió un parámetro incompatible ni se cambió a Extended Thinking. Referencia primaria: [guía de migración de Google](https://github.com/google-gemini/gemini-skills/blob/main/skills/gemini-live-api-dev/references/migration.md).
 
-Reproducción: con la página visible y `document.hasFocus()` verdadero, cuatro intervalos de `requestAnimationFrame` medidos en 4,21 s fueron aproximadamente de un segundo (mediana diagnóstica 1.007,7 ms, máximo 1.011,9 ms). Es una medición breve de cadencia, no un percentil de conversaciones.
+## Fallos del laboratorio separados del producto
 
-`NaturalVoiceConversation.loop` evaluaba inicio y fin de voz solo en cada animation frame. Tres repeticiones virtuales de «Hola, Olivia» dieron variación del cierre local y dos transcribieron solo «Olivia». En dos repeticiones, fin del estímulo → primer audio programado fue 1.470,7 y 2.560,5 ms; no son TTFA físicos.
-
-Corrección focalizada: el callback de captura existente de Gemini entrega RMS y timestamp al detector. `processInputFrame`/`evaluateVoice` hacen el VAD en esa cadencia de audio; animation frames conservan la visualización. No se cambian umbrales, silencios, modelo ni proveedor.
-
-## Inicio de frase anterior al umbral
-
-`attachCapture` descartaba audio hasta que el VAD activaba `listening`. Se agrega una ventana previa máxima de 200 ms en memoria, enviada en orden solo al abrir un turno válido y eliminada al cerrar la captura. No hay transmisión durante silencio ni almacenamiento permanente de PCM en el producto.
-
-Regresiones locales: los frames anteriores al umbral se conservan una sola vez; la duración queda acotada y contabilizada; el VAD cierra sin animation frames y mantiene la ventana previa de dos segundos para listas. `npm test`: 1.118 aprobados. Build aprobado con la advertencia de chunks grandes existente.
-
-La repetición con proveedor real sobre el nuevo preview y la batería de 37 casos deben registrarse antes de declarar estas correcciones aprobadas acústicamente.
-
-## Captura de salida e inactividad
-
-Una captura WASAPI encontró salida ajena en Windows. Se detuvo el proceso propio antes de guardar la muestra en memoria. El análisis inicial por sustracción de plantilla tampoco pasó el control de calidad (correlación 0,57 y un inicio candidato anterior a los frames de Gemini); su latencia queda N/D. Las capturas programadas de Web Audio se etiquetan como software, no como salida física.
-
-Durante la preparación, Gemini cerró una sesión con código 1008 y razón «Session closed due to client inactivity». Se conservó el registro, se liberó la reserva y se reconectó desde el control de Olivia. No se presenta esa desconexión como una prueba social aprobada.
+- WASAPI con salida ajena y un candidato inicial inválido de latencia: TTFA físico N/D; nada de voces privadas publicado.
+- Dos intentos con sesión cerrada, CAL-02 y B1-NOISE-BASE: sin entrada enviada, inválidos.
+- El envío de WAV largos interrumpió la conexión con la herramienta; se reencodificaron los estímulos de diez/veinte a MP3 y se recuperó Chrome. No se instaló un driver ni se cambió la seguridad.
+- Cierres 1008 por inactividad durante preparación: reserva liberada y reconexión; no se presentan como falla estadística de conversación activa.
+- Se restauraron getUserMedia, WebSocket, Response.json y hooks de audio temporales, se cerraron las pistas virtuales y la sesión; reserva final cero.
