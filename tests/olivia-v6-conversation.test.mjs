@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { recoveryDiagnostic } from '../src/gestion/olivia/liveRecovery.mjs';
+import { recoveryDiagnostic, waitForRecoveryNetwork, recoveryAllowed } from '../src/gestion/olivia/liveRecovery.mjs';
 import { ConversationNotifications } from '../src/gestion/olivia/conversationNotifications.mjs';
 import { compactVoiceContext, selectStatusTasks, taskOutcome } from '../src/shared/oliviaTaskConversation.mjs';
 import { classifyGeminiLiveTurn } from '../src/shared/oliviaConversationRouter.mjs';
@@ -127,4 +127,20 @@ test('recovery retries are bounded and closing during backoff prevents token all
 test('developer connection diagnostics never expose token URLs or ephemeral credentials',()=>{
  const message=recoveryDiagnostic(new Error('WebSocket 1008 wss://example.test/live?access_token=secret123 auth_tokens/private-token key=another-secret'));
  assert.match(message,/1008/);assert.doesNotMatch(message,/secret123|private-token|another-secret/);
+});
+
+test('offline recovery waits for online, aborts on close and has a terminal deadline',async()=>{
+ const target=new EventTarget(),controller=new AbortController();let connected=false,finished=false;
+ const pending=waitForRecoveryNetwork(controller.signal,{target,isOnline:()=>connected}).then(()=>finished=true);
+ await Promise.resolve();assert.equal(finished,false);target.dispatchEvent(new Event('online'));await Promise.resolve();assert.equal(finished,false);
+ connected=true;target.dispatchEvent(new Event('online'));await pending;assert.equal(finished,true);
+ connected=false;const aborted=waitForRecoveryNetwork(controller.signal,{target,isOnline:()=>connected});controller.abort();await assert.rejects(aborted,{name:'AbortError'});
+ await assert.rejects(waitForRecoveryNetwork(new AbortController().signal,{target,isOnline:()=>false,timeoutMs:5}),error=>error.code==='network-wait-expired'&&!recoveryAllowed(error));
+});
+
+test('offline recovery does not allocate a token until the network returns',async t=>{
+ const f=fixture(t);await f.live.start(null,{textInputOnly:true});let release;
+ f.live.waitNetwork=()=>new Promise(resolve=>release=resolve);
+ const recovering=f.live.reconnect();await Promise.resolve();assert.equal(f.requests.filter(r=>r.operation==='token').length,1);
+ release();await recovering;assert.equal(f.recovery.at(-1).status,'connected');
 });

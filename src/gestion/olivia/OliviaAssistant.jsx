@@ -480,9 +480,15 @@ export default function OliviaAssistant() {
       voiceRef.current?.close(); voiceRef.current = null;
       if (mounted.current && wasActive) { setVoiceState("idle"); setVoiceFailure(true); setVoiceNotice("La voz se interrumpió. Volvé a iniciar la conversación cuando el navegador y la conexión estén disponibles."); setSessionNotice("La voz se interrumpió"); }
     };
-    window.addEventListener("offline", disconnect);
+    const offline = () => {
+      stopRecording(true);
+      const live=voiceRef.current?.transcriber;
+      if(live?.reconnect && !live.closed && !live.failed){void live.reconnect();return;}
+      disconnect();
+    };
+    window.addEventListener("offline", offline);
     window.addEventListener("pagehide", disconnect);
-    return () => { window.removeEventListener("offline", disconnect); window.removeEventListener("pagehide", disconnect); };
+    return () => { window.removeEventListener("offline", offline); window.removeEventListener("pagehide", disconnect); };
   }, [stopRecording]);
 
   const sendMessage = async (dictated) => {

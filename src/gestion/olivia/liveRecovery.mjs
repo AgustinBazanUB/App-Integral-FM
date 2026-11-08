@@ -1,5 +1,16 @@
 export const recoveryBackoff=(attempt,random=Math.random)=>Math.round(Math.min(3000,400*2**(attempt-1))*(.8+.4*random()));
-export const recoveryAllowed=error=>!([400,401,403,429].includes(Number(error?.status)) || /budget|query-cap|billing|disabled|permission|session-active/.test(error?.code || ''));
+export const recoveryAllowed=error=>!([400,401,403,429].includes(Number(error?.status)) || /budget|query-cap|billing|disabled|permission|session-active|network-wait-expired/.test(error?.code || ''));
+export function waitForRecoveryNetwork(signal,{target=globalThis,isOnline=()=>globalThis.navigator?.onLine!==false,timeoutMs=30000}={}) {
+  if(signal.aborted)return Promise.reject(new DOMException('Sesión cerrada','AbortError'));
+  if(isOnline())return Promise.resolve();
+  return new Promise((resolve,reject)=>{
+    const cleanup=()=>{clearTimeout(timer);target.removeEventListener('online',online);signal.removeEventListener('abort',abort);};
+    const online=()=>{if(isOnline()){cleanup();resolve();}};
+    const abort=()=>{cleanup();reject(new DOMException('Sesión cerrada','AbortError'));};
+    const timer=setTimeout(()=>{cleanup();reject(Object.assign(new Error('La conexión no volvió dentro del plazo.'),{code:'network-wait-expired'}));},timeoutMs);
+    target.addEventListener('online',online);signal.addEventListener('abort',abort,{once:true});online();
+  });
+}
 export function recoveryDiagnostic(error) {
   return String(error?.message || 'provider-error')
     .replace(/((?:https?|wss?):\/\/[^\s?#"']+)\?[^\s#"']*/gi,'$1?[redacted]')

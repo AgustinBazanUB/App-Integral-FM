@@ -1,7 +1,7 @@
 import { GEMINI_LIVE_MODEL, geminiLiveRawSetup } from "../../shared/oliviaGeminiLive.mjs";
 import { classifyGeminiLiveTurn } from "../../shared/oliviaConversationRouter.mjs";
 import { compactVoiceTask, taskOutcome } from '../../shared/oliviaTaskConversation.mjs';
-import { recoveryAllowed, recoveryBackoff, recoveryWait } from './liveRecovery.mjs';
+import { recoveryAllowed, recoveryBackoff, recoveryWait, waitForRecoveryNetwork } from './liveRecovery.mjs';
 import { ConversationNotifications } from './conversationNotifications.mjs';
 
 const SOCKET_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained";
@@ -61,6 +61,7 @@ export class GeminiLiveSession {
     Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, onProtocol, onTrace, onSessionClosed, getConversationContext, backgroundTools, WebSocket, now, clock, connectTimeoutMs, turnTimeoutMs, completionGraceMs, transcriptWaitMs });
     this.onInputFrame=onInputFrame;this.capturePreRoll=[];this.capturePreRollFrames=0;
     Object.assign(this,{onRecovery,waitRecovery,random,maxRecoveryAttempts,maxRecoveries,onNotificationDelivered});
+    this.waitNetwork=waitForRecoveryNetwork;
     this.recoveryAbort=new AbortController();this.recoveryCount=0;this.pendingUsage=new Set();
     this.notifications=new ConversationNotifications({now});
     this.closed = false; this.failed = false; this.handlesTurns = false; this.listening = false; this.isPlaying = false; this.turnIndex = 0; this.sources = new Set(); this.playbackTurns = new Set(); this.finalizingTurns = new Set(); this.currentTurn = this.createTurn(); this.pendingTaskCalls = new Map(); this.toolResultQueue = []; this.queuedToolResults = new Set();
@@ -775,6 +776,7 @@ export class GeminiLiveSession {
         this.trace('gemini.recovery.attempt',{count:attempt,status:'starting'});
         this.onRecovery({status:'recovering',recoveries:this.recoveryCount,attempt,error:String(lastError?.code || lastError?.status || 'connection-interrupted')});
         try{
+          await this.waitNetwork(this.recoveryAbort.signal);
           await this.waitRecovery(recoveryBackoff(attempt,this.random),this.recoveryAbort.signal);
           if(this.closed)return false;
           const handle=!fresh && attempt===1 && this.resumeHandle && this.clock()<Math.min(this.tokenExpiresAt,this.newSessionExpiresAt) && this.clock()<(this.sessionDeadline || Infinity)?this.resumeHandle:null;
