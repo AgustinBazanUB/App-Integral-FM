@@ -66,6 +66,17 @@ export class NaturalVoiceConversation {
     let sum = 0; for (const sample of this.samples) sum += sample * sample;
     const rms = Math.sqrt(sum / this.samples.length), level = Math.min(1, rms * 5), now = this.now();
     this.onFrame({ seconds: Math.floor((now - this.startedAt) / 1000), level: this.muted ? 0 : level, recording: this.recordingTurn });
+    if(!this.audioClock)this.evaluateVoice(rms,now);
+    this.animation = this.frame(this.loop);
+  };
+
+  processInputFrame({rms,at}) {
+    if(this.closed || !this.transcriber?.handlesTurns || !this.transcriber.ready || !Number.isFinite(rms))return;
+    if(!this.audioClock){this.audioClock=true;this.onTrace({stage:'voice.input.clock',at,mode:'audio-callback'});}
+    this.evaluateVoice(rms,Number.isFinite(at)?at:this.now());
+  }
+
+  evaluateVoice(rms,now) {
     if (!this.muted) {
       if (!this.recordingTurn && rms > 0.025) this.beginTurn(now);
       if (this.recordingTurn) {
@@ -78,8 +89,7 @@ export class NaturalVoiceConversation {
         if (now - this.recordingStartedAt >= this.maxSeconds * 1000 || (now - this.lastSpeechAt >= silence && now - this.recordingStartedAt >= 400)) this.finishTurn();
       }
     }
-    this.animation = this.frame(this.loop);
-  };
+  }
 
   async renewTranscription() {
     const previous=this.transcriber;if(this.renewing || !previous?.renewalDue || this.closed)return;

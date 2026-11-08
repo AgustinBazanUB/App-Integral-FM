@@ -54,8 +54,9 @@ export function geminiTaskResult(value) {
 }
 
 export class GeminiLiveSession {
-  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, onTrace = () => {}, onSessionClosed = () => {}, getConversationContext = () => ({}), backgroundTools = false, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000, turnTimeoutMs = 45000, completionGraceMs = 5000, transcriptWaitMs = 3000 }) {
+  constructor({ request, conversationId, audioContext, onState = () => {}, onPartial = () => {}, onTranscript = () => {}, onClassification = () => {}, onFirstAudio = () => {}, onAudioComplete = () => {}, onTurnComplete = () => {}, onToolCall = async () => "No pude completar la solicitud.", onUsage = () => {}, onNotice = () => {}, onUnavailable = () => {}, onProtocol = () => {}, onTrace = () => {}, onSessionClosed = () => {}, onInputFrame = () => {}, getConversationContext = () => ({}), backgroundTools = false, WebSocket = globalThis.WebSocket, now = () => performance.now(), clock = () => Date.now(), connectTimeoutMs = 12000, turnTimeoutMs = 45000, completionGraceMs = 5000, transcriptWaitMs = 3000 }) {
     Object.assign(this, { request, conversationId, audioContext, onState, onPartial, onTranscript, onClassification, onFirstAudio, onAudioComplete, onTurnComplete, onToolCall, onUsage, onNotice, onUnavailable, onProtocol, onTrace, onSessionClosed, getConversationContext, backgroundTools, WebSocket, now, clock, connectTimeoutMs, turnTimeoutMs, completionGraceMs, transcriptWaitMs });
+    this.onInputFrame=onInputFrame;this.capturePreRoll=[];this.capturePreRollFrames=0;
     this.closed = false; this.failed = false; this.handlesTurns = false; this.listening = false; this.isPlaying = false; this.turnIndex = 0; this.sources = new Set(); this.finalizingTurns = new Set(); this.currentTurn = this.createTurn(); this.pendingTaskCalls = new Map(); this.toolResultQueue = []; this.queuedToolResults = new Set();
   }
 
@@ -166,14 +167,28 @@ export class GeminiLiveSession {
     this.processor = context.createScriptProcessor(1024, 1, 1);
     this.zeroGain = context.createGain(); this.zeroGain.gain.value = 0;
     this.processor.onaudioprocess = ({ inputBuffer }) => {
-      if (!this.ready || !this.listening || this.closed || this.failed || this.socket?.readyState !== this.WebSocket.OPEN) return;
-      const input = inputBuffer.getChannelData(0), samples = resamplePcm16(input, context.sampleRate, 16000);
+      if (!this.ready || this.closed || this.failed || this.socket?.readyState !== this.WebSocket.OPEN) return;
+      const input = inputBuffer.getChannelData(0);
+      let sum=0;for(const sample of input)sum+=sample*sample;
+      this.onInputFrame({rms:Math.sqrt(sum/input.length),at:this.now(),sampleRate:context.sampleRate});
+      const samples = resamplePcm16(input, context.sampleRate, 16000);
       if (!samples.length) return;
-      this.currentTurn.inputAudioSeconds += samples.length / 16000;
-      this.socket.send(JSON.stringify({ realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: toBase64(samples) } } }));
+      if(!this.listening){
+        // At most 200 ms in memory. Nothing is transmitted until local VAD
+        // opens a valid turn; preserve consonants preceding its threshold.
+        this.capturePreRoll.push(samples);this.capturePreRollFrames+=samples.length;
+        while(this.capturePreRollFrames>3200)this.capturePreRollFrames-=this.capturePreRoll.shift().length;
+        return;
+      }
+      this.sendInputSamples(samples);
     };
     this.captureSource.connect(this.processor); this.processor.connect(this.zeroGain); this.zeroGain.connect(context.destination);
     this.trace("gemini.capture.ready", { sampleRate: context.sampleRate });
+  }
+
+  sendInputSamples(samples){
+    this.currentTurn.inputAudioSeconds+=samples.length/16000;
+    this.socket.send(JSON.stringify({realtimeInput:{audio:{mimeType:'audio/pcm;rate=16000',data:toBase64(samples)}}}));
   }
 
   setListening(value, turnId = null) {
@@ -206,6 +221,10 @@ export class GeminiLiveSession {
       clearTimeout(turn.completionTimer); clearTimeout(turn.responseTimer);
       turn.turnId = turnId || globalThis.crypto.randomUUID(); turn.turnIndex = ++this.turnIndex; turn.pending = true; turn.inputText = ""; turn.interimText = ""; turn.outputText = ""; turn.publishedOutputText = ""; turn.usageMetadata = null; turn.inputAudioSeconds = 0; turn.outputAudioSeconds = 0; turn.generatedAudio = false; turn.heardAudio = false; turn.acknowledgementAuthorized = false; turn.acknowledgementHeard = false; turn.delegatedResponseHeardAudio = false; turn.pendingAudio = []; turn.pendingAudioStartedAt = null; turn.firstPcmAt = null; turn.toolTurn = false; turn.toolPending = false; turn.awaitingToolResponse = false; turn.outputAuthorized = false; turn.classificationPromise = null; turn.classifiedText = ""; turn.completeReceived = false; turn.transcriptComplete = false; turn.transcriptWaiters = new Set(); turn.noTranscriptTimer = null;
       this.trace("gemini.turn.start", { turnId: turn.turnId, turnIndex: turn.turnIndex, mode: this.textInputOnly ? "diagnostic-text" : "microphone" });
+      if(this.ready && this.socket?.readyState===this.WebSocket.OPEN){
+        const prior=this.capturePreRoll.splice(0);this.capturePreRollFrames=0;
+        for(const samples of prior)this.sendInputSamples(samples);
+      }
     }
   }
 
@@ -626,6 +645,7 @@ export class GeminiLiveSession {
   }
 
   stopCapture() {
+    this.capturePreRoll=[];this.capturePreRollFrames=0;
     this.processor?.disconnect(); this.captureSource?.disconnect(); this.zeroGain?.disconnect();
     if (this.processor) this.processor.onaudioprocess = null;
     this.processor = null; this.captureSource = null; this.zeroGain = null;

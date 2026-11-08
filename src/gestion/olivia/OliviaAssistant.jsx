@@ -632,6 +632,7 @@ export default function OliviaAssistant() {
             request:(payload,options)=>oliviaClient.hybridLive(payload,options),
             conversationId:conversationRef.current,
             audioContext:connection.context,
+            onInputFrame:frame=>connection.processInputFrame(frame),
             backgroundTools:true,
             getConversationContext:()=>({...snapshotRef.current.conversationContext,pendingAction:Boolean(snapshotRef.current.pendingAction)||delegatedTasksRef.current.some(t=>t.status==='awaiting-confirmation'),collectingTask:Boolean(snapshotRef.current.conversationContext?.collectingTask)||delegatedTasksRef.current.some(t=>t.status==='needs-input'),activeTask:Boolean(snapshotRef.current.conversationContext?.activeTask)||delegatedTasksRef.current.some(t=>['queued','running','dispatching','confirming','cancelling'].includes(t.status))}),
             onTrace:event=>{

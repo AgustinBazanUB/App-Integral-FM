@@ -36,6 +36,23 @@ test("spoken answer removes markdown and truncates at a readable boundary", () =
   assert.equal(spoken, "Primera oración.");
 });
 
+test('Live endpointing follows audio callbacks when animation frames are throttled, preserving list pauses',async()=>{
+  const frames=[],commits=[],starts=[];let now=0;
+  const track={stop(){}},stream={getTracks:()=>[track],getAudioTracks:()=>[track]};
+  const context={destination:{},resume:async()=>{},close:async()=>{},createMediaStreamSource:()=>({connect(){},disconnect(){}}),createAnalyser:()=>({fftSize:1024,getFloatTimeDomainData:s=>s.fill(0),disconnect(){}})};
+  const transcriber={handlesTurns:true,ready:true,beginTurn:id=>starts.push(id),commit:metadata=>commits.push(metadata),close(){this.closed=true;}};
+  const voice=new NaturalVoiceConversation({mediaDevices:{getUserMedia:async()=>stream},Recorder:class{},AudioContext:class{constructor(){return context;}},createTranscriber:async()=>transcriber,frame:fn=>{frames.push(fn);return frames.length;},cancelFrame(){},now:()=>now});
+  await voice.start();
+  const feed=(at,rms)=>{now=at;voice.processInputFrame({at,rms});};
+  feed(100,.1);feed(200,.1);feed(1299,0);
+  assert.equal(voice.recordingTurn,true);feed(1300,0);assert.equal(voice.recordingTurn,false);
+  assert.equal(commits.length,1,'a turn ends with no animation-frame callback');
+  feed(2000,.1);voice.partial='Lista de productos';feed(3000,0);
+  now=3500;frames.shift()();assert.equal(voice.recordingTurn,true,'the stale visual clock cannot finish an audio-controlled turn');
+  feed(3600,.1);feed(5500,0);assert.equal(voice.recordingTurn,true,'natural list pauses retain the existing 2 s window');
+  feed(5600,0);assert.equal(voice.recordingTurn,false);assert.equal(commits.length,2);assert.equal(starts.length,2);voice.close();
+});
+
 test("browser VAD sends a bounded turn with a short in-memory pre-roll and releases the microphone", async () => {
   const frames = [], records = [], states = [], turns = [], speechStarts = [], traces = [];
   let now = 0, amplitude = 0;

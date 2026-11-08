@@ -138,6 +138,23 @@ test("48 kHz capture resamples to 16 kHz signed PCM", () => {
   assert.ok(output.every((sample) => sample > 0));
 });
 
+test('Live preserves the onset preceding local VAD without transmitting idle microphone audio',()=>{
+  const sent=[],levels=[],node=()=>({connect(){},disconnect(){}});
+  const context={sampleRate:16000,destination:{},createMediaStreamSource:node,createScriptProcessor:node,createGain:()=>({...node(),gain:{value:1}})};
+  const live=new GeminiLiveSession({audioContext:context,WebSocket:{OPEN:1},onInputFrame:frame=>levels.push(frame),request:async()=>({})});
+  live.socket={readyState:1,send:data=>sent.push(JSON.parse(data)),close(){}};live.ready=true;live.attachCapture({});
+  const frame=value=>live.processor.onaudioprocess({inputBuffer:{getChannelData:()=>new Float32Array(1024).fill(value)}});
+  for(const value of [.001,.002,.003,.004,.005,.006])frame(value);
+  assert.equal(sent.length,0,'idle capture is never sent to Gemini');
+  assert.ok(live.capturePreRollFrames<=3200,'retained onset is bounded to 200 ms');
+  live.beginTurn('onset');frame(.1);
+  const audio=sent.filter(e=>e.realtimeInput?.audio).map(e=>Buffer.from(e.realtimeInput.audio.data,'base64').readInt16LE(0));
+  assert.deepEqual(audio,[.004,.005,.006,.1].map(v=>Math.round(v*32767)),'pre-threshold speech precedes the first live frame, once and in order');
+  assert.equal(levels.length,7,'VAD receives audio cadence even while not streaming');
+  assert.equal(live.currentTurn.inputAudioSeconds,4096/16000);
+  live.stopCapture();assert.equal(live.capturePreRollFrames,0);assert.deepEqual(live.capturePreRoll,[]);live.close();
+});
+
 test("Live connection diagnostics retain the WebSocket close code and request reconnect", async (t) => {
   class FakeSocket {
     static OPEN = 1;
