@@ -10,3 +10,14 @@
 - La pérdida de la respuesta HTTP de emisión de token puede dejar reserva temporal hasta su vencimiento; no se sortea el control con otra sesión paralela.
 
 Verificación local: reanudación, renovación, no replay, límite de reintentos, cierre durante backoff y corte por presupuesto. Las mediciones reales se completan en RESULTADOS_PRUEBAS_V6.md.
+
+
+## Causa observada de reanudaciones rechazadas
+
+En las pruebas reales se registraron cierres `1008: Session closed due to client inactivity.` seguidos por `1011: new_session_expire_time deadline exceeded`. El cliente solo comparaba la expiración total del token, no la ventana de apertura que el servidor configuraba en 60 s.
+
+Ahora la Function devuelve también `newSessionExpiresAt` y el cliente no intenta reanudar usando esa credencial después de esa ventana: libera la reserva y solicita una nueva. No se aumenta ninguna vigencia ni se permiten sesiones paralelas. La decisión es conservadora para el comportamiento observado en este endpoint, no una afirmación de que todo uso de sessionResumption tenga idénticas restricciones.
+
+Referencia primaria: [AuthToken — expireTime y newSessionExpireTime](https://ai.google.dev/api/generate-content#AuthToken). La segunda limita la apertura de conexiones nuevas; la primera limita la vigencia total de uso. Los rechazos y tiempos medidos se conservan por separado en las trazas.
+
+No se envía audio de silencio continuo para evitar cierres por inactividad: eso tendría costo y no garantiza una sesión eterna. Se recupera cuando el servicio cierra. El audio emitido mientras la conexión no está lista puede perderse; no se promete recuperación de esa entrada y no se reenvían operaciones anteriores.

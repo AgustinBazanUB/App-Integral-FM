@@ -74,7 +74,7 @@ async function issueToken({ store, session, config, env, now }) {
       liveConnectConstraints: { model: GEMINI_LIVE_MODEL, config: geminiLiveSetupConfig() },
     } });
     if (!token?.name) throw oliviaError("gemini-live-token-error", "Google no emitió un token efímero válido.", 503);
-    return { token: token.name, sessionId: sessionInfo.id, model: GEMINI_LIVE_MODEL, voice: "Aoede", maxSessionSeconds: sessionInfo.maxSessionSeconds, expiresAt: new Date(now.getTime() + TOKEN_EXPIRES_MS).toISOString(), reservedUsd: sessionInfo.reservation, timings: { reservationMs, providerTokenMs: Math.round(performance.now() - providerStartedAt) } };
+    return { token: token.name, sessionId: sessionInfo.id, model: GEMINI_LIVE_MODEL, voice: "Aoede", maxSessionSeconds: sessionInfo.maxSessionSeconds, expiresAt: new Date(now.getTime() + TOKEN_EXPIRES_MS).toISOString(), newSessionExpiresAt:new Date(now.getTime()+60_000).toISOString(), reservedUsd: sessionInfo.reservation, timings: { reservationMs, providerTokenMs: Math.round(performance.now() - providerStartedAt) } };
   } catch (error) {
     await releaseSession({ store, id: sessionInfo.id, now, status: "token-error" }).catch(() => {});
     if (error.code) throw error;

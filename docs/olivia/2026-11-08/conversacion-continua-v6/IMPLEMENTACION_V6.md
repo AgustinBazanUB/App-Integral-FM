@@ -30,7 +30,7 @@ Los backchannels se mantienen conservadores mediante instrucciones nativas; no s
 
 ## Validación local
 
-`npm test`: 1144 pruebas aprobadas, incluidas 21 nuevas V6. `npm run build`: aprobado, conserva aviso conocido por tamaño de chunks. Se requiere repetir si cambian estos módulos. Reglas y permisos de Firestore no se modifican.
+`npm test`: 1145 pruebas aprobadas, incluidas 22 nuevas V6. `npm run build`: aprobado, conserva aviso conocido por tamaño de chunks. Se requiere repetir si cambian estos módulos. Reglas y permisos de Firestore no se modifican.
 
 ## Fuentes de contrato
 

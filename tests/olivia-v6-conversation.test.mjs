@@ -89,6 +89,14 @@ test('expired session closes its lease before fresh credentials and restores his
   assert.equal(f.recovery.at(-1).resumed,false);assert.equal(f.sockets[1].sent[1].clientContent.turns[0].role,'model');
 });
 
+test('expired connection-opening window avoids a resumption attempt with otherwise valid credentials',async t=>{
+  const f=fixture(t);await f.live.start(null,{textInputOnly:true});f.live.resumeHandle='handle';
+  f.live.tokenExpiresAt=Date.now()+60000;f.live.newSessionExpiresAt=Date.now()-1;
+  await f.live.recover(new Error('idle-disconnect'));
+  assert.equal(f.sockets.length,2);assert.deepEqual(f.sockets[1].sent[0].setup.sessionResumption,{});
+  assert.equal(f.recovery.at(-1).resumed,false);assert.equal(f.recovery.at(-1).attempt,1);
+});
+
 test('budget denial is terminal and does not request more credentials',async t=>{
   const f=fixture(t);await f.live.start(null,{textInputOnly:true});
   await f.live.recover(Object.assign(new Error('quota'),{status:429}));

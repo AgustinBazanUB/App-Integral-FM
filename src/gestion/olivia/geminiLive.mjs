@@ -97,6 +97,7 @@ export class GeminiLiveSession {
       throw new DOMException("Sesión cerrada", "AbortError");
     }
     this.tokenExpiresAt = Date.parse(this.tokenResult.expiresAt);
+    this.newSessionExpiresAt=Date.parse(this.tokenResult.newSessionExpiresAt || this.tokenResult.expiresAt);
     try { await this.openSocket(null); }
     catch (error) { this.fail(error); throw error; }
     if (this.closed || this.failed) throw new DOMException("Sesión cerrada", "AbortError");
@@ -776,7 +777,7 @@ export class GeminiLiveSession {
         try{
           await this.waitRecovery(recoveryBackoff(attempt,this.random),this.recoveryAbort.signal);
           if(this.closed)return false;
-          const handle=!fresh && attempt===1 && this.resumeHandle && this.clock()<this.tokenExpiresAt && this.clock()<(this.sessionDeadline || Infinity)?this.resumeHandle:null;
+          const handle=!fresh && attempt===1 && this.resumeHandle && this.clock()<Math.min(this.tokenExpiresAt,this.newSessionExpiresAt) && this.clock()<(this.sessionDeadline || Infinity)?this.resumeHandle:null;
           if(!handle){
             if(this.sessionId){const released=await this.releaseBudget();this.stopping=null;if(!released?.closed)throw new Error('No se pudo cerrar la reserva anterior.');this.sessionId=null;}
             if(this.closed || this.failed)return false;
@@ -785,7 +786,7 @@ export class GeminiLiveSession {
             this.trace('gemini.token.request.end',{durationMs:this.now()-at,status:'ok'});
             if(!this.tokenResult?.token || !this.tokenResult?.sessionId)throw new Error('No se pudo renovar la sesión.');
             if(this.closed || this.failed){this.sessionId=this.tokenResult.sessionId;this.stopping=null;await this.releaseBudget();return false;}
-            this.sessionId=this.tokenResult.sessionId;this.tokenExpiresAt=Date.parse(this.tokenResult.expiresAt);this.resumeHandle=null;
+            this.sessionId=this.tokenResult.sessionId;this.tokenExpiresAt=Date.parse(this.tokenResult.expiresAt);this.newSessionExpiresAt=Date.parse(this.tokenResult.newSessionExpiresAt || this.tokenResult.expiresAt);this.resumeHandle=null;
           }
           await this.openSocket(handle);
           if(this.closed || this.failed)return false;
