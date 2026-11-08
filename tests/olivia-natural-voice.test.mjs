@@ -71,6 +71,16 @@ test('a brief playback-time noise pulse leaves the answer running while sustaine
   clearTimeout(voice.turnTimer);
 });
 
+test('a late local endpoint does not replace the completed native response with processing',()=>{
+  const states=[];
+  const voice=new NaturalVoiceConversation({now:()=>2000,onState:s=>states.push(s)});
+  const live={handlesTurns:true,ready:true,currentTurn:{pending:false},isPlaying:true,commit:async()=>{}};
+  voice.turnTranscriber=live;voice.recordingStartedAt=0;voice.lastSpeechAt=500;
+  voice.recordingTurn=true;voice.finishTurn();assert.equal(states.at(-1),'speaking');
+  live.isPlaying=false;voice.recordingTurn=true;voice.finishTurn();assert.equal(states.at(-1),'listening');
+  live.currentTurn.pending=true;voice.recordingTurn=true;voice.finishTurn();assert.equal(states.at(-1),'processing');
+});
+
 test("browser VAD sends a bounded turn with a short in-memory pre-roll and releases the microphone", async () => {
   const frames = [], records = [], states = [], turns = [], speechStarts = [], traces = [];
   let now = 0, amplitude = 0;

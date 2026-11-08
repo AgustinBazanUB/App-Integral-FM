@@ -192,7 +192,9 @@ export class NaturalVoiceConversation {
       if (discard) { liveSession.discardTurn?.(); return; }
       this.onTrace({ stage: "audio.commit", at: endedAt, turnId: this.turnId });
       this.onTrace({ stage: "voice.turn.end", at: endedAt, voiceEndedAt: metadata.voiceEndedAt, turnId: this.turnId, endpointMs: metadata.endpointWindowMs });
-      this.onState("processing");
+      // Native VAD may finish before the local silence window. A late local
+      // endpoint must not overwrite an already settled response with thinking.
+      this.onState(liveSession.currentTurn?.pending===false ? (liveSession.isPlaying ? "speaking" : "listening") : "processing");
       Promise.resolve(liveSession.commit(metadata)).catch(error => { if (!this.closed) this.onError(error); });
       return;
     }
