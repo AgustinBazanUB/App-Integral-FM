@@ -100,6 +100,17 @@ test('a completed voice turn becomes available before slow usage bookkeeping fin
   assert.equal(states.at(-1),'listening');assert.equal(live.currentTurn.pending,false);
   release({measurement:'provider-forwarded'});await tick();live.sessionId=null;
 });
+
+test('generated audio queued beyond the response deadline retains its playback completion window',async t=>{
+  const {live,turns}=session(t,{turnTimeoutMs:5,completionGraceMs:5});
+  live.sendText('Hola');live.nextAudioAt=.1;
+  live.receive({serverContent:{generationComplete:true}});
+  await new Promise(r=>setTimeout(r,20));
+  assert.equal(live.failed,false,'the provider response timeout cannot stop already generated audio');
+  assert.equal(live.currentTurn.pending,true);
+  live.receive({serverContent:{outputTranscription:{text:'Hola, acá estoy.'},turnComplete:true}});
+  await tick();assert.equal(turns.length,1);assert.equal(live.failed,false);
+});
 test('resumed tasks use an internal backend notification without a stale function response ID',async t=>{
   const {live,sent}=session(t);live.watchTasks([{id:'restored',status:'running'}]);
   live.notifyTaskUpdate({id:'restored',status:'completed',summary:'Resultado verificado'});

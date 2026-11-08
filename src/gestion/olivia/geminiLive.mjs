@@ -298,6 +298,9 @@ export class GeminiLiveSession {
       void this.handleTools(event.toolCall.functionCalls, turn);
     }
     if (content?.generationComplete && turn.pending && !interrupted && !ignoreOutput) {
+      // Generation succeeded. The remaining deadline is playback + the bounded
+      // turnComplete grace below, not the original provider-response timeout.
+      clearTimeout(turn.responseTimer);
       clearTimeout(turn.completionTimer);
       turn.completionTimer = setTimeout(() => {
         if (this.closed || this.failed || !turn.pending || turn.completeReceived || turn.toolPending || turn.awaitingToolResponse || turn.cancelled) return;
