@@ -40,7 +40,7 @@ export class DelegatedTaskClient {
       return this.control({action:'cancel',taskId},{onAccepted:context.onAccepted});
     }
     const identity=context.requestId || globalThis.crypto.randomUUID(),at=this.now();
-    const payload={operation:'delegatedTask',conversationId:this.conversationId,requestId:identity,message:text,...(taskId?{taskId}:{}),...(Number.isInteger(context.collectionRevision)?{collectionRevision:context.collectionRevision}:{}),priority:args.priority || 'normal',dependsOn:args.dependsOn || [],screenContext:context.screenContext || {}};
+    const payload={operation:'delegatedTask',conversationId:this.conversationId,requestId:identity,message:text,...(taskId?{taskId}:{}),...(Number.isInteger(context.collectionRevision)?{collectionRevision:context.collectionRevision}:{}),...(Number.isInteger(context.supersedesCollectionRevision)?{supersedesCollectionRevision:context.supersedesCollectionRevision}:{}),priority:args.priority || 'normal',dependsOn:args.dependsOn || [],screenContext:context.screenContext || {}};
     let task;
     for(let attempt=0;attempt<3;attempt++){
       try{task=await this.request(payload);break;}catch(error){

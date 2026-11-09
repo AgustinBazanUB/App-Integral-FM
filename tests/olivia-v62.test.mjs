@@ -6,6 +6,7 @@ import {InteractionCosts,monthlyProviderSummary} from '../src/gestion/olivia/int
 import {compactVoiceTask,taskOutcome} from '../src/shared/oliviaTaskConversation.mjs';
 import {GeminiLiveSession} from '../src/gestion/olivia/geminiLive.mjs';
 import {DelegatedTaskClient} from '../src/gestion/olivia/delegatedTaskClient.mjs';
+import {startDelegatedTask} from '../netlify/functions/_lib/olivia/delegatedTasks.mjs';
 import {createOliviaEngine,dualVoiceResponse} from '../netlify/functions/_lib/olivia/engine.mjs';
 import {fixture,start,textResponse} from './helpers/olivia-fixture.mjs';
 
@@ -41,6 +42,7 @@ test('late ASR cannot resurrect a delegated draft or mix its parameters into a n
  const next=advanceVoiceCollection('Quiero cargar un producto',accepted);
  assert.equal(next.revision,accepted.revision+1);assert.equal(next.intent,'choose-operation');assert.equal(next.requestedLocation,null);assert.deepEqual(next.itemsMentioned,[]);assert.equal(next.turns.length,1);
  assert.equal(mergeVoiceCollection(next,accepted),next);
+ const unknown=advanceVoiceCollection('Necesito cargar stock, pero todavía no sé en qué local.');assert.equal(unknown.requestedLocation,null);assert.equal(unknown.pendingQuestion,'location');
 });
 
 test('safe contextual categories allow varied questions and future intent but reject unverifiable claims',()=>{
@@ -93,6 +95,16 @@ test('collection audio is withheld until the entire generated utterance passes t
 });
 
 async function backend(provider){const f=fixture({role:'admin',provider});f.session.email='agsreserva@gmail.com';f.config.hybridVoice.enabled=true;f.documents.set('oliviaConfiguration/global',f.config);f.engine=createOliviaEngine({store:f.store,clock:f.clock,provider,env:{OPENAI_API_KEY:'fixture',OLIVIA_DEPLOY_PREVIEW_CONTEXT:'deploy-preview',OLIVIA_HYBRID_LIVE_ENABLED:'true',GEMINI_API_KEY:'synthetic',GEMINI_API_BILLING_TIER:'paid',FIREBASE_PROJECT_ID:'app-integral-fm-pruebas'}});f.id=(await start(f)).conversationId;return f;}
+
+test('an owned accepted new request supersedes only the matching unsubmitted draft revision',async()=>{
+ const f=await backend(async()=>assert.fail('no model call before queued dispatch'));
+ const root=f.documents.get('oliviaConversations/'+f.id);root.voiceCollection=advanceVoiceCollection('Quiero cargar stock');
+ const revision=root.voiceCollection.revision;
+ const task=await startDelegatedTask({store:f.store,engine:f.engine,session:f.session,body:{conversationId:f.id,requestId:'independent',message:'Quiero crear un producto',supersedesCollectionRevision:revision},dispatch:async()=>{},now:f.clock()});
+ const saved=f.documents.get('oliviaConversations/'+f.id).voiceCollection;
+ assert.equal(saved.status,'superseded');assert.equal(saved.supersededByTaskId,task.id);assert.equal(saved.revision,revision+1);assert.equal(mergeVoiceCollection(saved,{...saved,revision,status:'collecting'}),saved);
+ assert.equal(advanceVoiceCollection('El nombre es Aceite de prueba',saved),null);
+});
 
 test('native collection is persisted by the owned conversation endpoint with no model calls and no business facts',async()=>{
  const f=await backend(async()=>assert.fail('collection invoked Luna'));

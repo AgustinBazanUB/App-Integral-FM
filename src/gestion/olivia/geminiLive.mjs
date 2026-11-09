@@ -413,7 +413,7 @@ export class GeminiLiveSession {
     turn.classifiedText = userText;
     turn.directAuthorized = decision.route === "direct" && !turn.toolTurn;
     turn.classificationPromise = Promise.resolve(turn.directAuthorized);
-    this.onClassification({ durationMs: this.now() - startedAt, direct: turn.directAuthorized, route: turn.directAuthorized ? "local-direct" : turn.toolTurn ? "model-tool" : "local-policy-delegate", kind: decision.kind, source: "local-policy", turnId:turn.turnId, turnIndex: turn.turnIndex,collection:decision.collection });
+    this.onClassification({ durationMs: this.now() - startedAt, direct: turn.directAuthorized, route: turn.directAuthorized ? "local-direct" : turn.toolTurn ? "model-tool" : "local-policy-delegate", kind: decision.kind, source: "local-policy", turnId:turn.turnId, turnIndex: turn.turnIndex,collection:decision.collection,newTask:decision.newTask });
     this.trace("gemini.classification.local", { turnId: turn.turnId, turnIndex: turn.turnIndex, route: turn.directAuthorized ? "direct" : turn.toolTurn ? "tool" : "delegate", kind: decision.kind });
     if (turn.cancelled || this.closed || this.failed) return turn.classificationPromise;
     if (turn.directAuthorized) {
@@ -520,7 +520,7 @@ export class GeminiLiveSession {
       // Deliberately detached from the voice turn: barge-in stops speech, not
       // an independently accepted backend job. The job survives reconnection.
       const normalizedCall=decision.kind==='task-status'?{...call,args:{...call.args,action:'status'}}:decision.kind==='collected-operation'||decision.newTask?{...call,args:{...call.args,action:'new',taskId:undefined}}:call;
-      Promise.resolve().then(()=>this.onToolCall(normalizedCall,decision.request || transcript,{turnId:turn.turnId,turnIndex:turn.turnIndex,sessionId:this.sessionId,transcriptComplete:true,onAccepted,conversationDraft:decision.collection})).then(result=>{
+      Promise.resolve().then(()=>this.onToolCall(normalizedCall,decision.request || transcript,{turnId:turn.turnId,turnIndex:turn.turnIndex,sessionId:this.sessionId,transcriptComplete:true,onAccepted,conversationDraft:decision.collection,newTask:decision.newTask})).then(result=>{
         if(this.closed || this.failed)return;
         this.enqueueToolResult({...binding,result});
       }).catch(error=>{
@@ -541,7 +541,7 @@ export class GeminiLiveSession {
     const onAccepted=task=>{binding.taskId=task.id;this.pendingTaskCalls.set(task.id,{...binding});this.trace('task.accepted',{turnId:turn.turnId,taskId:task.id,jobId:task.jobId,status:task.status,source:'local-policy'});};
     // Same authenticated client, task engine and visual confirmation. This has
     // no invented provider call ID and never blocks the conversational turn.
-    Promise.resolve().then(()=>this.onToolCall({name:'delegate_to_olivia',args:{action,request:decision.request || turn.inputText}},decision.request || turn.inputText,{turnId:turn.turnId,turnIndex:turn.turnIndex,sessionId:this.sessionId,requestId:turn.turnId,transcriptComplete:true,onAccepted,conversationDraft:decision.collection})).then(result=>{
+    Promise.resolve().then(()=>this.onToolCall({name:'delegate_to_olivia',args:{action,request:decision.request || turn.inputText}},decision.request || turn.inputText,{turnId:turn.turnId,turnIndex:turn.turnIndex,sessionId:this.sessionId,requestId:turn.turnId,transcriptComplete:true,onAccepted,conversationDraft:decision.collection,newTask:decision.newTask})).then(result=>{
       if(!this.closed && !this.failed)this.enqueueToolResult({...binding,result:decision.kind==='task-control'?{...result,needsClarification:true,summary:'Pedí que indique qué tarea y qué control quiere realizar. No se modificó ninguna tarea.'}:result});
     }).catch(error=>{if(!this.closed && !this.failed)this.enqueueToolResult({...binding,result:{error:'No pude completar esa solicitud. Podemos seguir conversando.',outcome:taskOutcome({status:'failed',failure:{code:error?.code || 'task-error'}})}});});
   }

@@ -688,8 +688,9 @@ export default function OliviaAssistant() {
             onState:state=>{if(mounted.current && voiceRef.current===connection)setVoiceState(state);},
             onPartial:text=>{onPartial(text);if(mounted.current && text)setCaption(text);},
             onTranscript:(text,{turnId,turnIndex}={})=>{if(mounted.current){if(turnId && !visibleTranscriptTurns.current.has(turnId)){visibleTranscriptTurns.current.add(turnId);markTurnTrace('assistant.text.visible.first',{turnId,turnIndex,source:'gemini'},performance.now());}setCaption(text);}},
-            onClassification:({durationMs,direct,route,kind,source,turnIndex,turnId,collection})=>{
+            onClassification:({durationMs,direct,route,kind,source,turnIndex,turnId,collection,newTask})=>{
               if(collection)voiceCollectionRef.current=mergeVoiceCollection(voiceCollectionRef.current,collection);
+              else if(newTask && ['collecting','ready','paused'].includes(voiceCollectionRef.current?.status))voiceCollectionRef.current={...voiceCollectionRef.current,status:'superseded',revision:voiceCollectionRef.current.revision+1,nextStep:'new-request-scope'};
               recordVoiceMetric(source==='local-policy'?'geminiLocalClassification':'geminiClassification',durationMs);
               const label=route==='local-direct'?'Gemini directo · política local':route==='model-tool'?'Delegado con herramienta Gemini':route==='local-policy-delegate'?'Delegado por política local':'Delegado por política backend';
               setVoiceMetrics(current=>({...current,geminiLastRoute:label,geminiLastTurnIndex:turnIndex}));
@@ -713,6 +714,7 @@ export default function OliviaAssistant() {
               if(context.conversationDraft)await directPersistChain.current;
               return delegatedClient.current.run(call,String(inputText).trim(),{...context,requestId:context.requestId || requestId(),screenContext:contextRef.current,
                 collectionRevision:context.conversationDraft?.revision,
+                supersedesCollectionRevision:context.newTask && voiceCollectionRef.current?.status==='superseded'?voiceCollectionRef.current.revision-1:undefined,
                 onAccepted:task=>{if(context.conversationDraft)voiceCollectionRef.current={...context.conversationDraft,status:'delegated',taskId:task.id};if(['new','continue'].includes(call.args?.action))taskOrigins.current.set(task.id,context.turnId);interactionCosts.current.task(taskOrigins.current.get(task.id),task);refreshCosts(n=>n+1);markTurnTrace('olivia.delegate.accepted',{turnId:context.turnId,taskId:task.id,jobId:task.jobId,status:task.status});context.onAccepted?.(task);}});
             },
             onUsage:(usage,correlation={})=>{interactionCosts.current.voice(correlation.sourceTurnId || taskOrigins.current.get(correlation.taskId) || correlation.turnId,usage,`${correlation.sessionId}:${correlation.turnId}`);refreshCosts(n=>n+1);updateGeminiUsage(usage);setVoiceMetrics(current=>({...current,geminiLiveLastUsage:usage}));markTurnTrace('provider.usage',{...correlation,provider:'gemini',model:'gemini-3.8-live',costUsd:usage.costUsd,inputTokens:usage.inputTokens,outputTokens:usage.outputTokens,status:usage.measurement || 'unconfirmed'});},

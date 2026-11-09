@@ -35,7 +35,7 @@ export function advanceVoiceCollection(text,previous=null,context={}) {
   if(correction)draft.corrections=[...draft.corrections,raw].slice(-4);
   if(draft.intent==='stock-load'){
     const loc=/(?:^|\b)en\s+(?:(?:el|la)\s+)?(?:(?:local|ubicacion|deposito)\s+)?(.+)/i.exec(raw);
-    if(loc){const value=loc[1].split(new RegExp('(?:[,;]|\\s+(?:y\\s+)?'+qty+'\\s+)','i'))[0].trim();if(value&&!/^realidad\b/i.test(value))draft.requestedLocation=value.slice(0,160);}
+    if(loc){const value=loc[1].split(new RegExp('(?:[,;]|\\s+(?:y\\s+)?'+qty+'\\s+)','i'))[0].trim();if(value&&!/^(?:realidad|que|cual|donde)\b/.test(normalizeSpeech(value)))draft.requestedLocation=value.slice(0,160);}
     if(quantity.test(n)&&(!/^(?:en|local|ubicacion|deposito)\b/.test(n)||/\b(?:unidades|botellas|paquetes|sumar|cargar)\b/.test(n))){
       const parts=raw.split(new RegExp('(?:[,;]\\s*|\\s+y\\s+)(?='+qty+'\\b)','i'));
       const items=parts.map(part=>{const m=new RegExp('\\b('+qty+')\\s+(.+)','i').exec(part);return m?{quantityMentioned:m[1],description:m[2].replace(/\s+en\s+(?:el\s+)?local\b.*/i,'').trim().slice(0,350)}:null;}).filter(x=>x&&x.description).slice(0,20);
@@ -73,7 +73,7 @@ export function compactCollection(collection){if(!collection)return null;const {
 export function mergeVoiceCollection(current,incoming){
   if(!current)return incoming;
   if(!incoming || (incoming.revision || 0)<(current.revision || 0))return current;
-  if(incoming.revision===current.revision && ['delegated','cancelled'].includes(current.status) && !['delegated','cancelled'].includes(incoming.status))return current;
+  if(incoming.revision===current.revision && ['delegated','cancelled','superseded'].includes(current.status) && !['delegated','cancelled','superseded'].includes(incoming.status))return current;
   return incoming;
 }
 
