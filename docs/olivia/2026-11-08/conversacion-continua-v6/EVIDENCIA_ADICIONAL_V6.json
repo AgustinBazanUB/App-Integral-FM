@@ -1,0 +1,677 @@
+{
+  "codeSha": "3c43f1e2cb43a7f752f4a5775cc891f6a686292b",
+  "method": "Audio virtual con proveedores reales; no certificación física",
+  "list20": {
+    "V6-LIST20-A": {
+      "sha": "41cb4d7",
+      "durationSeconds": 29.760416666666668,
+      "vosk": "tome nota de la lista uno alfa dos bravo tres charly cuatro delta cinco eco seis fox trote siete golf ocho hotel nueve india diez julieta once kilo doce lima trece mil catorce noviembre quince oscar dieciseis papá diecisiete quebec dieciocho romeo diecinueve sierra y veinte tango",
+      "whisper": " Tomé nota de la lista, uno alfa, dos bravo, tres charli, cuatro delta, cinco eco, seis  Foxtrot, siete golf, ocho hotel, nueve India, diez Julieta, onsequilo, doce Lima, trece  Mike, catorce noviembre, quince Oscar, dieciséis papa, diecisiete que bec, dieciocho  Romeo 19 Sierra y 20 Tango.",
+      "complete": true
+    },
+    "V6-LIST20-B": {
+      "sha": "6e28f19fc5c0e186602b8d8fb023d451d227162c",
+      "durationSeconds": 22.920416666666668,
+      "vosk": "tome nota de tu lista uno alfa dos bravo tres charly cuatro delta cinco eco seis fox trout siete golf ocho hotel nueve india doce julieta trece mil catorce noviembre quince oscar dieciseis papá diecisiete quebec dieciocho romeo diecinueve sierra y veinte tango",
+      "whisper": " Tomé nota de tu lista, uno alfa, dos bravo, tres charli, cuatro delta, cinco eco, seis  Foxtrot, siete golf, ocho hotel, nueve India, doce julieta, trece Mike, catorce noviembre,  quince Oscar, dieciséis papa, diecisiete Quebec, dieciocho romeo, diecinueve cierra y veinte  de tango.",
+      "complete": false
+    },
+    "V6-LIST20-C": {
+      "sha": "c59c62458a5834ef0943b5ae365410b827676a03",
+      "durationSeconds": 26.620416666666667,
+      "vosk": "tome nota uno alfa dos bravo tres charlie cuatro delta cinco eco seis fox trote siete golf ocho hotel nueve india diez julieta once kilo doce lima trece mil catorce noviembre quince oscar dieciseis papá diecisiete quebec dieciocho romeo diecinueve sierra y veinte tango",
+      "whisper": " Tomenota, 1 alfa, 2 bravo, 3 charli, 4 delta, 5 eco, 6 Foxtrot, 7 golf, 8 hotel, 9 India, 10 Julieta, 11 kilo, 12 Lima, 13 Mike, 14 noviembre, 15 Oscar, 16 papa, 17 Quebec, 18 Romeo, 19 Sierra y 20 Tango.",
+      "complete": true,
+      "PCMComparison": {
+        "id": "V6-LIST20-C",
+        "raw_frames": 75,
+        "scheduled_frames": 75,
+        "raw_samples": 638880,
+        "scheduled_samples": 638880,
+        "same_length": true,
+        "max_int16_diff": 1,
+        "explanation": "Player converts int16 /32768; capture rounds float *32767. Difference at most one is expected."
+      }
+    }
+  },
+  "network": {
+    "network-short-final": {
+      "sha": "c59c62458a5834ef0943b5ae365410b827676a03",
+      "kind": "controlled-own-WebSocket-close-after-opening-window",
+      "start": 519103.6999999881,
+      "events": [
+        {
+          "at": 519119.1999999881,
+          "stage": "test.transport.drop"
+        },
+        {
+          "at": 519289,
+          "code": 1000,
+          "reason": "",
+          "stage": "provider.socket.closed"
+        },
+        {
+          "at": 521713.59999996424,
+          "sessionId": "dea955e5-2b9c-4313-9a05-3b9a0c0dc205",
+          "stage": "http.usage"
+        },
+        {
+          "at": 523867.89999997616,
+          "sessionId": "85bf7671-1c74-48cb-a8ca-d850129517cb",
+          "stage": "session.token"
+        },
+        {
+          "at": 524874.0999999642,
+          "stage": "provider.setup.sent"
+        },
+        {
+          "at": 525525.2999999523,
+          "stage": "provider.setup.complete"
+        }
+      ]
+    },
+    "network-long-final": {
+      "sha": "c59c62458a5834ef0943b5ae365410b827676a03",
+      "kind": "tab-only-offline-12s",
+      "start": 547798,
+      "restoredAt": 559840.6999999881,
+      "events": [
+        {
+          "at": 548010.2999999523,
+          "code": 1000,
+          "reason": "",
+          "stage": "provider.socket.closed"
+        },
+        {
+          "at": 548340.0999999642,
+          "stage": "history.persisted"
+        }
+      ]
+    },
+    "network-long-fixed": {
+      "sha": "b64e25739a39b11d2b04b2923348f92c08488b39",
+      "kind": "tab-only-offline-12s-after-fix",
+      "start": 41343.40000003576,
+      "restoredAt": 53386,
+      "events": [
+        {
+          "at": 41552.30000001192,
+          "code": 1000,
+          "reason": "",
+          "stage": "provider.socket.closed"
+        },
+        {
+          "at": 54761.80000001192,
+          "stage": "provider.setup.sent"
+        },
+        {
+          "at": 55256.30000001192,
+          "code": 1011,
+          "reason": "Token has been used too many times",
+          "stage": "provider.socket.closed"
+        },
+        {
+          "at": 57958.40000003576,
+          "closed": true,
+          "sessionId": "37697d8d-7b4d-45ee-9d09-9c268ed7b0d0",
+          "stage": "http.usage"
+        },
+        {
+          "at": 60030,
+          "sessionId": "b4bae16a-4006-4280-ad3a-ed0178ade69b",
+          "stage": "session.token"
+        },
+        {
+          "at": 60263.40000003576,
+          "stage": "provider.setup.sent"
+        },
+        {
+          "at": 61028.10000002384,
+          "stage": "provider.setup.complete"
+        }
+      ]
+    },
+    "network-final": {
+      "sha": "3c43f1e2cb43a7f752f4a5775cc891f6a686292b",
+      "kind": "tab-only-offline-12s-single-use-fix",
+      "start": 29078,
+      "restoredAt": 41438.10000002384,
+      "result": {
+        "fromCutMs": 18122.5,
+        "fromOnlineMs": 5762.399999976158,
+        "ready": true
+      },
+      "events": [
+        {
+          "at": 29281.10000002384,
+          "code": 1000,
+          "reason": "",
+          "stage": "provider.socket.closed"
+        },
+        {
+          "at": 44118.20000004768,
+          "closed": true,
+          "sessionId": "f51cba3d-dd29-4654-8bd3-853d680e6087",
+          "stage": "http.usage"
+        },
+        {
+          "at": 46232.90000003576,
+          "sessionId": "8a29a06e-28ec-445f-a037-22cad8f8cad5",
+          "stage": "session.token"
+        },
+        {
+          "at": 46463.20000004768,
+          "stage": "provider.setup.sent"
+        },
+        {
+          "at": 47200.5,
+          "stage": "provider.setup.complete"
+        }
+      ]
+    }
+  },
+  "syntheticOperations": {
+    "project": "app-integral-fm-pruebas",
+    "customer": "customer_019f4696d589ed87d3ef9af5c6d543f55197f190",
+    "stock": {
+      "productId": "TyLvf3SaCgPElBUNvspc",
+      "locationId": "7011f524-ce34-4e55-a5e4-9330ad4ee492",
+      "before": 11,
+      "after": 12,
+      "movementId": "olivia_stock_9c9cb955-8516-480d-9644-9b142ded941a_TyLvf3SaCgPElBUNvspc",
+      "visualConfirmation": true
+    }
+  },
+  "noise": {
+    "150": {
+      "modality": "synthetic-band-noise-not-physical-PC-ambient",
+      "durationMs": 150,
+      "outputStops": 0,
+      "providerInterruptions": 0,
+      "scheduledAfterFirstStop": null,
+      "transcriptions": [],
+      "automaticContinuationProved": false
+    },
+    "500": {
+      "modality": "synthetic-band-noise-not-physical-PC-ambient",
+      "durationMs": 500,
+      "outputStops": 9,
+      "providerInterruptions": 0,
+      "scheduledAfterFirstStop": 0,
+      "transcriptions": [],
+      "automaticContinuationProved": false
+    }
+  },
+  "tasks": [
+    {
+      "id": "ba82142f7c724882296fb9cee1dab93346605b95f95fa8723ec822f80e778b4e",
+      "requestId": "a81d7f0b-d29d-41d1-922a-f5e113135996",
+      "status": "completed",
+      "summary": "Entendido, no le voy a enviar mensajes.",
+      "progress": {
+        "at": "2026-11-08T18:57:02.729Z",
+        "events": [
+          {
+            "at": "2026-11-08T18:57:02.729Z",
+            "kind": "accepted",
+            "label": "Solicitud recibida",
+            "revision": 1,
+            "tool": null
+          }
+        ],
+        "kind": "accepted",
+        "label": "Solicitud recibida",
+        "revision": 1,
+        "tool": null
+      },
+      "notification": {
+        "delivered": true,
+        "eligible": true,
+        "key": "c78520de0c44f6b22ba184475a850ac8b4811aaf1862ade574b2f4d9aa2f4b4a"
+      },
+      "telemetry": {
+        "modelCalls": 1,
+        "toolCalls": 0,
+        "providerMs": 2621,
+        "toolsMs": 0,
+        "retrievalMs": 3,
+        "totalMs": 7971
+      }
+    },
+    {
+      "id": "7488ea5d2974149ac1243ca596675f96a8174709e756955badf79b0ec50ab0d8",
+      "requestId": "c47f9f84-b33c-494a-b994-3f2c74dcb217",
+      "status": "completed",
+      "summary": "Ayer y esta semana figuran cero ventas, así que no hay un producto más vendido en esos períodos. Para consultar stock, ¿cuál ubicación de prueba querés que revise: QA Envíos o QA PR53?",
+      "progress": {
+        "at": "2026-11-08T18:57:38.157Z",
+        "events": [
+          {
+            "at": "2026-11-08T18:57:30.152Z",
+            "kind": "processing",
+            "label": "Revisando la solicitud",
+            "revision": 5,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T18:57:30.152Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 6,
+            "tool": "get_sales_metrics"
+          },
+          {
+            "at": "2026-11-08T18:57:30.153Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 7,
+            "tool": "search_products"
+          },
+          {
+            "at": "2026-11-08T18:57:31.505Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 8,
+            "tool": "get_app_capabilities"
+          },
+          {
+            "at": "2026-11-08T18:57:31.641Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 9,
+            "tool": "get_sales_metrics"
+          },
+          {
+            "at": "2026-11-08T18:57:31.915Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 10,
+            "tool": "search_products"
+          },
+          {
+            "at": "2026-11-08T18:57:32.051Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 11,
+            "tool": "get_app_capabilities"
+          },
+          {
+            "at": "2026-11-08T18:57:37.176Z",
+            "kind": "processing",
+            "label": "Revisando la solicitud",
+            "revision": 12,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T18:57:37.176Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 13,
+            "tool": "list_locations"
+          },
+          {
+            "at": "2026-11-08T18:57:37.177Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 14,
+            "tool": "list_warehouses"
+          },
+          {
+            "at": "2026-11-08T18:57:38.022Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 15,
+            "tool": "list_locations"
+          },
+          {
+            "at": "2026-11-08T18:57:38.157Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 16,
+            "tool": "list_warehouses"
+          }
+        ],
+        "kind": "tool-finished",
+        "label": "Terminó una comprobación",
+        "revision": 16,
+        "tool": "list_warehouses"
+      },
+      "notification": {
+        "delivered": true,
+        "eligible": true,
+        "key": "59bdff2aa934c727474dbc72d344534c7257ffc51d360002c777c0a031435e00"
+      },
+      "telemetry": {
+        "modelCalls": 4,
+        "toolCalls": 8,
+        "providerMs": 15158,
+        "toolsMs": 2465,
+        "retrievalMs": 132,
+        "totalMs": 27054
+      }
+    },
+    {
+      "id": "0bb4777b46d057af0c01f416509349046380241e4b8db283495abe70bf6e0b70",
+      "requestId": "24e5f729-4f47-4568-96d6-7d638bccd8c2",
+      "status": "completed",
+      "summary": "No encontré “Q envíos” en el catálogo. ¿En cuál de las dos ubicaciones de prueba querés cargar la unidad: QA Envíos Preview o QA PR53?",
+      "progress": {
+        "at": "2026-11-08T19:40:06.131Z",
+        "events": [
+          {
+            "at": "2026-11-08T19:39:56.402Z",
+            "kind": "accepted",
+            "label": "Solicitud recibida",
+            "revision": 1,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T19:40:00.587Z",
+            "kind": "processing",
+            "label": "Revisando la solicitud",
+            "revision": 2,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T19:40:00.587Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 3,
+            "tool": "get_current_user_context"
+          },
+          {
+            "at": "2026-11-08T19:40:00.731Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 4,
+            "tool": "get_current_user_context"
+          },
+          {
+            "at": "2026-11-08T19:40:03.020Z",
+            "kind": "processing",
+            "label": "Revisando la solicitud",
+            "revision": 5,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T19:40:03.020Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 6,
+            "tool": "list_locations"
+          },
+          {
+            "at": "2026-11-08T19:40:03.305Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 7,
+            "tool": "list_locations"
+          },
+          {
+            "at": "2026-11-08T19:40:05.849Z",
+            "kind": "processing",
+            "label": "Revisando la solicitud",
+            "revision": 8,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T19:40:05.849Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 9,
+            "tool": "search_products"
+          },
+          {
+            "at": "2026-11-08T19:40:06.131Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 10,
+            "tool": "search_products"
+          }
+        ],
+        "kind": "tool-finished",
+        "label": "Terminó una comprobación",
+        "revision": 10,
+        "tool": "search_products"
+      },
+      "notification": {
+        "delivered": true,
+        "eligible": true,
+        "key": "61a3b703e86c1f87a9cbd5ee32196cde169f33f4ff4f7d61adf783c94dd2bb92"
+      },
+      "telemetry": {
+        "modelCalls": 4,
+        "toolCalls": 3,
+        "providerMs": 6113,
+        "toolsMs": 711,
+        "retrievalMs": 19,
+        "totalMs": 16043
+      }
+    },
+    {
+      "id": "e5244bff0b55e12dafac970c587a20c79d844348a369094a088c47d9f0360af5",
+      "requestId": "3b76cdd9-5be0-4b16-b1c1-df73996c1008",
+      "status": "completed",
+      "summary": "Se agregaron 1 unidades de QA Envíos - Producto de prueba. Stock actual: 12.",
+      "progress": {
+        "at": "2026-11-08T19:41:53.304Z",
+        "events": [
+          {
+            "at": "2026-11-08T19:41:41.780Z",
+            "kind": "processing",
+            "label": "Revisando la solicitud",
+            "revision": 2,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T19:41:41.780Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 3,
+            "tool": "list_locations"
+          },
+          {
+            "at": "2026-11-08T19:41:42.053Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 4,
+            "tool": "list_locations"
+          },
+          {
+            "at": "2026-11-08T19:41:44.920Z",
+            "kind": "processing",
+            "label": "Revisando la solicitud",
+            "revision": 5,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T19:41:44.920Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 6,
+            "tool": "search_products"
+          },
+          {
+            "at": "2026-11-08T19:41:46.029Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 7,
+            "tool": "search_products"
+          },
+          {
+            "at": "2026-11-08T19:41:49.019Z",
+            "kind": "processing",
+            "label": "Revisando la solicitud",
+            "revision": 8,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T19:41:49.019Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 9,
+            "tool": "search_products"
+          },
+          {
+            "at": "2026-11-08T19:41:49.678Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 10,
+            "tool": "search_products"
+          },
+          {
+            "at": "2026-11-08T19:41:52.778Z",
+            "kind": "processing",
+            "label": "Revisando la solicitud",
+            "revision": 11,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T19:41:52.778Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 12,
+            "tool": "prepare_stock_load"
+          },
+          {
+            "at": "2026-11-08T19:41:53.304Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 13,
+            "tool": "prepare_stock_load"
+          }
+        ],
+        "kind": "tool-finished",
+        "label": "Terminó una comprobación",
+        "revision": 13,
+        "tool": "prepare_stock_load"
+      },
+      "notification": {
+        "delivered": true,
+        "eligible": true,
+        "key": "df54110d15bd5dcb9c0529b0a064af3005c830767c9a15c298b9686409b2ea1c"
+      },
+      "telemetry": {
+        "modelCalls": 4,
+        "toolCalls": 4,
+        "providerMs": 5630,
+        "toolsMs": 2567,
+        "retrievalMs": 134,
+        "totalMs": 17984
+      }
+    },
+    {
+      "id": "4ef4147874983c8d61356d77d7ebf47de21329a47c74185b5f0e1f1b07db25c2",
+      "requestId": "939d05df-2d34-4f47-8f81-e87f451f0227",
+      "status": "cancelled",
+      "summary": "La propuesta quedó cancelada.",
+      "progress": {
+        "at": "2026-11-08T19:43:58.486Z",
+        "events": [
+          {
+            "at": "2026-11-08T19:43:54.721Z",
+            "kind": "accepted",
+            "label": "Solicitud recibida",
+            "revision": 1,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T19:43:58.080Z",
+            "kind": "processing",
+            "label": "Revisando la solicitud",
+            "revision": 2,
+            "tool": null
+          },
+          {
+            "at": "2026-11-08T19:43:58.080Z",
+            "kind": "tool-started",
+            "label": "Consultando la información necesaria",
+            "revision": 3,
+            "tool": "update_task"
+          },
+          {
+            "at": "2026-11-08T19:43:58.486Z",
+            "kind": "tool-finished",
+            "label": "Terminó una comprobación",
+            "revision": 4,
+            "tool": "update_task"
+          }
+        ],
+        "kind": "tool-finished",
+        "label": "Terminó una comprobación",
+        "revision": 4,
+        "tool": "update_task"
+      },
+      "notification": {
+        "delivered": true,
+        "eligible": true,
+        "key": "0f3642160ec71e266bb27a11bb0ebe45b8091675a332569046b43389a1a8e9b2"
+      },
+      "telemetry": {
+        "modelCalls": 1,
+        "toolCalls": 1,
+        "providerMs": 1362,
+        "toolsMs": 406,
+        "retrievalMs": 5,
+        "totalMs": 7006
+      }
+    }
+  ],
+  "accountAtClose": {
+    "capturedAt": "2026-11-08T19:57:29.373Z",
+    "codeSha": "3c43f1e2cb43a7f752f4a5775cc891f6a686292b",
+    "project": "app-integral-fm-pruebas",
+    "status": 200,
+    "readiness": {
+      "apiKeyConfigured": true,
+      "authorizedVoiceAccount": true,
+      "deployPreview": true,
+      "hybridVoiceEnabled": true,
+      "isolatedFirebaseProject": true,
+      "paidBillingTier": true,
+      "previewFlag": true
+    },
+    "usage": {
+      "__updateTime": "2026-11-08T19:57:14.011405Z",
+      "activeSessionId": null,
+      "averageUsdPerQuery": 0.003491380794701987,
+      "combinedEstimatedSpendUsd": 1.1632170000000002,
+      "combinedUnconfirmedCount": 6,
+      "createdAt": "2026-11-06T19:05:20.761Z",
+      "estimatedUsd": 0.065886,
+      "hardLimitUsd": 10,
+      "id": "2026-11",
+      "lunaSol": {
+        "calls": 125,
+        "estimatedUsd": 0.10882000000000004,
+        "inputTokens": 1044549,
+        "outputTokens": 9406,
+        "unconfirmedCalls": 3
+      },
+      "maxQueries": 660,
+      "period": "2026-11",
+      "projectedMonthEndUsd": 3.95398875,
+      "projectionAt660Usd": 2.3043113245033116,
+      "queryCount": 302,
+      "queryLimitReached": false,
+      "reservedUsd": 0,
+      "retentionExpiresAt": "2026-12-08T19:43:59.698Z",
+      "spendUsd": 1.054397,
+      "targetUsd": 5,
+      "unconfirmedQueryCount": 3,
+      "updatedAt": "2026-11-08T19:57:13.243Z",
+      "usageMetadataEstimatedUsd": 0.988511,
+      "usedUsd": 1.054397,
+      "warningReached": false,
+      "warningUsd": 6
+    },
+    "limits": {
+      "enabled": true,
+      "hardLimitUsd": 10,
+      "maxSessionSeconds": 600,
+      "reservedUsdPerSession": 0.5,
+      "targetUsd": 5,
+      "warningUsd": 6
+    }
+  }
+}

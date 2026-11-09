@@ -8,6 +8,19 @@ import {
 const NOW = new Date("2026-10-04T15:00:00.000Z");
 const PAST = new Date("2026-10-04T14:59:00.000Z");
 const FUTURE = new Date("2026-11-04T15:00:00.000Z");
+test('expired task records are purged before their parent without touching a current conversation',async()=>{
+  const f=memoryStore([
+    ['oliviaConversations/expired',{expiresAt:PAST,historyStorageVersion:1,messages:[]}],
+    ['oliviaConversations/expired/delegatedTasks/task',{message:'synthetic',requests:{attempt:'fingerprint'}}],
+    ['oliviaConversations/current',{expiresAt:FUTURE,messages:[]}],
+    ['oliviaConversations/current/delegatedTasks/active',{status:'running'}],
+  ]);
+  const result=await runOliviaRetention({store:f.store,now:NOW});
+  assert.equal(result.delegatedTasksRemoved,1);
+  assert.equal(f.data.has('oliviaConversations/expired'),false);
+  assert.equal(f.data.has('oliviaConversations/expired/delegatedTasks/task'),false);
+  assert.equal(f.data.has('oliviaConversations/current/delegatedTasks/active'),true);
+});
 test('private personalized audio follows retention without deleting unexpired user audio',async()=>{
   const f=memoryStore([
     ['oliviaPrivateSpeech/old',{userId:'a',audio:'synthetic',retentionExpiresAt:PAST}],
