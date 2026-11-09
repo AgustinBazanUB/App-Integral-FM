@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {advanceVoiceCollection,collectionDecision,safeConversationBridge,collectionQuestion} from '../src/shared/oliviaVoiceCollection.mjs';
+import {advanceVoiceCollection,collectionDecision,safeConversationBridge,collectionQuestion,mergeVoiceCollection} from '../src/shared/oliviaVoiceCollection.mjs';
 import {classifyGeminiLiveTurn} from '../src/shared/oliviaConversationRouter.mjs';
 import {InteractionCosts,monthlyProviderSummary} from '../src/gestion/olivia/interactionCosts.mjs';
 import {compactVoiceTask,taskOutcome} from '../src/shared/oliviaTaskConversation.mjs';
@@ -30,6 +30,16 @@ test('ambiguous product intake asks operation, cancellation stays unsubmitted an
  const pending=advanceVoiceCollection('Quiero cargar stock');assert.equal(advanceVoiceCollection('No, dejá',pending).status,'cancelled');
  assert.equal(collectionDecision('Quiero cargar stock',{capabilities:['search_products']}),null);
  assert.equal(classifyGeminiLiveTurn('Quiero cargar stock y decime cuánto hay disponible').route,'delegate');
+});
+
+test('late ASR cannot resurrect a delegated draft or mix its parameters into a new request',()=>{
+ let d=advanceVoiceCollection('Quiero cargar stock');d=advanceVoiceCollection('En Local Lavalle',d);d=advanceVoiceCollection('Dos botellas de Arbequina',d);
+ const accepted={...d,status:'delegated',taskId:'task-a'};
+ assert.equal(mergeVoiceCollection(accepted,d),accepted);
+ assert.equal(mergeVoiceCollection(accepted,{...d,revision:d.revision-1,status:'collecting'}),accepted);
+ const next=advanceVoiceCollection('Quiero cargar un producto',accepted);
+ assert.equal(next.revision,accepted.revision+1);assert.equal(next.intent,'choose-operation');assert.equal(next.requestedLocation,null);assert.deepEqual(next.itemsMentioned,[]);assert.equal(next.turns.length,1);
+ assert.equal(mergeVoiceCollection(next,accepted),next);
 });
 
 test('safe contextual categories allow varied questions and future intent but reject unverifiable claims',()=>{

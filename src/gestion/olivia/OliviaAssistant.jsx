@@ -35,6 +35,7 @@ import { DelegatedTaskClient } from './delegatedTaskClient.mjs';
 import OliviaDelegatedTasks from './OliviaDelegatedTasks';
 import { recoveryDiagnostic } from './liveRecovery.mjs';
 import { InteractionCosts } from './interactionCosts.mjs';
+import { mergeVoiceCollection } from '../../shared/oliviaVoiceCollection.mjs';
 
 export default function OliviaAssistant() {
   const { user, profile } = useAuth();
@@ -193,7 +194,7 @@ export default function OliviaAssistant() {
     }
     if(result.conversationContext&&Object.hasOwn(result.conversationContext,'voiceCollection')){
       const incoming=result.conversationContext.voiceCollection;
-      if(!voiceCollectionRef.current || (incoming?.revision || 0)>=(voiceCollectionRef.current.revision || 0))voiceCollectionRef.current=incoming;
+      voiceCollectionRef.current=mergeVoiceCollection(voiceCollectionRef.current,incoming);
     }
     setSnapshot((current) => ({ ...current, ...result, messages: Array.isArray(result.messages) ? result.messages : current.messages,
       pendingAction: Object.hasOwn(result, "pendingAction") ? result.pendingAction : current.pendingAction,
@@ -688,7 +689,7 @@ export default function OliviaAssistant() {
             onPartial:text=>{onPartial(text);if(mounted.current && text)setCaption(text);},
             onTranscript:(text,{turnId,turnIndex}={})=>{if(mounted.current){if(turnId && !visibleTranscriptTurns.current.has(turnId)){visibleTranscriptTurns.current.add(turnId);markTurnTrace('assistant.text.visible.first',{turnId,turnIndex,source:'gemini'},performance.now());}setCaption(text);}},
             onClassification:({durationMs,direct,route,kind,source,turnIndex,turnId,collection})=>{
-              if(collection)voiceCollectionRef.current=collection;
+              if(collection)voiceCollectionRef.current=mergeVoiceCollection(voiceCollectionRef.current,collection);
               recordVoiceMetric(source==='local-policy'?'geminiLocalClassification':'geminiClassification',durationMs);
               const label=route==='local-direct'?'Gemini directo · política local':route==='model-tool'?'Delegado con herramienta Gemini':route==='local-policy-delegate'?'Delegado por política local':'Delegado por política backend';
               setVoiceMetrics(current=>({...current,geminiLastRoute:label,geminiLastTurnIndex:turnIndex}));

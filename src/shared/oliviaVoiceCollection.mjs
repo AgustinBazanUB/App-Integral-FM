@@ -28,7 +28,7 @@ export function advanceVoiceCollection(text,previous=null,context={}) {
   if(active && intent && intent!==previous.intent && previous.intent!=='choose-operation')return null;
   if(!active && !intent)return null;
   if(active && !intent && !/^(?:en|local|ubicacion|deposito)\b/.test(n) && /\b(?:ventas?|clientes?|envios?|transfer\w*|metricas?|precios?)\b/.test(n))return null;
-  const draft=active?structuredClone(previous):{version:1,revision:0,intent,operation:intent,requestedLocation:null,itemsMentioned:[],requestedProductName:null,validation:'unverified',status:'collecting',turns:[],corrections:[]};
+  const draft=active?structuredClone(previous):{version:1,revision:previous?.revision || 0,intent,operation:intent,requestedLocation:null,itemsMentioned:[],requestedProductName:null,validation:'unverified',status:'collecting',turns:[],corrections:[]};
   if(intent){draft.intent=intent;draft.operation=intent;}
   draft.revision++;draft.lastInput=n;draft.turns=[...draft.turns,raw].slice(-10);
   const correction=/\b(?:en realidad|queria decir|mejor|corrijo|corregi)\b/.test(n);
@@ -67,6 +67,15 @@ export function collectionDecision(text,context={}){
 
 export const collectionQuestion=collection=>collection.status==='cancelled'?'No voy a preparar ese pedido.':({location:'¿En qué ubicación querés cargarlo?','items-and-quantities':'¿Qué productos y cantidades querés sumar?','product-name':'¿Qué nombre tendrá el producto?',operation:'¿Querés crear un producto nuevo o sumar stock de uno existente?'}[collection.pendingQuestion] || '¿Qué dato querés aclarar?');
 export function compactCollection(collection){if(!collection)return null;const {turns,lastInput,...rest}=collection;return {...rest,itemsMentioned:collection.itemsMentioned?.map(item=>({...item,description:item.description.slice(0,160)})),corrections:collection.corrections?.slice(-2).map(s=>s.slice(0,160))};}
+
+// Final ASR and history responses may arrive after task acceptance. A draft
+// already handed off must never be resurrected by that older turn.
+export function mergeVoiceCollection(current,incoming){
+  if(!current)return incoming;
+  if(!incoming || (incoming.revision || 0)<(current.revision || 0))return current;
+  if(incoming.revision===current.revision && ['delegated','cancelled'].includes(current.status) && !['delegated','cancelled'].includes(incoming.status))return current;
+  return incoming;
+}
 
 const unsafe=/\b(?:cargue|cargamos|agregue|agregamos|registre|registramos|ejecute|ejecutado|realizado|encontre|encontramos|existe|existen|habilitad\w*|autorizad\w*|verificad\w*|validad\w*|disponible\w*|vendimos|vendiste|tenemos|stock actual|quedo confirmad\w*|ya esta|ya esta hecho|confirmado|operacion completada|se cargo|se registro)\b/;
 const prefix=/^(?:(?:dale|perfecto|buenisimo|bien|bueno|entendido|tomado|listo|genial|claro|de acuerdo|con gusto|por supuesto)[\s,.:!¡]*)+/;
