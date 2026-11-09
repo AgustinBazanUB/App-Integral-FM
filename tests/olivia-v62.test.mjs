@@ -122,3 +122,9 @@ test('structured requiresInput prevents a generic delegated question from becomi
  assert.ok(calls>0);assert.equal(result.state,'DATOS_INCOMPLETOS');assert.equal(f.documents.get('oliviaConversations/'+f.id).taskState.status,'collecting');
  assert.equal(dualVoiceResponse(JSON.stringify({complete:'Pregunta',spoken:'Pregunta',requiresInput:true}),100).requiresInput,true);
 });
+
+test('deterministic product onboarding also stays incomplete without a provider round',async()=>{
+ const f=await backend(async()=>assert.fail('bare operation start should not call a provider'));
+ const result=await f.engine.chat(f.session,{conversationId:f.id,requestId:'bare-product',message:'Quiero crear un producto nuevo',inputMode:'natural-voice',screenContext:{module:'products'},foreground:true});
+ assert.equal(result.state,'DATOS_INCOMPLETOS');assert.equal(f.documents.get('oliviaConversations/'+f.id).taskState.status,'collecting');assert.match(result.messages.at(-1).content,/nombre|llame/);
+});
