@@ -49,7 +49,13 @@ export function classifyGeminiLiveTurn(text, context = {}) {
   // Gemini understands ordinary language/context; only the authenticated engine
   // can supply business facts, collect operational slots or prepare mutations.
   const business = /\b(?:stock|inventario|mercaderia|productos?|presentaciones?|precios?|vendimos|vendido|ventas?|factur\w*|comprobantes?|clientes?|proveedores?|depositos?|ubicaciones?|pedidos?|envios?|transfer\w*|gastos?|caja|cobros?|pagos?|saldos?|ganancias?|reportes?|metricas?|tareas?|lavalle|registr\w*|carg\w*|agreg\w*|crea(?:r|me)?|borra\w*|elimina\w*|modifica\w*|actualiza\w*)\b/.test(normalized) || /\b(?:cuanto (?:sale|cuesta)|cuantas? unidades|cuantos? quedan)\b/.test(normalized);
-  if (business) return { route: 'delegate', kind: 'data-or-operation' };
+  if (business) {
+    // A fresh explicit request cannot replace an unrelated pending proposal,
+    // even when the model suggests reusing that proposal's task ID.
+    const explicitOperation=/\b(?:crea\w*|registra\w*|transf\w*|carga\w*|agrega\w*)\b.+\b(?:clientes?|productos?|stock|mercaderia|ventas?|pedidos?|envios?)\b/.test(normalized);
+    const query=/^(?:olivia )?(?:cuanto\w*|cual\w*|busca\w*|consulta\w*|mostra\w*)\b/.test(normalized);
+    return { route: 'delegate', kind: 'data-or-operation', ...( (explicitOperation || query) && !/\b(?:corrijo|corregi|en realidad|queria decir|en vez de|ese mismo|esa misma)\b/.test(normalized)?{newTask:true}:{} ) };
+  }
   const control = /^(?:(?:si|no|dale|bueno|perfecto|listo)(?:\s+(?:dale|deja|dejalo|gracias|por favor|segui|continua))*|cancel\w*(?:\s+(?:eso|la tarea|la solicitud|por favor))*|espera(?:\s+.*)?|corri\w*(?:\s+.*)?)$/.test(normalized);
   if (taskActive && control) return { route: 'delegate', kind: 'task-control' };
   // Elliptical slot answers belong to their task. Explicit social speech is

@@ -5,6 +5,7 @@ import {classifyGeminiLiveTurn} from '../src/shared/oliviaConversationRouter.mjs
 import {InteractionCosts,monthlyProviderSummary} from '../src/gestion/olivia/interactionCosts.mjs';
 import {compactVoiceTask,taskOutcome} from '../src/shared/oliviaTaskConversation.mjs';
 import {GeminiLiveSession} from '../src/gestion/olivia/geminiLive.mjs';
+import {DelegatedTaskClient} from '../src/gestion/olivia/delegatedTaskClient.mjs';
 import {createOliviaEngine,dualVoiceResponse} from '../netlify/functions/_lib/olivia/engine.mjs';
 import {fixture,start,textResponse} from './helpers/olivia-fixture.mjs';
 
@@ -76,6 +77,12 @@ test('a paused proposal never instructs Gemini to confirm it',()=>{
  const task={status:'paused',pendingAction:{confirmationToken:'private'}};
  assert.equal(taskOutcome(task).kind,'paused');assert.equal(compactVoiceTask(task).requiresVisualConfirmation,undefined);
  assert.match(taskOutcome(task).nextStep,/no pedir confirmar/);
+});
+
+test('explicit independent requests do not continue a pending unrelated proposal',async t=>{
+ const context={pendingAction:true};for(const text of ['Quiero crear un cliente de prueba, pero no tengo el nombre.','Necesito transferir productos','¿Cuánto vendimos ayer?'])assert.equal(classifyGeminiLiveTurn(text,context).newTask,true,text);
+ const calls=[];const live=new GeminiLiveSession({backgroundTools:true,getConversationContext:()=>context,WebSocket:{OPEN:1},onToolCall:(call)=>{calls.push(call);return {status:'needs-input'};}});Object.assign(live,{ready:true,textInputOnly:true,socket:{readyState:1,send(){},close(){}}});t.after(()=>live.close());live.sendText('Quiero crear un cliente de prueba');await live.handleBackgroundTools([{id:'c',name:'delegate_to_olivia',args:{action:'continue',taskId:'unrelated-stock'}}],live.currentTurn);await new Promise(r=>setImmediate(r));assert.equal(calls[0].args.action,'new');assert.equal(calls[0].args.taskId,undefined);
+ const client=new DelegatedTaskClient({request:async body=>body.operation==='delegatedTaskStatus'?{tasks:[{id:'t',status:'needs-input'}]}:{task:{id:'t',status:'paused'}}});await client.run({args:{action:'pause',taskId:'t'}},'Pausá esa tarea');client.close();
 });
 
 test('collection audio is withheld until the entire generated utterance passes the contextual gate',t=>{

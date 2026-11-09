@@ -519,7 +519,7 @@ export class GeminiLiveSession {
       };
       // Deliberately detached from the voice turn: barge-in stops speech, not
       // an independently accepted backend job. The job survives reconnection.
-      const normalizedCall=decision.kind==='task-status'?{...call,args:{...call.args,action:'status'}}:decision.kind==='collected-operation'?{...call,args:{...call.args,action:'new',taskId:undefined}}:call;
+      const normalizedCall=decision.kind==='task-status'?{...call,args:{...call.args,action:'status'}}:decision.kind==='collected-operation'||decision.newTask?{...call,args:{...call.args,action:'new',taskId:undefined}}:call;
       Promise.resolve().then(()=>this.onToolCall(normalizedCall,decision.request || transcript,{turnId:turn.turnId,turnIndex:turn.turnIndex,sessionId:this.sessionId,transcriptComplete:true,onAccepted,conversationDraft:decision.collection})).then(result=>{
         if(this.closed || this.failed)return;
         this.enqueueToolResult({...binding,result});
@@ -535,7 +535,7 @@ export class GeminiLiveSession {
     if(turn.policyFallbackStarted || turn.cancelled || !turn.transcriptComplete)return;
     turn.policyFallbackStarted=true;turn.backgroundToolPending=true;
     const context=this.getConversationContext(),decision=turn.decision || classifyGeminiLiveTurn(turn.inputText,context);
-    const action=['task-status','task-control'].includes(decision.kind)?'status':context.collectingTask || context.pendingAction || context.pendingActionId?'continue':'new';
+    const action=['task-status','task-control'].includes(decision.kind)?'status':decision.newTask || decision.kind==='collected-operation'?'new':context.collectingTask || context.pendingAction || context.pendingActionId?'continue':'new';
     const binding={call:null,sourceTurnId:turn.turnId,turnIndex:turn.turnIndex};
     this.trace('task.policy_fallback',{turnId:turn.turnId,kind:decision.kind,source:'local-policy'});
     const onAccepted=task=>{binding.taskId=task.id;this.pendingTaskCalls.set(task.id,{...binding});this.trace('task.accepted',{turnId:turn.turnId,taskId:task.id,jobId:task.jobId,status:task.status,source:'local-policy'});};
