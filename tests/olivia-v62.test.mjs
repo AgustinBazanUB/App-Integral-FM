@@ -36,6 +36,7 @@ test('safe contextual categories allow varied questions and future intent but re
  const location=advanceVoiceCollection('Quiero cargar stock');
  for(const text of ['Dale, perfecto. ¿En qué ubicación querés cargarlo?','Buenísimo, ¿dónde querés sumar la mercadería?','¿En qué local hacemos la carga?'])assert.ok(safeConversationBridge(text,{collection:location}),text);
  const items=advanceVoiceCollection('En Local Lavalle',location);assert.ok(safeConversationBridge('Perfecto, tomo Lavalle como ubicación solicitada. ¿Qué productos y cantidades querés sumar?',{collection:items}));
+ assert.ok(safeConversationBridge('Tomado. ¿Qué productos y qué cantidades querés cargar en esa ubicación?',{collection:items}));
  for(const text of ['El local Lavalle existe. ¿Qué productos querés cargar?','Ya cargué cinco botellas. ¿Necesitás algo más?','El stock actual es 10.','Perfecto.'])assert.equal(safeConversationBridge(text,{collection:items}),false,text);
  for(const text of ['Voy a consultar las ventas y te cuento.','Perfecto, voy a preparar la comparación.','Dale, lo reviso.'])assert.ok(safeConversationBridge(text),text);
  for(const text of ['Ya estoy trabajando en eso.','Se cargó el stock.','Voy a revisar las ventas: son 5.','Registré tu cliente.'])assert.equal(safeConversationBridge(text),false,text);

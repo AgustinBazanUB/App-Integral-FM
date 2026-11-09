@@ -69,7 +69,7 @@ export const collectionQuestion=collection=>collection.status==='cancelled'?'No 
 export function compactCollection(collection){if(!collection)return null;const {turns,lastInput,...rest}=collection;return {...rest,itemsMentioned:collection.itemsMentioned?.map(item=>({...item,description:item.description.slice(0,160)})),corrections:collection.corrections?.slice(-2).map(s=>s.slice(0,160))};}
 
 const unsafe=/\b(?:cargue|cargamos|agregue|agregamos|registre|registramos|ejecute|ejecutado|realizado|encontre|encontramos|existe|existen|habilitad\w*|autorizad\w*|verificad\w*|validad\w*|disponible\w*|vendimos|vendiste|tenemos|stock actual|quedo confirmad\w*|ya esta|ya esta hecho|confirmado|operacion completada|se cargo|se registro)\b/;
-const prefix=/^(?:(?:dale|perfecto|buenisimo|bien|bueno|entendido|listo|genial|claro|de acuerdo|con gusto|por supuesto)[\s,.:!¡]*)+/;
+const prefix=/^(?:(?:dale|perfecto|buenisimo|bien|bueno|entendido|tomado|listo|genial|claro|de acuerdo|con gusto|por supuesto)[\s,.:!¡]*)+/;
 export function safeConversationBridge(text,{collection=null,accepted=false}={}){
   const raw=String(text || '').trim(),n=normalizeSpeech(raw);
   if(!n || raw.length>320 || unsafe.test(n))return false;
