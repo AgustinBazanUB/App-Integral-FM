@@ -30,6 +30,12 @@ import { qaTraffic, countTraffic } from './service.mjs';
 function Traffic(){const [,refresh]=React.useState(0);React.useEffect(()=>{const update=()=>refresh(x=>x+1);window.addEventListener('olivia:qa-traffic',update);return()=>window.removeEventListener('olivia:qa-traffic',update);},[]);return <output aria-label="Tráfico sintético">{JSON.stringify(qaTraffic)}</output>;}
 
 const qaParams=new URLSearchParams(location.search);
+if(qaParams.has('v62'))window.WebSocket=class extends EventTarget {
+  static OPEN=1;
+  constructor(){super();this.readyState=0;this.openTimer=setTimeout(()=>{this.readyState=1;this.onopen?.(new Event('open'));this.dispatchEvent(new Event('open'));},40);}
+  send(raw){if(JSON.parse(raw).setup)this.setupTimer=setTimeout(()=>{const e=new MessageEvent('message',{data:JSON.stringify({setupComplete:{}})});this.onmessage?.(e);this.dispatchEvent(e);},100);}
+  close(){clearTimeout(this.openTimer);clearTimeout(this.setupTimer);if(this.readyState===3)return;this.readyState=3;const e=new CloseEvent('close',{code:1000});this.onclose?.(e);this.dispatchEvent(e);}
+};
 // Protocol fixture only: no OpenAI connection or credentials leave this tab.
 if(qaParams.has('live'))window.RTCPeerConnection=class {
   addTrack(track){this.track=track;}

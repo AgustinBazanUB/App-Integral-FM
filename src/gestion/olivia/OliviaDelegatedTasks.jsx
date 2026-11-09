@@ -4,9 +4,9 @@ const labels={queued:'Solicitud recibida',dispatching:'Preparando',running:'Trab
 export default function OliviaDelegatedTasks({tasks,onControl,busyId,developer=false}){
   if(!tasks.length)return null;
   const active=tasks.filter(t=>['queued','dispatching','running','confirming','cancelling'].includes(t.status));
-  const visible=developer?tasks:tasks.filter(t=>['awaiting-confirmation','needs-input','paused'].includes(t.status));
+  const visible=developer?tasks:tasks.filter(t=>['awaiting-confirmation','needs-input','paused','failed'].includes(t.status));
   return <section className="fm-olivia-delegated-tasks" aria-label="Tareas de Olivia" aria-live="polite">
-    {developer?<h3>Tareas de Olivia</h3>:active.length?<p>Estoy trabajando en {active.length===1?'tu solicitud':`${active.length} solicitudes`}. Podemos seguir conversando.</p>:null}
+    {developer?<h3>Tareas de Olivia</h3>:null}
     {visible.map(task=><article key={task.id} data-olivia-task={task.id}>
       <strong>{labels[task.status] || task.status}</strong>
       <OliviaMessageContent content={typeof task.summary==='string'?(task.summary || task.phase || 'Solicitud recibida'):'Pedile a Olivia que prepare un resumen legible antes de confirmar.'} />

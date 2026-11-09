@@ -1,4 +1,5 @@
 import { isGreetingOnly, normalizeSpeech } from './oliviaSpeechText.mjs';
+import { collectionDecision } from './oliviaVoiceCollection.mjs';
 
 // These short canned replies remain for the written task engine. Native Live
 // conversation uses the contextual policy below rather than this exact list.
@@ -25,6 +26,8 @@ export function isConversationalFollowUp(text) {
 export function classifyGeminiLiveTurn(text, context = {}) {
   const normalized = normalizeSpeech(text);
   if (!normalized) return { route: 'delegate', kind: 'missing-transcript' };
+  const collection=collectionDecision(text,context);
+  if(collection)return collection;
   // A background clause describes context; classify the actual request after
   // it. Business requests in that second clause still cross the same boundary.
   const background = /^mientras\s+(?:revis[aá]s|trabaj[aá]s|proces[aá]s|termin[aá]s)\b[^,;]*[,;]\s*(.+)$/i.exec(String(text).trim());

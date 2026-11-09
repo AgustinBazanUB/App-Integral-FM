@@ -109,7 +109,8 @@ test("Gemini Live keeps consecutive everyday conversation direct and business in
   assert.equal(classifyGeminiLiveTurn("Sí").route, "direct");
   assert.equal(classifyGeminiLiveTurn("Sí",{collectingTask:true}).route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Perfecto, gracias; registrá una venta").route, "delegate");
-  assert.equal(classifyGeminiLiveTurn("Dale, cargá 20 unidades de aceite").route, "delegate");
+  assert.equal(classifyGeminiLiveTurn("Dale, cargá 20 unidades de aceite").kind, "collection-question", "missing location is collected without claiming a validated operation");
+  assert.equal(classifyGeminiLiveTurn("Dale, cargá 20 unidades de aceite en Local Lavalle").route, "delegate", "complete requested parameters still need backend validation");
   assert.equal(classifyGeminiLiveTurn("Hola, ¿cuánto stock queda?").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("¿Qué precio me dijiste recién para el aceite?").route, "delegate");
   assert.equal(classifyGeminiLiveTurn("Gracias, registrá una venta").route, "delegate");

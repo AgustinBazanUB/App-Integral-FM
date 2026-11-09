@@ -8,8 +8,13 @@ export const countTraffic=kind=>{qaTraffic[kind]++;window.dispatchEvent(new Even
 const conversationId = 'a1234567-1234-4234-8234-123456789012';
 let messages = [], pendingAction = null;
 const jobs = new Map();
-const state = () => ({ conversationId, messages, pendingAction, enabled: true, providerConfigured: true, voiceConversationAvailable: false, audioLimits: { maxSeconds: 60, maxBytes: 4194304 }, state: pendingAction ? 'ESPERANDO_CONFIRMACION' : 'INFORMACION', usage: { unlimited: true }, estimate: null });
+const state = () => ({ conversationId, messages, pendingAction, enabled: true, providerConfigured: true, voiceConversationAvailable:params.has('v62'),voiceSettings:{hybridLiveAvailable:params.has('v62'),hybridLiveEnabled:params.has('v62'),latencyMode:true},geminiLiveUsage:params.has('v62')?{period:'fixture',spendUsd:.02,reservedUsd:.5,unconfirmedQueryCount:1,lunaSol:{estimatedUsd:.01,unconfirmedCalls:0}}:undefined,audioLimits: { maxSeconds: 60, maxBytes: 4194304 }, state: pendingAction ? 'ESPERANDO_CONFIRMACION' : 'INFORMACION', usage: { unlimited: true }, estimate: null });
 export const oliviaClient = createOliviaTransport({ getToken: async () => 'synthetic-only', pollIntervalMs: 200, fetchImpl: async (url, init) => {
+  if(params.has('v62')&&url.includes('olivia-gemini-live')){
+    const body=JSON.parse(init.body);countTraffic('live');
+    if(body.operation==='token'){await new Promise(r=>setTimeout(r,Number(params.get('tokenDelay') || 1500)));if(params.has('tokenFailure'))return Response.json({message:'Fallo de conexión simulado',code:'fixture-unavailable'},{status:503});return Response.json({token:'auth_tokens/synthetic-only',uses:1,sessionId:'fixture-session',expiresAt:new Date(Date.now()+60000).toISOString(),newSessionExpiresAt:new Date(Date.now()+60000).toISOString(),maxSessionSeconds:60,context:{messages:[]}});}
+    return Response.json({closed:true,recorded:true,costUsd:0,measurement:'fixture-only'});
+  }
   if(params.has('contextGuide')) return fetch('/__qa/olivia-context', init);
   if(url.includes('live-transcribe')) {
     countTraffic('live');
@@ -19,7 +24,7 @@ export const oliviaClient = createOliviaTransport({ getToken: async () => 'synth
   }
   if (url.includes('transcribe')) {countTraffic('transcribe');return Response.json({ text: new URLSearchParams(location.search).has('slowVoice') ? 'Consulta lenta de prueba de voz' : 'Hola Olivia, probemos la conversación.' });}
   const b = JSON.parse(init.body);
-  if (['state', 'resume'].includes(b.operation)) return Response.json(state());
+  if (['state', 'resume'].includes(b.operation)) {if(params.has('hydrateDelay'))await new Promise(r=>setTimeout(r,Number(params.get('hydrateDelay'))));return Response.json(state());}
   if (b.operation === 'estimate') return Response.json({ estimate: null });
   if (b.operation==='cancelTurn')return Response.json({cancelled:true});
   if(b.operation==='chat' && b.stream===true){

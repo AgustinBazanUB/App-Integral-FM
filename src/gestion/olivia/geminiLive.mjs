@@ -3,6 +3,7 @@ import { classifyGeminiLiveTurn } from "../../shared/oliviaConversationRouter.mj
 import { compactVoiceTask, taskOutcome } from '../../shared/oliviaTaskConversation.mjs';
 import { recoveryAllowed, recoveryBackoff, recoveryWait, waitForRecoveryNetwork } from './liveRecovery.mjs';
 import { ConversationNotifications } from './conversationNotifications.mjs';
+import { safeConversationBridge, collectionQuestion } from '../../shared/oliviaVoiceCollection.mjs';
 
 const SOCKET_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained";
 
@@ -43,10 +44,7 @@ function errorMessage(event) {
   return message.slice(0, 240) || "Gemini Live interrumpió la sesión.";
 }
 
-function isSafeDelegationAcknowledgement(text) {
-  const normalized = String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[¿?¡!.,;:]/g, " ").replace(/\s+/g, " ").trim();
-  return ["dale lo reviso", "un segundo lo reviso", "voy a revisar eso"].includes(normalized);
-}
+const isSafeDelegationAcknowledgement = text => safeConversationBridge(text);
 
 export function geminiTaskResult(value) {
   if(typeof value==='string')return value.slice(0,12000);
@@ -339,6 +337,11 @@ export class GeminiLiveSession {
       void this.handleTools(event.toolCall.functionCalls, turn);
     }
     if (content?.generationComplete && turn.pending && !interrupted && !ignoreOutput) {
+      if(turn.decision?.collection && turn.directAuthorized){
+        turn.outputAuthorized=safeConversationBridge(turn.outputText,{collection:turn.decision.collection});
+        if(turn.outputAuthorized){this.publishTranscript(turn);this.flushPendingAudio(turn);}
+        else{turn.pendingAudio=[];turn.outputText=collectionQuestion(turn.decision.collection);this.trace('gemini.collection.audio.rejected',{turnId:turn.turnId,status:'unverified-content'});}
+      }
       // Generation succeeded. The remaining deadline is playback + the bounded
       // turnComplete grace below, not the original provider-response timeout.
       clearTimeout(turn.responseTimer);
@@ -403,15 +406,19 @@ export class GeminiLiveSession {
     const userText = String(turn.inputText || "").trim();
     if (!userText || userText === turn.classifiedText) return turn.classificationPromise;
     const startedAt = this.now(), previousDirect = turn.directAuthorized === true;
-    const decision = classifyGeminiLiveTurn(userText, this.getConversationContext?.() || {});
+    const context=this.getConversationContext?.() || {};
+    if(!Object.hasOwn(turn,'collectionBase'))turn.collectionBase=context.voiceCollection || null;
+    const decision = classifyGeminiLiveTurn(userText, {...context,voiceCollection:turn.collectionBase});
+    turn.decision=decision;
     turn.classifiedText = userText;
     turn.directAuthorized = decision.route === "direct" && !turn.toolTurn;
     turn.classificationPromise = Promise.resolve(turn.directAuthorized);
-    this.onClassification({ durationMs: this.now() - startedAt, direct: turn.directAuthorized, route: turn.directAuthorized ? "local-direct" : turn.toolTurn ? "model-tool" : "local-policy-delegate", kind: decision.kind, source: "local-policy", turnId:turn.turnId, turnIndex: turn.turnIndex });
+    this.onClassification({ durationMs: this.now() - startedAt, direct: turn.directAuthorized, route: turn.directAuthorized ? "local-direct" : turn.toolTurn ? "model-tool" : "local-policy-delegate", kind: decision.kind, source: "local-policy", turnId:turn.turnId, turnIndex: turn.turnIndex,collection:decision.collection });
     this.trace("gemini.classification.local", { turnId: turn.turnId, turnIndex: turn.turnIndex, route: turn.directAuthorized ? "direct" : turn.toolTurn ? "tool" : "delegate", kind: decision.kind });
     if (turn.cancelled || this.closed || this.failed) return turn.classificationPromise;
     if (turn.directAuthorized) {
-      turn.outputAuthorized = true;
+      turn.outputAuthorized = !decision.collection;
+      if(decision.collection)return turn.classificationPromise;
       if (turn.outputText && turn.outputText !== turn.publishedOutputText) this.publishTranscript(turn);
       this.flushPendingAudio(turn);
     } else {
@@ -475,14 +482,14 @@ export class GeminiLiveSession {
     }
     const transcript=await this.waitForFinalTranscript(turn);
     if(this.closed || this.failed || turn.cancelled)return;
-    const decision=classifyGeminiLiveTurn(transcript,this.getConversationContext());
+    const decision=turn.decision || classifyGeminiLiveTurn(transcript,this.getConversationContext());
     // A model tool request is not authority to turn social speech into a job.
     if(transcript && decision.route==='direct'){
-      turn.toolPending=false;turn.toolTurn=false;turn.outputAuthorized=true;
+      turn.toolPending=false;turn.toolTurn=false;turn.directAuthorized=true;turn.outputAuthorized=!decision.collection;
       // The function response starts another provider generation. The original
       // tool-only turnComplete must not retire its input before that answer.
       turn.awaitingToolResponse=true;turn.completeReceived=false;
-      const result=['social','conversation-control'].includes(decision.kind)?'Esta intervención es conversacional. Respondé directamente sin herramientas; no hay operación de negocio.':'No se identificó una solicitud comercial ni una continuación operativa. Si es una consulta general, respondela directamente. Si resulta ambigua o incompleta, pedí una aclaración sin inventar datos del negocio ni ejecutar acciones.';
+      const result=decision.collection?JSON.stringify({conversationDraft:decision.collection,instruction:'No se inició ninguna tarea ni se validaron entidades. Preguntá solamente el dato indicado en pendingQuestion. No afirmes hechos del catálogo ni resultados.'}):['social','conversation-control'].includes(decision.kind)?'Esta intervención es conversacional. Respondé directamente sin herramientas; no hay operación de negocio.':'No se identificó una solicitud comercial ni una continuación operativa. Si es una consulta general, respondela directamente. Si resulta ambigua o incompleta, pedí una aclaración sin inventar datos del negocio ni ejecutar acciones.';
       this.socket.send(JSON.stringify({toolResponse:{functionResponses:calls.map(call=>({id:call.id,name:call.name,scheduling:'WHEN_IDLE',response:{result}}))}}));
       this.armTurnTimeout(turn);
       return;
@@ -512,7 +519,8 @@ export class GeminiLiveSession {
       };
       // Deliberately detached from the voice turn: barge-in stops speech, not
       // an independently accepted backend job. The job survives reconnection.
-      Promise.resolve().then(()=>this.onToolCall(decision.kind==='task-status'?{...call,args:{...call.args,action:'status'}}:call,transcript,{turnId:turn.turnId,turnIndex:turn.turnIndex,sessionId:this.sessionId,transcriptComplete:true,onAccepted})).then(result=>{
+      const normalizedCall=decision.kind==='task-status'?{...call,args:{...call.args,action:'status'}}:decision.kind==='collected-operation'?{...call,args:{...call.args,action:'new',taskId:undefined}}:call;
+      Promise.resolve().then(()=>this.onToolCall(normalizedCall,decision.request || transcript,{turnId:turn.turnId,turnIndex:turn.turnIndex,sessionId:this.sessionId,transcriptComplete:true,onAccepted,conversationDraft:decision.collection})).then(result=>{
         if(this.closed || this.failed)return;
         this.enqueueToolResult({...binding,result});
       }).catch(error=>{
@@ -526,14 +534,14 @@ export class GeminiLiveSession {
   startPolicyTask(turn) {
     if(turn.policyFallbackStarted || turn.cancelled || !turn.transcriptComplete)return;
     turn.policyFallbackStarted=true;turn.backgroundToolPending=true;
-    const context=this.getConversationContext(),decision=classifyGeminiLiveTurn(turn.inputText,context);
+    const context=this.getConversationContext(),decision=turn.decision || classifyGeminiLiveTurn(turn.inputText,context);
     const action=['task-status','task-control'].includes(decision.kind)?'status':context.collectingTask || context.pendingAction || context.pendingActionId?'continue':'new';
     const binding={call:null,sourceTurnId:turn.turnId,turnIndex:turn.turnIndex};
     this.trace('task.policy_fallback',{turnId:turn.turnId,kind:decision.kind,source:'local-policy'});
     const onAccepted=task=>{binding.taskId=task.id;this.pendingTaskCalls.set(task.id,{...binding});this.trace('task.accepted',{turnId:turn.turnId,taskId:task.id,jobId:task.jobId,status:task.status,source:'local-policy'});};
     // Same authenticated client, task engine and visual confirmation. This has
     // no invented provider call ID and never blocks the conversational turn.
-    Promise.resolve().then(()=>this.onToolCall({name:'delegate_to_olivia',args:{action,request:turn.inputText}},turn.inputText,{turnId:turn.turnId,turnIndex:turn.turnIndex,sessionId:this.sessionId,requestId:turn.turnId,transcriptComplete:true,onAccepted})).then(result=>{
+    Promise.resolve().then(()=>this.onToolCall({name:'delegate_to_olivia',args:{action,request:decision.request || turn.inputText}},decision.request || turn.inputText,{turnId:turn.turnId,turnIndex:turn.turnIndex,sessionId:this.sessionId,requestId:turn.turnId,transcriptComplete:true,onAccepted,conversationDraft:decision.collection})).then(result=>{
       if(!this.closed && !this.failed)this.enqueueToolResult({...binding,result:decision.kind==='task-control'?{...result,needsClarification:true,summary:'Pedí que indique qué tarea y qué control quiere realizar. No se modificó ninguna tarea.'}:result});
     }).catch(error=>{if(!this.closed && !this.failed)this.enqueueToolResult({...binding,result:{error:'No pude completar esa solicitud. Podemos seguir conversando.',outcome:taskOutcome({status:'failed',failure:{code:error?.code || 'task-error'}})}});});
   }
@@ -646,7 +654,7 @@ export class GeminiLiveSession {
     try {
       const pending=this.request(report);this.pendingUsage.add(pending);
       let usage;try{usage=await pending;}finally{this.pendingUsage.delete(pending);}
-      this.trace("gemini.usage.report", { turnId: turn.turnId, turnIndex: turn.turnIndex, durationMs: this.now() - startedAt, status: usage.measurement || "ok", costUsd: usage.costUsd }); this.onUsage(usage,{turnId:turn.turnId,sessionId:report.sessionId});
+      this.trace("gemini.usage.report", { turnId: turn.turnId, turnIndex: turn.turnIndex, durationMs: this.now() - startedAt, status: usage.measurement || "ok", costUsd: usage.costUsd }); this.onUsage(usage,{turnId:turn.turnId,sessionId:report.sessionId,sourceTurnId:turn.sourceTurnId,taskId:turn.taskId});
       if (usage.shouldStop) this.fail(Object.assign(new Error('Se alcanzó el límite preventivo de voz.'),{code:'gemini-budget-stop'}));
     } catch { this.onUsage({ measurement: "unconfirmed", message: "No se pudo registrar el consumo de Gemini en el presupuesto mensual." }); }
   }
@@ -680,13 +688,19 @@ export class GeminiLiveSession {
           if (turn.classificationPromise) await turn.classificationPromise;
           const direct = turn.directAuthorized === true;
           if (!turn.cancelled && !this.closed && !this.failed && direct) {
-            turn.outputAuthorized = true;
+            const safe=!turn.decision?.collection || safeConversationBridge(turn.outputText,{collection:turn.decision.collection});
+            turn.outputAuthorized = safe;
+            if(!safe){turn.pendingAudio=[];turn.outputText=collectionQuestion(turn.decision.collection);}
             if (turn.outputText && turn.outputText !== turn.publishedOutputText) this.publishTranscript(turn);
             this.flushPendingAudio(turn);
             if (turn.inputText && turn.outputText) Promise.resolve(this.onTurnComplete({ turnId: turn.turnId, turnIndex: turn.turnIndex, userText: turn.inputText, assistantText: turn.outputText, delegated: false, noAudio: !turn.heardAudio || Boolean(turn.providerIncomplete), providerIncomplete: Boolean(turn.providerIncomplete), usageMetadata: turn.usageMetadata })).catch((error) => this.onNotice(error?.message || "No se pudo guardar la conversación de voz."));
             else if (turn.generatedAudio) this.onNotice("No pude comprobar la respuesta completa. Podés pedirme que la repita.");
           } else if (!turn.cancelled && !this.closed && !this.failed && turn.inputText) {
-            turn.pendingAudio = []; turn.outputAuthorized = false; this.onState("processing");
+            if(this.backgroundTools && isSafeDelegationAcknowledgement(turn.outputText)){
+              turn.acknowledgementAuthorized=true;turn.outputAuthorized=true;this.publishTranscript(turn);this.flushPendingAudio(turn);turn.acknowledgementAuthorized=false;
+              this.trace('gemini.acknowledgement.authorized',{turnId:turn.turnId,source:'contextual-future-intent',route:'policy-fallback'});
+            }else turn.pendingAudio=[];
+            turn.outputAuthorized = false; this.onState(this.isPlaying?'speaking':"processing");
             if(this.backgroundTools){
               this.startPolicyTask(turn);
               this.onTurnComplete({turnId:turn.turnId,turnIndex:turn.turnIndex,userText:turn.inputText,delegated:true,noAudio:true,pendingTask:true,missingTool:true,policyFallback:true});

@@ -1,5 +1,6 @@
 import { executeToolBatch } from "./toolExecution.mjs";
 import { classifyGeminiLiveTurn, quickReadPlan, latencyEnabled } from '../../../../src/shared/oliviaConversationRouter.mjs';
+import { safeConversationBridge } from '../../../../src/shared/oliviaVoiceCollection.mjs';
 import { latencyTrace, tracedStore } from '../../../../src/shared/oliviaLatencyTrace.mjs';
 import { fastConversationRead, formatQuickRead } from './fastConversation.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -86,7 +87,7 @@ export function dualVoiceResponse(raw, maxCharacters) {
     const value = JSON.parse(raw);
     const complete = typeof value.complete === "string" ? value.complete.trim() : "";
     const spoken = typeof value.spoken === "string" ? value.spoken.trim() : "";
-    if (complete) return { complete, spoken: spokenFallback(spoken || complete, maxCharacters) };
+    if (complete) return { complete, spoken: spokenFallback(spoken || complete, maxCharacters),...(typeof value.requiresInput==='boolean'?{requiresInput:value.requiresInput}:{}) };
   } catch { /* Fall back to the canonical verified text if structured output is unavailable. */ }
   return { complete: String(raw || ""), spoken: spokenFallback(raw, maxCharacters) };
 }
@@ -243,7 +244,7 @@ export function createOliviaEngine({
           ? "RECHAZADA"
           : conversation.state,
       pendingAction,
-      conversationContext: { collectingTask: conversation.taskState?.status === 'collecting' || Boolean(conversation.delegatedContext?.collectingTask), activeTask: Boolean(conversation.busyRequestId || conversation.queuedChatRequestId || conversation.delegatedContext?.activeTask), pendingAction: Boolean(pendingAction || conversation.delegatedContext?.pendingAction) },
+      conversationContext: { voiceCollection:conversation.voiceCollection || null,collectingTask: conversation.taskState?.status === 'collecting' || Boolean(conversation.delegatedContext?.collectingTask), activeTask: Boolean(conversation.busyRequestId || conversation.queuedChatRequestId || conversation.delegatedContext?.activeTask), pendingAction: Boolean(pendingAction || conversation.delegatedContext?.pendingAction) },
       guide: conversation.guide || null,
       failure: conversation.lastFailure || null,
       usage: await usage(session, config),
@@ -272,17 +273,18 @@ export function createOliviaEngine({
     const result = await store.transaction(async (tx) => {
       const path = `oliviaConversations/${id}`, snapshot = await tx.getDocument(path), conversation = snapshot?.data;
       assertConversationOwner(session, conversation, now);
-      const routingContext = { pendingAction:conversation.delegatedContext?.pendingAction, pendingActionId: conversation.pendingActionId, collectingTask: conversation.taskState?.status === 'collecting' || Boolean(conversation.delegatedContext?.collectingTask), activeTask: Boolean(conversation.busyRequestId || conversation.queuedChatRequestId || conversation.delegatedContext?.activeTask) };
-      if (classifyGeminiLiveTurn(userText, routingContext).route !== "direct") throw oliviaError("gemini-direct-not-authorized", "Esta consulta debe pasar por el motor autorizado de Olivia.", 403);
+      const routingContext = { voiceCollection:conversation.voiceCollection || null,capabilities:capabilities(session),pendingAction:conversation.delegatedContext?.pendingAction, pendingActionId: conversation.pendingActionId, collectingTask: conversation.taskState?.status === 'collecting' || Boolean(conversation.delegatedContext?.collectingTask), activeTask: Boolean(conversation.busyRequestId || conversation.queuedChatRequestId || conversation.delegatedContext?.activeTask) };
+      const decision=classifyGeminiLiveTurn(userText,routingContext);
+      if (decision.route !== "direct" || (decision.collection&&!safeConversationBridge(assistantText,{collection:decision.collection}))) throw oliviaError("gemini-direct-not-authorized", "Esta consulta debe pasar por el motor autorizado de Olivia.", 403);
       const turnPath = `oliviaGeminiLiveTurns/${session.uid}_${requestId}`, prior = await tx.getDocument(turnPath);
       if (prior) return prior.data.result;
       const userEntry = message("user", userText, now, "natural-voice"), assistantEntry = message("assistant", assistantText, now, "natural-voice");
       const messages = trimMessages([...(conversation.messages || []), userEntry, assistantEntry]);
-      const next = { ...conversation, messages, title: conversation.title || userText.replace(/\s+/g, " ").slice(0, 80), messageCount: (conversation.messageCount || 0) + (messages.includes(userEntry) ? 1 : 0) + (messages.includes(assistantEntry) ? 1 : 0), state: routingContext.activeTask || routingContext.pendingActionId || routingContext.collectingTask ? conversation.state : "INFORMACION", updatedAt: now, expiresAt: retentionDate(config.retentionMonths, now) };
+      const next = { ...conversation, messages, title: conversation.title || userText.replace(/\s+/g, " ").slice(0, 80), messageCount: (conversation.messageCount || 0) + (messages.includes(userEntry) ? 1 : 0) + (messages.includes(assistantEntry) ? 1 : 0), state: decision.collection?.status==='collecting'?'DATOS_INCOMPLETOS':routingContext.activeTask || routingContext.pendingActionId || routingContext.collectingTask ? conversation.state : "INFORMACION", updatedAt: now, expiresAt: retentionDate(config.retentionMonths, now) };
       await tx.commitDocuments([
         ...(messages.includes(userEntry) ? [retainedMessage(id, userEntry)] : []),
         ...(messages.includes(assistantEntry) ? [retainedMessage(id, assistantEntry)] : []),
-        { type: "update", path, data: { messages: next.messages, title: next.title, messageCount: next.messageCount, state: next.state, updatedAt: now, expiresAt: next.expiresAt } },
+        { type: "update", path, data: { messages: next.messages, title: next.title, messageCount: next.messageCount, state: next.state,...(decision.collection?{voiceCollection:decision.collection}:{}), updatedAt: now, expiresAt: next.expiresAt } },
         { type: "create", path: turnPath, data: { userId: session.uid, conversationId: id, requestId, createdAt: now, result: { recorded: true } } },
       ]);
       return { recorded: true };
@@ -752,6 +754,7 @@ export function createOliviaEngine({
         nextState = "INFORMACION",
         content = "",
         spokenContent = "",
+        requiresInput = false,
         failure = null,
         toolCallCount = 0;
       let taskRepairPending = false;
@@ -780,7 +783,8 @@ export function createOliviaEngine({
         };
         if (naturalVoice) {
           bodyRequest.instructions += "\n" + OLIVIA_VOICE_INSTRUCTIONS + "\nLa respuesta se escuchará en voz alta. Cuando no haya más herramientas, devolvé una versión completa y otra hablada breve, natural, en español argentino. Conservá hechos e incertidumbres respaldados por los mismos resultados de herramientas. No leas URLs ni Markdown ni código extenso: explicá su propósito y decí que el código está en pantalla. Una confirmación hablada nunca ejecuta una acción; solo la tarjeta visual autoriza operaciones.";
-          bodyRequest.text = { format: { type: "json_schema", name: "olivia_natural_voice_reply", strict: true, schema: { type: "object", properties: { complete: { type: "string" }, spoken: { type: "string" } }, required: ["complete", "spoken"], additionalProperties: false } } };
+          bodyRequest.instructions+='\nrequiresInput debe ser true si falta un dato, una elección o aclaración necesaria para resolver esta solicitud; false si la respuesta está completa. No uses true por un ofrecimiento opcional. Guardá slots conocidos con update_task antes de pedir otros datos.';
+          bodyRequest.text = { format: { type: "json_schema", name: "olivia_natural_voice_reply", strict: true, schema: { type: "object", properties: { complete: { type: "string" }, spoken: { type: "string" },requiresInput:{type:'boolean'} }, required: ["complete", "spoken","requiresInput"], additionalProperties: false } } };
         }
         // UTF-8 bytes conservatively bound tokenizer input; output is capped by API.
         await increaseReservation({
@@ -854,6 +858,7 @@ export function createOliviaEngine({
           const dual = dualVoiceResponse(content, config.naturalVoice.maxCharactersPerTurn);
           content = dual.complete;
           spokenContent = dual.spoken;
+          requiresInput = dual.requiresInput === true;
         }
         if (!calls.length) break;
         onEvent?.({ type: "phase", label: calls.some((call) => call.name.startsWith("prepare_")) ? "Preparando acción…" : "Revisando datos…", tools: calls.map((call) => call.name) });
@@ -1000,6 +1005,10 @@ export function createOliviaEngine({
       if (taskRepairPending && !prepared && nextState === "INFORMACION") {
         nextState = "ERROR";
         content = "No pude completar los datos de esta consulta. Podés reformularla; la tarea anterior conserva sus datos.";
+      }
+      if(requiresInput&&!prepared&&!['ERROR','RECHAZADA'].includes(nextState)){
+        taskState={...taskState,status:'collecting',missingFields:taskState.missingFields?.length?taskState.missingFields:['clarification'],pendingQuestion:spokenContent || content};
+        nextState='DATOS_INCOMPLETOS';
       }
       if (taskState.status === "working") taskState = { ...taskState, status: ["ERROR", "RECHAZADA"].includes(nextState) ? "failed" : "completed", updatedAt: clock() };
       if (!prepared && taskState.status === "collecting" && taskState.missingFields.length && nextState === "INFORMACION") nextState = "DATOS_INCOMPLETOS";
