@@ -413,7 +413,7 @@ export class GeminiLiveSession {
     turn.classifiedText = userText;
     turn.directAuthorized = decision.route === "direct" && !turn.toolTurn;
     turn.classificationPromise = Promise.resolve(turn.directAuthorized);
-    this.onClassification({ durationMs: this.now() - startedAt, direct: turn.directAuthorized, route: turn.directAuthorized ? "local-direct" : turn.toolTurn ? "model-tool" : "local-policy-delegate", kind: decision.kind, source: "local-policy", turnId:turn.turnId, turnIndex: turn.turnIndex,collection:decision.collection,newTask:decision.newTask });
+    this.onClassification({ durationMs: this.now() - startedAt, direct: turn.directAuthorized, route: turn.directAuthorized ? "local-direct" : turn.toolTurn ? "model-tool" : "local-policy-delegate", kind: decision.kind, source: "local-policy", turnId:turn.turnId, turnIndex: turn.turnIndex,collection:decision.collection,newTask:decision.newTask,independentRead:decision.independentRead });
     this.trace("gemini.classification.local", { turnId: turn.turnId, turnIndex: turn.turnIndex, route: turn.directAuthorized ? "direct" : turn.toolTurn ? "tool" : "delegate", kind: decision.kind });
     if (turn.cancelled || this.closed || this.failed) return turn.classificationPromise;
     if (turn.directAuthorized) {

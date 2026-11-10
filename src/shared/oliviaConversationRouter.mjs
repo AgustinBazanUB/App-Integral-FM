@@ -1,5 +1,6 @@
 import { isGreetingOnly, normalizeSpeech } from './oliviaSpeechText.mjs';
 import { collectionDecision } from './oliviaVoiceCollection.mjs';
+import { isIndependentBusinessRead } from './oliviaBusinessRead.mjs';
 
 // These short canned replies remain for the written task engine. Native Live
 // conversation uses the contextual policy below rather than this exact list.
@@ -26,6 +27,7 @@ export function isConversationalFollowUp(text) {
 export function classifyGeminiLiveTurn(text, context = {}) {
   const normalized = normalizeSpeech(text);
   if (!normalized) return { route: 'delegate', kind: 'missing-transcript' };
+  if (isIndependentBusinessRead(text)) return { route: 'delegate', kind: 'data-or-operation', newTask: true, independentRead: true };
   const collection=collectionDecision(text,context);
   if(collection)return collection;
   // A background clause describes context; classify the actual request after
@@ -68,6 +70,7 @@ export function classifyGeminiLiveTurn(text, context = {}) {
 export function quickReadPlan(text) {
   const value = normalizeSpeech(text).replace(/^olivia /, '').replace(/ por favor$/, '').replace(/^cuanto stock (?:de |del )?/, 'cuantas unidades de ');
   if (/\b(?:carga|cargame|cargues|crea|creame|registra|agrega|ingresa|vende|cobra|manda|envia|borra|elimina|cambia|modifica|queria decir|en realidad)\b/.test(value)) return null;
+  if (/^(?:(?:que|cuales) (?:son )?(?:las )?(?:ubicaciones|locales|depositos)(?: (?:estan|hay|tenemos|son))?(?: activ[oa]s)?|(?:mostra\w*|lista\w*|decime) (?:las |los )?(?:ubicaciones|locales|depositos)(?: activ[oa]s)?)$/.test(value)) return { kind: 'locations' };
   if (/^(?:quiero |necesito )?hablar con (?:un |el )?cliente$/.test(value)) return { kind: 'customer', query: '' };
   const customer = /^(?:(?:busca|buscame|buscar|mostrame|consulta)(?: al| el)? cliente |(?:quiero |necesito )?hablar con (?:el cliente |cliente ))(.+)$/.exec(value);
   if (customer) return { kind: 'customer', query: customer[1] };

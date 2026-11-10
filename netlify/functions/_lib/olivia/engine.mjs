@@ -580,7 +580,8 @@ export function createOliviaEngine({
       }
       // A saved improvement proposal does not monopolize later business turns.
       if (!suggestionFlow && conversation.draft?.kind === 'app-suggestion') conversation.draft = null;
-      const transition = suggestionFlow || assistance.pure ? { ...manageConversationTask({ task: conversation.taskState, suspendedTasks: conversation.suspendedTasks || [] }, "pause", null, clock()), handled: false, directive: assistance.pure ? 'ideation' : null } : transitionConversationTask(conversation, userMessage, clock());
+      const independentReadPlan = latencyEnabled(config) && !attachments.length && !conversation.pendingActionId ? quickReadPlan(userMessage) : null;
+      const transition = independentReadPlan ? { task: conversation.taskState, suspendedTasks: conversation.suspendedTasks || [], handled: false } : suggestionFlow || assistance.pure ? { ...manageConversationTask({ task: conversation.taskState, suspendedTasks: conversation.suspendedTasks || [] }, "pause", null, clock()), handled: false, directive: assistance.pure ? 'ideation' : null } : transitionConversationTask(conversation, userMessage, clock());
       if(latencyEnabled(config) && ['start','switch'].includes(transition.directive) && transition.task?.intent==='prepare_stock_load' && context.locationId && !transition.task.slots.locationId){transition.task.slots.locationId=context.locationId;transition.task.missingFields=requiredFields(transition.task.intent).filter(key=>transition.task.slots[key]==null);}
       if (transition.handled && ['start', 'switch'].includes(transition.directive) && transition.task) transition.content = missingQuestion(transition.task.missingFields, transition.task.intent, { starting: true });
       conversation.taskState = transition.task;
@@ -604,12 +605,12 @@ export function createOliviaEngine({
         return result;
       };
       trace.mark('router.start');
-      const readPlan = latencyEnabled(config) && !attachments.length && !conversation.pendingActionId && !transition.handled ? quickReadPlan(userMessage) : null;
+      const readPlan = independentReadPlan;
       trace.mark('router.end',{route:readPlan?'quick-read':'controlled'});
       const quick = readPlan ? await fastConversationRead({plan:readPlan,context,previous:conversation.taskState,run,check:name=>assertCapability(session,name),signal,now:clock()}) : null;
       if(quick?.content) {
         signal?.throwIfAborted();
-        const result=await persistTurn({...quick,taskState:quick.taskState || conversation.taskState || null,preservePending:true});
+        const result=await persistTurn({...quick,taskState:conversation.taskState && !['completed','cancelled'].includes(conversation.taskState.status) ? conversation.taskState : quick.taskState || conversation.taskState || null,preservePending:true});
         event={...event,route:'deterministic',routingReason:'quick-read',measurement:'provider',modelCalls:[],tools:deterministicTools,durationMs:Date.now()-startedAt};
         await settleUsage({store,session,reservation,event,configuration:config,result:{conversationId:id},now:clock()});settled=true;
         result.usage=await usage(session,config,event);trace.mark('response.complete',{route:'quick-read'});

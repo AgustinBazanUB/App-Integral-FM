@@ -1,4 +1,5 @@
 import { normalizeSpeech } from './oliviaSpeechText.mjs';
+import { isIndependentBusinessRead } from './oliviaBusinessRead.mjs';
 
 const qty='(?:\\d+(?:[.,]\\d+)?|un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|veinte)';
 const quantity=new RegExp('\\b'+qty+'\\b','i');
@@ -9,7 +10,7 @@ const social=/^(?:(?:hola|gracias|muchas gracias|perfecto|muy bien|que bueno|com
 // permission or confirmation. The existing task engine owns every validation.
 export function advanceVoiceCollection(text,previous=null,context={}) {
   const raw=String(text || '').trim().slice(0,1500),n=normalizeSpeech(raw);
-  if(!n || liveRead.test(n) || /[?¿]/.test(raw))return null;
+  if(!n || isIndependentBusinessRead(raw) || liveRead.test(n) || /[?¿]/.test(raw))return null;
   const active=previous && ['collecting','ready','paused'].includes(previous.status);
   if(active && previous.lastInput===n)return previous;
   if(active && /^(?:no deja|dejalo|cancela(?:lo)?|olvidalo)(?:\b|$)/.test(n)){
@@ -85,12 +86,15 @@ export function safeConversationBridge(text,{collection=null,accepted=false}={})
   let body=n.replace(prefix,'').trim();
   if(collection){
     if(collection.status==='cancelled')return /^(?:no (?:voy a )?(?:preparo|preparar|ejecuto|ejecutar)|dejamos? (?:este|el|ese) (?:pedido|borrador)|dejo (?:este|el|ese) pedido)/.test(body);
-    if(!raw.includes('?'))return false;
+    // Gemini can ask for a field as an imperative, without question marks.
+    // Accept only a field request, never a statement of commercial facts.
+    const fieldRequest=/^(?:decime|indicame|pasame|contame) (?:en que ubicacion(?: queres cargarlo)?|(?:los |que )?productos y (?:sus )?cantidades|(?:el |que )?nombre(?: del producto)?)$/.test(body);
+    if(!raw.includes('?')&&!fieldRequest)return false;
     const before=raw.split('¿')[0];
     const intro=normalizeSpeech(before).replace(prefix,'').trim();
     const echo=/^tomo (.+) como (?:la )?ubicacion solicitada$/.exec(intro);
     if(raw.includes('¿')&&intro&&(!echo||normalizeSpeech(collection.requestedLocation)!==echo[1]))return false;
-    if(!raw.includes('¿')&&!/^(?:que|cual|donde|cuanto|en que|queres|podes|me decis)\b/.test(body))return false;
+    if(!fieldRequest&&!raw.includes('¿')&&!/^(?:que|cual|donde|cuanto|en que|queres|podes|me decis)\b/.test(body))return false;
     if(/\b(?:ya|esta disponible|que cree|que cargue)\b/.test(body))return false;
     const field=collection.pendingQuestion;
     return field==='location'?/\b(?:donde|ubicacion|local|deposito)\b/.test(body):field==='items-and-quantities'?/\b(?:productos?|cantidades?|unidades?)\b/.test(body):field==='product-name'?/\b(?:producto|nombre|llama)\b/.test(body):field==='operation'?/\b(?:crear|nuevo)\b/.test(body)&&/\b(?:stock|existente)\b/.test(body):false;

@@ -17,6 +17,13 @@ export function formatQuickRead(tool, result, { priceOnly = false } = {}) {
 export async function fastConversationRead({ plan, context, previous, run, check, signal, now = new Date() }) {
   if(!plan) return null;
   const checkCurrent=()=>signal?.throwIfAborted();
+  if(plan.kind==='locations') {
+    check('list_locations');
+    const result=await run('list_locations',{});checkCurrent();
+    if(!Array.isArray(result?.data?.locations) || result.state || result.data.code) return null;
+    const names=result.data.locations.map(location=>location.name).filter(name=>typeof name==='string' && name.trim());
+    return {content:names.length ? `Las ubicaciones activas que podés consultar son: ${names.join(', ')}.${result.data.locations.length>=result.data.limit ? ' La consulta alcanzó su límite; puede haber más ubicaciones permitidas.' : ''}` : 'No encontré ubicaciones activas disponibles con tus permisos.',state:'INFORMACION'};
+  }
   if(plan.kind==='customer') {
     check('search_customers');
     if(!plan.query) return {content:'¿Qué cliente buscás? Pasame el nombre o el teléfono y lo busco.',state:'DATOS_INCOMPLETOS'};

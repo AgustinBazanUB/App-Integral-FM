@@ -24,6 +24,7 @@ export const oliviaClient = createOliviaTransport({ getToken: async () => 'synth
   }
   if (url.includes('transcribe')) {countTraffic('transcribe');return Response.json({ text: new URLSearchParams(location.search).has('slowVoice') ? 'Consulta lenta de prueba de voz' : 'Hola Olivia, probemos la conversación.' });}
   const b = JSON.parse(init.body);
+  if(b.operation==='delegatedTaskStatus')return Response.json({tasks:params.has('taskSample')?['needs-input','paused','failed'].map(status=>({id:'sample-'+status,status,summary:'Pregunta de tarea sintética'})):[]});
   if (['state', 'resume'].includes(b.operation)) {if(params.has('hydrateDelay'))await new Promise(r=>setTimeout(r,Number(params.get('hydrateDelay'))));return Response.json(state());}
   if (b.operation === 'estimate') return Response.json({ estimate: null });
   if (b.operation==='cancelTurn')return Response.json({cancelled:true});
