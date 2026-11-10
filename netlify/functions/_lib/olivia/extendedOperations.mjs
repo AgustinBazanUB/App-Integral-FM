@@ -24,7 +24,7 @@ export async function extendedOperationPlan({ session, toolName, args, store, no
   if (["prepare_shipment_create", "prepare_shipment_update"].includes(toolName)) throw oliviaError("shipping-sales-only", "Los envíos se crean exclusivamente desde Venta Rápida o Panel Vendedor. Las acciones logísticas se realizan desde Gestión de envíos.", 409);
   assertExtendedCapability(session, toolName);
   validateSchema(args, OLIVIA_CAPABILITIES[toolName]?.parameters);
-  if (toolName === "prepare_catalog_stock_load") return catalogStockPlan({ session, args, store, now, entityId, correlation });
+  if (["prepare_catalog_stock_load", "prepare_warehouse_stock_load"].includes(toolName)) return catalogStockPlan({ session, args, store, now, entityId, correlation, targetType: toolName === "prepare_warehouse_stock_load" ? "warehouse" : "location" });
   if (toolName === "prepare_batch_sales") return batchSalesPlan({ session, args, store, now, entityId, correlation });
   const profile = { ...session.profile, id: session.uid }, documents = {};
   const read = async (path) => { const row = await store.get(path); documents[path] = row || null; return row ? { ...row, id: path.split("/").at(-1) } : null; };

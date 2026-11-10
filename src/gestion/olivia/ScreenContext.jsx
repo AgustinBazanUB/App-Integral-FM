@@ -4,7 +4,7 @@ import { useLocation } from "../../router";
 const ScreenContext = createContext(null);
 
 export function OliviaScreenProvider({ children }) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [screen, setScreen] = useState(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [review, setReview] = useState(null);
@@ -17,15 +17,20 @@ export function OliviaScreenProvider({ children }) {
   }, []);
   const context = useMemo(() => {
     const parts = pathname.split("/").filter(Boolean);
+    const params = new URLSearchParams(search || "");
+    const queryLocationId = params.get("locationId") || params.get("location") || "";
+    const queryView = params.get("view") || "";
     return {
       route: pathname,
       module: parts[0] === "vendedor" ? "seller" : parts[1] || "dashboard",
+      ...(queryView && /^[A-Za-z0-9_-]{1,60}$/.test(queryView) ? { view: queryView } : {}),
+      ...(queryLocationId && /^[A-Za-z0-9_-]{1,128}$/.test(queryLocationId) ? { locationId: queryLocationId } : {}),
       ...(parts[1] === "locations" && parts[2] ? { locationId: decodeURIComponent(parts[2]), entityType: "location", entityId: decodeURIComponent(parts[2]) } : {}),
       ...(parts[1] === "warehouse" && parts[2] ? { warehouseId: decodeURIComponent(parts[2]), entityType: "warehouse", entityId: decodeURIComponent(parts[2]) } : {}),
-      ...(screen?.route === pathname ? screen.fields : {}),
+      ...(screen?.route === pathname ? screen.fields : screen?.fields?.locationId ? { locationId: screen.fields.locationId } : {}),
       ...(guideContext ? { uiGuide: guideContext } : {}),
     };
-  }, [pathname, screen, guideContext]);
+  }, [pathname, search, screen, guideContext]);
   return <ScreenContext.Provider value={{ context, publish, assistantOpen, setAssistantOpen, review, setReview, guideRequest, setGuideRequest, guideCommand, setGuideCommand, setGuideContext }}>{children}</ScreenContext.Provider>;
 }
 

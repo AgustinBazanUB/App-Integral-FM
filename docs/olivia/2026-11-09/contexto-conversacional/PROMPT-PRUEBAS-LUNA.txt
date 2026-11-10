@@ -1,0 +1,25 @@
+Usá GPT-6 Luna ya seleccionado en Codex. No cambies el modelo de Olivia ni sus proveedores.
+Objetivo: probar manualmente Olivia en Chrome, con pocas llamadas y evidencia. No hagas una auditoría extensa ni repitas el historial de este chat.
+
+1. Leé AGENTS.md y el informe de esta carpeta. Confirmá rama, SHA y último Deploy Preview del PR de esta actualización. No uses producción ni una URL antigua por comodidad.
+2. Antes de escribir, verificá frontend, Authentication, Functions, Firestore y credenciales del servidor en app-integral-fm-pruebas, sin mostrar secretos. Si algo es mixto o no verificable, detené solo las pruebas con escrituras y registrá el bloqueo. Usá datos sintéticos existentes. No confirmes modificaciones, no borres ni limpies registros en esta primera batería.
+3. Usá Computer Use de Chrome en una pestaña propia, sin controlar el mouse del escritorio. Reutilizá la sesión. No instales otra infraestructura ni llames directamente al backend para hacer pasar una operación de Olivia. Podés inspeccionarlo después para verificar resultados.
+4. Ejecutá un solo lote de estos 10 turnos, adaptando nombres a datos sintéticos permitidos. Anotá la pregunta pendiente antes de cambiar de tema:
+   a. Hola Olivia, cómo estás.
+   b. Quiero cargar stock.
+   c. Qué ubicaciones están activas.
+   d. Cómo se llaman esas ubicaciones (debe resolver la referencia, sin inventar).
+   e. Sigamos con la carga, en [ubicación sintética verificada].
+   f. No entendí lo que me pediste; explicámelo de otra forma.
+   g. Antes de seguir, cuánto stock tiene [producto sintético verificado] allí.
+   h. Qué tareas estás haciendo.
+   i. No, dejá la carga de stock (si hay varias, debe preguntar cuál).
+   j. Qué podés hacer en esta aplicación y qué no podés hacer con mis permisos.
+5. Comprobá que cada pregunta reciba respuesta o aclaración pertinente; que no vuelva a pedir productos cuando se consultan ubicaciones; que el borrador se conserve; que no haya tarjetas de seguimiento/cancelación/reanudación en el chat normal; que errores y datos faltantes sean mensajes normales; que solo una propuesta de modificación muestre confirmación visual; y que un sí hablado nunca ejecute por sí solo una modificación.
+6. Separá modalidades: primero texto manual. Voz solo si existe un dispositivo o arnés de audio autorizado, con límite de gasto vigente comprobado. No resetees el acumulado. No consideres costo desconocido como cero. No enciendas el micrófono físico si mezcla ambiente de la PC: preferí el arnés aislado existente y documentalo. Audio virtual no acredita parlantes/micrófono reales. Nunca presentes texto como prueba acústica.
+7. Para voz, hablá/emití audio real por la entrada autorizada. Conservá estímulo, transcripción, salida capturada y trazas correlacionadas. Medí fin real de entrada a primer audio de salida; diferenciá audio generado, programado y físicamente audible. Registrá primer acuse y respuesta definitiva por separado. Si no hay captura verificable, poné N/D, no estimes. Probá aparte ruido sin habla, interrupción involuntaria y corte intencional, solo con el entorno de audio controlado; no certifiques recuperación por instrucciones del prompt.
+8. Presupuesto: usá el saldo y tope ya autorizados en el informe previo; si faltan, hacé solo texto/fixtures sin proveedor pago y registrá voz pendiente. No amplíes el gasto ni ejecutes 37 pruebas por defecto. Detenete si aparecen dos fallos equivalentes y guardá el caso mínimo reproducible. No repitas capturas completas en cada turno: una al final y otra por fallo relevante.
+9. Guardá CSV: caso,modo,SHA,sessionId,turnId,frase,respuesta,esperado,ruta,herramientas,t_fin_entrada,t_primer_acuse,t_respuesta_final,t_audio_programado,latencia_ms,resultado,evidencia. N/D para lo no medido. Guardá informe breve con aprobados, fallos, pendientes, costo medido/estimado/desconocido y enlaces. No calcules percentiles representativos con 10 casos heterogéneos. No expongas tokens, datos personales ni audio ambiente.
+10. Antes de modificar código, reproducí el defecto en este SHA; si lo corregís, conservá cambios ajenos, tests focalizados y un solo build/preview agrupado. No integres a main. Terminá con enlace al preview y reporte de los casos ejecutados, sin certificar lo que no probaste.
+
+Ahorro: respuestas breves, inspecciones puntuales con rg, lotes pequeños, reutilizar fixtures y artefactos. No reconstruir arquitectura ni navegar repositorios de referencia salvo que un defecto lo requiera. Si falta contexto, leé este informe; no releas todo el historial.
