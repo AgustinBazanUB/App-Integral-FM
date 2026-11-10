@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { OLIVIA_TOOL_SCHEMAS, validateSchema, oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { operationGuidance } from "../../../../src/shared/oliviaOperationGuide.mjs";
+import { advanceVoiceCollection } from "../../../../src/shared/oliviaVoiceCollection.mjs";
 
 const normalize = (text = "") => String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const productReferenceWords = (value) => normalize(value).replace(/([a-z])(\d)/g, "$1 $2").replace(/medio litro|media botella de litro/g, "500 ml").replace(/\b(\d+)\s*(?:mililitros?|cc|ml)\b/g, "$1ml").replace(/\b(?:botellas?|bidones?|de|del|la|el|los|las|aceite|oliva|por|favor)\b/g, " ").split(/\s+/).filter(Boolean);
@@ -105,10 +106,21 @@ function parseMultiStockItems(clause) {
  * intents continue through Luna with this persisted task in its context. */
 export async function progressiveStock({ previous, initialId, message, context, run, check = () => {}, now = new Date() }) {
   const text = replaceNumberWords(normalize(message));
-  const voiceDraft=context.voiceCollectionDraft;
+  let voiceDraft=context.voiceCollectionDraft;
+  const previousStock=previous && ['prepare_stock_load','prepare_catalog_stock_load','prepare_warehouse_stock_load'].includes(previous.intent) && ['collecting','prepared'].includes(previous.status);
+  // Text and resumed tasks use the same unverified collector as voice. A
+  // warehouse request must not fall through to the location-only legacy path.
+  if(!voiceDraft && (/\bdepositos?\b/.test(text) || previousStock && (previous.intent==='prepare_warehouse_stock_load' || previous.collectionDraft))){
+    const previousItems=previousStock?(previous.slots?.items || (previous.productName && previous.slots?.quantity?[{name:previous.productName,quantity:previous.slots.quantity}]:[])):[];
+    const base=previousStock?{version:1,revision:previous.revision || 0,intent:'stock-load',operation:'stock-load',targetType:null,requestedLocation:null,requestedWarehouse:null,itemsMentioned:previousItems.map(item=>({description:item.name,quantityMentioned:String(item.quantity)})),validation:'unverified',...(previous.collectionDraft || {}),status:'collecting'}:null;
+    voiceDraft=advanceVoiceCollection(message,base,context);
+    if(voiceDraft && !['collecting','ready'].includes(voiceDraft.status))return null;
+  }
   if(voiceDraft){
     const targetType=voiceDraft.targetType;
     if(!['location','warehouse'].includes(targetType))return null;
+    const intent=targetType==='warehouse'?'prepare_warehouse_stock_load':'prepare_catalog_stock_load';
+    const taskId=!context.voiceCollectionDraft && previousStock?previous.id:initialId||randomUUID();
     const targetQuery=String((targetType==='warehouse'?voiceDraft.requestedWarehouse:voiceDraft.requestedLocation) || '').trim().slice(0,160);
     const targetOrdinal=Number.isInteger(voiceDraft.targetOrdinal)&&voiceDraft.targetOrdinal>0&&voiceDraft.targetOrdinal<=20?voiceDraft.targetOrdinal:null;
     const mentioned=Array.isArray(voiceDraft.itemsMentioned)?voiceDraft.itemsMentioned.slice(0,20):[];
@@ -118,9 +130,11 @@ export async function progressiveStock({ previous, initialId, message, context, 
       const name=String(item.description || '').trim().slice(0,150);
       return {name,quantity};
     });
+    const collectionDraft={version:1,revision:voiceDraft.revision || 1,intent:'stock-load',operation:'stock-load',targetType,requestedLocation:voiceDraft.requestedLocation || null,requestedWarehouse:voiceDraft.requestedWarehouse || null,targetOrdinal,itemsMentioned:mentioned.map(item=>({description:String(item.description || '').slice(0,350),quantityMentioned:String(item.quantityMentioned || '').slice(0,40)})),validation:'unverified',status:'collecting',lastInput:voiceDraft.lastInput || normalize(message),correctionNeedsProduct:voiceDraft.correctionNeedsProduct===true,pendingCorrectionQuantity:voiceDraft.pendingCorrectionQuantity || null,pendingQuestion:voiceDraft.pendingQuestion || null,missingFields:voiceDraft.missingFields || []};
+    const collectedTask=(slots,missingFields,ambiguities={})=>({id:taskId,intent,revision:(previous?.revision || 0)+1,status:'collecting',slots,missingFields,ambiguities,collectionDraft,route:null,createdAt:previousStock?previous.createdAt:now,updatedAt:now});
+    if(collectionDraft.correctionNeedsProduct)return {task:collectedTask({[targetType==='warehouse'?'warehouseId':'locationId']:null,items:parsedItems,reason:null},['correction-product']),result:{state:'DATOS_INCOMPLETOS'},content:'¿De cuál producto querés cambiar esa cantidad?'};
     if((!targetQuery&&!targetOrdinal)||!parsedItems.length||parsedItems.some(item=>!item.name||!Number.isSafeInteger(item.quantity)||item.quantity<1||item.quantity>1000000))
-      return {task:{id:initialId||randomUUID(),intent:targetType==='warehouse'?'prepare_warehouse_stock_load':'prepare_catalog_stock_load',revision:1,status:'collecting',slots:{...(targetType==='warehouse'?{warehouseId:null}:{locationId:null}),items:parsedItems.filter(item=>item.name&&Number.isSafeInteger(item.quantity)).map(item=>({name:item.name,quantity:item.quantity})),reason:null},missingFields:[...(!targetQuery&&!targetOrdinal?[targetType==='warehouse'?'warehouseId':'locationId']:[]),...(!parsedItems.length?['items']:[])],ambiguities:{},route:null,createdAt:now,updatedAt:now},result:{state:'DATOS_INCOMPLETOS'},content:!targetQuery&&!targetOrdinal?(targetType==='warehouse'?'¿En cuál depósito querés cargar esta lista?':'¿En qué local querés cargar esta lista?'):'¿Qué productos y cantidades querés sumar?'};
-    const intent=targetType==='warehouse'?'prepare_warehouse_stock_load':'prepare_catalog_stock_load';
+      return {task:collectedTask({[targetType==='warehouse'?'warehouseId':'locationId']:null,items:parsedItems.filter(item=>item.name&&Number.isSafeInteger(item.quantity)),reason:null},[...(!targetQuery&&!targetOrdinal?[targetType==='warehouse'?'warehouseId':'locationId']:[]),...(!parsedItems.length||parsedItems.some(item=>!item.name||!Number.isSafeInteger(item.quantity)||item.quantity<1||item.quantity>1000000)?['items']:[])]),result:{state:'DATOS_INCOMPLETOS'},content:!targetQuery&&!targetOrdinal?(targetType==='warehouse'?'¿En cuál depósito querés cargar esta lista?':'¿En qué local querés cargar esta lista?'):'¿Qué productos y cantidades querés sumar?'};
     check(intent);
     const [ownersResult,catalogResult]=await Promise.all([
       run(targetType==='warehouse'?'list_warehouses':'list_locations',{}),
@@ -136,7 +150,7 @@ export async function progressiveStock({ previous, initialId, message, context, 
       const names=matching.slice(0,5).map(row=>row.name).filter(Boolean);
       const detail=names.length?` Encontré: ${names.join(', ')}.`:'';
       const field=targetType==='warehouse'?'warehouseId':'locationId';
-      const task={id:initialId||randomUUID(),intent,revision:1,status:'collecting',slots:{[field]:null,items:parsedItems.map(item=>({name:item.name,quantity:item.quantity,productId:null,categoryName:null,abbreviation:null,defaultPrice:null})),reason:null},missingFields:[field],ambiguities:{[field]:names.map(name=>({name}))},route:null,createdAt:now,updatedAt:now};
+      const task=collectedTask({[field]:null,items:parsedItems.map(item=>({name:item.name,quantity:item.quantity,productId:null,categoryName:null,abbreviation:null,defaultPrice:null})),reason:null},[field],{[field]:names.map(name=>({name}))});
       return {task,result:{state:'DATOS_INCOMPLETOS'},content:`No pude identificar de forma única el ${targetType==='warehouse'?'depósito':'local'} «${targetQuery || `número ${targetOrdinal}`}».${detail} ¿Cuál querés usar?`};
     }
     const owner=matching[0],catalog=catalogResult?.data?.products || [];
@@ -146,9 +160,9 @@ export async function progressiveStock({ previous, initialId, message, context, 
       return {productId:matched?.productId || null,name:matched?.name || item.name,quantity:item.quantity,categoryName:null,abbreviation:null,defaultPrice:null};
     });
     const args={...(targetType==='warehouse'?{warehouseId:owner.id}:{locationId:owner.id}),items,reason:null};
-    const taskId=initialId||randomUUID(),task={id:taskId,intent,revision:(previous?.revision||0)+1,status:'collecting',slots:args,missingFields:[],ambiguities:{},route:null,createdAt:previous?.createdAt||now,updatedAt:now};
+    const task={...collectedTask(args,[]),...(targetType==='warehouse'?{warehouseName:owner.name}:{locationName:owner.name})};
     const result=await run(intent,args);
-    const preparedTask={...taskFromTool(task,intent,args,result,now),id:taskId,revision:task.revision};
+    const preparedTask={...task,...taskFromTool(task,intent,args,result,now),id:taskId,revision:task.revision};
     return {task:preparedTask,result,content:result.prepared?.summary||result.data?.summary||missingQuestion(result.data?.missing||result.data?.missingFields||[],intent)};
   }
   const start = /^(?:cargame|carga|cargar|ingresa|ingresame|agrega|agregame|sumame|suma)\s+(\d+)\s+(?:unidad(?:es)?\s+(?:de\s+)?|botellas?\s+(?:de\s+)?|bidones?\s+(?:de\s+)?|frascos?\s+(?:de\s+)?|de\s+)?(?!unidad(?:es)?$|botellas?$|bidones?$|frascos?$)(.+)$/.exec(text);

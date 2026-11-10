@@ -67,12 +67,12 @@ export function advanceVoiceCollection(text,previous=null,context={}) {
       if(targetCorrection){draft.targetId=null;draft.targetOrdinal=null;draft.requestedLocation=null;draft.requestedWarehouse=null;}
       else if(draft.targetType!==previous?.targetType){draft.targetId=null;draft.targetOrdinal=null;}
     }
-    const loc=/(?:^|\b)en\s+(?:(?:el|la|un|una)\s+)?(?:(?:local|ubicacion|sucursal|deposito|feria)\s+)?(.+)/i.exec(raw);
+    const loc=/(?:^|\b)en\s+(?:(?:el|la|un|una)\s+)?(?:(?:local|ubicaci[oó]n|sucursal|dep[oó]sito|feria)\s+)?(.+)/i.exec(raw);
     if(loc){const value=loc[1].split(new RegExp('(?:[,;]|\\s+(?:y\\s+)?'+qty+'\\s+)','i'))[0].trim();if(value&&!/^(?:realidad|que|cual|donde|local|ubicacion|sucursal|deposito|feria|que local|cual local|un local|una ubicacion|un deposito|local o deposito)\b/.test(normalizeSpeech(value))&&!/\btodavia no se\b/.test(n)){
       if(draft.targetType==='warehouse')draft.requestedWarehouse=value.slice(0,160);else draft.requestedLocation=value.slice(0,160);
     }}
     else if(active && ['location','warehouse'].includes(previous.pendingQuestion) && !correction && !intent && !quantity.test(n)){
-      const directLoc=raw.replace(/^(?:el|la)\s+/i,'').replace(/^(?:local|ubicacion|sucursal|deposito)\s+/i,'').trim();
+      const directLoc=raw.replace(/^(?:el|la)\s+/i,'').replace(/^(?:local|ubicaci[oó]n|sucursal|dep[oó]sito)\s+/i,'').trim();
       if(directLoc && !/^(?:realidad|que|cual|donde|si|no|dale|bueno|espera)\b/.test(normalizeSpeech(directLoc))){
         if(draft.targetType==='warehouse')draft.requestedWarehouse=directLoc.slice(0,160);else draft.requestedLocation=directLoc.slice(0,160);
       }
@@ -83,12 +83,12 @@ export function advanceVoiceCollection(text,previous=null,context={}) {
       const items=parts.map(part=>{
         const cleaned=part.trim().replace(/^(?:cargame|carga|cargar|sumame|suma|agregame|agrega|agregar|ingresa|ingresame|quiero|necesito)\\s+/i,'');
         const mProductFirst=new RegExp('^([A-Za-zÁÉÍÓÚÑáéíóúñ][^,;0-9]*?)\\s+('+qty+')(?:\\s+(?:unidades?|botellas?|paquetes?|cajas?|frascos?|bidones?))?$','i').exec(cleaned);
-        if(mProductFirst && !/^(?:un|una|uno)$/i.test(mProductFirst[2]) && !/\b(?:cargar|cargame|sumar|agregar|agregame|ingresar|quiero|necesito)\b/i.test(mProductFirst[1])){
+        if(mProductFirst && !/^(?:un|una|uno)$/i.test(mProductFirst[2]) && !/\b(?:carga|cargar|cargame|suma|sumame|sumar|agrega|agregar|agregame|ingresa|ingresame|ingresar|quiero|necesito)\b/.test(normalizeSpeech(mProductFirst[1]))){
           return {quantityMentioned:mProductFirst[2],description:mProductFirst[1].replace(/^(?:(?:unidades?|botellas?|paquetes?|cajas?|frascos?|bidones?)\\s+)?(?:de\\s+)?/i,'').trim().slice(0,350)};
         }
         const m=new RegExp('\\b('+qty+')\\s+(?:(?:unidades?|botellas?|paquetes?|cajas?|frascos?|bidones?)\\s+)?(?:de\\s+)?(.+)','i').exec(cleaned);
-        if(m && !(/^(?:un|una|uno)$/i.test(m[1]) && /^(?:local|ubicacion|sucursal|deposito|feria)$/i.test(m[2].trim())) && !/^(?:unidades?|botellas?|paquetes?|cajas?|frascos?|bidones?)$/i.test(m[2].trim())){
-          return {quantityMentioned:m[1],description:m[2].replace(/^de\s+/i,'').replace(/\s+en\s+(?:(?:el|la|un|una)\s+)?(?:local|ubicacion|sucursal|deposito|feria)\b.*/i,'').trim().slice(0,350)};
+        if(m && !(/^(?:un|una|uno)$/i.test(m[1]) && /^(?:local|ubicaci[oó]n|sucursal|dep[oó]sito|feria)$/i.test(m[2].trim())) && !/^(?:unidades?|botellas?|paquetes?|cajas?|frascos?|bidones?)$/i.test(m[2].trim())){
+          return {quantityMentioned:m[1],description:m[2].replace(/^de\s+/i,'').replace(/\s+en\s+(?:(?:el|la|un|una)\s+)?(?:local|ubicaci[oó]n|sucursal|dep[oó]sito|feria)\b.*/i,'').trim().slice(0,350)};
         }
         return null;
       }).filter(x=>x&&x.description).slice(0,20);

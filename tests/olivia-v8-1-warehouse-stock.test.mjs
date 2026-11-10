@@ -10,6 +10,73 @@ import { fixture, start } from './helpers/olivia-fixture.mjs';
 
 const warehouseProfile = { id:'warehouse-user', name:'Warehouse QA', role:'warehouse_manager', active:true };
 
+function stockTools(){
+  const calls=[];
+  const run=async(name,args)=>{
+    calls.push({name,args});
+    if(name==='list_warehouses')return {data:{records:[{id:'warehouse-b',name:'Norte',active:true}]}};
+    if(name==='list_locations')return {data:{locations:[{id:'local-b',name:'Norte',active:true}]}};
+    if(name==='search_products')return {data:{products:[{productId:'oil',name:'Aceite Arbequina'},{productId:'coratina',name:'Aceite Coratina'}]}};
+    if(name.startsWith('prepare_'))return {prepared:{canonicalArgs:args,summary:'Lista de QA preparada.'},data:{state:'ESPERANDO_CONFIRMACION'}};
+    throw new Error(`Unexpected tool ${name}`);
+  };
+  return {calls,run};
+}
+
+test('a complete spoken-style text warehouse request uses the warehouse tool without a client collection payload',async()=>{
+  const {calls,run}=stockTools();
+  const result=await progressiveStock({initialId:'native-warehouse',message:'Cargá diez botellas de Aceite Arbequina en el depósito Norte',context:{},run});
+  assert.equal(result.task.intent,'prepare_warehouse_stock_load');
+  assert.equal(result.task.slots.warehouseId,'warehouse-b');
+  assert.equal(calls.some(call=>call.name==='prepare_stock_load'||call.name==='prepare_catalog_stock_load'),false);
+});
+
+test('accented inventory nouns are destinations and never phantom merchandise',()=>{
+  const empty=advanceVoiceCollection('Quiero cargar stock en un depósito');
+  assert.equal(empty.targetType,'warehouse');
+  assert.deepEqual(empty.itemsMentioned,[]);
+  const named=advanceVoiceCollection('Cargá diez botellas de Aceite Arbequina en el depósito Norte');
+  assert.equal(named.requestedWarehouse,'Norte');
+  assert.equal(named.itemsMentioned[0].description,'Aceite Arbequina');
+  assert.deepEqual(advanceVoiceCollection('Cargá diez',empty).itemsMentioned,[]);
+});
+
+test('a native warehouse dialogue retains its target, clarifies one-item correction and safely switches to a location',async()=>{
+  const {calls,run}=stockTools();let previous;
+  const say=async message=>{const result=await progressiveStock({previous,initialId:'warehouse-dialogue',message,context:{},run});assert.ok(result,message);previous=result.task;return result;};
+  await say('Quiero cargar stock en un depósito');
+  await say('Depósito Norte');
+  assert.equal(previous.collectionDraft.requestedWarehouse,'Norte');
+  await say('Diez botellas de Aceite Arbequina y cinco de Aceite Coratina');
+  assert.equal(previous.status,'prepared');
+  assert.equal(previous.slots.warehouseId,'warehouse-b');
+  const preparedCount=()=>calls.filter(call=>call.name.startsWith('prepare_')).length;
+  assert.equal(preparedCount(),1);
+  const ambiguous=await say('No, eran quince');
+  assert.equal(previous.status,'collecting');
+  assert.match(ambiguous.content,/cuál producto/);
+  assert.equal(preparedCount(),1,'an ambiguous quantity must not prepare an unchanged proposal');
+  await say('Aceite Coratina');
+  assert.deepEqual(previous.slots.items.map(item=>item.quantity),[10,15]);
+  await say('No, en el local Norte');
+  assert.equal(previous.id,'warehouse-dialogue');
+  assert.equal(previous.intent,'prepare_catalog_stock_load');
+  assert.equal(previous.slots.locationId,'local-b');
+  assert.equal(Object.hasOwn(previous.slots,'warehouseId'),false);
+  assert.deepEqual(previous.slots.items.map(item=>item.quantity),[10,15]);
+  assert.equal(preparedCount(),3);
+});
+
+test('a newly submitted voice collection keeps its new task identity beside an older stock proposal',async()=>{
+  const {run}=stockTools();
+  const previous={id:'older-stock',intent:'prepare_warehouse_stock_load',status:'prepared',revision:1,slots:{warehouseId:'older-warehouse',items:[]}};
+  const context={voiceCollectionDraft:{intent:'stock-load',targetType:'warehouse',requestedWarehouse:'Norte',itemsMentioned:[{description:'Aceite Arbequina',quantityMentioned:'diez'}]}};
+  const result=await progressiveStock({previous,initialId:'new-stock',message:'Nueva carga',context,run});
+  assert.equal(result.task.id,'new-stock');
+  assert.equal(previous.id,'older-stock');
+  assert.equal(result.task.slots.warehouseId,'warehouse-b');
+});
+
 test('warehouse capability follows warehouse edit permission and remains unavailable to sellers',()=>{
   assert.equal(capabilityAllowed({profile:warehouseProfile},'prepare_warehouse_stock_load'),true);
   assert.equal(capabilityAllowed({profile:{...warehouseProfile,role:'seller'}},'prepare_warehouse_stock_load'),false);
@@ -59,6 +126,21 @@ test('warehouse plan writes the warehouse schema and keeps stock unchanged until
   assert.equal(Object.hasOwn(plan.writes.find(write=>write.path==='warehouseStock/warehouse-a/items/oil').data,'price'),false);
   assert.equal(plan.writes.some(write=>write.path.startsWith('locationStock/')),false);
   assert.equal(documents.get('warehouseStock/warehouse-a/items/oil').currentStock,4,'planning is read-only');
+});
+
+test('a warehouse manager with catalog access can prepare the first product assignment without location permissions',async()=>{
+  const product={id:'oil',name:'Aceite QA',abbreviation:'AQA',categoryId:'',categoryName:'Sin categoría',defaultPrice:1000,active:true,deleted:false};
+  const documents=new Map([['warehouses/warehouse-a',{name:'Depósito QA',active:true}],['products/oil',product]]);
+  const store={get:async path=>documents.get(path)||null,list:async path=>path==='products'?[product]:[]};
+  const profile={...warehouseProfile,permissionAllow:{products:['view']}};
+  const plan=await catalogStockPlan({session:{uid:warehouseProfile.id,profile},args:{warehouseId:'warehouse-a',reason:'Auditoría QA',items:[{productId:'oil',name:'Aceite QA',quantity:3,categoryName:null,abbreviation:null,defaultPrice:null}]},store,entityId:'first-warehouse-assignment',targetType:'warehouse'});
+  const stock=plan.writes.find(write=>write.path==='warehouseStock/warehouse-a/items/oil');
+  assert.equal(stock.type,'create');
+  assert.equal(stock.data.currentStock,3);
+  assert.equal(stock.data.initialStock,3);
+  assert.equal(Object.hasOwn(stock.data,'price'),false);
+  assert.equal(plan.writes.some(write=>write.path.startsWith('locationStock/')),false);
+  assert.equal(documents.has('warehouseStock/warehouse-a/items/oil'),false,'preparation must not write stock');
 });
 
 test('delegated voice draft creates one visual confirmation and commits warehouse stock only through confirm()',async()=>{

@@ -140,8 +140,8 @@ export async function catalogStockPlan({ session, args, store, now = new Date(),
   for (const row of grouped.values()) {
     const path = `${stockCollection}/${location.id}/items/${row.product.id}`;
     const existing = await read(path);
-    if (existing && (unavailable(existing) || existing.productDeleted === true)) throw oliviaError("stock-inactive", `${row.product.name} está desactivado en ${location.name}. Reactivalo desde la ubicación antes de cargar stock.`, 409);
-    if (!existing) requirePermission(profile, "locations", "configureLocationProducts", `Tu usuario no puede agregar ${row.product.name} a este local.`);
+    if (existing && (unavailable(existing) || existing.productDeleted === true)) throw oliviaError("stock-inactive", `${row.product.name} está desactivado en ${location.name}. Reactivalo desde el ${ownerLabel} antes de cargar stock.`, 409);
+    if (targetType === "location" && !existing) requirePermission(profile, "locations", "configureLocationProducts", `Tu usuario no puede agregar ${row.product.name} a este local.`);
     if (!row.created) await read(`products/${row.product.id}`);
     if (row.product.categoryId && !freshCategories.has(categoryKey(row.product.categoryName))) await read(`productCategories/${row.product.categoryId}`);
     const plan = targetType === "location"

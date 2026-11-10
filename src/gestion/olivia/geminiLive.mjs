@@ -360,14 +360,23 @@ export class GeminiLiveSession {
     }
     const interimText = content?.interimInputTranscription?.text;
     if (interimText) { turn.interimText = String(interimText); this.onPartial(turn.interimText, { turnId: turn.turnId, turnIndex: turn.turnIndex, final: false }); }
-    const inputText = content?.inputTranscription?.text;
-    if (inputText) {
-      const previousInput = turn.inputText;
-      turn.inputText = mergeTranscript(turn.inputText, inputText); turn.transcriptComplete = true; this.ignoreOutputUntilInput = false; this.onPartial(turn.inputText, { turnId: turn.turnId, turnIndex: turn.turnIndex, final: true });
-      if (turn.inputText !== previousInput) this.trace("gemini.transcript.final", { turnId: turn.turnId, turnIndex: turn.turnIndex });
-      void this.authorizeTurn(turn);
-      this.resolveTranscriptWaiters(turn);
-      clearTimeout(turn.noTranscriptTimer); turn.noTranscriptTimer = null;
+    const inputTranscription = content?.inputTranscription;
+    const inputText = inputTranscription?.text;
+    if (inputText || inputTranscription?.finished === true) {
+      const previousInput = turn.inputText, wasComplete = turn.transcriptComplete;
+      turn.inputText = mergeTranscript(turn.inputText, inputText);
+      if (typeof inputTranscription.finished === 'boolean') turn.transcriptExplicitlyPartial = !inputTranscription.finished;
+      // The provider can finish transcription in a separate, text-free frame.
+      // Legacy frames without `finished` retain their previous final semantics.
+      turn.transcriptComplete = turn.transcriptExplicitlyPartial !== true;
+      this.ignoreOutputUntilInput = false;
+      this.onPartial(turn.inputText, { turnId: turn.turnId, turnIndex: turn.turnIndex, final: turn.transcriptComplete });
+      if (turn.transcriptComplete) {
+        if (!wasComplete || turn.inputText !== previousInput) this.trace("gemini.transcript.final", { turnId: turn.turnId, turnIndex: turn.turnIndex });
+        void this.authorizeTurn(turn);
+        this.resolveTranscriptWaiters(turn);
+        clearTimeout(turn.noTranscriptTimer); turn.noTranscriptTimer = null;
+      }
     }
     const ignoreOutput = Boolean(this.ignoreOutputUntilInput);
     const outputText = content?.outputTranscription?.text;
@@ -793,6 +802,13 @@ export class GeminiLiveSession {
     clearTimeout(turn.responseTimer); clearTimeout(turn.completionTimer);
     clearTimeout(turn.noTranscriptTimer); turn.noTranscriptTimer = null;
     turn.pending = false; turn.completed = true; turn.finalizing = true; turn.turnId ||= globalThis.crypto.randomUUID(); turn.turnIndex ||= ++this.turnIndex;
+    if (turn.transcriptExplicitlyPartial && !turn.transcriptComplete) {
+      turn.cancelled = true; turn.pendingAudio = []; turn.outputAuthorized = false;
+      turn.outputText = ''; turn.publishedOutputText = ''; this.stopPlayback(turn);
+      this.onPartial('', {turnId:turn.turnId,turnIndex:turn.turnIndex,final:false});
+      this.onNotice('No recibí la frase completa. ¿Podés repetirla?');
+      this.trace('gemini.transcript.incomplete',{turnId:turn.turnId,turnIndex:turn.turnIndex,status:'unfinished-asr'});
+    }
     this.trace("gemini.turn.complete", { turnId: turn.turnId, turnIndex: turn.turnIndex, route: turn.toolTurn ? "tool" : turn.directAuthorized ? "direct" : "delegate" });
     if (this.currentTurn === turn) this.currentTurn = this.createTurn();
     this.finalizingTurns.add(turn);

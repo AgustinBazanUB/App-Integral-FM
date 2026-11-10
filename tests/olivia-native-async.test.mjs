@@ -13,6 +13,32 @@ function session(t,options={}){
   Object.assign(live,{ready:true,textInputOnly:true,socket:{readyState:1,send:data=>sent.push(JSON.parse(data)),close(){}}});
   t.after(()=>live.close());return {live,sent,turns,states,audio};
 }
+test('an explicitly unfinished ASR transcript cannot take focus or dispatch a tool before its final marker',async t=>{
+  const calls=[];const {live}=session(t,{onToolCall:async(call,text)=>{calls.push({call,text});return {tasks:[]};}});
+  live.beginTurn('asr-awaits-final');const turn=live.currentTurn;
+  live.receive({serverContent:{inputTranscription:{text:'Stock de aceite',finished:false}}});
+  live.receive({toolCall:{functionCalls:[{id:'wait-final',name:'delegate_to_olivia',args:{action:'new'}}]}});
+  live.receive({serverContent:{inputTranscription:{text:'Stock de aceite'}}});
+  await tick();
+  assert.equal(turn.transcriptComplete,false);
+  assert.equal(live.conversationFocus.intentEpoch,0,'a partial transcript must not take durable conversational focus');
+  assert.equal(calls.length,0,'partial speech must not dispatch backend work');
+  live.receive({serverContent:{inputTranscription:{finished:true}}});
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(turn.transcriptComplete,true);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].text,'Stock de aceite');
+});
+test('provider completion cannot promote unfinished ASR to an authoritative user turn',async t=>{
+  const {live,turns}=session(t,{onToolCall:()=>assert.fail('unfinished speech must never dispatch')});
+  live.beginTurn('unfinished-provider-completion');const turn=live.currentTurn;
+  live.receive({serverContent:{inputTranscription:{text:'Cargá diez unidades de Aceite en el local QA',finished:false}}});
+  live.setListening(false);
+  await live.finishTurn(turn);
+  assert.equal(turn.cancelled,true);
+  assert.equal(live.conversationFocus.intentEpoch,0);
+  assert.equal(turns.length,0,'unfinished speech must not be saved as a completed conversation');
+});
 test('social grammar stays native while contextual controls and free-form task slots use the authenticated engine',()=>{
   for(const text of ['Hola, Olivia. ¿Cómo estás?','Muy bien, ¿y vos?','Perfecto, muchas gracias.','Qué bueno.','¿Me escuchás bien?','¿Te puedo pedir algo?','No, dejá.','Sí, dale.','Contame algo lindo','¿Por qué el cielo es azul?'])assert.equal(classifyGeminiLiveTurn(text).route,'direct',text);
   for(const text of ['Sí, dale.','No, dejá.'])assert.equal(classifyGeminiLiveTurn(text,{pendingAction:true}).route,'delegate',text);
