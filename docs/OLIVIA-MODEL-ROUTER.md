@@ -1,5 +1,7 @@
 # Política de modelos y tareas conversacionales
 
+> La sección de voz de este anexo se actualizó a V5. Las referencias generales a V3/PR34 describen su origen; la arquitectura vigente es Gemini Live/Aoede según [OLIVIA-VOICE.md](OLIVIA-VOICE.md).
+
 Este anexo reemplaza la selección anterior de modelos y el protocolo de voz predeterminado de la evolución de PR31. Se implementa en PR34, sin promover producción ni escribir pruebas comerciales en el Firebase empresarial.
 
 ## Política central, versión 2
@@ -10,7 +12,8 @@ Este anexo reemplaza la selección anterior de modelos y el protocolo de voz pre
 | Pronóstico, comparación, análisis complejo | La misma Luna | `xhigh` |
 | Contenido/diseño creativo en Marketing o Redes con permiso | `gpt-6.1-sol` | `high` |
 | Creatividad con análisis, restricciones o volumen complejo | La misma Sol creativa | `xhigh` |
-| Conversación natural por voz | `gpt-transcribe` + motor Luna + Google Chirp 3 HD | Turnos finalizados; Chirp solo para síntesis |
+| Charla breve por voz | Gemini Live · audio Aoede | Respuesta de voz directa, sin llamada a Luna |
+| Consulta comercial por voz | Gemini Live → herramienta delegada → motor Olivia → Gemini Live | Datos verificados y respuesta de voz; permisos y confirmaciones existentes |
 | Slots inequívocos, esperar, cancelar, confirmación visual | Código de aplicación | Sin llamada de razonamiento |
 
 La [documentación de Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) y de [Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol) confirma los IDs y niveles utilizados. La disponibilidad en la cuenta configurada requiere una llamada real, que no forma parte de las pruebas con fixtures.
@@ -19,7 +22,7 @@ La [documentación de Luna](https://developers.openai.com/api/docs/models/gpt-6-
 
 La decisión no llama a otro modelo. Un aumento de complejidad entre rondas sube el razonamiento de Luna, conserva el modelo y registra cada llamada por separado. Una aclaración breve mantiene la ruta de la tarea incompleta; una intención nueva o una tarea completada permite volver a HIGH. Las Skills de pronóstico activan XHIGH; los análisis simples de ventas mantienen HIGH.
 
-`oliviaConfiguration/global` contiene `modelPolicyVersion`, perfiles de negocio, `routing`, `responseLimits` y `naturalVoice`. El administrador puede editar y confirmar perfiles HIGH/XHIGH, umbrales, límites, voz Chirp y cuota. Los modelos administrativos normal/complejo deben pertenecer a Luna y coincidir; los perfiles creativos deben pertenecer a Sol y coincidir. Los perfiles Live/Reatime antiguos se eliminan al normalizar configuración; la transcripción queda fijada a `gpt-transcribe`. `complexModules` se conserva solo por compatibilidad y no decide la ruta.
+`oliviaConfiguration/global` contiene `modelPolicyVersion`, perfiles de negocio, `routing`, `responseLimits`, `naturalVoice` y los límites híbridos de Gemini Live. El administrador puede editar y confirmar perfiles HIGH/XHIGH, umbrales, límites y cuota. Los modelos administrativos normal/complejo deben pertenecer a Luna y coincidir; los perfiles creativos deben pertenecer a Sol y coincidir. Los campos heredados de TTS se descartan al leer configuración; no seleccionan voces ni proveedores. `complexModules` se conserva solo por compatibilidad y no decide la ruta.
 
 ## Estado persistente de tarea
 
@@ -37,21 +40,17 @@ Las demás tareas usan Luna/Sol con `update_task`, herramientas de búsqueda y p
 
 ## Conversación natural por voz
 
-GPT-Live, Realtime y la variante económica se retiraron como modalidades de conversación. La API legacy rechaza creación, interrupción, herramientas, transcript y cost polling con HTTP 410. El chat escrito y el dictado revisable siguen funcionando.
+La voz conversacional activa es Gemini Live. El micrófono permanece en el navegador con VAD local, cancelación de eco, supresión de ruido y ganancia; el audio PCM se transmite a una sesión Live autenticada con token efímero. Gemini entrega transcripción y responde de forma directa a saludos y charla breve en español argentino con Aoede.
 
-El micrófono permanece en el navegador con VAD local y controles de cancelación de eco, supresión de ruido y ganancia. Cada turno cerrado por silencio produce un archivo acotado que se envía a [GPT Transcribe](https://developers.openai.com/api/docs/guides/transcription) con idioma/contexto/pistas de dominio. Esta integración usa transcripción de archivo completado; recibir texto incremental de un archivo no significa que el audio del micrófono se esté enviando en vivo.
+La política local clasifica la transcripción final antes de publicar texto/audio: la charla simple puede salir por voz; consultas sobre precios, stock, ventas, clientes, envíos y tareas se delegan a `delegate_to_olivia`. El motor verifica acceso y datos, y el resultado vuelve a Gemini Live para comunicarlo. Hablar o aceptar una respuesta no confirma operaciones; la tarjeta visual conserva la confirmación existente.
 
-El texto transcrito se manda al mismo `engine.chat` que el chat escrito. Para voz, Luna devuelve respuesta escrita completa y resumen breve bajo salida estructurada. Las llamadas con herramientas conservan todo el flujo existente; una confirmación oral no ejecuta una tarjeta.
-
-Cuando la respuesta final queda guardada, `chatJobs` publica el resumen hablado. `/olivia-synthesize` valida identidad y propiedad de conversación, limita caracteres y cuota, y llama al stream bidireccional PCM de [Google Chirp 3 HD](https://docs.cloud.google.com/text-to-speech/docs/create-audio-text-streaming). Ese endpoint está en Preview; el cliente Google exige primero la configuración de voz y después el texto. El navegador programa audio PCM mono 24 kHz y cancela la lectura/proveedor cuando el usuario interrumpe.
-
-La función de streaming Netlify tiene un máximo documentado de 60 segundos y 20 MB. El máximo por respuesta hablada y la cuota mensual de caracteres se fijan en la configuración validada por servidor. La única cuenta habilitada durante la prueba es `agsreserva@gmail.com`; la disponibilidad además requiere OpenAI y credenciales ADC/Google TTS en el backend.
+Los límites de sesión y consumo se controlan en Functions. No hay síntesis HTTP ni fallback de Chirp. Ante desconexión o respuesta sin audio, el texto disponible queda visible y se pide reconectar. La única cuenta habilitada durante la prueba es `agsreserva@gmail.com`; las pruebas administrativas ampliadas requieren Gemini Live pagado y el Firebase aislado `app-integral-fm-pruebas`.
 
 ## Uso, costo y seguridad
 
 Cada llamada Responses guarda modelo/esfuerzo/ruta/motivo, tokens y costo conocidos, duración, herramientas, módulo, Skill, conversationId y taskId. Los fallos dejan costos desconocidos cuando falta medición. El panel de desarrollo administrativo muestra ruta y tarea; la configuración agrega distribución de las llamadas de los últimos 500 registros. No cuenta comandos determinísticos como llamadas de modelo. Una ronda que pasa de HIGH a XHIGH aparece en ambas categorías según sus llamadas reales.
 
-GPT Transcribe se estima por minutos de audio y Chirp por caracteres sintetizados; el historial guarda conteos y costo estimado, no audio ni texto de síntesis. Las tarifas de referencia consultadas son USD 0,0045/minuto para GPT Transcribe y USD 30 por millón de caracteres para Chirp 3 HD. Los montos reales pueden variar con cuota gratuita, consumo, impuestos y cotización. Las métricas de navegador presentan mediana/P95 de fin de habla a transcripción, transcripción a primer bloque programado y TTFA programado. No miden salida física del altavoz.
+Gemini Live informa consumo por modalidad cuando los metadatos están disponibles; el historial no guarda grabaciones. La métrica del navegador presenta la programación de PCM, no la salida física del altavoz. Los costos sin medición completa se mantienen como desconocidos.
 
 La transacción de confirmación sigue releyendo perfil, permisos, cuota y huella de datos. Ningún modelo confirma acciones, modifica reglas, concede permisos ni publica contenido. `oliviaLiveDelegations` y el resto del estado Olivia rechazan lecturas/escrituras directas de browser. La limpieza programada incluye nuevas delegaciones; la retención reconoce solicitudes Live. Los fallos preservan slots conocidos, muestran error y permiten continuar con una nueva solicitud o el flujo manual; no cambian a Sol.
 
@@ -60,8 +59,10 @@ La transacción de confirmación sigue releyendo perfil, permisos, cuota y huell
 ```mermaid
 flowchart TD
   Text[Texto autenticado] --> Core[Backend Olivia]
-  Voice[Micrófono con VAD local] -->|Turno grabado| ASR[GPT Transcribe]
-  ASR -->|Texto final| Core
+  Voice[Micrófono con VAD local] -->|Audio PCM en sesión| Live[Gemini Live · Aoede]
+  Live -->|Charla breve · audio| VoiceOut[AudioContext del navegador]
+  Live -->|Consulta comercial| Delegate[delegate_to_olivia]
+  Delegate --> Core
   Core --> Task[Conversación y taskState de servidor]
   Core --> Fast[Slots inequívocos y controles]
   Core --> Router[Router determinístico]
@@ -74,8 +75,7 @@ flowchart TD
   Card -->|Sí visual| Transaction[Revalidación transaccional y auditoría]
   Core --> Ledger[Uso por llamada y costo conocido]
   Monitor --> Duration[Duración de voz independiente]
-  Core -->|Respuesta escrita y texto hablado guardados| Chirp[Google Chirp 3 HD]
-  Chirp -->|PCM en streaming| VoiceOut[Reproductor del navegador]
+  Tools -->|Resultado verificado| Live
 ```
 
 Pruebas y evidencia: `olivia-router-tasks.test.mjs`, `olivia-live.test.mjs`, suites existentes y reglas de emulador. La [matriz del anexo](OLIVIA-ANNEX-REQUIREMENTS.md) distingue código implementado, evidencia con fixtures y validaciones externas pendientes.

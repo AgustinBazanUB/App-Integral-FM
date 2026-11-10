@@ -694,3 +694,20 @@
   54% { clip-path:inset(24% 0 round 999px); transform:scaleY(.65); }
   78% { clip-path:inset(10% 0 round 999px); transform:scaleY(.9); }
 }
+
+/* Olivia's pearl surface stays white in either OS color scheme. */
+.orb.ivoryGold {
+  color-scheme:light;
+  --eq-ink:#77571d;
+  --eq-surface-hi:#fffefa;
+  --eq-surface-lo:#f4e9ca;
+  --eq-rim:#d9bf7d;
+  --eq-sheen:rgb(255 255 255 / .92);
+  --eq-vignette:rgb(151 111 30 / .09);
+  --eq-glow-halo:rgb(225 192 112 / .35);
+  --eq-glow-core:rgb(255 250 225 / .8);
+  --eq-shadow-tint:rgb(131 97 30 / .2);
+  --eq-shadow-tint-active:rgb(131 97 30 / .25);
+  --eq-shadow-glow:rgb(226 194 115 / .14);
+  --eq-shadow-glow-active:rgb(226 194 115 / .24);
+}

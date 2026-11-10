@@ -1,0 +1,105 @@
+{
+  "at": "2026-11-10T21:23:26Z",
+  "speaker": "Speakers (Realtek(R) Audio)",
+  "mic": "Microphone Array (Intel® Smart Sound Technology for Digital Microphones)",
+  "loopback": "Speakers (Realtek(R) Audio)",
+  "voice": "Google español",
+  "trials": [
+    {
+      "id": "A01",
+      "phrase": "Hola Olivia, ¿cómo estás?",
+      "duration": 4.0,
+      "voice": "Google español",
+      "loopbackPeak": 0.9850471019744873,
+      "loopbackRmsMax": 0.43438953161239624,
+      "micPeak": 0.0012642756337299943,
+      "micRmsMax": 0.0004805620410479605,
+      "wavFile": "docs\\olivia\\antigravity-chrome-qa\\evidencias\\acustica\\A01_loopback.wav",
+      "status": "PASS"
+    },
+    {
+      "id": "A02",
+      "phrase": "¿Qué productos tenemos en stock en Mendoza?",
+      "duration": 4.5,
+      "voice": "Google español",
+      "loopbackPeak": 0.9850469827651978,
+      "loopbackRmsMax": 0.5378950834274292,
+      "micPeak": 0.021600866690278053,
+      "micRmsMax": 0.004411861300468445,
+      "wavFile": "docs\\olivia\\antigravity-chrome-qa\\evidencias\\acustica\\A02_loopback.wav",
+      "status": "PASS"
+    },
+    {
+      "id": "A03",
+      "phrase": "¿Cuánto vendimos hoy diez de noviembre?",
+      "duration": 4.0,
+      "voice": "Google español",
+      "loopbackPeak": 0.9864354133605957,
+      "loopbackRmsMax": 0.5435813069343567,
+      "micPeak": 0.001848398707807064,
+      "micRmsMax": 0.0006875942926853895,
+      "wavFile": "docs\\olivia\\antigravity-chrome-qa\\evidencias\\acustica\\A03_loopback.wav",
+      "status": "PASS"
+    },
+    {
+      "id": "A04",
+      "phrase": "Quiero cargar mercadería en el depósito central",
+      "duration": 4.5,
+      "voice": "Google español",
+      "loopbackPeak": 0.9859193563461304,
+      "loopbackRmsMax": 0.5156310200691223,
+      "micPeak": 0.002208291320130229,
+      "micRmsMax": 0.0008116855169646442,
+      "wavFile": "docs\\olivia\\antigravity-chrome-qa\\evidencias\\acustica\\A04_loopback.wav",
+      "status": "PASS"
+    },
+    {
+      "id": "A05",
+      "phrase": "Esperá, no cargues nada, primero decime las ventas de ayer",
+      "duration": 5.0,
+      "voice": "Google español",
+      "loopbackPeak": 0.9859762191772461,
+      "loopbackRmsMax": 0.5137906074523926,
+      "micPeak": 0.006508296355605125,
+      "micRmsMax": 0.002203954616561532,
+      "wavFile": "docs\\olivia\\antigravity-chrome-qa\\evidencias\\acustica\\A05_loopback.wav",
+      "status": "PASS"
+    },
+    {
+      "id": "A06",
+      "phrase": "¿Cuáles son las ubicaciones activas autorizadas en el sistema?",
+      "duration": 4.5,
+      "voice": "Google español",
+      "loopbackPeak": 0.9861650466918945,
+      "loopbackRmsMax": 0.5242381691932678,
+      "micPeak": 0.0017310804687440395,
+      "micRmsMax": 0.0008060323889367282,
+      "wavFile": "docs\\olivia\\antigravity-chrome-qa\\evidencias\\acustica\\A06_loopback.wav",
+      "status": "PASS"
+    },
+    {
+      "id": "A07",
+      "phrase": "Reportar un problema con mi último pedido en el panel",
+      "duration": 4.5,
+      "voice": "Google español",
+      "loopbackPeak": 0.9858946800231934,
+      "loopbackRmsMax": 0.4777049720287323,
+      "micPeak": 0.006660162005573511,
+      "micRmsMax": 0.0022150641307234764,
+      "wavFile": "docs\\olivia\\antigravity-chrome-qa\\evidencias\\acustica\\A07_loopback.wav",
+      "status": "PASS"
+    },
+    {
+      "id": "A08",
+      "phrase": "Sí, confirmo la operación de prueba de stock",
+      "duration": 4.0,
+      "voice": "Google español",
+      "loopbackPeak": 0.9853296279907227,
+      "loopbackRmsMax": 0.5061005353927612,
+      "micPeak": 0.0032193013466894627,
+      "micRmsMax": 0.0010324352188035846,
+      "wavFile": "docs\\olivia\\antigravity-chrome-qa\\evidencias\\acustica\\A08_loopback.wav",
+      "status": "PASS"
+    }
+  ]
+}

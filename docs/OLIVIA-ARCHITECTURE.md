@@ -4,32 +4,33 @@ Olivia conserva una única conversación para crear contenido, aprender y operar
 
 ## Voz
 
-`OliviaAssistant` integra `NaturalVoiceConversation`, `DictationCapture` y `OliviaVoiceControls`. El chat escrito no solicita el micrófono. El dictado captura un audio y deja revisar la transcripción. La conversación natural usa VAD adaptativo y transcripción continua con `/olivia-live-transcribe` (conserva `/olivia-transcribe` para archivo), envía el texto a `engine.chat` como `natural-voice`, persiste la respuesta escrita y una versión corta hablada, y solicita `/olivia-synthesize` para recibir PCM en streaming.
+`OliviaAssistant` integra `NaturalVoiceConversation`, `GeminiLiveSession`, `DictationCapture` y `OliviaVoiceControls`. El chat escrito no solicita el micrófono. El dictado revisable sigue separado. En conversación natural, Gemini Live recibe el audio, transcribe y responde con Aoede: conversa directamente ante saludos y charla breve; para datos del negocio invoca la herramienta delegada, que valida permisos y consulta el motor de Olivia. La respuesta verificada vuelve a Gemini Live para comunicarla con audio.
 
 ```mermaid
 flowchart LR
-  Mic[Micrófono con VAD local] -->|Audio continuo| ASR[GPT Live Transcribe]
-  ASR -->|Texto| Core[Engine Olivia autenticado]
+  Mic[Micrófono con VAD local] -->|Audio PCM en sesión segura| Live[Gemini Live · Aoede]
+  Live -->|Saludo o charla breve| Player[AudioContext del navegador]
+  Live -->|Consulta comercial / tarea| Tool[delegate_to_olivia]
+  Tool -->|Transcripción final| Core[Engine Olivia autenticado]
   Text[Chat escrito] --> Core
-  Core --> Router[Luna NONE o MEDIUM; Sol creativo autorizado]
-  Router --> Tools[Herramientas con permisos vigentes]
+  Core --> Router[Router autorizado y permisos vigentes]
+  Router --> Tools[Herramientas de dominio]
   Tools --> Verified[Respuesta verificada y tarjeta visual]
-  Verified --> Saved[Historial: respuesta escrita y texto hablado]
-  Saved -->|Solo allowlist administrativa| Chirp[Google Chirp 3 HD]
-  Chirp -->|PCM 24 kHz streaming| Player[AudioContext del navegador]
-  Player -->|Interrupción| Cancel[Cancelar playback y turno previo]
+  Verified -->|Resultado estructurado| Live
+  Live -->|Audio PCM y transcripción| Player
+  Player -->|Interrupción| Cancel[Cancelar reproducción y turno previo]
   Cancel --> Mic
 ```
 
-La función de síntesis valida Firebase, allowlist, conversación, texto y cupo mensual antes de pedir audio. Google TTS y OpenAI se llaman únicamente desde el backend. La cuota registra solo caracteres, estado de proveedor y costo estimado. La captura/PCM no se conserva. Si falla TTS, la respuesta escrita guardada se mantiene.
+La API de Gemini Live se usa con un token efímero emitido por Functions; las credenciales permanentes quedan en el servidor. El backend también controla cupos y consumo reportado por el proveedor. No hay sintetizador de voz, clips ni fallback a Chirp: si Gemini no produce audio o se desconecta, la respuesta visible se conserva y Olivia pide reconectar. La métrica de PCM indica audio programado en `AudioContext`, no audibilidad física del dispositivo. El PCM de entrada solo se transmite a la sesión y no se guarda como grabación.
 
-GPT-Live, Realtime y la voz económica están deshabilitados como modos conversacionales. El endpoint legacy devuelve HTTP 410 y la configuración nueva elimina los perfiles antiguos al normalizar. Las funciones de medición/cierre legacy solo conservan utilidades de limpieza de sesiones ya creadas; no hay selección ni creación de sesiones GPT-Live desde la app.
+Los endpoints de síntesis Chirp y de clips de voz fueron retirados. Las funciones de medición/cierre legacy solo conservan utilidades de limpieza de sesiones históricas; no hay selección ni creación de sesiones GPT-Live desde la app.
 
 ## Resto del motor
 
 El frontend autenticado valida acceso con sesión y perfil Firebase. El endpoint `olivia` coordina estado, chat, tareas en segundo plano y confirmaciones. `engine.mjs` usa el router determinístico, recuperación de conocimiento y herramientas explícitas; los servicios/planes de dominio vuelven a validar autorización y datos al preparar y confirmar.
 
-Las lecturas siguen acotadas y las operaciones mutables generan tarjetas. Aceptar texto hablado no ejecuta acciones. `chatJobs.mjs` publica fases y una respuesta final guardada; el cliente acelera el sondeo solo para el modo de voz natural, para iniciar la síntesis apenas queda listo el texto hablado.
+Las lecturas siguen acotadas y las operaciones mutables generan tarjetas. Aceptar texto hablado no ejecuta acciones. `chatJobs.mjs` publica fases y una respuesta final guardada; Gemini Live comunica en audio el resultado autorizado de una consulta delegada.
 
 El historial conserva hasta 40 mensajes y el contexto usa los últimos 16, sujeto a retención y alcance de permisos. Las métricas de desarrollo de voz reportan medianas/P95 de transcripción y primer audio programado; no afirman medir sonido físico.
 
