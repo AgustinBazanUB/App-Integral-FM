@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { advanceVoiceCollection } from '../src/shared/oliviaVoiceCollection.mjs';
+import { classifyGeminiLiveTurn } from '../src/shared/oliviaConversationRouter.mjs';
 import {
   acceptConversationTask,
   classifyConversationFocus,
@@ -13,6 +15,15 @@ const stockDraft = {
   turnId: 'turn-3', sessionId: 'session-a', turnIndex: 3, targetType: 'location', targetId: 'local-1',
 };
 const collection = { intent: 'stock-load', status: 'collecting', targetType: 'location', pendingQuestion: 'items-and-quantities', itemsMentioned: [] };
+
+test('a natural resume preface restores the same suspended voice draft in focus, collector and router',()=>{
+  const previous={...stockDraft,draftStatus:'suspended'},draft={...collection,status:'suspended',requestedLocation:'Norte'};
+  const text='Bueno, volvamos a la carga';
+  assert.equal(classifyConversationFocus(text,{conversationFocus:previous,voiceCollection:draft}).kind,'RESUME_DRAFT');
+  assert.equal(advanceVoiceCollection(text,draft)?.status,'collecting');
+  const route=classifyGeminiLiveTurn(text,{conversationFocus:previous,voiceCollection:draft});
+  assert.equal(route.collection?.requestedLocation,'Norte');
+});
 
 test('a quick business read suspends a draft and does not resume it implicitly', () => {
   const transition = transitionConversationFocus(stockDraft, {

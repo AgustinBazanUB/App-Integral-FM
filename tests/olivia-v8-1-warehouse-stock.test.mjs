@@ -4,11 +4,22 @@ import { advanceVoiceCollection } from '../src/shared/oliviaVoiceCollection.mjs'
 import { capabilityAllowed } from '../src/shared/oliviaCapabilities.mjs';
 import { catalogStockPlan } from '../netlify/functions/_lib/olivia/catalogStock.mjs';
 import { progressiveStock } from '../netlify/functions/_lib/olivia/tasks.mjs';
+import { manageConversationTask } from '../netlify/functions/_lib/olivia/conversationTasks.mjs';
 import { startDelegatedTask } from '../netlify/functions/_lib/olivia/delegatedTasks.mjs';
 import { createOliviaEngine } from '../netlify/functions/_lib/olivia/engine.mjs';
 import { fixture, start } from './helpers/olivia-fixture.mjs';
 
 const warehouseProfile = { id:'warehouse-user', name:'Warehouse QA', role:'warehouse_manager', active:true };
+
+test('pausing and resuming a warehouse collection retains its unverified destination before product dictation',async()=>{
+  const {run}=stockTools();
+  const first=await progressiveStock({initialId:'paused-warehouse',message:'Quiero cargar stock en el depósito Norte',context:{},run});
+  const paused=manageConversationTask({task:first.task},'pause');
+  const resumed=manageConversationTask(paused,'resume');
+  const next=await progressiveStock({previous:resumed.task,message:'Diez botellas de Aceite Arbequina',context:{},run});
+  assert.equal(next.task.status,'prepared');
+  assert.equal(next.task.slots.warehouseId,'warehouse-b');
+});
 
 function stockTools(){
   const calls=[];

@@ -11,8 +11,9 @@ const social=/^(?:(?:hola|gracias|muchas gracias|perfecto|muy bien|que bueno|com
 export function advanceVoiceCollection(text,previous=null,context={}) {
   const raw=String(text || '').trim().slice(0,1500),n=normalizeSpeech(raw);
   if(!n || isIndependentBusinessRead(raw) || liveRead.test(n) || /[?¿]/.test(raw))return null;
-  if(['collecting','ready'].includes(previous?.status)&&/^(?:volvamos|volvamos a|retomemos|retoma|sigamos con|volvamos con)\b/.test(n))return previous;
-  if(['suspended','paused'].includes(previous?.status)&&/^(?:volvamos|volvamos a|retomemos|retoma|sigamos con|volvamos con)\b/.test(n)){
+  const resume=/^(?:volvamos|volvamos a|retomemos|retoma|sigamos con|volvamos con)\b/.test(n.replace(/^(?:bueno|dale|ok)\s+/,''));
+  if(['collecting','ready'].includes(previous?.status)&&resume)return previous;
+  if(['suspended','paused'].includes(previous?.status)&&resume){
     const draft=structuredClone(previous);draft.status='collecting';draft.revision=(draft.revision || 0)+1;draft.lastInput=n;draft.nextStep=`ask-${draft.pendingQuestion || draft.missingFields?.[0] || 'items-and-quantities'}`;return draft;
   }
   if(previous&&['collecting','ready','paused'].includes(previous.status)&&/^(?:espera|pausa(?:lo)?|dejalo para despues|despues seguimos|pone(?:lo)? en pausa)$/.test(n))

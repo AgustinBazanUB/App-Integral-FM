@@ -51,6 +51,9 @@ function pauseInto(tasks, task, now) {
   if (!active(task)) return tasks;
   // A paused proposal stores data, never a confirmation or an execution token.
   const saved = { id: task.id, intent: task.intent, revision: task.revision || 1, status: "paused", slots: structuredClone(task.slots || {}), missingFields: [...(task.missingFields || [])], ambiguities: structuredClone(task.ambiguities || {}), route: task.route || null, createdAt: task.createdAt || now, updatedAt: now };
+  // These bounded, unverified names are needed before entity IDs are resolved.
+  // They never restore a confirmation token or bypass live backend validation.
+  if (['prepare_stock_load','prepare_catalog_stock_load','prepare_warehouse_stock_load'].includes(task.intent) && task.collectionDraft) saved.collectionDraft=structuredClone(task.collectionDraft);
   return [...tasks.filter((item) => item.id !== saved.id), saved].slice(-MAX_PAUSED_TASKS);
 }
 

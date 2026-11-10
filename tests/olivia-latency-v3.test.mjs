@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import {fixture,start,textResponse} from './helpers/olivia-fixture.mjs';
 import {createOliviaEngine} from '../netlify/functions/_lib/olivia/engine.mjs';
 import {instantConversation,isConversationalFollowUp,quickReadPlan,classifyGeminiLiveTurn} from '../src/shared/oliviaConversationRouter.mjs';
+
+test('a bounded conversational preface keeps a simple read fast without dropping mutations or negations',()=>{
+  assert.equal(quickReadPlan('Esperá, primero decime cuánto vendimos hoy')?.kind,'today-sales');
+  assert.equal(quickReadPlan('Pará un segundo, primero decime cuánto vendimos ayer')?.kind,'yesterday-sales');
+  for(const text of ['Esperá, primero decime cuánto vendimos hoy y cargá diez botellas','No, primero decime cuánto vendimos hoy','Primero decime cuánto vendimos hoy y después transferí stock'])assert.equal(quickReadPlan(text),null,text);
+});
 import {endpointingWindow} from '../src/gestion/olivia/endpointing.mjs';
 import {latencyTrace} from '../src/shared/oliviaLatencyTrace.mjs';
 import {routeModel} from '../netlify/functions/_lib/olivia/modelRouter.mjs';

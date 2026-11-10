@@ -42,7 +42,7 @@ export function classifyConversationFocus(text, context = {}) {
     return { kind: 'DISCARD_DRAFT' };
   if (/^(?:espera|pausa(?:lo)?|dejalo para despues|despues seguimos|pone(?:lo)? en pausa)$/.test(normalized) && pendingDraft)
     return { kind: 'PAUSE_DRAFT' };
-  if (/^(?:volvamos|volvamos a|retomemos|retoma|sigamos con|volvamos con)\b/.test(normalized) && ['suspended','paused'].includes(focus.draftStatus))
+  if (/^(?:volvamos|volvamos a|retomemos|retoma|sigamos con|volvamos con)\b/.test(normalized.replace(/^(?:bueno|dale|ok)\s+/,'')) && ['suspended','paused'].includes(focus.draftStatus))
     return { kind: 'RESUME_DRAFT' };
 
   if (pendingDraft && /^(?:mejor )?(?:otra cosa|cambiemos de tema|hablemos de otra cosa)$/.test(normalized))
