@@ -172,8 +172,9 @@ test("Problema 3.2: DelegatedTaskClient y startDelegatedTask resuelven lecturas 
 
 test("Problema 4: advanceVoiceCollection acepta ubicación sin 'en', cantidades mayores, producto antes de cantidad y válvula de escape hacia Luna", () => {
   let d = advanceVoiceCollection("Quiero cargar stock");
-  assert.equal(d.pendingQuestion, "location");
+  assert.equal(d.pendingQuestion, "targetType");
 
+  d = advanceVoiceCollection("En un local", d);
   d = advanceVoiceCollection("Tribunales", d);
   assert.equal(d.requestedLocation, "Tribunales");
   assert.equal(d.pendingQuestion, "items-and-quantities");
@@ -191,6 +192,7 @@ test("Problema 4: advanceVoiceCollection acepta ubicación sin 'en', cantidades 
   assert.equal(productFirst.collection.itemsMentioned[0].description, "Original");
 
   let d3 = advanceVoiceCollection("Quiero cargar stock");
+  d3 = advanceVoiceCollection("En un local", d3);
   d3 = advanceVoiceCollection("Tribunales", d3);
   const escaped = collectionDecision("Sumame lo mismo que mandamos la semana pasada del lote especial", { voiceCollection: d3 });
   assert.equal(escaped.route, "delegate");
@@ -201,7 +203,8 @@ test("Problema 4: advanceVoiceCollection acepta ubicación sin 'en', cantidades 
 test("Problema 5: safeConversationBridge permite expresiones naturales argentinas y drainToolResults no bloquea resultados terminales", async (t) => {
   const loc = advanceVoiceCollection("Quiero cargar stock");
   assert.equal(safeConversationBridge("¿En qué sucursal o depósito?", { collection: loc }), true);
-  const items = advanceVoiceCollection("Tribunales", loc);
+  const local = advanceVoiceCollection("En un local", loc);
+  const items = advanceVoiceCollection("Tribunales", local);
   assert.equal(safeConversationBridge("¿Cuántas unidades y de qué producto?", { collection: items }), true);
   assert.equal(safeConversationBridge("Dale, ya me fijo."), true);
   assert.equal(safeConversationBridge("Bárbaro, ahí lo consulto."), true);

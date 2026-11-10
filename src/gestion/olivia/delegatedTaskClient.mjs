@@ -30,18 +30,20 @@ export class DelegatedTaskClient {
       if(!allowed.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Pedí que aclare si desea pausar o retomar; no se cambió la tarea.',tasks:this.tasks};
       const tasks=await this.refresh(),target=tasks.find(t=>t.id===taskId);
       if(!target || ['completed','cancelled','failed'].includes(target.status))return {needsClarification:true,summary:'Esa solicitud ya terminó o no está disponible. Preguntá cuál de las solicitudes pendientes quiere controlar; no se cambió ninguna.',tasks:tasks.filter(t=>!['completed','cancelled','failed'].includes(t.status))};
-      return this.control({action:args.action,taskId},{onAccepted:context.onAccepted});
+      return this.control({action:args.action,taskId,...(Number.isInteger(context.intentEpoch)?{intentEpoch:context.intentEpoch,focusTurnId:context.focusTurnId,focusSessionId:context.focusSessionId}: {})},{onAccepted:context.onAccepted});
     }
     if(args.action==='cancel'){
       if(/\b(?:no cancel\w*|no quiero cancelar|sin cancelar)\b/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'No se canceló ninguna tarea. Pedí que aclare qué necesita.',tasks:this.tasks};
       if(!/\b(?:cancel\w*|deja|dejalo|olvida\w*|detene\w*|no sigas|no continues)\b/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Pedí que aclare si desea cancelar; no se detuvo ninguna tarea.',tasks:this.tasks};
       const candidates=(await this.refresh()).filter(t=>!['completed','cancelled','failed'].includes(t.status));
       if(candidates.length>1 && /^(?:no )?(?:deja|dejalo|cancela|cancelalo|olvidalo)(?: por favor)?$/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Hay varias tareas. Preguntá cuál debe cancelarse.',tasks:candidates};
-      return this.control({action:'cancel',taskId},{onAccepted:context.onAccepted});
+      return this.control({action:'cancel',taskId,...(Number.isInteger(context.intentEpoch)?{intentEpoch:context.intentEpoch,focusTurnId:context.focusTurnId,focusSessionId:context.focusSessionId}: {})},{onAccepted:context.onAccepted});
     }
     const identity=context.requestId || globalThis.crypto.randomUUID(),at=this.now();
     const fastRead=!taskId && !(args.dependsOn?.length) && Boolean(quickReadPlan(text));
-    const payload={operation:'delegatedTask',conversationId:this.conversationId,requestId:identity,message:text,...(taskId?{taskId}:{}),...(fastRead?{foreground:true}:{}),...(Number.isInteger(context.collectionRevision)?{collectionRevision:context.collectionRevision}:{}),...(Number.isInteger(context.supersedesCollectionRevision)?{supersedesCollectionRevision:context.supersedesCollectionRevision}:{}),priority:args.priority || 'normal',dependsOn:args.dependsOn || [],screenContext:context.screenContext || {}};
+    const draft=context.conversationDraft;
+    const voiceCollectionDraft=draft?.intent==='stock-load'&&draft.status==='ready'&&!draft.fallbackToEngine&&draft.itemsMentioned?.length?{intent:draft.intent,revision:draft.revision,targetType:draft.targetType,targetOrdinal:draft.targetOrdinal || null,requestedLocation:draft.requestedLocation || null,requestedWarehouse:draft.requestedWarehouse || null,itemsMentioned:(draft.itemsMentioned || []).slice(0,20).map(item=>({description:String(item.description || '').slice(0,350),quantityMentioned:String(item.quantityMentioned || '').slice(0,40)}))}:null;
+    const payload={operation:'delegatedTask',conversationId:this.conversationId,requestId:identity,message:text,...(taskId?{taskId}:{}),...(fastRead?{foreground:true}:{}),...(voiceCollectionDraft?{voiceCollectionDraft}:{}),...(Number.isInteger(context.collectionRevision)?{collectionRevision:context.collectionRevision}:{}),...(Number.isInteger(context.supersedesCollectionRevision)?{supersedesCollectionRevision:context.supersedesCollectionRevision}:{}),...(Number.isInteger(context.intentEpoch)?{intentEpoch:context.intentEpoch,focusTurnId:context.focusTurnId,focusSessionId:context.focusSessionId}:{}),priority:args.priority || 'normal',dependsOn:args.dependsOn || [],screenContext:context.screenContext || {}};
     let task;
     for(let attempt=0;attempt<3;attempt++){
       try{task=await this.request(payload);break;}catch(error){

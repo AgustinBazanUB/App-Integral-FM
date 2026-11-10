@@ -5,6 +5,7 @@ import { safeId, oliviaError } from '../../../../src/shared/oliviaContracts.mjs'
 import { safeUserMessage } from './provider.mjs';
 import { taskOutcome } from '../../../../src/shared/oliviaTaskConversation.mjs';
 import { quickReadPlan } from '../../../../src/shared/oliviaConversationRouter.mjs';
+import { acceptConversationTask, normalizeConversationFocus } from '../../../../src/shared/oliviaConversationFocus.mjs';
 
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const pathFor = (parent, id) => `oliviaConversations/${parent}/delegatedTasks/${id}`;
@@ -25,6 +26,24 @@ async function ownedTask(store, session, parent, id, now) {
   if(!task)throw oliviaError('task-not-found','No se encontró la tarea.',404);
   return task;
 }
+function assertCurrentFocus(root,body){
+  if(!Number.isInteger(body.intentEpoch))return;
+  const focus=normalizeConversationFocus(root?.conversationFocus || {});
+  if(focus.intentEpoch!==body.intentEpoch||focus.turnId!==body.focusTurnId||focus.sessionId!==body.focusSessionId)
+    throw oliviaError('stale-conversation-turn','El control quedó desplazado por una intervención más reciente.',409);
+}
+function cleanVoiceCollectionDraft(value){
+  if(!value||value.intent!=='stock-load'||!['location','warehouse'].includes(value.targetType)||!Number.isInteger(value.revision)||value.revision<1||!Array.isArray(value.itemsMentioned)||value.itemsMentioned.length<1||value.itemsMentioned.length>20)
+    throw oliviaError('invalid-input','El borrador de mercadería está incompleto. Repetí los productos, cantidades y destino.',422);
+  const itemsMentioned=value.itemsMentioned.map(item=>{
+    const description=String(item?.description || '').trim().slice(0,350),quantityMentioned=String(item?.quantityMentioned || '').trim().slice(0,40);
+    if(!description||!quantityMentioned)throw oliviaError('invalid-input','Falta el producto o su cantidad en la lista.',422);
+    return {description,quantityMentioned};
+  });
+  const targetOrdinal=value.targetOrdinal==null?null:Number(value.targetOrdinal);
+  if(targetOrdinal!=null&&(!Number.isInteger(targetOrdinal)||targetOrdinal<1||targetOrdinal>20))throw oliviaError('invalid-input','La referencia al destino no es válida.',422);
+  return {intent:'stock-load',revision:value.revision,targetType:value.targetType,targetOrdinal,requestedLocation:String(value.requestedLocation || '').trim().slice(0,160)||null,requestedWarehouse:String(value.requestedWarehouse || '').trim().slice(0,160)||null,itemsMentioned};
+}
 
 // Each task uses an isolated scope of the EXISTING engine and chatJobs queue.
 // This keeps its slots/confirmation/lease independent without duplicating tools,
@@ -33,14 +52,27 @@ export async function startDelegatedTask({store,engine,session,body,dispatch,now
   const parent=safeId(body.conversationId), requestId=safeId(body.requestId);
   const text=safeUserMessage(body.message);
   const id=body.taskId ? safeId(body.taskId) : hash([session.uid,parent,requestId]);
-  const path=pathFor(parent,id), fingerprint=hash([text,body.taskId || null,body.dependsOn || [],body.priority || 'normal']);
+  const voiceCollectionDraft=body.voiceCollectionDraft?cleanVoiceCollectionDraft(body.voiceCollectionDraft):null;
+  if(voiceCollectionDraft&&(!Number.isInteger(body.collectionRevision)||body.collectionRevision!==voiceCollectionDraft.revision))throw oliviaError('invalid-input','El borrador y su revisión no coinciden.',422);
+  const path=pathFor(parent,id), fingerprint=hash([text,body.taskId || null,body.dependsOn || [],body.priority || 'normal',voiceCollectionDraft]);
   const attemptKey=hash(requestId);
   await ownedRoot(store,session,parent,now);
   const isForegroundFastRead = body.foreground===true && !body.taskId && !(body.dependsOn?.length) && Boolean(quickReadPlan(text)) && typeof engine?.chat==='function';
-  const fgJobId = isForegroundFastRead ? `fg_${requestId}` : null;
+  const isForegroundVoiceDraft=Boolean(voiceCollectionDraft&&!body.taskId&&!(body.dependsOn?.length)&&typeof engine?.chat==='function');
+  const foregroundEngineRun=isForegroundFastRead||isForegroundVoiceDraft;
+  const fgJobId = foregroundEngineRun ? `fg_${requestId}` : null;
   await store.transaction(async tx=>{
     const root=(await tx.getDocument(`oliviaConversations/${parent}`))?.data;
     assertConversationOwner(session,root,now);
+    const focus=normalizeConversationFocus(root.conversationFocus || {});
+    if(Number.isInteger(body.intentEpoch)&&(focus.intentEpoch!==body.intentEpoch||focus.turnId!==body.focusTurnId||focus.sessionId!==body.focusSessionId))
+      throw oliviaError('stale-conversation-turn','Esta solicitud quedó desplazada por una intervención más reciente. No se inició ninguna tarea.',409);
+    if(voiceCollectionDraft){
+      const current=root.voiceCollection;
+      const shape=value=>({intent:value?.intent,revision:value?.revision,targetType:value?.targetType,targetOrdinal:value?.targetOrdinal || null,requestedLocation:value?.requestedLocation || null,requestedWarehouse:value?.requestedWarehouse || null,itemsMentioned:(value?.itemsMentioned || []).map(item=>({description:item.description,quantityMentioned:item.quantityMentioned}))});
+      if(!current||current.status!=='ready'||voiceCollectionDraft.revision!==current.revision||current.intent!=='stock-load'||hash(shape(current))!==hash(shape(voiceCollectionDraft)))
+        throw oliviaError('stale-conversation-turn','La lista cambió o se suspendió antes de iniciarse. Revisá el último pedido y volvé a prepararla.',409);
+    }
     const previous=(await tx.getDocument(path))?.data;
     const attempt=previous?.requests?.[attemptKey];
     if(attempt){if(attempt!==fingerprint)throw oliviaError('request-already-used','El intento ya corresponde a otra solicitud.',409);return;}
@@ -63,19 +95,21 @@ export async function startDelegatedTask({store,engine,session,body,dispatch,now
     }
     const scopeId=previous?.scopeId || `task_${id}`;
     const writes=[];
+    const acceptedFocus=Number.isInteger(body.intentEpoch)?acceptConversationTask(focus,{id,status:isForegroundFastRead?'running':'queued',createdAt:now},{intentEpoch:body.intentEpoch,now}):null;
     if(!previous)writes.push({type:'create',path:`oliviaConversations/${scopeId}`,data:{id:scopeId,userId:root.userId,sessionBinding:root.sessionBinding,roleBinding:root.roleBinding,permissionScope:root.permissionScope,historyStorageVersion:root.historyStorageVersion || 1,internalTask:true,parentConversationId:parent,delegatedTaskIds:[],messages:(root.messages || []).slice(-8),messageCount:0,state:'INFORMACION',taskState:null,memory:null,draft:null,pendingActionId:null,activeChatJobId:null,queuedChatRequestId:null,busyRequestId:null,busyUntil:null,title:text.slice(0,80),createdAt:now,updatedAt:now,expiresAt:root.expiresAt}});
     const requests={...(previous?.requests || {}),[attemptKey]:fingerprint};
-    writes.push({type:previous?'update':'create',path,data:{id,parentConversationId:parent,scopeId,requestId,fingerprint,requests,message:text,screenContext:body.screenContext || {},status:isForegroundFastRead?'running':'queued',phase:isForegroundFastRead?'Consultando datos':'En cola',priority:['low','high'].includes(body.priority)?body.priority:'normal',dependsOn:dependencies,jobId:fgJobId,pendingAction:null,summary:'',fullResult:'',voiceSummary:'',progress:null,notificationProtocol:1,attempt:(previous?.attempt || 0)+1,createdAt:previous?.createdAt || now,updatedAt:now,expiresAt:root.expiresAt}});
+    writes.push({type:previous?'update':'create',path,data:{id,parentConversationId:parent,scopeId,requestId,fingerprint,requests,message:text,screenContext:body.screenContext || {},...(voiceCollectionDraft?{voiceCollectionDraft}:{}),status:foregroundEngineRun?'running':'queued',phase:isForegroundFastRead?'Consultando datos':isForegroundVoiceDraft?'Preparando propuesta':'En cola',priority:['low','high'].includes(body.priority)?body.priority:'normal',dependsOn:dependencies,jobId:fgJobId,pendingAction:null,summary:'',fullResult:'',voiceSummary:'',progress:null,notificationProtocol:1,attempt:(previous?.attempt || 0)+1,createdAt:previous?.createdAt || now,updatedAt:now,expiresAt:root.expiresAt}});
     if(!previous)writes.push({type:'update',path:`oliviaConversations/${parent}`,data:{delegatedTaskIds:[...retainedTaskIds,id],
+      ...(acceptedFocus&&!acceptedFocus.stale?{conversationFocus:acceptedFocus.focus}:{}),
       ...(['collecting','ready'].includes(root.voiceCollection?.status)&&Number.isInteger(body.collectionRevision)&&[root.voiceCollection.revision,root.voiceCollection.revision+1].includes(body.collectionRevision)?{voiceCollection:{...root.voiceCollection,status:'delegated',taskId:id,revision:body.collectionRevision,missingFields:[],nextStep:'backend-validation'}}:{}),
       ...(['collecting','ready','paused'].includes(root.voiceCollection?.status)&&body.supersedesCollectionRevision===root.voiceCollection.revision?{voiceCollection:{...root.voiceCollection,status:'superseded',revision:root.voiceCollection.revision+1,supersededByTaskId:id,nextStep:'new-request-scope'}}:{})}});
     await tx.commitDocuments(writes);
   });
-  if(isForegroundFastRead){
+  if(foregroundEngineRun){
     const taskDoc=await ownedTask(store,session,parent,id,now);
     if(taskDoc.jobId===fgJobId && taskDoc.recordedJobId!==fgJobId){
       try{
-        const result=await engine.chat(session,{conversationId:taskDoc.scopeId,requestId,message:text,screenContext:body.screenContext || {},inputMode:'natural-voice',foreground:true});
+        const result=await engine.chat(session,{conversationId:taskDoc.scopeId,requestId,message:text,screenContext:body.screenContext || {},inputMode:'natural-voice',foreground:true,...(taskDoc.voiceCollectionDraft?{voiceCollectionDraft:taskDoc.voiceCollectionDraft}:{})});
         const lastAssistant=result?.messages?.filter(m=>m.role==='assistant').at(-1);
         const fullResult=result?.pendingAction?.summary || lastAssistant?.content || result?.spokenText || result?.failure?.message || '';
         const voiceSummary=result?.spokenText || lastAssistant?.voiceTranscript || fullResult;
@@ -185,10 +219,12 @@ export async function pumpDelegatedTasks({store,engine,session,parent,dispatch,n
 export async function controlDelegatedTask({store,engine,session,body,dispatch,now=new Date()}) {
   const parent=safeId(body.conversationId),id=safeId(body.taskId);
   await ownedTask(store,session,parent,id,now);
+  assertCurrentFocus(await store.get('oliviaConversations/'+parent),body);
   if(['pause','resume'].includes(body.action)){
     let blocked=false;
     await store.transaction(async tx=>{
       const path=pathFor(parent,id),task=(await tx.getDocument(path))?.data,controlId=safeId(body.requestId),key=hash(controlId);
+      assertCurrentFocus((await tx.getDocument('oliviaConversations/'+parent))?.data,body);
       if(task.controlReceipts?.[key]){if(task.controlReceipts[key]!==body.action)throw oliviaError('request-already-used','El control ya corresponde a otra acción.',409);return;}
       if(['running','dispatching','confirming','cancelling'].includes(task.status)){blocked=true;return;}
       if(['completed','cancelled','failed'].includes(task.status))throw oliviaError('task-terminal','La tarea ya terminó.',409);
@@ -205,6 +241,7 @@ export async function controlDelegatedTask({store,engine,session,body,dispatch,n
   let task, alreadyFinished=false;
   await store.transaction(async tx=>{
     task=(await tx.getDocument(pathFor(parent,id)))?.data;
+    assertCurrentFocus((await tx.getDocument('oliviaConversations/'+parent))?.data,body);
     if(task.lastControlId===controlId){alreadyFinished=true;return;}
     if(['confirming','cancelling'].includes(task.status)){
       if(task.controlId!==controlId || task.status!==controlStatus)throw oliviaError('task-busy','Hay un control de esta tarea en curso.',409);

@@ -9,8 +9,19 @@ import { classifyGeminiLiveTurn } from "../../src/shared/oliviaConversationRoute
 import { compactVoiceContext } from '../../src/shared/oliviaTaskConversation.mjs';
 import { estimateGeminiLiveAudioCost, geminiLiveProviderCost, geminiLiveMonthlyProjection, GEMINI_LIVE_MODEL, GEMINI_LIVE_MONTHLY_QUERY_CAP, geminiLiveSetupConfig } from "../../src/shared/oliviaGeminiLive.mjs";
 import { defaultOliviaConfiguration, oliviaError, safeId, validateConfiguration } from "../../src/shared/oliviaContracts.mjs";
+import { initialConversationFocus, normalizeConversationFocus, transitionConversationFocus } from "../../src/shared/oliviaConversationFocus.mjs";
+import { normalizeSpeech } from "../../src/shared/oliviaSpeechText.mjs";
 
 const TOKEN_EXPIRES_MS = 30 * 60 * 1000;
+
+function cleanStockCollection(value){
+  if(!value||value.intent!=='stock-load'||!Number.isInteger(value.revision)||value.revision<1||!['collecting','ready','paused','cancelled'].includes(value.status)||!Array.isArray(value.itemsMentioned)||value.itemsMentioned.length>20)return null;
+  const itemsMentioned=value.itemsMentioned.map(item=>({description:String(item?.description || '').trim().slice(0,350),quantityMentioned:String(item?.quantityMentioned || '').trim().slice(0,40)})).filter(item=>item.description&&item.quantityMentioned);
+  if(itemsMentioned.length!==value.itemsMentioned.length)return null;
+  const targetOrdinal=value.targetOrdinal==null?null:Number(value.targetOrdinal);
+  if(targetOrdinal!=null&&(!Number.isInteger(targetOrdinal)||targetOrdinal<1||targetOrdinal>20))return null;
+  return {version:1,revision:value.revision,intent:'stock-load',operation:'stock-load',targetType:['location','warehouse'].includes(value.targetType)?value.targetType:null,targetId:null,targetOrdinal,requestedLocation:String(value.requestedLocation || '').trim().slice(0,160)||null,requestedWarehouse:String(value.requestedWarehouse || '').trim().slice(0,160)||null,itemsMentioned,validation:'unverified',status:value.status,lastInput:normalizeSpeech(value.lastInput || '').slice(0,1500),missingFields:Array.isArray(value.missingFields)?value.missingFields.filter(field=>typeof field==='string').slice(0,8):[],pendingQuestion:typeof value.pendingQuestion==='string'?value.pendingQuestion.slice(0,80):null};
+}
 
 export function assertGeminiLivePreview({ env = process.env, projectId = configuredFirebaseProjectId(env) } = {}) {
   if (!isOliviaDeployPreview(env) || env.OLIVIA_HYBRID_LIVE_ENABLED !== "true" || projectId !== STAGING_FIREBASE_PROJECT_ID)
@@ -119,6 +130,52 @@ async function classifyTurn({ store, session, body, now }) {
   return { route: direct ? "direct" : "delegate", direct, policy: "exact-small-talk-v1" };
 }
 
+async function persistConversationFocus({store,session,body,now}) {
+  const sessionId=safeId(body.sessionId),turnId=safeId(body.turnId),conversationId=safeId(body.conversationId),turnIndex=Number(body.turnIndex);
+  const userText=String(body.userText || '').trim().slice(0,12000);
+  if(!userText||!Number.isInteger(turnIndex)||turnIndex<1)throw oliviaError('invalid-input','Faltan el turno final o su correlación.');
+  const live=await store.get(sessionPath(sessionId));
+  if(!live||live.userId!==session.uid||live.sessionBinding!==String(session.authTime || '')||live.conversationId!==conversationId||live.status!=='active'||new Date(live.expiresAt).getTime()<=now.getTime())
+    throw oliviaError('gemini-live-session-expired','La sesión de Gemini venció. Reconectá la voz.',409);
+  const conversation=await store.get('oliviaConversations/'+conversationId);
+  assertConversationOwner(session,conversation,now);
+  const taskIds=(conversation.delegatedTaskIds || []).slice(-20);
+  const tasks=(await Promise.all(taskIds.map(id=>store.get('oliviaConversations/'+conversationId+'/delegatedTasks/'+safeId(id))))).filter(Boolean);
+  return store.transaction(async tx=>{
+    const path='oliviaConversations/'+conversationId,snapshot=await tx.getDocument(path),root=snapshot?.data;
+    assertConversationOwner(session,root,now);
+    const previous=normalizeConversationFocus(root.conversationFocus || initialConversationFocus());
+    const result=transitionConversationFocus(previous,{text:userText,turnId,sourceTurnId:turnId,sessionId,turnIndex,context:{voiceCollection:root.voiceCollection || null,messages:(root.messages || []).slice(-8).map(message=>({role:message.role,content:message.content || message.voiceTranscript || ''})),tasks,pendingAction:Boolean(root.pendingActionId),pendingActionId:root.pendingActionId,collectingTask:root.taskState?.status==='collecting',activeTask:Boolean(root.busyRequestId || root.queuedChatRequestId)},now});
+    if(result.stale)return {stale:true,conversationFocus:previous,voiceCollection:root.voiceCollection || null,decision:result.decision};
+    if(Number.isInteger(body.intentEpoch)&&body.intentEpoch!==result.focus.intentEpoch)return {stale:true,conversationFocus:previous,voiceCollection:root.voiceCollection || null,decision:{kind:'AMBIGUOUS',reason:'intent-epoch-mismatch'}};
+    let voiceCollection=root.voiceCollection || null;
+    const submittedCollection=body.collection?cleanStockCollection(body.collection):null;
+    if(body.collection&&!submittedCollection)throw oliviaError('invalid-input','La lista de mercadería no tiene un formato válido.',422);
+    if(submittedCollection){
+      const previousRevision=Number.isInteger(voiceCollection?.revision)?voiceCollection.revision:0;
+      if(submittedCollection.revision<previousRevision||submittedCollection.revision>previousRevision+1)return {stale:true,conversationFocus:previous,voiceCollection,decision:{kind:'AMBIGUOUS',reason:'collection-revision-mismatch'}};
+      voiceCollection=submittedCollection;
+    }
+    const liveDraft=voiceCollection&&['collecting','ready','paused','suspended'].includes(voiceCollection.status);
+    if(liveDraft&&['INDEPENDENT_READ','SOCIAL/GENERAL','NEW_INTENT','TASK_STATUS','CANCEL_ACCEPTED_TASK'].includes(result.decision.kind)){
+      if(!submittedCollection)voiceCollection={...voiceCollection,status:'suspended',revision:(voiceCollection.revision || 0)+1,nextStep:'resume-explicitly'};
+      result.focus={...result.focus,activeDraftId:result.focus.activeDraftId || previous.activeDraftId,draftStatus:'suspended'};
+    }else if(liveDraft&&result.decision.kind==='PAUSE_DRAFT'){
+      if(!submittedCollection)voiceCollection={...voiceCollection,status:'paused',revision:(voiceCollection.revision || 0)+1,nextStep:'resume-or-discard'};
+      result.focus={...result.focus,draftStatus:'paused'};
+    }else if(liveDraft&&result.decision.kind==='RESUME_DRAFT'){
+      if(!submittedCollection)voiceCollection={...voiceCollection,status:'collecting',revision:(voiceCollection.revision || 0)+1,nextStep:'ask-'+(voiceCollection.pendingQuestion || voiceCollection.missingFields?.[0] || 'items-and-quantities')};
+      result.focus={...result.focus,draftStatus:'collecting'};
+    }else if(liveDraft&&result.decision.kind==='DISCARD_DRAFT'){
+      if(!submittedCollection)voiceCollection={...voiceCollection,status:'cancelled',revision:(voiceCollection.revision || 0)+1,missingFields:[],nextStep:'leave-unsubmitted'};
+      result.focus={...result.focus,activeIntentId:'conversation:discarded',activeDraftId:null,draftStatus:'discarded',targetType:null,targetId:null,awaitingField:null,taskId:null};
+    }
+    result.focus=normalizeConversationFocus(result.focus);
+    await tx.commitDocuments([{type:'update',path,data:{conversationFocus:result.focus,...(voiceCollection!==root.voiceCollection?{voiceCollection}:{}),updatedAt:now}}]);
+    return {stale:false,conversationFocus:result.focus,voiceCollection,decision:result.decision};
+  });
+}
+
 export default async function handler(request) {
   if (request.method !== "POST") return json({ code: "method-not-allowed", message: "Método no permitido." }, 405);
   let session;
@@ -141,6 +198,7 @@ export default async function handler(request) {
       const token = await issueToken({ store, session, config, env, now, replaceSessionId: body.replaceSessionId ? safeId(body.replaceSessionId) : null });
       return json({ ...token, context:compactVoiceContext(conversation,tasks.filter(Boolean)), timings: { configurationReadMs, conversationReadMs, ...token.timings } });
     }
+    if (body.operation === "focus") return json(await persistConversationFocus({store,session,body,now}));
     if (body.operation === "classify") return json(await classifyTurn({ store, session, body, now }));
     if (body.operation === "usage") return json(await reportTurn({ store, session, body, now, config }));
     if (body.operation === "close") {

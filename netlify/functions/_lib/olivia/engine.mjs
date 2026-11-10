@@ -244,7 +244,7 @@ export function createOliviaEngine({
           ? "RECHAZADA"
           : conversation.state,
       pendingAction,
-      conversationContext: { voiceCollection:conversation.voiceCollection || null,collectingTask: conversation.taskState?.status === 'collecting' || Boolean(conversation.delegatedContext?.collectingTask), activeTask: Boolean(conversation.busyRequestId || conversation.queuedChatRequestId || conversation.delegatedContext?.activeTask), pendingAction: Boolean(pendingAction || conversation.delegatedContext?.pendingAction) },
+      conversationContext: { voiceCollection:conversation.voiceCollection || null,conversationFocus:conversation.conversationFocus || null,collectingTask: conversation.taskState?.status === 'collecting' || Boolean(conversation.delegatedContext?.collectingTask), activeTask: Boolean(conversation.busyRequestId || conversation.queuedChatRequestId || conversation.delegatedContext?.activeTask), pendingAction: Boolean(pendingAction || conversation.delegatedContext?.pendingAction) },
       guide: conversation.guide || null,
       failure: conversation.lastFailure || null,
       usage: await usage(session, config),
@@ -273,7 +273,10 @@ export function createOliviaEngine({
     const result = await store.transaction(async (tx) => {
       const path = `oliviaConversations/${id}`, snapshot = await tx.getDocument(path), conversation = snapshot?.data;
       assertConversationOwner(session, conversation, now);
-      const routingContext = { voiceCollection:conversation.voiceCollection || null,capabilities:capabilities(session),pendingAction:conversation.delegatedContext?.pendingAction, pendingActionId: conversation.pendingActionId, collectingTask: conversation.taskState?.status === 'collecting' || Boolean(conversation.delegatedContext?.collectingTask), activeTask: Boolean(conversation.busyRequestId || conversation.queuedChatRequestId || conversation.delegatedContext?.activeTask) };
+      const focus=conversation.conversationFocus || null;
+      if(Number.isInteger(body.intentEpoch)&&(focus?.intentEpoch!==body.intentEpoch||focus?.turnId!==requestId))throw oliviaError('stale-conversation-turn','La respuesta quedó desplazada por una intervención más reciente.',409);
+      const suspended=focus?.draftStatus==='suspended';
+      const routingContext = { voiceCollection:suspended?null:conversation.voiceCollection || null,conversationFocus:focus,capabilities:capabilities(session),pendingAction:conversation.delegatedContext?.pendingAction, pendingActionId: conversation.pendingActionId, collectingTask: conversation.taskState?.status === 'collecting' || Boolean(conversation.delegatedContext?.collectingTask), activeTask: Boolean(conversation.busyRequestId || conversation.queuedChatRequestId || conversation.delegatedContext?.activeTask) };
       const decision=classifyGeminiLiveTurn(userText,routingContext);
       if (decision.route !== "direct" || (decision.collection&&!safeConversationBridge(assistantText,{collection:decision.collection}))) throw oliviaError("gemini-direct-not-authorized", "Esta consulta debe pasar por el motor autorizado de Olivia.", 403);
       const turnPath = `oliviaGeminiLiveTurns/${session.uid}_${requestId}`, prior = await tx.getDocument(turnPath);
@@ -595,7 +598,7 @@ export function createOliviaEngine({
       });
       onEvent?.({ type: "accepted", conversationId: id, message: conversation.messages.at(-1) });
       const deterministicTools = [];
-      const deterministicTaskId = ["prepare_stock_load", "prepare_catalog_stock_load"].includes(conversation.taskState?.intent) && !["completed", "cancelled"].includes(conversation.taskState.status) ? conversation.taskState.id : randomUUID();
+      const deterministicTaskId = ["prepare_stock_load", "prepare_catalog_stock_load", "prepare_warehouse_stock_load"].includes(conversation.taskState?.intent) && !["completed", "cancelled"].includes(conversation.taskState.status) ? conversation.taskState.id : randomUUID();
       const run = async (name, args) => {
         signal?.throwIfAborted();
         onEvent?.({type:'phase',label:'Consultando datos…',tools:[name]});
@@ -633,8 +636,9 @@ export function createOliviaEngine({
         if (canAccessAdministration(session.profile)) result.telemetry = { requestId, model: event.model, reasoningEffort: suggestionCalls ? "low" : null, route: event.route, modelCalls: suggestionCalls, toolCalls: 0, totalMs: Date.now() - startedAt };
         return result;
       }
-      const deniedTask = transition.task?.status !== "cancelled" && transition.task?.intent?.startsWith("prepare_") && !capabilities(session).includes(transition.task.intent);
-      let progressive = !deniedTask && !transition.handled && !control && !attachments.length ? await progressiveStock({ previous: conversation.taskState, initialId: deterministicTaskId, message: userMessage, context, run, check: () => assertCapability(session, "prepare_stock_load"), now: clock() }) : null;
+      const progressiveIntent=body.voiceCollectionDraft?.targetType==='warehouse'?'prepare_warehouse_stock_load':body.voiceCollectionDraft?.targetType==='location'?'prepare_catalog_stock_load':transition.task?.intent;
+      const deniedTask = transition.task?.status !== "cancelled" && progressiveIntent?.startsWith("prepare_") && !capabilities(session).includes(progressiveIntent);
+      let progressive = !deniedTask && !transition.handled && !control && !attachments.length ? await progressiveStock({ previous: conversation.taskState, initialId: deterministicTaskId, message: userMessage, context: { ...context, voiceCollectionDraft: body.voiceCollectionDraft || null }, run, check: name => assertCapability(session, name || "prepare_stock_load"), now: clock() }) : null;
       if (transition.directive === "resume" && transition.task?.status === "collecting" && !transition.task.missingFields.length && transition.task.intent.startsWith("prepare_")) {
         const result = await run(transition.task.intent, transition.task.slots);
         progressive = { task: taskFromTool(transition.task, transition.task.intent, transition.task.slots, result, clock()), result, content: result.prepared?.summary || missingQuestion(result.data?.missing || [], transition.task.intent) };

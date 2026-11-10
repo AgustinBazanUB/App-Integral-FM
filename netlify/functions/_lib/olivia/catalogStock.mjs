@@ -3,6 +3,7 @@ import { can, canAccessAdministration, normalizedRole } from "../../../../src/ge
 import { isLocationActiveNow } from "../../../../src/modules/locations/domain/locations.js";
 import { buildMasterProductPayload } from "../../../../src/shared/productWritePlans.mjs";
 import { buildLocationStockLinePlan } from "../../../../src/shared/operationalWritePlans.mjs";
+import { nextStockAfterAddition } from "../../../../src/modules/inventory/domain/inventory.js";
 import { oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
 
 const key = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/([a-z])(\d)/g, "$1 $2").replace(/(\d)\s+(cc|ml|kg|gr)\b/g, "$1$2").replace(/[^a-z0-9]+/g, " ").trim();
@@ -39,22 +40,33 @@ function generatedAbbreviation(name, occupied) {
 
 // Pure planning: reads only. Confirmation rebuilds this plan against the
 // transaction snapshot and commits catalog, stock, movements and audit together.
-export async function catalogStockPlan({ session, args, store, now = new Date(), entityId = "preview", correlation = {} }) {
+export async function catalogStockPlan({ session, args, store, now = new Date(), entityId = "preview", correlation = {}, targetType = "location" }) {
   const profile = { ...session.profile, id: session.uid };
-  if (!profile.active || !canAccessAdministration(profile)) throw oliviaError("permission-denied", "Crear catálogo y cargar una lista requiere un administrador autorizado.", 403);
-  requirePermission(profile, "locations", "loadStock", "No tenés permiso para cargar stock.");
-  requirePermission(profile, "locations", "viewStock", "No tenés permiso para consultar este stock.");
+  if (!profile.active) throw oliviaError("permission-denied", "La cuenta no está activa.", 403);
+  if (targetType === "location") {
+    if (!canAccessAdministration(profile)) throw oliviaError("permission-denied", "Cargar una lista en ubicaciones requiere un administrador autorizado.", 403);
+    requirePermission(profile, "locations", "loadStock", "No tenés permiso para cargar stock.");
+    requirePermission(profile, "locations", "viewStock", "No tenés permiso para consultar este stock.");
+  } else if (targetType === "warehouse") {
+    requirePermission(profile, "warehouse", "edit", "No tenés permiso para agregar stock a este depósito.");
+  } else throw oliviaError("invalid-input", "El tipo de inventario de destino no es válido.");
   requirePermission(profile, "products", "view", "No tenés permiso para revisar el catálogo de productos.");
   if (!args.items.length) return incomplete(["items"], "Pasame los nombres y cantidades de la mercadería que recibiste.");
-  if (!args.locationId) return incomplete(["locationId"], "¿En qué local querés cargar esta lista? Conservé los productos y cantidades.");
+  const ownerId = targetType === "warehouse" ? args.warehouseId : args.locationId;
+  const ownerField = targetType === "warehouse" ? "warehouseId" : "locationId";
+  const ownerLabel = targetType === "warehouse" ? "depósito" : "local";
+  const ownerCollection = targetType === "warehouse" ? "warehouses" : "locations";
+  const stockCollection = targetType === "warehouse" ? "warehouseStock" : "locationStock";
+  if (!ownerId) return incomplete([ownerField], `¿En cuál ${ownerLabel} querés cargar esta lista? Conservé los productos y cantidades.`);
   const documents = {};
   const reads = new Map();
   const read = path => {
     if (!reads.has(path)) reads.set(path, Promise.resolve(store.get(path)).then(value => { const row = value ? { ...value, id: path.split("/").at(-1) } : null; documents[path] = row; return row; }));
     return reads.get(path);
   };
-  const location = await read(`locations/${args.locationId}`);
-  if (!location || !isLocationActiveNow(location, now)) throw oliviaError("location-unavailable", "Ese local no está activo para recibir mercadería. Revisá la ubicación antes de cargarla.", 409);
+  const location = await read(`${ownerCollection}/${ownerId}`);
+  const ownerActive = targetType === "warehouse" ? Boolean(location && location.deleted !== true && location.active !== false) : Boolean(location && isLocationActiveNow(location, now));
+  if (!ownerActive) throw oliviaError(targetType === "warehouse" ? "warehouse-unavailable" : "location-unavailable", `Ese ${ownerLabel} no está activo para recibir mercadería. Revisá el inventario antes de cargarlo.`, 409);
   const [products, categories] = await Promise.all([store.list("products"), store.list("productCategories")]);
   const occupied = new Set(products.filter(row => !row.deleted).map(row => key(row.abbreviation)).filter(Boolean));
   const missing = [], questions = [], choices = [], resolved = [];
@@ -123,23 +135,54 @@ export async function catalogStockPlan({ session, args, store, now = new Date(),
     grouped.set(row.product.id, { ...row, quantity });
   }
   const lines = [], operationId = `olivia_stock_${entityId}`;
-  const paths = [...new Set([...grouped.values()].flatMap(row => [`locationStock/${location.id}/items/${row.product.id}`, ...(!row.created ? [`products/${row.product.id}`] : []), ...(row.product.categoryId && !freshCategories.has(categoryKey(row.product.categoryName)) ? [`productCategories/${row.product.categoryId}`] : [])]))];
+  const paths = [...new Set([...grouped.values()].flatMap(row => [`${stockCollection}/${location.id}/items/${row.product.id}`, ...(!row.created ? [`products/${row.product.id}`] : []), ...(row.product.categoryId && !freshCategories.has(categoryKey(row.product.categoryName)) ? [`productCategories/${row.product.categoryId}`] : [])]))];
   for (let offset = 0; offset < paths.length; offset += 3) await Promise.all(paths.slice(offset, offset + 3).map(read));
   for (const row of grouped.values()) {
-    const path = `locationStock/${location.id}/items/${row.product.id}`;
+    const path = `${stockCollection}/${location.id}/items/${row.product.id}`;
     const existing = await read(path);
     if (existing && (unavailable(existing) || existing.productDeleted === true)) throw oliviaError("stock-inactive", `${row.product.name} está desactivado en ${location.name}. Reactivalo desde la ubicación antes de cargar stock.`, 409);
     if (!existing) requirePermission(profile, "locations", "configureLocationProducts", `Tu usuario no puede agregar ${row.product.name} a este local.`);
     if (!row.created) await read(`products/${row.product.id}`);
     if (row.product.categoryId && !freshCategories.has(categoryKey(row.product.categoryName))) await read(`productCategories/${row.product.categoryId}`);
-    const plan = buildLocationStockLinePlan({ product: row.product, existing: existing || {}, mode: "add", requested: row.quantity, entry: { reason: args.reason }, operationId, location, profile, stamp: now });
+    const plan = targetType === "location"
+      ? buildLocationStockLinePlan({ product: row.product, existing: existing || {}, mode: "add", requested: row.quantity, entry: { reason: args.reason }, operationId, location, profile, stamp: now })
+      : (() => {
+        const previousStock = Number(existing?.currentStock || 0);
+        if (!Number.isSafeInteger(previousStock) || previousStock < 0) throw oliviaError("stock-invalid", `El stock actual de ${row.product.name} en ${location.name} no es válido.`, 409);
+        let currentStock;
+        try { currentStock = nextStockAfterAddition(previousStock, row.quantity); }
+        catch (error) { throw oliviaError("quantity-invalid", error.message, 422); }
+        const movementId = `${operationId}_${row.product.id}`;
+        return {
+          movementId,
+          previousStock,
+          currentStock,
+          stockData: {
+            productId: row.product.id, productName: row.product.name, abbreviation: row.product.abbreviation || "",
+            categoryId: row.product.categoryId || "", categoryName: row.product.categoryName || "Sin categoría",
+            imageUrl: row.product.imageUrl || "", thumbUrl: row.product.thumbUrl || "",
+            initialStock: existing ? Number(existing.initialStock || 0) : row.quantity,
+            currentStock, active: true, deleted: false, deletedAt: null, productDeleted: false,
+            ...(!existing ? { assignedAt: now, assignedBy: session.uid } : {}),
+            lastMovementId: movementId, updatedAt: now, updatedBy: session.uid,
+          },
+          movementData: {
+            operationId, inventoryType: "warehouse", inventoryId: location.id, warehouseId: location.id, warehouseName: location.name,
+            productId: row.product.id, productName: row.product.name, type: existing ? "add" : "initial",
+            qty: row.quantity, requestedQty: row.quantity, previousStock, newStock: currentStock,
+            reason: String(args.reason || "Ingreso de mercadería").trim() || "Ingreso de mercadería",
+            userId: session.uid, userName: profile.name || profile.email || "Usuario", saleId: "", createdAt: now,
+          },
+        };
+      })();
     writes.push({ type: existing ? "update" : "create", path, data: plan.stockData }, { type: "create", path: `stockMovements/${plan.movementId}`, data: { ...plan.movementData, ...correlation, origin: "Asistente IA / Olivia" } });
-    lines.push({ productId: row.product.id, name: row.product.name, abbreviation: row.product.abbreviation, categoryName: row.product.categoryName || "Sin categoría", price: plan.stockData.price, created: row.created, quantity: row.quantity, previousStock: plan.previousStock, newStock: plan.currentStock });
+    lines.push({ productId: row.product.id, name: row.product.name, abbreviation: row.product.abbreviation, categoryName: row.product.categoryName || "Sin categoría", ...(targetType === "location" ? { price: plan.stockData.price } : {}), created: row.created, quantity: row.quantity, previousStock: plan.previousStock, newStock: plan.currentStock });
   }
-  writes.push({ type: "update", path: `locations/${location.id}`, data: { stockConfiguredAt: now, updatedAt: now, updatedBy: session.uid } });
+  writes.push({ type: "update", path: `${ownerCollection}/${location.id}`, data: { ...(targetType === "location" ? { stockConfiguredAt: now } : {}), updatedAt: now, updatedBy: session.uid } });
   const totalUnits = lines.reduce((sum, row) => sum + row.quantity, 0);
-  const result = { operationId, locationId: location.id, locationName: location.name, mode: "add", itemCount: lines.length, totalUnits, createdProducts: freshProducts.size, createdCategories: freshCategories.size, lines, userId: session.uid, status: "completed", createdAt: now, ...correlation, origin: "Asistente IA / Olivia" };
-  writes.push({ type: "create", path: `stockOperations/${operationId}`, data: result }, audit(operationId, "locations", "stock.add", "Lista de mercadería ingresada", lines.map(row => ({ productId: row.productId, currentStock: row.previousStock })), result));
-  const summary = `Ingresar mercadería en ${location.name}: ${lines.length} productos, ${totalUnits} unidades. Se crearán ${freshProducts.size} productos y ${freshCategories.size} categorías${freshCategories.size ? ` (${[...freshCategories.values()].map(row => row.name).join(", ")})` : ""}.\n${lines.map(row => `${row.created ? "Crear" : "Reutilizar"} ${row.name} · ${row.abbreviation || "sin abreviación"} · ${row.categoryName} · $${row.price}: +${row.quantity} unidades; stock ${row.previousStock} → ${row.newStock}.`).join("\n")}\nSolo al tocar Sí se crea el catálogo faltante y se carga toda la lista. No publica productos en la tienda.`;
-  return { toolName: "prepare_catalog_stock_load", module: "locations", canonicalArgs: args, snapshotFingerprint: digest(JSON.stringify(clean({ documents, products: catalogSnapshot(products), categories: catalogSnapshot(categories), args }))), summary, writes, navigation: null, affectedId: location.id, completedMessage: `Ingreso registrado en ${location.name}: ${totalUnits} unidades de ${lines.length} productos. Se crearon ${freshProducts.size} productos y ${freshCategories.size} categorías.` };
+  const result = { operationId, inventoryType: targetType, inventoryId: location.id, ...(targetType === "warehouse" ? { warehouseId: location.id, warehouseName: location.name } : { locationId: location.id, locationName: location.name }), mode: "add", itemCount: lines.length, totalUnits, createdProducts: freshProducts.size, createdCategories: freshCategories.size, lines, userId: session.uid, status: "completed", createdAt: now, ...correlation, origin: "Asistente IA / Olivia" };
+  const operationsCollection = targetType === "warehouse" ? "inventoryOperations" : "stockOperations";
+  writes.push({ type: "create", path: `${operationsCollection}/${operationId}`, data: targetType === "warehouse" ? { ...result, operationType: "add_stock" } : result }, audit(operationId, targetType === "warehouse" ? "warehouse" : "locations", "stock.add", "Lista de mercadería ingresada", lines.map(row => ({ productId: row.productId, currentStock: row.previousStock })), result));
+  const summary = `Ingresar mercadería en ${ownerLabel} ${location.name}: ${lines.length} productos, ${totalUnits} unidades. Se crearán ${freshProducts.size} productos y ${freshCategories.size} categorías${freshCategories.size ? ` (${[...freshCategories.values()].map(row => row.name).join(", ")})` : ""}.\n${lines.map(row => `${row.created ? "Crear" : "Reutilizar"} ${row.name} · ${row.abbreviation || "sin abreviación"} · ${row.categoryName}${targetType === "location" ? ` · $${row.price}` : ""}: +${row.quantity} unidades; stock ${row.previousStock} → ${row.newStock}.`).join("\n")}\nSolo al tocar Sí se crea el catálogo faltante y se carga toda la lista. No publica productos en la tienda.`;
+  return { toolName: targetType === "warehouse" ? "prepare_warehouse_stock_load" : "prepare_catalog_stock_load", module: targetType === "warehouse" ? "warehouse" : "locations", canonicalArgs: args, snapshotFingerprint: digest(JSON.stringify(clean({ documents, products: catalogSnapshot(products), categories: catalogSnapshot(categories), args, targetType }))), summary, writes, navigation: null, affectedId: location.id, completedMessage: `Ingreso registrado en ${ownerLabel} ${location.name}: ${totalUnits} unidades de ${lines.length} productos. Se crearon ${freshProducts.size} productos y ${freshCategories.size} categorías.` };
 }

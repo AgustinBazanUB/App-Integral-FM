@@ -171,9 +171,10 @@ test('unconfirmed notification usage still triggers the original preventive stop
 test('provider interruption of an old buffer preserves the current endpointed user request',async t=>{
   let called=false;const {live}=session(t,{onToolCall:async()=>{called=true;return {tasks:[]};}});
   const turn=live.currentTurn;Object.assign(turn,{pending:true,turnId:'current',inputAudioSeconds:.5,inputText:'Stock de aceite',transcriptComplete:true,outputAuthorized:true});
+  await live.authorizeTurn(turn);await turn.focusPromise;
   live.scheduleAudio({duration:.01},turn);live.receive({serverContent:{interrupted:true}});
   assert.equal(turn.cancelled,false);assert.equal(turn.pending,true);
-  live.receive({toolCall:{functionCalls:[{id:'stock',name:'delegate_to_olivia',args:{action:'new'}}]}});await tick();assert.equal(called,true);
+  live.receive({toolCall:{functionCalls:[{id:'stock',name:'delegate_to_olivia',args:{action:'new'}}]}});await new Promise(resolve=>setTimeout(resolve,0));assert.equal(called,true);
 });
 
 test('missing native business tool uses one visible asynchronous policy fallback without provider call IDs',async t=>{

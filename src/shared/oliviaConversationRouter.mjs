@@ -27,6 +27,9 @@ export function isConversationalFollowUp(text) {
 export function classifyGeminiLiveTurn(text, context = {}) {
   const normalized = normalizeSpeech(text);
   if (!normalized) return { route: 'delegate', routeCategory: 'TASK', kind: 'missing-transcript' };
+  const focusStatus=context.conversationFocus?.draftStatus;
+  const explicitResume=/^(?:volvamos|volvamos a|retomemos|retoma|sigamos con|volvamos con)\b/.test(normalized);
+  if(['suspended','paused'].includes(focusStatus)&&!explicitResume)context={...context,voiceCollection:null};
   const fastPlan = quickReadPlan(text);
   if (fastPlan || isIndependentBusinessRead(text)) return { route: 'delegate', routeCategory: fastPlan ? 'FAST_READ' : 'TASK', fastRead: Boolean(fastPlan), kind: 'data-or-operation', newTask: true, independentRead: true };
   const collection=collectionDecision(text,context);

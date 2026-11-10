@@ -12,7 +12,7 @@ export function compactVoiceTask(task={}) {
 }
 export function compactVoiceContext(conversation={},tasks=[]) {
   return {version:1,messages:(conversation.messages || []).filter(m=>['user','assistant'].includes(m.role)).slice(-8).map(m=>({role:m.role,text:String(m.voiceTranscript || m.content || '').slice(0,700)})),
-    tasks:tasks.slice(-20).map(compactVoiceTask),collection:compactCollection(conversation.voiceCollection),pendingConfirmation:Boolean(conversation.pendingActionId)};
+    tasks:tasks.slice(-20).map(compactVoiceTask),collection:compactCollection(conversation.voiceCollection),conversationFocus:conversation.conversationFocus || null,pendingConfirmation:Boolean(conversation.pendingActionId)};
 }
 export function taskOutcome({status,failure,pendingAction,summary}={}) {
   if(status==='paused')return {kind:'paused',retryable:false,nextStep:'Está pausada. Solo podés ofrecer retomar o cancelar; no pedir confirmar mientras siga pausada.'};

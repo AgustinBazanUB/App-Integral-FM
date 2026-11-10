@@ -61,6 +61,8 @@ export default function OliviaAssistant() {
   const drawerRef = useOverlay(open, minimizeChat, closeButtonRef);
   const [snapshot, setSnapshot] = useState({ messages: [], state: "information", pendingAction: null, usage: null });
   const snapshotRef=useRef(snapshot);snapshotRef.current=snapshot;
+  const conversationFocusRef=useRef(snapshot.conversationContext?.conversationFocus || null);
+  conversationFocusRef.current=snapshot.conversationContext?.conversationFocus || conversationFocusRef.current;
   const [delegatedTasks,setDelegatedTasks]=useState([]);
   const delegatedTasksRef=useRef([]);delegatedTasksRef.current=delegatedTasks;
   const delegatedClient=useRef(null);
@@ -137,6 +139,7 @@ export default function OliviaAssistant() {
   const [caption, setCaption] = useState("");
   const [liveUserTranscript, setLiveUserTranscript] = useState("");
   const [liveAssistantTranscript, setLiveAssistantTranscript] = useState("");
+  const liveAssistantTurnRef=useRef(null);
   const [tasksPanelOpen, setTasksPanelOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [quotaRequestOpen, setQuotaRequestOpen] = useState(false);
@@ -193,7 +196,7 @@ export default function OliviaAssistant() {
     else { setError(""); setErrorCode(""); setErrorReportId(null); }
     if (Array.isArray(result.messages)) { setOptimistic(null); setStreamText(""); setLiveUserTranscript(""); setLiveAssistantTranscript(""); }
     if (result.conversationId) {
-      if(conversationRef.current!==result.conversationId)voiceCollectionRef.current=null;
+      if(conversationRef.current!==result.conversationId){voiceCollectionRef.current=null;conversationFocusRef.current=null;}
       conversationRef.current = result.conversationId;
       rememberConversation(user.uid, result.conversationId);
     }
@@ -201,6 +204,7 @@ export default function OliviaAssistant() {
       const incoming=result.conversationContext.voiceCollection;
       voiceCollectionRef.current=mergeVoiceCollection(voiceCollectionRef.current,incoming);
     }
+    if(result.conversationContext&&Object.hasOwn(result.conversationContext,'conversationFocus'))conversationFocusRef.current=result.conversationContext.conversationFocus;
     setSnapshot((current) => ({ ...current, ...result, messages: Array.isArray(result.messages) ? result.messages : current.messages,
       pendingAction: Object.hasOwn(result, "pendingAction") ? result.pendingAction : current.pendingAction,
       activeChatJob: result.activeChatJob || null }));
@@ -683,7 +687,7 @@ export default function OliviaAssistant() {
             audioContext:connection.context,
             onInputFrame:frame=>connection.processInputFrame(frame),
             backgroundTools:true,
-            getConversationContext:()=>({...snapshotRef.current.conversationContext,voiceCollection:voiceCollectionRef.current,capabilities:snapshotRef.current.capabilities,pendingAction:Boolean(snapshotRef.current.pendingAction)||delegatedTasksRef.current.some(t=>t.status==='awaiting-confirmation'),collectingTask:Boolean(snapshotRef.current.conversationContext?.collectingTask)||delegatedTasksRef.current.some(t=>t.status==='needs-input'),activeTask:Boolean(snapshotRef.current.conversationContext?.activeTask)||delegatedTasksRef.current.some(t=>['queued','running','dispatching','confirming','cancelling'].includes(t.status))}),
+            getConversationContext:()=>({...snapshotRef.current.conversationContext,conversationFocus:conversationFocusRef.current,voiceCollection:voiceCollectionRef.current,messages:(snapshotRef.current.messages || []).slice(-8).map(message=>({role:message.role,content:message.content || message.voiceTranscript || ''})),tasks:delegatedTasksRef.current,capabilities:snapshotRef.current.capabilities,pendingAction:Boolean(snapshotRef.current.pendingAction)||delegatedTasksRef.current.some(t=>t.status==='awaiting-confirmation'),collectingTask:Boolean(snapshotRef.current.conversationContext?.collectingTask)||delegatedTasksRef.current.some(t=>t.status==='needs-input'),activeTask:Boolean(snapshotRef.current.conversationContext?.activeTask)||delegatedTasksRef.current.some(t=>['queued','running','dispatching','confirming','cancelling'].includes(t.status))}),
             onTrace:event=>{
               const {stage,at,...metadata}=event;
               const sessionStage=stage.startsWith('gemini.token.') || stage.startsWith('gemini.websocket.') || stage.startsWith('gemini.setup.') || stage==='gemini.capture.ready';
@@ -692,16 +696,26 @@ export default function OliviaAssistant() {
             },
             onState:state=>{if(mounted.current && voiceRef.current===connection)setVoiceState(state);},
             onPartial:text=>{onPartial(text);if(mounted.current){setLiveUserTranscript(String(text || ""));if(text)setCaption(text);}},
-            onTranscript:(text,{turnId,turnIndex}={})=>{if(mounted.current){if(turnId && !visibleTranscriptTurns.current.has(turnId)){visibleTranscriptTurns.current.add(turnId);markTurnTrace('assistant.text.visible.first',{turnId,turnIndex,source:'gemini'},performance.now());}setLiveAssistantTranscript(String(text || ""));setCaption(text);}},
-            onClassification:({durationMs,direct,route,kind,source,turnIndex,turnId,collection,newTask,independentRead})=>{
+            onTranscript:(text,{turnId,turnIndex,stale=false}={})=>{if(mounted.current){if(stale){if(liveAssistantTurnRef.current===turnId){liveAssistantTurnRef.current=null;setLiveAssistantTranscript("");setCaption("");}return;}if(turnId && !visibleTranscriptTurns.current.has(turnId)){visibleTranscriptTurns.current.add(turnId);markTurnTrace('assistant.text.visible.first',{turnId,turnIndex,source:'gemini'},performance.now());}if(turnId)liveAssistantTurnRef.current=turnId;setLiveAssistantTranscript(String(text || ""));setCaption(text);}},
+            onClassification:async({durationMs,direct,route,kind,source,turnIndex,turnId,sessionId,userText,intentEpoch,focus,focusDecision,collection})=>{
+              if(focus&&(!conversationFocusRef.current||focus.intentEpoch>=conversationFocusRef.current.intentEpoch))conversationFocusRef.current=focus;
               if(collection)voiceCollectionRef.current=mergeVoiceCollection(voiceCollectionRef.current,collection);
-              else if(newTask && !independentRead && ['collecting','ready','paused'].includes(voiceCollectionRef.current?.status))voiceCollectionRef.current={...voiceCollectionRef.current,status:'superseded',revision:voiceCollectionRef.current.revision+1,nextStep:'new-request-scope'};
               recordVoiceMetric(source==='local-policy'?'geminiLocalClassification':'geminiClassification',durationMs);
               const label=route==='local-direct'?'Gemini directo · política local':route==='model-tool'?'Delegado con herramienta Gemini':route==='local-policy-delegate'?'Delegado por política local':'Delegado por política backend';
               setVoiceMetrics(current=>({...current,geminiLastRoute:label,geminiLastTurnIndex:turnIndex}));
-              markTurnTrace('gemini.classification',{turnId,route:route || (direct?'direct':'delegate'),kind,source,durationMs,turnIndex},performance.now());
+              markTurnTrace('gemini.classification',{turnId,sessionId,route:route || (direct?'direct':'delegate'),kind,source,durationMs,turnIndex,intentEpoch,focusDecision},performance.now());
+              if(source==='local-policy'&&turnId&&sessionId&&userText){
+                try{
+                  const collectionDraft=collection?.intent==='stock-load'?{intent:collection.intent,revision:collection.revision,status:collection.status,lastInput:collection.lastInput || null,targetType:collection.targetType,targetOrdinal:collection.targetOrdinal || null,requestedLocation:collection.requestedLocation || null,requestedWarehouse:collection.requestedWarehouse || null,itemsMentioned:(collection.itemsMentioned || []).slice(0,20).map(item=>({description:String(item.description || '').slice(0,350),quantityMentioned:String(item.quantityMentioned || '').slice(0,40)})),missingFields:(collection.missingFields || []).slice(0,8),pendingQuestion:collection.pendingQuestion || null}:null;
+                  const persisted=await oliviaClient.hybridLive({operation:'focus',conversationId:conversationRef.current,sessionId,turnId,turnIndex,userText,intentEpoch,...(collectionDraft?{collection:collectionDraft}:{})});
+                  if(persisted.conversationFocus&&(!conversationFocusRef.current||persisted.conversationFocus.intentEpoch>=conversationFocusRef.current.intentEpoch))conversationFocusRef.current=persisted.conversationFocus;
+                  if(Object.hasOwn(persisted,'voiceCollection'))voiceCollectionRef.current=mergeVoiceCollection(voiceCollectionRef.current,persisted.voiceCollection);
+                  markTurnTrace(persisted.stale?'stale.output.suppressed':'intent.persisted',{turnId,sessionId,intentEpoch:persisted.conversationFocus?.intentEpoch,status:persisted.stale?'stale':'ok',kind:focusDecision},performance.now());
+                  return persisted;
+                }catch(error){markTurnTrace('intent.persist.failed',{turnId,sessionId,intentEpoch,code:error?.code || 'focus-error'},performance.now());throw error;}
+              }
             },
-            onFirstAudio:(at,{turnId,sourceTurnId,taskId,turnIndex,acknowledgement})=>{if(mounted.current && voiceRef.current===connection){setVoiceState('speaking');const timing=turnTimings.current.get(sourceTurnId || turnId);if(timing){const duration=at-timing.voiceEndedAt;if(acknowledgement)recordVoiceMetric('voiceEndToAcknowledgement',duration,'delegate');else if(taskId)recordVoiceMetric('delegatedVoiceEndToResult',duration,'delegate');else{recordVoiceMetric('voiceEndToUsefulAudio',duration,'gemini');recordVoiceMetric('geminiVoiceEndToUsefulAudio',duration);recordVoiceMetric(turnIndex===1?'geminiFirstTurnVoiceEndToUsefulAudio':'geminiLaterTurnVoiceEndToUsefulAudio',duration);}}}},
+            onFirstAudio:(at,{turnId,sourceTurnId,taskId,turnIndex,acknowledgement})=>{if(mounted.current && voiceRef.current===connection){setVoiceState('speaking');markTurnTrace(acknowledgement?'audio.ack.first':'assistant.response.first_audio',{turnId,sourceTurnId,taskId,turnIndex,measurement:'audio-context-scheduled'},at);const timing=turnTimings.current.get(sourceTurnId || turnId);if(timing){const duration=at-timing.voiceEndedAt;if(acknowledgement)recordVoiceMetric('voiceEndToAcknowledgement',duration,'delegate');else if(taskId)recordVoiceMetric('delegatedVoiceEndToResult',duration,'delegate');else{recordVoiceMetric('voiceEndToUsefulAudio',duration,'gemini');recordVoiceMetric('geminiVoiceEndToUsefulAudio',duration);recordVoiceMetric(turnIndex===1?'geminiFirstTurnVoiceEndToUsefulAudio':'geminiLaterTurnVoiceEndToUsefulAudio',duration);}}}},
             onAudioComplete:(at,{turnId,sourceTurnId,taskId}={})=>{const timing=turnTimings.current.get(sourceTurnId || turnId);if(timing)recordVoiceMetric(taskId?'delegatedVoiceEndToComplete':'voiceEndToComplete',at-timing.voiceEndedAt,taskId?'delegate':'gemini');if(mounted.current && voiceRef.current===connection && !connection.recordingTurn && !connection.transcriber?.currentTurn?.pending)setVoiceState(mutedRef.current?'muted':'listening');},
             onTurnComplete:turn=>{
               markTurnTrace('assistant.result.complete',{turnId:turn.turnId,turnIndex:turn.turnIndex,route:turn.delegated?'delegate':'direct',status:turn.providerIncomplete?'provider-incomplete':'complete'},performance.now());
@@ -716,7 +730,7 @@ export default function OliviaAssistant() {
               if(turn.noAudio)setVoiceNotice('La respuesta quedó en pantalla, pero no pude reproducirla. Podés pedirme que la repita.');
               const persistStartedAt=performance.now();markTurnTrace('history.persist.start',{turnId:turn.turnId,turnIndex:turn.turnIndex,operation:'geminiDirectTurn'},persistStartedAt);
               const parent=conversationRef.current;
-              directPersistChain.current=directPersistChain.current.catch(()=>{}).then(()=>oliviaClient.request({operation:'geminiDirectTurn',conversationId:parent,requestId:turn.turnId,userText:turn.userText,assistantText:turn.assistantText})).then(result=>{markTurnTrace('history.persist.end',{turnId:turn.turnId,turnIndex:turn.turnIndex,durationMs:performance.now()-persistStartedAt,status:'ok'},performance.now());if(mounted.current && voiceRef.current===connection && conversationRef.current===parent)apply(result);}).catch(failure=>{markTurnTrace('history.persist.end',{turnId:turn.turnId,turnIndex:turn.turnIndex,durationMs:performance.now()-persistStartedAt,status:'error'},performance.now());if(mounted.current)setVoiceNotice('No pude guardar la transcripción en este chat.');});
+              directPersistChain.current=directPersistChain.current.catch(()=>{}).then(()=>turn.focusReady).then(()=>oliviaClient.request({operation:'geminiDirectTurn',conversationId:parent,requestId:turn.turnId,sessionId:turn.sessionId,intentEpoch:turn.intentEpoch,userText:turn.userText,assistantText:turn.assistantText})).then(result=>{markTurnTrace('history.persist.end',{turnId:turn.turnId,turnIndex:turn.turnIndex,durationMs:performance.now()-persistStartedAt,status:'ok'},performance.now());if(mounted.current && voiceRef.current===connection && conversationRef.current===parent)apply(result);}).catch(failure=>{markTurnTrace('history.persist.end',{turnId:turn.turnId,turnIndex:turn.turnIndex,durationMs:performance.now()-persistStartedAt,status:'error'},performance.now());if(mounted.current)setVoiceNotice('No pude guardar la transcripción en este chat.');});
             },
             onToolCall:async(call,inputText,context={})=>{
               if(context.transcriptComplete!==true || !String(inputText || '').trim())throw new Error('No se recibió la transcripción final; repetí la solicitud.');

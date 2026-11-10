@@ -587,7 +587,7 @@ test("Gemini tool calls wait for final user transcription and never use model ar
   await handler;
   assert.equal(calls.length, 1);
   assert.equal(calls[0].text, "¿Cuánto stock queda?");
-  assert.deepEqual(calls[0].context, { turnId: "turn_has_final", turnIndex: 1, transcriptComplete: true });
+  assert.deepEqual(calls[0].context, { turnId: "turn_has_final", sourceTurnId: "turn_has_final", turnIndex: 1, sessionId: "tool", requestId: "turn_has_final", intentEpoch: 1, focusTurnId: "turn_has_final", focusSessionId: "tool", transcriptComplete: true });
   const response = socket.sent.find(message => message.toolResponse)?.toolResponse.functionResponses[0];
   assert.equal(response.response.result, "Verified: ¿Cuánto stock queda?");
 

@@ -3,7 +3,7 @@
 export const OPERATION_NAMES = {
   prepare_create_location: 'crear una ubicación', prepare_update_location: 'editar una ubicación',
   prepare_product_create: 'preparar el alta de un producto', prepare_customer_create: 'crear un cliente', prepare_customer_update: 'actualizar un cliente',
-  prepare_stock_load: 'cargar stock', prepare_catalog_stock_load: 'cargar la lista de mercadería', prepare_stock_transfer: 'preparar una transferencia',
+  prepare_stock_load: 'cargar stock', prepare_catalog_stock_load: 'cargar la lista de mercadería', prepare_warehouse_stock_load: 'cargar una lista de mercadería en un depósito', prepare_stock_transfer: 'preparar una transferencia',
   prepare_sale: 'preparar una venta', prepare_batch_sales: 'preparar las ventas', prepare_expense_create: 'registrar un gasto',
   prepare_warehouse_create: 'crear un depósito', prepare_supplier_create: 'crear un proveedor', prepare_alert_create: 'crear una alerta',
   prepare_marketing_campaign: 'preparar una campaña en borrador', prepare_social_lead_create: 'registrar una consulta de redes',
@@ -20,7 +20,7 @@ export const FIELD_GUIDANCE = {
   defaultPrice: 'el precio de venta en pesos; por ejemplo, 8500', description: 'una descripción del producto, si querés agregarla', categoryId: 'el nombre de la categoría del producto; voy a buscarla en el catálogo',
   phone: 'el teléfono del cliente, con código de área; sirve para encontrar su ficha y evitar duplicados', customerId: 'el nombre o teléfono del cliente que querés actualizar; voy a buscar su ficha',
   zoneId: 'la zona del cliente por su nombre', zoneName: 'el nombre de la zona del cliente',
-  locationId: 'el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro', productId: 'el nombre del producto y su presentación; por ejemplo, aceite Arbosana de 500 ml',
+  locationId: 'el nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro', warehouseId: 'el nombre del depósito donde vamos a trabajar; por ejemplo, Depósito Central', productId: 'el nombre del producto y su presentación; por ejemplo, aceite Arbosana de 500 ml',
   quantity: 'cuántas unidades querés cargar; por ejemplo, 12 botellas', reason: 'qué querés hacer o corregir y por qué',
   items: 'los productos y sus cantidades; por ejemplo, 12 botellas de aceite de 500 ml', lines: 'los productos, cuántas unidades salen y cuántas preparaste y recibiste físicamente; si algo está pendiente, decímelo',
   originId: 'el nombre del depósito o ubicación de donde sale la mercadería', destinationId: 'el nombre del depósito o ubicación que recibe la mercadería',
