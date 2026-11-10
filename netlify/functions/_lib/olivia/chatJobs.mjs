@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { appendTaskProgress } from './taskProgress.mjs';
 import { safeId, oliviaError, screenContext } from "../../../../src/shared/oliviaContracts.mjs";
 import { safeUserMessage } from "./provider.mjs";
 import { taskControl } from "./tasks.mjs";
@@ -10,14 +11,14 @@ const digest = value => createHash("sha256").update(JSON.stringify(value)).diges
 function ownJob(session, job) {
   if (!job || job.userId !== session.uid || job.sessionBinding !== sessionBinding(session) || job.permissionScope !== permissionScope(session)) throw oliviaError("chat-job-not-found", "Esta consulta no está disponible para tu sesión.", 404);
 }
-export async function startChatJob({ store, engine, session, body, dispatch, now = new Date() }) {
+export async function startChatJob({ store, engine, session, body, dispatch, now = new Date(), dispatchQueued = false }) {
   const requestId = safeId(body.requestId), conversationId = body.conversationId ? safeId(body.conversationId) : (await engine.state(session)).conversationId;
   const payload = { operation: "chat", requestId, conversationId, message: safeUserMessage(body.message), screenContext: screenContext(body.screenContext || {}), attachmentIds: Array.isArray(body.attachmentIds) ? body.attachmentIds.map(id => safeId(id)).slice(0, 4) : [], inputMode: ["dictation", "natural-voice"].includes(body.inputMode) ? body.inputMode : "text" };
   const jobId = digest([session.uid, sessionBinding(session), requestId]), path = `oliviaChatJobs/${jobId}`, fingerprint = digest(payload);
   let created = false;
   await store.transaction(async tx => {
     const existing = (await tx.getDocument(path))?.data;
-    if (existing) { ownJob(session, existing); if (existing.fingerprint !== fingerprint) throw oliviaError("request-already-used", "Este intento corresponde a otra consulta. Actualizá el chat.", 409); return; }
+    if (existing) { ownJob(session, existing); if (existing.fingerprint !== fingerprint) throw oliviaError("request-already-used", "Este intento corresponde a otra consulta. Actualizá el chat.", 409); created = dispatchQueued && existing.status === 'queued'; return; }
     const conversation = (await tx.getDocument(`oliviaConversations/${conversationId}`))?.data;
     assertConversationOwner(session, conversation, now);
     const previous = conversation.activeChatJobId ? (await tx.getDocument(`oliviaChatJobs/${conversation.activeChatJobId}`))?.data : null;
@@ -60,7 +61,7 @@ export async function chatJobStatus({ store, session, body, now = new Date() }) 
     });
     job = await store.get(path);
   }
-  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase,tools:(job.tools || []).filter(tool=>/^[a-z_]{1,80}$/.test(tool)).slice(0,12), text: job.text || "", voiceText: job.voiceText || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
+  return { jobId, conversationId: job.payload.conversationId, status: job.status, phase: job.phase,progress:job.progress || null,tools:(job.tools || []).filter(tool=>/^[a-z_]{1,80}$/.test(tool)).slice(0,12), text: job.text || "", accepted: job.accepted || null, ...(job.status === "completed" ? { result: job.result } : {}), ...(job.status === "failed" ? { failure: job.failure } : {}) };
 }
 export async function activeChatJob({ store, session, conversationId }) {
   const conversation = await store.get(`oliviaConversations/${conversationId}`);
@@ -87,7 +88,7 @@ export async function cancelChatJob({ store, session, body, now = new Date() }) 
   });
   return { cancelled: true };
 }
-export async function runChatJob({ store, engine, session, jobId, clock = () => new Date() }) {
+export async function runChatJob({ store, engine, session, jobId, clock = () => new Date(), wait = ms => new Promise(resolve => setTimeout(resolve,ms)) }) {
   const path = `oliviaChatJobs/${safeId(jobId)}`;
   let payload;
   await store.transaction(async tx => {
@@ -98,7 +99,7 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
   });
   if (!payload) return;
   const controller = new AbortController();
-  let progress = { phase: "Pensando…", text: "", voiceText: "" }, changed = false, flushing = Promise.resolve();
+  let progress = { phase: "Pensando…", text: "" }, changed = false, flushing = Promise.resolve();
   const flush = () => flushing = flushing.catch(() => {}).then(async () => {
     await store.transaction(async tx => {
       const job = (await tx.getDocument(path))?.data;
@@ -109,13 +110,27 @@ export async function runChatJob({ store, engine, session, jobId, clock = () => 
   const interval = setInterval(() => { flush().catch(() => {}); }, 2000);
   const timer = setTimeout(() => controller.abort(oliviaError("assistant-timeout", "La consulta alcanzó su límite de procesamiento.", 503)), 300000);
   try {
-    const result = await engine.chat(session, payload, { longRunning: true, signal: controller.signal, onEvent: event => {
+    const options = { longRunning: true, jobId, signal: controller.signal, onEvent: event => {
+      if(event.type==='progress')progress.progress=appendTaskProgress(progress.progress,event,clock());
+      if(event.type==='accepted')progress.progress=appendTaskProgress(progress.progress,{kind:'accepted'},clock());
+      if(event.type==='phase')progress.progress=appendTaskProgress(progress.progress,{kind:'processing'},clock());
       if (event.type === "accepted") { progress.accepted = event.message; changed = true; flush().catch(() => {}); }
       if (event.type === "phase") { progress.phase = event.label; if (event.tools) { progress.text = ""; progress.tools = event.tools; } changed = true; flush().catch(() => {}); }
       if (event.type === "delta") progress.text = (progress.text + event.delta).slice(-64000);
-      if (event.type === "voice.ready" && typeof event.text === "string") { progress.voiceText = event.text.slice(0, 3000); changed = true; flush().catch(() => {}); }
       changed = true;
-    } });
+    } };
+    let result;
+    for(let attempt=0;attempt<3;attempt++){
+      try{result=await engine.chat(session,payload,options);break;}
+      catch(error){
+        // The shared budget's 1.2 s admission limit remains enforced. Only
+        // that pre-reservation failure can be retried without replaying work.
+        if(error.code!=='rate-limit' || attempt===2)throw error;
+        progress.phase='Esperando turno de ejecución…';changed=true;await flush();
+        await wait(1300);controller.signal.throwIfAborted();
+        const job=await store.get(path);if(job?.status!=='running')return;
+      }
+    }
     await flush();
     await store.transaction(async tx => {
       const job = (await tx.getDocument(path))?.data;

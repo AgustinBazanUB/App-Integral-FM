@@ -81,13 +81,93 @@ export function taskControl(text) {
   return null;
 }
 
+const NUMBER_WORDS = { un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19, veinte: 20, veintiuno: 21, veintidos: 22, veintitres: 23, veinticuatro: 24, veinticinco: 25, treinta: 30, cuarenta: 40, cincuenta: 50, cien: 100 };
+const replaceNumberWords = (text = "") => text.replace(/\b(un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|diecinueve|veinte|veintiuno|veintidos|veintitres|veinticuatro|veinticinco|treinta|cuarenta|cincuenta|cien)\b/g, (m) => String(NUMBER_WORDS[m] ?? m));
+
+function parseMultiStockItems(clause) {
+  const parts = clause
+    .split(/\s*(?:,|\by\b|\bademas\b)\s*(?=\d+\s+)/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return null;
+  const items = [];
+  for (const part of parts) {
+    const match = /^(\d+)\s+(?:unidades?\s+|botellas?\s+|bidones?\s+|frascos?\s+)?(?:de\s+)?(.+)$/.exec(part);
+    if (!match) return null;
+    items.push({ quantity: Number(match[1]), query: match[2].trim() });
+  }
+  return items.length >= 2 ? items : null;
+}
+
 /** Bounded fast path for stock loading. All entity resolution and preparation
  * uses the same permission-checked tools as the reasoning backend. Other
  * intents continue through Luna with this persisted task in its context. */
 export async function progressiveStock({ previous, initialId, message, context, run, check = () => {}, now = new Date() }) {
-  const text = normalize(message);
-  const start = /^(?:cargame|carga|ingresa|ingresame|agrega|agregame)\s+(\d+)\s+(?:unidades? |botellas? |bidones? )?(?:de )?(.+)$/.exec(text);
-  const continuation = previous?.intent === "prepare_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/\b(?:cliente|cancel[a-z]*|explic[a-z]*|ensen[a-z]*|queria decir|no me cargues)\b/.test(text) && !/^(ahora|consulta|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|mandame|transferi|vende|registra|crea|disena)/.test(text);
+  const text = replaceNumberWords(normalize(message));
+  const start = /^(?:cargame|carga|cargar|ingresa|ingresame|agrega|agregame|sumame|suma)\s+(\d+)\s+(?:unidad(?:es)?\s+(?:de\s+)?|botellas?\s+(?:de\s+)?|bidones?\s+(?:de\s+)?|frascos?\s+(?:de\s+)?|de\s+)?(?!unidad(?:es)?$|botellas?$|bidones?$|frascos?$)(.+)$/.exec(text);
+  const isCatalogContinuation = previous?.intent === "prepare_catalog_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/\b(?:cliente|cancel[a-z]*|explic[a-z]*|ensen[a-z]*|no me cargues)\b/.test(text);
+  if (start || isCatalogContinuation) {
+    const rawClause = start ? `${start[1]} ${start[2]}` : text;
+    const locationSplit = rawClause.split(/\s+en\s+(?:el\s+|la\s+)?/);
+    const itemClause = locationSplit[0];
+    const locClause = locationSplit.length > 1 ? locationSplit.slice(1).join(" en ") : null;
+    const multiItems = start ? parseMultiStockItems(itemClause) : null;
+    if (multiItems || isCatalogContinuation) {
+      check();
+      let task = isCatalogContinuation && !multiItems
+        ? structuredClone(previous)
+        : { id: initialId || randomUUID(), intent: "prepare_catalog_stock_load", revision: (previous?.revision || 0) + 1, status: "collecting", slots: { locationId: context.locationId || null, items: [], reason: null }, missingFields: [], ambiguities: {}, route: null, createdAt: previous?.createdAt || now, updatedAt: now };
+      task.revision++; task.updatedAt = now; task.status = "collecting";
+      if (!task.slots.locationId && context.locationId) task.slots.locationId = context.locationId;
+      let locationQuery = locClause;
+      if (multiItems) {
+        const catalog = (await run("search_products", { query: "", locationId: null }))?.data?.products || [];
+        task.slots.items = multiItems.map((entry) => {
+          const words = productReferenceWords(entry.query);
+          const filterWords = words.length ? words : normalize(entry.query).split(" ");
+          const matches = catalog.filter((p) => filterWords.length && filterWords.every((w) => productReferenceWords(p.name).includes(w) || normalize(p.name).includes(w)));
+          const matched = matches.length === 1 ? matches[0] : null;
+          return { productId: matched?.productId || null, name: matched?.name || entry.query, quantity: entry.quantity, abbreviation: null, categoryName: null, defaultPrice: null };
+        });
+      } else {
+        const itemCorrection = /^(?:no )?(?:mejor |eran |son |que sean |cambia(?:r)? |corregi(?:r)? )?(?:a )?(\d+)\s+(?:unidades? |botellas? |bidones? |frascos? )?(?:de )?(.+)$/.exec(text)
+          || /^(?:no )?(?:mejor |cambia(?:r)? |corregi(?:r)? )?(.+?)\s+(?:a |eran |son |por )(\d+)(?: unidades?| botellas?)?$/.exec(text);
+        if (itemCorrection) {
+          const qty = Number(/^\d+$/.test(itemCorrection[1]) ? itemCorrection[1] : itemCorrection[2]);
+          const targetQuery = /^\d+$/.test(itemCorrection[1]) ? itemCorrection[2] : itemCorrection[1];
+          const words = productReferenceWords(targetQuery);
+          const filterWords = words.length ? words : normalize(targetQuery).split(" ");
+          let updated = false;
+          task.slots.items = (task.slots.items || []).map((item) => {
+            if (filterWords.length && filterWords.every((w) => productReferenceWords(item.name).includes(w) || normalize(item.name).includes(w))) {
+              updated = true;
+              return { ...item, quantity: qty };
+            }
+            return item;
+          });
+          if (!updated) return null;
+        } else if (!task.slots.locationId) {
+          locationQuery = text.replace(/^(?:en |a |el |la )+/, "");
+        } else return null;
+      }
+      if (locationQuery) {
+        const locations = (await run("list_locations", {})).data.locations || [];
+        const query = normalize(locationQuery).replace(/^(?:local|sucursal)\s+/, "");
+        const exact = locations.filter((l) => normalize(l.name) === normalize(locationQuery) || normalize(l.name).replace(/^(?:local|sucursal)\s+/, "") === query);
+        const matches = exact.length ? exact : locations.filter((l) => query.split(" ").every((w) => normalize(l.name).split(" ").includes(w)));
+        if (matches.length === 1) { task.slots.locationId = matches[0].id || matches[0].locationId; task.locationName = matches[0].name; delete task.ambiguities.locationId; }
+        else { task.slots.locationId = null; task.ambiguities.locationId = matches.map(({ id, locationId, name }) => ({ id: id || locationId, name })); }
+      }
+      task.missingFields = requiredFields("prepare_catalog_stock_load").filter((k) => !task.slots[k] || (Array.isArray(task.slots[k]) && !task.slots[k].length));
+      if (!task.missingFields.length) {
+        const result = await run("prepare_catalog_stock_load", { locationId: task.slots.locationId, items: task.slots.items, reason: task.slots.reason ?? null });
+        task = { ...task, ...taskFromTool(task, "prepare_catalog_stock_load", task.slots, result, now), revision: task.revision };
+        return { task, result, content: result.prepared?.summary || result.data?.summary || missingQuestion(task.missingFields, "prepare_catalog_stock_load") };
+      }
+      return { task, result: { state: "DATOS_INCOMPLETOS" }, content: "¿En qué ubicación querés cargar esta lista de mercadería?" };
+    }
+  }
+  const continuation = previous?.intent === "prepare_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/\b(?:cliente|cancel[a-z]*|explic[a-z]*|ensen[a-z]*|queria decir|no me cargues)\b/.test(text) && !/^(ahora|consulta|revisa|fijate|chequea|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|mandame|transferi|vende|registra|crea|disena)/.test(text);
   if (!start && !continuation) return null;
   check();
   let task = continuation ? structuredClone(previous) : { id: initialId || randomUUID(), intent: "prepare_stock_load", revision: 0, status: "collecting", slots: { locationId: context.locationId || null, productId: null, quantity: null, reason: null }, missingFields: [], ambiguities: {}, route: null, createdAt: now };

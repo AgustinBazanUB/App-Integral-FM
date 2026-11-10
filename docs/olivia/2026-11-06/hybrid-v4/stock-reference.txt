@@ -1,0 +1,38 @@
+← Volver a Ubicaciones y eventos
+
+CONFIGURACIÓN OPERATIVA
+
+Ubicación · QA PR53 - Local ficticio - No despachar
+
+Ubicación · Operación permanente
+
+Activa
+Cargar stock
+Vendedores
+Descuentos
+Ventas
+Stock de QA PR53 - Local ficticio - No despachar
+
+Acá ves solamente los productos disponibles en esta ubicación. Para sumar uno nuevo, elegilo desde el catálogo general.
+
+TRANSFERIR STOCK
+AGREGAR PRODUCTO
+Buscar en esta ubicación
+Todas las categorías
+FM
+Aceite QA PR53 - No despachar
+
+Aceites de oliva
+
+Activo
+STOCK ACTUAL
+19
+PRECIO EFECTIVO
+$ 1.000
+
+Usa el precio de Productos
+
+AJUSTAR INVENTARIO
+AGREGAR STOCK
+MOVIMIENTOS
+CONFIGURACIÓN

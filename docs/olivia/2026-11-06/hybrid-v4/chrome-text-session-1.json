@@ -1,0 +1,15 @@
+{
+  "commit": "b69bec0",
+  "evidence": "observations-from-first-Chrome-test-before-protocol-instrumentation",
+  "connectionMs": 5413.2,
+  "turns": [
+    {
+      "input": "Hola, Olivia",
+      "route": "direct",
+      "classificationMs": 2291.3,
+      "response": "¡Hola! ¿Cómo estás? ¿En qué te puedo ayudar hoy?",
+      "error": "Prueba detenida tras 60 segundos sin completar el turno.",
+      "usage": null
+    }
+  ]
+}
