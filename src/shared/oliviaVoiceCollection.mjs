@@ -6,12 +6,16 @@ const quantity=new RegExp('\\b'+qty+'\\b','i');
 const liveRead=/[?¿]|\b(?:cuanto\w*|cual\w*|consulta\w*|busca\w*|mostra\w*|vendimos|disponible|existe|tenemos)\b/;
 const social=/^(?:(?:hola|gracias|muchas gracias|perfecto|muy bien|que bueno|como estas|me escuchas|te puedo pedir algo)\b)/;
 
+export function isDraftResumeRequest(text) {
+  return /^(?:volvamos|volvamos a|retomemos|retoma|sigamos con|volvamos con)\b/.test(normalizeSpeech(text).replace(/^(?:bueno|dale|ok)\s+/,''));
+}
+
 // A bounded draft of what the user SAID, never entity IDs, catalog facts,
 // permission or confirmation. The existing task engine owns every validation.
 export function advanceVoiceCollection(text,previous=null,context={}) {
   const raw=String(text || '').trim().slice(0,1500),n=normalizeSpeech(raw);
   if(!n || isIndependentBusinessRead(raw) || liveRead.test(n) || /[?¿]/.test(raw))return null;
-  const resume=/^(?:volvamos|volvamos a|retomemos|retoma|sigamos con|volvamos con)\b/.test(n.replace(/^(?:bueno|dale|ok)\s+/,''));
+  const resume=isDraftResumeRequest(raw);
   if(['collecting','ready'].includes(previous?.status)&&resume)return previous;
   if(['suspended','paused'].includes(previous?.status)&&resume){
     const draft=structuredClone(previous);draft.status='collecting';draft.revision=(draft.revision || 0)+1;draft.lastInput=n;draft.nextStep=`ask-${draft.pendingQuestion || draft.missingFields?.[0] || 'items-and-quantities'}`;return draft;

@@ -1,6 +1,7 @@
 import { classifyGeminiLiveTurn, quickReadPlan } from './oliviaConversationRouter.mjs';
 import { normalizeSpeech } from './oliviaSpeechText.mjs';
 import { isIndependentBusinessRead } from './oliviaBusinessRead.mjs';
+import { isDraftResumeRequest } from './oliviaVoiceCollection.mjs';
 
 export const CONVERSATION_FOCUS_KINDS = Object.freeze([
   'ANSWER_SLOT', 'CORRECT_CURRENT', 'CHANGE_TARGET', 'NEW_INTENT',
@@ -42,7 +43,7 @@ export function classifyConversationFocus(text, context = {}) {
     return { kind: 'DISCARD_DRAFT' };
   if (/^(?:espera|pausa(?:lo)?|dejalo para despues|despues seguimos|pone(?:lo)? en pausa)$/.test(normalized) && pendingDraft)
     return { kind: 'PAUSE_DRAFT' };
-  if (/^(?:volvamos|volvamos a|retomemos|retoma|sigamos con|volvamos con)\b/.test(normalized.replace(/^(?:bueno|dale|ok)\s+/,'')) && ['suspended','paused'].includes(focus.draftStatus))
+  if (isDraftResumeRequest(raw) && ['suspended','paused'].includes(focus.draftStatus))
     return { kind: 'RESUME_DRAFT' };
 
   if (pendingDraft && /^(?:mejor )?(?:otra cosa|cambiemos de tema|hablemos de otra cosa)$/.test(normalized))

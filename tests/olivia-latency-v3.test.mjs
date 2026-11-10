@@ -7,6 +7,7 @@ import {instantConversation,isConversationalFollowUp,quickReadPlan,classifyGemin
 test('a bounded conversational preface keeps a simple read fast without dropping mutations or negations',()=>{
   assert.equal(quickReadPlan('Esperá, primero decime cuánto vendimos hoy')?.kind,'today-sales');
   assert.equal(quickReadPlan('Primero dime cuánto vendimos hoy.')?.kind,'today-sales');
+  assert.equal(quickReadPlan('esperar Primero decime cuánto vendimos hoy.')?.kind,'today-sales');
   assert.equal(classifyGeminiLiveTurn('Primero dime cuánto vendimos hoy.',{voiceCollection:{intent:'stock-load',status:'collecting',targetType:'warehouse',pendingQuestion:'warehouse'}}).routeCategory,'FAST_READ');
   assert.equal(quickReadPlan('Pará un segundo, primero decime cuánto vendimos ayer')?.kind,'yesterday-sales');
   for(const text of ['Esperá, primero decime cuánto vendimos hoy y cargá diez botellas','No, primero decime cuánto vendimos hoy','Primero decime cuánto vendimos hoy y después transferí stock'])assert.equal(quickReadPlan(text),null,text);

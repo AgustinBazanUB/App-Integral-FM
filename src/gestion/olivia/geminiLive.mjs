@@ -3,7 +3,7 @@ import { classifyGeminiLiveTurn } from "../../shared/oliviaConversationRouter.mj
 import { compactVoiceTask, taskOutcome } from '../../shared/oliviaTaskConversation.mjs';
 import { recoveryAllowed, recoveryBackoff, recoveryWait, waitForRecoveryNetwork } from './liveRecovery.mjs';
 import { ConversationNotifications } from './conversationNotifications.mjs';
-import { safeConversationBridge, collectionQuestion } from '../../shared/oliviaVoiceCollection.mjs';
+import { safeConversationBridge, collectionQuestion, isDraftResumeRequest } from '../../shared/oliviaVoiceCollection.mjs';
 import { acceptConversationTask, initialConversationFocus, transitionConversationFocus, isCurrentFocusResponse } from '../../shared/oliviaConversationFocus.mjs';
 
 const SOCKET_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained";
@@ -468,7 +468,7 @@ export class GeminiLiveSession {
     const startedAt = this.now(), previousDirect = turn.directAuthorized === true;
     const context=this.getConversationContext?.() || {};
     const previousFocus=initialConversationFocus(this.conversationFocus?.turnId ? this.conversationFocus : context.conversationFocus || {});
-    const explicitResume=/^(?:volvamos|volvamos a|retomemos|retoma|sigamos con|volvamos con)\b/.test(userText.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase());
+    const explicitResume=isDraftResumeRequest(userText);
     const suspended=previousFocus.activeDraftId && ['suspended','paused'].includes(previousFocus.draftStatus)&&!explicitResume;
     const routeContext={...context,conversationFocus:previousFocus,voiceCollection:suspended?null:context.voiceCollection};
     if(!Object.hasOwn(turn,'collectionBase'))turn.collectionBase=routeContext.voiceCollection || null;

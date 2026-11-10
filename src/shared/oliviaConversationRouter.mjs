@@ -1,5 +1,5 @@
 import { isGreetingOnly, normalizeSpeech } from './oliviaSpeechText.mjs';
-import { collectionDecision } from './oliviaVoiceCollection.mjs';
+import { collectionDecision, isDraftResumeRequest } from './oliviaVoiceCollection.mjs';
 import { isIndependentBusinessRead, normalizeBusinessRead } from './oliviaBusinessRead.mjs';
 
 // These short canned replies remain for the written task engine. Native Live
@@ -28,7 +28,7 @@ export function classifyGeminiLiveTurn(text, context = {}) {
   const normalized = normalizeSpeech(text);
   if (!normalized) return { route: 'delegate', routeCategory: 'TASK', kind: 'missing-transcript' };
   const focusStatus=context.conversationFocus?.draftStatus;
-  const explicitResume=/^(?:volvamos|volvamos a|retomemos|retoma|sigamos con|volvamos con)\b/.test(normalized.replace(/^(?:bueno|dale|ok)\s+/,''));
+  const explicitResume=isDraftResumeRequest(text);
   if(['suspended','paused'].includes(focusStatus)&&!explicitResume)context={...context,voiceCollection:null};
   const fastPlan = quickReadPlan(text);
   if (fastPlan || isIndependentBusinessRead(text)) return { route: 'delegate', routeCategory: fastPlan ? 'FAST_READ' : 'TASK', fastRead: Boolean(fastPlan), kind: 'data-or-operation', newTask: true, independentRead: true };

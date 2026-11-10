@@ -3,7 +3,7 @@ import { normalizeSpeech } from './oliviaSpeechText.mjs';
 export function normalizeBusinessRead(text) {
   // Keep the complete query and any negation/mutation. ASR can render the
   // Argentine "decime" as "dime"; both are the same read request boundary.
-  return normalizeSpeech(text).replace(/^olivia /,'').replace(/^(?:(?:espera|para)(?: un segundo)?\s+)?(?:primero\s+)?(?:decime|dime|mostrame|muestrame|consulta|revisa)\s+(?=(?:cuant[oa]s?|que|cuales|como)\b)/,'');
+  return normalizeSpeech(text).replace(/^olivia /,'').replace(/^(?:(?:espera(?:r)?|para(?:r)?)(?: un segundo)?\s+)?(?:primero\s+)?(?:decime|dime|mostrame|muestrame|consulta|revisa)\s+(?=(?:cuant[oa]s?|que|cuales|como)\b)/,'');
 }
 
 // Live data questions are independent of collecting an operation's fields.

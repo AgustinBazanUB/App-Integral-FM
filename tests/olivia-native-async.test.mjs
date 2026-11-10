@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GeminiLiveSession, geminiTaskResult } from '../src/gestion/olivia/geminiLive.mjs';
 import { classifyGeminiLiveTurn } from '../src/shared/oliviaConversationRouter.mjs';
+import { advanceVoiceCollection } from '../src/shared/oliviaVoiceCollection.mjs';
 const tick=()=>new Promise(r=>setImmediate(r));
 test('Gemini receives task facts without confirmation tokens, internal scopes or telemetry',()=>{
   const result=JSON.stringify(geminiTaskResult({id:'a',status:'awaiting-confirmation',summary:'Propuesta revisada',pendingAction:{confirmationToken:'secret-token'},scopeId:'internal',telemetry:{private:'diagnostics'}}));
@@ -13,6 +14,18 @@ function session(t,options={}){
   Object.assign(live,{ready:true,textInputOnly:true,socket:{readyState:1,send:data=>sent.push(JSON.parse(data)),close(){}}});
   t.after(()=>live.close());return {live,sent,turns,states,audio};
 }
+test('the live session restores a suspended draft before routing a natural resume preface',async t=>{
+  const draft={...advanceVoiceCollection('Quiero cargar stock en un depósito'),status:'suspended'};
+  const focus={activeIntentId:'read:today-sales',activeDraftId:'draft-stock',draftStatus:'suspended',intentEpoch:4,turnIndex:2,turnId:'previous'};
+  const {live}=session(t,{getConversationContext:()=>({conversationFocus:focus,voiceCollection:draft})});
+  live.turnIndex=2;
+  live.beginTurn('resume-spoken');const turn=live.currentTurn;
+  live.receive({serverContent:{inputTranscription:{text:'Bueno, volvamos a la carga.',finished:true}}});
+  await tick();
+  assert.equal(turn.decision.collection?.targetType,'warehouse');
+  assert.equal(turn.decision.collection?.status,'collecting');
+  assert.equal(turn.directAuthorized,true,'resuming an unsubmitted draft must not query a nonexistent accepted task');
+});
 test('an explicitly unfinished ASR transcript cannot take focus or dispatch a tool before its final marker',async t=>{
   const calls=[];const {live}=session(t,{onToolCall:async(call,text)=>{calls.push({call,text});return {tasks:[]};}});
   live.beginTurn('asr-awaits-final');const turn=live.currentTurn;
