@@ -27,7 +27,7 @@ export function isConversationalFollowUp(text) {
 export function classifyGeminiLiveTurn(text, context = {}) {
   const normalized = normalizeSpeech(text);
   if (!normalized) return { route: 'delegate', kind: 'missing-transcript' };
-  if (isIndependentBusinessRead(text)) return { route: 'delegate', kind: 'data-or-operation', newTask: true, independentRead: true };
+  if (isIndependentBusinessRead(text) || quickReadPlan(text)) return { route: 'delegate', kind: 'data-or-operation', newTask: true, independentRead: true };
   const collection=collectionDecision(text,context);
   if(collection)return collection;
   // A background clause describes context; classify the actual request after
@@ -68,12 +68,29 @@ export function classifyGeminiLiveTurn(text, context = {}) {
   return { route: 'direct', kind: control ? 'conversation-control' : social ? 'social' : 'conversation' };
 }
 export function quickReadPlan(text) {
-  const value = normalizeSpeech(text).replace(/^olivia /, '').replace(/ por favor$/, '').replace(/^cuanto stock (?:de |del )?/, 'cuantas unidades de ');
+  const value = normalizeSpeech(text)
+    .replace(/^olivia /, '')
+    .replace(/ por favor$/, '')
+    .replace(/\s+(?:aca|aqui|en este local|en esta ubicacion|en esta sucursal)$/, '')
+    .replace(/^cuanto stock (?:(?:hay|queda|tenemos) )?(?:de |del )/, 'cuantas unidades de ');
   if (/\b(?:carga|cargame|cargues|crea|creame|registra|agrega|ingresa|vende|cobra|manda|envia|borra|elimina|cambia|modifica|queria decir|en realidad)\b/.test(value)) return null;
   if (/^(?:(?:que|cuales) (?:son )?(?:las )?(?:ubicaciones|locales|depositos)(?: (?:estan|hay|tenemos|son))?(?: activ[oa]s)?|(?:mostra\w*|lista\w*|decime) (?:las |los )?(?:ubicaciones|locales|depositos)(?: activ[oa]s)?|como se llaman (?:esas|estas|las|los|esos|estos) (?:ubicaciones|locales|depositos))$/.test(value)) return { kind: 'locations' };
   if (/^(?:quiero |necesito )?hablar con (?:un |el )?cliente$/.test(value)) return { kind: 'customer', query: '' };
   const customer = /^(?:(?:busca|buscame|buscar|mostrame|consulta)(?: al| el)? cliente |(?:quiero |necesito )?hablar con (?:el cliente |cliente ))(.+)$/.exec(value);
   if (customer) return { kind: 'customer', query: customer[1] };
+  const todaySales = /^(?:(?:cuanto|que) (?:vendimos|vendi|se vendio|hicimos de ventas?) hoy|(?:resumen de )?(?:las |mis )?ventas (?:de hoy|del dia)|como (?:vienen|van|estuvieron) las ventas (?:de )?hoy|(?:mostrame|decime|consulta|revisa) (?:las |mis )?ventas (?:de hoy|del dia)|(?:que|cuales) ventas (?:hicimos|hubo|tenemos) hoy)(?: en (?:el |la )?(.+))?$/.exec(value);
+  if (todaySales) return { kind: 'today-sales', scope: /\b(?:vendi|mis ventas)\b/.test(value) ? 'mine' : 'all', locationQuery: todaySales[1]?.trim() || null };
+  const inventory = /^(?:resumen(?: rapido| general)? de (?:stock|inventario)|estado del (?:stock|inventario)|como (?:esta|viene) el (?:stock|inventario)|(?:mostrame|decime|consulta|revisa) el (?:resumen|estado) de (?:stock|inventario))(?: (?:de|del|en) (?:el |la )?(.+))?$/.exec(value);
+  if (inventory) return { kind: 'inventory', locationQuery: inventory[1]?.trim() || null };
+  if (/^(?:(?:que|cuales) alertas (?:tenemos|hay|estan activas|estan vigentes)|alertas (?:vigentes|activas|pendientes|de bajo stock|de stock)|(?:mostrame|decime|consulta|revisa) (?:las )?alertas(?: vigentes| activas| de bajo stock)?)$/.test(value)) return { kind: 'alerts' };
+  if (/^(?:(?:que|cuales) envios (?:estan pendientes|hay(?: pendientes| hoy)?|tenemos(?: pendientes| hoy)?|salen hoy)|envios (?:pendientes|de hoy|del dia|activos)|(?:mostrame|decime|consulta|revisa) (?:los )?envios(?: pendientes| de hoy| del dia)?)$/.test(value)) return { kind: 'shipments', statusFilter: /\bpendientes\b/.test(value) ? 'pending' : null };
+  const promotions = /^(?:(?:que|cuales) (?:promociones|descuentos|promos)(?: (?:o|y) (?:descuentos|promociones))? (?:hay|tenemos|estan vigentes|estan activos|estan disponibles)|(?:promociones|descuentos|promos)(?: (?:o|y) (?:descuentos|promociones))? (?:vigentes|activos|disponibles|de hoy)|(?:mostrame|decime|consulta|revisa) (?:las |los )?(?:promociones|descuentos|promos)(?: (?:o|y) (?:descuentos|promociones))?(?: vigentes| disponibles)?)(?: en (?:el |la )?(.+))?$/.exec(value);
+  if (promotions) return { kind: 'promotions', locationQuery: promotions[1]?.trim() || null };
+  const nav = /^(?:llevame a|abri|anda a|ir a|navega a) (?:la seccion (?:de )?|el modulo (?:de )?|la pantalla (?:de )?)?(envios|ventas|clientes|productos|ubicaciones|locales|depositos|alertas|proveedores|pedidos|ecommerce|marketing|finanzas|gastos|metricas|auditoria|configuracion|stock|precios|pendientes)$/.exec(value);
+  if (nav) {
+    const map = { envios: 'shipping', ventas: 'quick-sales', clientes: 'loyal-customers', productos: 'products', ubicaciones: 'locations', locales: 'locations', depositos: 'warehouse', alertas: 'alerts', proveedores: 'suppliers', pedidos: 'ecommerce', ecommerce: 'ecommerce', marketing: 'marketing', finanzas: 'finance', gastos: 'finance', metricas: 'metrics', auditoria: 'audit', configuracion: 'settings', stock: 'stock', precios: 'prices', pendientes: 'pending' };
+    return { kind: 'navigate', module: map[nav[1]], label: nav[1] };
+  }
   let match = /^(?:cuantas?|cuantos?) (.+?) (?:quedan|hay|tenemos|estan disponibles)(.*)$/.exec(value), kind = 'stock', query;
   if (match && (!match[2] || /^ en /.test(match[2]))) query = match[1] + match[2];
   if (!query) {
@@ -81,11 +98,20 @@ export function quickReadPlan(text) {
     if (match) { kind = match[1] === 'precio' ? 'price' : 'stock'; query = match[2]; }
   }
   if (!query) {
-    match = /^(?:cuanto (?:sale|cuesta)|cual es el precio de) (.+)$/.exec(value);
+    match = /^(?:cuanto stock (?:hay|queda|tenemos) (?:de |del )?|cuantas? unidades (?:de |del ))(.+)$/.exec(value);
+    if (match) { kind = 'stock'; query = match[1]; }
+  }
+  if (!query) {
+    match = /^(?:tenemos|hay)(?: stock(?: disponible)? de| unidades de)? (.+)$/.exec(value);
+    if (match && !/^(?:alertas?|envios?|promociones?|descuentos?|promos?|ventas?|ubicaciones?|locales|depositos?|clientes?|pedidos?)\b/.test(match[1])) { kind = 'stock'; query = match[1]; }
+  }
+  if (!query) {
+    match = /^(?:a cuanto (?:esta|estan)|cuanto (?:sale|salen|cuesta|cuestan|vale|valen)|cual es el precio de|que precio (?:tiene|tienen)) (.+)$/.exec(value);
     if (match) { kind = 'price'; query = match[1]; }
   }
   if (!query || /\b(?:y|tambien|despues|ademas|si|cuando|comparado|compara|proyecta)\b/.test(query)) return null;
   const parts = query.split(/ en (?:el |la )?/);
   if (parts.length > 2 || !parts[0].trim()) return null;
-  return { kind, query: parts[0].replace(/^(?:(?:el|la|los|las|de|del|botellas?|unidades?|frascos?|paquetes?|bolsas?|bidones?)\s+)+/, '').trim(), locationQuery: parts[1]?.trim() || null };
+  const locationQuery = parts[1]?.trim().replace(/^(?:aca|aqui|este local|esta ubicacion|esta sucursal)$/, '') || null;
+  return { kind, query: parts[0].replace(/^(?:(?:el|la|los|las|de|del|botellas?|unidades?|frascos?|paquetes?|bolsas?|bidones?)\s+)+/, '').trim(), locationQuery };
 }

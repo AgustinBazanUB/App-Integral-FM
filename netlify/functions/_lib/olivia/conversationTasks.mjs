@@ -20,7 +20,7 @@ export function latestInstruction(message = "") {
 export function requestedTaskIntent(message = "") {
   const text = latestInstruction(message);
   if (isGuidanceRequest(message) || /\b(?:document[a-z]*|record[a-z]*|anota[a-z]*)\b/.test(text)) return null;
-  if (!/carg|crea|registra|agrega|ingresa|dar de alta|alta de/.test(text)) return null;
+  if (!/carg|crea|registra|agrega|ingresa|dar de alta|alta de|prepara|suma|repon/.test(text)) return null;
   if (/campana|publicacion|post |reel|anuncio/.test(text)) return null;
   if (/\b(?:ubicacion|local|feria|evento)\b/.test(text) && /crea|alta/.test(text) && !/stock|botellas?|unidades|mercaderia/.test(text)) return "prepare_create_location";
   if (/\bproducto\b/.test(text) && !/stock|botellas?|unidades|mercaderia/.test(text)) return "prepare_product_create";

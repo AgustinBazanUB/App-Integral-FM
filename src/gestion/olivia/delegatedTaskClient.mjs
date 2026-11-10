@@ -40,7 +40,8 @@ export class DelegatedTaskClient {
       return this.control({action:'cancel',taskId},{onAccepted:context.onAccepted});
     }
     const identity=context.requestId || globalThis.crypto.randomUUID(),at=this.now();
-    const payload={operation:'delegatedTask',conversationId:this.conversationId,requestId:identity,message:text,...(taskId?{taskId}:{}),...(Number.isInteger(context.collectionRevision)?{collectionRevision:context.collectionRevision}:{}),...(Number.isInteger(context.supersedesCollectionRevision)?{supersedesCollectionRevision:context.supersedesCollectionRevision}:{}),priority:args.priority || 'normal',dependsOn:args.dependsOn || [],screenContext:context.screenContext || {}};
+    const fastRead=!taskId && !(args.dependsOn?.length) && Boolean(quickReadPlan(text));
+    const payload={operation:'delegatedTask',conversationId:this.conversationId,requestId:identity,message:text,...(taskId?{taskId}:{}),...(fastRead?{foreground:true}:{}),...(Number.isInteger(context.collectionRevision)?{collectionRevision:context.collectionRevision}:{}),...(Number.isInteger(context.supersedesCollectionRevision)?{supersedesCollectionRevision:context.supersedesCollectionRevision}:{}),priority:args.priority || 'normal',dependsOn:args.dependsOn || [],screenContext:context.screenContext || {}};
     let task;
     for(let attempt=0;attempt<3;attempt++){
       try{task=await this.request(payload);break;}catch(error){
@@ -51,9 +52,11 @@ export class DelegatedTaskClient {
     context.onAccepted?.(task);
     this.publish([...this.tasks.filter(t=>t.id!==task.id),task]);
     this.onTrace('task.accepted',{turnId:context.turnId,sessionId:context.sessionId,taskId:task.id,jobId:task.jobId,requestId:identity,durationMs:this.now()-at,status:task.status});
+    let pollAttempt=0;
+    const pollIntervals=[250,500,1000];
     while(running(task)){
       if(this.closed)throw aborted();
-      await this.delay(1500);
+      await this.delay(pollIntervals[Math.min(pollAttempt++,pollIntervals.length-1)]);
       const tasks=await this.refresh();task=tasks.find(t=>t.id===task.id);
       if(!task)throw new Error('La tarea ya no está disponible.');
     }
@@ -77,3 +80,4 @@ export class DelegatedTaskClient {
   }
 }
 import { normalizeSpeech } from '../../shared/oliviaSpeechText.mjs';
+import { quickReadPlan } from '../../shared/oliviaConversationRouter.mjs';

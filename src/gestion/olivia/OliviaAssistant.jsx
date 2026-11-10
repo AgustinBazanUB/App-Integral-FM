@@ -135,6 +135,8 @@ export default function OliviaAssistant() {
   const [connectionTraceView,setConnectionTraceView]=useState(null);
   const [voiceTurnTraces,setVoiceTurnTraces]=useState([]);
   const [caption, setCaption] = useState("");
+  const [liveUserTranscript, setLiveUserTranscript] = useState("");
+  const [liveAssistantTranscript, setLiveAssistantTranscript] = useState("");
   const [now, setNow] = useState(Date.now());
   const [quotaRequestOpen, setQuotaRequestOpen] = useState(false);
   const [quotaRequested, setQuotaRequested] = useState(false);
@@ -188,7 +190,7 @@ export default function OliviaAssistant() {
     if (!mounted.current) return;
     if (result.failure && !result.activeChatJob) { setError(result.failure.message); setErrorCode(result.failure.code); setErrorReportId(result.failure.reportId || null); }
     else { setError(""); setErrorCode(""); setErrorReportId(null); }
-    if (Array.isArray(result.messages)) { setOptimistic(null); setStreamText(""); }
+    if (Array.isArray(result.messages)) { setOptimistic(null); setStreamText(""); setLiveUserTranscript(""); setLiveAssistantTranscript(""); }
     if (result.conversationId) {
       if(conversationRef.current!==result.conversationId)voiceCollectionRef.current=null;
       conversationRef.current = result.conversationId;
@@ -266,8 +268,8 @@ export default function OliviaAssistant() {
   useEffect(()=>{
     if(!snapshot.conversationId || !snapshot.voiceConversationAvailable)return;
     const client=new DelegatedTaskClient({request:(payload)=>oliviaClient.request(payload),conversationId:snapshot.conversationId,
-      onChange:tasks=>{if(!mounted.current)return;const previous=delegatedTasksRef.current;setDelegatedTasks(tasks);voiceRef.current?.transcriber?.watchTasks?.(tasks);for(const task of tasks){interactionCosts.current.task(taskOrigins.current.get(task.id),task);if(task.telemetry?.trace)saveTurnTrace({...task.telemetry.trace,events:task.telemetry.trace.events.map(event=>({...event,taskId:task.id,jobId:task.jobId}))});}refreshCosts(n=>n+1);
-        if(tasks.some(task=>['completed','failed','cancelled','needs-input','awaiting-confirmation'].includes(task.status)&&previous.some(old=>old.id===task.id&&old.status!==task.status))){const parent=snapshot.conversationId;void oliviaClient.request({operation:'resume',conversationId:parent}).then(result=>{if(mounted.current&&conversationRef.current===parent&&Array.isArray(result.messages))setSnapshot(current=>({...current,messages:prependHistoryMessages(current.messages,result.messages)}));}).catch(()=>{});}},
+      onChange:tasks=>{if(!mounted.current)return;const previous=delegatedTasksRef.current;setDelegatedTasks(tasks);voiceRef.current?.transcriber?.watchTasks?.(tasks);for(const task of tasks){interactionCosts.current.task(taskOrigins.current.get(task.id),task);if(task.telemetry?.trace)saveTurnTrace({...task.telemetry.trace,events:task.telemetry.trace.events.map(event=>({...event,taskId:task.id,jobId:task.jobId}))});if(task.status==='completed' && task.navigation?.path && previous.some(old=>old.id===task.id && old.status!==task.status)){const destination=safeNavigation(task.navigation.path,window.location.origin);if(destination)navigate(destination);}}refreshCosts(n=>n+1);
+        if(tasks.some(task=>['completed','failed','cancelled','needs-input','awaiting-confirmation'].includes(task.status)&&previous.some(old=>old.id===task.id&&old.status!==task.status))){const parent=snapshot.conversationId;void oliviaClient.request({operation:'resume',conversationId:parent}).then(result=>{if(mounted.current&&conversationRef.current===parent&&Array.isArray(result.messages)){setOptimistic(null);setLiveUserTranscript("");setLiveAssistantTranscript("");setSnapshot(current=>({...current,messages:prependHistoryMessages(current.messages,result.messages),pendingAction:Object.hasOwn(result,'pendingAction')?result.pendingAction:current.pendingAction}));}}).catch(()=>{});}},
       onTrace:(stage,metadata)=>markTurnTrace(stage,metadata)});
     delegatedClient.current=client;
     setDelegatedTasks([]);
@@ -401,7 +403,7 @@ export default function OliviaAssistant() {
       requestRef.current.abort("voice-ended");
       if (jobRef.current) oliviaClient.request({ operation: "cancelChat", jobId: jobRef.current, preserveTask: true }).catch(() => {});
     }
-    if (mounted.current) { setVoiceState("idle"); setCaption(""); setVoiceNotice(""); setVoiceFailure(false); setSessionNotice("La conversación por voz terminó"); }
+    if (mounted.current) { setVoiceState("idle"); setCaption(""); setLiveUserTranscript(""); setLiveAssistantTranscript(""); setVoiceNotice(""); setVoiceFailure(false); setSessionNotice("La conversación por voz terminó"); }
   }, []);
 
 
@@ -494,7 +496,7 @@ export default function OliviaAssistant() {
 
   useEffect(() => {
     if (stickToBottom.current) messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "auto" });
-  }, [snapshot.messages, busy, open, streamText, optimistic]);
+  }, [snapshot.messages, busy, open, streamText, optimistic, liveUserTranscript, liveAssistantTranscript]);
 
   useEffect(() => {
     voiceRef.current?.setMuted(muted);
@@ -654,10 +656,10 @@ export default function OliviaAssistant() {
       return;
     }
     setVoiceNotice("");
-    if (geminiDiagnosticActive || busy || recording || voiceRef.current || exhausted || unavailable || snapshot.pendingAction || !conversationRef.current) return;
+    if (geminiDiagnosticActive || busy || recording || voiceRef.current || exhausted || unavailable || !conversationRef.current) return;
     const hybridLive = Boolean(snapshot.voiceSettings?.hybridLiveAvailable && snapshot.voiceSettings?.hybridLiveEnabled);
     if (!hybridLive) { setVoiceNotice("Gemini Live no está disponible en este preview. Podés seguir por escrito o intentar más tarde."); return; }
-    setError(""); setCaption(""); setMuted(false); setVoiceFailure(false); setPermissionDenied(false); setSessionNotice(""); voiceTurnTiming.current = null;
+    setError(""); setCaption(""); setLiveUserTranscript(""); setLiveAssistantTranscript(""); setMuted(false); setVoiceFailure(false); setPermissionDenied(false); setSessionNotice(""); voiceTurnTiming.current = null;
     voiceMetricsSamples.current={};setVoiceMetrics({geminiLiveStatus:'connecting',geminiLiveFallback:null});turnTimings.current.clear();turnTraces.current.clear();
     voiceStartAt.current = performance.now(); connectionTrace.current = latencyTrace({ id: requestId(), origin: "client" });
     connectionTrace.current.mark("voice.connect.start", {}, voiceStartAt.current); voiceTrace.current = null; visibleTranscriptTurns.current.clear();
@@ -688,8 +690,8 @@ export default function OliviaAssistant() {
               else markTurnTrace(stage,metadata,at);
             },
             onState:state=>{if(mounted.current && voiceRef.current===connection)setVoiceState(state);},
-            onPartial:text=>{onPartial(text);if(mounted.current && text)setCaption(text);},
-            onTranscript:(text,{turnId,turnIndex}={})=>{if(mounted.current){if(turnId && !visibleTranscriptTurns.current.has(turnId)){visibleTranscriptTurns.current.add(turnId);markTurnTrace('assistant.text.visible.first',{turnId,turnIndex,source:'gemini'},performance.now());}setCaption(text);}},
+            onPartial:text=>{onPartial(text);if(mounted.current){setLiveUserTranscript(String(text || ""));if(text)setCaption(text);}},
+            onTranscript:(text,{turnId,turnIndex}={})=>{if(mounted.current){if(turnId && !visibleTranscriptTurns.current.has(turnId)){visibleTranscriptTurns.current.add(turnId);markTurnTrace('assistant.text.visible.first',{turnId,turnIndex,source:'gemini'},performance.now());}setLiveAssistantTranscript(String(text || ""));setCaption(text);}},
             onClassification:({durationMs,direct,route,kind,source,turnIndex,turnId,collection,newTask,independentRead})=>{
               if(collection)voiceCollectionRef.current=mergeVoiceCollection(voiceCollectionRef.current,collection);
               else if(newTask && !independentRead && ['collecting','ready','paused'].includes(voiceCollectionRef.current?.status))voiceCollectionRef.current={...voiceCollectionRef.current,status:'superseded',revision:voiceCollectionRef.current.revision+1,nextStep:'new-request-scope'};
@@ -702,9 +704,14 @@ export default function OliviaAssistant() {
             onAudioComplete:(at,{turnId,sourceTurnId,taskId}={})=>{const timing=turnTimings.current.get(sourceTurnId || turnId);if(timing)recordVoiceMetric(taskId?'delegatedVoiceEndToComplete':'voiceEndToComplete',at-timing.voiceEndedAt,taskId?'delegate':'gemini');if(mounted.current && voiceRef.current===connection && !connection.recordingTurn && !connection.transcriber?.currentTurn?.pending)setVoiceState(mutedRef.current?'muted':'listening');},
             onTurnComplete:turn=>{
               markTurnTrace('assistant.result.complete',{turnId:turn.turnId,turnIndex:turn.turnIndex,route:turn.delegated?'delegate':'direct',status:turn.providerIncomplete?'provider-incomplete':'complete'},performance.now());
-              if(turn.delegated){if(!turn.pendingTask && turn.noAudio && turn.assistantText){setCaption(turn.assistantText);setVoiceNotice('La respuesta quedó en pantalla, pero no pude reproducirla. Podés pedirme que la repita.');}return;}
+              if(turn.delegated){
+                if(mounted.current && turn.userText){const cleanUser=String(turn.userText).trim();if(cleanUser){stickToBottom.current=true;setLiveUserTranscript("");setOptimistic(current=>current?.content===cleanUser?current:{id:`voice-user-${turn.turnId || requestId()}`,role:"user",content:cleanUser});}}
+                if(!turn.pendingTask && turn.noAudio && turn.assistantText){setCaption(turn.assistantText);setLiveAssistantTranscript(turn.assistantText);setVoiceNotice('La respuesta quedó en pantalla, pero no pude reproducirla. Podés pedirme que la repita.');}
+                return;
+              }
               if(!turn.userText || !turn.assistantText)return;
               setCaption(turn.assistantText);
+              if(mounted.current){stickToBottom.current=true;setLiveUserTranscript("");setOptimistic({id:`voice-user-${turn.turnId || requestId()}`,role:"user",content:String(turn.userText).trim()});setLiveAssistantTranscript(String(turn.assistantText).trim());}
               if(turn.noAudio)setVoiceNotice('La respuesta quedó en pantalla, pero no pude reproducirla. Podés pedirme que la repita.');
               const persistStartedAt=performance.now();markTurnTrace('history.persist.start',{turnId:turn.turnId,turnIndex:turn.turnIndex,operation:'geminiDirectTurn'},persistStartedAt);
               const parent=conversationRef.current;
@@ -713,8 +720,10 @@ export default function OliviaAssistant() {
             onToolCall:async(call,inputText,context={})=>{
               if(context.transcriptComplete!==true || !String(inputText || '').trim())throw new Error('No se recibió la transcripción final; repetí la solicitud.');
               if(!delegatedClient.current)throw new Error('La cola de tareas todavía no está lista.');
+              const cleanInput=String(inputText).trim();
+              if(mounted.current){stickToBottom.current=true;setLiveUserTranscript("");setOptimistic({id:`voice-user-${context.turnId || requestId()}`,role:"user",content:cleanInput});}
               if(context.conversationDraft)await directPersistChain.current;
-              return delegatedClient.current.run(call,String(inputText).trim(),{...context,requestId:context.requestId || requestId(),screenContext:contextRef.current,
+              return delegatedClient.current.run(call,cleanInput,{...context,requestId:context.requestId || requestId(),screenContext:contextRef.current,
                 collectionRevision:context.conversationDraft?.revision,
                 supersedesCollectionRevision:context.newTask && voiceCollectionRef.current?.status==='superseded'?voiceCollectionRef.current.revision-1:undefined,
                 onAccepted:task=>{if(context.conversationDraft)voiceCollectionRef.current={...context.conversationDraft,status:'delegated',taskId:task.id};if(['new','continue'].includes(call.args?.action))taskOrigins.current.set(task.id,context.turnId);interactionCosts.current.task(taskOrigins.current.get(task.id),task);refreshCosts(n=>n+1);markTurnTrace('olivia.delegate.accepted',{turnId:context.turnId,taskId:task.id,jobId:task.jobId,status:task.status});context.onAccepted?.(task);}});
@@ -735,7 +744,7 @@ export default function OliviaAssistant() {
           return ready;
         } catch(error) { live.close(); throw error; }
       },
-      onPartial:text=>{if(mounted.current && text)setCaption(text);},
+      onPartial:text=>{if(mounted.current){setLiveUserTranscript(String(text || ""));if(text)setCaption(text);}},
       onNotice:notice=>{if(mounted.current && voiceRef.current===connection)setVoiceNotice(notice);},
       silenceMs: Math.max(1900, snapshot.voiceSettings?.turnEndSilenceMs || 1900),
       maxSeconds: snapshot.audioLimits?.maxSeconds || 60,
@@ -746,7 +755,7 @@ export default function OliviaAssistant() {
         turnTraces.current.set(turnId,voiceTrace.current);
         markTurnTrace('voice.start',{turnId,kind:'microphone'},Number.isFinite(at)?at:performance.now());
         if(bargeIn)markTurnTrace('voice.barge_in',{turnId,source:'microphone'},Number.isFinite(at)?at:performance.now());
-        if (mounted.current) { setVoiceNotice(""); setVoiceFailure(false); }
+        if (mounted.current) { setVoiceNotice(""); setVoiceFailure(false); if (bargeIn) setLiveAssistantTranscript(""); }
       },
       onError: (failure) => { if (mounted.current && voiceRef.current===connection && !connection.closed) { setPermissionDenied(failure.name === "NotAllowedError"); setVoiceFailure(failure.name !== "NotAllowedError"); setVoiceNotice(failure.name === "NotAllowedError" ? "Permití el micrófono para conversar por voz." : "No pude iniciar la voz. Podés seguir escribiendo o volver a intentarlo."); setVoiceState("idle"); } },
     });
@@ -764,7 +773,12 @@ export default function OliviaAssistant() {
   const quota = snapshot.usage;
   const estimate = draftEstimate || snapshot.estimate;
   const money = formatOliviaCost;
-  const visibleMessages = prependHistoryMessages(archived, optimistic ? [...snapshot.messages.filter((entry) => entry.id !== optimistic.id), optimistic] : snapshot.messages);
+  const lastPersistedUser = snapshot.messages.filter((entry) => entry.role === "user").at(-1)?.content?.trim() || "";
+  const lastPersistedAssistant = snapshot.messages.filter((entry) => entry.role === "assistant").at(-1)?.content?.trim() || "";
+  const effectiveOptimistic = optimistic && lastPersistedUser !== String(optimistic.content || "").trim() ? optimistic : null;
+  const visibleMessages = prependHistoryMessages(archived, effectiveOptimistic ? [...snapshot.messages.filter((entry) => entry.id !== effectiveOptimistic.id), effectiveOptimistic] : snapshot.messages);
+  const activeLiveUser = liveUserTranscript.trim() && String(effectiveOptimistic?.content || "").trim() !== liveUserTranscript.trim() && lastPersistedUser !== liveUserTranscript.trim() ? liveUserTranscript.trim() : "";
+  const activeLiveAssistant = liveAssistantTranscript.trim() && !streamText && lastPersistedAssistant !== liveAssistantTranscript.trim() ? liveAssistantTranscript.trim() : "";
   const selectOption = action => { if (optionsRef.current) { optionsRef.current.open = false; optionsRef.current.querySelector('summary')?.focus(); } action(); };
   const dictateDuringConnection = async () => {
     const connection = voiceRef.current;
@@ -799,9 +813,11 @@ export default function OliviaAssistant() {
       <div ref={messagesRef} onScroll={(event) => { const area = event.currentTarget; stickToBottom.current = area.scrollHeight - area.clientHeight - area.scrollTop < 70; if (area.scrollTop < 60 && snapshot.messages.length && messagesCursor !== null && !historyBusy) void loadHistory("messages"); }} className="fm-olivia-messages" role="log" aria-live="polite" aria-label="Conversación con Olivia">
         <div ref={historySentinelRef} className="fm-olivia-history-sentinel" aria-hidden="true" />
         {(hydrating || historyBusy) && !chatsOpen ? <small className="fm-olivia-history-loading" role="status">Cargando historial… Podés escribir mientras tanto.</small> : null}
-        {!snapshot.messages.length && !busy ? <div className="fm-olivia-welcome"><h3>Hola, soy Olivia.</h3><p>Te ayudo a consultar Flor Mía y preparar operaciones de tu panel. Los cambios siempre se confirman con Sí o No.</p><p>Podés escribir o dictar un mensaje.</p></div> : null}
+        {!snapshot.messages.length && !activeLiveUser && !activeLiveAssistant && !effectiveOptimistic && !busy ? <div className="fm-olivia-welcome"><h3>Hola, soy Olivia.</h3><p>Te ayudo a consultar Flor Mía y preparar operaciones de tu panel. Los cambios siempre se confirman con Sí o No.</p><p>Podés escribir o dictar un mensaje.</p></div> : null}
         {visibleMessages.filter((message) => !message.hiddenFromChat && ["user", "assistant"].includes(message.role)).map((message, index) => <article key={message.id || `${index}:${message.role}`} className={`fm-olivia-message fm-olivia-message--${message.role}`}><strong>{message.role === "user" ? "Vos" : "Olivia"}</strong>{message.role === "assistant" ? <OliviaMessageContent content={message.content} /> : <p>{String(message.content || "")}</p>}{message.attachments?.length ? <ul className="fm-olivia-attachments" aria-label="Archivos de este mensaje">{message.attachments.map((file, fileIndex) => <li key={file.id || fileIndex}>{file.name} · {file.type}</li>)}</ul> : null}</article>)}
-        {streamText ? <article className="fm-olivia-message fm-olivia-message--assistant"><strong>Olivia</strong><OliviaMessageContent content={streamText} />{!busy ? <small>Respuesta incompleta</small> : null}</article> : null}
+        {activeLiveUser ? <article className="fm-olivia-message fm-olivia-message--user is-streaming" data-streaming="user"><strong>Vos</strong><p>{activeLiveUser}</p></article> : null}
+        {activeLiveAssistant ? <article className="fm-olivia-message fm-olivia-message--assistant is-streaming" data-streaming="assistant"><strong>Olivia</strong><OliviaMessageContent content={activeLiveAssistant} /></article> : null}
+        {streamText ? <article className="fm-olivia-message fm-olivia-message--assistant is-streaming" data-streaming="assistant"><strong>Olivia</strong><OliviaMessageContent content={streamText} />{!busy ? <small>Respuesta incompleta</small> : null}</article> : null}
         {busy || snapshot.activeChatJob ? <div className="fm-olivia-working" role="status"><span className="fm-olivia-working__spinner" aria-hidden="true" /><span>Estoy trabajando en ello</span><span className="fm-olivia-working__bar" aria-hidden="true" /></div> : null}
         <OliviaDelegatedTasks tasks={delegatedTasks} onControl={controlTask} busyId={taskControlId} />
       </div>

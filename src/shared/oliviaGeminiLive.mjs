@@ -41,10 +41,10 @@ export function geminiLiveSetupConfig() {
       automaticActivityDetection: {
         disabled: false,
         endOfSpeechSensitivity: "END_SENSITIVITY_LOW",
-        // NaturalVoiceConversation closes short turns locally at 500–950 ms
-        // and keeps lists open up to 2 s. Align Gemini's own VAD ceiling with
-        // the longest local window so its earlier default cannot split lists.
-        silenceDurationMs: 2000,
+        // NaturalVoiceConversation closes short turns locally at 500–700 ms
+        // and keeps lists open up to 2 s. Keep Gemini's VAD ceiling agile at
+        // 1000 ms while local endpointing manages turn boundaries.
+        silenceDurationMs: 1000,
       },
       activityHandling: "START_OF_ACTIVITY_INTERRUPTS",
     },

@@ -66,6 +66,7 @@
 .fm-olivia-welcome p { color:var(--olivia-muted); }
 .fm-olivia-message { width:fit-content; max-width:92%; margin:0 auto 18px 0; padding:13px 17px; border:1px solid var(--olivia-line); border-radius:20px 20px 20px 6px; background:#fff; box-shadow:0 3px 12px #72531e04; }
 .fm-olivia-message--user { margin-left:auto; margin-right:0; border-color:#f0e6d0; background:#fcf8ee; border-radius:20px 20px 6px 20px; }
+.fm-olivia-message.is-streaming { border-style:dashed; border-color:var(--olivia-gold-soft); }
 .fm-olivia-message > strong { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
 .fm-olivia-message p,.fm-olivia-message li { color:var(--olivia-ink); font-size:14px; line-height:1.7; }
 .fm-olivia-message p:last-child { margin-bottom:0; }

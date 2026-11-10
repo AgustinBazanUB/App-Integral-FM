@@ -7,7 +7,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { metricsForModel } from "./analytics.mjs";
 import { progressiveStock, taskFromTool, taskControl, missingQuestion, updateTask, taskUpdateTool, taskSlotSchema, requiredFields, isCorrection, operationalIntent, shortVoiceQuestion } from "./tasks.mjs";
 import { aggregateRoutes } from "./modelRouter.mjs";
-import { transitionConversationTask, manageConversationTask, taskManagementTool, isTaskInterruption } from "./conversationTasks.mjs";
+import { transitionConversationTask, manageConversationTask, taskManagementTool, isTaskInterruption, requestedTaskIntent } from "./conversationTasks.mjs";
 import { isSuggestionRequest, isFeedbackCaptureRequest, isSuggestionContinuation, processSuggestion } from "./suggestions.mjs";
 import { fieldGuidance } from '../../../../src/shared/oliviaOperationGuide.mjs';
 import { assistiveIntent } from '../../../../src/shared/oliviaAssistiveIntent.mjs';
@@ -920,6 +920,19 @@ export function createOliviaEngine({
             if (toolModule !== "core") touchedModules.add(toolModule);
             for (const [key, value] of Object.entries(args)) if (/Id$/.test(key) && typeof value === "string") entityIds.add(value);
             for (const value of Object.values(result.data || {})) if (Array.isArray(value)) dataRows += value.length;
+            if (call.name === "get_stock" && result.data && !result.state) {
+              if (!context.locationId && result.data.locationId) context.locationId = result.data.locationId;
+              if (!context.productId && result.data.productId) context.productId = result.data.productId;
+            } else if (call.name === "search_products" && result.data?.products?.length === 1) {
+              if (!context.productId && result.data.products[0].productId) context.productId = result.data.products[0].productId;
+            } else if (call.name === "list_locations" && result.data?.locations?.length === 1) {
+              const singleLocId = result.data.locations[0].id || result.data.locations[0].locationId;
+              if (!context.locationId && singleLocId) context.locationId = singleLocId;
+            }
+            const chainedPrepareIntent = requestedTaskIntent(userMessage);
+            if (chainedPrepareIntent && capabilities(session).includes(chainedPrepareIntent)) {
+              loadedTools.add(chainedPrepareIntent);
+            }
             if (call.name.startsWith("prepare_")) {
               const priorTask = ["collecting", "prepared"].includes(taskState.status) ? taskState : conversation.taskState;
               if (priorTask && priorTask.intent !== call.name) currentSuspendedTasks = manageConversationTask({ task: priorTask, suspendedTasks: currentSuspendedTasks }, "pause", null, clock()).suspendedTasks;
@@ -927,7 +940,11 @@ export function createOliviaEngine({
               taskState.route = profile;
               currentTask = taskState;
             } else if (call.name === taskState.intent && result.data && !result.state) {
-              taskState = { ...taskState, slots: { ...taskState.slots, ...args }, status: "completed", missingFields: [], updatedAt: clock() };
+              if (chainedPrepareIntent && chainedPrepareIntent !== call.name && capabilities(session).includes(chainedPrepareIntent)) {
+                taskState = { ...taskState, intent: chainedPrepareIntent, slots: { ...taskState.slots, ...args }, updatedAt: clock() };
+              } else {
+                taskState = { ...taskState, slots: { ...taskState.slots, ...args }, status: "completed", missingFields: [], updatedAt: clock() };
+              }
               currentTask = taskState;
             }
             if (result.skill && !activeSkills.some((skill) => skill.name === result.skill.name)) activeSkills.push(result.skill);

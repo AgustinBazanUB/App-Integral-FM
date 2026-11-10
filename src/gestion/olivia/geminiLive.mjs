@@ -308,11 +308,11 @@ export class GeminiLiveSession {
       this.onState("recording");
     }
     const interimText = content?.interimInputTranscription?.text;
-    if (interimText) { turn.interimText = String(interimText); this.onPartial(turn.interimText); }
+    if (interimText) { turn.interimText = String(interimText); this.onPartial(turn.interimText, { turnId: turn.turnId, turnIndex: turn.turnIndex, final: false }); }
     const inputText = content?.inputTranscription?.text;
     if (inputText) {
       const previousInput = turn.inputText;
-      turn.inputText = mergeTranscript(turn.inputText, inputText); turn.transcriptComplete = true; this.ignoreOutputUntilInput = false; this.onPartial(turn.inputText);
+      turn.inputText = mergeTranscript(turn.inputText, inputText); turn.transcriptComplete = true; this.ignoreOutputUntilInput = false; this.onPartial(turn.inputText, { turnId: turn.turnId, turnIndex: turn.turnIndex, final: true });
       if (turn.inputText !== previousInput) this.trace("gemini.transcript.final", { turnId: turn.turnId, turnIndex: turn.turnIndex });
       void this.authorizeTurn(turn);
       this.resolveTranscriptWaiters(turn);
@@ -570,7 +570,18 @@ export class GeminiLiveSession {
   }
 
   drainToolResults(){
-    if(this.closed || this.failed || !this.ready || this.reconnecting || this.holdNotificationsUntilInput || this.listening || this.isPlaying || this.currentTurn.pending || !this.toolResultQueue.length)return;
+    if(this.closed || this.failed || !this.ready || this.reconnecting || !this.toolResultQueue.length)return;
+    const hasTerminalResult=this.toolResultQueue.some(item=>{
+      const status=item?.result?.status || item?.result?.task?.status || item?.result?.outcome?.status;
+      return ['completed','needs-input','awaiting-confirmation','failed','cancelled'].includes(status) || typeof item?.result==='string' || Boolean(item?.result?.error);
+    });
+    if(this.holdNotificationsUntilInput && !hasTerminalResult)return;
+    if(hasTerminalResult)this.holdNotificationsUntilInput=false;
+    if(this.listening || this.isPlaying || this.currentTurn.pending){
+      clearTimeout(this.notificationTimer);
+      this.notificationTimer=setTimeout(()=>this.drainToolResults(),120);
+      return;
+    }
     const item=this.notifications.take();
     if(!item){clearTimeout(this.notificationTimer);this.notificationTimer=setTimeout(()=>this.drainToolResults(),Math.max(20,this.notifications.nextDelay() || 20));return;}
     const turn=this.createTurn();

@@ -83,7 +83,7 @@ test("raw Live setup fixes model, voice, tool policy, compression and modalities
   assert.equal(setup.contextWindowCompression.slidingWindow.targetTokens, 1200);
   assert.equal(setup.tools[0].functionDeclarations[0].name, "delegate_to_olivia");
   assert.equal(setup.realtimeInputConfig.automaticActivityDetection.disabled, false);
-  assert.equal(setup.realtimeInputConfig.automaticActivityDetection.silenceDurationMs, 2000);
+  assert.equal(setup.realtimeInputConfig.automaticActivityDetection.silenceDurationMs, 1000);
   assert.equal(setup.realtimeInputConfig.activityHandling, "START_OF_ACTIVITY_INTERRUPTS");
   assert.equal(setup.thinkingLevel, undefined);
 });
