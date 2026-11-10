@@ -2,8 +2,8 @@
 export function interactionState({ disabled, voiceDisabled, permissionDenied, error, voiceError, connecting, recording, speaking, busy, activeJob, processing, listening, muted, pending, phase, notice }) {
   if (permissionDenied) return { state: 'disabled', label: 'Habilitá el micrófono para conversar', pill: 'Habilitar micrófono' };
   if (error || voiceError) return { state: 'error', label: 'Necesito tu ayuda para continuar', pill: error ? 'Revisar solicitud' : 'Volver a conectar' };
-  if (disabled) return { state: 'disabled', label: 'Olivia no está disponible en este momento', pill: 'Olivia no disponible' };
   if (connecting) return { state: 'connecting', label: 'Preparando la conversación…' };
+  if (disabled) return { state: 'disabled', label: 'Olivia no está disponible en este momento', pill: 'Olivia no disponible' };
   if (recording) return { state: 'listening', label: 'Te escucho…' };
   if (speaking) return { state: 'speaking', label: 'Olivia está respondiendo…' };
   if (busy || activeJob || processing) return { state: 'thinking', label: phase || 'Olivia está pensando…' };

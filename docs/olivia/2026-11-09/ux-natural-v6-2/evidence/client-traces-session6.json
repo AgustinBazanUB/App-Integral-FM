@@ -1,0 +1,863 @@
+[
+  {
+    "id": "131373dd-4394-4cc6-afb1-1ed21d4842e7",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 80887.5,
+    "elapsedMs": 3940.300000000745,
+    "events": [
+      {
+        "stage": "voice.connect.start",
+        "ms": 0
+      },
+      {
+        "stage": "voice.capture.start",
+        "ms": 0.2
+      },
+      {
+        "stage": "audio.context.create.start",
+        "ms": 0.3
+      },
+      {
+        "stage": "audio.context.create.end",
+        "ms": 345.7,
+        "durationMs": 345.40000000037253,
+        "status": "ok"
+      },
+      {
+        "stage": "audio.context.resume.start",
+        "ms": 345.9
+      },
+      {
+        "stage": "microphone.request.start",
+        "ms": 346
+      },
+      {
+        "stage": "audio.context.resume.end",
+        "ms": 347.6,
+        "durationMs": 1.700000001117587,
+        "status": "ok"
+      },
+      {
+        "stage": "microphone.request.end",
+        "ms": 352.6,
+        "durationMs": 6.600000001490116,
+        "status": "ok"
+      },
+      {
+        "stage": "voice.mic.ready",
+        "ms": 353.8
+      },
+      {
+        "stage": "gemini.token.request.start",
+        "ms": 360.8
+      },
+      {
+        "stage": "gemini.token.request.end",
+        "ms": 2487.3,
+        "durationMs": 2126.5,
+        "status": "ok"
+      },
+      {
+        "stage": "gemini.token.server",
+        "ms": 2487.5,
+        "configurationMs": 142,
+        "conversationMs": 140,
+        "reservationMs": 555,
+        "providerMs": 238
+      },
+      {
+        "stage": "gemini.websocket.start",
+        "ms": 2487.5
+      },
+      {
+        "stage": "gemini.websocket.open",
+        "ms": 3499.9,
+        "durationMs": 1012.3000000007451,
+        "status": "ok"
+      },
+      {
+        "stage": "gemini.setup.complete",
+        "ms": 3931.4,
+        "durationMs": 1443.800000000745,
+        "status": "ok"
+      },
+      {
+        "stage": "gemini.capture.ready",
+        "ms": 3940,
+        "sampleRate": 48000
+      },
+      {
+        "stage": "gemini.session.ready",
+        "ms": 3940.2,
+        "durationMs": 3581.7000000011176
+      },
+      {
+        "stage": "voice.capture.ready",
+        "ms": 3940.3
+      }
+    ]
+  },
+  {
+    "id": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 90070.40000000037,
+    "elapsedMs": 24692.599999999627,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -1.5,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "kind": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 15207.6,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 15207.6,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "endpointMs": 1700,
+        "durationMs": 1719.2999999988824
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 15394.9,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "turnIndex": 1
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 15397.5,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "route": "local-direct",
+        "kind": "conversation-note",
+        "source": "local-policy",
+        "durationMs": 2.5,
+        "turnIndex": 1
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 15397.6,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "turnIndex": 1,
+        "route": "direct",
+        "kind": "conversation-note"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 15536.9,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "turnIndex": 1
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 15537.1,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "turnIndex": 1,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 15537.7,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "turnIndex": 1
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 15537.9,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "turnIndex": 1,
+        "kind": "answer"
+      },
+      {
+        "stage": "voice.barge_in.rejected",
+        "ms": 16157.9,
+        "kind": "short-energy-pulse",
+        "durationMs": 200.40000000037253
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 22110.5,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "turnIndex": 1,
+        "route": "direct"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 22110.7,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "turnIndex": 1,
+        "route": "direct",
+        "status": "complete"
+      },
+      {
+        "stage": "history.persist.start",
+        "ms": 22110.8,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "turnIndex": 1,
+        "operation": "geminiDirectTurn"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 23972,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "turnIndex": 1,
+        "durationMs": 1861.0999999996275,
+        "status": "provider-forwarded",
+        "costUsd": 0.004784
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 23972.3,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "sessionId": "427d48de-0fe8-4ab8-adcb-3fbb0f1ca27f",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.004784,
+        "inputTokens": 1956,
+        "outputTokens": 174,
+        "status": "provider-forwarded"
+      },
+      {
+        "stage": "history.persist.end",
+        "ms": 24692.6,
+        "turnId": "cecf479e-3577-43f6-aca9-09df8d60ea6c",
+        "turnIndex": 1,
+        "durationMs": 2581.7999999988824,
+        "status": "ok"
+      }
+    ]
+  },
+  {
+    "id": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 123157.10000000149,
+    "elapsedMs": 17907.199999999255,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -9.7,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+        "kind": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 15161.3,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 15161.3,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+        "endpointMs": 1700,
+        "durationMs": 1729
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 15345.1,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+        "turnIndex": 2
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 15350.6,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+        "route": "local-direct",
+        "kind": "conversation-note",
+        "source": "local-policy",
+        "durationMs": 5.200000001117587,
+        "turnIndex": 2
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 15350.8,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+        "turnIndex": 2,
+        "route": "direct",
+        "kind": "conversation-note"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 15356.6,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+        "turnIndex": 2
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 15356.7,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+        "turnIndex": 2,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 15357.7,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+        "turnIndex": 2
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 15357.9,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+        "turnIndex": 2,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 17907,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+        "turnIndex": 2,
+        "durationMs": 2045.5,
+        "status": "estimated-audio-context-excluded",
+        "costUsd": 0.00346
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 17907.1,
+        "turnId": "79a3e1a1-c3d9-473a-ad39-3a0f6a257b7f",
+        "sessionId": "427d48de-0fe8-4ab8-adcb-3fbb0f1ca27f",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.00346,
+        "status": "estimated-audio-context-excluded"
+      }
+    ]
+  },
+  {
+    "id": "5e76ef46-6aa0-4684-92b7-df0e0e70ec4f",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 139019.6000000015,
+    "elapsedMs": 6320.5999999996275,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -1.3,
+        "turnId": "5e76ef46-6aa0-4684-92b7-df0e0e70ec4f",
+        "kind": "microphone"
+      },
+      {
+        "stage": "voice.barge_in",
+        "ms": -1.3,
+        "turnId": "5e76ef46-6aa0-4684-92b7-df0e0e70ec4f",
+        "source": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 1448.5,
+        "turnId": "5e76ef46-6aa0-4684-92b7-df0e0e70ec4f"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 1448.5,
+        "turnId": "5e76ef46-6aa0-4684-92b7-df0e0e70ec4f",
+        "endpointMs": 1100,
+        "durationMs": 1109.5
+      },
+      {
+        "stage": "gemini.input.unrecognized",
+        "ms": 4451,
+        "turnId": "5e76ef46-6aa0-4684-92b7-df0e0e70ec4f",
+        "durationMs": 3000,
+        "status": "no-transcript"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 6320.3,
+        "turnId": "5e76ef46-6aa0-4684-92b7-df0e0e70ec4f",
+        "turnIndex": 3,
+        "durationMs": 1869,
+        "status": "estimated-audio-context-excluded",
+        "costUsd": 0.000137
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 6320.5,
+        "turnId": "5e76ef46-6aa0-4684-92b7-df0e0e70ec4f",
+        "sessionId": "427d48de-0fe8-4ab8-adcb-3fbb0f1ca27f",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.000137,
+        "status": "estimated-audio-context-excluded"
+      }
+    ]
+  },
+  {
+    "id": "85126575-9328-4784-adf0-806cbf0f59ce",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 165561.30000000075,
+    "elapsedMs": 19246.400000000373,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -2.3,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce",
+        "kind": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 15198.3,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 15198.3,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce",
+        "endpointMs": 1700,
+        "durationMs": 1711.9000000003725
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 15687.4,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce",
+        "turnIndex": 4
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 15727.3,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce",
+        "route": "local-direct",
+        "kind": "conversation-note",
+        "source": "local-policy",
+        "durationMs": 39.40000000037253,
+        "turnIndex": 4
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 15727.8,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce",
+        "turnIndex": 4,
+        "route": "direct",
+        "kind": "conversation-note"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 15728.4,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce",
+        "turnIndex": 4
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 15728.5,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce",
+        "turnIndex": 4,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 15745.8,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce",
+        "turnIndex": 4
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 15771.1,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce",
+        "turnIndex": 4,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 19246,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce",
+        "turnIndex": 4,
+        "durationMs": 2598.5,
+        "status": "estimated-audio-context-excluded",
+        "costUsd": 0.003339
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 19246.4,
+        "turnId": "85126575-9328-4784-adf0-806cbf0f59ce",
+        "sessionId": "427d48de-0fe8-4ab8-adcb-3fbb0f1ca27f",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.003339,
+        "status": "estimated-audio-context-excluded"
+      }
+    ]
+  },
+  {
+    "id": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 182210.5,
+    "elapsedMs": 10431,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -1.9,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "kind": "microphone"
+      },
+      {
+        "stage": "voice.barge_in",
+        "ms": -1.9,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "source": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 3907.6,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 3907.6,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "endpointMs": 1700,
+        "durationMs": 1709
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 4093.8,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "turnIndex": 5
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 4095.7,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "route": "local-direct",
+        "kind": "conversation",
+        "source": "local-policy",
+        "durationMs": 1.700000001117587,
+        "turnIndex": 5
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 4095.8,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "turnIndex": 5,
+        "route": "direct",
+        "kind": "conversation"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 4096.6,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "turnIndex": 5
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 4096.6,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "turnIndex": 5,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 4105.2,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "turnIndex": 5
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 4105.3,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "turnIndex": 5,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 7857.2,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "turnIndex": 5,
+        "route": "direct"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 7857.4,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "turnIndex": 5,
+        "route": "direct",
+        "status": "complete"
+      },
+      {
+        "stage": "history.persist.start",
+        "ms": 7857.4,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "turnIndex": 5,
+        "operation": "geminiDirectTurn"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 9855.5,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "turnIndex": 5,
+        "durationMs": 1998,
+        "status": "provider-forwarded",
+        "costUsd": 0.003017
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 9855.9,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "sessionId": "427d48de-0fe8-4ab8-adcb-3fbb0f1ca27f",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.003017,
+        "inputTokens": 1636,
+        "outputTokens": 100,
+        "status": "provider-forwarded"
+      },
+      {
+        "stage": "history.persist.end",
+        "ms": 10430.9,
+        "turnId": "a484f06e-1ee2-432f-a925-f51b56feb78a",
+        "turnIndex": 5,
+        "durationMs": 2573.5,
+        "status": "ok"
+      }
+    ]
+  },
+  {
+    "id": "40b647fa-6487-4078-923d-1de026d8cbf3",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 199140,
+    "elapsedMs": 29931.10000000149,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -1.6,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "kind": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 8603.9,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 8603.9,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "endpointMs": 1700,
+        "durationMs": 1714.5
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 8790,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "turnIndex": 6
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 8792.5,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "route": "local-policy-delegate",
+        "kind": "data-or-operation",
+        "source": "local-policy",
+        "durationMs": 2.199999999254942,
+        "turnIndex": 6
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 8792.9,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "turnIndex": 6,
+        "route": "delegate",
+        "kind": "data-or-operation"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 8798.3,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "turnIndex": 6
+      },
+      {
+        "stage": "gemini.audio.held",
+        "ms": 8798.8,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "turnIndex": 6
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 12709.4,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "turnIndex": 6,
+        "route": "delegate"
+      },
+      {
+        "stage": "task.policy_fallback",
+        "ms": 12709.9,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "kind": "data-or-operation",
+        "source": "local-policy"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 12710.1,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "turnIndex": 6,
+        "route": "delegate",
+        "status": "complete"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 14751,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "turnIndex": 6,
+        "durationMs": 2040.7999999988824,
+        "status": "provider-forwarded",
+        "costUsd": 0.003953
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 14751.1,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "sessionId": "427d48de-0fe8-4ab8-adcb-3fbb0f1ca27f",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.003953,
+        "inputTokens": 1956,
+        "outputTokens": 105,
+        "status": "provider-forwarded"
+      },
+      {
+        "stage": "olivia.delegate.accepted",
+        "ms": 15843.6,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "taskId": "c1eb1edb4f20e5d567980076073773e1b5493f41f8f222eaa77d8db305499384",
+        "jobId": "0315a2fc6f1b7b79a8301113c2e1cd1a11ed195176ce15f7240ac4e717da7327",
+        "status": "running"
+      },
+      {
+        "stage": "task.accepted",
+        "ms": 15843.8,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "taskId": "c1eb1edb4f20e5d567980076073773e1b5493f41f8f222eaa77d8db305499384",
+        "jobId": "0315a2fc6f1b7b79a8301113c2e1cd1a11ed195176ce15f7240ac4e717da7327",
+        "status": "running",
+        "source": "local-policy"
+      },
+      {
+        "stage": "task.accepted",
+        "ms": 15843.9,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "sessionId": "427d48de-0fe8-4ab8-adcb-3fbb0f1ca27f",
+        "taskId": "c1eb1edb4f20e5d567980076073773e1b5493f41f8f222eaa77d8db305499384",
+        "jobId": "0315a2fc6f1b7b79a8301113c2e1cd1a11ed195176ce15f7240ac4e717da7327",
+        "requestId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "durationMs": 3133.5999999996275,
+        "status": "running"
+      },
+      {
+        "stage": "task.result",
+        "ms": 29931.1,
+        "turnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "sessionId": "427d48de-0fe8-4ab8-adcb-3fbb0f1ca27f",
+        "taskId": "c1eb1edb4f20e5d567980076073773e1b5493f41f8f222eaa77d8db305499384",
+        "jobId": "0315a2fc6f1b7b79a8301113c2e1cd1a11ed195176ce15f7240ac4e717da7327",
+        "requestId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "durationMs": 17220.800000000745,
+        "status": "needs-input"
+      }
+    ]
+  },
+  {
+    "id": "fbc543f5-e65f-4c23-b179-a421784154e6",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 229069.1000000015,
+    "elapsedMs": 7029.199999999255,
+    "events": [
+      {
+        "stage": "task.notification.start",
+        "ms": 0,
+        "turnId": "fbc543f5-e65f-4c23-b179-a421784154e6",
+        "taskId": "c1eb1edb4f20e5d567980076073773e1b5493f41f8f222eaa77d8db305499384",
+        "sourceTurnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "status": "needs-input"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 763.8,
+        "turnId": "fbc543f5-e65f-4c23-b179-a421784154e6",
+        "turnIndex": 7
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 764.1,
+        "turnId": "fbc543f5-e65f-4c23-b179-a421784154e6",
+        "turnIndex": 7,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 765.1,
+        "turnId": "fbc543f5-e65f-4c23-b179-a421784154e6",
+        "turnIndex": 7
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 765.2,
+        "turnId": "fbc543f5-e65f-4c23-b179-a421784154e6",
+        "sourceTurnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "taskId": "c1eb1edb4f20e5d567980076073773e1b5493f41f8f222eaa77d8db305499384",
+        "turnIndex": 7,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 5235,
+        "turnId": "fbc543f5-e65f-4c23-b179-a421784154e6",
+        "turnIndex": 7,
+        "route": "tool"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 5235.5,
+        "turnId": "fbc543f5-e65f-4c23-b179-a421784154e6",
+        "turnIndex": 7,
+        "route": "delegate",
+        "status": "complete"
+      },
+      {
+        "stage": "task.notification.delivered",
+        "ms": 6358.2,
+        "turnId": "fbc543f5-e65f-4c23-b179-a421784154e6",
+        "taskId": "c1eb1edb4f20e5d567980076073773e1b5493f41f8f222eaa77d8db305499384",
+        "status": "persisted"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 7029,
+        "turnId": "fbc543f5-e65f-4c23-b179-a421784154e6",
+        "turnIndex": 7,
+        "durationMs": 1793.4000000003725,
+        "status": "provider-forwarded",
+        "costUsd": 0.00454
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 7029.2,
+        "turnId": "fbc543f5-e65f-4c23-b179-a421784154e6",
+        "sessionId": "427d48de-0fe8-4ab8-adcb-3fbb0f1ca27f",
+        "sourceTurnId": "40b647fa-6487-4078-923d-1de026d8cbf3",
+        "taskId": "c1eb1edb4f20e5d567980076073773e1b5493f41f8f222eaa77d8db305499384",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.00454,
+        "inputTokens": 2279,
+        "outputTokens": 114,
+        "status": "provider-forwarded"
+      }
+    ]
+  }
+]
