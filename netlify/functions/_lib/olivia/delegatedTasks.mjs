@@ -11,7 +11,7 @@ const pathFor = (parent, id) => `oliviaConversations/${parent}/delegatedTasks/${
 const active = task => ['queued','dispatching','running'].includes(task.status);
 const dateMs = value => new Date(value).getTime();
 const notificationKey=task=>hash([task.requestId,task.status,active(task)?task.progress?.revision || 0:0]);
-const publicTask = task => ({ id:task.id, requestId:task.requestId, jobId:task.jobId || null, status:task.status, phase:task.phase || '', summary:task.summary || '', progress:task.progress || null,outcome:taskOutcome(task),notification:{key:notificationKey(task),eligible:task.notificationProtocol===1,delivered:task.voiceDeliveryKey===notificationKey(task)},pendingAction:task.pendingAction || null, navigation:task.navigation || null, priority:task.priority, dependsOn:task.dependsOn || [], createdAt:task.createdAt, updatedAt:task.updatedAt, failure:task.failure || null, telemetry:task.telemetry || null });
+const publicTask = task => ({ id:task.id, requestId:task.requestId, jobId:task.jobId || null, status:task.status, phase:task.phase || '', summary:task.summary || '', fullResult:task.fullResult || task.summary || '', voiceSummary:task.voiceSummary || task.summary || '', progress:task.progress || null,outcome:taskOutcome(task),notification:{key:notificationKey(task),eligible:task.notificationProtocol===1,delivered:task.voiceDeliveryKey===notificationKey(task)},pendingAction:task.pendingAction || null, navigation:task.navigation || null, priority:task.priority, dependsOn:task.dependsOn || [], createdAt:task.createdAt, updatedAt:task.updatedAt, failure:task.failure || null, telemetry:task.telemetry || null });
 async function ownedRoot(store, session, id, now) {
   const root = await store.get(`oliviaConversations/${safeId(id)}`);
   assertConversationOwner(session, root, now);
@@ -36,6 +36,8 @@ export async function startDelegatedTask({store,engine,session,body,dispatch,now
   const path=pathFor(parent,id), fingerprint=hash([text,body.taskId || null,body.dependsOn || [],body.priority || 'normal']);
   const attemptKey=hash(requestId);
   await ownedRoot(store,session,parent,now);
+  const isForegroundFastRead = body.foreground===true && !body.taskId && !(body.dependsOn?.length) && Boolean(quickReadPlan(text)) && typeof engine?.chat==='function';
+  const fgJobId = isForegroundFastRead ? `fg_${requestId}` : null;
   await store.transaction(async tx=>{
     const root=(await tx.getDocument(`oliviaConversations/${parent}`))?.data;
     assertConversationOwner(session,root,now);
@@ -63,28 +65,30 @@ export async function startDelegatedTask({store,engine,session,body,dispatch,now
     const writes=[];
     if(!previous)writes.push({type:'create',path:`oliviaConversations/${scopeId}`,data:{id:scopeId,userId:root.userId,sessionBinding:root.sessionBinding,roleBinding:root.roleBinding,permissionScope:root.permissionScope,historyStorageVersion:root.historyStorageVersion || 1,internalTask:true,parentConversationId:parent,delegatedTaskIds:[],messages:(root.messages || []).slice(-8),messageCount:0,state:'INFORMACION',taskState:null,memory:null,draft:null,pendingActionId:null,activeChatJobId:null,queuedChatRequestId:null,busyRequestId:null,busyUntil:null,title:text.slice(0,80),createdAt:now,updatedAt:now,expiresAt:root.expiresAt}});
     const requests={...(previous?.requests || {}),[attemptKey]:fingerprint};
-    writes.push({type:previous?'update':'create',path,data:{id,parentConversationId:parent,scopeId,requestId,fingerprint,requests,message:text,screenContext:body.screenContext || {},status:'queued',phase:'En cola',priority:['low','high'].includes(body.priority)?body.priority:'normal',dependsOn:dependencies,jobId:null,pendingAction:null,summary:'',progress:null,notificationProtocol:1,attempt:(previous?.attempt || 0)+1,createdAt:previous?.createdAt || now,updatedAt:now,expiresAt:root.expiresAt}});
+    writes.push({type:previous?'update':'create',path,data:{id,parentConversationId:parent,scopeId,requestId,fingerprint,requests,message:text,screenContext:body.screenContext || {},status:isForegroundFastRead?'running':'queued',phase:isForegroundFastRead?'Consultando datos':'En cola',priority:['low','high'].includes(body.priority)?body.priority:'normal',dependsOn:dependencies,jobId:fgJobId,pendingAction:null,summary:'',fullResult:'',voiceSummary:'',progress:null,notificationProtocol:1,attempt:(previous?.attempt || 0)+1,createdAt:previous?.createdAt || now,updatedAt:now,expiresAt:root.expiresAt}});
     if(!previous)writes.push({type:'update',path:`oliviaConversations/${parent}`,data:{delegatedTaskIds:[...retainedTaskIds,id],
       ...(['collecting','ready'].includes(root.voiceCollection?.status)&&Number.isInteger(body.collectionRevision)&&[root.voiceCollection.revision,root.voiceCollection.revision+1].includes(body.collectionRevision)?{voiceCollection:{...root.voiceCollection,status:'delegated',taskId:id,revision:body.collectionRevision,missingFields:[],nextStep:'backend-validation'}}:{}),
       ...(['collecting','ready','paused'].includes(root.voiceCollection?.status)&&body.supersedesCollectionRevision===root.voiceCollection.revision?{voiceCollection:{...root.voiceCollection,status:'superseded',revision:root.voiceCollection.revision+1,supersededByTaskId:id,nextStep:'new-request-scope'}}:{})}});
     await tx.commitDocuments(writes);
   });
-  if(body.foreground===true && !body.taskId && !(body.dependsOn?.length) && quickReadPlan(text) && typeof engine?.chat==='function'){
+  if(isForegroundFastRead){
     const taskDoc=await ownedTask(store,session,parent,id,now);
-    if(taskDoc.status==='queued'){
+    if(taskDoc.jobId===fgJobId && taskDoc.recordedJobId!==fgJobId){
       try{
         const result=await engine.chat(session,{conversationId:taskDoc.scopeId,requestId,message:text,screenContext:body.screenContext || {},inputMode:'natural-voice',foreground:true});
-        const summary=result?.pendingAction?.summary || result?.spokenText || result?.messages?.filter(m=>m.role==='assistant').at(-1)?.voiceTranscript || result?.messages?.filter(m=>m.role==='assistant').at(-1)?.content || result?.failure?.message || '';
+        const lastAssistant=result?.messages?.filter(m=>m.role==='assistant').at(-1);
+        const fullResult=result?.pendingAction?.summary || lastAssistant?.content || result?.spokenText || result?.failure?.message || '';
+        const voiceSummary=result?.spokenText || lastAssistant?.voiceTranscript || fullResult;
+        const summary=voiceSummary || fullResult;
         const nextStatus=result?.pendingAction?'awaiting-confirmation':result?.state==='DATOS_INCOMPLETOS'?'needs-input':result?.failure?'failed':'completed';
-        const fgJobId=`fg_${requestId}`;
         await store.transaction(async tx=>{
           const current=(await tx.getDocument(path))?.data;
           if(!current || current.recordedJobId===fgJobId)return;
           const rootDoc=(await tx.getDocument(`oliviaConversations/${parent}`))?.data;
           const userEntry=message('user',current.message,now,'natural-voice');
-          const assistantEntry=message('assistant',summary || 'La tarea terminó sin respuesta disponible.',now,'natural-voice');
+          const assistantEntry=message('assistant',fullResult || summary || 'La tarea terminó sin respuesta disponible.',now,'natural-voice');
           await tx.commitDocuments([
-            {type:'update',path,data:{status:nextStatus,phase:'Completada',notificationProtocol:1,summary,navigation:result?.navigation || null,pendingAction:result?.pendingAction || null,failure:result?.failure || null,telemetry:result?.telemetry || null,recordedJobId:fgJobId,updatedAt:now}},
+            {type:'update',path,data:{status:nextStatus,phase:'Completada',notificationProtocol:1,summary,fullResult,voiceSummary,navigation:result?.navigation || null,pendingAction:result?.pendingAction || null,failure:result?.failure || null,telemetry:result?.telemetry || null,recordedJobId:fgJobId,updatedAt:now}},
             retainedMessage(parent,userEntry),
             retainedMessage(parent,assistantEntry),
             {type:'update',path:`oliviaConversations/${parent}`,data:{messages:trimMessages([...(rootDoc.messages || []),userEntry,assistantEntry]),messageCount:(rootDoc.messageCount || 0)+2,updatedAt:now}},
@@ -94,11 +98,12 @@ export async function startDelegatedTask({store,engine,session,body,dispatch,now
       }catch(error){
         await store.transaction(async tx=>{
           const current=(await tx.getDocument(path))?.data;
-          if(current && current.status==='queued')await tx.commitDocuments([{type:'update',path,data:{status:'failed',failure:{code:error.code || 'task-fast-read-failed',message:error.message},updatedAt:now}}]);
+          if(current && current.jobId===fgJobId && current.recordedJobId!==fgJobId)await tx.commitDocuments([{type:'update',path,data:{status:'failed',failure:{code:error.code || 'task-fast-read-failed',message:error.message},recordedJobId:fgJobId,updatedAt:now}}]);
         });
         return publicTask(await ownedTask(store,session,parent,id,now));
       }
     }
+    return publicTask(taskDoc);
   }
   await pumpDelegatedTasks({store,engine,session,parent,dispatch,now});
   return publicTask(await ownedTask(store,session,parent,id,now));
@@ -108,20 +113,23 @@ export async function listDelegatedTasks({store,engine,session,parent,dispatch,n
   const root=await ownedRoot(store,session,parent,now);
   for(const id of root.delegatedTaskIds || []) {
     const task=await store.get(pathFor(parent,id));
-    if(!task?.jobId || !active(task))continue;
+    if(!task?.jobId || String(task.jobId).startsWith('fg_') || !active(task))continue;
     const status=await chatJobStatus({store,session,body:{jobId:task.jobId},now});
     const result=status.result;
-    const summary=result?.pendingAction?.summary || result?.messages?.filter(m=>m.role==='assistant').at(-1)?.voiceTranscript || result?.messages?.filter(m=>m.role==='assistant').at(-1)?.content || status.failure?.message || '';
+    const lastAssistant=result?.messages?.filter(m=>m.role==='assistant').at(-1);
+    const fullResult=result?.pendingAction?.summary || lastAssistant?.content || lastAssistant?.voiceTranscript || status.failure?.message || '';
+    const voiceSummary=lastAssistant?.voiceTranscript || result?.spokenText || fullResult;
+    const summary=result?.pendingAction?.summary || voiceSummary || fullResult;
     const nextStatus=status.status==='completed' ? result?.pendingAction?'awaiting-confirmation':result?.state==='DATOS_INCOMPLETOS'?'needs-input':result?.failure?'failed':'completed' : status.status==='queued'?'running':status.status;
     await store.transaction(async tx=>{
       const current=(await tx.getDocument(pathFor(parent,id)))?.data;
       if(current?.jobId!==task.jobId || !active(current))return;
       if(current.status===nextStatus && current.phase===status.phase && (current.progress?.revision || 0)===(status.progress?.revision || 0) && current.summary===summary)return;
       const rootDoc=(await tx.getDocument(`oliviaConversations/${parent}`))?.data;
-      const writes=[{type:'update',path:pathFor(parent,id),data:{status:nextStatus,phase:status.phase,progress:status.progress || null,notificationProtocol:1,summary,navigation:result?.navigation || null,pendingAction:result?.pendingAction || null,failure:status.failure || result?.failure || null,telemetry:result?.telemetry || null,updatedAt:now}}];
+      const writes=[{type:'update',path:pathFor(parent,id),data:{status:nextStatus,phase:status.phase,progress:status.progress || null,notificationProtocol:1,summary,fullResult,voiceSummary,navigation:result?.navigation || null,pendingAction:result?.pendingAction || null,failure:status.failure || result?.failure || null,telemetry:result?.telemetry || null,updatedAt:now}}];
       if(!['queued','running'].includes(status.status) && current.recordedJobId!==task.jobId){
         const userEntry=message('user',current.message,now,'natural-voice');
-        const assistantEntry=message('assistant',summary || 'La tarea terminó sin respuesta disponible.',now,'natural-voice');
+        const assistantEntry=message('assistant',fullResult || summary || 'La tarea terminó sin respuesta disponible.',now,'natural-voice');
         writes.push(retainedMessage(parent,userEntry),retainedMessage(parent,assistantEntry),{type:'update',path:`oliviaConversations/${parent}`,data:{messages:trimMessages([...(rootDoc.messages || []),userEntry,assistantEntry]),messageCount:(rootDoc.messageCount || 0)+2,updatedAt:now}},{type:'update',path:pathFor(parent,id),data:{recordedJobId:task.jobId}});
       }
       await tx.commitDocuments(writes);

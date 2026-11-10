@@ -137,6 +137,7 @@ export default function OliviaAssistant() {
   const [caption, setCaption] = useState("");
   const [liveUserTranscript, setLiveUserTranscript] = useState("");
   const [liveAssistantTranscript, setLiveAssistantTranscript] = useState("");
+  const [tasksPanelOpen, setTasksPanelOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [quotaRequestOpen, setQuotaRequestOpen] = useState(false);
   const [quotaRequested, setQuotaRequested] = useState(false);
@@ -799,6 +800,7 @@ export default function OliviaAssistant() {
         <details ref={optionsRef} className="fm-olivia-options" onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); event.stopPropagation(); } }}><summary aria-label="Opciones de Olivia"><Icon name="MoreHorizontal" /></summary><div role="group" aria-label="Opciones de Olivia">
           <button type="button" aria-label="Mis conversaciones" disabled={busy || hydrating || recording || voiceActive || historyBusy} onClick={() => selectOption(() => { setDeveloper(false); setChatsOpen(!chatsOpen); if (!chatsOpen) loadHistory('chats'); })}>Mis conversaciones</button>
           <button type="button" aria-label="Nueva conversación" disabled={busy || hydrating || recording || voiceActive} onClick={() => selectOption(() => { setDeveloper(false); void newConversation(); })}>Nueva conversación</button>
+          <button type="button" aria-label="Tareas de Olivia" onClick={() => selectOption(() => { setDeveloper(false); setTasksPanelOpen(value => !value); })}>Tareas de Olivia ({delegatedTasks.length})</button>
           <button type="button" aria-label="Preferencias" onClick={() => selectOption(() => { setDeveloper(false); setPreferencesOpen(value => !value); })}>Preferencias</button>
           <button type="button" aria-label="Configuración de voz" onClick={() => selectOption(() => { setDeveloper(false); setPreferencesOpen(true); })}>Configuración de voz</button>
           {admin ? <button type="button" aria-label="Panel Developer" onClick={() => selectOption(() => { setDeveloper(true); setPreferencesOpen(false); })}>Panel Developer</button> : null}
@@ -807,6 +809,7 @@ export default function OliviaAssistant() {
       </header>
       <div className="fm-olivia-chat-surface" hidden={admin && developer}>
       {preferencesOpen ? <section aria-label="Preferencias y voz"><OliviaPreferences uid={user.uid} /><p className="fm-olivia-preference-note">El dictado prepara un mensaje para revisar. Conversar por voz inicia Gemini; el micrófono se activa solo cuando lo pedís.</p></section> : null}
+      {tasksPanelOpen ? <OliviaDelegatedTasks panel tasks={delegatedTasks} onControl={controlTask} busyId={taskControlId} /> : null}
       {chatsOpen ? <section className="fm-olivia-chats" aria-label="Mis chats"><h3>Mis chats</h3><p>Retomá una conversación o creá una nueva. El historial se guarda en tu cuenta durante el período de retención.</p>{chats.map((chat) => <button type="button" key={chat.id} disabled={busy || historyBusy} aria-current={chat.id === snapshot.conversationId ? "true" : undefined} onClick={() => reopen(chat.id)}><strong>{chat.title}</strong><small>{formatDateTime(chat.updatedAt)}</small></button>)}{!chats.length && !historyBusy ? <p>Todavía no hay chats guardados.</p> : null}{chatsCursor ? <Button variant="secondary" disabled={historyBusy} onClick={() => loadHistory("chats", true)}>Ver más chats</Button> : null}{historyBusy ? <p role="status">Cargando chats…</p> : null}</section> : null}
       {historyError ? <p className="fm-olivia-error" role="alert">{historyError}</p> : null}
       <OliviaVoiceControls visual={visual} active={voiceActive || recording} muted={muted} compact={viewport?.height < 500} />

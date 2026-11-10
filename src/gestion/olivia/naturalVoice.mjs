@@ -85,7 +85,13 @@ export class NaturalVoiceConversation {
     if (!this.muted) {
       if (!this.recordingTurn) {
         const playing=this.sources?.size>0 || Boolean(this.transcriber?.isPlaying);
-        if(rms>0.025){
+        if (rms < 0.022) {
+          this.noiseFloor = (this.noiseFloor ?? 0.008) * 0.92 + Math.max(0.002, rms) * 0.08;
+        }
+        const floor = this.noiseFloor ?? 0.008;
+        const speechThreshold = Math.max(0.025, Math.min(0.042, floor * 2.2));
+        const bargeThreshold = Math.max(0.032, Math.min(0.048, floor * 2.8));
+        if(rms > (playing ? bargeThreshold : speechThreshold)){
           if(!playing)this.beginTurn(now);
           else {
             // A measured 150 ms non-speech pulse stopped the full answer.

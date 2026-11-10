@@ -26,16 +26,17 @@ function turnPath(sessionId, turnId) { return `oliviaGeminiLiveTurns/${sessionId
 const roundMoney = (value) => Math.round((Number(value) + Number.EPSILON) * 1_000_000) / 1_000_000;
 const numeric = (value) => Number.isFinite(value) && value >= 0 ? value : 0;
 
-async function reserveSession({ store, session, config, now }) {
+export async function reserveSession({ store, session, config, now, replaceSessionId = null }) {
   const period = periodKey(now), path = budgetPath(period), id = randomUUID(), reservation = Number(config.reservedUsdPerSession || 0.015), hardLimitUsd = Number(config.hardLimitUsd || 10), maxSessionSeconds = Math.min(600, Math.max(60, Number(config.maxSessionSeconds || 600))), expiresAt = new Date(now.getTime() + maxSessionSeconds * 1000 + 30_000);
   await store.transaction(async (tx) => {
     const snapshot = await tx.getDocument(path), current = snapshot?.data || { period, usedUsd: 0, reservedUsd: 0, queryCount: 0, usageMetadataEstimatedUsd: 0, estimatedUsd: 0, unconfirmedQueryCount: 0 }, stale = current.activeSessionId ? await tx.getDocument(sessionPath(current.activeSessionId)) : null;
     let reservedUsd = numeric(current.reservedUsd);
     const writes = [];
-    if (stale?.data?.status === "active" && new Date(stale.data.expiresAt).getTime() > now.getTime()) throw oliviaError("gemini-live-session-active", "Ya hay una sesión híbrida abierta. Cerrala antes de abrir otra.", 409);
+    const sameOwnerSession = stale?.data?.status === "active" && stale.data.userId === session.uid && (stale.data.conversationId === session.conversationId || (replaceSessionId && current.activeSessionId === replaceSessionId));
+    if (stale?.data?.status === "active" && new Date(stale.data.expiresAt).getTime() > now.getTime() && !sameOwnerSession) throw oliviaError("gemini-live-session-active", "Ya hay una sesión híbrida abierta. Cerrala antes de abrir otra.", 409);
     if (stale?.data?.status === "active") {
       reservedUsd = Math.max(0, reservedUsd - numeric(stale.data.reservedUsd));
-      writes.push({ type: "update", path: sessionPath(current.activeSessionId), data: { status: "expired", closedAt: now } });
+      writes.push({ type: "update", path: sessionPath(current.activeSessionId), data: { status: sameOwnerSession ? "replaced" : "expired", closedAt: now, reservedUsd: 0 } });
     }
     if (numeric(current.queryCount) >= GEMINI_LIVE_MONTHLY_QUERY_CAP) throw oliviaError("gemini-live-query-cap", "Se alcanzó el límite preventivo mensual de 660 turnos Gemini Live.", 429);
     if (numeric(current.usedUsd) + reservedUsd + reservation > hardLimitUsd)
@@ -47,7 +48,7 @@ async function reserveSession({ store, session, config, now }) {
   return { id, period, reservation, expiresAt, maxSessionSeconds };
 }
 
-async function releaseSession({ store, id, now, status = "closed" }) {
+export async function releaseSession({ store, id, now, status = "closed" }) {
   await store.transaction(async (tx) => {
     const snapshot = await tx.getDocument(sessionPath(id)), session = snapshot?.data;
     if (!session || session.status !== "active") return;
@@ -60,9 +61,9 @@ async function releaseSession({ store, id, now, status = "closed" }) {
   });
 }
 
-async function issueToken({ store, session, config, env, now }) {
+async function issueToken({ store, session, config, env, now, replaceSessionId = null }) {
   const reservationStartedAt = performance.now();
-  const sessionInfo = await reserveSession({ store, session: { ...session, conversationId: session.conversationId }, config, now });
+  const sessionInfo = await reserveSession({ store, session: { ...session, conversationId: session.conversationId }, config, now, replaceSessionId });
   const reservationMs = Math.round(performance.now() - reservationStartedAt);
   try {
     const providerStartedAt = performance.now();
@@ -82,7 +83,7 @@ async function issueToken({ store, session, config, env, now }) {
   }
 }
 
-async function reportTurn({ store, session, body, now, config }) {
+export async function reportTurn({ store, session, body, now, config }) {
   const maxSessionSeconds = Math.min(600, Math.max(60, Number(config.maxSessionSeconds || 600))), inputAudioSeconds = Math.min(maxSessionSeconds, numeric(Number(body.inputAudioSeconds))), outputAudioSeconds = Math.min(maxSessionSeconds, numeric(Number(body.outputAudioSeconds))), sessionId = safeId(body.sessionId), turnId = safeId(body.turnId), targetPath = sessionPath(sessionId), cost = geminiLiveProviderCost(body.usageMetadata), audioEstimate = estimateGeminiLiveAudioCost({ inputAudioSeconds, outputAudioSeconds }), estimate = inputAudioSeconds + outputAudioSeconds > 0 ? audioEstimate : null;
   return store.transaction(async (tx) => {
     const live = await tx.getDocument(targetPath), record = live?.data;
@@ -94,7 +95,7 @@ async function reportTurn({ store, session, body, now, config }) {
     }
     const costUsd = cost.costUsd ?? estimate?.estimatedCostUsd ?? null, measurement = cost.costUsd != null ? cost.measurement : estimate ? "estimated-audio-context-excluded" : "unconfirmed", data = budget?.data;
     if (!data) throw oliviaError("gemini-live-budget-missing", "No se pudo verificar el presupuesto mensual de Gemini.", 503);
-    const chargedUsd = costUsd == null ? 0 : roundMoney(costUsd), usedUsd = roundMoney(numeric(data.usedUsd) + chargedUsd), estimatedUsd = roundMoney(numeric(data.estimatedUsd) + (cost.measurement === "provider-forwarded" ? 0 : chargedUsd)), usageMetadataEstimatedUsd = roundMoney(numeric(data.usageMetadataEstimatedUsd) + (cost.measurement === "provider-forwarded" ? chargedUsd : 0)), sessionUsedUsd = roundMoney(numeric(record.usedUsd) + chargedUsd), limit = Number(config.hardLimitUsd || 10), warning = Number(config.warningUsd || 6), queryCount = numeric(data.queryCount) + 1, unconfirmedQueryCount = numeric(data.unconfirmedQueryCount) + (measurement === "unconfirmed" ? 1 : 0), stop = costUsd == null || sessionUsedUsd >= numeric(record.reservedUsd) || usedUsd + numeric(data.reservedUsd) >= limit || queryCount >= GEMINI_LIVE_MONTHLY_QUERY_CAP;
+    const chargedUsd = costUsd == null ? 0 : roundMoney(costUsd), usedUsd = roundMoney(numeric(data.usedUsd) + chargedUsd), estimatedUsd = roundMoney(numeric(data.estimatedUsd) + (cost.measurement === "provider-forwarded" ? 0 : chargedUsd)), usageMetadataEstimatedUsd = roundMoney(numeric(data.usageMetadataEstimatedUsd) + (cost.measurement === "provider-forwarded" ? chargedUsd : 0)), sessionUsedUsd = roundMoney(numeric(record.usedUsd) + chargedUsd), limit = Number(config.hardLimitUsd || 10), warning = Number(config.warningUsd || 6), maxSessionSpendUsd = Math.min(limit, Number(config.maxSessionSpendUsd || 2.5)), queryCount = numeric(data.queryCount) + 1, unconfirmedQueryCount = numeric(data.unconfirmedQueryCount) + (measurement === "unconfirmed" ? 1 : 0), stop = sessionUsedUsd >= maxSessionSpendUsd || usedUsd + numeric(data.reservedUsd) >= limit || queryCount >= GEMINI_LIVE_MONTHLY_QUERY_CAP;
     const turnData = { userId: session.uid, sessionId, turnId, period: record.period, model: GEMINI_LIVE_MODEL, measurement, inputTokens: cost.inputTokens, outputTokens: cost.outputTokens, inputTokensByModality: cost.inputTokensByModality || null, outputTokensByModality: cost.outputTokensByModality || null, inputAudioSeconds: estimate?.inputAudioSeconds ?? null, outputAudioSeconds: estimate?.outputAudioSeconds ?? null, costUsd: chargedUsd || null, excludesAccumulatedContext: measurement === "estimated-audio-context-excluded", createdAt: now };
     await tx.commitDocuments([
       { type: "create", path, data: turnData },
@@ -137,7 +138,7 @@ export default async function handler(request) {
       assertConversationOwner(session, conversation, now);
       session.conversationId = conversationId;
       const tasks=await Promise.all((conversation.delegatedTaskIds || []).slice(-20).map(id=>store.get(`oliviaConversations/${conversationId}/delegatedTasks/${safeId(id)}`)));
-      const token = await issueToken({ store, session, config, env, now });
+      const token = await issueToken({ store, session, config, env, now, replaceSessionId: body.replaceSessionId ? safeId(body.replaceSessionId) : null });
       return json({ ...token, context:compactVoiceContext(conversation,tasks.filter(Boolean)), timings: { configurationReadMs, conversationReadMs, ...token.timings } });
     }
     if (body.operation === "classify") return json(await classifyTurn({ store, session, body, now }));

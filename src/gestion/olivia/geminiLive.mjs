@@ -172,23 +172,71 @@ export class GeminiLiveSession {
     this.processor = context.createScriptProcessor(1024, 1, 1);
     this.zeroGain = context.createGain(); this.zeroGain.gain.value = 0;
     this.processor.onaudioprocess = ({ inputBuffer }) => {
-      if (!this.ready || this.closed || this.failed || this.socket?.readyState !== this.WebSocket.OPEN) return;
-      const input = inputBuffer.getChannelData(0);
-      let sum=0;for(const sample of input)sum+=sample*sample;
-      this.onInputFrame({rms:Math.sqrt(sum/input.length),at:this.now(),sampleRate:context.sampleRate});
-      const samples = resamplePcm16(input, context.sampleRate, 16000);
-      if (!samples.length) return;
-      if(!this.listening){
-        // At most 200 ms in memory. Nothing is transmitted until local VAD
-        // opens a valid turn; preserve consonants preceding its threshold.
-        this.capturePreRoll.push(samples);this.capturePreRollFrames+=samples.length;
-        while(this.capturePreRollFrames>3200)this.capturePreRollFrames-=this.capturePreRoll.shift().length;
-        return;
-      }
-      this.sendInputSamples(samples);
+      if (this.workletActive) return;
+      this.processCaptureChunk(inputBuffer.getChannelData(0), context.sampleRate);
     };
     this.captureSource.connect(this.processor); this.processor.connect(this.zeroGain); this.zeroGain.connect(context.destination);
+    const WorkletNode = context.AudioWorkletNode || globalThis.AudioWorkletNode;
+    if (context.audioWorklet?.addModule && typeof WorkletNode === "function" && typeof globalThis.Blob === "function" && typeof globalThis.URL?.createObjectURL === "function") {
+      void this.attachWorkletCapture(context, WorkletNode);
+    }
     this.trace("gemini.capture.ready", { sampleRate: context.sampleRate });
+  }
+
+  async attachWorkletCapture(context, WorkletNode = context.AudioWorkletNode || globalThis.AudioWorkletNode) {
+    try {
+      const code = `class OliviaPcmCapture extends AudioWorkletProcessor { process(inputs) { const ch = inputs[0]?.[0]; if (ch?.length) this.port.postMessage(ch.slice(0)); return true; } } registerProcessor("olivia-pcm-capture", OliviaPcmCapture);`;
+      const url = globalThis.URL.createObjectURL(new globalThis.Blob([code], { type: "application/javascript" }));
+      try { await context.audioWorklet.addModule(url); } finally { globalThis.URL.revokeObjectURL?.(url); }
+      if (this.closed || this.failed || !this.captureSource) return;
+      const worklet = new WorkletNode(context, "olivia-pcm-capture");
+      worklet.port.onmessage = ({ data }) => this.processCaptureChunk(data, context.sampleRate);
+      this.captureSource.connect(worklet);
+      if (this.zeroGain) worklet.connect(this.zeroGain);
+      this.workletNode = worklet;
+      this.workletActive = true;
+      this.trace("gemini.capture.worklet.ready", { sampleRate: context.sampleRate });
+    } catch {
+      this.workletActive = false;
+    }
+  }
+
+  processCaptureChunk(input, sampleRate = this.audioContext?.sampleRate || 16000) {
+    if (!this.ready || this.closed || this.failed || this.socket?.readyState !== this.WebSocket.OPEN || !input?.length) return;
+    let sum = 0;
+    for (const sample of input) sum += sample * sample;
+    const rms = Math.sqrt(sum / input.length);
+    this.onInputFrame({ rms, at: this.now(), sampleRate });
+    const samples = resamplePcm16(input, sampleRate, 16000);
+    if (!samples.length) return;
+    if (!this.listening) {
+      this.silentTurnFrames = 0;
+      this.pausePreRoll = [];
+      this.pausePreRollFrames = 0;
+      // At most 200 ms in memory. Nothing is transmitted until local VAD
+      // opens a valid turn; preserve consonants preceding its threshold.
+      this.capturePreRoll.push(samples); this.capturePreRollFrames += samples.length;
+      while (this.capturePreRollFrames > 3200) this.capturePreRollFrames -= this.capturePreRoll.shift().length;
+      return;
+    }
+    if (rms < 0.012) {
+      this.silentTurnFrames = (this.silentTurnFrames || 0) + samples.length;
+      if (this.silentTurnFrames > 9600) {
+        this.pausePreRoll ||= [];
+        this.pausePreRollFrames = (this.pausePreRollFrames || 0) + samples.length;
+        this.pausePreRoll.push(samples);
+        while (this.pausePreRollFrames > 3200) this.pausePreRollFrames -= this.pausePreRoll.shift().length;
+        return;
+      }
+    } else {
+      if (this.pausePreRoll?.length) {
+        const paused = this.pausePreRoll.splice(0);
+        this.pausePreRollFrames = 0;
+        for (const chunk of paused) this.sendInputSamples(chunk);
+      }
+      this.silentTurnFrames = 0;
+    }
+    this.sendInputSamples(samples);
   }
 
   sendInputSamples(samples){
@@ -305,7 +353,7 @@ export class GeminiLiveSession {
       turn.outputText='';turn.publishedOutputText='';turn.pendingAudio=[];
       turn.generatedAudio=false;turn.outputAuthorized=false;turn.acknowledgementAuthorized=false;
       if(this.listening || (!turn.notification && turn.inputAudioSeconds>0))turn.cancelled=false;
-      this.onState("recording");
+      this.onState(this.listening ? "recording" : "listening");
     }
     const interimText = content?.interimInputTranscription?.text;
     if (interimText) { turn.interimText = String(interimText); this.onPartial(turn.interimText, { turnId: turn.turnId, turnIndex: turn.turnIndex, final: false }); }
@@ -528,7 +576,8 @@ export class GeminiLiveSession {
         this.enqueueToolResult({...binding,result:{error:'No pude completar esa tarea. Podemos seguir conversando.',outcome:taskOutcome({status:'failed',failure:{code:error?.code || 'task-error'}})}});
       });
     }
-    if(turn.completeReceived)void this.finishTurn(turn);
+    turn.completeReceived=true;
+    if(!this.listening)void this.finishTurn(turn);
   }
 
   startPolicyTask(turn) {
@@ -806,10 +855,11 @@ export class GeminiLiveSession {
           if(this.closed)return false;
           const handle=!fresh && Number(this.tokenResult?.uses)!==1 && attempt===1 && this.resumeHandle && this.clock()<Math.min(this.tokenExpiresAt,this.newSessionExpiresAt) && this.clock()<(this.sessionDeadline || Infinity)?this.resumeHandle:null;
           if(!handle){
-            if(this.sessionId){const released=await this.releaseBudget();this.stopping=null;if(!released?.closed)throw new Error('No se pudo cerrar la reserva anterior.');this.sessionId=null;}
+            const previousSessionId=this.sessionId;
+            if(this.sessionId){const released=await this.releaseBudget();this.stopping=null;this.sessionId=null;if(!released?.closed)this.trace('gemini.recovery.release_fallback',{sessionId:previousSessionId});}
             if(this.closed || this.failed)return false;
             const at=this.now();this.trace('gemini.token.request.start');
-            this.tokenResult=await this.request({operation:'token',conversationId:this.conversationId});
+            this.tokenResult=await this.request({operation:'token',conversationId:this.conversationId,...(previousSessionId?{replaceSessionId:previousSessionId}:{})});
             this.trace('gemini.token.request.end',{durationMs:this.now()-at,status:'ok'});
             if(!this.tokenResult?.token || !this.tokenResult?.sessionId)throw new Error('No se pudo renovar la sesión.');
             if(this.closed || this.failed){this.sessionId=this.tokenResult.sessionId;this.stopping=null;await this.releaseBudget();return false;}
@@ -848,6 +898,8 @@ export class GeminiLiveSession {
 
   stopCapture() {
     this.capturePreRoll=[];this.capturePreRollFrames=0;
+    this.pausePreRoll=[];this.pausePreRollFrames=0;this.silentTurnFrames=0;this.workletActive=false;
+    if (this.workletNode) { try { this.workletNode.port.onmessage = null; this.workletNode.disconnect(); } catch {} this.workletNode = null; }
     this.processor?.disconnect(); this.captureSource?.disconnect(); this.zeroGain?.disconnect();
     if (this.processor) this.processor.onaudioprocess = null;
     this.processor = null; this.captureSource = null; this.zeroGain = null;

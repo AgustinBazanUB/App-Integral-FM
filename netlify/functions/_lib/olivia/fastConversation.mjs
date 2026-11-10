@@ -45,6 +45,48 @@ export async function fastConversationRead({ plan, context = {}, previous, run, 
     const names=result.data.locations.map(location=>location.name).filter(name=>typeof name==='string' && name.trim());
     return {content:names.length ? `Las ubicaciones activas que podés consultar son: ${names.join(', ')}.${result.data.locations.length>=result.data.limit ? ' La consulta alcanzó su límite; puede haber más ubicaciones permitidas.' : ''}` : 'No encontré ubicaciones activas disponibles con tus permisos.',state:'INFORMACION'};
   }
+  if(plan.kind==='warehouses') {
+    check('list_warehouses');
+    const result=await run('list_warehouses',{});checkCurrent();
+    const records=(result?.data?.records || []).filter(w=>w.active!==false);
+    if(!result?.data || result.state || result.data.code) return null;
+    const names=records.map(w=>w.name).filter(name=>typeof name==='string' && name.trim());
+    return {content:names.length ? `Los depósitos activos son: ${names.join(', ')}.` : 'No encontré depósitos activos registrados en este momento.',state:'INFORMACION',observedAt:result.data.observedAt || now.toISOString()};
+  }
+  if(plan.kind==='products-list') {
+    check('search_products');
+    const locationId=context.locationId || null;
+    const result=await run('search_products',{query:'',locationId});checkCurrent();
+    const products=result?.data?.products;
+    if(!Array.isArray(products) || result.state || result.data.code) return null;
+    const names=products.slice(0,12).map(p=>`${p.name}${Number.isFinite(p.currentStock)?` (${p.currentStock} u.)`:''}`);
+    return {content:names.length ? `Productos disponibles (${products.length}): ${names.join(', ')}${products.length>12?', entre otros.':'.'}` : 'No encontré productos habilitados en esta ubicación.',state:'INFORMACION'};
+  }
+  if(plan.kind==='yesterday-sales') {
+    check('get_sales_metrics');
+    let locationId = !plan.locationQuery && context.locationId ? context.locationId : null;
+    if (plan.locationQuery) {
+      check('list_locations');
+      const resolved = await resolveNamedLocation({ locationQuery: plan.locationQuery, context, run, checkCurrent });
+      if (resolved.error) return { content: resolved.error, state: 'DATOS_INCOMPLETOS' };
+      locationId = resolved.locationId;
+    }
+    const yesterday = argentinaDateKey(new Date(now.getTime() - 86400000));
+    const metrics = await run('get_sales_metrics', { startDate: yesterday, endDate: yesterday, locationId, productId: null, sellerId: null });
+    checkCurrent();
+    const summary = metrics?.data?.summary || metrics?.data?.current || metrics?.data;
+    if (!summary || metrics?.state || metrics?.data?.code) return null;
+    const count = Number(summary.operations ?? summary.count ?? summary.salesCount ?? 0);
+    const total = money(summary.revenue ?? summary.total ?? summary.totalSales ?? 0);
+    return {
+      content: count
+        ? `Ayer (${yesterday}) se registraron ${count} ${count === 1 ? 'venta' : 'ventas'} por un total de ${total}.`
+        : `Ayer (${yesterday}) no se registraron ventas activas${locationId ? ' en esta ubicación' : ''}.`,
+      state: 'INFORMACION',
+      taskState: { id: previous?.id || crypto.randomUUID(), intent: 'get_sales_metrics', status: 'completed', revision: (previous?.revision || 0) + 1, slots: { startDate: yesterday, endDate: yesterday, locationId, productId: null, sellerId: null }, missingFields: [], ambiguities: {}, updatedAt: now, createdAt: now },
+      observedAt: metrics?.data?.observedAt || now.toISOString(),
+    };
+  }
   if(plan.kind==='customer') {
     check('search_customers');
     if(!plan.query) return {content:'¿Qué cliente buscás? Pasame el nombre o el teléfono y lo busco.',state:'DATOS_INCOMPLETOS'};

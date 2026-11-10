@@ -595,7 +595,7 @@ export function createOliviaEngine({
       });
       onEvent?.({ type: "accepted", conversationId: id, message: conversation.messages.at(-1) });
       const deterministicTools = [];
-      const deterministicTaskId = conversation.taskState?.intent === "prepare_stock_load" && !["completed", "cancelled"].includes(conversation.taskState.status) ? conversation.taskState.id : randomUUID();
+      const deterministicTaskId = ["prepare_stock_load", "prepare_catalog_stock_load"].includes(conversation.taskState?.intent) && !["completed", "cancelled"].includes(conversation.taskState.status) ? conversation.taskState.id : randomUUID();
       const run = async (name, args) => {
         signal?.throwIfAborted();
         onEvent?.({type:'phase',label:'Consultando datos…',tools:[name]});

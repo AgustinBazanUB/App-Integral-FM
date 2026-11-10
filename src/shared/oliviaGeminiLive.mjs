@@ -99,15 +99,17 @@ export function geminiLiveProviderCost(usageMetadata) {
     ? { ...promptTokens, ...Object.fromEntries(Object.entries(toolPromptTokens).map(([modality, count]) => [modality, (promptTokens[modality] || 0) + count])) }
     : promptTokens || toolPromptTokens;
   const outputTokens = modalityTokens(usageMetadata?.responseTokensDetails);
-  if (!inputTokens || !outputTokens) return { measurement: "unconfirmed", inputTokens: null, outputTokens: null, costUsd: null };
-  const inputCostUsd = costForTokens(inputTokens, INPUT_USD_PER_MILLION);
-  const outputCostUsd = costForTokens(outputTokens, OUTPUT_USD_PER_MILLION);
+  if (!inputTokens && !outputTokens) return { measurement: "unconfirmed", inputTokens: null, outputTokens: null, costUsd: null };
+  const safeInput = inputTokens || {};
+  const safeOutput = outputTokens || {};
+  const inputCostUsd = costForTokens(safeInput, INPUT_USD_PER_MILLION);
+  const outputCostUsd = costForTokens(safeOutput, OUTPUT_USD_PER_MILLION);
   return {
     measurement: "provider-forwarded",
-    inputTokens: Object.values(inputTokens).reduce((total, count) => total + count, 0),
-    outputTokens: Object.values(outputTokens).reduce((total, count) => total + count, 0),
-    inputTokensByModality: inputTokens,
-    outputTokensByModality: outputTokens,
+    inputTokens: Object.values(safeInput).reduce((total, count) => total + count, 0),
+    outputTokens: Object.values(safeOutput).reduce((total, count) => total + count, 0),
+    inputTokensByModality: inputTokens || null,
+    outputTokensByModality: outputTokens || null,
     inputCostUsd,
     outputCostUsd,
     costUsd: inputCostUsd + outputCostUsd,

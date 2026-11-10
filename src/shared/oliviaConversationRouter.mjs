@@ -26,27 +26,28 @@ export function isConversationalFollowUp(text) {
 }
 export function classifyGeminiLiveTurn(text, context = {}) {
   const normalized = normalizeSpeech(text);
-  if (!normalized) return { route: 'delegate', kind: 'missing-transcript' };
-  if (isIndependentBusinessRead(text) || quickReadPlan(text)) return { route: 'delegate', kind: 'data-or-operation', newTask: true, independentRead: true };
+  if (!normalized) return { route: 'delegate', routeCategory: 'TASK', kind: 'missing-transcript' };
+  const fastPlan = quickReadPlan(text);
+  if (fastPlan || isIndependentBusinessRead(text)) return { route: 'delegate', routeCategory: fastPlan ? 'FAST_READ' : 'TASK', fastRead: Boolean(fastPlan), kind: 'data-or-operation', newTask: true, independentRead: true };
   const collection=collectionDecision(text,context);
-  if(collection)return collection;
+  if(collection)return { ...collection, routeCategory: collection.route === 'direct' ? 'DIRECT' : 'TASK' };
   // A background clause describes context; classify the actual request after
   // it. Business requests in that second clause still cross the same boundary.
   const background = /^mientras\s+(?:revis[aá]s|trabaj[aá]s|proces[aá]s|termin[aá]s)\b[^,;]*[,;]\s*(.+)$/i.exec(String(text).trim());
   if (background) return classifyGeminiLiveTurn(background[1], context);
   const mutation = /\b(?:crea\w*|carga\w*|registra\w*|agrega\w*|transfi\w*|borra\w*|elimina\w*|modifica\w*|actualiza\w*|cancela\w*)\b/.test(normalized);
-  if(/\b(?:no autorizo|no autoriza|sin autorizar)\b/.test(normalized) && /\b(?:solo|solamente) (?:seguimos )?(?:conversando|hablando)\b/.test(normalized) && !/\b(?:crea|creame|carga|cargame|registra|registrame|borra|elimina|transferi|cancela)\b/.test(normalized))return {route:'direct',kind:'conversation-authorization-boundary'};
+  if(/\b(?:no autorizo|no autoriza|sin autorizar)\b/.test(normalized) && /\b(?:solo|solamente) (?:seguimos )?(?:conversando|hablando)\b/.test(normalized) && !/\b(?:crea|creame|carga|cargame|registra|registrame|borra|elimina|transferi|cancela)\b/.test(normalized))return {route:'direct',routeCategory:'DIRECT',kind:'conversation-authorization-boundary'};
   const taskActive = Boolean(context.pendingAction || context.pendingActionId || context.collectingTask || context.activeTask);
   const requestingData=/[¿?]/.test(String(text)) || /\b(?:cuanto\w*|cual\w*|como|donde|podes|podrias|quiero|necesito|busca\w*|consulta\w*|mostra\w*|envia\w*|manda\w*)\b/.test(normalized);
   // A supplied name/example is conversational context unless a task is
   // collecting it. It is not a request to verify or create a business record.
-  if(!context.collectingTask && !context.pendingAction && !context.pendingActionId && !mutation && !requestingData && /^(?:el|la)\b/.test(normalized) && /\b(?:se llama|registro ficticio)\b/.test(normalized))return {route:'direct',kind:'provided-context'};
-  if (!mutation && /^(?:(?:olivia )?(?:como (?:venis|vas)|que te falta|ya terminaste|en que (?:vas|quedaste)|que estas haciendo|que tareas estas haciendo))(?: con .+)?$/.test(normalized)) return { route: 'delegate', kind: 'task-status' };
-  if (taskActive && /\b(?:pausa\w*|retoma\w*|reanuda\w*|para despues)\b/.test(normalized)) return {route:'delegate',kind:'task-control'};
-  if (/^espera\b/.test(normalized) && !mutation && !/\b(?:stock|precio|ventas?|clientes?)\b/.test(normalized)) return { route: 'direct', kind: 'conversation-hold' };
-  if (/^(?:avisame|notificame) cuando (?:termines|finalices)\b/.test(normalized) && !mutation) return { route: 'direct', kind: 'conversation-notification-preference' };
+  if(!context.collectingTask && !context.pendingAction && !context.pendingActionId && !mutation && !requestingData && /^(?:el|la)\b/.test(normalized) && /\b(?:se llama|registro ficticio)\b/.test(normalized))return {route:'direct',routeCategory:'DIRECT',kind:'provided-context'};
+  if (!mutation && /^(?:(?:olivia )?(?:como (?:venis|vas)|que te falta|ya terminaste|en que (?:vas|quedaste)|que estas haciendo|que tareas estas haciendo))(?: con .+)?$/.test(normalized)) return { route: 'delegate', routeCategory: 'TASK', kind: 'task-status' };
+  if (taskActive && /\b(?:pausa\w*|retoma\w*|reanuda\w*|para despues)\b/.test(normalized)) return {route:'delegate',routeCategory:'TASK',kind:'task-control'};
+  if (/^espera\b/.test(normalized) && !mutation && !/\b(?:stock|precio|ventas?|clientes?)\b/.test(normalized)) return { route: 'direct', routeCategory: 'DIRECT', kind: 'conversation-hold' };
+  if (/^(?:avisame|notificame) cuando (?:termines|finalices)\b/.test(normalized) && !mutation) return { route: 'direct', routeCategory: 'DIRECT', kind: 'conversation-notification-preference' };
   const noteOnly = /^toma nota (?:en (?:esta|la) conversacion|para (?:esta|la) charla)\b/.test(normalized);
-  if (noteOnly && !context.collectingTask && !context.pendingAction && !context.pendingActionId && !mutation && !/\b(?:cuanto\w*|cual\w*|stock|precio\w*|vendimos|ventas?)\b/.test(normalized)) return { route: 'direct', kind: 'conversation-note' };
+  if (noteOnly && !context.collectingTask && !context.pendingAction && !context.pendingActionId && !mutation && !/\b(?:cuanto\w*|cual\w*|stock|precio\w*|vendimos|ventas?)\b/.test(normalized)) return { route: 'direct', routeCategory: 'DIRECT', kind: 'conversation-note' };
   // This is a business-data boundary, not a phrase whitelist or a second LLM.
   // Gemini understands ordinary language/context; only the authenticated engine
   // can supply business facts, collect operational slots or prepare mutations.
@@ -56,16 +57,16 @@ export function classifyGeminiLiveTurn(text, context = {}) {
     // even when the model suggests reusing that proposal's task ID.
     const explicitOperation=/\b(?:crea\w*|registra\w*|transf\w*|carga\w*|agrega\w*)\b.+\b(?:clientes?|productos?|stock|mercaderia|ventas?|pedidos?|envios?)\b/.test(normalized);
     const query=/^(?:olivia )?(?:cuanto\w*|cual\w*|busca\w*|consulta\w*|mostra\w*)\b/.test(normalized);
-    return { route: 'delegate', kind: 'data-or-operation', ...( (explicitOperation || query) && !/\b(?:corrijo|corregi|en realidad|queria decir|en vez de|ese mismo|esa misma)\b/.test(normalized)?{newTask:true}:{} ) };
+    return { route: 'delegate', routeCategory: 'TASK', kind: 'data-or-operation', ...( (explicitOperation || query) && !/\b(?:corrijo|corregi|en realidad|queria decir|en vez de|ese mismo|esa misma)\b/.test(normalized)?{newTask:true}:{} ) };
   }
   const control = /^(?:(?:si|no|dale|bueno|perfecto|listo)(?:\s+(?:dale|deja|dejalo|gracias|por favor|segui|continua))*|cancel\w*(?:\s+(?:eso|la tarea|la solicitud|por favor))*|espera(?:\s+.*)?|corri\w*(?:\s+.*)?)$/.test(normalized);
-  if (taskActive && control) return { route: 'delegate', kind: 'task-control' };
+  if (taskActive && control) return { route: 'delegate', routeCategory: 'TASK', kind: 'task-control' };
   // Elliptical slot answers belong to their task. Explicit social speech is
   // still conversational while an unrelated background job is running.
   const social = /\b(?:hola|chau|gracias|escuch\w*|pedir algo|bien|bueno|vos|convers\w*|habl\w*|acord\w*)\b/.test(normalized) || /\b(?:como (?:estas|andas)|que tal|me (?:podes|podrias) ayudar|me ayudas|necesito ayuda)\b/.test(normalized);
   const slotAnswer=/^(?:\d|un(?:a|o)?\b|dos\b|tres\b|cuatro\b|cinco\b|en\b|local\b|deposito\b|se llama\b|el\b|la\b)/.test(normalized);
-  if (context.collectingTask && !social && (slotAnswer || !control)) return { route: 'delegate', kind: 'task-continuation' };
-  return { route: 'direct', kind: control ? 'conversation-control' : social ? 'social' : 'conversation' };
+  if (context.collectingTask && !social && (slotAnswer || !control)) return { route: 'delegate', routeCategory: 'TASK', kind: 'task-continuation' };
+  return { route: 'direct', routeCategory: 'DIRECT', kind: control ? 'conversation-control' : social ? 'social' : 'conversation' };
 }
 export function quickReadPlan(text) {
   const value = normalizeSpeech(text)
@@ -74,12 +75,18 @@ export function quickReadPlan(text) {
     .replace(/\s+(?:aca|aqui|en este local|en esta ubicacion|en esta sucursal)$/, '')
     .replace(/^cuanto stock (?:(?:hay|queda|tenemos) )?(?:de |del )/, 'cuantas unidades de ');
   if (/\b(?:carga|cargame|cargues|crea|creame|registra|agrega|ingresa|vende|cobra|manda|envia|borra|elimina|cambia|modifica|queria decir|en realidad)\b/.test(value)) return null;
-  if (/^(?:(?:que|cuales) (?:son )?(?:las )?(?:ubicaciones|locales|depositos)(?: (?:estan|hay|tenemos|son))?(?: activ[oa]s)?|(?:mostra\w*|lista\w*|decime) (?:las |los )?(?:ubicaciones|locales|depositos)(?: activ[oa]s)?|como se llaman (?:esas|estas|las|los|esos|estos) (?:ubicaciones|locales|depositos))$/.test(value)) return { kind: 'locations' };
+  if (/^(?:(?:que|cuales) (?:son )?(?:los )?depositos(?: (?:estan|hay|tenemos|son))?(?: activos)?|(?:mostra\w*|lista\w*|decime) (?:los )?depositos(?: activos)?|como se llaman (?:esos|estos|los) depositos)$/.test(value)) return { kind: 'warehouses' };
+  if (/^(?:(?:que|cuales) (?:son )?(?:las )?(?:ubicaciones|locales|sucursales)(?: (?:estan|hay|tenemos|son))?(?: activ[oa]s)?|(?:mostra\w*|lista\w*|decime) (?:las |los )?(?:ubicaciones|locales|sucursales)(?: activ[oa]s)?|como se llaman (?:esas|estas|las|los|esos|estos) (?:ubicaciones|locales|sucursales))$/.test(value)) return { kind: 'locations' };
+  if (/^(?:(?:que|cuales) (?:son )?(?:los )?productos(?: (?:hay|tenemos|estan activos|estan disponibles))?|(?:mostra\w*|lista\w*|decime) (?:los )?productos(?: activos| disponibles)?)$/.test(value)) return { kind: 'products-list' };
   if (/^(?:quiero |necesito )?hablar con (?:un |el )?cliente$/.test(value)) return { kind: 'customer', query: '' };
   const customer = /^(?:(?:busca|buscame|buscar|mostrame|consulta)(?: al| el)? cliente |(?:quiero |necesito )?hablar con (?:el cliente |cliente ))(.+)$/.exec(value);
   if (customer) return { kind: 'customer', query: customer[1] };
-  const todaySales = /^(?:(?:cuanto|que) (?:vendimos|vendi|se vendio|hicimos de ventas?) hoy|(?:resumen de )?(?:las |mis )?ventas (?:de hoy|del dia)|como (?:vienen|van|estuvieron) las ventas (?:de )?hoy|(?:mostrame|decime|consulta|revisa) (?:las |mis )?ventas (?:de hoy|del dia)|(?:que|cuales) ventas (?:hicimos|hubo|tenemos) hoy)(?: en (?:el |la )?(.+))?$/.exec(value);
-  if (todaySales) return { kind: 'today-sales', scope: /\b(?:vendi|mis ventas)\b/.test(value) ? 'mine' : 'all', locationQuery: todaySales[1]?.trim() || null };
+  const yesterdaySales = /^(?:(?:cuanto|que) (?:vendimos|vendi|se vendio|hicimos de ventas?) ayer|como (?:nos fue|estuvimos|anduvimos) ayer(?: con las ventas)?|cuanta plata entro ayer|(?:resumen de )?(?:las |mis )?ventas de ayer|como (?:estuvieron|fueron) las ventas de ayer|(?:mostrame|decime|consulta|revisa) (?:las |mis )?ventas de ayer|(?:que|cuales) ventas (?:hicimos|hubo|tuvimos) ayer)(?: en (?:el |la )?(.+))?$/.exec(value);
+  if (yesterdaySales) return { kind: 'yesterday-sales', scope: /\b(?:vendi|mis ventas)\b/.test(value) ? 'mine' : 'all', locationQuery: yesterdaySales[1]?.trim() || null };
+  if (!/\b(?:ayer|semana|mes|ano|historial)\b/.test(value)) {
+    const todaySales = /^(?:(?:cuanto|que) (?:vendimos|vendi|se vendio|hicimos de ventas?)(?: hoy)?|como (?:nos fue|estuvimos|anduvimos)(?: hoy)?(?: con las ventas)?|cuanta plata entro(?: hoy| en la caja)?|como (?:viene|esta|va) la caja(?: hoy)?|(?:resumen de )?(?:las |mis )?ventas(?: de hoy| del dia)?|como (?:vienen|van|estuvieron) las ventas(?: (?:de )?hoy)?|(?:mostrame|decime|consulta|revisa) (?:las |mis )?ventas(?: de hoy| del dia)?|(?:que|cuales) ventas (?:hicimos|hubo|tenemos)(?: hoy)?)(?: en (?:el |la )?(.+))?$/.exec(value);
+    if (todaySales) return { kind: 'today-sales', scope: /\b(?:vendi|mis ventas)\b/.test(value) ? 'mine' : 'all', locationQuery: todaySales[1]?.trim() || null };
+  }
   const inventory = /^(?:resumen(?: rapido| general)? de (?:stock|inventario)|estado del (?:stock|inventario)|como (?:esta|viene) el (?:stock|inventario)|(?:mostrame|decime|consulta|revisa) el (?:resumen|estado) de (?:stock|inventario))(?: (?:de|del|en) (?:el |la )?(.+))?$/.exec(value);
   if (inventory) return { kind: 'inventory', locationQuery: inventory[1]?.trim() || null };
   if (/^(?:(?:que|cuales) alertas (?:tenemos|hay|estan activas|estan vigentes)|alertas (?:vigentes|activas|pendientes|de bajo stock|de stock)|(?:mostrame|decime|consulta|revisa) (?:las )?alertas(?: vigentes| activas| de bajo stock)?)$/.test(value)) return { kind: 'alerts' };
@@ -98,7 +105,7 @@ export function quickReadPlan(text) {
     if (match) { kind = match[1] === 'precio' ? 'price' : 'stock'; query = match[2]; }
   }
   if (!query) {
-    match = /^(?:cuanto stock (?:hay|queda|tenemos) (?:de |del )?|cuantas? unidades (?:de |del ))(.+)$/.exec(value);
+    match = /^(?:cuanto stock (?:hay|queda|tenemos) (?:de |del )?|cuantas? unidades (?:(?:quedan|hay|tenemos|estan disponibles) )?(?:de |del ))(.+)$/.exec(value);
     if (match) { kind = 'stock'; query = match[1]; }
   }
   if (!query) {
