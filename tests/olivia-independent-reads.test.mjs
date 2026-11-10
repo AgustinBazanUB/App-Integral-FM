@@ -5,17 +5,21 @@ import { advanceVoiceCollection, safeConversationBridge } from '../src/shared/ol
 import { fastConversationRead } from '../netlify/functions/_lib/olivia/fastConversation.mjs';
 import { fixture, start } from './helpers/olivia-fixture.mjs';
 import { build } from 'esbuild';
+import { isTaskInterruption } from '../netlify/functions/_lib/olivia/conversationTasks.mjs';
 
 test('an independent read neither completes nor discards the spoken stock draft',()=>{
   const draft=advanceVoiceCollection('Quiero cargar stock');
-  for(const text of ['Qué ubicaciones están activas','Cuáles son las ubicaciones activas','Mostrame los locales activos','Cuánto vendimos ayer']) {
+  for(const text of ['Qué ubicaciones están activas','Cuáles son las ubicaciones activas','Mostrame los locales activos','Cómo se llaman esas ubicaciones','Cuánto vendimos ayer']) {
     const decision=classifyGeminiLiveTurn(text,{voiceCollection:draft,collectingTask:true});
     assert.equal(decision.route,'delegate');assert.equal(decision.newTask,true);assert.equal(decision.independentRead,true);
     assert.equal(advanceVoiceCollection(text,draft),null);
   }
   assert.equal(advanceVoiceCollection('En Local Lavalle',draft).requestedLocation,'Lavalle');
   assert.equal(quickReadPlan('Qué ubicaciones están activas').kind,'locations');
+  assert.equal(quickReadPlan('Cómo se llaman esas ubicaciones').kind,'locations');
   assert.equal(quickReadPlan('Qué ubicaciones están activas y cargá stock'),null);
+  assert.equal(isTaskInterruption('Qué productos hay disponibles'),true);
+  assert.equal(isTaskInterruption('Dos unidades del producto de prueba'),false);
 });
 test('location reads call only the authorized tool and do not manufacture names',async()=>{
   const calls=[];

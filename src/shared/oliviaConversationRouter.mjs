@@ -70,7 +70,7 @@ export function classifyGeminiLiveTurn(text, context = {}) {
 export function quickReadPlan(text) {
   const value = normalizeSpeech(text).replace(/^olivia /, '').replace(/ por favor$/, '').replace(/^cuanto stock (?:de |del )?/, 'cuantas unidades de ');
   if (/\b(?:carga|cargame|cargues|crea|creame|registra|agrega|ingresa|vende|cobra|manda|envia|borra|elimina|cambia|modifica|queria decir|en realidad)\b/.test(value)) return null;
-  if (/^(?:(?:que|cuales) (?:son )?(?:las )?(?:ubicaciones|locales|depositos)(?: (?:estan|hay|tenemos|son))?(?: activ[oa]s)?|(?:mostra\w*|lista\w*|decime) (?:las |los )?(?:ubicaciones|locales|depositos)(?: activ[oa]s)?)$/.test(value)) return { kind: 'locations' };
+  if (/^(?:(?:que|cuales) (?:son )?(?:las )?(?:ubicaciones|locales|depositos)(?: (?:estan|hay|tenemos|son))?(?: activ[oa]s)?|(?:mostra\w*|lista\w*|decime) (?:las |los )?(?:ubicaciones|locales|depositos)(?: activ[oa]s)?|como se llaman (?:esas|estas|las|los|esos|estos) (?:ubicaciones|locales|depositos))$/.test(value)) return { kind: 'locations' };
   if (/^(?:quiero |necesito )?hablar con (?:un |el )?cliente$/.test(value)) return { kind: 'customer', query: '' };
   const customer = /^(?:(?:busca|buscame|buscar|mostrame|consulta)(?: al| el)? cliente |(?:quiero |necesito )?hablar con (?:el cliente |cliente ))(.+)$/.exec(value);
   if (customer) return { kind: 'customer', query: customer[1] };

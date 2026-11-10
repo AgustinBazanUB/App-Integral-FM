@@ -291,7 +291,7 @@ export default function OliviaAssistant() {
     let backendAccepted = false;
     const notifyAccepted = event => { if (backendAccepted) return; backendAccepted = true; hooks.onAccepted?.(event); };
     requestRef.current = controller;
-    const foreground = operation==='chat' && fields.inputMode==='natural-voice' && voiceSettingsRef.current?.latencyMode===true && (instantConversation(fields.message) || isGreetingOnly(fields.message) || quickReadPlan(fields.message));
+    const foreground = operation==='chat' && voiceSettingsRef.current?.latencyMode===true && (quickReadPlan(fields.message) || fields.inputMode==='natural-voice' && (instantConversation(fields.message) || isGreetingOnly(fields.message)));
     if(foreground)fields={...fields,foreground:true};
     const trace=fields.inputMode==='natural-voice'?voiceTrace.current:null;
     trace?.bindRequest(identity);
