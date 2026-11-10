@@ -79,6 +79,7 @@ export function taskFromTool(previous, intent, args, result, now = new Date()) {
 export function taskControl(text) {
   const value = normalize(text);
   if (/^(cancela|cancelar|cancelalo|no sigas|olvidalo|dejalo|no gracias)$/.test(value)) return "cancel";
+  if (/^(?:(?:si|dale|ok) )?(?:confirma|confirmalo|confirmar)(?: por favor)?$/.test(value)) return "acknowledge";
   if (/^(si|dale|ok|perfecto|espera|espera un segundo|aguarda)$/.test(value)) return "acknowledge";
   return null;
 }

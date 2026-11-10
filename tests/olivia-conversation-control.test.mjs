@@ -5,6 +5,7 @@ import { transitionConversationTask, manageConversationTask } from "../netlify/f
 import { updateTask } from "../netlify/functions/_lib/olivia/tasks.mjs";
 import { startChatJob, cancelChatJob } from "../netlify/functions/_lib/olivia/chatJobs.mjs";
 import { responseInstructions } from "../netlify/functions/_lib/olivia/provider.mjs";
+import { createOliviaEngine } from "../netlify/functions/_lib/olivia/engine.mjs";
 
 const turn = (f, id, message, requestId) => { f.advance(2000); return f.engine.chat(f.session, { conversationId: id, message, requestId, screenContext: { module: "locations" } }); };
 function stockFixture(provider = async () => textResponse("Te explico cómo hacerlo desde el panel.")) {
@@ -13,6 +14,24 @@ function stockFixture(provider = async () => textResponse("Te explico cómo hace
   f.documents.set("locations/local_a", { name: "Tribunales", active: true });
   return f;
 }
+test('asking to confirm keeps the same visual proposal and never writes or invokes Luna',async()=>{
+  for(const mode of ['text','natural-voice']){
+    const f=stockFixture(async()=>assert.fail('a confirmation request needs no reasoning call'));
+    if(mode==='natural-voice'){
+      f.config.naturalVoice.enabled=true;f.config.hybridVoice.enabled=true;f.documents.set('oliviaConfiguration/global',f.config);
+      f.engine=createOliviaEngine({store:f.store,clock:f.clock,provider:async()=>assert.fail('a spoken confirmation must not invoke Luna'),env:{OPENAI_API_KEY:'fixture',OLIVIA_DEPLOY_PREVIEW_CONTEXT:'deploy-preview',OLIVIA_HYBRID_LIVE_ENABLED:'true',GEMINI_API_KEY:'synthetic',GEMINI_API_BILLING_TIER:'paid',FIREBASE_PROJECT_ID:'app-integral-fm-pruebas'}});
+    }
+    const {conversationId:id}=await start(f);
+    const stock=await turn(f,id,'Cargame 12 botellas de Original en Tribunales',`stock-${mode}`);
+    f.advance(2000);
+    const next=await f.engine.chat(f.session,{conversationId:id,message:'Sí, confirmalo',requestId:`confirmation-${mode}`,inputMode:mode,screenContext:{module:'locations'}});
+    assert.equal(next.pendingAction?.id,stock.pendingAction.id,mode);
+    assert.equal(f.documents.get(`oliviaConfirmations/${stock.pendingAction.id}`).status,'pending');
+    assert.equal(f.documents.get('locationStock/local_a/items/oil').currentStock,4);
+    assert.match(next.messages.at(-1).content,/tarjeta|toc[aá]|bot[oó]n/);
+    assert.equal(f.providerCalls(),0);
+  }
+});
 test("the latest stock-to-customer correction invalidates the old proposal without writing stock", async () => {
   const f = stockFixture(), { conversationId: id } = await start(f);
   const stock = await turn(f, id, "Cargame 12 botellas de Original en Tribunales", "stock");

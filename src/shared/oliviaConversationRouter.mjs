@@ -1,6 +1,6 @@
 import { isGreetingOnly, normalizeSpeech } from './oliviaSpeechText.mjs';
 import { collectionDecision } from './oliviaVoiceCollection.mjs';
-import { isIndependentBusinessRead } from './oliviaBusinessRead.mjs';
+import { isIndependentBusinessRead, normalizeBusinessRead } from './oliviaBusinessRead.mjs';
 
 // These short canned replies remain for the written task engine. Native Live
 // conversation uses the contextual policy below rather than this exact list.
@@ -72,15 +72,12 @@ export function classifyGeminiLiveTurn(text, context = {}) {
   return { route: 'direct', routeCategory: 'DIRECT', kind: control ? 'conversation-control' : social ? 'social' : 'conversation' };
 }
 export function quickReadPlan(text) {
-  let value = normalizeSpeech(text)
+  const value = normalizeBusinessRead(text)
     .replace(/^olivia /, '')
     .replace(/ por favor$/, '')
     .replace(/\s+(?:aca|aqui|en este local|en esta ubicacion|en esta sucursal)$/, '')
     .replace(/^cuanto stock (?:(?:hay|queda|tenemos) )?(?:de |del )/, 'cuantas unidades de ');
   if (/\b(?:carga|cargame|cargues|crea|creame|registra|agrega|ingresa|vende|cobra|manda|envia|borra|elimina|cambia|modifica|queria decir|en realidad)\b/.test(value)) return null;
-  // Strip only a bounded request preface; the entire remaining read must still
-  // match its anchored grammar. Never discard a negation or another operation.
-  value=value.replace(/^(?:(?:espera|para)(?: un segundo)?\s+)?(?:primero\s+)?(?:decime|mostrame|consulta|revisa)\s+(?=(?:cuant[oa]s?|que|cuales|como)\b)/,'');
   if (/^(?:(?:que|cuales) (?:son )?(?:los )?depositos(?: (?:estan|hay|tenemos|son))?(?: activos)?|(?:mostra\w*|lista\w*|decime) (?:los )?depositos(?: activos)?|como se llaman (?:esos|estos|los) depositos)$/.test(value)) return { kind: 'warehouses' };
   if (/^(?:(?:que|cuales) (?:son )?(?:las )?(?:ubicaciones|locales|sucursales)(?: (?:estan|hay|tenemos|son))?(?: activ[oa]s)?|(?:mostra\w*|lista\w*|decime) (?:las |los )?(?:ubicaciones|locales|sucursales)(?: activ[oa]s)?|como se llaman (?:esas|estas|las|los|esos|estos) (?:ubicaciones|locales|sucursales))$/.test(value)) return { kind: 'locations' };
   if (/^(?:(?:que|cuales) (?:son )?(?:los )?productos(?: (?:hay|tenemos|estan activos|estan disponibles))?|(?:mostra\w*|lista\w*|decime) (?:los )?productos(?: activos| disponibles)?)$/.test(value)) return { kind: 'products-list' };
