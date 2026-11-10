@@ -1,6 +1,6 @@
 .fm-olivia-slot { display:inline-flex; flex:none; }
 .fm-olivia-slot:empty { display:none; }
-.fm-olivia-chat-surface { display:flex; flex-direction:column; min-height:0; min-width:0; max-width:100%; flex:1; }
+.fm-olivia-chat-surface { display:flex; flex-direction:column; min-height:0; min-width:0; max-width:100%; flex:1; overflow:clip; }
 .fm-olivia-chat-surface[hidden] { display:none; }
 .fm-olivia-chat-surface > .fm-olivia-messages { flex:1; min-height:80px; }
 .fm-olivia-options { position:relative; flex:none; }
@@ -382,3 +382,6 @@
  .fm-olivia-header { padding-left:16px;padding-right:10px; }
  .fm-olivia-header button { min-width:40px; }
 }
+/* Only the message log scrolls. Hidden overflow still lets focus/scrollIntoView
+   move the entire drawer, hiding its header and leaving an empty lower half. */
+.fm-olivia-drawer { overflow:clip; }
