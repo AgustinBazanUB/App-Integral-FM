@@ -6,7 +6,7 @@ const params=new URLSearchParams(location.search);
 export const qaTraffic={live:0,transcribe:0,foreground:0};
 export const countTraffic=kind=>{qaTraffic[kind]++;window.dispatchEvent(new Event('olivia:qa-traffic'));};
 const conversationId = 'a1234567-1234-4234-8234-123456789012';
-let messages = [], pendingAction = null;
+let messages = params.has('layoutSample') ? [{id:'sample-user',role:'user',content:'Hola, Olivia, quiero cargar stock.'},{id:'sample-assistant',role:'assistant',content:'Dale, perfecto. ¿En qué ubicación querés cargarlo?'}] : [], pendingAction = null;
 const jobs = new Map();
 const state = () => ({ conversationId, messages, pendingAction, enabled: true, providerConfigured: true, voiceConversationAvailable:params.has('v62'),voiceSettings:{hybridLiveAvailable:params.has('v62'),hybridLiveEnabled:params.has('v62'),latencyMode:true},geminiLiveUsage:params.has('v62')?{period:'fixture',spendUsd:.02,reservedUsd:.5,unconfirmedQueryCount:1,lunaSol:{estimatedUsd:.01,unconfirmedCalls:0}}:undefined,audioLimits: { maxSeconds: 60, maxBytes: 4194304 }, state: pendingAction ? 'ESPERANDO_CONFIRMACION' : 'INFORMACION', usage: { unlimited: true }, estimate: null });
 export const oliviaClient = createOliviaTransport({ getToken: async () => 'synthetic-only', pollIntervalMs: 200, fetchImpl: async (url, init) => {
@@ -34,6 +34,7 @@ export const oliviaClient = createOliviaTransport({ getToken: async () => 'synth
     return new Response(new ReadableStream({start(controller){for(const event of [{type:'accepted',conversationId,message:input},{type:'completed',result:{...state(),telemetry:{route:instantConversation(b.message)?'instant':'quick-read',modelCalls:0,toolCalls:instantConversation(b.message)?0:1}}}])controller.enqueue(streamFrame(event));controller.close();}}),{headers:{'content-type':'text/event-stream'}});
   }
   if (b.operation === 'history') {
+    if (params.has('layoutSample') && b.conversationId) return Response.json({ selectedConversation: { messages: [], nextCursor: null } });
     if (b.conversationId) return Response.json({ selectedConversation: { messages: Array.from({ length: 20 }, (_, i) => ({ id: 'archived-'+i, role: i % 2 ? 'assistant' : 'user', content: 'Mensaje anterior sintético ' + (i + 1) + '. Historial de prueba para verificar scroll sin botones.' })), nextCursor: null } });
     return Response.json({ conversations: [{ id: conversationId, title: 'Conversación de prueba', updatedAt: new Date().toISOString() }], conversationsCursor: null });
   }

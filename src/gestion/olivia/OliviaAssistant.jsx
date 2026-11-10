@@ -29,6 +29,8 @@ import OliviaMessageContent from "./OliviaMessageContent";
 import { formatOliviaCost } from "../../shared/oliviaCostFormat.mjs";
 import { OLIVIA_VOICE_UNAVAILABLE_MESSAGE } from "../../shared/oliviaVoiceAvailability.mjs";
 import "./olivia.css";
+import "./olivia-gold.css";
+import { Icon } from '../components/icons';
 import { OliviaLauncherPortal } from "./LauncherHost";
 import { getUiGuide, UI_GUIDE_VERSION } from '../../shared/oliviaUiGuides.mjs';
 import { DelegatedTaskClient } from './delegatedTaskClient.mjs';
@@ -780,7 +782,7 @@ export default function OliviaAssistant() {
     {open ? <div className="fm-olivia-overlay" role="presentation"><aside ref={drawerRef} id="fm-olivia-drawer" className={`fm-olivia-drawer${viewport?.height < 500 ? " is-compact" : ""}`} style={viewport ? { "--olivia-viewport-height": `${viewport.height}px`, "--olivia-viewport-top": `${viewport.top}px` } : undefined} role="dialog" aria-modal="true" aria-labelledby="fm-olivia-title">
       <header className="fm-olivia-header">
         <div className="fm-olivia-identity"><div className="fm-olivia-title-line"><h2 id="fm-olivia-title">Olivia<span className="fm-olivia-brand-dot" aria-hidden="true" /></h2></div><small>Flor Mía · Tu asistente</small></div>
-        <details ref={optionsRef} className="fm-olivia-options" onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); event.stopPropagation(); } }}><summary aria-label="Opciones de Olivia"><span aria-hidden="true">•••</span></summary><div role="group" aria-label="Opciones de Olivia">
+        <details ref={optionsRef} className="fm-olivia-options" onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); event.stopPropagation(); } }}><summary aria-label="Opciones de Olivia"><Icon name="MoreHorizontal" /></summary><div role="group" aria-label="Opciones de Olivia">
           <button type="button" aria-label="Mis conversaciones" disabled={busy || hydrating || recording || voiceActive || historyBusy} onClick={() => selectOption(() => { setDeveloper(false); setChatsOpen(!chatsOpen); if (!chatsOpen) loadHistory('chats'); })}>Mis conversaciones</button>
           <button type="button" aria-label="Nueva conversación" disabled={busy || hydrating || recording || voiceActive} onClick={() => selectOption(() => { setDeveloper(false); void newConversation(); })}>Nueva conversación</button>
           <button type="button" aria-label="Preferencias" onClick={() => selectOption(() => { setDeveloper(false); setPreferencesOpen(value => !value); })}>Preferencias</button>
@@ -793,7 +795,7 @@ export default function OliviaAssistant() {
       {preferencesOpen ? <section aria-label="Preferencias y voz"><OliviaPreferences uid={user.uid} /><p className="fm-olivia-preference-note">El dictado prepara un mensaje para revisar. Conversar por voz inicia Gemini; el micrófono se activa solo cuando lo pedís.</p></section> : null}
       {chatsOpen ? <section className="fm-olivia-chats" aria-label="Mis chats"><h3>Mis chats</h3><p>Retomá una conversación o creá una nueva. El historial se guarda en tu cuenta durante el período de retención.</p>{chats.map((chat) => <button type="button" key={chat.id} disabled={busy || historyBusy} aria-current={chat.id === snapshot.conversationId ? "true" : undefined} onClick={() => reopen(chat.id)}><strong>{chat.title}</strong><small>{formatDateTime(chat.updatedAt)}</small></button>)}{!chats.length && !historyBusy ? <p>Todavía no hay chats guardados.</p> : null}{chatsCursor ? <Button variant="secondary" disabled={historyBusy} onClick={() => loadHistory("chats", true)}>Ver más chats</Button> : null}{historyBusy ? <p role="status">Cargando chats…</p> : null}</section> : null}
       {historyError ? <p className="fm-olivia-error" role="alert">{historyError}</p> : null}
-      <OliviaVoiceControls visual={visual} active={voiceActive || recording} muted={muted} compact={viewport?.height < 500 || (!voiceActive && !recording && (snapshot.messages.length > 0 || Boolean(optimistic)))} />
+      <OliviaVoiceControls visual={visual} active={voiceActive || recording} muted={muted} compact={viewport?.height < 500} />
       <div ref={messagesRef} onScroll={(event) => { const area = event.currentTarget; stickToBottom.current = area.scrollHeight - area.clientHeight - area.scrollTop < 70; if (area.scrollTop < 60 && snapshot.messages.length && messagesCursor !== null && !historyBusy) void loadHistory("messages"); }} className="fm-olivia-messages" role="log" aria-live="polite" aria-label="Conversación con Olivia">
         <div ref={historySentinelRef} className="fm-olivia-history-sentinel" aria-hidden="true" />
         {(hydrating || historyBusy) && !chatsOpen ? <small className="fm-olivia-history-loading" role="status">Cargando historial… Podés escribir mientras tanto.</small> : null}
