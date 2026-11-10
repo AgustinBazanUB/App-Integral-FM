@@ -2,9 +2,11 @@
 
 ## Scope and source
 
+The detailed voice lifecycle below records the earlier Chirp implementation. V5 uses Gemini Live/Aoede; see [OLIVIA-VOICE.md](OLIVIA-VOICE.md) for current runtime behavior.
+
 This update adds the real [VoiceOrbs Equalizer Orb](https://voiceorbs.vercel.app/orbs/equalizer-orb), its CSS and required utilities under the upstream MIT license. The pinned upstream revision and React 18 adaptations are recorded in `src/gestion/olivia/voiceorbs/README.md`. The supplied reference is preserved in `olivia-equalizer-orb-design-v1.json`.
 
-The update continues the pending Chirp natural-voice integration. Live and Realtime modules were already retired; they are not reintroduced. Business tools, permissions, history, attachment processing and visual Sí/No confirmations retain their existing backend contracts.
+The current voice path is Gemini Live/Aoede. The earlier Chirp synthesis integration has been removed; no fallback TTS is used. Business tools, permissions, history, attachment processing and visual Sí/No confirmations retain their existing backend contracts.
 
 ## Causes and changes
 
@@ -18,7 +20,7 @@ The update continues the pending Chirp natural-voice integration. Live and Realt
 
 ## Audio and presentation
 
-`OliviaVoiceControls` renders one state description from the shared visual lifecycle: idle, connecting, listening, thinking, speaking, error or disabled. Microphone amplitude comes from the existing input analyser, and PCM playback passes through an output analyser in the same authorized AudioContext. `levelRef` updates outside React's render loop. Speaking begins when audio is actually scheduled, rather than while waiting for synthesis. There is no second microphone permission or getUserMedia call for the orb.
+`OliviaVoiceControls` renders one state description from the shared visual lifecycle: idle, connecting, listening, thinking, speaking, error or disabled. Microphone amplitude comes from the existing input analyser, and Gemini Live PCM playback passes through an output analyser in the same authorized AudioContext. `levelRef` updates outside React's render loop. Speaking begins when Gemini audio is scheduled. There is no second microphone permission or getUserMedia call for the orb.
 
 The header, message surfaces, composer and voice stage use the new light chat styling, with the original cyan/indigo orb colors and Flor Mía branding. Usage/costs remain in an expandable secondary area; developer information, attachments, camera, dictation, mute/end, manual turn-send and stop controls remain available. The source orb honors dark color preference. Reduced-motion removes animations; offscreen animation and the analyser visualization RAF pause. The visualization does not open or close media on visibility changes. Browsers can throttle the local VAD RAF in background tabs; recordings also have a duration timer/byte cap, and pagehide releases the microphone while retaining any active backend job. Background microphone behavior is therefore not guaranteed across devices.
 

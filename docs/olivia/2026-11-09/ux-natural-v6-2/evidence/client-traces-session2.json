@@ -1,0 +1,3102 @@
+[
+  {
+    "id": "6c548715-f860-4251-8890-07193ebe5152",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 34505.39999999851,
+    "elapsedMs": 2882.7000000011176,
+    "events": [
+      {
+        "stage": "voice.connect.start",
+        "ms": 0
+      },
+      {
+        "stage": "voice.capture.start",
+        "ms": 0.4
+      },
+      {
+        "stage": "audio.context.create.start",
+        "ms": 0.4
+      },
+      {
+        "stage": "audio.context.create.end",
+        "ms": 259.5,
+        "durationMs": 259.09999999962747,
+        "status": "ok"
+      },
+      {
+        "stage": "audio.context.resume.start",
+        "ms": 259.6
+      },
+      {
+        "stage": "microphone.request.start",
+        "ms": 259.7
+      },
+      {
+        "stage": "audio.context.resume.end",
+        "ms": 262.3,
+        "durationMs": 2.699999999254942,
+        "status": "ok"
+      },
+      {
+        "stage": "microphone.request.end",
+        "ms": 265.3,
+        "durationMs": 5.599999999627471,
+        "status": "ok"
+      },
+      {
+        "stage": "voice.mic.ready",
+        "ms": 266.4
+      },
+      {
+        "stage": "gemini.token.request.start",
+        "ms": 269.3
+      },
+      {
+        "stage": "gemini.token.request.end",
+        "ms": 2265.6,
+        "durationMs": 1996.199999999255,
+        "status": "ok"
+      },
+      {
+        "stage": "gemini.token.server",
+        "ms": 2265.7,
+        "configurationMs": 133,
+        "conversationMs": 134,
+        "reservationMs": 485,
+        "providerMs": 257
+      },
+      {
+        "stage": "gemini.websocket.start",
+        "ms": 2265.9
+      },
+      {
+        "stage": "gemini.websocket.open",
+        "ms": 2512.8,
+        "durationMs": 246.90000000037253,
+        "status": "ok"
+      },
+      {
+        "stage": "gemini.setup.complete",
+        "ms": 2881.5,
+        "durationMs": 615.5999999996275,
+        "status": "ok"
+      },
+      {
+        "stage": "gemini.capture.ready",
+        "ms": 2882.4,
+        "sampleRate": 48000
+      },
+      {
+        "stage": "gemini.session.ready",
+        "ms": 2882.6,
+        "durationMs": 2615.800000000745
+      },
+      {
+        "stage": "voice.capture.ready",
+        "ms": 2882.7
+      }
+    ]
+  },
+  {
+    "id": "61d919c2-427f-4342-98bc-e0c9963fd125",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 42771.699999999255,
+    "elapsedMs": 10411.800000000745,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -5.3,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "kind": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 3555.5,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 3555.5,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "endpointMs": 1700,
+        "durationMs": 1719.300000000745
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 3738.5,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "turnIndex": 1
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 3741.7,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "route": "local-direct",
+        "kind": "collection-question",
+        "source": "local-policy",
+        "durationMs": 2.300000000745058,
+        "turnIndex": 1
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 3742.3,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "turnIndex": 1,
+        "route": "direct",
+        "kind": "collection-question"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 3751,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "turnIndex": 1
+      },
+      {
+        "stage": "gemini.audio.held",
+        "ms": 3751.2,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "turnIndex": 1
+      },
+      {
+        "stage": "gemini.collection.audio.rejected",
+        "ms": 4347.7,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "status": "unverified-content"
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 7657,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "turnIndex": 1,
+        "route": "direct"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 7657.6,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "turnIndex": 1
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 7657.7,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "turnIndex": 1,
+        "source": "gemini"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 7658.1,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "turnIndex": 1,
+        "route": "direct",
+        "status": "complete"
+      },
+      {
+        "stage": "history.persist.start",
+        "ms": 7658.1,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "turnIndex": 1,
+        "operation": "geminiDirectTurn"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 9683.3,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "turnIndex": 1,
+        "durationMs": 2024.9000000003725,
+        "status": "provider-forwarded",
+        "costUsd": 0.003043
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 9683.8,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.003043,
+        "inputTokens": 1628,
+        "outputTokens": 104,
+        "status": "provider-forwarded"
+      },
+      {
+        "stage": "history.persist.end",
+        "ms": 10411.8,
+        "turnId": "61d919c2-427f-4342-98bc-e0c9963fd125",
+        "turnIndex": 1,
+        "durationMs": 2753.7000000011176,
+        "status": "ok"
+      }
+    ]
+  },
+  {
+    "id": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 52959,
+    "elapsedMs": 12593.39999999851,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -1.8,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "kind": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 5081.4,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 5081.4,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "endpointMs": 1100,
+        "durationMs": 1113.199999999255
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 5324.7,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 5339.9,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "route": "local-direct",
+        "kind": "collection-question",
+        "source": "local-policy",
+        "durationMs": 14.5,
+        "turnIndex": 2
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 5340,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2,
+        "route": "direct",
+        "kind": "collection-question"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 5401.9,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2
+      },
+      {
+        "stage": "gemini.audio.held",
+        "ms": 5402,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 5873.8,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 5874,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.released",
+        "ms": 5874.2,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2,
+        "count": 14
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 5896.6,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 9956.4,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2,
+        "route": "direct"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 9956.8,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2,
+        "route": "direct",
+        "status": "complete"
+      },
+      {
+        "stage": "history.persist.start",
+        "ms": 9956.8,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2,
+        "operation": "geminiDirectTurn"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 11972,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2,
+        "durationMs": 2015,
+        "status": "provider-forwarded",
+        "costUsd": 0.003944
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 11972.1,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.003944,
+        "inputTokens": 1880,
+        "outputTokens": 123,
+        "status": "provider-forwarded"
+      },
+      {
+        "stage": "history.persist.end",
+        "ms": 12593.4,
+        "turnId": "8d6f330c-71ce-4e56-9455-40b61369be5b",
+        "turnIndex": 2,
+        "durationMs": 2636.5999999996275,
+        "status": "ok"
+      }
+    ]
+  },
+  {
+    "id": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 65509.39999999851,
+    "elapsedMs": 38122.5,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -1.4,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "kind": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 5387.9,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 5387.9,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "endpointMs": 1700,
+        "durationMs": 1720.5999999996275
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 5567.3,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "turnIndex": 3
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 5569.5,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "route": "local-policy-delegate",
+        "kind": "data-or-operation",
+        "source": "local-policy",
+        "durationMs": 2,
+        "turnIndex": 3
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 5569.6,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "turnIndex": 3,
+        "route": "delegate",
+        "kind": "data-or-operation"
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 5574.6,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "route": "model-tool",
+        "turnIndex": 3
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 5585.4,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "turnIndex": 3,
+        "route": "tool"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 5585.9,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "turnIndex": 3,
+        "route": "delegate",
+        "status": "complete"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 6815.1,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "turnIndex": 3,
+        "durationMs": 1229.1000000014901,
+        "status": "estimated-audio-context-excluded",
+        "costUsd": 0.000465
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 6815.4,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.000465,
+        "status": "estimated-audio-context-excluded"
+      },
+      {
+        "stage": "olivia.delegate.accepted",
+        "ms": 9360,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "f90d048c4d2cd6bb815db552a75bbca8b5948add8278afa25a9fa229a48c08c1",
+        "status": "running"
+      },
+      {
+        "stage": "task.accepted",
+        "ms": 9363.2,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "f90d048c4d2cd6bb815db552a75bbca8b5948add8278afa25a9fa229a48c08c1",
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "status": "running"
+      },
+      {
+        "stage": "task.accepted",
+        "ms": 9363.6,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "f90d048c4d2cd6bb815db552a75bbca8b5948add8278afa25a9fa229a48c08c1",
+        "requestId": "ef08af59-3bf2-4f80-9c72-1750696a68e9",
+        "durationMs": 3784.7999999988824,
+        "status": "running"
+      },
+      {
+        "stage": "task.result",
+        "ms": 38122.4,
+        "turnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "f90d048c4d2cd6bb815db552a75bbca8b5948add8278afa25a9fa229a48c08c1",
+        "requestId": "ef08af59-3bf2-4f80-9c72-1750696a68e9",
+        "durationMs": 32543.699999999255,
+        "status": "awaiting-confirmation"
+      }
+    ]
+  },
+  {
+    "id": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 75770,
+    "elapsedMs": 27862,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -2.6,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "kind": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 2146.4,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 2146.4,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "endpointMs": 1100,
+        "durationMs": 1113.2999999988824
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 2351,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "turnIndex": 4
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 2351.5,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "route": "local-policy-delegate",
+        "kind": "data-or-operation",
+        "source": "local-policy",
+        "durationMs": 0.3999999985098839,
+        "turnIndex": 4
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 2351.6,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "turnIndex": 4,
+        "route": "delegate",
+        "kind": "data-or-operation"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 2361,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "turnIndex": 4
+      },
+      {
+        "stage": "gemini.audio.held",
+        "ms": 2361.1,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "turnIndex": 4
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 2882.9,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "route": "model-tool",
+        "turnIndex": 4
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 5896.3,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "turnIndex": 4,
+        "route": "tool"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 5896.5,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "turnIndex": 4,
+        "route": "delegate",
+        "status": "complete"
+      },
+      {
+        "stage": "olivia.delegate.accepted",
+        "ms": 5923.7,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923",
+        "status": "running"
+      },
+      {
+        "stage": "task.accepted",
+        "ms": 5924,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923",
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "status": "running"
+      },
+      {
+        "stage": "task.accepted",
+        "ms": 5924.2,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923",
+        "requestId": "259b59ac-9d34-4b93-9f1f-25b42944b723",
+        "durationMs": 3041,
+        "status": "running"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 8084.6,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "turnIndex": 4,
+        "durationMs": 2188,
+        "status": "provider-forwarded",
+        "costUsd": 0.004521
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 8084.8,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.004521,
+        "inputTokens": 2306,
+        "outputTokens": 95,
+        "status": "provider-forwarded"
+      },
+      {
+        "stage": "task.result",
+        "ms": 27862,
+        "turnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923",
+        "requestId": "259b59ac-9d34-4b93-9f1f-25b42944b723",
+        "durationMs": 24978.800000000745,
+        "status": "completed"
+      }
+    ]
+  },
+  {
+    "id": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 82301.69999999925,
+    "elapsedMs": 26087.099999999627,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -13.6,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "kind": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 2831.8,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 2831.8,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "endpointMs": 1100,
+        "durationMs": 1115.9000000003725
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 3014.4,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "turnIndex": 5
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 3014.7,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "route": "local-policy-delegate",
+        "kind": "data-or-operation",
+        "source": "local-policy",
+        "durationMs": 0.19999999925494194,
+        "turnIndex": 5
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 3014.8,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "turnIndex": 5,
+        "route": "delegate",
+        "kind": "data-or-operation"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 3024.3,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "turnIndex": 5
+      },
+      {
+        "stage": "gemini.audio.held",
+        "ms": 3024.4,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "turnIndex": 5
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 3477.6,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "route": "model-tool",
+        "turnIndex": 5
+      },
+      {
+        "stage": "olivia.delegate.accepted",
+        "ms": 6705.8,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477",
+        "status": "running"
+      },
+      {
+        "stage": "task.accepted",
+        "ms": 6706.3,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477",
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "status": "running"
+      },
+      {
+        "stage": "task.accepted",
+        "ms": 6706.7,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477",
+        "requestId": "1afae10c-3172-4b8c-97a1-33c0015bd340",
+        "durationMs": 3228.7999999988824,
+        "status": "running"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 8459.1,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "turnIndex": 5,
+        "durationMs": 1223.4000000003725,
+        "status": "estimated-audio-context-excluded",
+        "costUsd": 0.001548
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 8459.3,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.001548,
+        "status": "estimated-audio-context-excluded"
+      },
+      {
+        "stage": "task.result",
+        "ms": 26087.1,
+        "turnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477",
+        "requestId": "1afae10c-3172-4b8c-97a1-33c0015bd340",
+        "durationMs": 22609.299999998882,
+        "status": "completed"
+      }
+    ]
+  },
+  {
+    "id": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 89541.69999999925,
+    "elapsedMs": 8796.5,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -4.7,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "kind": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 1916.4,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 1916.4,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "endpointMs": 1100,
+        "durationMs": 1112.0999999996275
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 2092.9,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "turnIndex": 6
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 2093.6,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "route": "local-direct",
+        "kind": "social",
+        "source": "local-policy",
+        "durationMs": 0.599999999627471,
+        "turnIndex": 6
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 2093.7,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "turnIndex": 6,
+        "route": "direct",
+        "kind": "social"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 2094.1,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "turnIndex": 6
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 2094.1,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "turnIndex": 6,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 2103.6,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "turnIndex": 6
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 2104.2,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "turnIndex": 6,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 5856.5,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "turnIndex": 6,
+        "route": "direct"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 5856.8,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "turnIndex": 6,
+        "route": "direct",
+        "status": "complete"
+      },
+      {
+        "stage": "history.persist.start",
+        "ms": 5856.8,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "turnIndex": 6,
+        "operation": "geminiDirectTurn"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 7760.1,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "turnIndex": 6,
+        "durationMs": 1903.0999999996275,
+        "status": "provider-forwarded",
+        "costUsd": 0.005676
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 7760.4,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.005676,
+        "inputTokens": 2859,
+        "outputTokens": 101,
+        "status": "provider-forwarded"
+      },
+      {
+        "stage": "history.persist.end",
+        "ms": 8796.5,
+        "turnId": "2cc12149-bfc3-4eb5-81fe-3154f6b7b458",
+        "turnIndex": 6,
+        "durationMs": 2939.699999999255,
+        "status": "ok"
+      }
+    ]
+  },
+  {
+    "id": "6f2586cb-5473-4eea-b4cb-8a2145f6a9bf",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 103629,
+    "elapsedMs": 6526.5,
+    "events": [
+      {
+        "stage": "task.notification.start",
+        "ms": 0,
+        "turnId": "6f2586cb-5473-4eea-b4cb-8a2145f6a9bf",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "sourceTurnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "status": "awaiting-confirmation"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 827.5,
+        "turnId": "6f2586cb-5473-4eea-b4cb-8a2145f6a9bf",
+        "turnIndex": 7
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 827.7,
+        "turnId": "6f2586cb-5473-4eea-b4cb-8a2145f6a9bf",
+        "turnIndex": 7,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 829.5,
+        "turnId": "6f2586cb-5473-4eea-b4cb-8a2145f6a9bf",
+        "turnIndex": 7
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 830,
+        "turnId": "6f2586cb-5473-4eea-b4cb-8a2145f6a9bf",
+        "sourceTurnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "turnIndex": 7,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 6526.3,
+        "turnId": "6f2586cb-5473-4eea-b4cb-8a2145f6a9bf",
+        "turnIndex": 7,
+        "durationMs": 1827.699999999255,
+        "status": "estimated-audio-context-excluded",
+        "costUsd": 0.001461
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 6526.4,
+        "turnId": "6f2586cb-5473-4eea-b4cb-8a2145f6a9bf",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "sourceTurnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.001461,
+        "status": "estimated-audio-context-excluded"
+      }
+    ]
+  },
+  {
+    "id": "ef08af59-3bf2-4f80-9c72-1750696a68e9",
+    "requestId": null,
+    "origin": "server",
+    "clock": "unix-ms",
+    "startedAt": 1794265404008,
+    "elapsedMs": 19832,
+    "events": [
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 2704,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "llm.start",
+        "ms": 2704,
+        "model": "gpt-6-luna",
+        "reasoning": "none",
+        "requestBytes": 33004,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "llm.end",
+        "ms": 4060,
+        "model": "gpt-6-luna",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 4061,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 4624,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "tool.start",
+        "ms": 4625,
+        "tool": "search_products",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 4626,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 4764,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.query.start",
+        "ms": 4764,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.query.end",
+        "ms": 4902,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "tool.end",
+        "ms": 4902,
+        "tool": "search_products",
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.commit.start",
+        "ms": 4903,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.commit.end",
+        "ms": 5055,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 5057,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 5625,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "llm.start",
+        "ms": 5625,
+        "model": "gpt-6-luna",
+        "reasoning": "none",
+        "requestBytes": 33396,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "llm.end",
+        "ms": 6633,
+        "model": "gpt-6-luna",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 6633,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 7170,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "tool.start",
+        "ms": 7171,
+        "tool": "list_locations",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 7171,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 7305,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.query.start",
+        "ms": 7305,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.query.end",
+        "ms": 7446,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "tool.end",
+        "ms": 7449,
+        "tool": "list_locations",
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.commit.start",
+        "ms": 7449,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.commit.end",
+        "ms": 7582,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 7584,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 8120,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "llm.start",
+        "ms": 8120,
+        "model": "gpt-6-luna",
+        "reasoning": "none",
+        "requestBytes": 33882,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "llm.end",
+        "ms": 9472,
+        "model": "gpt-6-luna",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 9472,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 10007,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "tool.start",
+        "ms": 10008,
+        "tool": "search_products",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 10008,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 10186,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 10187,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 10314,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 10314,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 10458,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.query.start",
+        "ms": 10458,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.query.end",
+        "ms": 10609,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "tool.end",
+        "ms": 10609,
+        "tool": "search_products",
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.commit.start",
+        "ms": 10611,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.commit.end",
+        "ms": 10746,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 10750,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 11293,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "llm.start",
+        "ms": 11293,
+        "model": "gpt-6-luna",
+        "reasoning": "none",
+        "requestBytes": 34291,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "llm.end",
+        "ms": 12368,
+        "model": "gpt-6-luna",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 12368,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 13667,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "tool.start",
+        "ms": 13667,
+        "tool": "search_products",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 13667,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 13792,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 13792,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 13928,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 13928,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 14061,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.query.start",
+        "ms": 14061,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.query.end",
+        "ms": 14193,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 14193,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 14329,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "tool.end",
+        "ms": 14329,
+        "tool": "search_products",
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.commit.start",
+        "ms": 14331,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.commit.end",
+        "ms": 14466,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 14471,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 15276,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "llm.start",
+        "ms": 15277,
+        "model": "gpt-6-luna",
+        "reasoning": "none",
+        "requestBytes": 34966,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "llm.end",
+        "ms": 16684,
+        "model": "gpt-6-luna",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 16684,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 17222,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "tool.start",
+        "ms": 17223,
+        "tool": "prepare_stock_load",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 17223,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 17357,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 17358,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 17484,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 17484,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 17618,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 17618,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 17753,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "tool.end",
+        "ms": 17754,
+        "tool": "prepare_stock_load",
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.commit.start",
+        "ms": 17755,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.commit.end",
+        "ms": 17892,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 17893,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 18313,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 18314,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 18456,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 18457,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 18597,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 18598,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 18726,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 18730,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 18866,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.query.start",
+        "ms": 18866,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.query.end",
+        "ms": 19000,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 19001,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 19136,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 19136,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 19831,
+        "status": "ok",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      },
+      {
+        "stage": "response.complete",
+        "ms": 19832,
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9"
+      }
+    ]
+  },
+  {
+    "id": "259b59ac-9d34-4b93-9f1f-25b42944b723",
+    "requestId": null,
+    "origin": "server",
+    "clock": "unix-ms",
+    "startedAt": 1794265410751,
+    "elapsedMs": 15695,
+    "events": [
+      {
+        "stage": "request.start",
+        "ms": 3,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 4,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 302,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 305,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 866,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 867,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 1424,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "router.start",
+        "ms": 1430,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "router.end",
+        "ms": 1431,
+        "route": "controlled",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 1443,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 1578,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 1579,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 1974,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 1980,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 2502,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "llm.start",
+        "ms": 2502,
+        "model": "gpt-6-luna",
+        "reasoning": "medium",
+        "requestBytes": 55068,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "llm.end",
+        "ms": 4391,
+        "model": "gpt-6-luna",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 4391,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 4945,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 4946,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 5375,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.commit.start",
+        "ms": 5375,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.commit.end",
+        "ms": 5519,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 5521,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 6162,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "llm.start",
+        "ms": 6163,
+        "model": "gpt-6-luna",
+        "reasoning": "medium",
+        "requestBytes": 58569,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "llm.end",
+        "ms": 8154,
+        "model": "gpt-6-luna",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 8154,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 8687,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "tool.start",
+        "ms": 8687,
+        "tool": "get_sales_metrics",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 8687,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 8830,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.query.start",
+        "ms": 8832,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.query.start",
+        "ms": 8833,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.query.end",
+        "ms": 8976,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.query.end",
+        "ms": 9548,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "tool.end",
+        "ms": 9551,
+        "tool": "get_sales_metrics",
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.commit.start",
+        "ms": 9551,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.commit.end",
+        "ms": 9694,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 9696,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 10240,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "llm.start",
+        "ms": 10241,
+        "model": "gpt-6-luna",
+        "reasoning": "medium",
+        "requestBytes": 65581,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "llm.first_token",
+        "ms": 12463,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "llm.end",
+        "ms": 13356,
+        "model": "gpt-6-luna",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 13357,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 13897,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 13898,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 14323,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 14323,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 14456,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 14457,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 14593,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 14598,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 14730,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.query.start",
+        "ms": 14730,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.query.end",
+        "ms": 14869,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 14870,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 15005,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 15005,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 15695,
+        "status": "ok",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      },
+      {
+        "stage": "response.complete",
+        "ms": 15695,
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "jobId": "4cdc48ba307adc8977ac42928151ae71bcb4d594c87f8af8d69435019a6bb923"
+      }
+    ]
+  },
+  {
+    "id": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 108329.19999999925,
+    "elapsedMs": 33039.199999999255,
+    "events": [
+      {
+        "stage": "voice.start",
+        "ms": -1.9,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "kind": "microphone"
+      },
+      {
+        "stage": "voice.barge_in",
+        "ms": -1.9,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "source": "microphone"
+      },
+      {
+        "stage": "audio.commit",
+        "ms": 4907.7,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b"
+      },
+      {
+        "stage": "voice.turn.end",
+        "ms": 4907.7,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "endpointMs": 1700,
+        "durationMs": 1710.8999999985099
+      },
+      {
+        "stage": "gemini.transcript.final",
+        "ms": 5216.1,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "turnIndex": 8
+      },
+      {
+        "stage": "gemini.classification",
+        "ms": 5217.9,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "route": "local-policy-delegate",
+        "kind": "data-or-operation",
+        "source": "local-policy",
+        "durationMs": 1.3999999985098839,
+        "turnIndex": 8
+      },
+      {
+        "stage": "gemini.classification.local",
+        "ms": 5217.9,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "turnIndex": 8,
+        "route": "delegate",
+        "kind": "data-or-operation"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 5256.6,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "turnIndex": 8
+      },
+      {
+        "stage": "gemini.audio.held",
+        "ms": 5256.8,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "turnIndex": 8
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 10034,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "turnIndex": 8,
+        "route": "delegate"
+      },
+      {
+        "stage": "task.policy_fallback",
+        "ms": 10100.6,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "kind": "data-or-operation",
+        "source": "local-policy"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 10109.6,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "turnIndex": 8,
+        "route": "delegate",
+        "status": "complete"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 12245.2,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "turnIndex": 8,
+        "durationMs": 2133.89999999851,
+        "status": "provider-forwarded",
+        "costUsd": 0.003898
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 12245.7,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.003898,
+        "inputTokens": 2032,
+        "outputTokens": 120,
+        "status": "provider-forwarded"
+      },
+      {
+        "stage": "olivia.delegate.accepted",
+        "ms": 17176.7,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9",
+        "status": "running"
+      },
+      {
+        "stage": "task.accepted",
+        "ms": 17176.9,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9",
+        "status": "running",
+        "source": "local-policy"
+      },
+      {
+        "stage": "task.accepted",
+        "ms": 17177.1,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9",
+        "requestId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "durationMs": 3529.7999999988824,
+        "status": "running"
+      },
+      {
+        "stage": "task.result",
+        "ms": 33039.1,
+        "turnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "jobId": "62871ec90da294181ec7a20bd9a2cd3b147e133c18c4ecbec94c216560c8f4a9",
+        "requestId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "durationMs": 19391.799999998882,
+        "status": "needs-input"
+      }
+    ]
+  },
+  {
+    "id": "1afae10c-3172-4b8c-97a1-33c0015bd340",
+    "requestId": null,
+    "origin": "server",
+    "clock": "unix-ms",
+    "startedAt": 1794265417922,
+    "elapsedMs": 13013,
+    "events": [
+      {
+        "stage": "request.start",
+        "ms": 3,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 3,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 324,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 327,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 883,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 884,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 1442,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "router.start",
+        "ms": 1456,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "router.end",
+        "ms": 1456,
+        "route": "controlled",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 1460,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 1611,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 1611,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 2026,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 2030,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 2554,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "llm.start",
+        "ms": 2555,
+        "model": "gpt-6-luna",
+        "reasoning": "none",
+        "requestBytes": 52327,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "llm.end",
+        "ms": 3749,
+        "model": "gpt-6-luna",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 3750,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 4319,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 4320,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 4762,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.commit.start",
+        "ms": 4763,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.commit.end",
+        "ms": 4922,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 4923,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 5516,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "llm.start",
+        "ms": 5516,
+        "model": "gpt-6-luna",
+        "reasoning": "none",
+        "requestBytes": 52805,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "llm.end",
+        "ms": 6651,
+        "model": "gpt-6-luna",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 6651,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 7173,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "tool.start",
+        "ms": 7173,
+        "tool": "get_sales_metrics",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 7173,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 7307,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.query.start",
+        "ms": 7309,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.query.start",
+        "ms": 7309,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.query.end",
+        "ms": 7460,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.query.end",
+        "ms": 8058,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "tool.end",
+        "ms": 8061,
+        "tool": "get_sales_metrics",
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.commit.start",
+        "ms": 8061,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.commit.end",
+        "ms": 8204,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 8206,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 8739,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "llm.start",
+        "ms": 8740,
+        "model": "gpt-6-luna",
+        "reasoning": "medium",
+        "requestBytes": 57436,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "llm.first_token",
+        "ms": 9852,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "llm.end",
+        "ms": 10711,
+        "model": "gpt-6-luna",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 10711,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 11233,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 11234,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 11640,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 11641,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 11769,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 11769,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 11907,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 11911,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 12042,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.query.start",
+        "ms": 12042,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.query.end",
+        "ms": 12182,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.start",
+        "ms": 12182,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.get.end",
+        "ms": 12350,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.start",
+        "ms": 12350,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "firestore.transaction.end",
+        "ms": 13013,
+        "status": "ok",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      },
+      {
+        "stage": "response.complete",
+        "ms": 13013,
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "jobId": "7e9ff590abee756c06c8fcff8bb775a65aac6a40681a49643c800f79d225f477"
+      }
+    ]
+  },
+  {
+    "id": "66e1d61b-3420-42e3-8403-bec0b59d8664",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 118591.69999999925,
+    "elapsedMs": 8093,
+    "events": [
+      {
+        "stage": "task.notification.start",
+        "ms": -1.7,
+        "turnId": "66e1d61b-3420-42e3-8403-bec0b59d8664",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "sourceTurnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "status": "completed"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 665.9,
+        "turnId": "66e1d61b-3420-42e3-8403-bec0b59d8664",
+        "turnIndex": 9
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 667.2,
+        "turnId": "66e1d61b-3420-42e3-8403-bec0b59d8664",
+        "turnIndex": 9,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 669.8,
+        "turnId": "66e1d61b-3420-42e3-8403-bec0b59d8664",
+        "turnIndex": 9
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 680.6,
+        "turnId": "66e1d61b-3420-42e3-8403-bec0b59d8664",
+        "sourceTurnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "turnIndex": 9,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 6049,
+        "turnId": "66e1d61b-3420-42e3-8403-bec0b59d8664",
+        "turnIndex": 9,
+        "route": "tool"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 6049.5,
+        "turnId": "66e1d61b-3420-42e3-8403-bec0b59d8664",
+        "turnIndex": 9,
+        "route": "delegate",
+        "status": "complete"
+      },
+      {
+        "stage": "task.notification.delivered",
+        "ms": 7207.6,
+        "turnId": "66e1d61b-3420-42e3-8403-bec0b59d8664",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "status": "persisted"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 8092.8,
+        "turnId": "66e1d61b-3420-42e3-8403-bec0b59d8664",
+        "turnIndex": 9,
+        "durationMs": 2043.300000000745,
+        "status": "provider-forwarded",
+        "costUsd": 0.004586
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 8092.9,
+        "turnId": "66e1d61b-3420-42e3-8403-bec0b59d8664",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "sourceTurnId": "5ec2cc14-8097-4d9a-9925-02e6ceb08acf",
+        "taskId": "7603729920a41b89e39a47c71108a3218ad9146e9d31814d884beef35cf5bc1d",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.004586,
+        "inputTokens": 2334,
+        "outputTokens": 136,
+        "status": "provider-forwarded"
+      }
+    ]
+  },
+  {
+    "id": "08758d66-3273-42dd-826f-8ccd9373bf64",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 124661.5,
+    "elapsedMs": 5996.5,
+    "events": [
+      {
+        "stage": "task.notification.start",
+        "ms": -0.1,
+        "turnId": "08758d66-3273-42dd-826f-8ccd9373bf64",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "sourceTurnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "status": "awaiting-confirmation"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 609.1,
+        "turnId": "08758d66-3273-42dd-826f-8ccd9373bf64",
+        "turnIndex": 10
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 609.1,
+        "turnId": "08758d66-3273-42dd-826f-8ccd9373bf64",
+        "turnIndex": 10,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 615.2,
+        "turnId": "08758d66-3273-42dd-826f-8ccd9373bf64",
+        "turnIndex": 10
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 615.4,
+        "turnId": "08758d66-3273-42dd-826f-8ccd9373bf64",
+        "sourceTurnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "turnIndex": 10,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 4767.9,
+        "turnId": "08758d66-3273-42dd-826f-8ccd9373bf64",
+        "turnIndex": 10,
+        "route": "tool"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 4768.1,
+        "turnId": "08758d66-3273-42dd-826f-8ccd9373bf64",
+        "turnIndex": 10,
+        "route": "delegate",
+        "status": "complete"
+      },
+      {
+        "stage": "task.notification.delivered",
+        "ms": 5992.1,
+        "turnId": "08758d66-3273-42dd-826f-8ccd9373bf64",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "status": "unconfirmed"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 5996.4,
+        "turnId": "08758d66-3273-42dd-826f-8ccd9373bf64",
+        "turnIndex": 10,
+        "durationMs": 1228.199999999255,
+        "status": "provider-forwarded",
+        "costUsd": 0.004857
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 5996.5,
+        "turnId": "08758d66-3273-42dd-826f-8ccd9373bf64",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "sourceTurnId": "3427fee2-59bb-4c19-8c5c-84ba59ca27c9",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.004857,
+        "inputTokens": 2703,
+        "outputTokens": 110,
+        "status": "provider-forwarded"
+      }
+    ]
+  },
+  {
+    "id": "4251479b-3b80-4356-a5f1-cf9e118264d7",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 129440.89999999851,
+    "elapsedMs": 8810,
+    "events": [
+      {
+        "stage": "task.notification.start",
+        "ms": 0,
+        "turnId": "4251479b-3b80-4356-a5f1-cf9e118264d7",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "sourceTurnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "status": "completed"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 571.4,
+        "turnId": "4251479b-3b80-4356-a5f1-cf9e118264d7",
+        "turnIndex": 11
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 571.6,
+        "turnId": "4251479b-3b80-4356-a5f1-cf9e118264d7",
+        "turnIndex": 11,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 578.1,
+        "turnId": "4251479b-3b80-4356-a5f1-cf9e118264d7",
+        "turnIndex": 11
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 578.3,
+        "turnId": "4251479b-3b80-4356-a5f1-cf9e118264d7",
+        "sourceTurnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "turnIndex": 11,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 6975.6,
+        "turnId": "4251479b-3b80-4356-a5f1-cf9e118264d7",
+        "turnIndex": 11,
+        "route": "tool"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 6975.9,
+        "turnId": "4251479b-3b80-4356-a5f1-cf9e118264d7",
+        "turnIndex": 11,
+        "route": "delegate",
+        "status": "complete"
+      },
+      {
+        "stage": "task.notification.delivered",
+        "ms": 8149.8,
+        "turnId": "4251479b-3b80-4356-a5f1-cf9e118264d7",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "status": "persisted"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 8809.8,
+        "turnId": "4251479b-3b80-4356-a5f1-cf9e118264d7",
+        "turnIndex": 11,
+        "durationMs": 1833.9000000003725,
+        "status": "provider-forwarded",
+        "costUsd": 0.006004
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 8809.9,
+        "turnId": "4251479b-3b80-4356-a5f1-cf9e118264d7",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "sourceTurnId": "b260b2fe-e1eb-4327-9b73-3ca05a16180f",
+        "taskId": "32012c1f9a574da0c3a39dc9e03996692a8a8b04488e08004c04c0359ef61184",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.006004,
+        "inputTokens": 2990,
+        "outputTokens": 167,
+        "status": "provider-forwarded"
+      }
+    ]
+  },
+  {
+    "id": "bf684be5-d853-48dd-b438-2fd374e5a26c",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 136427.19999999925,
+    "elapsedMs": 6068.9000000003725,
+    "events": [
+      {
+        "stage": "task.notification.start",
+        "ms": -0.1,
+        "turnId": "bf684be5-d853-48dd-b438-2fd374e5a26c",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "sourceTurnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "status": "running"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 769.9,
+        "turnId": "bf684be5-d853-48dd-b438-2fd374e5a26c",
+        "turnIndex": 12
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 770,
+        "turnId": "bf684be5-d853-48dd-b438-2fd374e5a26c",
+        "turnIndex": 12,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 770.4,
+        "turnId": "bf684be5-d853-48dd-b438-2fd374e5a26c",
+        "turnIndex": 12
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 770.5,
+        "turnId": "bf684be5-d853-48dd-b438-2fd374e5a26c",
+        "sourceTurnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "turnIndex": 12,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 4884.9,
+        "turnId": "bf684be5-d853-48dd-b438-2fd374e5a26c",
+        "turnIndex": 12,
+        "route": "tool"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 4885.2,
+        "turnId": "bf684be5-d853-48dd-b438-2fd374e5a26c",
+        "turnIndex": 12,
+        "route": "delegate",
+        "status": "complete"
+      },
+      {
+        "stage": "task.notification.delivered",
+        "ms": 5931.4,
+        "turnId": "bf684be5-d853-48dd-b438-2fd374e5a26c",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "status": "unconfirmed"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 6068.8,
+        "turnId": "bf684be5-d853-48dd-b438-2fd374e5a26c",
+        "turnIndex": 12,
+        "durationMs": 1183.5,
+        "status": "provider-forwarded",
+        "costUsd": 0.003038
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 6068.9,
+        "turnId": "bf684be5-d853-48dd-b438-2fd374e5a26c",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "sourceTurnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.003038,
+        "inputTokens": 1725,
+        "outputTokens": 109,
+        "status": "provider-forwarded"
+      }
+    ]
+  },
+  {
+    "id": "18d91921-0631-46da-a1ec-0ea71dbd0aa5",
+    "requestId": null,
+    "origin": "client",
+    "clock": "performance",
+    "startedAt": 141367.5,
+    "elapsedMs": 7004,
+    "events": [
+      {
+        "stage": "task.notification.start",
+        "ms": 0,
+        "turnId": "18d91921-0631-46da-a1ec-0ea71dbd0aa5",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "sourceTurnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "status": "needs-input"
+      },
+      {
+        "stage": "gemini.transcript.output.first",
+        "ms": 846.3,
+        "turnId": "18d91921-0631-46da-a1ec-0ea71dbd0aa5",
+        "turnIndex": 13
+      },
+      {
+        "stage": "assistant.text.visible.first",
+        "ms": 846.5,
+        "turnId": "18d91921-0631-46da-a1ec-0ea71dbd0aa5",
+        "turnIndex": 13,
+        "source": "gemini"
+      },
+      {
+        "stage": "gemini.audio.first_pcm",
+        "ms": 846.8,
+        "turnId": "18d91921-0631-46da-a1ec-0ea71dbd0aa5",
+        "turnIndex": 13
+      },
+      {
+        "stage": "gemini.audio.first_scheduled",
+        "ms": 847,
+        "turnId": "18d91921-0631-46da-a1ec-0ea71dbd0aa5",
+        "sourceTurnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "turnIndex": 13,
+        "kind": "answer"
+      },
+      {
+        "stage": "gemini.turn.complete",
+        "ms": 5174.8,
+        "turnId": "18d91921-0631-46da-a1ec-0ea71dbd0aa5",
+        "turnIndex": 13,
+        "route": "tool"
+      },
+      {
+        "stage": "assistant.result.complete",
+        "ms": 5174.9,
+        "turnId": "18d91921-0631-46da-a1ec-0ea71dbd0aa5",
+        "turnIndex": 13,
+        "route": "delegate",
+        "status": "complete"
+      },
+      {
+        "stage": "task.notification.delivered",
+        "ms": 6253.6,
+        "turnId": "18d91921-0631-46da-a1ec-0ea71dbd0aa5",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "status": "persisted"
+      },
+      {
+        "stage": "gemini.usage.report",
+        "ms": 7003.6,
+        "turnId": "18d91921-0631-46da-a1ec-0ea71dbd0aa5",
+        "turnIndex": 13,
+        "durationMs": 1828.5999999996275,
+        "status": "provider-forwarded",
+        "costUsd": 0.003593
+      },
+      {
+        "stage": "provider.usage",
+        "ms": 7004,
+        "turnId": "18d91921-0631-46da-a1ec-0ea71dbd0aa5",
+        "sessionId": "c5236a1d-06cf-4361-b4a7-949d868a3d43",
+        "sourceTurnId": "74d8f0c5-a269-4cb2-bc7c-058a2b656e1b",
+        "taskId": "6d97c2dda37d93aefbbf174401bc499ee136c1b1054ac084bf5018d7c06b127d",
+        "provider": "gemini",
+        "model": "gemini-3.8-live",
+        "costUsd": 0.003593,
+        "inputTokens": 2058,
+        "outputTokens": 114,
+        "status": "provider-forwarded"
+      }
+    ]
+  }
+]
