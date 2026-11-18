@@ -153,7 +153,7 @@ export function createConversationStorage({ store, clock, configuration, state }
     return {
       conversationsCursor: conversationRows.length > 20 ? { id: lastConversation.id, updatedAt: new Date(lastConversation.updatedAt).toISOString() } : null,
       conversations: conversations
-        .filter((c) => dateMs(c.expiresAt) > now.getTime() && (canAccessAdministration(session.profile) || ((!c.roleBinding || c.roleBinding === normalizedRole(session.profile)) && (!c.permissionScope || compatiblePermissionScope(session, c.permissionScope)))))
+        .filter((c) => !c.internalTask && dateMs(c.expiresAt) > now.getTime() && (canAccessAdministration(session.profile) || ((!c.roleBinding || c.roleBinding === normalizedRole(session.profile)) && (!c.permissionScope || compatiblePermissionScope(session, c.permissionScope)))))
         .map((c) => ({
           id: c.id,
           userId,

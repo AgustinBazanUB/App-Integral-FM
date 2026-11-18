@@ -26,8 +26,6 @@ import "../../../src/styles/seller-compact.css";
 import "../../../src/styles/seller-pos.css";
 import OliviaAssistant from '../../../src/gestion/olivia/OliviaAssistant';
 import { FixtureModule } from './mocks';
-import { speechClips, voiceVersion } from '../../../src/shared/oliviaFastSpeech.mjs';
-import {conversationClips} from '../../../src/shared/oliviaConversationRouter.mjs';
 import { qaTraffic, countTraffic } from './service.mjs';
 function Traffic(){const [,refresh]=React.useState(0);React.useEffect(()=>{const update=()=>refresh(x=>x+1);window.addEventListener('olivia:qa-traffic',update);return()=>window.removeEventListener('olivia:qa-traffic',update);},[]);return <output aria-label="Tráfico sintético">{JSON.stringify(qaTraffic)}</output>;}
 
@@ -49,14 +47,6 @@ if(qaParams.has('live'))window.RTCPeerConnection=class {
   async setRemoteDescription(){this.channel.onmessage({data:JSON.stringify({type:'session.created'})});}
   close(){clearTimeout(this.partialTimer);clearTimeout(this.finalTimer);}
 };
-if(qaParams.get('clips')==='ready') {
-  const pcm=new Int16Array(12000),version=voiceVersion({voice:'es-US-Chirp3-HD-Aoede',speakingRate:1});
-  for(let i=0;i<pcm.length;i++)pcm[i]=Math.sin(i/12)*3000;
-  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',pcm.buffer)),x=>x.toString(16).padStart(2,'0')).join('');
-  const fetchOriginal=window.fetch.bind(window);
-  window.fetch=(url,options)=>{if(String(url).startsWith('/olivia-speech/')){if(!String(url).endsWith('manifest.json'))countTraffic('clips');const entries=String(url).endsWith('conversation-manifest.json')?conversationClips:speechClips;return Promise.resolve(String(url).endsWith('manifest.json')?Response.json({voiceVersion:version,libraryVersion:'1.0.0',entries:entries.map(clip=>({id:clip.id,status:'ready',url:`/olivia-speech/${version}/${clip.id}.pcm`,codec:'pcm_s16le',sampleRate:24000,checksum:digest}))}):new Response(pcm));}return fetchOriginal(url,options);};
-}
-
 // Synthetic WebAudio input/output only. No system microphone permission and no
 // audible test noise; production mediaDevices are untouched outside this tab.
 const NativeContext = window.AudioContext;

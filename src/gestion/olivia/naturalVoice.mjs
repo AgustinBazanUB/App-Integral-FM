@@ -13,10 +13,24 @@ export class NaturalVoiceConversation {
   async start() {
     try {
       if (!this.mediaDevices?.getUserMedia || !this.Recorder || !this.AudioContext) throw new Error("Este navegador no admite conversación por voz. Podés dictar o escribir.");
+      const startedAt = this.now();
+      this.onTrace({ stage: "voice.capture.start", at: startedAt });
+      const contextCreatedAt = this.now();
+      this.onTrace({ stage: "audio.context.create.start", at: contextCreatedAt });
       this.context = new this.AudioContext();
-      await this.context.resume();
-      this.stream = await this.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      this.onTrace({ stage: "audio.context.create.end", at: this.now(), durationMs: this.now() - contextCreatedAt, status: "ok" });
+      const resumeStartedAt = this.now();
+      this.onTrace({ stage: "audio.context.resume.start", at: resumeStartedAt });
+      const resumeContext = Promise.resolve(this.context.resume()).then(() => this.onTrace({ stage: "audio.context.resume.end", at: this.now(), durationMs: this.now() - resumeStartedAt, status: "ok" }));
+      const microphoneStartedAt = this.now();
+      this.onTrace({ stage: "microphone.request.start", at: microphoneStartedAt });
+      const requestMicrophone = this.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
+        .then((stream) => { this.onTrace({ stage: "microphone.request.end", at: this.now(), durationMs: this.now() - microphoneStartedAt, status: "ok" }); if (this.closed) stream.getTracks().forEach((track) => track.stop()); return stream; })
+        .catch((error) => { this.onTrace({ stage: "microphone.request.end", at: this.now(), durationMs: this.now() - microphoneStartedAt, status: "error" }); throw error; });
+      const [, stream] = await Promise.all([resumeContext, requestMicrophone]);
+      this.stream = stream;
       if (this.closed) return this.release();
+      this.onTrace({ stage: "voice.mic.ready", at: this.now() });
       this.onMediaInterrupted = () => {
         if (this.closed) return;
         this.onError(new Error("El navegador interrumpió el micrófono o el audio. Volvé a conectar la voz para continuar."));
@@ -28,12 +42,19 @@ export class NaturalVoiceConversation {
       this.source = this.context.createMediaStreamSource(this.stream);
       this.analyser = this.context.createAnalyser(); this.analyser.fftSize = 1024; this.source.connect(this.analyser);
       this.samples = new Float32Array(this.analyser.fftSize);
-      if(this.createTranscriber) {
-        try { this.transcriber=await this.createTranscriber(this.stream,text=>{if(text!==this.partial)this.partialChangedAt=this.now();this.partial=text;this.onPartial(text);},this.captureController.signal); }
-        catch { if(!this.closed)this.onNotice('La transcripción en vivo no pudo conectarse. La voz continúa con dictado por turnos.'); }
-        if(this.closed){this.transcriber?.close();return this.release();}
+      if (this.createTranscriber) {
+        const readyAt = this.now();
+        this.transcriberReady = Promise.resolve().then(() => this.createTranscriber(this.stream, text => { if (text !== this.partial) this.partialChangedAt = this.now(); this.partial = text; this.onPartial(text); }, this.captureController.signal))
+          .then(transcriber => {
+            if (this.closed) { transcriber?.close(); return; }
+            this.transcriber = transcriber;
+            this.onTrace({ stage: transcriber?.handlesTurns ? "gemini.session.ready" : "transcription.session.ready", at: this.now(), startedAt: readyAt });
+          });
+        await this.transcriberReady;
       }
-      this.startRecorder();
+      if (this.closed) return;
+      if (!this.transcriber?.handlesTurns) this.startRecorder();
+      this.onTrace({ stage: "voice.capture.ready", at: this.now() });
       this.startedAt = this.now(); this.onState("listening"); this.loop();
     } catch (error) { this.onError(error); this.close(); }
   }
@@ -45,8 +66,36 @@ export class NaturalVoiceConversation {
     let sum = 0; for (const sample of this.samples) sum += sample * sample;
     const rms = Math.sqrt(sum / this.samples.length), level = Math.min(1, rms * 5), now = this.now();
     this.onFrame({ seconds: Math.floor((now - this.startedAt) / 1000), level: this.muted ? 0 : level, recording: this.recordingTurn });
+    if(!this.audioClock)this.evaluateVoice(rms,now);
+    this.animation = this.frame(this.loop);
+  };
+
+  processInputFrame({rms,at}) {
+    if(this.closed || !this.transcriber?.handlesTurns || !this.transcriber.ready || !Number.isFinite(rms))return;
+    if(!this.audioClock){this.audioClock=true;this.onTrace({stage:'voice.input.clock',at,mode:'audio-callback'});}
+    this.evaluateVoice(rms,Number.isFinite(at)?at:this.now());
+  }
+
+  evaluateVoice(rms,now) {
     if (!this.muted) {
-      if (!this.recordingTurn && rms > 0.025) this.beginTurn(now);
+      if (!this.recordingTurn) {
+        const playing=this.sources?.size>0 || Boolean(this.transcriber?.isPlaying);
+        if(rms>0.025){
+          if(!playing)this.beginTurn(now);
+          else {
+            // A measured 150 ms non-speech pulse stopped the full answer.
+            // Validate a short sustained candidate before destroying playback;
+            // the existing 200 ms input pre-roll retains this speech onset.
+            this.bargeCandidate ||= {startedAt:now,lastAt:now};
+            this.bargeCandidate.lastAt=now;
+            if(now-this.bargeCandidate.startedAt>=160){this.bargeCandidate=null;this.beginTurn(now);}
+          }
+        } else if(this.bargeCandidate && now-this.bargeCandidate.lastAt>60){
+          this.onTrace({stage:'voice.barge_in.rejected',at:now,durationMs:now-this.bargeCandidate.startedAt,kind:'short-energy-pulse'});
+          this.bargeCandidate=null;
+        }
+        if(!playing)this.bargeCandidate=null;
+      }
       if (this.recordingTurn) {
         if (rms > 0.016) {
           if (now - this.lastSpeechAt >= 350) this.pauseResumes++;
@@ -57,8 +106,7 @@ export class NaturalVoiceConversation {
         if (now - this.recordingStartedAt >= this.maxSeconds * 1000 || (now - this.lastSpeechAt >= silence && now - this.recordingStartedAt >= 400)) this.finishTurn();
       }
     }
-    this.animation = this.frame(this.loop);
-  };
+  }
 
   async renewTranscription() {
     const previous=this.transcriber;if(this.renewing || !previous?.renewalDue || this.closed)return;
@@ -70,7 +118,7 @@ export class NaturalVoiceConversation {
       const next=await this.createTranscriber(this.stream,text=>{if(text!==this.partial)this.partialChangedAt=this.now();this.partial=text;this.onPartial(text);},this.captureController.signal);
       if(this.closed){next.close();return;}
       this.transcriber=next;
-    } catch {if(!this.closed)this.onNotice('Continúo con dictado por turnos. Podés reconectar la voz cuando quieras.');}
+    } catch {if(!this.closed){this.onNotice('Gemini Live se interrumpió. Volvé a conectar para continuar por voz.');this.close();}}
     finally {this.renewing=false;}
   }
 
@@ -91,23 +139,24 @@ export class NaturalVoiceConversation {
     recorder.onerror = () => { this.discardTurn = true; this.finishTurn(); this.onError(new Error("La grabación se interrumpió. Podés volver a hablar.")); };
     recorder.onstop = () => {
       clearTimeout(this.turnTimer);
-      const wasTurn = this.recordingTurn, chunks = this.chunks || [], durationSeconds = wasTurn ? Math.max(0.1, (this.now() - this.recordingStartedAt) / 1000) : 0, actualType = recorder.mimeType || type || "audio/webm", discard = this.discardTurn;
+      const wasTurn = this.recordingTurn, chunks = this.chunks || [], durationSeconds = wasTurn ? Math.max(0.1, (this.now() - this.recordingStartedAt) / 1000) : 0, actualType = recorder.mimeType || type || "audio/webm", discard = this.discardTurn, turnTranscriber = this.turnTranscriber, handledByLive = Boolean(this.turnLive && turnTranscriber?.handlesTurns && !turnTranscriber.failed);
       this.recorder = null; this.recordingTurn = false; this.finishing = false; this.chunks = []; this.bytes = 0; this.discardTurn = false;
       if (!this.closed) this.startRecorder();
       if (!wasTurn || discard || this.closed) { if(discard && !this.transcriber?.closed)this.transcriber?.discardTurn?.(); return; }
       const blob = new Blob(chunks, { type: actualType }); blob.durationSeconds = Math.min(this.maxSeconds, durationSeconds);
       const metadata={durationSeconds:blob.durationSeconds,endedAt:this.now(),voiceEndedAt:this.lastSpeechAt,turnId:this.turnId,endpointWindowMs:this.endpointWindowMs};
       this.onTrace({stage:'audio.commit',at:metadata.endedAt,turnId:this.turnId});
+      this.onTrace({stage:'voice.turn.end',at:metadata.endedAt,voiceEndedAt:metadata.voiceEndedAt,turnId:this.turnId,endpointMs:metadata.endpointWindowMs});
       this.onState("processing");
       const ready=(async()=>{
-        if(this.transcriber && !this.transcriber.closed) {
-          try { metadata.transcript=await this.transcriber.commit(metadata); }
+        if(turnTranscriber && !turnTranscriber.closed) {
+          try { metadata.transcript=await turnTranscriber.commit(metadata); }
           catch { if(!this.closed)this.onNotice('Recupero este turno con el audio grabado.'); }
         }
       })();
       const deliver=async()=>{
         await ready;
-        if(!this.closed)await this.onTurn?.(blob,metadata);
+        if(!this.closed && !handledByLive)await this.onTurn?.(blob,metadata);
       };
       this.deliveryQueue=this.deliveryQueue.catch(()=>{}).then(deliver).catch(error=>this.onError(error));
     };
@@ -116,21 +165,40 @@ export class NaturalVoiceConversation {
 
   beginTurn(now) {
     try {
-      if (!this.recorder) this.startRecorder();
+      if (!this.recorder && !this.transcriber?.handlesTurns) this.startRecorder();
       const preRoll = [...new Set([this.idleHeader, ...(this.idleRing || [])].filter(Boolean))];
       this.chunks = preRoll; this.bytes = preRoll.reduce((total, chunk) => total + chunk.size, 0); this.discardTurn = false; this.recordingTurn = true; this.recordingStartedAt = now; this.lastSpeechAt = now; this.pauseResumes = 0;
       this.partial='';
       this.partialChangedAt=now;this.turnId=globalThis.crypto.randomUUID();
-      if(this.transcriber && !this.transcriber.closed) {try{this.transcriber.beginTurn();}catch{this.transcriber.close();}}
+      if(this.transcriber && !this.transcriber.closed) {try{this.transcriber.beginTurn(this.turnId);}catch{this.transcriber.close();}}
       clearTimeout(this.turnTimer); this.turnTimer = setTimeout(() => this.finishTurn(), this.maxSeconds * 1000);
-      const bargeIn = this.sources?.size > 0;
-      if (bargeIn) this.stopPlayback();
+      const bargeIn = this.sources?.size > 0 || Boolean(this.transcriber?.isPlaying);
+      this.turnTranscriber = this.transcriber;
+      this.turnLive = Boolean(this.turnTranscriber?.handlesTurns && this.turnTranscriber?.ready);
+      if (bargeIn) { this.stopPlayback(); this.transcriber?.interrupt?.(); }
       this.onSpeechStart({ at: now, bargeIn, turnId:this.turnId }); this.onState("recording");
     } catch (error) { this.onError(error); }
   }
 
   finishTurn() {
-    if (!this.recorder || !this.recordingTurn || this.finishing || this.recorder.state === "inactive") return;
+    if (!this.recordingTurn || this.finishing) return;
+    const liveSession = this.turnTranscriber;
+    if (liveSession?.handlesTurns && liveSession?.ready) {
+      this.finishing = true;
+      clearTimeout(this.turnTimer);
+      const endedAt = this.now(), metadata = { durationSeconds: Math.min(this.maxSeconds, Math.max(0.1, (endedAt - this.recordingStartedAt) / 1000)), endedAt, voiceEndedAt: this.lastSpeechAt, turnId: this.turnId, endpointWindowMs: this.endpointWindowMs };
+      const discard = this.discardTurn;
+      this.recordingTurn = false; this.discardTurn = false; this.finishing = false;
+      if (discard) { liveSession.discardTurn?.(); return; }
+      this.onTrace({ stage: "audio.commit", at: endedAt, turnId: this.turnId });
+      this.onTrace({ stage: "voice.turn.end", at: endedAt, voiceEndedAt: metadata.voiceEndedAt, turnId: this.turnId, endpointMs: metadata.endpointWindowMs });
+      // Native VAD may finish before the local silence window. A late local
+      // endpoint must not overwrite an already settled response with thinking.
+      this.onState(liveSession.currentTurn?.pending===false ? (liveSession.isPlaying ? "speaking" : "listening") : "processing");
+      Promise.resolve(liveSession.commit(metadata)).catch(error => { if (!this.closed) this.onError(error); });
+      return;
+    }
+    if (!this.recorder || this.recorder.state === "inactive") return;
     this.finishing = true;
     try { this.recorder.stop(); } catch (error) { this.recorder = null; this.finishing = false; this.recordingTurn = false; this.onError(error); if (!this.closed) this.startRecorder(); }
   }

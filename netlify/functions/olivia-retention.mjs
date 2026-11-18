@@ -11,6 +11,7 @@ const OPERATIONS = new Set([
   "text",
   "transcription",
   "natural-voice",
+  // Keep expiring historical usage documents; the Chirp endpoint was removed in V5.
   "chirp-synthesis",
   "sale",
   "stock_load",
@@ -37,6 +38,7 @@ function counts() {
   return {
     conversationsRemoved: 0,
     messagesRemoved: 0,
+    delegatedTasksRemoved: 0,
     confirmationsRemoved: 0,
     requestsRecovered: 0,
     requestsRemoved: 0,
@@ -157,6 +159,7 @@ async function purgeConversations(store, rows, now, hasTime = () => true) {
       ]),
     ),
   );
+  const taskPages=new Map(await Promise.all(candidates.map(async row=>[row.id,await store.query(`oliviaConversations/${row.id}/delegatedTasks`,[],MAX_BATCH,[])])));
   if (!hasTime()) return { ...counts(), possibleBacklog: true };
 
   const first = await store.transaction(async (tx) => {
@@ -171,6 +174,7 @@ async function purgeConversations(store, rows, now, hasTime = () => true) {
         ),
       )
     ).flat();
+    const tasks=(await Promise.all(expiredRows.map(row=>snapshots(tx,`${row.path}/delegatedTasks`,taskPages.get(row.id) || [])))).flat();
     const actionIds = [
       ...new Set(
         expiredRows
@@ -190,6 +194,7 @@ async function purgeConversations(store, rows, now, hasTime = () => true) {
       writes.push(remove(child.path, child.snapshot));
       addMessageMetrics(aggregate, [child.snapshot.data]);
     }
+    for(const task of tasks)if(task.snapshot){writes.push(remove(task.path,task.snapshot));addCount(aggregate.counts,'delegatedTasksRemoved');}
     for (const row of expiredRows) {
       if (!(pages.get(row.id) || []).length) continue;
       // Embedded messages are a cache of canonical history. Scrub its contents
@@ -242,9 +247,7 @@ async function purgeConversations(store, rows, now, hasTime = () => true) {
   const checks = await Promise.all(
     first.eligible.map(async (row) => ({
       ...row,
-      empty: !(
-        await store.query(`oliviaConversations/${row.id}/messages`, [], 1, [])
-      ).length,
+      empty: !(await store.query(`oliviaConversations/${row.id}/messages`, [], 1, [])).length && !(await store.query(`oliviaConversations/${row.id}/delegatedTasks`, [], 1, [])).length,
     })),
   );
   const emptyParents = checks.filter((row) => row.empty);
