@@ -204,11 +204,14 @@ export default function SalesMetricsPage() {
 
           <Panel title="Categorías" description="Unidades y subtotal de productos, antes de descuentos generales."><DataTable rows={metricsByCategory(filteredSales, dimensions.products, dimensions.categories)} columns={[{ key: "name", label: "Categoría" }, { key: "items", label: "Unidades" }, { key: "sales", label: "Ventas" }, { key: "total", label: "Subtotal", render: row => formatMoney(row.total) }]} empty={<EmptyState title="Sin categorías vendidas" />} /></Panel>
 
-          <Panel title="Productos" description="Unidades y subtotal antes de descuentos generales según los filtros.">
+          <Panel title="Productos" description="El descuento y el neto por producto están disponibles para ventas con el desglose registrado.">
             <DataTable rows={productRows} columns={[
               { key: "name", label: "Producto" },
               { key: "items", label: "Unidades" },
-              { key: "total", label: "Monto", render: (row) => formatMoney(row.total) },
+              { key: "bonifiedUnits", label: "Bonificadas" },
+              { key: "total", label: "Precio original total", render: (row) => formatMoney(row.total) },
+              { key: "discount", label: "Descuento", render: (row) => row.netIncomplete ? "—" : formatMoney(row.discount) },
+              { key: "net", label: "Neto", render: (row) => row.netIncomplete ? "—" : formatMoney(row.net) },
             ]} empty={<EmptyState icon="Boxes" title="Sin productos vendidos" />} />
           </Panel>
 
@@ -255,7 +258,7 @@ export default function SalesMetricsPage() {
             <Panel title="Descuentos aplicados" description="Diferencia descuentos configurados y manuales cuando esa información existe en la venta.">
               <DataTable rows={metrics.byDiscount.map((row) => ({ ...row, percentage: metrics.salesCount ? row.sales / metrics.salesCount * 100 : 0 }))} columns={[
                 { key: "name", label: "Descuento" },
-                { key: "source", label: "Origen", render: (row) => row.source === "manual" ? "Manual" : "Guardado" },
+                { key: "source", label: "Origen", render: (row) => ({ manual: "Manual", gift: "Producto bonificado" })[row.source] || "Guardado" },
                 { key: "sales", label: "Usos" },
                 { key: "salesTotal", label: "Vendido asociado", render: (row) => formatMoney(row.salesTotal || 0) },
                 { key: "total", label: "Descontado", render: (row) => formatMoney(row.total) },

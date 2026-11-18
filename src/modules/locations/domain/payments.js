@@ -4,6 +4,7 @@ export const PAYMENT_LABELS = {
   debit:"Pago debito",
   alias:"Pago Alias",
   cash:"Pago eft",
+  none:"Sin cobro",
   multiple:"+2 pagos"
 };
 export const PAYMENT_OPTIONS = [
@@ -34,6 +35,7 @@ export function completeRemainingPayment(payments, method, total) {
 
 export function normalizePayment(paymentMethod, paymentMethodLabel, payments, total) {
   const saleTotal = wholeAmount(total,"El total de la venta");
+  if (saleTotal === 0) return { paymentMethod: "none", paymentMethodLabel: PAYMENT_LABELS.none, payments: [] };
   if (SINGLE_PAYMENT_METHODS.includes(paymentMethod)) {
     return {paymentMethod,paymentMethodLabel:PAYMENT_LABELS[paymentMethod]};
   }
@@ -56,6 +58,7 @@ export function normalizePayment(paymentMethod, paymentMethodLabel, payments, to
 }
 
 export function salePaymentParts(sale) {
+  if (sale?.paymentMethod === "none") return [];
   if (sale?.paymentMethod === "multiple" && Array.isArray(sale.payments)) {
     return sale.payments.filter(entry=>entry?.method && Number.isFinite(Number(entry.amount)) && Number(entry.amount)>0).map(entry=>({method:entry.method,label:PAYMENT_LABELS[entry.method] || entry.label || entry.method,amount:Number(entry.amount)}));
   }

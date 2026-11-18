@@ -32,7 +32,9 @@ function normalizedDiscount(discount, index) {
   };
 }
 
-export function calculateDiscountSummary(discounts, subtotal, { paymentMethod, roundCashTotal = false } = {}) {
+/** @param {{ paymentMethod?: string, roundCashTotal?: boolean }} [options] */
+export function calculateDiscountSummary(discounts, subtotal, options = {}) {
+  const { paymentMethod, roundCashTotal = false } = options;
   const totalBeforeDiscounts = Number(subtotal);
   if (!Number.isFinite(totalBeforeDiscounts) || totalBeforeDiscounts < 0) {
     throw new Error("El subtotal no es válido");
@@ -88,13 +90,48 @@ export function saleDiscountList(sale) {
   return sale?.discount ? [sale.discount] : [];
 }
 
+export function calculateOperationalDiscountSummary(items, discounts, options) {
+  const gross = item => Number(item.subtotal ?? Number(item.unitPrice ?? item.price ?? 0) * item.qty);
+  const subtotal = items.reduce((sum, item) => sum + gross(item), 0);
+  if (!Number.isSafeInteger(subtotal) || subtotal < 0) throw new Error("El subtotal de la venta supera el límite permitido o es inválido.");
+  const giftDiscountTotal = items.reduce((sum, item) => sum + (item.gift === true ? gross(item) : 0), 0);
+  const summary = calculateDiscountSummary(discounts, subtotal - giftDiscountTotal, options);
+  return { ...summary, totalBeforeDiscounts: subtotal, giftDiscountTotal, discountTotal: summary.discountTotal + giftDiscountTotal };
+}
+
+export function requiresFullDiscountPermission(items, summary) {
+  return items.some(item => item.gift === true) ||
+    summary.discounts.some(discount => discount.type === "percent" && discount.value === 100) ||
+    summary.total === 0;
+}
+
+// Allocate sale-level discounts over the paid lines in whole currency units.
+// The cumulative method reconciles exactly and never over-discounts any line.
+export function allocateOperationalSaleItems(items, { giftDiscountTotal = 0, discountTotal = 0, totalBeforeDiscounts }) {
+  const base = totalBeforeDiscounts - giftDiscountTotal;
+  const sharedDiscount = discountTotal - giftDiscountTotal;
+  let grossSoFar = 0;
+  let allocated = 0;
+  return items.map(item => {
+    let lineDiscount = item.gift ? item.subtotal : 0;
+    if (!item.gift && base > 0 && sharedDiscount > 0) {
+      grossSoFar += item.subtotal;
+      const target = Number(BigInt(grossSoFar) * BigInt(sharedDiscount) / BigInt(base));
+      lineDiscount = target - allocated;
+      allocated = target;
+    }
+    const netAmount = item.subtotal - lineDiscount;
+    return { ...item, lineDiscount, netAmount, bonified: item.gift === true || (item.subtotal > 0 && netAmount === 0) };
+  });
+}
+
 export function storedDiscountTotal(sale) {
   const stored = Number(sale?.discountTotal);
   if (Number.isFinite(stored) && stored >= 0) return stored;
   return saleDiscountList(sale).reduce(
     (sum, discount) => sum + Math.max(0, Number(discount.amountApplied || 0)),
     0,
-  ) + Math.max(0, Number(sale?.cashRoundingDiscountTotal || 0));
+  ) + Math.max(0, Number(sale?.cashRoundingDiscountTotal || 0)) + Math.max(0, Number(sale?.giftDiscountTotal || 0));
 }
 
 export function storedDiscountTotals(sale) {
@@ -111,10 +148,12 @@ export function storedDiscountTotals(sale) {
     : discounts
       .filter((discount) => discount.type === "percent")
       .reduce((sum, discount) => sum + Math.max(0, Number(discount.amountApplied || 0)), 0);
+  const giftDiscountTotal = Math.max(0, Number(sale?.giftDiscountTotal || 0));
   return {
     fixedDiscountTotal,
     percentageDiscountTotal,
     cashRoundingDiscountTotal: Math.max(0, Number(sale?.cashRoundingDiscountTotal || 0)),
-    discountTotal: fixedDiscountTotal + percentageDiscountTotal + Math.max(0, Number(sale?.cashRoundingDiscountTotal || 0)),
+    giftDiscountTotal,
+    discountTotal: fixedDiscountTotal + percentageDiscountTotal + giftDiscountTotal + Math.max(0, Number(sale?.cashRoundingDiscountTotal || 0)),
   };
 }

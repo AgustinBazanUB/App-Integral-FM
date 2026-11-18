@@ -50,10 +50,13 @@ export function sellerSaleProblem({ profile, location, items, paymentMethod, pay
   }
   if (discounts.length && !can(profile, "quick-sales", "useDiscounts")) return sellerProblem("DESCUENTO-PERMISO", "Tu usuario no puede aplicar descuentos. Quitalos o pedí permiso al administrador.");
   if (discounts.some(discount => discount.source === "manual") && !can(profile, "quick-sales", "useManualDiscounts")) return sellerProblem("DESCUENTO-MANUAL-PERMISO", "Tu usuario no puede aplicar descuentos manuales. Quitalos o pedí permiso al administrador.");
-  if (paymentMethod === "multiple" && !can(profile, "quick-sales", "useMultiplePayments")) return sellerProblem("PAGO-PERMISO", "Tu usuario no puede combinar pagos. Elegí un solo medio o pedí permiso al administrador.");
+  if ((items.some(item => item.gift === true) || discounts.some(discount => discount.type === "percent" && Number(discount.value) === 100) || total === 0) &&
+    (!can(profile, "quick-sales", "useDiscounts") || !can(profile, "quick-sales", "useManualDiscounts"))) return sellerProblem("BONIFICACION-PERMISO", "Tu usuario no puede aplicar una bonificación del 100%.");
+  if (total > 0 && paymentMethod === "multiple" && !can(profile, "quick-sales", "useMultiplePayments")) return sellerProblem("PAGO-PERMISO", "Tu usuario no puede combinar pagos. Elegí un solo medio o pedí permiso al administrador.");
   try { normalizePayment(paymentMethod, PAYMENT_LABELS[paymentMethod], payments, total); }
   catch (error) { return sellerProblem(paymentMethod === "multiple" ? "PAGO-DESGLOSE" : "PAGO-FALTANTE", error.message); }
   if (ticketRequested && !can(profile, "quick-sales", "requestTicket")) return sellerProblem("FACTURA-PERMISO", "Tu usuario no tiene permiso para generar facturas.");
+  if (ticketRequested && (total === 0 || items.some(item => item.gift === true))) return sellerProblem("FACTURA-BONIFICACION", "Las entregas bonificadas requieren revisión fiscal antes de emitir la factura.");
   if (!online && editing) return sellerProblem("VENTA-EDICION-OFFLINE", "Necesitás conexión para editar una venta confirmada. El carrito sigue acá.");
   if (!online && !can(profile, "quick-sales", "useOfflineSales")) return sellerProblem("VENTA-OFFLINE-PERMISO", "No hay conexión y tu usuario no puede guardar ventas pendientes. Reconectate para continuar.");
   return "";

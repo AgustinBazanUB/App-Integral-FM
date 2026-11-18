@@ -14,7 +14,7 @@ function boundary(extra = {}) {
   const context = {
     render: (_type, props) => props, DiscountDialog: "DiscountDialog", dialog: state.dialog,
     availableDiscounts: [{ id: "cash", name: "Efectivo", type: "percent", value: 10 }],
-    discountIds: state.ids, manualDiscounts: state.manual, profile: { role: "admin" }, can: () => true,
+    discountIds: state.ids, manualDiscounts: state.manual, manualAllowed: true,
     setDiscountIds: value => { state.ids = value; }, setManualDiscounts: value => { state.manual = value; }, setDialog: value => { state.dialog = value; },
   };
   return { state, props: Function(...Object.keys(context), compiled)(...Object.values(context)), context };

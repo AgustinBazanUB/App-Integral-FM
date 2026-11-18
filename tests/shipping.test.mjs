@@ -62,17 +62,23 @@ test("permissions and denials: seller cannot impersonate admin, approve, prepare
   s.documents.set("users/admin", { ...admin, permissionDeny: { shipping: ["view", "admin", "approve", "edit"] } });
   await assert.rejects(s.op("address", { displayAddress: "Calle nueva 111", reason: "Corrección" }), /permiso/);
 });
-test("insufficient warehouse stock rolls back all sale and shipment writes; deferred approval also blocks insufficient stock", async () => {
+test("immediate shipping asks for warehouse stock confirmation; deferred approval still checks sufficient stock", async () => {
   const store = memoryStore(); store.documents.get("warehouseStock/infal/items/oil").currentStock = 1;
-  await assert.rejects(createShippingSale({ sale: sale({ stockOrigin: { type: "warehouse", id: "infal" } }), administrative: true, session: session(admin), requestId: "insufficient", runTransaction: store.runTransaction, now }), /stock disponible/);
+  const request = { sale: sale({ stockOrigin: { type: "warehouse", id: "infal" } }), administrative: true, session: session(admin), requestId: "insufficient", runTransaction: store.runTransaction, now };
+  const shortage = await createShippingSale(request).then(() => null, error => error);
+  assert.equal(shortage?.code, "sale/stock-confirmation");
   assert.equal([...store.documents.keys()].filter(key => key.startsWith("sales/")).length, 0);
+  const result = await createShippingSale({ ...request, sale: { ...request.sale, stockConfirmation: shortage.stockDiscrepancies } });
+  assert.equal(store.documents.get("warehouseStock/infal/items/oil").currentStock, -1);
+  assert.equal(store.documents.get("locationStock/valle/items/oil").currentStock, 10);
+  assert.equal(store.documents.get(`sales/${result.id}`).stockAuthorization.userId, admin.id);
   const s = await setup(); s.documents.get("warehouseStock/infal/items/oil").currentStock = 1;
   await assert.rejects(s.op("approve", approval), /stock insuficiente/);
   assert.equal(s.shipment().status, "solicitud_pendiente");
 });
-test("immediate location sale follows existing negative stock policy, deferred creation ignores local insufficiency", async () => {
+test("immediate location sale confirms negative stock, deferred creation ignores local insufficiency", async () => {
   const store = memoryStore(); store.documents.get("locationStock/valle/items/oil").currentStock = 0;
-  const result = await createShippingSale({ sale: sale(), administrative: true, session: session(admin), requestId: "negative", runTransaction: store.runTransaction, now });
+  const result = await createShippingSale({ sale: sale({ stockConfirmation: [{ productId: "oil", previousStock: 0, quantity: 2, newStock: -2 }] }), administrative: true, session: session(admin), requestId: "negative", runTransaction: store.runTransaction, now });
   assert.equal(store.documents.get("locationStock/valle/items/oil").currentStock, -2);
   assert.equal(result.stockDiscrepancies.length, 1);
   const deferred = await createShippingSale({ sale: sale(), session: session(seller), requestId: "deferred", runTransaction: store.runTransaction, now });

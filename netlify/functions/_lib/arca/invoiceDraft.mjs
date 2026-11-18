@@ -45,6 +45,8 @@ export async function validateInvoiceDraft({
       "Agregá productos antes de generar la factura.",
       "arca-items-invalid",
     );
+  if (Number(total) === 0 || items.some(item => item.gift === true))
+    throw problem("Las entregas bonificadas requieren revisión fiscal antes de emitir la factura.", "arca-gift-review-required");
   const cleaned = items.map((item) => {
     const productId = String(item.productId || item.id || "");
     const qty = Number(item.qty),

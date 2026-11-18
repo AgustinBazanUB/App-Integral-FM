@@ -286,6 +286,27 @@ service cloud.firestore {
         && (size < 3 || validPaymentPart(data.payments[2]))
         && (size < 4 || validPaymentPart(data.payments[3]));
     }
+    function validNoPayment(data) {
+      return data.total == 0 && data.paymentMethod == "none"
+        && data.paymentMethodLabel == "Sin cobro" && data.payments == [];
+    }
+    function saleDiscountPermission(action) {
+      let user = profile();
+      let role = normalizedRoleValue(user.role);
+      let grant = user.get("permissions", {}).get("quick-sales", null);
+      let allowedActions = user.get("permissionAllow", {}).get("quick-sales", []);
+      let deniedActions = user.get("permissionDeny", {}).get("quick-sales", []);
+      return activeUser() && !(action in deniedActions) && (
+        explicitPermissionFor(user, "quick-sales", action)
+        || action in allowedActions
+        || (grant == null && role in ["seller", "location_manager", "operational_admin", "admin", "general_admin"]));
+    }
+    function validSaleDiscountPermissions(data) {
+      return (!(data.get("discountTotal", 0) > 0 || data.get("discounts", []).size() > 0)
+        || saleDiscountPermission("useDiscounts"))
+        && (!(data.get("giftDiscountTotal", 0) > 0 || data.get("total", -1) == 0)
+          || (saleDiscountPermission("useDiscounts") && saleDiscountPermission("useManualDiscounts")));
+    }
     function validSale(data) {
       return data.sellerId == request.auth.uid
         && data.locationId is string
@@ -294,7 +315,7 @@ service cloud.firestore {
         && data.total >= 0
         && data.items is list
         && data.items.size() > 0
-        && (validSinglePayment(data) || validMultiplePayment(data));
+        && (validNoPayment(data) || validSinglePayment(data) || validMultiplePayment(data));
     }
     function linkedSellerStockMutation(locationId, productId) {
       let sale = getAfter(/databases/$(database)/documents/sales/$(request.resource.data.lastSaleId)).data;
@@ -339,8 +360,12 @@ service cloud.firestore {
       let afterIndex = data.get("saleItemIndex", -2);
       let before = beforeIndex >= 0 && beforeIndex < original.items.size() ? original.items[beforeIndex] : {"productId": data.productId, "qty": 0};
       let after = afterIndex >= 0 && afterIndex < sale.items.size() ? sale.items[afterIndex] : {"productId": data.productId, "qty": 0};
-      return sale.locationId == data.locationId
+      return (data.get("inventoryType", "location") == "warehouse"
+          ? sale.stockOriginType == "warehouse" && sale.stockOriginId == data.warehouseId
+          : sale.locationId == data.locationId)
         && (sale.sellerId == request.auth.uid || isAdmin())
+        && (sale.get("sourceType", "") != "admin_quick_sale" || data.type != "sale"
+          || (sale.stockAuthorization.userId == request.auth.uid && sale.stockAuthorization.confirmedAt == request.time))
         && sale.updatedAt == request.time
         && sale.get("deleted", false) != true
         && original.get("deleted", false) != true
@@ -361,18 +386,20 @@ service cloud.firestore {
         && data.createdAt == request.time
         && ((data.type in ["sale", "sale_edit", "sale_cancel"]
             && stock.lastSaleId == data.saleId && validNegativeSaleEffect(data))
-          || (data.type == "add" && data.previousStock < 0 && data.qty > 0));
+          || (data.type in ["add", "transfer_in"] && data.previousStock < 0 && data.qty > 0));
     }
     function validNegativeStockRecovery(locationId, productId) {
       let movement = getAfter(/databases/$(database)/documents/stockMovements/$(request.resource.data.lastMovementId)).data;
-      return canModule("locations", "loadStock") && allowedLocation(locationId)
+      return ((movement.type == "add" && canModule("locations", "loadStock"))
+          || (movement.type == "transfer_in" && canModule("warehouse", "transferStock")))
+        && allowedLocation(locationId)
         && resource.data.currentStock < 0
         && request.resource.data.currentStock is int
         && request.resource.data.currentStock > resource.data.currentStock
         && request.resource.data.productId == productId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["currentStock", "lastMovementId", "updatedAt", "updatedBy"])
         && movement.userId == request.auth.uid && movement.locationId == locationId && movement.productId == productId
-        && movement.type == "add" && movement.qty > 0
+        && movement.qty > 0
         && movement.previousStock == resource.data.currentStock
         && movement.newStock == request.resource.data.currentStock
         && movement.newStock == movement.previousStock + movement.qty
@@ -864,21 +891,52 @@ service cloud.firestore {
     function validWarehouseStock(data, productId) {
       return data.productId == productId
         && data.currentStock is int
-        && data.currentStock >= 0
         && !data.keys().hasAny([
           "price", "effectivePrice", "priceMode", "priceOverride", "masterDefaultPrice"
         ]);
+    }
+    function linkedQuickSaleStock(stock, originType, originId, productId, previous) {
+      let movement = getAfter(/databases/$(database)/documents/stockMovements/$(stock.lastMovementId)).data;
+      let sale = getAfter(/databases/$(database)/documents/sales/$(stock.lastSaleId)).data;
+      return isAdmin()
+        && movement.type == "sale" && movement.inventoryType == originType
+        && (originType == "warehouse" ? movement.warehouseId == originId : movement.locationId == originId)
+        && movement.productId == productId && movement.userId == request.auth.uid
+        && movement.saleId == stock.lastSaleId && movement.createdAt == request.time
+        && movement.previousStock == previous && movement.newStock == stock.currentStock
+        && movement.newStock == previous + movement.qty && movement.qty < 0
+        && sale.sourceType == "admin_quick_sale"
+        && sale.stockOriginType == originType && sale.stockOriginId == originId
+        && validNegativeSaleEffect(movement);
+    }
+    function linkedNegativeWarehouseMovement(data, movementId) {
+      let stock = getAfter(/databases/$(database)/documents/warehouseStock/$(data.warehouseId)/items/$(data.productId)).data;
+      return stock.lastMovementId == movementId && stock.currentStock == data.newStock
+        && data.newStock == data.previousStock + data.qty && data.createdAt == request.time
+        && ((data.type == "sale" && stock.lastSaleId == data.saleId && validNegativeSaleEffect(data))
+          || (data.type in ["add", "transfer_in"] && data.previousStock < 0 && data.qty > 0)
+          || (data.type == "adjustment" && data.newStock >= 0));
+    }
+    function validWarehouseStockRecovery(warehouseId, productId) {
+      let movement = getAfter(/databases/$(database)/documents/stockMovements/$(request.resource.data.lastMovementId)).data;
+      return resource.data.currentStock < 0
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["currentStock", "lastMovementId", "updatedAt", "updatedBy"])
+        && movement.inventoryType == "warehouse" && movement.warehouseId == warehouseId && movement.productId == productId
+        && movement.userId == request.auth.uid && movement.createdAt == request.time
+        && movement.type in ["add", "transfer_in"] && movement.qty > 0
+        && movement.previousStock == resource.data.currentStock && movement.newStock == request.resource.data.currentStock
+        && movement.newStock == movement.previousStock + movement.qty;
     }
     function validInventoryMovement(data, movementId) {
       return data.userId == request.auth.uid
         && data.productId is string
         && data.previousStock is int
-        && (data.previousStock >= 0 || (data.get("locationId", null) is string && data.type in ["sale", "sale_edit", "sale_cancel", "add", "adjustment"]))
         && data.newStock is int
         && ((data.previousStock >= 0 && data.newStock >= 0)
           || (data.get("locationId", null) is string && (
             (data.type == "adjustment" && data.newStock >= 0)
-            || linkedNegativeLocationMovement(data, movementId))))
+            || linkedNegativeLocationMovement(data, movementId)))
+          || (data.get("warehouseId", null) is string && linkedNegativeWarehouseMovement(data, movementId)))
         && data.qty is int
         && data.saleId is string
         && (!(data.type in ["adjustment", "initial_adjustment"])
@@ -981,7 +1039,10 @@ service cloud.firestore {
       allow read, write: if isAdmin();
       match /items/{productId} {
         allow read: if activeUser() && allowedLocation(locationId);
-        allow create: if validOperationalLocationStockCreate(locationId, productId);
+        allow create: if validOperationalLocationStockCreate(locationId, productId)
+          || (request.resource.data.currentStock is int && request.resource.data.currentStock < 0
+            && request.resource.data.productId == productId
+            && linkedQuickSaleStock(request.resource.data, "location", locationId, productId, 0));
         allow update: if validOperationalLocationStockMutation(locationId, productId)
           || validSellerStockMutation(locationId, productId)
           || validNegativeStockRecovery(locationId, productId);
@@ -1003,10 +1064,16 @@ service cloud.firestore {
       match /items/{productId} {
         allow read: if canModule("warehouse", "view");
         allow create: if canModule("warehouse", "edit")
-          && validWarehouseStock(request.resource.data, productId);
+          && validWarehouseStock(request.resource.data, productId)
+          && (request.resource.data.currentStock >= 0
+            || linkedQuickSaleStock(request.resource.data, "warehouse", warehouseId, productId, 0));
         allow update: if canModule("warehouse", "edit")
           && validWarehouseStock(request.resource.data, productId)
-          && request.resource.data.productId == resource.data.productId;
+          && request.resource.data.productId == resource.data.productId
+          && (request.resource.data.currentStock >= 0
+            || validWarehouseStockRecovery(warehouseId, productId)
+            || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(["currentStock", "lastMovementId", "lastSaleId", "updatedAt"])
+              && linkedQuickSaleStock(request.resource.data, "warehouse", warehouseId, productId, resource.data.currentStock)));
         allow delete: if false;
       }
     }
@@ -1039,7 +1106,10 @@ service cloud.firestore {
       allow create: if !("shipmentId" in request.resource.data)
         && (!("deliveryMethod" in request.resource.data) || request.resource.data.deliveryMethod != "shipping")
         && (!("sourceType" in request.resource.data) || request.resource.data.sourceType != "ecommerce")
+        && (request.resource.data.get("sourceType", "") != "admin_quick_sale" || isAdmin())
         && safeNewSaleFiscalFields(request.resource.data)
+        && validSaleDiscountPermissions(request.resource.data)
+        && (request.resource.data.get("paymentMethod", "") != "none" || validNoPayment(request.resource.data))
         && ((quickSalesPermission("create")
           && activeQuickSalesLocation(request.resource.data.locationId)
           && validSale(request.resource.data))
@@ -1050,6 +1120,9 @@ service cloud.firestore {
         && !hasFiscalInvoice(saleId, resource.data)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["fiscalInvoiceId", "fiscalInvoice", "fiscalEnvironment", "fiscalUpdatedAt", "fiscalCancellation", "invoiceStatus", "authorization", "verification", "cae", "voucherNumber", "sourceType", "paymentStatus", "paymentProvider"])
         && (!("sourceType" in request.resource.data) || request.resource.data.sourceType != "ecommerce")
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["discounts", "discountTotal", "giftDiscountTotal", "paymentMethod", "paymentMethodLabel", "payments", "total"])
+          || (validSaleDiscountPermissions(request.resource.data)
+            && (request.resource.data.get("paymentMethod", "") != "none" || validNoPayment(request.resource.data))))
         && ((quickSalesPermission("edit")
           && resource.data.sellerId == request.auth.uid
           && request.resource.data.sellerId == resource.data.sellerId

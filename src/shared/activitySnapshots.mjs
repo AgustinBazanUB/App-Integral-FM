@@ -5,8 +5,8 @@ const pick = (record, fields) => Object.fromEntries(fields.filter(key => record?
 export function saleActivitySnapshot(sale = {}) {
   return {
     ...pick(sale, ["saleCode", "status", "sourceChannel", "sourceType", "locationName", "stockOriginType", "stockOriginName", "warehouseName", "sellerName", "subtotal", "totalBeforeDiscounts", "discountTotal", "cashRoundingDiscountTotal", "total", "totalItems", "paymentMethod", "paymentMethodLabel", "ticketRequested", "ticketStatus", "invoiceStatus", "deliveryMethod", "cancelReason"]),
-    items: (sale.items || []).map(item => pick(item, ["productId", "name", "productName", "abbreviation", "qty", "quantity", "unitPrice", "price", "subtotal"])),
-    discounts: (sale.discounts || []).map(discount => pick(discount, ["name", "type", "value", "amount", "discountAmount", "source"])),
+    items: (sale.items || []).map(item => pick(item, ["productId", "name", "productName", "abbreviation", "qty", "quantity", "unitPrice", "price", "subtotal", "bonified", "lineDiscount", "netAmount"])),
+    discounts: (sale.discounts || []).map(discount => pick(discount, ["name", "type", "value", "amount", "amountApplied", "discountAmount", "source"])),
     payments: (sale.payments || []).map(payment => pick(payment, ["method", "label", "amount"])),
   };
 }

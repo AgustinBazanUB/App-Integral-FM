@@ -90,11 +90,54 @@ test("reglas: vendedor vende 0 → -1 → -2 y anula dejando -1 antes de recuper
 
 test("reglas: Administrador y reintento conservan una sola venta desde ubicación sin stock", async () => {
   const id = "negative-admin"; await seedProduct(id, -1);
-  const input = { ...sellerInput(id), profile: admin, stockOrigin: { type: "location", id: "origin" }, channel: "whatsapp", requestId: "negative-admin" };
+  const input = { ...sellerInput(id), profile: admin, stockOrigin: { type: "location", id: "origin" }, channel: "whatsapp", requestId: "negative-admin", stockConfirmation: [{ productId: id, previousStock: -1, quantity: 1, newStock: -2 }] };
   const [first, retry] = await Promise.all([service.createAdministrativeSale(input), service.createAdministrativeSale(input)]);
   assert.equal(first.id, retry.id);
   assert.equal((await getDoc(stockReference(globalThis.__quickSalesRulesDb, id))).data().currentStock, -2);
   assert.equal((await getDoc(doc(globalThis.__quickSalesRulesDb, "sales", first.id))).data().stockDiscrepancies[0].newStock, -2);
+});
+
+test("reglas: venta rápida bonificada y autorizada crea la ficha faltante en ambos tipos de origen", async () => {
+  const database = globalThis.__quickSalesRulesDb;
+  const ids = ["gift-one", "gift-two"];
+  await environment.withSecurityRulesDisabled(async context => {
+    for (const id of ids) await setDoc(doc(context.firestore(), "products", id), { name: id, defaultPrice: 350, active: true });
+  });
+  for (const [type, source] of [["location", "locationStock"], ["warehouse", "warehouseStock"]]) {
+    const args = {
+      profile: admin, stockOrigin: { type, id: "origin" }, channel: "in_person", requestId: `gift-${type}`,
+      items: ids.map(id => ({ productId: id, name: id, qty: 1, unitPrice: 350, gift: true })),
+    };
+    const shortage = await service.createAdministrativeSale(args).then(() => null, error => error);
+    assert.equal(shortage?.code, "sale/stock-confirmation");
+    assert.equal(shortage.stockDiscrepancies.length, 2);
+    const stock = doc(database, source, "origin", "items", ids[0]);
+    assert.equal((await getDoc(stock)).exists(), false);
+    const [first, retry] = await Promise.all([1, 2].map(() => service.createAdministrativeSale({ ...args, stockConfirmation: shortage.stockDiscrepancies })));
+    assert.equal(first.id, retry.id);
+    const sale = (await getDoc(doc(database, "sales", first.id))).data();
+    assert.equal(sale.stockAuthorization.userId, admin.id);
+    assert.equal(sale.giftDiscountTotal, 700);
+    assert.equal(sale.paymentMethod, "none");
+    assert.equal(sale.total, 0);
+    assert.equal((await getDoc(stock)).data().currentStock, -1);
+    await assertFails(setDoc(stock, { currentStock: -8 }, { merge: true }));
+    await service.addStockToInventory({ type, inventory: { id: "origin" }, product: { id: ids[0], productName: ids[0] }, quantity: 1, profile: admin, requestId: `gift-replenish-${type}` });
+    assert.equal((await getDoc(stock)).data().currentStock, 0);
+  }
+});
+
+test("reglas: vendedor autorizado registra una venta sin cobro y un vendedor sin permiso no puede crearla", async () => {
+  const id = "gift-seller"; await seedProduct(id, 3);
+  const result = await sellerService.createSellerSale({ ...sellerInput(id), paymentMethod: "", discounts: [{ source: "manual", type: "percent", value: 100 }] });
+  const sale = (await getDoc(doc(globalThis.__quickSalesRulesDb, "sales", result.id))).data();
+  assert.deepEqual(sale.payments, []);
+  assert.equal(sale.items[0].netAmount, 0);
+  assert.equal((await getDoc(stockReference(globalThis.__quickSalesRulesDb, id))).data().currentStock, 2);
+  const denied = "quick-seller-denied";
+  await environment.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), "users", denied), { ...seller, permissionDeny: { "quick-sales": ["useManualDiscounts"] } }));
+  const database = environment.authenticatedContext(denied).firestore();
+  await assertFails(setDoc(doc(database, "sales", "gift-forged"), { ...sale, sellerId: denied, createdBy: denied }));
 });
 
 test("reglas: carrito de ocho productos sin stock confirma todos los movimientos atómicos", async () => {
@@ -104,6 +147,24 @@ test("reglas: carrito de ocho productos sin stock confirma todos los movimientos
   assert.equal(result.total, 800);
   const database = environment.authenticatedContext(seller.id).firestore();
   for (const id of ids) assert.equal((await getDoc(stockReference(database, id))).data().currentStock, -1);
+});
+
+test("reglas: ocho faltantes sin ficha en depósito se procesan en una transacción", async () => {
+  const ids = Array.from({ length: 8 }, (_, index) => `warehouse-shortage-${index}`);
+  await environment.withSecurityRulesDisabled(async context => {
+    for (const id of ids) await setDoc(doc(context.firestore(), "products", id), { name: id, defaultPrice: 100, active: true });
+  });
+  const result = await service.createAdministrativeSale({
+    ...input("warehouse", "warehouse-shortage-many"),
+    paymentMethod: "cash",
+    customer: null,
+    items: ids.map(productId => ({ productId, name: productId, qty: 1, unitPrice: 100 })),
+    stockConfirmation: ids.map(productId => ({ productId, quantity: 1, previousStock: 0, newStock: -1 })),
+  });
+  assert.equal(result.stockDiscrepancies.length, ids.length);
+  for (const id of ids) {
+    assert.equal((await getDoc(doc(globalThis.__quickSalesRulesDb, "warehouseStock", "origin", "items", id))).data().currentStock, -1);
+  }
 });
 
 test("reglas: edición recalcula faltante y respeta el bloqueo de comprobantes fiscales", async () => {

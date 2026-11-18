@@ -19,7 +19,7 @@ import {
   Timestamp,
   where,
 } from "firebase/firestore";
-import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
+import { allocateOperationalSaleItems, calculateOperationalDiscountSummary, requiresFullDiscountPermission } from "../../modules/locations/domain/discounts";
 import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
 import { isLocationActiveNow } from "../../modules/locations/domain/locations";
 import { normalizePayment } from "../../modules/locations/domain/payments";
@@ -233,6 +233,13 @@ async function verifiedDiscounts({ profile, location, discounts, items }) {
   return [...normalizedSaved, ...normalizedManual];
 }
 
+function verifyFullDiscount(profile, items, summary) {
+  if (requiresFullDiscountPermission(items, summary) &&
+    (!can(profile, "quick-sales", "useDiscounts") || !can(profile, "quick-sales", "useManualDiscounts"))) {
+    throw saleValidationError("No tenés permiso para aplicar una bonificación del 100%.");
+  }
+}
+
 function saleRefs({ location, saleItems, seller, offlineSale, stockType = "location", requestId = null }) {
   const dateKey = argentinaDateKey().replaceAll("-", "");
   const prefix = String(location.codePrefix || "LOC")
@@ -301,7 +308,7 @@ async function resumeAdministrativeSale(sale, requestId, fingerprint) {
 }
 
 function administrativeFingerprint(sale) {
-  return JSON.stringify({ origin: sale.stockOrigin, channel: sale.channel, items: sale.items, discounts: sale.discounts || [], paymentMethod: sale.paymentMethod, payments: sale.payments || [], customer: sale.customer || null, customerDni: sale.customerDni || "", invoiceRequested: sale.invoiceRequested === true, deliveryMethod: sale.deliveryMethod || "pickup" });
+  return JSON.stringify({ origin: sale.stockOrigin, channel: sale.channel, items: sale.items, discounts: sale.discounts || [], paymentMethod: sale.paymentMethod, payments: sale.payments || [], customer: sale.customer || null, customerDni: sale.customerDni || "", invoiceRequested: sale.invoiceRequested === true, deliveryMethod: sale.deliveryMethod || "pickup", ...(sale.stockConfirmation?.length ? { stockConfirmation: sale.stockConfirmation } : {}) });
 }
 
 async function createSale({
@@ -318,6 +325,7 @@ async function createSale({
   offlineSale = null,
   administrative = false,
   stockOrigin = null,
+  stockConfirmation = null,
   channel = "in_person",
   requestId = null,
   requestFingerprint = null,
@@ -357,10 +365,11 @@ async function createSale({
   }
   const saleItems = cleanSaleItems(items);
   const safeDiscounts = await verifiedDiscounts({ profile, location: stockType === "warehouse" ? {} : permittedLocation, discounts, items: saleItems });
-  const subtotal = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal, { paymentMethod, roundCashTotal: administrative });
+  const discountSummary = calculateOperationalDiscountSummary(saleItems, safeDiscounts, { paymentMethod, roundCashTotal: administrative });
+  verifyFullDiscount(profile, saleItems, discountSummary);
+  if ((ticketRequested || invoiceRequested) && (discountSummary.total === 0 || saleItems.some(item => item.gift))) throw saleValidationError("Las entregas bonificadas requieren revisión fiscal antes de emitir la factura.");
   const payment = normalizePayment(paymentMethod, paymentMethodLabel, payments, discountSummary.total);
-  if (paymentMethod === "multiple" && !can(profile, "quick-sales", "useMultiplePayments")) throw saleValidationError("No tenés permiso para combinar pagos.");
+  if (payment.paymentMethod === "multiple" && !can(profile, "quick-sales", "useMultiplePayments")) throw saleValidationError("No tenés permiso para combinar pagos.");
   const preparedCustomer = await prepareSaleCustomer(customer);
   const refs = saleRefs({ location: permittedLocation, saleItems, seller: profile, offlineSale, stockType, requestId });
   const fingerprint = requestFingerprint;
@@ -405,10 +414,13 @@ async function createSale({
     for (const stockRef of refs.stockRefs) stockSnapshots.push(await transaction.get(stockRef));
 
     const priceOverrides = [];
+    const quickSaleProducts = administrative ? [] : null;
     if (administrative) {
       for (const [index, item] of saleItems.entries()) {
         const product = await transaction.get(doc(db, "products", item.productId));
         if (!product.exists() || product.data().active === false || product.data().deleted === true) throw saleValidationError(`${item.name} ya no está activo en el catálogo global.`);
+        quickSaleProducts.push(product.data());
+        item.name = product.data().name || item.name;
         const suggestedPrice = stockType === "warehouse" ? Number(product.data().defaultPrice || 0) : effectiveLocationPrice(product.data(), stockSnapshots[index].data() || {});
         item.categoryId = product.data().categoryId || null;
         if (item.unitPrice !== suggestedPrice) priceOverrides.push({ productId: item.productId, suggestedPrice, unitPrice: item.unitPrice });
@@ -424,11 +436,12 @@ async function createSale({
       localFields: saleLocalFields(), discountSummary, payment, customer: resolvedCustomer,
       stockType, administrative, requestId, requestFingerprint: fingerprint,
       priceOverrides, offlineSale: refs.localId ? { localId: refs.localId, createdLocallyAt } : null,
-      ticketRequested, customerDni, invoiceRequested, deliveryMethod, channel, legacyStockMutation,
+      ticketRequested, customerDni, invoiceRequested, deliveryMethod, channel, legacyStockMutation, quickSaleProducts, stockConfirmation,
     });
     transaction.set(refs.counterRef, plan.counterData, { merge: true });
     plan.stockWrites.forEach((write, index) => {
-      transaction.update(refs.stockRefs[index], write.stockData);
+      if (write.create) transaction.set(refs.stockRefs[index], write.stockData);
+      else transaction.update(refs.stockRefs[index], write.stockData);
       transaction.set(refs.movementRefs[index], write.movementData);
     });
     writeCustomerForSale(transaction, customerRef, customerSnapshot, resolvedCustomer, profile, refs.saleRef.id, administrative ? "admin_quick_sale" : "seller_sale");
@@ -487,10 +500,11 @@ export async function updateSellerSale({
   const location = await assertSellerLocation(profile, original.locationId);
   const newItems = cleanSaleItems(items);
   const safeDiscounts = await verifiedDiscounts({ profile, location, discounts, items: newItems });
-  const subtotal = newItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountSummary = calculateDiscountSummary(safeDiscounts, subtotal, { paymentMethod, roundCashTotal: original.sourceType === "admin_quick_sale" || original.cashRoundingEnabled === true });
+  const discountSummary = calculateOperationalDiscountSummary(newItems, safeDiscounts, { paymentMethod, roundCashTotal: original.sourceType === "admin_quick_sale" || original.cashRoundingEnabled === true });
+  verifyFullDiscount(profile, newItems, discountSummary);
   const payment = normalizePayment(paymentMethod, paymentMethodLabel, payments, discountSummary.total);
   const nextTicketRequested = ticketRequested == null ? original.ticketRequested === true : Boolean(ticketRequested);
+  if (nextTicketRequested && (discountSummary.total === 0 || newItems.some(item => item.gift))) throw saleValidationError("Las entregas bonificadas requieren revisión fiscal antes de emitir la factura.");
   if (nextTicketRequested && !can(profile, "quick-sales", "requestTicket")) {
     throw new Error("No tenés permiso para generar facturas.");
   }
@@ -508,6 +522,7 @@ export async function updateSellerSale({
     if (!saleSnapshot.exists()) throw new Error("La venta ya no existe.");
     const sale = saleSnapshot.data();
     if (sale.shipmentId) throw new Error("Esta venta tiene un envío vinculado. Solicitá revisión de logística antes de modificar productos o pagos.");
+    if (sale.stockOriginType === "warehouse") throw saleValidationError("Las ventas de depósito se anulan desde su origen. No se editan desde el Panel Vendedor.");
     if (sale.fiscalInvoiceId || sale.fiscalInvoice) throw new Error("La venta tiene una solicitud fiscal asociada. Requiere revisión administrativa.");
     if (sale.status !== "active") throw new Error("La venta está anulada.");
     if (!canAccessAdministration(profile) && sale.sellerId !== profile.id) {
@@ -571,7 +586,8 @@ export async function updateSellerSale({
       ? (sale.ticketRequested ? sale.ticketStatus || "pending" : "pending")
       : "not_requested";
     const nextSaleData = {
-      items: newItems,
+      items: allocateOperationalSaleItems(newItems, discountSummary),
+      giftDiscountTotal: discountSummary.giftDiscountTotal,
       stockDiscrepancies,
       discounts: discountSummary.discounts,
       discount: null,
@@ -583,7 +599,7 @@ export async function updateSellerSale({
       totalBeforeDiscounts: discountSummary.totalBeforeDiscounts,
       ...payment,
       ...customerSnapshotFields(resolvedCustomer),
-      subtotal,
+      subtotal: discountSummary.totalBeforeDiscounts,
       totalItems: newItems.reduce((sum, item) => sum + item.qty, 0),
       total: discountSummary.total,
       ticketRequested: nextTicketRequested,
