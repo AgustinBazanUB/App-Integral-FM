@@ -390,7 +390,7 @@ export default function LocationSalesPanel({ profile, location, products = [] })
               <div><span>Vendedor</span><strong>{detail.sellerName || detail.sellerId}</strong></div>
             </section>
 
-            <section><h3>Productos</h3><div className="fm-location-sale-detail__items">{(detail.items || []).map((item) => <article key={item.productId}><img src={productImage(item, productMap)} alt="" /><div><strong>{item.name}</strong><span>{item.abbreviation || "Sin abreviación"}</span></div><span>{item.qty} u.</span><span>{formatMoney(item.unitPrice)} c/u</span><strong>{formatMoney(item.subtotal)}</strong></article>)}</div></section>
+            <section><h3>Productos</h3><div className="fm-location-sale-detail__items">{(detail.items || []).map((item) => <article key={item.productId}><img src={productImage(item, productMap)} alt="" /><div><strong>{item.name}</strong><span>{item.bonified ? "Bonificado" : item.abbreviation}</span></div><span>{item.qty} u.</span><span>{formatMoney(item.unitPrice)} c/u</span><strong>{formatMoney(item.netAmount ?? item.subtotal)}</strong></article>)}</div></section>
 
             <section><h3>Descuentos</h3>{detailDiscounts.length ? <div className="fm-location-sale-detail__discounts">{detailDiscounts.map((discount, index) => <div key={`${discount.discountId || "manual"}-${index}`}><span><strong>{discount.name || "Descuento"}</strong><small>{discount.source === "manual" ? "Manual" : "Guardado"} · {discount.type === "percent" ? "Porcentaje" : "Monto fijo"} · {discount.type === "percent" ? `${discount.value}%` : formatMoney(discount.value)}</small></span><strong>− {formatMoney(discount.amountApplied)}</strong></div>)}</div> : <p className="fm-muted">Sin descuentos.</p>}</section>
 
@@ -400,6 +400,7 @@ export default function LocationSalesPanel({ profile, location, products = [] })
               <div><span>Subtotal</span><strong>{formatMoney(detail.subtotal ?? detail.totalBeforeDiscounts ?? detail.total)}</strong></div>
               <div><span>Descuentos fijos</span><strong>− {formatMoney(detailDiscountTotals.fixedDiscountTotal)}</strong></div>
               <div><span>Descuentos porcentuales</span><strong>− {formatMoney(detailDiscountTotals.percentageDiscountTotal)}</strong></div>
+              {detailDiscountTotals.giftDiscountTotal > 0 ? <div><span>Bonificaciones por producto</span><strong>− {formatMoney(detailDiscountTotals.giftDiscountTotal)}</strong></div> : null}
               {detailDiscountTotals.cashRoundingDiscountTotal > 0 ? <div><span>Redondeo por efectivo</span><strong>− {formatMoney(detailDiscountTotals.cashRoundingDiscountTotal)}</strong></div> : null}
               <div><span>Total descuentos</span><strong>− {formatMoney(detailDiscountTotals.discountTotal)}</strong></div>
               <div className="is-grand"><span>Total final</span><strong>{formatMoney(detail.total)}</strong></div>

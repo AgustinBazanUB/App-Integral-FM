@@ -18,9 +18,9 @@ import {
   normalizePayment,
   completeRemainingPayment,
 } from "../../modules/locations/domain/payments";
-import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
+import { calculateOperationalDiscountSummary } from "../../modules/locations/domain/discounts";
 import { SALES_CHANNELS } from "../../modules/locations/domain/channels";
-import { saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
+import { globalStockByProduct, saleStockDiscrepancies } from "../../modules/locations/domain/saleStock";
 import SaleStockWarning from "../components/SaleStockWarning";
 import ArcaBillingDialog from "../components/ArcaBillingDialog";
 import ProductImage from "../components/ProductImage";
@@ -38,7 +38,8 @@ import { useAsyncData } from "../hooks";
 import {
   createQuickSale,
 } from "../services/managementService";
-import { listQuickSaleStock, listWarehouses } from "../services/inventoryService";
+import { listWarehouses } from "../services/inventoryService";
+import { subscribeQuickSaleStock } from "../services/quickSaleStockService";
 import { requestPendingArcaInvoice, validateArcaInvoiceDraft } from "../services/arcaService";
 import SaleInvoicePanel from "../components/SaleInvoicePanel";
 import ArcaInvoicePrintAction from "../components/ArcaInvoicePrintAction";
@@ -63,15 +64,18 @@ export default function QuickSalesPage() {
   const [pendingIntent, setPendingIntent] = useState(() => readQuickSaleIntent(profile.id));
   const restored = pendingIntent?.sale;
   const locationsResult = useAsyncData(() => listLocationsShared(profile), [profile.id]);
-  const warehousesResult = useAsyncData(() => listWarehouses(profile), [profile.id]);
+  const warehousesResult = useAsyncData(() => listWarehouses(profile, { includeInactive: true }), [profile.id]);
   const productsResult = useAsyncData(() => listMasterProductsShared(profile), [profile.id]);
   const categoriesResult = useAsyncData(() => listProductCategoriesShared(profile), [profile.id]);
   const discountsResult = useAsyncData(() => listDiscountsShared(profile), [profile.id]);
   const [stockType, setStockType] = useState(restored?.stockOrigin?.type || "location");
   const [locationId, setLocationId] = useState(restored?.stockOrigin?.id || "");
-  const [stock, setStock] = useState(/** @type {{status: string, data: any[], error?: Error}} */ ({ status: "idle", data: [] }));
+  const [balances, setBalances] = useState(null);
+  const [stockError, setStockError] = useState(null);
+  const [stockReview, setStockReview] = useState(null);
   const [quantities, setQuantities] = useState(() => Object.fromEntries((restored?.items || []).map(item => [item.id, item.qty])));
   const [prices, setPrices] = useState(() => Object.fromEntries((restored?.items || []).map(item => [item.id, item.unitPrice])));
+  const [giftIds, setGiftIds] = useState(() => (restored?.items || []).filter(item => item.gift).map(item => item.id));
   const [paymentMethod, setPaymentMethod] = useState(restored?.paymentMethod || "");
   const [payments, setPayments] = useState(restored?.payments || SINGLE_PAYMENT_METHODS.map(method => ({ method, amount: "" })));
   const [customer, setCustomer] = useState(restored?.customer || { phone: "", name: "", zoneName: "" });
@@ -99,69 +103,52 @@ export default function QuickSalesPage() {
   const [lastShipmentId, setLastShipmentId] = useState(null);
 
   const locations = effectiveSellerLocations(profile, locationsResult.data || []);
-  const origins = stockType === "warehouse" ? (warehousesResult.data || []) : locations;
+  const warehouses = (warehousesResult.data || []).filter(warehouse => warehouse.active !== false);
+  const origins = stockType === "warehouse" ? warehouses : locations;
   const stockOrigin = { type: stockType, id: locationId };
   const locked = submitState.busy || Boolean(pendingIntent);
-  const refreshStock = async () => {
-    const data = await listQuickSaleStock(stockOrigin, profile);
-    setStock({ status: "ready", data });
-  };
   useEffect(() => {
     if (!locationId && origins.length && !pendingIntent) setLocationId(origins[0].id);
   }, [locationId, origins, pendingIntent]);
   useEffect(() => {
-    if (!locationId) { setStock({ status: "idle", data: [] }); return; }
-    let active = true;
-    setStock({ status: "loading", data: [] });
-    listQuickSaleStock({ type: stockType, id: locationId }, profile)
-      .then((data) => active && setStock({
-        status: "ready",
-        data,
-      }))
-      .catch((error) => active && setStock({ status: "error", data: [], error }));
-    return () => {
-      active = false;
-    };
-  }, [locationId, stockType, profile.id]);
-  useEffect(() => {
-    let active = true, refreshing = false;
-    const refresh = async event => {
-      if (!locationId || refreshing || submitRef.current || event.type === "shipping-changed" && !event.detail?.inventoryChanged) return;
-      refreshing = true;
-      try { const data = await listQuickSaleStock({ type: stockType, id: locationId }, profile); if (active) setStock({ status: "ready", data }); }
-      catch (error) { if (active) setStock({ status: "error", data: [], error }); }
-      finally { refreshing = false; }
-    };
-    window.addEventListener("shipping-changed", refresh); window.addEventListener("focus", refresh);
-    return () => { active = false; window.removeEventListener("shipping-changed", refresh); window.removeEventListener("focus", refresh); };
-  }, [locationId, stockType, profile.id]);
+    setBalances(null);
+    setStockError(null);
+    if (!locationsResult.data || !warehousesResult.data) return;
+    return subscribeQuickSaleStock(locationsResult.data, warehousesResult.data, setBalances, setStockError);
+  }, [locationsResult.data, warehousesResult.data]);
 
-  const catalog = useMemo(() => joinMasterProducts(productsResult.data || [], stock.data).filter(item => item.masterActive), [productsResult.data, stock.data]);
+  const inventory = useMemo(() => {
+    if (!balances) return { totals: null, error: null };
+    try { return { totals: globalStockByProduct(balances.values()), error: null }; }
+    catch (error) { return { totals: null, error }; }
+  }, [balances]);
+  const inventoryError = stockError || inventory.error || locationsResult.error || warehousesResult.error;
+  const originStock = balances?.get(`${stockType === "warehouse" ? "warehouseStock" : "locationStock"}/${locationId}`);
+  const stockReady = Boolean(originStock && inventory.totals && !inventoryError);
+  const catalog = useMemo(() => joinMasterProducts(productsResult.data || [], originStock).filter(item => item.masterActive), [productsResult.data, originStock]);
   const visibleProducts = catalog.filter(item => item.productName.toLocaleLowerCase("es").includes(search.toLocaleLowerCase("es")));
   const cart = useMemo(
     () => pendingIntent ? pendingIntent.sale.items.map(item => ({ ...item, productName: item.name, price: item.unitPrice })) :
       catalog
         .filter((item) => Number(quantities[item.id] || 0) > 0)
-        .map((item) => ({ ...item, price: prices[item.id] ?? item.price, qty: Number(quantities[item.id]) })),
-    [quantities, prices, catalog, pendingIntent],
-  );
-  const subtotal = cart.reduce(
-    (sum, item) => sum + Number(item.price || 0) * item.qty,
-    0,
+        .map((item) => ({ ...item, price: prices[item.id] ?? item.price, qty: Number(quantities[item.id]), gift: giftIds.includes(item.id) })),
+    [quantities, prices, catalog, pendingIntent, giftIds],
   );
   const selectedLocation = origins.find((item) => item.id === locationId);
-  const availableDiscounts = (discountsResult.data || []).filter((discount) => isDiscountAvailable(discount, stockType === "warehouse" ? {} : selectedLocation, new Date(), { profile, items: cart }));
+  const manualAllowed = can(profile, "quick-sales", "useDiscounts") && can(profile, "quick-sales", "useManualDiscounts");
+  const availableDiscounts = (discountsResult.data || []).filter((discount) => (manualAllowed || discount.type !== "percent" || Number(discount.value) !== 100) && isDiscountAvailable(discount, stockType === "warehouse" ? {} : selectedLocation || {}, new Date(), { profile, items: cart }));
   const appliedDiscounts = pendingIntent ? pendingIntent.sale.discounts : [...availableDiscounts.filter((discount) => discountIds.includes(discount.id)), ...manualDiscounts];
-  const saleSummary = useMemo(() => calculateDiscountSummary(appliedDiscounts, subtotal, { paymentMethod, roundCashTotal: true }), [appliedDiscounts, subtotal, paymentMethod]);
+  const saleSummary = useMemo(() => calculateOperationalDiscountSummary(cart, appliedDiscounts, { paymentMethod, roundCashTotal: true }), [appliedDiscounts, cart, paymentMethod]);
+  const fiscalReviewRequired = cart.length > 0 && (saleSummary.total === 0 || cart.some(item => item.gift));
 
   const allocation = paymentAllocationSummary(payments, saleSummary.total);
-  const stockDiscrepancies = stockType === "location" && !pendingIntent ? saleStockDiscrepancies(cart) : [];
+  const stockDiscrepancies = stockReady && !pendingIntent ? saleStockDiscrepancies(cart) : [];
 
   const changeQty = (item, amount) => {
+    if (amount < 0 && Number(quantities[item.id]) === 1) setGiftIds(ids => ids.filter(id => id !== item.id));
     setQuantities((current) => {
       const requested = Math.max(0, Number(current[item.id] || 0) + amount);
-      const next = stockType === "warehouse" ? Math.min(Math.max(0, Number(item.currentStock || 0)), requested) : requested;
-      return { ...current, [item.id]: next };
+      return { ...current, [item.id]: requested };
     });
   };
 
@@ -171,15 +158,14 @@ export default function QuickSalesPage() {
     result[key].items.push(item);
     return result;
   }, {}));
-  const canConfirm = Boolean(pendingIntent) || Boolean(cart.length && paymentMethod && channel &&
-    (paymentMethod !== "multiple" || (!allocation.invalid && allocation.difference === 0 && allocation.positiveCount >= 2)));
+  const canConfirm = Boolean(pendingIntent) || Boolean(stockReady && cart.length && selectedLocation && channel &&
+    (saleSummary.total === 0 || paymentMethod && (paymentMethod !== "multiple" || (!allocation.invalid && allocation.difference === 0 && allocation.positiveCount >= 2))));
   const switchOrigin = (id, type = stockType) => {
-    setStockType(type); setLocationId(id); setQuantities({}); setPrices({}); setDiscountIds([]);
-    setStock({ status: "idle", data: [] });
+    setStockType(type); setLocationId(id); setQuantities({}); setPrices({}); setDiscountIds([]); setGiftIds([]);
     setOpenCategoryId(null);
   };
   const openOriginDialog = () => { setOriginDraft({ channel, stockType, locationId }); setOriginError(""); setDialog("origin"); };
-  const draftOrigins = originDraft?.stockType === "warehouse" ? (warehousesResult.data || []) : locations;
+  const draftOrigins = originDraft?.stockType === "warehouse" ? warehouses : locations;
   const confirmOrigin = () => {
     if (!SALES_CHANNELS.some(option => option.value === originDraft?.channel) || !["location", "warehouse"].includes(originDraft?.stockType) || !draftOrigins.some(origin => origin.id === originDraft.locationId)) { setOriginError("Elegí el canal, el tipo de origen y la ubicación antes de confirmar."); return; }
     setChannel(originDraft.channel);
@@ -189,9 +175,14 @@ export default function QuickSalesPage() {
   const paymentStatus = allocation.invalid ? "Revisá los montos" : allocation.difference === 0 ? "Pagos completos" : allocation.difference > 0 ? `Falta ${formatMoney(allocation.difference)}` : `Excede ${formatMoney(-allocation.difference)}`;
 
 
-  const handleSubmit = async (event, requestInvoice = invoiceRequested, receiverOverride = null) => {
+  const handleSubmit = async (event, requestInvoice = invoiceRequested, receiverOverride = null, confirmation = null) => {
     event?.preventDefault();
     if (submitRef.current) return;
+    if (!pendingIntent && stockDiscrepancies.length && !confirmation) {
+      setStockReview({ discrepancies: stockDiscrepancies, requestInvoice, receiver: receiverOverride });
+      setDialog("stock-review");
+      return;
+    }
     submitRef.current = true;
     let sent = false;
     setRegisteredInvoice(null);
@@ -218,13 +209,14 @@ export default function QuickSalesPage() {
         if (!selectedLocation || !cart.length) throw new Error("Elegí un origen y agregá productos.");
         normalizePayment(paymentMethod, PAYMENT_LABELS[paymentMethod], payments, saleSummary.total);
         if(fiscalRequested) {
-          const draft=await validateArcaInvoiceDraft({sourceType:"admin_quick_sale",items:cart.map(item=>({productId:item.productId || item.id,qty:item.qty,unitPrice:Number(item.price)})),total:saleSummary.total,discountTotal:saleSummary.discountTotal,receiver});
+          const draft=await validateArcaInvoiceDraft({sourceType:"admin_quick_sale",items:cart.map(item=>({productId:item.productId || item.id,qty:item.qty,unitPrice:Number(item.price),gift:item.gift === true})),total:saleSummary.total,discountTotal:saleSummary.discountTotal,receiver});
           receiver=draft.receiver;
         }
         const existing = customer.phone.trim() ? await findCustomerByPhone(customer.phone) : null;
         const saleCustomer = customer.phone.trim() ? buildCustomerDraft({ ...customer, name: existing?.name || customer.name, zoneName: existing?.zoneName || existing?.customZone || customer.zoneName }) : null;
         const sale = {
-          stockOrigin, items: cart.map(item => ({ id: item.id, productId: item.id, name: item.productName, categoryId: item.categoryId || null, unitPrice: Number(item.price), qty: item.qty })),
+          stockOrigin, items: cart.map(item => ({ id: item.id, productId: item.id, name: item.productName, categoryId: item.categoryId || null, unitPrice: Number(item.price), qty: item.qty, ...(item.gift ? { gift: true } : {}) })),
+          ...(confirmation ? { stockConfirmation: confirmation } : {}),
           discounts: appliedDiscounts, paymentMethod, paymentMethodLabel: PAYMENT_LABELS[paymentMethod], payments,
           channel, customer: saleCustomer, customerDni, invoiceRequested: fiscalRequested, deliveryMethod, shipping: deliveryMethod === "shipping" ? shipping : null, receiverVatConditionId: receiverCondition, receiverDocument: receiverDigits, fiscalReceiver: receiver,
         };
@@ -264,6 +256,7 @@ export default function QuickSalesPage() {
       setPendingIntent(null);
       setQuantities({});
       setPrices({});
+      setGiftIds([]);
       setPayments(SINGLE_PAYMENT_METHODS.map(method => ({ method, amount: "" })));
       setCustomer({ phone: "", name: "", zoneName: "" });
       setCustomerState({ status: "idle" });
@@ -277,13 +270,16 @@ export default function QuickSalesPage() {
       setReceiverDocument("");
       setDiscountIds([]);
       setDialog("");
+      setStockReview(null);
       setSubmitState({ busy: false, error: "", success: `${result.saleCode} registrada por ${formatMoney(result.total)}.${result.shipmentId ? " Envío generado y stock imputado al origen elegido." : ""}${result.shippingLegacyReviewRequired ? " Se recuperó una venta anterior: gestión debe revisar y vincular su envío sin volver a descontar stock." : ""}${result.stockDiscrepancies?.length ? " Stock negativo pendiente de revisión." : ""}${invoiceNotice}` });
-      // Refresh failure must never turn a committed sale into a retryable commercial failure.
-      await refreshStock().catch(error => setStock({ status: "error", data: [], error }));
     } catch (error) {
-      if (!sent || [400, 403].includes(error.status) || error.status === 409 && error.code === "shipping/blocked" || ["sale/validation", "permission-denied", "seller/insufficient-stock", "invalid-argument", "failed-precondition"].includes(error.code)) {
+      if (!sent || [400, 403].includes(error.status) || error.status === 409 && error.code === "shipping/blocked" || ["sale/stock-confirmation", "sale/validation", "permission-denied", "seller/insufficient-stock", "invalid-argument", "failed-precondition"].includes(error.code)) {
         clearQuickSaleIntent(profile.id);
         setPendingIntent(null);
+      }
+      if (error.code === "sale/stock-confirmation") {
+        setStockReview({ discrepancies: error.stockDiscrepancies, requestInvoice: pendingIntent?.sale.invoiceRequested ?? requestInvoice, receiver: pendingIntent?.sale.fiscalReceiver ?? receiverOverride });
+        setDialog("stock-review");
       }
       setSubmitState({ busy: false, error: error.message, success: "" });
     } finally {
@@ -300,19 +296,21 @@ export default function QuickSalesPage() {
         <section data-olivia="sale.catalog" className="fm-quick-pos__catalog" aria-label="Catálogo de productos">
           <FormField label="Buscar producto o catálogo"><input type="search" disabled={locked} value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar en catálogo" /></FormField>
           {[locationsResult, warehousesResult, productsResult].some(result => result.status === "error") ? <EmptyState icon="AlertTriangle" title="No se pudieron leer los recursos" description="Revisá conexión y permisos." /> : null}
-          {productsResult.status === "loading" || stock.status === "loading" ? <Skeleton lines={4} /> : null}
-          {stock.status === "error" ? <EmptyState icon="AlertTriangle" title="No se pudo leer el stock" description={stock.error.message} /> : null}
+          {productsResult.status === "loading" || !inventory.totals && !inventoryError ? <Skeleton lines={4} /> : null}
+          {inventoryError ? <EmptyState icon="AlertTriangle" title="No se pudo leer el stock" description={inventoryError.message} /> : null}
           {!locationId ? <EmptyState icon="Box" title="Elegí de dónde sale la mercadería" description="Seleccioná una ubicación o un depósito activo." /> : null}
-          {stock.status === "ready" && !visibleProducts.length ? <EmptyState icon="Box" title="No hay productos disponibles" description="Revisá la búsqueda y los productos activos." /> : null}
+          {inventory.totals && !visibleProducts.length ? <EmptyState icon="Box" title="No hay productos disponibles" description="Revisá la búsqueda y los productos activos." /> : null}
           <div className="fm-quick-pos__categories">
-            {stock.status === "ready" && groups.map(group => <section key={group.id} className={`fm-quick-pos__category ${openCategoryId === group.id ? "is-open" : ""}`}>
+            {inventory.totals && groups.map(group => <section key={group.id} className={`fm-quick-pos__category ${openCategoryId === group.id ? "is-open" : ""}`}>
               <button type="button" className="fm-quick-pos__category-toggle" aria-expanded={openCategoryId === group.id} aria-controls={`quick-category-${group.id}`} onClick={() => setOpenCategoryId(current => current === group.id ? null : group.id)}>{group.name}<span>{group.items.length}</span></button>
               {openCategoryId === group.id ? <div id={`quick-category-${group.id}`}>
               <ProductSubcategoryRows items={group.items} category={(categoriesResult.data || []).find(category => category.id === group.id) || { name: group.name }} className="fm-quick-pos__carousel" renderProduct={item => {
                 const qty = Number(quantities[item.id] || 0);
-                return <button key={item.id} type="button" className={`fm-quick-pos__tile ${qty ? "is-selected" : ""}`} aria-label={`Agregar ${item.productName}`} disabled={locked || !item.hasLocalRecord || item.active === false || (stockType === "warehouse" && qty >= Number(item.currentStock || 0))} onClick={() => changeQty(item, 1)}>
+                return <button key={item.id} type="button" className={`fm-quick-pos__tile ${qty ? "is-selected" : ""}`} aria-label={`Agregar ${item.productName}`} disabled={locked || !stockReady || item.active === false || item.productDeleted === true} onClick={() => changeQty(item, 1)}>
                   <ProductImage className="fm-quick-pos__product-mark" product={item} eager />
-                  <strong>{item.productName}</strong><span>{formatMoney(item.price)}</span><small>{item.currentStock > 0 ? `${item.currentStock} disponibles` : `Stock registrado: ${item.currentStock}`}</small>
+                  <strong>{item.productName}{item.presentation ? ` · ${item.presentation}` : ""}</strong><span>{formatMoney(item.price)}</span>
+                  <small>Stock global: {inventory.totals.get(item.id) ?? 0}</small>
+                  {selectedLocation ? <small>{selectedLocation.name}: {item.currentStock}{item.active === false ? " · deshabilitado" : ""}</small> : null}
                   {qty > 0 ? <b className="fm-quick-pos__count">{qty}</b> : null}
                 </button>;
               }} />
@@ -322,23 +320,25 @@ export default function QuickSalesPage() {
         </section>
         </div>
         <section data-olivia="sale.cart" className="fm-quick-pos__sale" aria-label="Venta actual">
-          <div className="fm-quick-pos__cart-head"><h2>Venta actual</h2><Button variant="ghost" disabled={locked || !cart.length} onClick={() => { setQuantities({}); setPrices({}); }}>Vaciar</Button></div>
+          <div className="fm-quick-pos__cart-head"><h2>Venta actual</h2><Button variant="ghost" disabled={locked || !cart.length} onClick={() => { setQuantities({}); setPrices({}); setGiftIds([]); }}>Vaciar</Button></div>
           <div className="fm-quick-pos__cart">
             {!cart.length ? <p className="fm-quick-pos__empty">Tocá un producto para agregarlo a la venta.</p> : cart.map(item => <article key={item.id} className="fm-quick-pos__line">
-              <div><strong>{item.productName}</strong><button type="button" className="fm-quick-pos__price" disabled={locked} aria-label={`Editar precio de ${item.productName}`} onClick={() => { setPriceItem(item); setPriceDraft(String(item.price)); setDialog("price"); }}>{formatMoney(item.price)} / unidad · Editar</button></div>
-              <div className="fm-quantity-control"><button type="button" aria-label={`Quitar ${item.productName}`} disabled={locked} onClick={() => changeQty(item, -1)}>−</button><output aria-live="polite">{item.qty}</output><button type="button" aria-label={`Sumar ${item.productName}`} disabled={locked || (stockType === "warehouse" && item.qty >= Number(item.currentStock || 0))} onClick={() => changeQty(item, 1)}>+</button></div>
-              <strong>{formatMoney(item.qty * Number(item.price))}</strong>
+              <div><strong>{item.productName}</strong><button type="button" className="fm-quick-pos__price" disabled={locked || item.gift} aria-label={`Editar precio de ${item.productName}`} onClick={() => { setPriceItem(item); setPriceDraft(String(item.price)); setDialog("price"); }}>{formatMoney(item.price)} / unidad</button>
+                {manualAllowed ? <label><input type="checkbox" disabled={locked} checked={item.gift === true} onChange={event => setGiftIds(ids => event.target.checked ? [...ids, item.id] : ids.filter(id => id !== item.id))} /> Bonificar 100%</label> : null}
+              </div>
+              <div className="fm-quantity-control"><button type="button" aria-label={`Quitar ${item.productName}`} disabled={locked} onClick={() => changeQty(item, -1)}>−</button><output aria-live="polite">{item.qty}</output><button type="button" aria-label={`Sumar ${item.productName}`} disabled={locked || !stockReady || item.active === false || item.productDeleted === true} onClick={() => changeQty(item, 1)}>+</button></div>
+              <strong>{formatMoney(item.gift ? 0 : item.qty * Number(item.price))}</strong>
             </article>)}
           </div>
           <SaleStockWarning discrepancies={stockDiscrepancies} />
           <div className="fm-quick-pos__extras">
-            <Button variant="secondary" disabled={locked || discountsResult.status === "loading"} onClick={() => setDialog("discount")}>Descuento</Button>
+            <Button variant="secondary" disabled={locked || discountsResult.status === "loading" || !can(profile, "quick-sales", "useDiscounts")} onClick={() => setDialog("discount")}>Descuento</Button>
             <Button data-olivia="sale.customer" variant="secondary" disabled={locked} title={customer.phone ? customer.name || customer.phone : undefined} onClick={() => setDialog("customer")}>Cliente</Button>
             <Button variant="secondary" disabled={locked} aria-pressed={deliveryMethod === "shipping"} onClick={() => setDialog("shipping")}>{deliveryMethod === "shipping" ? "Con envío · editar" : "Con envío"}</Button>
             <Button data-olivia="sale.origin" variant="secondary" disabled={locked} onClick={openOriginDialog}>Canal</Button>
           </div>
           {appliedDiscounts.length ? <div className="fm-quick-pos__discounts">{appliedDiscounts.map((discount, index) => <button type="button" disabled={locked} key={`${discount.id || discount.discountId}-${index}`} aria-label={`Quitar ${discount.name}`} onClick={() => discount.source === "manual" ? setManualDiscounts(manual => manual.filter(entry => entry !== discount)) : setDiscountIds(ids => ids.filter(id => id !== (discount.discountId || discount.id)))}>{discount.name} ×</button>)}</div> : null}
-          <div data-olivia="sale.payment" className="fm-quick-pos__payments" role="group" aria-label="Forma de pago">{PAYMENT_OPTIONS.map(option => <button type="button" key={option.value} disabled={locked || (option.value === "multiple" && !can(profile, "quick-sales", "useMultiplePayments"))} aria-pressed={paymentMethod === option.value} className={paymentMethod === option.value ? "is-selected" : ""} onClick={() => { setPaymentMethod(option.value); if (option.value === "multiple") setDialog("payments"); }}>{friendlyPayments[option.value] || option.label}{option.value === "multiple" && paymentMethod === "multiple" ? <small>{paymentStatus}</small> : null}</button>)}</div>
+          {cart.length && saleSummary.total === 0 ? <p>Sin cobro</p> : <div data-olivia="sale.payment" className="fm-quick-pos__payments" role="group" aria-label="Forma de pago">{PAYMENT_OPTIONS.map(option => <button type="button" key={option.value} disabled={locked || (option.value === "multiple" && !can(profile, "quick-sales", "useMultiplePayments"))} aria-pressed={paymentMethod === option.value} className={paymentMethod === option.value ? "is-selected" : ""} onClick={() => { setPaymentMethod(option.value); if (option.value === "multiple") setDialog("payments"); }}>{friendlyPayments[option.value] || option.label}{option.value === "multiple" && paymentMethod === "multiple" ? <small>{paymentStatus}</small> : null}</button>)}</div>}
         </section>
       </div>
       {pendingIntent ? <Toast tone="warning">Confirmación pendiente. Recuperá el resultado de esta misma venta.</Toast> : null}
@@ -347,14 +347,18 @@ export default function QuickSalesPage() {
       {submitState.error ? <div data-olivia-error="sale.form"><Toast tone="error">{submitState.error}</Toast></div> : null}
       {submitState.success ? <Toast tone="success">{submitState.success}</Toast> : null}
       {registeredInvoice ? <SaleInvoicePanel sale={registeredInvoice} allowGenerate={can(profile,"quick-sales","requestTicket")}/> : null}
-      <footer className="fm-quick-pos__actions"><div><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div><Button variant="secondary" icon="FileText" disabled={locked || !canConfirm} onClick={() => setDialog("billing")}>Generar factura</Button><Button data-olivia="sale.submit" icon="Check" loading={submitState.busy} aria-disabled={!canConfirm || undefined} onClick={event => {
+      {fiscalReviewRequired ? <p>Las entregas bonificadas requieren revisión fiscal antes de emitir la factura.</p> : null}
+      <footer className="fm-quick-pos__actions"><div><span>Total</span><strong>{formatMoney(saleSummary.total)}</strong></div><Button variant="secondary" icon="FileText" disabled={locked || !canConfirm || fiscalReviewRequired} onClick={() => setDialog("billing")}>Generar factura</Button><Button data-olivia="sale.submit" icon="Check" loading={submitState.busy} aria-disabled={!canConfirm || undefined} onClick={event => {
         if (!canConfirm) {
-          const message = !cart.length ? "No se puede continuar. Agregá al menos un producto." : !paymentMethod ? "No se puede continuar. Seleccioná el medio de pago." : !channel ? "No se puede continuar. Falta seleccionar el canal de venta." : "No se puede continuar. Completá los pagos para cubrir el total.";
+          const message = !cart.length ? "Agregá al menos un producto." : !stockReady ? "Esperá a que se lea el stock o elegí un origen activo." : !channel ? "Seleccioná el canal de venta." : !paymentMethod ? "Seleccioná el medio de pago." : "Completá los pagos para cubrir el total.";
           setSubmitState({ busy: false, error: message, success: "" }); return;
         }
         handleSubmit(event, false);
       }}>{pendingIntent ? "Recuperar confirmación" : "Continuar"}</Button></footer>
 
+      <Modal open={dialog === "stock-review"} title="Stock insuficiente" description={`Origen: ${selectedLocation?.name || "origen seleccionado"}`} onClose={() => { if (!submitRef.current) setDialog(""); }} footer={<><Button variant="secondary" disabled={submitState.busy} onClick={() => setDialog("")}>Cancelar</Button><Button loading={submitState.busy} onClick={() => handleSubmit(null, stockReview.requestInvoice, stockReview.receiver, stockReview.discrepancies)}>Continuar de todas formas</Button></>}>
+        <SaleStockWarning discrepancies={stockReview?.discrepancies} />
+      </Modal>
       <Modal open={dialog === "origin"} title="Canal y origen del stock" description="Elegí por dónde llegó la venta y de dónde sale la mercadería." onClose={() => setDialog("")} footer={<><Button variant="secondary" onClick={() => setDialog("")}>Cancelar</Button><Button onClick={confirmOrigin}>Confirmar canal y origen</Button></>}>
         <FormField label="Canal comercial" required><Select value={originDraft?.channel || ""} onChange={event => setOriginDraft(current => ({ ...current, channel: event.target.value }))}><option value="">Elegir canal real</option>{SALES_CHANNELS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></FormField>
         <FormField label="Tipo de origen"><Select value={originDraft?.stockType || "location"} onChange={event => setOriginDraft(current => ({ ...current, stockType: event.target.value, locationId: "" }))}><option value="location">Ubicación</option><option value="warehouse">Depósito</option></Select></FormField>
@@ -362,7 +366,7 @@ export default function QuickSalesPage() {
         {originError ? <p className="fm-form-error" role="alert">{originError}</p> : null}
         {cart.length ? <p>Cambiar el origen vacía los productos seleccionados.</p> : null}
       </Modal>
-      <DiscountDialog open={dialog === "discount"} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} initialManualDiscounts={manualDiscounts} manualAllowed={can(profile, "quick-sales", "useManualDiscounts")} onClose={() => setDialog("")} onApply={({ savedIds, manual }) => { setDiscountIds(savedIds); setManualDiscounts(manual); setDialog(""); }} />
+      <DiscountDialog open={dialog === "discount"} availableDiscounts={availableDiscounts} selectedDiscountIds={discountIds} initialManualDiscounts={manualDiscounts} manualAllowed={manualAllowed} onClose={() => setDialog("")} onApply={({ savedIds, manual }) => { setDiscountIds(savedIds); setManualDiscounts(manual); setDialog(""); }} />
       <CustomerDialog open={dialog === "customer"} zones={zonesResult.data || []} initialCustomer={customer.phone ? customer : null} onClose={() => setDialog("")} onSelect={setCustomer} onClear={() => { setCustomer({ phone: "", name: "", zoneName: "" }); setDialog(""); }} />
       <Modal open={dialog === "payments"} title="Combinar pagos" description={`Total de la venta: ${formatMoney(saleSummary.total)}`} onClose={() => setDialog("")} footer={<Button disabled={allocation.invalid || allocation.difference !== 0 || allocation.positiveCount < 2} onClick={() => setDialog("")}>Listo</Button>}>
         {payments.map(part => <FormField key={part.method} label={friendlyPayments[part.method]}><div className="fm-quick-pos__payment-input"><input aria-label={friendlyPayments[part.method]} type="number" min="0" step="1" inputMode="numeric" value={part.amount} onChange={event => setPayments(current => current.map(entry => entry.method === part.method ? { ...entry, amount: event.target.value } : entry))} /><Button variant="ghost" disabled={allocation.invalid || allocation.difference <= 0} onClick={() => setPayments(current => completeRemainingPayment(current, part.method, saleSummary.total))}>Completar</Button></div></FormField>)}<p role="status">{paymentStatus}</p>

@@ -30,7 +30,7 @@ import {
   Skeleton,
   Toast,
 } from "../../design-system";
-import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
+import { calculateOperationalDiscountSummary } from "../../modules/locations/domain/discounts";
 import { isDiscountAvailable } from "../../modules/locations/domain/dashboard";
 import {
   completeRemainingPayment,
@@ -85,7 +85,6 @@ import {
 import {
   cartItems,
   cartQuantity,
-  cartSubtotal,
   groupSellerProducts,
   pendingReservedQuantities,
   SELLER_ACTION_SHORTCUTS,
@@ -390,27 +389,28 @@ export default function SellerPanel() {
   }, [products, stockResult.status]);
 
   const currentItems = useMemo(() => cartItems(cart), [cart]);
-  const subtotal = useMemo(() => cartSubtotal(cart), [cart]);
+  const discountAllowed = can(profile, "quick-sales", "useDiscounts");
+  const manualDiscountAllowed = discountAllowed && can(profile, "quick-sales", "useManualDiscounts");
   const availableDiscounts = useMemo(() => {
     // Durante el primer render las ubicaciones pueden estar cargadas pero el
     // effect que elige la ubicación todavía no corrió. Nunca se evalúan
     // descuentos contra una ubicación nula.
     if (!selectedLocation) return [];
     return discounts.filter((discount) =>
+      (manualDiscountAllowed || discount.type !== "percent" || Number(discount.value) !== 100) &&
       isDiscountAvailable(discount, selectedLocation, new Date(), { profile, items: currentItems }),
     );
-  }, [discounts, selectedLocation, profile, currentItems]);
+  }, [discounts, selectedLocation, profile, currentItems, manualDiscountAllowed]);
   const savedDiscounts = availableDiscounts
     .filter((discount) => discountIds.includes(discount.id))
     .map((discount) => ({ ...discount, discountId: discount.id, source: "saved" }));
   const appliedDiscounts = [...savedDiscounts, ...manualDiscounts];
   const summary = useMemo(
-    () => calculateDiscountSummary(appliedDiscounts, subtotal, { paymentMethod, roundCashTotal: editSale?.sourceType === "admin_quick_sale" || editSale?.cashRoundingEnabled === true }),
-    [appliedDiscounts, subtotal, paymentMethod, editSale?.sourceType, editSale?.cashRoundingEnabled],
+    () => calculateOperationalDiscountSummary(currentItems, appliedDiscounts, { paymentMethod, roundCashTotal: editSale?.sourceType === "admin_quick_sale" || editSale?.cashRoundingEnabled === true }),
+    [appliedDiscounts, currentItems, paymentMethod, editSale?.sourceType, editSale?.cashRoundingEnabled],
   );
   const stockDiscrepancies = saleStockDiscrepancies(currentItems);
-  const discountAllowed = can(profile, "quick-sales", "useDiscounts");
-  const manualDiscountAllowed = discountAllowed && can(profile, "quick-sales", "useManualDiscounts");
+  const fiscalReviewRequired = currentItems.length > 0 && (summary.total === 0 || currentItems.some(item => item.gift));
   const multiplePaymentAllowed = can(profile, "quick-sales", "useMultiplePayments");
   const ticketAllowed = can(profile, "quick-sales", "requestTicket");
 
@@ -427,7 +427,7 @@ export default function SellerPanel() {
   }, [availableDiscounts]);
 
   useEffect(() => {
-    if (paymentMethod === "multiple" && payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0) !== summary.total) {
+    if (summary.total > 0 && paymentMethod === "multiple" && payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0) !== summary.total) {
       if (submitRef.current) return;
       setSubmitState({ busy: false, tone: "error", message: sellerProblem("PAGO-TOTAL-CAMBIO", "El total cambió. Tocá +2 pagos para ajustar los importes; conservamos lo que ya cargaste.") });
     }
@@ -481,6 +481,7 @@ export default function SellerPanel() {
           price: Number(product.price || 0),
           unitPrice: Number(product.price || 0),
           qty: nextQty,
+          gift: existing?.gift === true,
           stock: Number(product.availableStock ?? product.stock ?? 0),
           ...resolveProductImages(product),
           unavailable: product.unavailable === true,
@@ -609,6 +610,7 @@ export default function SellerPanel() {
     },
     onShortcut: (shortcut) => {
       if (shortcut.paymentMethod) {
+        if (currentItems.length && summary.total === 0) return;
         if (shortcut.paymentMethod === "multiple") {
           if (!multiplePaymentAllowed) { setSubmitState({ busy: false, tone: "error", message: sellerProblem("PAGO-PERMISO", "Tu usuario no puede combinar pagos. Elegí un solo medio o pedí permiso al administrador.") }); return; }
           setMultipleOpen(true);
@@ -709,13 +711,14 @@ export default function SellerPanel() {
       price: Number(item.unitPrice || 0),
       unitPrice: Number(item.unitPrice || 0),
       qty: Number(item.qty || 0),
+      gift: item.gift === true,
       stock: Number(item.qty || 0),
       imageUrl: "/images/flor-mia/logo-flor-mia.svg",
     }])));
     const saleDiscounts = asArray(sale.discounts);
     setDiscountIds(saleDiscounts.filter((discount) => discount.source !== "manual" && discount.discountId !== "manual").map((discount) => discount.discountId || discount.id).filter(Boolean));
     setManualDiscounts(saleDiscounts.filter((discount) => discount.source === "manual" || discount.discountId === "manual").map((discount) => ({ ...discount, source: "manual", discountId: "manual" })));
-    setPaymentMethod(sale.paymentMethod || "");
+    setPaymentMethod(sale.cashRoundingDiscountTotal > 0 && sale.paymentMethod === "none" ? "cash" : sale.paymentMethod || "");
     setPayments(salePaymentParts(sale));
     setTicketRequested(sale.ticketRequested === true);
     setSelectedCustomer(sale.customerId && sale.customerPhoneSnapshot ? {
@@ -856,7 +859,7 @@ export default function SellerPanel() {
             {currentItems.length ? currentItems.map((item) => (
               <article key={item.id} className={item.qty > item.stock ? "has-stock-warning" : ""}>
                 <ProductImage product={item} />
-                <div><strong>{item.abbreviation || item.name}</strong><small>{formatMoney(item.price)} c/u · {formatMoney(item.qty * item.price)}</small></div>
+                <div><strong>{item.abbreviation || item.name}</strong><small>{formatMoney(item.price)} c/u · {formatMoney(item.gift ? 0 : item.qty * item.price)}</small>{manualDiscountAllowed ? <label><input type="checkbox" checked={item.gift === true} onChange={event => setCart(current => ({ ...current, [item.id]: { ...current[item.id], gift: event.target.checked } }))} /> Bonificar 100%</label> : null}</div>
                 <div className="fm-quantity-control"><button type="button" aria-label={`Quitar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, -1)}><Icon name="Minus" /></button><output aria-label={`Cantidad de ${item.name}`}>{item.qty}</output><button type="button" aria-label={`Agregar una unidad de ${item.name}`} onClick={() => changeQuantity(products.find((product) => product.id === item.id) || item, 1)}><Icon name="Plus" /></button></div>
                 <button type="button" className="fm-seller-line-remove" aria-label={`Eliminar ${item.name} del carrito`} onClick={() => setCart((current) => { const next = { ...current }; delete next[item.id]; return next; })}><Icon name="X" /></button>
               </article>
@@ -872,7 +875,7 @@ export default function SellerPanel() {
             <div className="fm-seller-discount-list" role="region" aria-label="Descuentos aplicados" tabIndex="0">
             {summary.discounts.length ? summary.discounts.map((discount, index) => <div key={`${discount.discountId}-${discount.type}-${discount.value}-${index}`} className="fm-seller-applied-discount"><span><strong>{discount.name}</strong><small>{discount.type === "percent" ? `${discount.value} %` : "Monto fijo"}</small></span><strong>− {formatMoney(discount.amountApplied)}</strong><button type="button" aria-label={`Quitar ${discount.name}`} onClick={() => removeDiscount(discount)}><Icon name="X" /></button></div>) : null}
             </div></div>
-            {summary.discounts.length ? <div className="fm-seller-discount-total"><span>Total descuentos</span><strong>− {formatMoney(summary.discountTotal)}</strong></div> : null}
+            {summary.discountTotal > 0 ? <div className="fm-seller-discount-total"><span>Total descuentos</span><strong>− {formatMoney(summary.discountTotal)}</strong></div> : null}
             {summary.cashRoundingDiscountTotal > 0 ? <div className="fm-seller-discount-total"><span>Incluye redondeo por efectivo</span><strong>− {formatMoney(summary.cashRoundingDiscountTotal)}</strong></div> : null}
           </div>
 
@@ -909,7 +912,7 @@ export default function SellerPanel() {
       </aside>
       <footer className="fm-seller-sticky-action fm-seller-sale-footer">
         <div><span>Total</span><strong>{formatMoney(summary.total)}</strong></div>
-        <Button variant="secondary" icon="FileText" disabled={submitState.busy || !ticketAllowed || !online || Boolean(editSale)} onClick={() => setBillingOpen(true)}>Generar factura</Button>
+        <Button variant="secondary" icon="FileText" disabled={submitState.busy || !ticketAllowed || !online || Boolean(editSale) || fiscalReviewRequired} onClick={() => setBillingOpen(true)}>Generar factura</Button>
         <Button icon="Check" loading={submitState.busy} onClick={() => submitSale()} className="fm-seller-confirm">{editSale ? "Guardar cambios" : online ? "Continuar" : shipping ? "Envío requiere conexión" : "Guardar pendiente"}</Button>
         {submitState.message ? <div className="fm-seller-action-feedback" role={submitState.tone === "error" ? "alert" : "status"}>{submitState.tone === "error" ? <p className="fm-form-error">{submitState.message}</p> : <Toast tone={submitState.tone}>{submitState.message}</Toast>}</div> : null}
       </footer>
@@ -992,10 +995,10 @@ export default function SellerPanel() {
               <Badge tone={statusTone(detailSale.status)}>{detailSale.status === "cancelled" ? "Anulada" : "Activa"}</Badge>
               <strong>{formatMoney(detailSale.total)}</strong>
             </div>
-            <section className="fm-seller-detail__section"><h3>Productos</h3><div>{asArray(detailSale.items).map((item) => <p key={item.productId}><span>{item.qty} × {item.name}<small>{formatMoney(item.unitPrice)} por unidad</small></span><strong>{formatMoney(item.subtotal)}</strong></p>)}</div>
+            <section className="fm-seller-detail__section"><h3>Productos</h3><div>{asArray(detailSale.items).map((item) => <p key={item.productId}><span>{item.qty} × {item.name}<small>{formatMoney(item.unitPrice)} por unidad{item.bonified ? " · Bonificado" : ""}</small></span><strong>{formatMoney(item.netAmount ?? item.subtotal)}</strong></p>)}</div>
               <dl className="fm-seller-detail__rows"><div><dt>Subtotal</dt><dd>{formatMoney(detailSale.subtotal)}</dd></div>{Number(detailSale.discountTotal)>0?<div><dt>Descuentos</dt><dd>− {formatMoney(detailSale.discountTotal)}</dd></div>:null}<div className="is-total"><dt>Total</dt><dd>{formatMoney(detailSale.total)}</dd></div></dl>
             </section>
-                <section className="fm-seller-detail__section"><h3>Forma de pago</h3><dl className="fm-seller-detail__rows">{salePaymentParts(detailSale).length?salePaymentParts(detailSale).map((payment,index)=><div key={`${payment.method}-${index}`}><dt>{friendlyPayment[payment.method] || payment.label}</dt><dd>{formatMoney(payment.amount)}</dd></div>):<div><dt>Sin información de pago</dt><dd>—</dd></div>}</dl></section>
+                <section className="fm-seller-detail__section"><h3>Forma de pago</h3><dl className="fm-seller-detail__rows">{salePaymentParts(detailSale).length?salePaymentParts(detailSale).map((payment,index)=><div key={`${payment.method}-${index}`}><dt>{friendlyPayment[payment.method] || payment.label}</dt><dd>{formatMoney(payment.amount)}</dd></div>):<div><dt>{detailSale.paymentMethod === "none" ? "Sin cobro" : "Sin información de pago"}</dt><dd>—</dd></div>}</dl></section>
             {detailSale.customerPhoneSnapshot || detailSale.customerNameSnapshot || detailSale.customerId ? (
               <div className="fm-seller-detail__customer">
                 <h3>Cliente asociado</h3>

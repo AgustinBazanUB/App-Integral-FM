@@ -14,3 +14,24 @@ export function saleStockDiscrepancies(items = [], stockForItem = item => item.s
     };
   }).filter(item => item.quantity > 0 && item.newStock < 0);
 }
+
+export function stockConfirmationMatches(confirmed, discrepancies) {
+  if (!Array.isArray(confirmed) || confirmed.length !== discrepancies.length) return false;
+  return discrepancies.every(expected => confirmed.some(item =>
+    item?.productId === expected.productId && item.quantity === expected.quantity &&
+    item.previousStock === expected.previousStock && item.newStock === expected.newStock));
+}
+
+export function globalStockByProduct(inventories) {
+  const totals = new Map();
+  for (const items of inventories) {
+    for (const item of items) {
+      if (item.deleted === true || item.productDeleted === true) continue;
+      const id = item.id;
+      const quantity = Number(item.currentStock ?? 0);
+      if (!Number.isSafeInteger(quantity)) throw new Error("Hay un saldo de inventario inválido.");
+      totals.set(id, (totals.get(id) || 0) + quantity);
+    }
+  }
+  return totals;
+}

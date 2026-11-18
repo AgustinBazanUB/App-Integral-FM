@@ -9,11 +9,11 @@ function harness(overrides = {}) {
     pendingIntent: null, stockOrigin: { type: 'location', id: 'local' }, customer: { phone: '' }, payments: [], prices: {},
     SALES_CHANNELS: [{ value: 'whatsapp' }], normalizePayment: noop, findCustomerByPhone: async () => null, buildCustomerDraft: value => value,
     saveQuickSaleIntent: (_id, sale) => ({ requestId: 'attempt-1', sale }), clearQuickSaleIntent: noop, setPendingIntent: noop,
-    setDialog: noop, setPrices: noop, setPayments: noop, setCustomer: noop, setCustomerState: noop, setManualDiscounts: noop, setShipping: noop, setDeliveryMethod: noop, setLastShipmentId: noop, shipping: null, SINGLE_PAYMENT_METHODS: ['cash'], refreshStock: async () => {},
+    setDialog: noop, setPrices: noop, setGiftIds: noop, setStockReview: noop, stockDiscrepancies: [], setPayments: noop, setCustomer: noop, setCustomerState: noop, setManualDiscounts: noop, setShipping: noop, setDeliveryMethod: noop, setLastShipmentId: noop, shipping: null, SINGLE_PAYMENT_METHODS: ['cash'],
     setSubmitState: (s) => states.push(s), setRegisteredInvoice: noop, setQuantities: noop, setCustomerDni: noop, setPaymentMethod: noop, setInvoiceRequested: noop, setReceiverVatConditionId: noop, setReceiverDocument: noop, setDiscountIds: noop, setStock: noop,
     createQuickSale: async () => ({ id: 's1', saleCode: 'QA-1', total: 1210 }), listLocationInventory: async () => [], requestPendingArcaInvoice: async () => ({ id: 'invoice-s1' }), validateArcaInvoiceDraft:async value=>({ready:true,receiver:value.receiver}), ...overrides };
   const submit = Function(...Object.keys(context), `${handlerSource}; return handleSubmit;`)(...Object.values(context));
-  return { submit: (invoice) => submit({ preventDefault() {} }, invoice), states, context };
+  return { submit: (invoice, confirmation) => submit({ preventDefault() {} }, invoice, null, confirmation), states, context };
 }
 test('Venta Rápida: dos submits antes del render registran una sola venta', async () => {
   let calls = 0; let finish;
@@ -39,12 +39,30 @@ test('fallo comercial libera bloqueo para corregir y volver a intentar', async (
 });
 
 
-test('confirmación incierta conserva el intento y falla de refresco posterior conserva el éxito comercial', async () => {
+test('confirmación incierta conserva el intento y la venta confirmada lo libera', async () => {
   let cleared = 0;
   const uncertain = harness({ clearQuickSaleIntent: () => { cleared++; }, createQuickSale: async () => { throw Object.assign(new Error('Acuse perdido'), { code: 'unavailable' }); } });
   await uncertain.submit(); assert.equal(cleared, 0); assert.equal(uncertain.states.at(-1).error, 'Acuse perdido');
-  const confirmed = harness({ refreshStock: async () => { throw new Error('Sin conexión al refrescar'); } });
-  await confirmed.submit(); assert.equal(confirmed.states.at(-1).error, ''); assert.match(confirmed.states.at(-1).success, /registrada/);
+  const confirmed = harness({ clearQuickSaleIntent: () => { cleared++; } });
+  await confirmed.submit(); assert.equal(cleared, 1); assert.match(confirmed.states.at(-1).success, /registrada/);
+});
+
+test("muestra todos los faltantes antes de escribir y exige actualizar la confirmación ante saldos nuevos", async () => {
+  const shown = [{ productId: "p1", previousStock: 0, quantity: 1, newStock: -1 }, { productId: "p2", previousStock: 1, quantity: 2, newStock: -1 }];
+  const updated = [{ ...shown[0], previousStock: -1, newStock: -2 }, shown[1]];
+  let calls = 0; let review; let dialog;
+  const h = harness({ stockDiscrepancies: shown, setStockReview: value => { review = value; }, setDialog: value => { dialog = value; }, createQuickSale: async sale => {
+    calls++;
+    assert.deepEqual(sale.stockConfirmation, shown);
+    throw Object.assign(new Error("Revisá los faltantes"), { code: "sale/stock-confirmation", stockDiscrepancies: updated });
+  } });
+  await h.submit(false);
+  assert.equal(calls, 0);
+  assert.equal(dialog, "stock-review");
+  assert.deepEqual(review.discrepancies, shown);
+  await h.submit(false, shown);
+  assert.equal(calls, 1);
+  assert.deepEqual(review.discrepancies, updated);
 });
 
 

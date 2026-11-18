@@ -294,6 +294,11 @@ export async function ensurePendingInvoice({
   const saleSnapshot = await getDocument(salePathFor(sourceId), { env });
   const sale = saleSnapshot?.data || null;
   validateSaleForInvoice(sourceType, sourceId, sale);
+  if (sale.paymentMethod === "none" || sale.items.some(item => item.gift === true)) {
+    throw Object.assign(new Error("Las entregas bonificadas requieren revisión fiscal antes de emitir la factura."), {
+      code: "arca-gift-review-required", status: 409, publicMessage: true,
+    });
+  }
   await assertInvoiceAssociation(invoiceId, null);
 
   const items = compactSaleItems(sale.items);

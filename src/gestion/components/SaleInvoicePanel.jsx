@@ -118,7 +118,7 @@ export default function SaleInvoicePanel({
         <p>Esta venta no tiene factura emitida.</p>
       ) : null}
       {state.error ? <Toast tone="error">{state.error}</Toast> : null}
-      {allowGenerate &&
+      {allowGenerate && (Boolean(invoice) || (sale.paymentMethod !== "none" && !sale.items?.some(item => item.gift))) &&
       sale.status !== "cancelled" &&
       !sale.fiscalCancellation &&
       !state.loading &&

@@ -45,6 +45,6 @@ export default async function handler(request, context = {}) {
       code: typeof error?.code === "string" ? error.code : "unknown",
       status: Number(error?.status) || 0,
     });
-    return json({ ok: false, code: error.publicMessage ? error.code : "shipping/unavailable", message: error.publicMessage ? error.message : "No se pudo completar la operación de envíos. Verificá la conexión y la configuración del servidor." }, Number(error.status) || 500);
+    return json({ ok: false, code: error.publicMessage ? error.code : "shipping/unavailable", message: error.publicMessage ? error.message : "No se pudo completar la operación de envíos. Verificá la conexión y la configuración del servidor.", ...(error.code === "sale/stock-confirmation" ? { stockDiscrepancies: error.stockDiscrepancies } : {}) }, Number(error.status) || 500);
   }
 }

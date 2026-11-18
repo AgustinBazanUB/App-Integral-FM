@@ -90,7 +90,7 @@ test("pagos con diferencia, canal manual, duplicados y catálogo inactivo no esc
 test("ubicación permite stock cero, insuficiente y negativo; registra saldo, aviso y actividad sin duplicar", async () => {
   for (const stock of [0, 1, -2]) {
     seed(); mock.data.get("locationStock/origin/items/oil").currentStock = stock;
-    const input = args("location", { items: [{ id: "oil", name: "Aceite", qty: 2, unitPrice: 2500 }] });
+    const input = args("location", { items: [{ id: "oil", name: "Aceite", qty: 2, unitPrice: 2500 }], stockConfirmation: [{ productId: "oil", previousStock: stock, quantity: 2, newStock: stock - 2 }] });
     const [first, retry] = await Promise.all([service.createQuickSale(input), service.createQuickSale(input)]);
     assert.equal(first.id, retry.id); assert.equal(sales().length, 1);
     assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, stock - 2);
@@ -122,11 +122,57 @@ test("vendedor registra 0 → -1 → -2; edición y anulación restituyen sólo 
   assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, 0);
 });
 
-test("faltante de depósito, producto ausente o deshabilitado y ubicación inactiva siguen rechazados", async () => {
-  seed(); await assert.rejects(service.createQuickSale(args("warehouse", { items: [{ id: "oil", qty: 21, unitPrice: 2500 }] })), /stock/); assert.equal(mock.writes.length, 0);
-  for (const change of [() => mock.data.delete("locationStock/origin/items/oil"), () => { mock.data.get("locationStock/origin/items/oil").active = false; }, () => { mock.data.get("locations/origin").active = false; }]) {
+test("faltante y ficha ausente exigen confirmar; productos deshabilitados u origen inactivo siguen rechazados", async () => {
+  seed(); await assert.rejects(service.createQuickSale(args("warehouse", { items: [{ id: "oil", name: "Aceite", qty: 21, unitPrice: 2500 }] })), { code: "sale/stock-confirmation" }); assert.equal(mock.writes.length, 0);
+  seed(); mock.data.delete("locationStock/origin/items/oil");
+  await assert.rejects(service.createQuickSale(args()), { code: "sale/stock-confirmation" }); assert.equal(mock.writes.length, 0);
+  for (const change of [() => { mock.data.get("locationStock/origin/items/oil").active = false; }, () => { mock.data.get("locations/origin").active = false; }]) {
     seed(); change(); await assert.rejects(service.createQuickSale(args())); assert.equal(mock.writes.length, 0);
   }
+});
+
+test("dos intentos concurrentes con los mismos faltantes exigen revisar el saldo tras el primer commit", async () => {
+  seed();
+  mock.data.get("warehouseStock/origin/items/oil").currentStock = 0;
+  mock.data.set("products/jam", { name: "Dulce", defaultPrice: 500, active: true });
+  const input = args("warehouse", {
+    items: [...args().items, { productId: "jam", name: "Dulce", qty: 3, unitPrice: 500, gift: true }],
+    stockConfirmation: [{ productId: "oil", previousStock: 0, quantity: 2, newStock: -2 }, { productId: "jam", previousStock: 0, quantity: 3, newStock: -3 }],
+  });
+  const results = await Promise.allSettled([service.createQuickSale(input), service.createQuickSale({ ...input, requestId: "attempt-2" })]);
+  assert.equal(results[0].status, "fulfilled");
+  assert.equal(results[1].reason.code, "sale/stock-confirmation");
+  assert.deepEqual(results[1].reason.stockDiscrepancies.map(item => item.previousStock), [-2, -3]);
+  assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, 20);
+  assert.equal(mock.data.get("warehouseStock/origin/items/jam").currentStock, -3);
+  assert.equal(sales()[0].items[1].unitPrice, 500);
+  assert.equal(sales()[0].items[1].netAmount, 0);
+  assert.equal(sales()[0].items[1].bonified, true);
+  assert.ok([...mock.data.values()].some(item => item.action === "sale.created" && item.stockAuthorization.userId === admin.id));
+  mock.sessionProfile = admin;
+  await service.cancelSellerSale({profile: admin, saleId: results[0].value.id, reason: "Prueba de restitución"});
+  assert.equal(mock.data.get("warehouseStock/origin/items/jam").currentStock, 0);
+  assert.equal(mock.data.get("warehouseStock/origin/items/oil").currentStock, 0);
+});
+
+test("Panel Vendedor conserva unidades, precio y descuento de una venta al 100% sin pagos", async () => {
+  seed();
+  const profile = { id: "lavalle", role: "seller", active: true, allowedLocationIds: ["origin"] };
+  const input = { profile, location: { id: "origin" }, items: args().items, discounts: [{ source: "manual", type: "percent", value: 100 }] };
+  await assert.rejects(service.createSellerSale({ ...input, profile: { ...profile, permissionDeny: { "quick-sales": ["useManualDiscounts"] } } }), /permiso/);
+  await service.createSellerSale(input);
+  const sale = sales()[0];
+  assert.equal(sale.paymentMethod, "none");
+  assert.deepEqual(sale.payments, []);
+  assert.equal(sale.total, 0);
+  assert.equal(sale.items[0].bonified, true);
+  const summary = calculateMetrics(sales(), range);
+  assert.equal(summary.byProduct[0].bonifiedUnits, 2);
+  assert.equal(summary.byProduct[0].total, 5000);
+  assert.equal(summary.byProduct[0].discount, 5000);
+  assert.equal(summary.byProduct[0].net, 0);
+  assert.deepEqual(summary.byPayment, []);
+  assert.equal(mock.data.get("locationStock/origin/items/oil").currentStock, 18);
 });
 
 test("nuevo cliente y teléfono argentino equivalente reutilizan el mismo registro e historial",async()=>{seed();const customer={phone:"+54 9 11 1234-5678",name:"Ana",zoneName:"CABA"};await service.createQuickSale(args("location",{customer}));const id=await customerDocumentId("1112345678");assert.equal(sales()[0].customerId,id);assert.equal(mock.data.get(`customers/${id}`).source,"admin_quick_sale");await service.createQuickSale(args("warehouse",{channel:"instagram",requestId:"attempt-2",customer:{phone:"11 1234-5678",name:"Nombre distinto",zoneName:"Otra zona"}}));assert.equal([...mock.data.keys()].filter(k=>k.startsWith("customers/")).length,1);assert.equal(sales()[1].customerNameSnapshot,"Ana");assert.equal(sales()[1].customerZoneSnapshot,"CABA");assert.equal(mock.data.get(`customers/${id}`).lastSaleId,sales()[1].id);});

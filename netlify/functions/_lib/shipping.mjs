@@ -3,7 +3,7 @@ import { adminRunTransaction, adminListDocuments } from "./firestoreAdminRest.mj
 import { can, canAccessAdministration, canAccessSellerPanel, effectiveSellerLocations, normalizedRole } from "../../../src/gestion/permissions.js";
 import { buildCustomerDraft, customerDocumentId } from "../../../src/gestion/customers/customerDomain.js";
 import { buildOperationalSalePlan, cleanOperationalSaleItems, customerSaleWrite, resolveOperationalCustomer } from "../../../src/shared/operationalWritePlans.mjs";
-import { calculateDiscountSummary } from "../../../src/modules/locations/domain/discounts.js";
+import { calculateOperationalDiscountSummary, requiresFullDiscountPermission } from "../../../src/modules/locations/domain/discounts.js";
 import { isDiscountAvailable } from "../../../src/modules/locations/domain/dashboard.js";
 import { effectiveLocationPrice } from "../../../src/modules/inventory/domain/inventory.js";
 import { normalizePayment } from "../../../src/modules/locations/domain/payments.js";
@@ -88,17 +88,18 @@ export async function createShippingSale({ sale, session, requestId, administrat
     if (administrative) assert(SALES_CHANNELS.some(channel => channel.value === sale.channel), "Elegí un canal comercial válido.");
     const items = cleanOperationalSaleItems(sale.items);
     assert(items.length <= 80, "La venta admite hasta 80 productos distintos.");
-    const stocks = [], priceOverrides = [];
+    const stocks = [], priceOverrides = [], quickSaleProducts = administrative ? [] : null;
     for (const item of items) {
       id(item.productId);
       const product = (await transaction.getDocument(`products/${item.productId}`))?.data;
       assert(product && product.active !== false && product.deleted !== true, "Un producto ya no está activo.");
       const stock = (await transaction.getDocument(`${originType === "warehouse" ? "warehouseStock" : "locationStock"}/${originId}/items/${item.productId}`))?.data;
-      assert(stock && stock.active !== false && stock.deleted !== true && stock.productDeleted !== true, `${product.name} no está habilitado en el origen.`);
-      const suggestedPrice = originType === "warehouse" ? Number(product.defaultPrice || 0) : effectiveLocationPrice(product, stock);
+      assert((stock || administrative) && stock?.active !== false && stock?.deleted !== true && stock?.productDeleted !== true, `${product.name} no está habilitado en el origen.`);
+      const suggestedPrice = originType === "warehouse" ? Number(product.defaultPrice || 0) : effectiveLocationPrice(product, stock || {});
       if (!administrative) assert(item.unitPrice === suggestedPrice, "El precio cambió. Actualizá el carrito.");
       else if (suggestedPrice !== item.unitPrice) priceOverrides.push({ productId: item.productId, suggestedPrice, unitPrice: item.unitPrice });
       item.name = product.name; item.categoryId = product.categoryId || null; stocks.push(stock);
+      quickSaleProducts?.push(product);
     }
     const discounts = [], savedIds = new Set();
     assert((sale.discounts || []).length <= 20, "Demasiados descuentos.");
@@ -117,10 +118,12 @@ export async function createShippingSale({ sale, session, requestId, administrat
         discounts.push({ discountId, name: discount.name, type: discount.type, value: discount.value, source: "saved" });
       }
     }
-    if (sale.paymentMethod === "multiple" && !can(profile, "quick-sales", "useMultiplePayments")) forbidden();
     if ((sale.ticketRequested || sale.invoiceRequested) && !can(profile, "quick-sales", "requestTicket")) forbidden();
-    const summary = calculateDiscountSummary(discounts, items.reduce((sum, item) => sum + item.subtotal, 0), { paymentMethod: sale.paymentMethod, roundCashTotal: administrative });
+    const summary = calculateOperationalDiscountSummary(items, discounts, { paymentMethod: sale.paymentMethod, roundCashTotal: administrative });
+    if (requiresFullDiscountPermission(items, summary) && (!can(profile, "quick-sales", "useDiscounts") || !can(profile, "quick-sales", "useManualDiscounts"))) forbidden();
+    assert(!(sale.ticketRequested || sale.invoiceRequested) || (summary.total > 0 && !items.some(item => item.gift)), "Las entregas bonificadas requieren revisión fiscal antes de emitir la factura.");
     const payment = normalizePayment(sale.paymentMethod, sale.paymentMethodLabel, sale.payments || [], summary.total);
+    if (payment.paymentMethod === "multiple" && !can(profile, "quick-sales", "useMultiplePayments")) forbidden();
     const prepared = buildCustomerDraft({ ...sale.customer, phone: sale.customer?.phone || sale.customer?.phoneNormalized });
     assert(prepared.name && prepared.name.length <= 200, "El cliente necesita nombre y teléfono.");
     prepared.id = await customerDocumentId(prepared.phoneNormalized);
@@ -136,7 +139,8 @@ export async function createShippingSale({ sale, session, requestId, administrat
     const plan = buildOperationalSalePlan({ profile, location, items, stocks, counter, saleId, movementIds, dateKey, prefix, stamp: now,
       localFields: { saleDate: argentinaDateKey(now), saleTime: new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(now) },
       discountSummary: summary, payment, customer, stockType: originType, administrative, requestId, requestFingerprint: fingerprint, priceOverrides,
-      ticketRequested: sale.ticketRequested === true, invoiceRequested: sale.invoiceRequested === true, customerDni: sale.customerDni || "", deliveryMethod: "shipping", channel: administrative ? sale.channel : "in_person", deferredStock: !administrative });
+      ticketRequested: sale.ticketRequested === true, invoiceRequested: sale.invoiceRequested === true, customerDni: sale.customerDni || "", deliveryMethod: "shipping", channel: administrative ? sale.channel : "in_person", deferredStock: !administrative,
+      quickSaleProducts, stockConfirmation: sale.stockConfirmation });
     Object.assign(plan.saleData, { sourceType: administrative ? "admin_quick_sale" : "seller_sale", deliveryMethod: "shipping", shipmentId, requestId, requestFingerprint: fingerprint, stockCommitState: administrative ? "committed" : "pending", ...(!administrative ? { stockOriginType: null, stockOriginId: null, stockOriginName: null } : {}) });
     const shipment = { id: shipmentId, shippingSchemaVersion: 1, saleId, saleCode: plan.saleData.saleCode, publicCode: `FM-E-${publicLookupId.slice(0, 8).toUpperCase()}`, publicLookupId,
       creationSource: plan.saleData.sourceType, createdBy: session.uid, commercialLocationId: plan.saleData.locationId, commercialLocationName: plan.saleData.locationName,
@@ -152,7 +156,7 @@ export async function createShippingSale({ sale, session, requestId, administrat
       eventWrite(shipment, "created", "created", session.uid, null, now, { actorRole: normalizedRole(profile) }), create(`auditLogs/shipping_sale_${saleId}`, plan.auditData),
       counter.lastNumber == null ? create(counterPath, plan.counterData) : update(counterPath, plan.counterData),
       customerDocument ? update(`customers/${customer.id}`, customerWrite) : create(`customers/${customer.id}`, customerWrite), ...notices];
-    plan.stockWrites.forEach((write, index) => operations.push(update(`${originType === "warehouse" ? "warehouseStock" : "locationStock"}/${originId}/items/${write.productId}`, write.stockData), create(`stockMovements/${movementIds[index]}`, write.movementData)));
+    plan.stockWrites.forEach((write, index) => operations.push((write.create ? create : update)(`${originType === "warehouse" ? "warehouseStock" : "locationStock"}/${originId}/items/${write.productId}`, write.stockData), create(`stockMovements/${movementIds[index]}`, write.movementData)));
     await transaction.commitDocuments(operations);
     return { ...plan.result, shipmentId, stockCommitState: shipment.stockCommitState, createdAt: now };
   }, { env });

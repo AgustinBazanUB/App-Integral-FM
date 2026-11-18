@@ -34,11 +34,19 @@ export default function ActivityDetail({ selected, state, onClose, onRetry }) {
           ]} />
         </section> : null}
         {sale && fields.total != null ? <p className="fm-activity-detail__total">Total de la venta: <strong>{formatMoney(fields.total)}</strong></p> : null}
+        {raw.stockAuthorization ? <section>
+          <h3>Venta con stock insuficiente autorizada</h3>
+          <p>{selected?.userName || raw.stockAuthorization.userId} · {formatDateTime(raw.stockAuthorization.confirmedAt)}</p>
+          <DataTable rows={raw.stockDiscrepancies || []} rowKey="productId" columns={[
+            { key: "name", label: "Producto" }, { key: "quantity", label: "Solicitado" },
+            { key: "previousStock", label: "Disponible" }, { key: "newStock", label: "Saldo resultante" },
+          ]} />
+        </section> : null}
         {movements.length ? <section><h3>Movimientos de stock</h3><DataTable rows={movements} columns={[{ key: "productName", label: "Producto" }, { key: "qty", label: "Variación" }, { key: "previousStock", label: "Antes" }, { key: "newStock", label: "Después" }, { key: "reason", label: "Motivo" }]} /></section> : null}
         {items.length ? <section><h3>{sale ? "Productos de la venta" : "Productos de la operación"}</h3><DataTable rows={items} rowKey="productId" columns={[
-          { key: "name", label: "Producto", render: item => item.name || item.productName || "Producto" },
+          { key: "name", label: "Producto", render: item => `${item.name || item.productName || "Producto"}${item.bonified ? " · Bonificado" : ""}` },
           { key: "qty", label: "Cantidad", render: item => item.qty ?? item.quantity ?? item.receivedQuantity ?? "—" },
-          ...(sale ? [{ key: "unitPrice", label: "Precio unitario", render: item => formatMoney(item.unitPrice ?? item.price) }, { key: "subtotal", label: "Importe", render: item => formatMoney(item.subtotal ?? Number(item.qty ?? item.quantity ?? 0) * Number(item.unitPrice ?? item.price ?? 0)) }] : [
+          ...(sale ? [{ key: "unitPrice", label: "Precio unitario", render: item => formatMoney(item.unitPrice ?? item.price) }, { key: "netAmount", label: "Importe", render: item => formatMoney(item.netAmount ?? item.subtotal ?? Number(item.qty ?? item.quantity ?? 0) * Number(item.unitPrice ?? item.price ?? 0)) }] : [
             { key: "preparedQuantity", label: "Preparada" }, { key: "receivedQuantity", label: "Recibida" }, { key: "missingQuantity", label: "Faltante" }, { key: "lostQuantity", label: "Perdida" },
           ]),
         ]} /></section> : null}

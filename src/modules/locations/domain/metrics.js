@@ -58,7 +58,11 @@ export function buildMetricsCustomRange(from, to) {
 
 const itemMatches = (item, id, name) => !id || item?.productId === id || (!item?.productId && name && item?.name === name);
 const discountIdentity = (discount, index = 0) => discount.discountId || discount.id || discount.name || `legacy-${index}`;
-const saleDiscountIds = (sale) => saleDiscountList(sale).map(discountIdentity);
+const giftDiscount = sale => Number(sale.giftDiscountTotal || 0);
+const saleDiscountIds = (sale) => [
+  ...saleDiscountList(sale).map(discountIdentity),
+  ...(giftDiscount(sale) > 0 ? ["__gift"] : []),
+];
 
 export const metricLocations = (locations) => (Array.isArray(locations) ? locations : []).filter((location) => location?.deleted !== true);
 
@@ -237,6 +241,11 @@ export function calculateMetrics(sales, range, filters = {}) {
       const product = row(byProduct, key, name);
       product.items += qty;
       product.total += amount;
+      product.bonifiedUnits = (product.bonifiedUnits || 0) + (item.bonified === true ? qty : 0);
+      const net = item.netAmount ?? (storedDiscountTotal(sale) > 0 ? null : amount);
+      product.netIncomplete ||= net == null;
+      product.net = (product.net || 0) + (net ?? 0);
+      product.discount = (product.discount || 0) + (item.lineDiscount ?? 0);
       if (!productsInSale.has(key)) { product.sales += 1; productsInSale.add(key); }
       if (filters.productId && itemMatches(item, filters.productId, filters.productName)) {
         selectedProductAmount += amount;
@@ -254,6 +263,14 @@ export function calculateMetrics(sales, range, filters = {}) {
     discountTotal += saleDiscountTotal;
     if (saleDiscountTotal > 0) discountedSales += 1;
     const discounts = saleDiscountList(sale);
+    if (giftDiscount(sale) > 0) {
+      const entry = row(byDiscount, "__gift", "Bonificación por producto");
+      entry.sales += 1;
+      entry.total += giftDiscount(sale);
+      entry.salesTotal = (entry.salesTotal || 0) + saleTotal;
+      entry.source = "gift";
+      entry.type = "percent";
+    }
     discounts.forEach((discount, index) => {
       const key = discountIdentity(discount, index);
       const name = discount.name || (discount.source === "manual" ? "Descuento manual" : "Descuento");

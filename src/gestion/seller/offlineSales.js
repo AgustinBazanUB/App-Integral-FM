@@ -1,4 +1,4 @@
-import { calculateDiscountSummary } from "../../modules/locations/domain/discounts";
+import { calculateOperationalDiscountSummary } from "../../modules/locations/domain/discounts";
 import { normalizePayment } from "../../modules/locations/domain/payments";
 import { buildCustomerDraft } from "../customers/customerDomain";
 
@@ -95,18 +95,19 @@ function normalizePendingSale(sale) {
       unitPrice,
       qty,
       subtotal: unitPrice * qty,
+      ...(item.gift === true ? { gift: true } : {}),
     };
   });
   if (!items.length) throw new Error("La venta pendiente está vacía.");
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
   const discounts = Array.isArray(sale.discounts) ? sale.discounts : [];
-  const discountSummary = calculateDiscountSummary(discounts, subtotal);
+  const discountSummary = calculateOperationalDiscountSummary(items, discounts);
   const total = wholeNumber(sale.total, "El total");
   if (total !== discountSummary.total) {
     throw new Error("El total pendiente no coincide con los descuentos aplicados.");
   }
   const payment = normalizePayment(
-    requiredText(sale.paymentMethod, "la forma de pago"),
+    sale.paymentMethod,
     sale.paymentMethodLabel,
     sale.payments,
     total,

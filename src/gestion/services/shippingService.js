@@ -10,7 +10,7 @@ export async function shippingRequest(body, { publicAccess = false, signal, keep
   const token = !publicAccess && auth.currentUser ? await auth.currentUser.getIdToken() : null;
   const response = await fetch("/.netlify/functions/shipping", { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body), signal, keepalive });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok || payload.ok !== true) throw Object.assign(new Error(payload.message || "No se pudo consultar el módulo de envíos."), { code: payload.code, status: response.status });
+  if (!response.ok || payload.ok !== true) throw Object.assign(new Error(payload.message || "No se pudo consultar el módulo de envíos."), { code: payload.code, status: response.status, stockDiscrepancies: payload.stockDiscrepancies });
   if (mutationModes.has(body.mode)) changed(body.mode === "approve" || body.mode === "create_sale" && body.administrative === true);
   return payload.result;
 }

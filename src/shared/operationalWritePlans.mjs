@@ -1,5 +1,6 @@
 import { effectiveLocationPrice, wholeInventoryQuantity } from "../modules/inventory/domain/inventory.js";
-import { saleStockDiscrepancies } from "../modules/locations/domain/saleStock.js";
+import { saleStockDiscrepancies, stockConfirmationMatches } from "../modules/locations/domain/saleStock.js";
+import { allocateOperationalSaleItems } from "../modules/locations/domain/discounts.js";
 import { saleActivitySnapshot } from "./activitySnapshots.mjs";
 
 const userName = profile => profile.name || profile.email || "Usuario";
@@ -13,7 +14,7 @@ export function cleanOperationalSaleItems(items = []) {
     if (!qty) return null;
     const unitPrice = wholeInventoryQuantity(item.unitPrice ?? item.price ?? 0, `El precio de ${item.name || item.productName || "un producto"}`);
     if (!Number.isSafeInteger(qty * unitPrice)) throw validationError("El importe supera el límite permitido.");
-    return { productId: item.productId || item.id, name: item.name || item.productName, abbreviation: item.abbreviation || "", categoryId: item.categoryId || null, unitPrice, qty, subtotal: qty * unitPrice };
+    return { productId: item.productId || item.id, name: item.name || item.productName, abbreviation: item.abbreviation || "", categoryId: item.categoryId || null, unitPrice, qty, subtotal: qty * unitPrice, ...(item.gift === true ? { gift: true } : {}) };
   }).filter(Boolean);
   if (!cleaned.length) throw validationError("La venta está vacía.");
   const ids = cleaned.map(item => item.productId);
@@ -47,26 +48,48 @@ export function customerSaleWrite({ existing, customer, profile, saleId, stamp, 
   return { customerKey: customer.id, phone: customer.phone, phoneNormalized: customer.phoneNormalized, name: customer.name || null, zoneId: customer.zoneId || null, zoneName: customer.zoneName, customZone: customer.customZone || null, active: true, deleted: false, source, createdBy: profile.id, createdByName: userName(profile), createdAt: stamp, updatedAt: stamp, lastSaleId: saleId, lastPurchaseAt: stamp };
 }
 
-export function buildOperationalSalePlan({ profile, location, items, stocks, counter = {}, saleId, movementIds, dateKey, prefix, stamp, localFields, discountSummary, payment, customer = null, stockType = "location", administrative = false, requestId = null, requestFingerprint = null, priceOverrides = [], offlineSale = null, ticketRequested = false, customerDni = "", invoiceRequested = false, deliveryMethod = "pickup", channel = "in_person", legacyStockMutation = false, deferredStock = false }) {
+export function buildOperationalSalePlan({ profile, location, items, stocks, counter = {}, saleId, movementIds, dateKey, prefix, stamp, localFields, discountSummary, payment, customer = null, stockType = "location", administrative = false, requestId = null, requestFingerprint = null, priceOverrides = [], offlineSale = null, ticketRequested = false, customerDni = "", invoiceRequested = false, deliveryMethod = "pickup", channel = "in_person", legacyStockMutation = false, deferredStock = false, quickSaleProducts = null, stockConfirmation = null }) {
   if (stocks.length !== items.length || movementIds.length !== items.length) throw validationError("La lectura de stock está incompleta.");
   const next = Number(counter.lastNumber || 0) + 1;
   if (!Number.isSafeInteger(next) || next <= 0) throw validationError("El contador de ventas no es válido.");
   const saleCode = `FM-${prefix}-${dateKey}-${String(next).padStart(4, "0")}`;
   const stockWrites = deferredStock ? [] : stocks.map((stock, index) => {
     const item = items[index];
-    if (!stock || stock.active === false || stock.deleted === true || stock.productDeleted === true) throw validationError(`${item.name} ya no está habilitado en esta ubicación.`);
-    const previousStock = Number(stock.currentStock || 0);
+    const product = quickSaleProducts?.[index];
+    if ((!stock && !product) || stock?.active === false || stock?.deleted === true || stock?.productDeleted === true) throw validationError(`${item.name} ya no está habilitado en este origen.`);
+    const previousStock = Number(stock?.currentStock ?? 0);
     if (!Number.isSafeInteger(previousStock)) throw validationError(`El stock registrado de ${item.name} no es válido.`);
-    if (stockType === "warehouse" && previousStock < item.qty) throw Object.assign(new Error(`${item.name}: el stock disponible es ${previousStock}. Corregí el carrito antes de continuar.`), { code: "seller/insufficient-stock", productId: item.productId, availableStock: previousStock });
+    if (!quickSaleProducts && stockType === "warehouse" && previousStock < item.qty) throw Object.assign(new Error(`${item.name}: el stock disponible es ${previousStock}. Corregí el carrito antes de continuar.`), { code: "seller/insufficient-stock", productId: item.productId, availableStock: previousStock });
     const currentStock = previousStock - item.qty;
     if (!Number.isSafeInteger(currentStock)) throw validationError("El saldo de stock supera el límite permitido.");
     return {
       productId: item.productId,
-      stockData: { currentStock, lastSaleId: saleId, ...(legacyStockMutation ? {} : { lastMovementId: movementIds[index] }), updatedAt: stamp },
+      create: !stock,
+      stockData: {
+        ...(!stock ? {
+          productId: item.productId, productName: product.name, abbreviation: product.abbreviation || "",
+          categoryId: product.categoryId || "", categoryName: product.categoryName || "",
+          presentation: product.presentation || "", imageUrl: product.imageUrl || "", thumbUrl: product.thumbUrl || "",
+          initialStock: 0, assignedAt: stamp, assignedBy: profile.id, updatedBy: profile.id,
+          active: true, deleted: false, productDeleted: false,
+          ...(stockType === "location" ? {
+            priceMode: "default", priceOverride: null, price: Number(product.defaultPrice || 0),
+            masterDefaultPrice: Number(product.defaultPrice || 0), yellowAlertQty: 0, redAlertQty: 0,
+          } : {}),
+        } : {}),
+        currentStock, lastSaleId: saleId, ...(legacyStockMutation && !quickSaleProducts ? {} : { lastMovementId: movementIds[index] }), updatedAt: stamp,
+      },
       movementData: { inventoryType: stockType, ...(stockType === "warehouse" ? { warehouseId: location.id, warehouseName: location.name } : { locationId: location.id, locationName: location.name }), productId: item.productId, productName: item.name, type: "sale", qty: -item.qty, previousStock, newStock: currentStock, reason: `Venta ${saleCode}`, userId: profile.id, userName: userName(profile), saleId, saleItemIndex: index, previousSaleItemIndex: -1, createdAt: stamp },
     };
   });
-  const stockDiscrepancies = !deferredStock && stockType === "location" ? saleStockDiscrepancies(items, item => Number(stocks[items.indexOf(item)]?.currentStock || 0)) : [];
+  const stockDiscrepancies = !deferredStock && (stockType === "location" || quickSaleProducts)
+    ? saleStockDiscrepancies(items.map((item, index) => ({ ...item, stock: stockWrites[index].movementData.previousStock }))) : [];
+  if (quickSaleProducts && stockDiscrepancies.length && !stockConfirmationMatches(stockConfirmation, stockDiscrepancies)) {
+    throw Object.assign(new Error("Revisá los faltantes del origen antes de continuar."), {
+      code: "sale/stock-confirmation", status: 409, publicMessage: true, stockDiscrepancies,
+    });
+  }
+  const stockAuthorization = quickSaleProducts && stockDiscrepancies.length ? { userId: profile.id, confirmedAt: stamp } : null;
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
   if (!Number.isSafeInteger(subtotal) || !Number.isSafeInteger(discountSummary.total)) throw validationError("El total de la venta supera el límite permitido.");
   const ticketStatus = ticketRequested ? "pending" : "not_requested";
@@ -75,8 +98,10 @@ export function buildOperationalSalePlan({ profile, location, items, stocks, cou
     saleCode, ...origin,
     ...(stockType === "warehouse" ? { warehouseId: location.id, warehouseName: location.name } : {}),
     ...(administrative ? { sourceType: "admin_quick_sale", requestId, requestFingerprint, priceOverrides, customerDni: String(customerDni).trim() || null, invoiceStatus: invoiceRequested ? "pending" : "not_requested", deliveryMethod } : {}),
-    locationPrefix: prefix, sellerId: profile.id, sellerName: userName(profile), createdBy: profile.id, createdByName: userName(profile), items,
+    locationPrefix: prefix, sellerId: profile.id, sellerName: userName(profile), createdBy: profile.id, createdByName: userName(profile), items: discountSummary.giftDiscountTotal !== undefined ? allocateOperationalSaleItems(items, discountSummary) : items,
     ...(stockDiscrepancies.length ? { stockDiscrepancies } : {}),
+    ...(stockAuthorization ? { stockAuthorization } : {}),
+    ...(discountSummary.giftDiscountTotal ? { giftDiscountTotal: discountSummary.giftDiscountTotal } : {}),
     discounts: discountSummary.discounts, discount: null, fixedDiscountTotal: discountSummary.fixedDiscountTotal, percentageDiscountTotal: discountSummary.percentageDiscountTotal, discountTotal: discountSummary.discountTotal, totalBeforeDiscounts: discountSummary.totalBeforeDiscounts,
     ...(discountSummary.cashRoundingDiscountTotal > 0 ? { cashRoundingDiscountTotal: discountSummary.cashRoundingDiscountTotal } : {}),
     ...(discountSummary.cashRoundingEnabled ? { cashRoundingEnabled: true } : {}),
@@ -87,6 +112,7 @@ export function buildOperationalSalePlan({ profile, location, items, stocks, cou
   };
   const auditData = { action: "sale.created", title: offlineSale ? "Venta pendiente sincronizada" : "Venta registrada", description: `${saleCode} · ${location.name}`, moduleId: "quick-sales", entityType: "sale", entityId: saleId, locationId: origin.locationId, locationName: origin.locationName, stockOriginType: stockType, stockOriginId: location.id, sourceChannel: saleData.sourceChannel, userId: profile.id, userName: userName(profile), status: "completed", amount: discountSummary.total, ...(priceOverrides.length ? { priceOverrides } : {}), ...(stockDiscrepancies.length ? { stockDiscrepancies } : {}), ticketRequested: Boolean(ticketRequested), ...(customer ? { customerId: customer.id } : {}), createdAt: stamp };
   auditData.detailSnapshot = saleActivitySnapshot(saleData);
+  if (stockAuthorization) auditData.stockAuthorization = stockAuthorization;
   return { saleData, auditData, stockWrites, counterData: { locationId: origin.locationId, stockOriginType: stockType, stockOriginId: location.id, date: dateKey, lastNumber: next }, result: { id: saleId, saleCode, total: discountSummary.total, ...payment, stockDiscrepancies, customerId: customer?.id || null, ticketRequested: Boolean(ticketRequested), ticketStatus } };
 }
 

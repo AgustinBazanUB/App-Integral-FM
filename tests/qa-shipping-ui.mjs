@@ -21,14 +21,15 @@ if(body.mode==='ready'){row.status='listo_retirar';row.revision++;emit();return{
 if(body.mode==='incident'){row.incident={reason:body.reason,note:body.note};row.revision++;emit();return{id:row.id};}
 if(body.mode==='courier_action'){row.status=body.action==='pickup'?'reparto_final':'entregado';row.revision++;emit();return{id:row.id};}if(['gps_start','gps_stop','position'].includes(body.mode))throw Error('GPS endpoint disabled in QA');if(body.mode==='labels')return{shipment:structuredClone(row)};if(body.mode==='approve'){row.status='aprobado';row.stockCommitState='committed';row.stockOriginName='Depósito Infal';row.assignedPreparerIds=['admin'];row.preparerNames=['Preparador de prueba'];row.deliveryType=body.deliveryType;row.revision++;emit();return{id:row.id}};return{id:row.id}};export const shippingAction=(shipmentId,mode,data={})=>shippingRequest({shipmentId,mode,...data});export const issueShippingAccess=async()=>({url:location.origin+'/reparto#synthetic',expiresAt:'2026-10-16T22:00:00Z'});export const createCourierRouteAccess=async()=>({url:location.origin+'/reparto#synthetic',expiresAt:'2026-10-16T22:00:00Z',shipmentIds:[]});export const createCourierQrAccess=async({sessionId,token})=>{rows[1].status='listo_retirar';return{sessionId,shipmentIds:['shipment_1'],expiresAt:new Date(Date.now()+3600000).toISOString(),token}};export const subscribeShippingShipment=(shipmentId,notify)=>{notify(structuredClone(rows.find(row=>row.id===shipmentId)));return()=>{}};export const subscribeCourierSession=(sessionId,notify)=>{notify(null);return()=>{}};`,
   sharedResources: `export const listLocationsShared=async()=>[{id:'valle',name:'Local Valle',active:true}];export const listMasterProductsShared=async()=>[{id:'oil',name:'Aceite de oliva 2 L',active:true,defaultPrice:1000,categoryId:'food',categoryName:'Almacén'}];export const listDiscountsShared=async()=>[];export const listProductCategoriesShared=async()=>[{id:'food',name:'Almacén'}];`,
-  inventoryService: `export const listWarehouses=async()=>[{id:'infal',name:'Depósito Infal',active:true}];export const listQuickSaleStock=async()=>[{id:'oil',productId:'oil',productName:'Aceite de oliva 2 L',currentStock:10,active:true,price:1000}];`,
-  managementService: `export const createQuickSale=async()=>({id:'sale-qa',saleCode:'FM-QA',shipmentId:'shipment_1',total:2000});`,
+  inventoryService: `export const listWarehouses=async()=>[{id:'infal',name:'Depósito Infal',active:true}];`,
+  quickSaleStockService: `export const subscribeQuickSaleStock=(_locations,_warehouses,notify)=>{notify(new Map([['locationStock/valle',[]],['warehouseStock/infal',[{id:'oil',currentStock:10}]]]));return()=>{};};`,
+  managementService: `export const createQuickSale=async payload=>{window.__qaSale=payload;return {id:'sale-qa',saleCode:'FM-QA',total:0,stockDiscrepancies:payload.stockConfirmation};};`,
   customerService: `export const listActiveCustomerZones=async()=>[];export const findCustomerByPhone=async()=>null;`,
   arcaService: `export const lookupArcaBillingReceiver=async()=>null;export const validateArcaInvoiceDraft=async()=>{throw Error('ARCA deshabilitada en QA')};export const requestPendingArcaInvoice=async()=>{throw Error('ARCA deshabilitada en QA')};`,
   SaleInvoicePanel: `export default()=>null;`, ArcaInvoicePrintAction: `export default()=>null;`,
 };
   await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{RouterProvider}from'./src/router';import ShippingPage from './src/gestion/pages/ShippingPage';import QuickSalesPage from './src/gestion/pages/QuickSalesPage';import ShippingPublicApp from './src/gestion/shipping/ShippingPublicApp';import '@fontsource/inter/latin-400.css';import '@fontsource/inter/latin-600.css';import '@fontsource/cormorant-garamond/latin-600.css';import './src/styles.css';import './src/styles/tokens.css';import './src/styles/theme.css';import './src/styles/management.css';import './src/styles/responsive.css';import './src/gestion/styles/quick-sales.css';document.body.className='fm-management-body';createRoot(document.getElementById('root')).render(<RouterProvider><div style={{padding:24,maxWidth:1500,margin:'auto'}}><p>QA LOCAL · DATOS SINTÉTICOS · SIN SERVICIOS PRODUCTIVOS</p>{location.pathname.includes('quick-sales')?<QuickSalesPage/>:location.pathname.startsWith('/e/')||location.pathname==='/reparto'||location.pathname==='/seguimiento'?<ShippingPublicApp/>:<ShippingPage/>}</div></RouterProvider>);`, resolveDir: process.cwd(), loader: "jsx" }, bundle: true, external: ["/images/*"], outdir: directory, entryNames: "app", format: "esm", jsx: "automatic", define: { "import.meta.env": "{}" }, loader: { ".woff": "dataurl", ".woff2": "dataurl", ".png": "dataurl", ".webp": "dataurl", ".wasm": "file" }, plugins: [{ name: "shipping-qa-mocks", setup(builder) {
-  builder.onResolve({ filter: /(?:AuthContext|shippingService|sharedResources|inventoryService|managementService|customerService|arcaService|SaleInvoicePanel|ArcaInvoicePrintAction)$/ }, args => ({ path: args.path.split("/").at(-1), namespace: "mock" }));
+  builder.onResolve({ filter: /(?:AuthContext|shippingService|sharedResources|inventoryService|quickSaleStockService|managementService|customerService|arcaService|SaleInvoicePanel|ArcaInvoicePrintAction)$/ }, args => ({ path: args.path.split("/").at(-1), namespace: "mock" }));
   builder.onLoad({ filter: /.*/, namespace: "mock" }, args => ({ contents: mocks[args.path], loader: "jsx" }));
 } }] });
 const html = '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"><div id="root"></div><script type="module" src="/app.js"></script></html>';
@@ -86,6 +87,30 @@ try {
   await page.getByLabel("Dirección de entrega", { exact: false }).fill("Calle de prueba 123, CABA");
   await page.screenshot({ path: path.join(directory, "quick-sale-modal-mobile.png"), fullPage: true });
   await page.getByRole("button", { name: "Guardar envío" }).click(); await page.getByRole("button", { name: "Con envío · editar" }).waitFor(); checks.push("existing_quick_sale_shipping_modal");
+  await page.reload();
+  await page.getByRole("button", { name: "Canal", exact: true }).click();
+  await page.getByLabel("Canal comercial").selectOption("in_person");
+  await page.getByLabel("Origen físico del stock").selectOption("valle");
+  await page.getByRole("button", { name: "Confirmar canal y origen" }).click();
+  await page.getByRole("button", { name: /Almacén/ }).click();
+  const variant = page.getByRole("button", { name: "Agregar Aceite de oliva 2 L" });
+  assert.match(await variant.innerText(), /Stock global: 10\s+Local Valle: 0/);
+  await variant.click();
+  await page.getByLabel("Bonificar 100%").check();
+  await page.getByText("Sin cobro", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  const stockDialog = page.getByRole("dialog", { name: "Stock insuficiente" });
+  assert.match(await stockDialog.innerText(), /Solicitado 1 · Disponible 0 · Saldo resultante -1/);
+  await page.screenshot({ path: path.join(directory, "quick-sale-shortage-mobile.png"), fullPage: true });
+  await stockDialog.getByRole("button", { name: "Cancelar", exact: true }).click();
+  assert.equal(await page.evaluate(() => window.__qaSale ?? null), null);
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await stockDialog.getByRole("button", { name: "Continuar de todas formas" }).click();
+  await page.getByText(/FM-QA registrada/).waitFor();
+  const submitted = await page.evaluate(() => window.__qaSale);
+  assert.equal(submitted.items[0].gift, true);
+  assert.equal(submitted.stockConfirmation[0].newStock, -1);
+  checks.push("quick_sale_global_stock_shortage_cancel_confirm_and_gift");
   await page.goto(`${base}/e/synthetic_lookup_1`); await page.getByRole("heading", { name: "¿Cómo querés continuar?" }).waitFor();
   await page.screenshot({ path: path.join(directory, "qr-mobile.png"), fullPage: true });
   await page.getByRole("button", { name: /Soy repartidor/ }).click(); await page.getByRole("heading", { name: "Envío para Destinatario de prueba" }).waitFor();
