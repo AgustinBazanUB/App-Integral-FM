@@ -418,6 +418,25 @@
   .fm-location-sale__badges { grid-column: 1; grid-row: auto; justify-content: flex-start; }
 }
 
+.fm-sale-gift-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  min-height: 32px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.fm-sale-gift-toggle input[type="checkbox"] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--fm-gold-primary);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fm-seller-products > button,
   .fm-location-sales__list > button,

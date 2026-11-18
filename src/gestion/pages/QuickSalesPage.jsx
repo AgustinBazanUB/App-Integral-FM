@@ -324,7 +324,7 @@ export default function QuickSalesPage() {
           <div className="fm-quick-pos__cart">
             {!cart.length ? <p className="fm-quick-pos__empty">Tocá un producto para agregarlo a la venta.</p> : cart.map(item => <article key={item.id} className="fm-quick-pos__line">
               <div><strong>{item.productName}</strong><button type="button" className="fm-quick-pos__price" disabled={locked || item.gift} aria-label={`Editar precio de ${item.productName}`} onClick={() => { setPriceItem(item); setPriceDraft(String(item.price)); setDialog("price"); }}>{formatMoney(item.price)} / unidad</button>
-                {manualAllowed ? <label><input type="checkbox" disabled={locked} checked={item.gift === true} onChange={event => setGiftIds(ids => event.target.checked ? [...ids, item.id] : ids.filter(id => id !== item.id))} /> Bonificar 100%</label> : null}
+                {manualAllowed ? <label className="fm-sale-gift-toggle"><input type="checkbox" disabled={locked} checked={item.gift === true} onChange={event => setGiftIds(ids => event.target.checked ? [...ids, item.id] : ids.filter(id => id !== item.id))} /> Bonificar 100%</label> : null}
               </div>
               <div className="fm-quantity-control"><button type="button" aria-label={`Quitar ${item.productName}`} disabled={locked} onClick={() => changeQty(item, -1)}>−</button><output aria-live="polite">{item.qty}</output><button type="button" aria-label={`Sumar ${item.productName}`} disabled={locked || !stockReady || item.active === false || item.productDeleted === true} onClick={() => changeQty(item, 1)}>+</button></div>
               <strong>{formatMoney(item.gift ? 0 : item.qty * Number(item.price))}</strong>
