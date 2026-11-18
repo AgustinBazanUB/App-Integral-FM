@@ -880,8 +880,10 @@ export default function SellerPanel() {
           </div>
 
 
-          <fieldset className={`fm-seller-payments${multiplePaymentAllowed ? " has-multiple" : ""}`}><legend>Forma de pago *</legend>{PAYMENT_OPTIONS.filter((option) => option.value !== "multiple" || multiplePaymentAllowed).map((option) => { const selected = paymentMethod === option.value; return <button key={option.value} type="button" className={`${selected ? "is-selected" : ""}${option.value === "multiple" ? " fm-seller-payments-multiple" : ""}`} aria-pressed={selected} onClick={() => option.value === "multiple" ? setMultipleOpen(true) : (setPaymentMethod(option.value), setPayments([]), setSubmitState({ busy: false, tone: "info", message: "" }))}>{selected ? <Icon name="Check" /> : null}<span>{friendlyPayment[option.value]}</span></button>; })}</fieldset>
-          {paymentMethod === "multiple" ? <p className="fm-seller-payment-summary">{payments.map((payment) => `${friendlyPayment[payment.method]} ${formatMoney(payment.amount)}`).join(" · ")}</p> : null}
+          {currentItems.length > 0 && summary.total === 0 ? <p role="status">Sin cobro</p> : (
+            <fieldset className={`fm-seller-payments${multiplePaymentAllowed ? " has-multiple" : ""}`}><legend>Forma de pago *</legend>{PAYMENT_OPTIONS.filter((option) => option.value !== "multiple" || multiplePaymentAllowed).map((option) => { const selected = paymentMethod === option.value; return <button key={option.value} type="button" className={`${selected ? "is-selected" : ""}${option.value === "multiple" ? " fm-seller-payments-multiple" : ""}`} aria-pressed={selected} onClick={() => option.value === "multiple" ? setMultipleOpen(true) : (setPaymentMethod(option.value), setPayments([]), setSubmitState({ busy: false, tone: "info", message: "" }))}>{selected ? <Icon name="Check" /> : null}<span>{friendlyPayment[option.value]}</span></button>; })}</fieldset>
+          )}
+          {summary.total > 0 && paymentMethod === "multiple" ? <p className="fm-seller-payment-summary">{payments.map((payment) => `${friendlyPayment[payment.method]} ${formatMoney(payment.amount)}`).join(" · ")}</p> : null}
 
           <div className="fm-seller-customer-section">
             {selectedCustomer ? (
