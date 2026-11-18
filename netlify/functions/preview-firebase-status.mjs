@@ -10,23 +10,28 @@ export default async function handler(request) {
   if (request.method !== "GET" || !previewHost.test(new URL(request.url).hostname)) {
     return reply(404, { ok: false });
   }
+  let check = "project";
+  const failed = () => reply(503, { ok: false, check });
   try {
     const env = process.env;
-    if (configuredFirebaseProjectId(env) !== STAGING_FIREBASE_PROJECT_ID) return reply(503, { ok: false });
+    if (configuredFirebaseProjectId(env) !== STAGING_FIREBASE_PROJECT_ID) return failed();
+    check = "credential";
     const account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON || "{}");
     if (account.project_id !== STAGING_FIREBASE_PROJECT_ID || (env.FIREBASE_ADMIN_CLIENT_EMAIL || account.client_email) !== stagingAccount) {
-      return reply(503, { ok: false });
+      return failed();
     }
+    check = "authentication";
     const auth = await fetch(`https://identitytoolkit.googleapis.com/v1/projects?key=${encodeURIComponent(env.FIREBASE_WEB_API_KEY || "")}`, {
       signal: AbortSignal.timeout(5000),
     });
     const identity = auth.ok ? await auth.json() : null;
     if (String(identity?.projectId) !== "545036860675" || !identity.authorizedDomains?.includes(`${STAGING_FIREBASE_PROJECT_ID}.firebaseapp.com`)) {
-      return reply(503, { ok: false });
+      return failed();
     }
+    check = "firestore";
     await adminListDocuments("settings", { maxDocuments: 1, env });
     return reply(200, { ok: true, projectId: STAGING_FIREBASE_PROJECT_ID, authentication: true, firestore: true });
   } catch {
-    return reply(503, { ok: false });
+    return failed();
   }
 }

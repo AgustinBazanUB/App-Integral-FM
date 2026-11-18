@@ -149,6 +149,24 @@ test("reglas: carrito de ocho productos sin stock confirma todos los movimientos
   for (const id of ids) assert.equal((await getDoc(stockReference(database, id))).data().currentStock, -1);
 });
 
+test("reglas: ocho faltantes sin ficha en depósito se procesan en una transacción", async () => {
+  const ids = Array.from({ length: 8 }, (_, index) => `warehouse-shortage-${index}`);
+  await environment.withSecurityRulesDisabled(async context => {
+    for (const id of ids) await setDoc(doc(context.firestore(), "products", id), { name: id, defaultPrice: 100, active: true });
+  });
+  const result = await service.createAdministrativeSale({
+    ...input("warehouse", "warehouse-shortage-many"),
+    paymentMethod: "cash",
+    customer: null,
+    items: ids.map(productId => ({ productId, name: productId, qty: 1, unitPrice: 100 })),
+    stockConfirmation: ids.map(productId => ({ productId, quantity: 1, previousStock: 0, newStock: -1 })),
+  });
+  assert.equal(result.stockDiscrepancies.length, ids.length);
+  for (const id of ids) {
+    assert.equal((await getDoc(doc(globalThis.__quickSalesRulesDb, "warehouseStock", "origin", "items", id))).data().currentStock, -1);
+  }
+});
+
 test("reglas: edición recalcula faltante y respeta el bloqueo de comprobantes fiscales", async () => {
   const id = "negative-edit"; await seedProduct(id);
   const input = sellerInput(id), sale = await sellerService.createSellerSale(input);
