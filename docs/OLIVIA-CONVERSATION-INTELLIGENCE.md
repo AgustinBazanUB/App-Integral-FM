@@ -1,3 +1,5 @@
+> Registro histórico de una versión anterior. La integración Chirp y `voice.ready` descritas aquí se retiraron en V5; ver [OLIVIA-VOICE.md](OLIVIA-VOICE.md) y [OLIVIA-ARCHITECTURE.md](OLIVIA-ARCHITECTURE.md) para el estado actual.
+
 # Olivia · prioridades, tareas y respuesta durante la espera
 
 La actualización incluye la experiencia Equalizer Orb/Chirp del PR 45 y mejora la conversación con los modelos configurados actualmente. El cambio visual fino del orb queda disponible para el próximo prompt del usuario.

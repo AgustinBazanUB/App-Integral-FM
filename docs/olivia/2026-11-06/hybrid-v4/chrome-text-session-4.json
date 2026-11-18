@@ -1,0 +1,429 @@
+{
+  "commit": "c83c051",
+  "url": "https://deploy-preview-55--appintegralflormia.netlify.app/gestion/locations/qa-pr53-location/products",
+  "evidence": "real-provider-text-input-not-microphone",
+  "connectionMs": 5197.5,
+  "audioContextState": "running",
+  "turns": [
+    {
+      "id": "1dab2562-8598-4401-9861-c890877f2710",
+      "input": "Hola, Olivia",
+      "inputMode": "diagnostic-text",
+      "route": "direct",
+      "classificationMs": 1461.800000011921,
+      "response": "¡Hola! ¿Cómo estás? ¿En qué te puedo ayudar hoy?",
+      "textToScheduledAudioMs": 1498,
+      "delegated": false,
+      "noAudio": false,
+      "providerIncomplete": false,
+      "textToResultMs": 3882.399999976158,
+      "usage": {
+        "duplicate": false,
+        "measurement": "provider-forwarded",
+        "costUsd": 0.001997,
+        "sessionSpendUsd": 0.001997,
+        "spendUsd": 0.02055,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.01956,
+        "estimatedUsd": 0.00099,
+        "unconfirmedQueryCount": 1,
+        "queryCount": 10,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": 688,
+        "outputTokens": 87,
+        "inputTokensByModality": {
+          "TEXT": 494,
+          "AUDIO": 194
+        },
+        "outputTokensByModality": {
+          "AUDIO": 87
+        },
+        "inputAudioSeconds": 0,
+        "outputAudioSeconds": 3.2199999999999998,
+        "shouldStop": false,
+        "includesAccumulatedContext": true,
+        "averageUsdPerQuery": 0.002055,
+        "projectionAt660Usd": 1.3563,
+        "projectedMonthEndUsd": 0.10275
+      }
+    },
+    {
+      "id": "b51859ff-2179-40df-974f-c0ce4a977948",
+      "input": "Gracias",
+      "inputMode": "diagnostic-text",
+      "route": "direct",
+      "classificationMs": 812.5,
+      "response": "De nada. ¡Un placer!",
+      "textToScheduledAudioMs": 817.6999999880791,
+      "delegated": false,
+      "noAudio": false,
+      "providerIncomplete": false,
+      "textToResultMs": 2595.2999999523163,
+      "usage": {
+        "duplicate": false,
+        "measurement": "provider-forwarded",
+        "costUsd": 0.001862,
+        "sessionSpendUsd": 0.003859,
+        "spendUsd": 0.022412,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.021422,
+        "estimatedUsd": 0.00099,
+        "unconfirmedQueryCount": 1,
+        "queryCount": 11,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": 791,
+        "outputTokens": 53,
+        "inputTokensByModality": {
+          "TEXT": 510,
+          "AUDIO": 281
+        },
+        "outputTokensByModality": {
+          "AUDIO": 53
+        },
+        "inputAudioSeconds": 0,
+        "outputAudioSeconds": 1.8599999999999999,
+        "shouldStop": false,
+        "includesAccumulatedContext": true,
+        "averageUsdPerQuery": 0.0020374545454545454,
+        "projectionAt660Usd": 1.34472,
+        "projectedMonthEndUsd": 0.11206
+      }
+    },
+    {
+      "id": "53bcf4f1-1fd3-4364-a70e-f299e13aff18",
+      "input": "Buen día",
+      "inputMode": "diagnostic-text",
+      "route": "direct",
+      "classificationMs": 760.5,
+      "response": "¡Buen día! ¿En qué puedo ayudarte hoy?",
+      "textToScheduledAudioMs": 776.6999999880791,
+      "delegated": false,
+      "noAudio": false,
+      "providerIncomplete": false,
+      "textToResultMs": 3374.699999988079,
+      "usage": {
+        "duplicate": false,
+        "measurement": "provider-forwarded",
+        "costUsd": 0.002255,
+        "sessionSpendUsd": 0.006114,
+        "spendUsd": 0.024667,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.023677,
+        "estimatedUsd": 0.00099,
+        "unconfirmedQueryCount": 1,
+        "queryCount": 12,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": 853,
+        "outputTokens": 72,
+        "inputTokensByModality": {
+          "TEXT": 519,
+          "AUDIO": 334
+        },
+        "outputTokensByModality": {
+          "AUDIO": 72
+        },
+        "inputAudioSeconds": 0,
+        "outputAudioSeconds": 2.6,
+        "shouldStop": false,
+        "includesAccumulatedContext": true,
+        "averageUsdPerQuery": 0.0020555833333333333,
+        "projectionAt660Usd": 1.356685,
+        "projectedMonthEndUsd": 0.123335
+      }
+    },
+    {
+      "id": "a028d9b1-a387-451f-9616-90d5a9498c28",
+      "input": "¿Cuánto stock de Aceite QA PR53 hay en QA PR53?",
+      "inputMode": "diagnostic-text",
+      "route": "model-tool",
+      "classificationMs": 1916.300000011921,
+      "response": "Hay 19 unidades de Aceite QA PR53 en QA PR53. Tené en cuenta que figura",
+      "textToScheduledAudioMs": 9140.100000023842,
+      "delegated": true,
+      "noAudio": false,
+      "providerIncomplete": false,
+      "textToResultMs": 14497.200000047684,
+      "usage": {
+        "duplicate": false,
+        "measurement": "provider-forwarded",
+        "costUsd": 0.003365,
+        "sessionSpendUsd": 0.009479,
+        "spendUsd": 0.028032,
+        "reservedUsd": 0.5,
+        "targetUsd": 5,
+        "warningUsd": 6,
+        "hardLimitUsd": 10,
+        "maxQueries": 660,
+        "usageMetadataEstimatedUsd": 0.027042,
+        "estimatedUsd": 0.00099,
+        "unconfirmedQueryCount": 1,
+        "queryCount": 13,
+        "warningReached": false,
+        "hardLimitReached": false,
+        "queryLimitReached": false,
+        "inputTokens": 1013,
+        "outputTokens": 141,
+        "inputTokensByModality": {
+          "TEXT": 607,
+          "AUDIO": 406
+        },
+        "outputTokensByModality": {
+          "AUDIO": 141
+        },
+        "inputAudioSeconds": 0,
+        "outputAudioSeconds": 5.359999999999999,
+        "shouldStop": false,
+        "includesAccumulatedContext": true,
+        "averageUsdPerQuery": 0.0021563076923076926,
+        "projectionAt660Usd": 1.4231630769230772,
+        "projectedMonthEndUsd": 0.14016
+      }
+    }
+  ],
+  "protocol": [
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn",
+        "outputTranscription"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 20480
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 20480
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 20480
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 2560
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn",
+        "outputTranscription"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 33280
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 28160
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 2560
+        }
+      ]
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [],
+      "contentKeys": [],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn",
+        "outputTranscription"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 38400
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "modelTurn"
+      ],
+      "parts": [
+        {
+          "keys": [
+            "inlineData"
+          ],
+          "mimeType": "audio/pcm;rate=24000",
+          "encodedAudioLength": 2560
+        }
+      ]
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "outputTranscription"
+      ],
+      "parts": []
+    },
+    {
+      "keys": [
+        "serverContent"
+      ],
+      "contentKeys": [
+        "generationComplete"
+      ],
+      "parts": [],
+      "generationComplete": true
+    },
+    {
+      "keys": [
+        "serverContent",
+        "usageMetadata"
+      ],
+      "contentKeys": [
+        "turnComplete"
+      ],
+      "parts": [],
+      "turnComplete": true
+    }
+  ]
+}

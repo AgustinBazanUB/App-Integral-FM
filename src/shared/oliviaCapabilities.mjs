@@ -1,4 +1,4 @@
-import { can, canAccessAdministration, normalizedRole } from "../gestion/permissions.js";
+import { can, canAccessAdministration, canAccessAdminPanel, normalizedRole } from "../gestion/permissions.js";
 import { oliviaError, OLIVIA_TOOL_SCHEMAS } from "./oliviaContracts.mjs";
 import { UI_GUIDES } from './oliviaUiGuides.mjs';
 export const closedSchema = (properties) => ({ type: "object", properties, required: Object.keys(properties), additionalProperties: false });
@@ -66,6 +66,7 @@ for (const [name, module, action, description] of [
 ]) add(name, module, description, record, action);
 add("prepare_product_create", "products", "Preparar producto del catálogo con validación compartida; no agrega stock.", closedSchema({ name: str(150), abbreviation: str(8), defaultPrice: { type: "integer", minimum: 0, maximum: 1000000000 }, categoryId: id, description: str(1000) }), "create");
 add("prepare_catalog_stock_load", "locations", "Preparar UNA lista de mercadería recibida: reutiliza catálogo/categorías existentes, propone crear los faltantes y suma todas las cantidades al local. Resuelve nombres en el servidor; no hagas una llamada por producto. productId null permite resolver por nombre, abbreviation null genera una abreviación única para productos nuevos. categoryName es la categoría propuesta (puede inferirse por el tipo de producto si el usuario autorizó crear categorías). defaultPrice null conserva el precio de existentes; para nuevos pide el precio faltante, nunca lo inventa. Una sola tarjeta confirma todo atómicamente, con stock antes/después. No ejecuta ni publica en ecommerce.", closedSchema({ locationId: id, reason: nullable(str(500)), items: { type: "array", minItems: 1, maxItems: 40, items: closedSchema({ productId: id, name: str(150), quantity: { type: "integer", minimum: 1, maximum: 1000000 }, categoryName: nullable(str(150)), abbreviation: nullable(str(8)), defaultPrice: nullable({ type: "integer", minimum: 0, maximum: 1000000000 }) }) } }), "loadStock");
+add("prepare_warehouse_stock_load", "warehouse", "Preparar UNA lista de mercadería recibida en un depósito: reutiliza catálogo existente, propone crear los productos faltantes y suma todas las cantidades al inventario del depósito. Resuelve nombres en el servidor. Una sola tarjeta confirma la lista, el catálogo y los movimientos de stock de forma atómica. No ejecuta antes de la confirmación visual.", closedSchema({ warehouseId: id, reason: nullable(str(500)), items: { type: "array", minItems: 1, maxItems: 40, items: closedSchema({ productId: id, name: str(150), quantity: { type: "integer", minimum: 1, maximum: 1000000 }, categoryName: nullable(str(150)), abbreviation: nullable(str(8)), defaultPrice: nullable({ type: "integer", minimum: 0, maximum: 1000000000 }) }) } }), "edit");
 for (const [name, module, description] of [
   ["prepare_invoice_review", "quick-sales", "Preparar revisión fiscal de una venta y abrir el flujo seguro ARCA; la emisión se confirma allí."],
   ["prepare_sale_cancellation_review", "quick-sales", "Preparar revisión de anulación de venta en su flujo manual seguro; no anula por texto."],
@@ -89,6 +90,7 @@ export function capabilityAllowed(session, name) {
   const definition = definitions[name];
   if (!definition || !session?.profile?.active) return false;
   if (name === "prepare_batch_sales") return can(session.profile, "quick-sales", "create");
+  if (definition.module === "warehouse") return normalizedRole(session.profile) !== "seller" && canAccessAdminPanel(session.profile) && can(session.profile, "warehouse", definition.action);
   if (["search_tools", "get_app_capabilities", "get_ui_guide", "show_ui_guide", "discover_skills", "load_skill", "search_knowledge"].includes(name)) return true;
   if (["prepare_shipment_create", "prepare_shipment_update"].includes(name)) return false;
   if (name === "research_web_metric" && !["admin", "general_admin"].includes(normalizedRole(session.profile))) return false;
