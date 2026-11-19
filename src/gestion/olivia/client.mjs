@@ -115,7 +115,7 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
     if (signal?.aborted) abort();
   });
   const waitForChat = async (jobId, options = {}) => {
-    let acceptedId = null, text = "", voiceText = "", phase = "", toolState='', failures = 0;
+    let acceptedId = null, text = "", phase = "", toolState='', failures = 0;
     const started = Date.now();
     options.onEvent?.({ type: "job", jobId });
     // The backend owns the job deadline. Polling delays or a transient disconnect
@@ -136,7 +136,6 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
       const tools=JSON.stringify(status.tools || []);
       if (nextPhase !== phase || tools!==toolState || !status.text.startsWith(text)) { phase = nextPhase;toolState=tools; if (!status.text.startsWith(text)) text = ""; options.onEvent?.({ type: "phase", label: phase, tools:status.tools || [] }); }
       if (status.text !== text) { options.onEvent?.({ type: "delta", delta: status.text.slice(text.length) }); text = status.text; }
-      if (status.voiceText && status.voiceText !== voiceText) { voiceText = status.voiceText; options.onEvent?.({ type: "voice.ready", text: voiceText }); }
       if (status.status === "completed") return status.result;
       if (status.status === "failed") throw Object.assign(new Error(status.failure.message), { ...status.failure });
       if (status.status === "cancelled") throw Object.assign(new Error("Detuviste la respuesta. El chat se conserva."), { name: "AbortError", code: "chat-job-cancelled" });
@@ -169,12 +168,8 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
       return send("/.netlify/functions/olivia", payload, options);
     },
     knowledge: (payload, options) => send("/.netlify/functions/olivia-knowledge", payload, options),
+    hybridLive: (payload, options) => send("/.netlify/functions/olivia-gemini-live", payload, options),
     liveTranscription: (payload, options) => send("/.netlify/functions/olivia-live-transcribe",payload,options),
-    fastSpeech: (payload, options) => send("/.netlify/functions/olivia-fast-speech",payload,options),
-    speechAudio: async (payload,{signal}={}) => {
-      const token=await getToken();
-      return fetchImpl('/.netlify/functions/olivia-speech-audio',{method:'POST',signal,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    },
     publishKnowledge: (file, payload, options) => {
       const form = new FormData(); form.set("file", file, file.name);
       Object.entries(payload).forEach(([key, value]) => form.set(key, String(value)));
@@ -193,17 +188,6 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
       form.set("audio", audio, `olivia.${extension}`);
       Object.entries({ ...payload, durationSeconds: payload.durationSeconds ?? audio.durationSeconds }).forEach(([key, value]) => { if (value != null) form.set(key, typeof value === "object" ? JSON.stringify(value) : String(value)); });
       return send("/.netlify/functions/olivia-transcribe", form, { ...options, isForm: true });
-    },
-    synthesize: async (text, payload, { signal } = {}) => {
-      const token = await getToken();
-      if (!token) throw new Error("Iniciá sesión para usar Olivia.");
-      const response = await fetchImpl("/.netlify/functions/olivia-synthesize", { method: "POST", signal, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, text }) });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        const error = new Error(data.message || "Olivia no pudo generar el audio. La respuesta escrita quedó guardada.");
-        error.code = data.code || "chirp-synthesis-failed"; error.status = response.status; throw error;
-      }
-      return response;
     },
   };
 }

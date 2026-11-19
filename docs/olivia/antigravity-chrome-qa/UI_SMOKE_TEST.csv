@@ -1,0 +1,11 @@
+id,nombre,ruta,url_final,titulo,estado_http,errores_consola,errores_red,render_ok,screenshot
+settings,"Configuración / Ajustes",/gestion/settings,https://deploy-preview-63--appintegralflormia.netlify.app/gestion/settings,"Gestión | Flor Mía",200,0,0,PASS,evidencias/smoke_settings.png
+clientes,"Clientes",/gestion/loyal-customers,https://deploy-preview-63--appintegralflormia.netlify.app/gestion/loyal-customers,"Clientes | Flor Mía",200,0,0,PASS,evidencias/smoke_clientes.png
+productos,"Productos",/gestion/products,https://deploy-preview-63--appintegralflormia.netlify.app/gestion/products,"Productos | Flor Mía",200,0,0,PASS,evidencias/smoke_productos.png
+ubicaciones,"Ubicaciones",/gestion/locations,https://deploy-preview-63--appintegralflormia.netlify.app/gestion/locations,"Ubicaciones | Flor Mía",200,0,0,PASS,evidencias/smoke_ubicaciones.png
+deposito,"Depósito",/gestion/warehouse,https://deploy-preview-63--appintegralflormia.netlify.app/gestion/warehouse,"Depósitos | Flor Mía",200,0,0,PASS,evidencias/smoke_deposito.png
+ventas_rapidas,"Ventas rápidas",/gestion/quick-sales,https://deploy-preview-63--appintegralflormia.netlify.app/gestion/quick-sales,"Ventas rápidas | Flor Mía",200,0,0,PASS,evidencias/smoke_ventas_rapidas.png
+envios,"Gestión de envíos",/gestion/shipping,https://deploy-preview-63--appintegralflormia.netlify.app/gestion/shipping,"Gestión de envíos | Flor Mía",200,0,0,PASS,evidencias/smoke_envios.png
+metricas,"Métricas de ventas",/gestion/metrics/sales,https://deploy-preview-63--appintegralflormia.netlify.app/gestion/metrics/sales,"Métricas generales | Flor Mía",200,0,0,PASS,evidencias/smoke_metricas.png
+public_tienda,"Tienda pública",/tienda,https://deploy-preview-63--appintegralflormia.netlify.app/tienda,"Flor Mía | Productos Regionales de Mendoza",200,0,0,PASS,evidencias/smoke_public_tienda.png
+public_catalogo,"Catálogo público",/productos,https://deploy-preview-63--appintegralflormia.netlify.app/productos,"Flor Mía | Productos Regionales de Mendoza",200,0,0,PASS,evidencias/smoke_public_catalogo.png

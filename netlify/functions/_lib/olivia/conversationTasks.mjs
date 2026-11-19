@@ -1,4 +1,5 @@
 import { updateTask, missingQuestion, requiredFields } from "./tasks.mjs";
+import { isIndependentBusinessRead } from '../../../../src/shared/oliviaBusinessRead.mjs';
 
 const normalize = (text = "") => String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const active = (task) => task && ["collecting", "prepared", "paused"].includes(task.status);
@@ -19,7 +20,7 @@ export function latestInstruction(message = "") {
 export function requestedTaskIntent(message = "") {
   const text = latestInstruction(message);
   if (isGuidanceRequest(message) || /\b(?:document[a-z]*|record[a-z]*|anota[a-z]*)\b/.test(text)) return null;
-  if (!/carg|crea|registra|agrega|ingresa|dar de alta|alta de/.test(text)) return null;
+  if (!/carg|crea|registra|agrega|ingresa|dar de alta|alta de|prepara|suma|repon/.test(text)) return null;
   if (/campana|publicacion|post |reel|anuncio/.test(text)) return null;
   if (/\b(?:ubicacion|local|feria|evento)\b/.test(text) && /crea|alta/.test(text) && !/stock|botellas?|unidades|mercaderia/.test(text)) return "prepare_create_location";
   if (/\bproducto\b/.test(text) && !/stock|botellas?|unidades|mercaderia/.test(text)) return "prepare_product_create";
@@ -42,7 +43,7 @@ export function isGuidanceRequest(message = "") {
 
 export function isTaskInterruption(message = "") {
   const text = latestInstruction(message);
-  return isGuidanceRequest(message) || /\b(?:document[a-z]*|record[a-z]*|ensen[a-z]*|instruime|guiame|orientame|ayudame a entender)\b/.test(text)
+  return isIndependentBusinessRead(message) || isGuidanceRequest(message) || /\b(?:document[a-z]*|record[a-z]*|ensen[a-z]*|instruime|guiame|orientame|ayudame a entender)\b/.test(text)
     || /^(?:antes |otra cosa|ahora |mientras |como |por que |cuant[a-z]* |analiza|estima|compara|pronostica|mostra|decime|consulta|revisa|calcula|quiero saber|necesito saber|que puedo|que podes|que ventas|que paso)/.test(text);
 }
 
@@ -50,6 +51,9 @@ function pauseInto(tasks, task, now) {
   if (!active(task)) return tasks;
   // A paused proposal stores data, never a confirmation or an execution token.
   const saved = { id: task.id, intent: task.intent, revision: task.revision || 1, status: "paused", slots: structuredClone(task.slots || {}), missingFields: [...(task.missingFields || [])], ambiguities: structuredClone(task.ambiguities || {}), route: task.route || null, createdAt: task.createdAt || now, updatedAt: now };
+  // These bounded, unverified names are needed before entity IDs are resolved.
+  // They never restore a confirmation token or bypass live backend validation.
+  if (['prepare_stock_load','prepare_catalog_stock_load','prepare_warehouse_stock_load'].includes(task.intent) && task.collectionDraft) saved.collectionDraft=structuredClone(task.collectionDraft);
   return [...tasks.filter((item) => item.id !== saved.id), saved].slice(-MAX_PAUSED_TASKS);
 }
 

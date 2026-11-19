@@ -32,9 +32,9 @@ El registro `oliviaUiGuides.mjs` contiene recorridos específicos y una orientac
 
 ## Voz, costos y límites
 
-Se mantienen [GPT Live Transcribe](https://developers.openai.com/api/docs/models/gpt-live-transcribe), [GPT Transcribe](https://developers.openai.com/api/docs/guides/transcription) y [Chirp 3 HD/Aoede](https://docs.cloud.google.com/text-to-speech/docs/chirp3-hd), documentados como vigentes al revisar esta actualización. La salida visual admite código; la salida hablada lo resume. La voz y los acuses existentes no se regeneran.
+La voz conversacional actual usa Gemini Live/Aoede: responde directamente a la charla breve y delega consultas de negocio al motor autenticado de Olivia. No utiliza GPT Live Transcribe, Chirp, clips ni un sintetizador alternativo. La salida visual admite código; cuando una consulta de negocio se delega, Gemini Live comunica el resultado autorizado en forma breve.
 
-Las guías registradas y sus controles usan cero llamadas de modelo. Generar/revisar contenido usa una llamada; las consultas mixtas mantienen las rondas necesarias para datos reales. Estas cantidades se comprueban con fixtures, no son una medición facturada ni una garantía de latencia de red. Los caracteres TTS y minutos STT se siguen contabilizando por el sistema actual.
+Las guías registradas y sus controles usan cero llamadas de modelo. Generar/revisar contenido usa una llamada; las consultas mixtas mantienen las rondas necesarias para datos reales. Estas cantidades se comprueban con fixtures, no son una medición facturada ni una garantía de latencia de red. El consumo de Gemini Live se registra con metadatos disponibles y queda sin confirmar si falta información del proveedor.
 
 El registro debe ampliarse al cambiar pantallas. El grafo previo de Graphify es parcial y tiene referencias externas sin resolver: los hallazgos se contrastaron con código y contratos. Las pruebas de comprensión libre, ruido y dispositivos físicos requieren evaluación humana; los fixtures no prueban que el modelo real siempre clasifique o redacte perfectamente.
 

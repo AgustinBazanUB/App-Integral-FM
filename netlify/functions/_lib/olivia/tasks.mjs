@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { OLIVIA_TOOL_SCHEMAS, validateSchema, oliviaError } from "../../../../src/shared/oliviaContracts.mjs";
 import { OLIVIA_CAPABILITIES } from "../../../../src/shared/oliviaCapabilities.mjs";
 import { operationGuidance } from "../../../../src/shared/oliviaOperationGuide.mjs";
+import { advanceVoiceCollection } from "../../../../src/shared/oliviaVoiceCollection.mjs";
 
 const normalize = (text = "") => String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const productReferenceWords = (value) => normalize(value).replace(/([a-z])(\d)/g, "$1 $2").replace(/medio litro|media botella de litro/g, "500 ml").replace(/\b(\d+)\s*(?:mililitros?|cc|ml)\b/g, "$1ml").replace(/\b(?:botellas?|bidones?|de|del|la|el|los|las|aceite|oliva|por|favor)\b/g, " ").split(/\s+/).filter(Boolean);
@@ -17,6 +18,7 @@ export function requiredFields(intent) {
   const minimum = {
     prepare_stock_load: ["locationId", "productId", "quantity"],
     prepare_catalog_stock_load: ["locationId", "items"],
+    prepare_warehouse_stock_load: ["warehouseId", "items"],
     prepare_sale: ["locationId", "items", "paymentMethod", "ticketRequested", "customerDecision", "promotionDecision"],
     prepare_batch_sales: ["sales"],
     prepare_stock_transfer: ["originId", "destinationId", "lines", "reason"],
@@ -77,17 +79,157 @@ export function taskFromTool(previous, intent, args, result, now = new Date()) {
 export function taskControl(text) {
   const value = normalize(text);
   if (/^(cancela|cancelar|cancelalo|no sigas|olvidalo|dejalo|no gracias)$/.test(value)) return "cancel";
+  if (/^(?:(?:si|dale|ok) )?(?:confirma|confirmalo|confirmar)(?: por favor)?$/.test(value)) return "acknowledge";
   if (/^(si|dale|ok|perfecto|espera|espera un segundo|aguarda)$/.test(value)) return "acknowledge";
   return null;
+}
+
+const NUMBER_WORDS = { un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19, veinte: 20, veintiuno: 21, veintidos: 22, veintitres: 23, veinticuatro: 24, veinticinco: 25, treinta: 30, cuarenta: 40, cincuenta: 50, cien: 100 };
+const replaceNumberWords = (text = "") => text.replace(/\b(un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|diecinueve|veinte|veintiuno|veintidos|veintitres|veinticuatro|veinticinco|treinta|cuarenta|cincuenta|cien)\b/g, (m) => String(NUMBER_WORDS[m] ?? m));
+
+function parseMultiStockItems(clause) {
+  const parts = clause
+    .split(/\s*(?:,|\by\b|\bademas\b)\s*(?=\d+\s+)/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return null;
+  const items = [];
+  for (const part of parts) {
+    const match = /^(\d+)\s+(?:unidades?\s+|botellas?\s+|bidones?\s+|frascos?\s+)?(?:de\s+)?(.+)$/.exec(part);
+    if (!match) return null;
+    items.push({ quantity: Number(match[1]), query: match[2].trim() });
+  }
+  return items.length >= 2 ? items : null;
 }
 
 /** Bounded fast path for stock loading. All entity resolution and preparation
  * uses the same permission-checked tools as the reasoning backend. Other
  * intents continue through Luna with this persisted task in its context. */
 export async function progressiveStock({ previous, initialId, message, context, run, check = () => {}, now = new Date() }) {
-  const text = normalize(message);
-  const start = /^(?:cargame|carga|ingresa|ingresame|agrega|agregame)\s+(\d+)\s+(?:unidades? |botellas? |bidones? )?(?:de )?(.+)$/.exec(text);
-  const continuation = previous?.intent === "prepare_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/\b(?:cliente|cancel[a-z]*|explic[a-z]*|ensen[a-z]*|queria decir|no me cargues)\b/.test(text) && !/^(ahora|consulta|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|mandame|transferi|vende|registra|crea|disena)/.test(text);
+  const text = replaceNumberWords(normalize(message));
+  let voiceDraft=context.voiceCollectionDraft;
+  const previousStock=previous && ['prepare_stock_load','prepare_catalog_stock_load','prepare_warehouse_stock_load'].includes(previous.intent) && ['collecting','prepared'].includes(previous.status);
+  // Text and resumed tasks use the same unverified collector as voice. A
+  // warehouse request must not fall through to the location-only legacy path.
+  if(!voiceDraft && (/\bdepositos?\b/.test(text) || previousStock && (previous.intent==='prepare_warehouse_stock_load' || previous.collectionDraft))){
+    const previousItems=previousStock?(previous.slots?.items || (previous.productName && previous.slots?.quantity?[{name:previous.productName,quantity:previous.slots.quantity}]:[])):[];
+    const base=previousStock?{version:1,revision:previous.revision || 0,intent:'stock-load',operation:'stock-load',targetType:null,requestedLocation:null,requestedWarehouse:null,itemsMentioned:previousItems.map(item=>({description:item.name,quantityMentioned:String(item.quantity)})),validation:'unverified',...(previous.collectionDraft || {}),status:'collecting'}:null;
+    voiceDraft=advanceVoiceCollection(message,base,context);
+    if(voiceDraft && !['collecting','ready'].includes(voiceDraft.status))return null;
+  }
+  if(voiceDraft){
+    const targetType=voiceDraft.targetType;
+    if(!['location','warehouse'].includes(targetType))return null;
+    const intent=targetType==='warehouse'?'prepare_warehouse_stock_load':'prepare_catalog_stock_load';
+    const taskId=!context.voiceCollectionDraft && previousStock?previous.id:initialId||randomUUID();
+    const targetQuery=String((targetType==='warehouse'?voiceDraft.requestedWarehouse:voiceDraft.requestedLocation) || '').trim().slice(0,160);
+    const targetOrdinal=Number.isInteger(voiceDraft.targetOrdinal)&&voiceDraft.targetOrdinal>0&&voiceDraft.targetOrdinal<=20?voiceDraft.targetOrdinal:null;
+    const mentioned=Array.isArray(voiceDraft.itemsMentioned)?voiceDraft.itemsMentioned.slice(0,20):[];
+    const parsedItems=mentioned.map(item=>{
+      const spoken=replaceNumberWords(normalize(item.quantityMentioned));
+      const quantity=/^\d+$/.test(spoken)?Number(spoken):null;
+      const name=String(item.description || '').trim().slice(0,150);
+      return {name,quantity};
+    });
+    const collectionDraft={version:1,revision:voiceDraft.revision || 1,intent:'stock-load',operation:'stock-load',targetType,requestedLocation:voiceDraft.requestedLocation || null,requestedWarehouse:voiceDraft.requestedWarehouse || null,targetOrdinal,itemsMentioned:mentioned.map(item=>({description:String(item.description || '').slice(0,350),quantityMentioned:String(item.quantityMentioned || '').slice(0,40)})),validation:'unverified',status:'collecting',lastInput:voiceDraft.lastInput || normalize(message),correctionNeedsProduct:voiceDraft.correctionNeedsProduct===true,pendingCorrectionQuantity:voiceDraft.pendingCorrectionQuantity || null,pendingQuestion:voiceDraft.pendingQuestion || null,missingFields:voiceDraft.missingFields || []};
+    const collectedTask=(slots,missingFields,ambiguities={})=>({id:taskId,intent,revision:(previous?.revision || 0)+1,status:'collecting',slots,missingFields,ambiguities,collectionDraft,route:null,createdAt:previousStock?previous.createdAt:now,updatedAt:now});
+    if(collectionDraft.correctionNeedsProduct)return {task:collectedTask({[targetType==='warehouse'?'warehouseId':'locationId']:null,items:parsedItems,reason:null},['correction-product']),result:{state:'DATOS_INCOMPLETOS'},content:'¿De cuál producto querés cambiar esa cantidad?'};
+    if((!targetQuery&&!targetOrdinal)||!parsedItems.length||parsedItems.some(item=>!item.name||!Number.isSafeInteger(item.quantity)||item.quantity<1||item.quantity>1000000))
+      return {task:collectedTask({[targetType==='warehouse'?'warehouseId':'locationId']:null,items:parsedItems.filter(item=>item.name&&Number.isSafeInteger(item.quantity)),reason:null},[...(!targetQuery&&!targetOrdinal?[targetType==='warehouse'?'warehouseId':'locationId']:[]),...(!parsedItems.length||parsedItems.some(item=>!item.name||!Number.isSafeInteger(item.quantity)||item.quantity<1||item.quantity>1000000)?['items']:[])]),result:{state:'DATOS_INCOMPLETOS'},content:!targetQuery&&!targetOrdinal?(targetType==='warehouse'?'¿En cuál depósito querés cargar esta lista?':'¿En qué local querés cargar esta lista?'):'¿Qué productos y cantidades querés sumar?'};
+    check(intent);
+    const [ownersResult,catalogResult]=await Promise.all([
+      run(targetType==='warehouse'?'list_warehouses':'list_locations',{}),
+      run('search_products',{query:'',locationId:null}),
+    ]);
+    const owners=targetType==='warehouse'?(ownersResult?.data?.records || []):(ownersResult?.data?.locations || []);
+    const ownerKey=value=>normalize(value).replace(/^(?:local|sucursal|deposito)\s+/, '').trim();
+    const query=ownerKey(targetQuery);
+    const activeOwners=owners.filter(row=>!row.deleted&&row.active!==false);
+    const exact=activeOwners.filter(row=>ownerKey(row.name)===query);
+    const matching=targetOrdinal?[activeOwners[targetOrdinal-1]].filter(Boolean):exact.length?exact:activeOwners.filter(row=>query.split(/\s+/).every(word=>ownerKey(row.name).split(/\s+/).includes(word)));
+    if(matching.length!==1){
+      const names=matching.slice(0,5).map(row=>row.name).filter(Boolean);
+      const detail=names.length?` Encontré: ${names.join(', ')}.`:'';
+      const field=targetType==='warehouse'?'warehouseId':'locationId';
+      const task=collectedTask({[field]:null,items:parsedItems.map(item=>({name:item.name,quantity:item.quantity,productId:null,categoryName:null,abbreviation:null,defaultPrice:null})),reason:null},[field],{[field]:names.map(name=>({name}))});
+      return {task,result:{state:'DATOS_INCOMPLETOS'},content:`No pude identificar de forma única el ${targetType==='warehouse'?'depósito':'local'} «${targetQuery || `número ${targetOrdinal}`}».${detail} ¿Cuál querés usar?`};
+    }
+    const owner=matching[0],catalog=catalogResult?.data?.products || [];
+    const items=parsedItems.map(item=>{
+      const words=productReferenceWords(item.name),matches=catalog.filter(product=>words.length&&words.every(word=>productReferenceWords(product.name).includes(word)||normalize(product.name).includes(word)));
+      const matched=matches.length===1?matches[0]:null;
+      return {productId:matched?.productId || null,name:matched?.name || item.name,quantity:item.quantity,categoryName:null,abbreviation:null,defaultPrice:null};
+    });
+    const args={...(targetType==='warehouse'?{warehouseId:owner.id}:{locationId:owner.id}),items,reason:null};
+    const task={...collectedTask(args,[]),...(targetType==='warehouse'?{warehouseName:owner.name}:{locationName:owner.name})};
+    const result=await run(intent,args);
+    const preparedTask={...task,...taskFromTool(task,intent,args,result,now),id:taskId,revision:task.revision};
+    return {task:preparedTask,result,content:result.prepared?.summary||result.data?.summary||missingQuestion(result.data?.missing||result.data?.missingFields||[],intent)};
+  }
+  const start = /^(?:cargame|carga|cargar|ingresa|ingresame|agrega|agregame|sumame|suma)\s+(\d+)\s+(?:unidad(?:es)?\s+(?:de\s+)?|botellas?\s+(?:de\s+)?|bidones?\s+(?:de\s+)?|frascos?\s+(?:de\s+)?|de\s+)?(?!unidad(?:es)?$|botellas?$|bidones?$|frascos?$)(.+)$/.exec(text);
+  const isCatalogContinuation = previous?.intent === "prepare_catalog_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/\b(?:cliente|cancel[a-z]*|explic[a-z]*|ensen[a-z]*|no me cargues)\b/.test(text);
+  if (start || isCatalogContinuation) {
+    const rawClause = start ? `${start[1]} ${start[2]}` : text;
+    const locationSplit = rawClause.split(/\s+en\s+(?:el\s+|la\s+)?/);
+    const itemClause = locationSplit[0];
+    const locClause = locationSplit.length > 1 ? locationSplit.slice(1).join(" en ") : null;
+    const multiItems = start ? parseMultiStockItems(itemClause) : null;
+    if (multiItems || isCatalogContinuation) {
+      check();
+      let task = isCatalogContinuation && !multiItems
+        ? structuredClone(previous)
+        : { id: initialId || randomUUID(), intent: "prepare_catalog_stock_load", revision: (previous?.revision || 0) + 1, status: "collecting", slots: { locationId: context.locationId || null, items: [], reason: null }, missingFields: [], ambiguities: {}, route: null, createdAt: previous?.createdAt || now, updatedAt: now };
+      task.revision++; task.updatedAt = now; task.status = "collecting";
+      if (!task.slots.locationId && context.locationId) task.slots.locationId = context.locationId;
+      let locationQuery = locClause;
+      if (multiItems) {
+        const catalog = (await run("search_products", { query: "", locationId: null }))?.data?.products || [];
+        task.slots.items = multiItems.map((entry) => {
+          const words = productReferenceWords(entry.query);
+          const filterWords = words.length ? words : normalize(entry.query).split(" ");
+          const matches = catalog.filter((p) => filterWords.length && filterWords.every((w) => productReferenceWords(p.name).includes(w) || normalize(p.name).includes(w)));
+          const matched = matches.length === 1 ? matches[0] : null;
+          return { productId: matched?.productId || null, name: matched?.name || entry.query, quantity: entry.quantity, abbreviation: null, categoryName: null, defaultPrice: null };
+        });
+      } else {
+        const itemCorrection = /^(?:no )?(?:mejor |eran |son |que sean |cambia(?:r)? |corregi(?:r)? )?(?:a )?(\d+)\s+(?:unidades? |botellas? |bidones? |frascos? )?(?:de )?(.+)$/.exec(text)
+          || /^(?:no )?(?:mejor |cambia(?:r)? |corregi(?:r)? )?(.+?)\s+(?:a |eran |son |por )(\d+)(?: unidades?| botellas?)?$/.exec(text);
+        if (itemCorrection) {
+          const qty = Number(/^\d+$/.test(itemCorrection[1]) ? itemCorrection[1] : itemCorrection[2]);
+          const targetQuery = /^\d+$/.test(itemCorrection[1]) ? itemCorrection[2] : itemCorrection[1];
+          const words = productReferenceWords(targetQuery);
+          const filterWords = words.length ? words : normalize(targetQuery).split(" ");
+          let updated = false;
+          task.slots.items = (task.slots.items || []).map((item) => {
+            if (filterWords.length && filterWords.every((w) => productReferenceWords(item.name).includes(w) || normalize(item.name).includes(w))) {
+              updated = true;
+              return { ...item, quantity: qty };
+            }
+            return item;
+          });
+          if (!updated) return null;
+        } else if (!task.slots.locationId) {
+          locationQuery = text.replace(/^(?:en |a |el |la )+/, "");
+        } else return null;
+      }
+      if (locationQuery) {
+        const locations = (await run("list_locations", {})).data.locations || [];
+        const query = normalize(locationQuery).replace(/^(?:local|sucursal)\s+/, "");
+        const exact = locations.filter((l) => normalize(l.name) === normalize(locationQuery) || normalize(l.name).replace(/^(?:local|sucursal)\s+/, "") === query);
+        const matches = exact.length ? exact : locations.filter((l) => query.split(" ").every((w) => normalize(l.name).split(" ").includes(w)));
+        if (matches.length === 1) { task.slots.locationId = matches[0].id || matches[0].locationId; task.locationName = matches[0].name; delete task.ambiguities.locationId; }
+        else { task.slots.locationId = null; task.ambiguities.locationId = matches.map(({ id, locationId, name }) => ({ id: id || locationId, name })); }
+      }
+      task.missingFields = requiredFields("prepare_catalog_stock_load").filter((k) => !task.slots[k] || (Array.isArray(task.slots[k]) && !task.slots[k].length));
+      if (!task.missingFields.length) {
+        const result = await run("prepare_catalog_stock_load", { locationId: task.slots.locationId, items: task.slots.items, reason: task.slots.reason ?? null });
+        task = { ...task, ...taskFromTool(task, "prepare_catalog_stock_load", task.slots, result, now), revision: task.revision };
+        return { task, result, content: result.prepared?.summary || result.data?.summary || missingQuestion(task.missingFields, "prepare_catalog_stock_load") };
+      }
+      return { task, result: { state: "DATOS_INCOMPLETOS" }, content: "¿En qué ubicación querés cargar esta lista de mercadería?" };
+    }
+  }
+  const continuation = previous?.intent === "prepare_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/\b(?:cliente|cancel[a-z]*|explic[a-z]*|ensen[a-z]*|queria decir|no me cargues)\b/.test(text) && !/^(ahora|consulta|revisa|fijate|chequea|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|mandame|transferi|vende|registra|crea|disena)/.test(text);
   if (!start && !continuation) return null;
   check();
   let task = continuation ? structuredClone(previous) : { id: initialId || randomUUID(), intent: "prepare_stock_load", revision: 0, status: "collecting", slots: { locationId: context.locationId || null, productId: null, quantity: null, reason: null }, missingFields: [], ambiguities: {}, route: null, createdAt: now };
