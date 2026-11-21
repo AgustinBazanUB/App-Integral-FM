@@ -1,0 +1,51 @@
+session,id,firstInputDelayMs,sourceEndDriftMs,stableStimulusTiming,control,providerTurnComplete,scheduledFrames,modelToolCalls,firstScheduledMs,providerText,note
+voice-session1,S01,207.7,32.1,True,False,True,15,0,1949.6,"¡Hola! Estoy muy bien, gracias por preguntar. ¿En qué te puedo ayudar hoy?",virtual source T1 to scheduled PCM only
+voice-session1,S02,233.6,2.6,True,False,True,17,0,1205.3,"También muy bien, gracias. Decime, ¿en qué te puedo ayudar con el negocio hoy?",virtual source T1 to scheduled PCM only
+voice-session1,S03,238.5,15.7,True,False,True,15,0,1355.0,"Sí, te escucho perfecto. Decime, ¿en qué te puedo ayudar hoy?",virtual source T1 to scheduled PCM only
+voice-session1,S04,222.2,11.2,True,False,True,14,0,1183.4,De nada. ¿Qué tenemos pendiente para hoy en el negocio?,virtual source T1 to scheduled PCM only
+voice-session1,S05,271.8,15.3,True,False,True,15,0,1790.5,¡Claro que sí! Decime qué necesitás y vemos cómo lo resolvemos.,virtual source T1 to scheduled PCM only
+voice-session1,S06,237.5,5.9,True,False,True,14,0,1513.5,"¡Tal cual! Decime, ¿qué necesitás hacer en el negocio hoy?",virtual source T1 to scheduled PCM only
+voice-session1,S07,219.3,-0.9,True,False,True,14,0,1482.6,Entendido. Avisame si necesitás algo más más adelante.,virtual source T1 to scheduled PCM only
+voice-session1,S08,303.2,16.7,True,False,True,9,0,1906.9,"De nada, acá voy a estar cuando estés listo.",virtual source T1 to scheduled PCM only
+voice-session1,C01,221.1,-1.7,True,False,True,10,0,,¡Perfecto! ¿En qué ubicación querés cargar el stock?,separate app trace required for async attribution
+voice-session1,C02,266.1,5.4,True,False,True,0,0,,Tomado. ¿Qué productos y qué cantidades querés cargar en esa ubicación?,separate app trace required for async attribution
+voice-session1,C03,254.9,24.3,True,False,True,48,1,,"Para completar la carga, ¿me confirmás si el producto es ""QA Envíos - Producto de prueba""? Si es otra presentación, indicame el nombre completo para crearlo.Para crear un producto, decime primero el nombre que le querés poner.La propuesta quedó cancelada.",separate app trace required for async attribution
+voice-session1,B03,225,-7.4,True,False,True,13,1,,Estoy esperando que me confirmes el producto para poder completar la carga de stock.,separate app trace required for async attribution
+voice-session1,C04,306.1,12.8,True,False,True,0,0,,¿Querés crear un producto nuevo o sumar stock de uno que ya existe?,separate app trace required for async attribution
+voice-session1,C05,418.7,14.2,True,False,True,0,0,,"Perfecto, ¿qué nombre le querés poner al nuevo producto?",separate app trace required for async attribution
+voice-session1,C06,362.3,26.9,True,False,True,43,0,,"Perfecto, ya tengo el nombre. ¿Qué precio le querés asignar a este producto?Ya registré el nombre. Ahora, ¿qué abreviación querés usar para reconocer el producto?No pude identificar el producto. ¿Me podrías decir su nombre o presentación?",separate app trace required for async attribution
+voice-session2,R-C01,236.7,17.5,True,False,True,0,0,,"¡Hola! Decime, ¿en qué ubicación querés cargar el stock?",separate app trace required for async attribution
+voice-session2,R-C02,262.7,29.3,True,False,True,14,0,,Perfecto. ¿Qué productos y qué cantidades querés cargar en esa ubicación?,separate app trace required for async attribution
+voice-session2,R-C03,244.7,-2.4,True,False,True,33,1,,"Ya preparé el movimiento. Por favor, revisá y confirmá la tarjeta en pantalla. Te confirmo que la carga de stock sigue esperando tu confirmación en pantalla.",separate app trace required for async attribution
+voice-session2,B01,277.3,7.5,True,False,True,16,1,,"Dame un momento, voy a consultar los datos de ventas de ayer.Ayer no se registraron ventas, así que no hubo operaciones ni movimiento comercial.",separate app trace required for async attribution
+voice-session2,B02,292.5,-0.5,True,False,True,50,1,,"Voy a revisar cuál fue el producto más vendido durante la jornada de ayer.Respecto a tu consulta anterior, ayer no se registraron ventas, por lo tanto no hubo un producto más vendido.Te aviso que ya estoy revisando los datos necesarios para avanzar con tu pedido.Para preparar la ficha del cliente, por favor pasame su número de teléfono.",separate app trace required for async attribution
+voice-session2,R-S03,209.4,-6.1,True,False,True,14,0,,"Sí, te escucho perfecto. Decime en qué puedo ayudarte.",separate app trace required for async attribution
+voice-session2,B04,511.0,-7.1,True,False,True,0,0,,No hay problema. Decime el nombre del cliente cuando lo tengas y avanzamos.,separate app trace required for async attribution
+voice-session3,F-C04,289.7,5.4,True,False,True,0,0,,¡Buenísimo! Decime el nombre del producto que querés cargar.,separate app trace required for async attribution
+voice-session3,F-C05,252.3,12.9,True,False,True,12,0,,Perfecto. ¿Qué nombre le querés poner al nuevo producto?,separate app trace required for async attribution
+voice-session3,F-C06,349.0,-8.4,True,False,True,0,0,,Anotado. ¿En qué ubicación querés cargar este producto?,separate app trace required for async attribution
+voice-session3,F-B04,275.3,13.6,True,False,True,0,0,,"No hay problema, cuando tengas el nombre me avisás y lo cargamos.",separate app trace required for async attribution
+voice-session3,F-B05,242.7,-2.1,True,False,True,3,0,,Entendido. Avisame cuando tengas los productos y las cantidades para coordinar la transferencia.Para poder preparar ,separate app trace required for async attribution
+voice-session4,N05,246.6,21.2,True,False,True,28,0,1990.0,"Tomé nota. La lista es: un Alfa, dos Bravo, tres Charlie, cuatro Delta y cinco Eco.",virtual source T1 to scheduled PCM only
+voice-session4,N10,173125.6,162257.3,False,False,True,41,0,,"La lista completa es: un Alfa, dos Bravo, tres Charlie, cuatro Delta, cinco Eco, seis Foxtrot, siete Golf, ocho Hotel, nueve India y diez Julieta.",timing invalid/partial input
+voice-session4,N20-A,6842.0,15.9,False,False,True,71,0,,"La lista es: tres Charlie, cuatro Delta, cinco Eco, seis Foxtrot, siete Golf, ocho Hotel, nueve India, diez Julieta, once Kilo, doce Lima, trece Mike, catorce Noviembre, quince Oscar, dieciséis Papa, diecisiete Quebec, dieciocho Romeo, diecinueve Sierra y veinte Tango.",timing invalid/partial input
+voice-session4,N20-B,125.4,5.6,True,False,True,80,0,2818.2,"Tomé nota: 1 alfa, 2 bravo, 3 charlie, 4 delta, 5 eco, 6 foxtrot, 7 golf, 8 hotel, 9 india, 10 julieta, 11 kilo, 12 lima, 13 mike, 14 noviembre, 15 oscar, 16 papa, 17 quebec, 18 romeo, 19 sierra y 20 tango.",virtual source T1 to scheduled PCM only
+voice-session4,C07,280.1,0.3,True,False,True,0,0,,"¡Buenísimo! Decime, ¿en qué ubicación querés sumar esa mercadería?",separate app trace required for async attribution
+voice-session4,C08,206.2,11.9,True,False,True,13,0,,"Entendido, no preparo el pedido. Avisame cuando quieras retomarlo.",separate app trace required for async attribution
+voice-session4,C09,240.4,-0.3,True,False,True,0,0,,No hay problema. Decime en qué local querés cargar el stock y qué productos y cantidades vas a ingresar.,separate app trace required for async attribution
+voice-session4,C10,,-0.6,False,False,False,0,0,,,timing invalid/partial input
+voice-session4,C10-R,279.4,6.5,True,False,True,0,0,,"¡Buenísimo! Decime, ¿qué nombre querés ponerle al producto nuevo?",separate app trace required for async attribution
+voice-session4,C11,250.5,2.0,True,False,True,22,0,,¡Perfecto! ¿Qué cantidad de ese producto nuevo querés ingresar?¿Qué cantidad de ese producto nuevo querés ingresar?No pude identificar el producto. Decime su nombre o presentación.,separate app trace required for async attribution
+voice-session5,Z-C09,259.9,11.0,True,False,True,0,0,,No hay problema. Avisame en cuanto sepas a qué local querés sumar el stock.,separate app trace required for async attribution
+voice-session5,Z-C10,274.3,13.6,True,False,True,0,0,,"¡Buenísimo! Decime, ¿qué nombre le querés poner al producto nuevo?",separate app trace required for async attribution
+voice-session5,Z-C11,267.7,1.7,True,False,True,38,0,,"Perfecto. ¿En qué ubicación querés cargar este producto y qué cantidad vas a sumar?Recibí tu solicitud. Para avanzar, por favor decime qué abreviación querés usar para el producto y en qué ubicación vas a cargar el stock.",separate app trace required for async attribution
+voice-session6,Q-C09,263.2,13.4,True,False,True,0,0,,No hay problema. Decime en qué local querés cargar el stock y qué productos y cantidades vas a sumar.,separate app trace required for async attribution
+voice-session6,Q-C10,282.0,14.4,True,False,True,0,0,,"¡Buenísimo! Decime, ¿qué nombre le querés poner al producto nuevo?",separate app trace required for async attribution
+voice-session6,Q-C11,252.0,6.9,True,False,True,46,0,,"Perfecto. ¿En qué local querés cargar el stock de este producto?Ya registré el nombre. Ahora, por favor, decime la abreviación para reconocer el producto, que puede tener hasta ocho caracteres.Ya estoy procesando la información del nuevo producto.Para avanzar, pasame una abreviación para el producto de hasta ocho caracteres y su precio",separate app trace required for async attribution
+voice-session6,NOISE150-SPEECH,249.2,-2.5,True,False,True,19,0,,"Tomé nota de la lista: un Alfa, dos Bravo, tres Charlie, cuatro Delta y cinco Eco.",separate app trace required for async attribution
+voice-session6,NOISE150,,,False,True,False,0,0,,,control
+voice-session6,NOISE500-SPEECH,311.9,6.6,True,False,True,22,0,,"Ya registré los cinco elementos: un Alfa, dos Bravo, tres Charlie, cuatro Delta y cinco Eco.",separate app trace required for async attribution
+voice-session6,NOISE500,,,False,True,False,0,0,,,control
+voice-session6,INT-SPEECH,265.1,23.5,True,False,False,22,0,,"Queda registrada la lista: un Alfa, dos Bravo, tres Charlie, cuatro Delta y cinco Eco.",separate app trace required for async attribution
+voice-session6,INT,402.2,1.9,True,False,True,14,0,,"Dale, decime qué tenés en mente y seguimos por ahí.",separate app trace required for async attribution
+voice-session6,B06,303.3,5.5,True,False,True,14,0,,"Entendido, tomo nota del problema para seguir mejorando el sistema.Para avanzar, ¿qué ocurre actualmente en esa prueba que debería mejorar?",separate app trace required for async attribution

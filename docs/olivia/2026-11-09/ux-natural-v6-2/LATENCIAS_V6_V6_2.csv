@@ -1,0 +1,122 @@
+version,category,id,condition,sha,metric,ms,valid,notes
+V6,opening,V6-cold-01,first-document-developer-on,400b4a0,click_to_enabled_visible_composer,2687.0,True,falseThinking=True
+V6,opening,V6-warm-01,warm-same-document,400b4a0,click_to_enabled_visible_composer,113.2,True,falseThinking=False
+V6,opening,V6-warm-02,warm-same-document,400b4a0,click_to_enabled_visible_composer,65.2,True,falseThinking=False
+V6,opening,V6-warm-03,warm-same-document,400b4a0,click_to_enabled_visible_composer,190.7,True,falseThinking=False
+V6,opening,V6-warm-04,warm-same-document,400b4a0,click_to_enabled_visible_composer,618.4,True,falseThinking=False
+V6,opening,V6-warm-05,warm-same-document,400b4a0,click_to_enabled_visible_composer,57.8,True,falseThinking=False
+V6,opening,V6-warm-06,warm-same-document,400b4a0,click_to_enabled_visible_composer,63.7,True,falseThinking=False
+V6,opening,V6-warm-07,warm-same-document,400b4a0,click_to_enabled_visible_composer,65.7,True,falseThinking=False
+V6,opening,V6-warm-08,warm-same-document,400b4a0,click_to_enabled_visible_composer,572.0,True,falseThinking=False
+V6,opening,V6-warm-09,warm-same-document,400b4a0,click_to_enabled_visible_composer,44.0,True,falseThinking=False
+V6,opening,V6-warm-10,warm-same-document,400b4a0,click_to_enabled_visible_composer,74.3,True,falseThinking=False
+V6,opening,V6-warm-11,warm-same-document,400b4a0,click_to_enabled_visible_composer,79.8,True,falseThinking=False
+V6,opening,V6-warm-12,warm-same-document,400b4a0,click_to_enabled_visible_composer,61.4,True,falseThinking=False
+V6,opening,V6-warm-13,warm-same-document,400b4a0,click_to_enabled_visible_composer,48.6,True,falseThinking=False
+V6,opening,V6-warm-14,warm-same-document,400b4a0,click_to_enabled_visible_composer,54.8,True,falseThinking=False
+V6,opening,V6-warm-15,warm-same-document,400b4a0,click_to_enabled_visible_composer,53.8,True,falseThinking=False
+V6,opening,V6-warm-16,warm-same-document,400b4a0,click_to_enabled_visible_composer,52.2,True,falseThinking=False
+V6,opening,V6-warm-17,warm-same-document,400b4a0,click_to_enabled_visible_composer,41.5,True,falseThinking=False
+V6,opening,V6-warm-18,warm-same-document,400b4a0,click_to_enabled_visible_composer,48.9,True,falseThinking=False
+V6,opening,V6-warm-19,warm-same-document,400b4a0,click_to_enabled_visible_composer,58.2,True,falseThinking=False
+V6,opening,V6-warm-20,warm-same-document,400b4a0,click_to_enabled_visible_composer,57.1,True,falseThinking=False
+V6,opening,V6-document-01,new-document-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,972.9,True,falseThinking=True
+V6,opening,V6-document-02,new-document-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,972.8,True,falseThinking=True
+V6,opening,V6-document-03,new-document-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,966.8,True,falseThinking=True
+V6,opening,V6-document-04,new-document-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,989.1,True,falseThinking=True
+V6,opening,V6-document-05,new-document-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,893.1,True,falseThinking=True
+V6,opening,V6-new-session-01,new-document-new-chat-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,2141.9,True,falseThinking=True
+V6,opening,V6-new-session-02,new-document-new-chat-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,1273.9,True,falseThinking=True
+V6,opening,V6-new-session-03,new-document-new-chat-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,1260.5,True,falseThinking=True
+V6,opening,V6-new-session-04,new-document-new-chat-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,1182.3,True,falseThinking=True
+V6,opening,V6-new-session-05,new-document-new-chat-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,1193.2,True,falseThinking=True
+V6,opening,V6-new-session-06,new-document-new-chat-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,2461.1,True,falseThinking=True
+V6,opening,V6-new-session-07,new-document-new-chat-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,1335.5,True,falseThinking=True
+V6,opening,V6-new-session-08,new-document-new-chat-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,1332.3,True,falseThinking=True
+V6,opening,V6-new-session-09,new-document-new-chat-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,1356.3,True,falseThinking=True
+V6,opening,V6-new-session-10,new-document-new-chat-http-cache-preserved,400b4a0,click_to_enabled_visible_composer,1264.6,True,falseThinking=True
+V6.2,opening,AW1,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,952.1,True,falseThinking=False
+V6.2,opening,AW2,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,85.9,True,falseThinking=False
+V6.2,opening,AW3,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,54.5,True,falseThinking=False
+V6.2,opening,AW4,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,63.6,True,falseThinking=False
+V6.2,opening,AW5,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,47.8,True,falseThinking=False
+V6.2,opening,AW6,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,42.3,True,falseThinking=False
+V6.2,opening,AW7,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,77.8,True,falseThinking=False
+V6.2,opening,AW8,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,58.5,True,falseThinking=False
+V6.2,opening,AW9,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,45.2,True,falseThinking=False
+V6.2,opening,AW10,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,998.0,True,falseThinking=False
+V6.2,opening,AW11,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,988.9,True,falseThinking=False
+V6.2,opening,AW12,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,964.3,True,falseThinking=False
+V6.2,opening,AW13,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,51.3,True,falseThinking=False
+V6.2,opening,AW14,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,67.9,True,falseThinking=False
+V6.2,opening,AW15,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,51.2,True,falseThinking=False
+V6.2,opening,AW16,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,68.9,True,falseThinking=False
+V6.2,opening,AW17,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,47.0,True,falseThinking=False
+V6.2,opening,AW18,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,52.6,True,falseThinking=False
+V6.2,opening,AW19,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,43.7,True,falseThinking=False
+V6.2,opening,AW20-retry,warm-same-document,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,980.7,True,falseThinking=False
+V6.2,opening,AC1,new-document-no-conversation,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,973.3,True,falseThinking=False
+V6.2,opening,AC2,new-document-no-conversation,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,955.7,True,falseThinking=False
+V6.2,opening,AC3,new-document-no-conversation,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,991.1,True,falseThinking=False
+V6.2,opening,AC4,new-document-no-conversation,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,986.2,True,falseThinking=False
+V6.2,opening,AC5,new-document-no-conversation,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,984.1,True,falseThinking=False
+V6.2,opening,AC6,new-document-no-conversation,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,1025.6,True,falseThinking=False
+V6.2,opening,AC7,new-document-no-conversation,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,1058.2,True,falseThinking=False
+V6.2,opening,AC8,new-document-no-conversation,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,483.3,True,falseThinking=False
+V6.2,opening,AC9,new-document-no-conversation,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,961.6,True,falseThinking=False
+V6.2,opening,AC10,new-document-no-conversation,47337d91bd09748a06ada55967d8054a61d439fe,click_to_enabled_visible_composer,265.0,True,falseThinking=False
+V6.2,virtual-voice,S01,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,1949.6,True,virtual source T1 to scheduled PCM only
+V6.2,virtual-voice,S02,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,1205.3,True,virtual source T1 to scheduled PCM only
+V6.2,virtual-voice,S03,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,1355.0,True,virtual source T1 to scheduled PCM only
+V6.2,virtual-voice,S04,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,1183.4,True,virtual source T1 to scheduled PCM only
+V6.2,virtual-voice,S05,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,1790.5,True,virtual source T1 to scheduled PCM only
+V6.2,virtual-voice,S06,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,1513.5,True,virtual source T1 to scheduled PCM only
+V6.2,virtual-voice,S07,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,1482.6,True,virtual source T1 to scheduled PCM only
+V6.2,virtual-voice,S08,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,1906.9,True,virtual source T1 to scheduled PCM only
+V6.2,virtual-voice,C01,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,C02,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,C03,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,B03,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,C04,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,C05,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,C06,voice-session1,47337d9,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,R-C01,voice-session2,418ffc8,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,R-C02,voice-session2,418ffc8,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,R-C03,voice-session2,418ffc8,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,B01,voice-session2,418ffc8,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,B02,voice-session2,418ffc8,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,R-S03,voice-session2,418ffc8,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,B04,voice-session2,418ffc8,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,F-C04,voice-session3,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,F-C05,voice-session3,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,F-C06,voice-session3,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,F-B04,voice-session3,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,F-B05,voice-session3,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,N05,voice-session4,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,1990.0,True,virtual source T1 to scheduled PCM only
+V6.2,virtual-voice,N10,voice-session4,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,timing invalid/partial input
+V6.2,virtual-voice,N20-A,voice-session4,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,timing invalid/partial input
+V6.2,virtual-voice,N20-B,voice-session4,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,2818.2,True,virtual source T1 to scheduled PCM only
+V6.2,virtual-voice,C07,voice-session4,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,C08,voice-session4,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,C09,voice-session4,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,C10,voice-session4,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,timing invalid/partial input
+V6.2,virtual-voice,C10-R,voice-session4,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,C11,voice-session4,5d0dbcd,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,Z-C09,voice-session5,c4f204b,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,Z-C10,voice-session5,c4f204b,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,Z-C11,voice-session5,c4f204b,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,Q-C09,voice-session6,81e3df6,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,Q-C10,voice-session6,81e3df6,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,Q-C11,voice-session6,81e3df6,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,NOISE150-SPEECH,voice-session6,81e3df6,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,NOISE150,voice-session6,81e3df6,stimulus_T1_to_first_scheduled_PCM,,False,control
+V6.2,virtual-voice,NOISE500-SPEECH,voice-session6,81e3df6,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,NOISE500,voice-session6,81e3df6,stimulus_T1_to_first_scheduled_PCM,,False,control
+V6.2,virtual-voice,INT-SPEECH,voice-session6,81e3df6,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,INT,voice-session6,81e3df6,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,virtual-voice,B06,voice-session6,81e3df6,stimulus_T1_to_first_scheduled_PCM,,False,separate app trace required for async attribution
+V6.2,voice-connection,client-traces-session2,last_manual_connection_in_export,see_source_trace_export,voice_gesture_to_capture_ready,2882.7,True,virtual mic; token/network/setup included; not panel opening
+V6.2,voice-connection,client-traces-session3,last_manual_connection_in_export,see_source_trace_export,voice_gesture_to_capture_ready,4334.4,True,virtual mic; token/network/setup included; not panel opening
+V6.2,voice-connection,client-traces-session4,last_manual_connection_in_export,see_source_trace_export,voice_gesture_to_capture_ready,3661.2,True,virtual mic; token/network/setup included; not panel opening
+V6.2,voice-connection,client-traces-session5,last_manual_connection_in_export,see_source_trace_export,voice_gesture_to_capture_ready,5149.9,True,virtual mic; token/network/setup included; not panel opening
+V6.2,voice-connection,client-traces-session6,last_manual_connection_in_export,see_source_trace_export,voice_gesture_to_capture_ready,3940.3,True,virtual mic; token/network/setup included; not panel opening
