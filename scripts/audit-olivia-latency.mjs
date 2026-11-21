@@ -17,7 +17,7 @@ const server=[];
 for(const enabled of [false,true])for(let sample=0;sample<12;sample++){
   const f=fixture({role:'admin'});f.config.conversationLatency.enabled=enabled;f.session.email='agsreserva@gmail.com';
   f.documents.set('products/almonds',{name:'Almendras',active:true,defaultPrice:1500});f.documents.set('locations/local_a',{name:'Local sintético',active:true});f.documents.set('locationStock/local_a/items/almonds',{productName:'Almendras',productId:'almonds',currentStock:31,active:true});
-  let calls=0;const engine=createOliviaEngine({store:f.store,clock:f.clock,env:{OPENAI_API_KEY:'synthetic-only',GOOGLE_APPLICATION_CREDENTIALS:'/fixture-only'},provider:async()=>++calls===1?functionResponse('get_stock',{productId:'almonds',locationId:'local_a'}):textResponse(JSON.stringify({complete:'Almendras: 31 unidades en Local sintético.',spoken:'Almendras: 31 unidades en Local sintético.'}))});
+  let calls=0;const engine=createOliviaEngine({store:f.store,clock:f.clock,env:{OPENAI_API_KEY:'synthetic-only'},provider:async()=>++calls===1?functionResponse('get_stock',{productId:'almonds',locationId:'local_a'}):textResponse(JSON.stringify({complete:'Almendras: 31 unidades en Local sintético.',spoken:'Almendras: 31 unidades en Local sintético.'}))});
   const {conversationId}=await start(f),began=performance.now();const result=await engine.chat(f.session,{message:'Stock de almendras',requestId:'sample-'+sample,conversationId,inputMode:'natural-voice',screenContext:{module:'locations',locationId:'local_a'}});
   server.push({enabled,elapsedMs:performance.now()-began,modelCalls:calls,toolCalls:result.telemetry?.toolCalls});
 }

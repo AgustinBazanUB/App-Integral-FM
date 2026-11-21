@@ -3,13 +3,15 @@ import assert from "node:assert/strict";
 import { defaultOliviaConfiguration, validateConfiguration } from "../src/shared/oliviaContracts.mjs";
 import { fixture, start } from "./helpers/olivia-fixture.mjs";
 
-test("the engine exposes natural voice but no GPT-Live conversation APIs", async () => {
+test("the engine exposes natural voice without a selectable speech provider", async () => {
   const f = fixture({ role: "admin" }), { conversationId } = await start(f);
   const configuration = validateConfiguration({ ...defaultOliviaConfiguration(), voiceProtocol: "live" });
   const state = await f.engine.state(f.session, conversationId);
-  assert.equal(configuration.voiceProtocol, "chirp");
+  assert.equal("voiceProtocol" in configuration, false);
   for (const key of ["live", "liveTranscription", "realtime"]) assert.equal(key in configuration.profiles, false);
-  assert.equal(state.voiceProtocol, "chirp");
+  assert.equal(state.voiceConversationAvailable, false);
+  assert.equal(state.googleTtsConfigured, undefined);
+  assert.equal(state.voiceConfiguration, undefined);
   for (const key of ["realtimeTool", "realtimeTranscript", "voiceCosts", "recordSpeech"]) assert.equal(key in f.engine, false);
 });
 

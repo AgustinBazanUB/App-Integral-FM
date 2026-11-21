@@ -1,28 +1,32 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { EventEmitter } from "node:events";
 import { createOliviaTransport } from "../src/gestion/olivia/client.mjs";
 import { defaultOliviaConfiguration, validateConfiguration, costForUsage } from "../src/shared/oliviaContracts.mjs";
 import { dualVoiceResponse, spokenFallback } from "../netlify/functions/_lib/olivia/engine.mjs";
-import { synthesizeChirp } from "../netlify/functions/_lib/olivia/chirp.mjs";
 import { NaturalVoiceConversation, latencyPercentile } from "../src/gestion/olivia/naturalVoice.mjs";
 
 test("configuration removes selectable legacy voice profiles and fixes GPT Transcribe", () => {
   const legacy = defaultOliviaConfiguration();
   legacy.voiceProtocol = "realtime";
+  legacy.naturalVoice.voice = "es-US-Chirp3-HD-Aoede";
+  legacy.naturalVoice.speakingRate = 1;
+  legacy.naturalVoice.maxMonthlyCharacters = 10000;
   legacy.liveUsdPerMinute = 0.05;
   legacy.profiles.live = { model: "gpt-live-1", voice: "marin" };
   legacy.profiles.realtime = { model: "gpt-realtime-2.1", voice: "marin" };
   legacy.profiles.liveTranscription = { model: "gpt-realtime-whisper" };
   legacy.profiles.transcription.model = "other-model";
   const normalized = validateConfiguration(legacy);
-  assert.equal(normalized.voiceProtocol, "chirp");
+  assert.equal("voiceProtocol" in normalized, false);
+  assert.equal("voice" in normalized.naturalVoice, false);
+  assert.equal("speakingRate" in normalized.naturalVoice, false);
+  assert.equal("maxMonthlyCharacters" in normalized.naturalVoice, false);
   assert.equal(normalized.profiles.transcription.model, "gpt-transcribe");
   assert.equal("live" in normalized.profiles, false);
   assert.equal("realtime" in normalized.profiles, false);
   assert.equal("liveTranscription" in normalized.profiles, false);
   assert.equal("liveUsdPerMinute" in normalized, false);
-  assert.equal(costForUsage({ billingUnit: "tts-characters", characters: 1000 }, normalized).actualCostUsd, 0.03);
+  assert.equal(costForUsage({ billingUnit: "tts-characters", characters: 1000 }, normalized).actualCostUsd, null);
 });
 
 test("spoken answer removes markdown and truncates at a readable boundary", () => {
@@ -32,8 +36,53 @@ test("spoken answer removes markdown and truncates at a readable boundary", () =
   assert.equal(spoken, "Primera oración.");
 });
 
+test('Live endpointing follows audio callbacks when animation frames are throttled, preserving list pauses',async()=>{
+  const frames=[],commits=[],starts=[];let now=0;
+  const track={stop(){}},stream={getTracks:()=>[track],getAudioTracks:()=>[track]};
+  const context={destination:{},resume:async()=>{},close:async()=>{},createMediaStreamSource:()=>({connect(){},disconnect(){}}),createAnalyser:()=>({fftSize:1024,getFloatTimeDomainData:s=>s.fill(0),disconnect(){}})};
+  const transcriber={handlesTurns:true,ready:true,beginTurn:id=>starts.push(id),commit:metadata=>commits.push(metadata),close(){this.closed=true;}};
+  const voice=new NaturalVoiceConversation({mediaDevices:{getUserMedia:async()=>stream},Recorder:class{},AudioContext:class{constructor(){return context;}},createTranscriber:async()=>transcriber,frame:fn=>{frames.push(fn);return frames.length;},cancelFrame(){},now:()=>now});
+  await voice.start();
+  const feed=(at,rms)=>{now=at;voice.processInputFrame({at,rms});};
+  feed(100,.1);feed(200,.1);feed(1299,0);
+  assert.equal(voice.recordingTurn,true);feed(1300,0);assert.equal(voice.recordingTurn,false);
+  assert.equal(commits.length,1,'a turn ends with no animation-frame callback');
+  feed(2000,.1);voice.partial='Lista de productos';feed(3000,0);
+  now=3500;frames.shift()();assert.equal(voice.recordingTurn,true,'the stale visual clock cannot finish an audio-controlled turn');
+  feed(3600,.1);feed(5500,0);assert.equal(voice.recordingTurn,true,'natural list pauses retain the existing 2 s window');
+  feed(5600,0);assert.equal(voice.recordingTurn,false);assert.equal(commits.length,2);assert.equal(starts.length,2);voice.close();
+});
+
+test('a brief playback-time noise pulse leaves the answer running while sustained speech still interrupts',()=>{
+  const starts=[],traces=[];let interrupted=0;
+  const live={isPlaying:true,handlesTurns:true,ready:true,beginTurn:id=>starts.push(id),interrupt:()=>interrupted++};
+  const voice=new NaturalVoiceConversation({onTrace:e=>traces.push(e),onState(){},onSpeechStart(){}});
+  voice.transcriber=live;
+  for(let t=100;t<=240;t+=20)voice.evaluateVoice(.05,t);
+  voice.evaluateVoice(0,260);voice.evaluateVoice(0,320);
+  assert.equal(starts.length,0,'the 150 ms pulse never opens a turn or stops playback');
+  assert.equal(interrupted,0);assert.equal(traces[0].stage,'voice.barge_in.rejected');
+  for(let t=500;t<=660;t+=20)voice.evaluateVoice(.05,t);
+  assert.equal(starts.length,1);assert.equal(interrupted,1);
+  clearTimeout(voice.turnTimer);
+  voice.recordingTurn=false;live.isPlaying=false;
+  voice.evaluateVoice(.05,1000);
+  assert.equal(starts.length,2,'idle speech retains the immediate local start');
+  clearTimeout(voice.turnTimer);
+});
+
+test('a late local endpoint does not replace the completed native response with processing',()=>{
+  const states=[];
+  const voice=new NaturalVoiceConversation({now:()=>2000,onState:s=>states.push(s)});
+  const live={handlesTurns:true,ready:true,currentTurn:{pending:false},isPlaying:true,commit:async()=>{}};
+  voice.turnTranscriber=live;voice.recordingStartedAt=0;voice.lastSpeechAt=500;
+  voice.recordingTurn=true;voice.finishTurn();assert.equal(states.at(-1),'speaking');
+  live.isPlaying=false;voice.recordingTurn=true;voice.finishTurn();assert.equal(states.at(-1),'listening');
+  live.currentTurn.pending=true;voice.recordingTurn=true;voice.finishTurn();assert.equal(states.at(-1),'processing');
+});
+
 test("browser VAD sends a bounded turn with a short in-memory pre-roll and releases the microphone", async () => {
-  const frames = [], records = [], states = [], turns = [], speechStarts = [];
+  const frames = [], records = [], states = [], turns = [], speechStarts = [], traces = [];
   let now = 0, amplitude = 0;
   class Recorder {
     static isTypeSupported() { return true; }
@@ -51,9 +100,13 @@ test("browser VAD sends a bounded turn with a short in-memory pre-roll and relea
   const voice = new NaturalVoiceConversation({
     mediaDevices: { getUserMedia: async (constraints) => { assert.equal(constraints.audio.echoCancellation, true); assert.equal(constraints.audio.noiseSuppression, true); return stream; } },
     Recorder, AudioContext: class { constructor() { return context; } }, frame: (callback) => { frames.push(callback); return frames.length; }, cancelFrame() {}, now: () => now,
-    onTurn: async (blob, metadata) => turns.push({ text: await blob.text(), metadata }), onState: (state) => states.push(state), onSpeechStart: (data) => speechStarts.push(data),
+    onTurn: async (blob, metadata) => turns.push({ text: await blob.text(), metadata }), onState: (state) => states.push(state), onSpeechStart: (data) => speechStarts.push(data), onTrace: event => traces.push(event),
   });
   await voice.start();
+  assert.ok(traces.some(event => event.stage === 'microphone.request.start'));
+  assert.ok(traces.some(event => event.stage === 'microphone.request.end' && event.status === 'ok'));
+  assert.ok(traces.some(event => event.stage === 'audio.context.resume.end'));
+  assert.ok(traces.some(event => event.stage === 'voice.capture.ready'));
   const recorder = records[0];
   for (const chunk of ["header", "old-1", "old-2"]) recorder.ondataavailable({ data: new Blob([chunk]) });
   now = 100; amplitude = 0.1; frames.shift()();
@@ -65,6 +118,7 @@ test("browser VAD sends a bounded turn with a short in-memory pre-roll and relea
   assert.equal(turns.length, 1);
   assert.equal(turns[0].text, "headerold-1old-2speechtail");
   assert.equal(turns[0].metadata.durationSeconds, 2);
+  assert.ok(traces.some(event => event.stage === 'voice.turn.end' && Number.isFinite(event.endpointMs) && event.turnId));
   assert.ok(states.includes("recording"));
   voice.close();
   assert.equal(track.stopped, true);
@@ -72,65 +126,59 @@ test("browser VAD sends a bounded turn with a short in-memory pre-roll and relea
   assert.equal(latencyPercentile([40, 10, 30, 20], 0.5), 20);
 });
 
-test("Chirp synthesis authorizes owner, enforces monthly character quota and streams PCM without persisting text", async () => {
-  const config = defaultOliviaConfiguration(); config.naturalVoice.maxMonthlyCharacters = 10;
-  const now = new Date("2026-10-28T15:00:00Z"), uid = "admin_user", requestId = "voice_request_1";
-  const docs = new Map([["oliviaConversations/conversation_1", { userId: uid, sessionBinding: "123", expiresAt: new Date(now.getTime() + 60000) }]]);
-  const apply = (writes) => writes.forEach((write) => {
-    if (write.type === "create" && docs.has(write.path)) throw new Error("duplicate create");
-    docs.set(write.path, write.type === "update" ? { ...docs.get(write.path), ...structuredClone(write.data) } : structuredClone(write.data));
-  });
-  const store = {
-    get: async (path) => docs.has(path) ? { ...docs.get(path), id: path.split("/").at(-1) } : null,
-    commit: async (writes) => apply(writes),
-    transaction: async (work) => work({ getDocument: async (path) => docs.has(path) ? { data: docs.get(path) } : null, commitDocuments: async (writes) => apply(writes) }),
+test("Gemini Live streams the microphone once and local VAD only commits the turn", async () => {
+  const frames = [], commits = [], states = [];
+  let now = 0, amplitude = 0, recorderCount = 0, fallbackTurns = 0;
+  class Recorder { static isTypeSupported() { return true; } constructor() { recorderCount++; } }
+  const track = { enabled: true, stop() {} };
+  const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
+  const context = {
+    currentTime: 0, destination: {}, resume: async () => {}, close: async () => {},
+    createMediaStreamSource: () => ({ connect() {}, disconnect() {} }),
+    createAnalyser: () => ({ fftSize: 1024, getFloatTimeDomainData(samples) { samples.fill(amplitude); }, connect() {}, disconnect() {} }),
   };
-  const session = { uid, email: "AGSRESERVA@gmail.com", authTime: 123, profile: { role: "admin", active: true } };
-  const env = { OPENAI_API_KEY: "backend-secret", GOOGLE_APPLICATION_CREDENTIALS_JSON: JSON.stringify({ project_id: "fm-project", client_email: "tts@example.test", private_key: "private" }) };
-  const engine = { configuration: async () => config };
-  const writes = [], stream = new EventEmitter();
-  stream.write = (frame) => writes.push(frame);
-  stream.end = () => setImmediate(() => { stream.emit("data", { audioContent: Buffer.from([1, 0, 2, 0]) }); stream.emit("end"); });
-  stream.cancel = () => { stream.cancelled = true; };
-  const client = { streamingSynthesize: () => stream };
-  const call = (rid, text = "Hola") => synthesizeChirp({ request: new Request("https://preview.test/.netlify/functions/olivia-synthesize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId: "conversation_1", requestId: rid, text }) }), session, store, engine, env, createClient: () => client, now });
-  const response = await call(requestId);
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get("X-Olivia-Sample-Rate"), "24000");
-  assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [1, 0, 2, 0]);
-  assert.equal(writes[0].streamingConfig.voice.name, "es-US-Chirp3-HD-Aoede");
-  assert.equal(writes[0].streamingConfig.streamingAudioConfig.audioEncoding, "PCM");
-  assert.equal(writes[1].input.text, "Hola");
-  const usage = docs.get(`oliviaUsage/${uid}_${requestId}`);
-  assert.equal(usage.characters, 4);
-  assert.equal(usage.actualCostUsd, 4 * 30 / 1_000_000);
-  assert.ok(usage.retentionExpiresAt instanceof Date);
-  assert.ok(docs.get(`oliviaVoiceRequests/${uid}_${requestId}`).retentionExpiresAt instanceof Date);
-  assert.ok([...docs].find(([path]) => path.startsWith(`oliviaVoiceBudgets/${uid}_`))[1].retentionExpiresAt instanceof Date);
-  assert.equal(JSON.stringify([...docs.values()]).includes("Hola"), false);
-  await assert.rejects(call("voice_request_2", "1234567"), { code: "voice-quota-exhausted" });
-  await assert.rejects(synthesizeChirp({ request: new Request("https://preview.test", { method: "POST", body: JSON.stringify({ conversationId: "conversation_1", requestId: "foreign", text: "Hola" }) }), session: { ...session, uid: "other" }, store, engine, env, createClient: () => client, now }), { code: "conversation-not-found" });
+  const liveSession = {
+    handlesTurns: true, ready: true, beginTurn(turnId) { this.turnId = turnId; },
+    commit: async metadata => commits.push(metadata), discardTurn() {}, close() {},
+  };
+  const voice = new NaturalVoiceConversation({
+    createTranscriber: async () => liveSession,
+    mediaDevices: { getUserMedia: async () => stream },
+    Recorder, AudioContext: class { constructor() { return context; } },
+    frame: callback => { frames.push(callback); return frames.length; }, cancelFrame() {}, now: () => now,
+    onTurn: async () => { fallbackTurns++; }, onState: state => states.push(state),
+  });
+  await voice.start();
+  assert.equal(recorderCount, 0, "Gemini's streamed input must not be duplicated in MediaRecorder");
+  now = 100; amplitude = 0.1; frames.shift()();
+  assert.equal(voice.recordingTurn, true);
+  now = 2100; amplitude = 0; frames.shift()();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(commits.length, 1);
+  assert.equal(commits[0].turnId, liveSession.turnId);
+  assert.equal(fallbackTurns, 0);
+  assert.ok(states.includes("processing"));
+  voice.close();
 });
 
-test("natural voice job polling emits the saved spoken response and synthesize keeps binary response", async () => {
+test("natural voice job polling keeps the saved spoken text and exposes no independent speech service", async () => {
   const sent = [], events = []; let polls = 0;
   const fetchImpl = async (url, options) => {
     sent.push({ url, options });
-    if (url.endsWith("olivia-synthesize")) return new Response(new Uint8Array([1, 2]), { headers: { "Content-Type": "audio/pcm" } });
     const body = JSON.parse(options.body);
     if (body.operation === "startChat") return Response.json({ jobId: "job_1" });
     polls++;
     return Response.json(polls === 1
-      ? { status: "running", phase: "Guardando…", text: "", voiceText: "" }
-      : { status: "completed", phase: "Completado", text: "respuesta escrita", voiceText: "respuesta hablada", result: { state: "INFORMACION" } });
+      ? { status: "running", phase: "Guardando…", text: "" }
+      : { status: "completed", phase: "Completado", text: "respuesta escrita", result: { state: "INFORMACION", spokenText: "respuesta hablada" } });
   };
   const client = createOliviaTransport({ getToken: async () => "firebase-token", fetchImpl, pollIntervalMs: 1 });
   const result = await client.request({ operation: "chat", background: true, inputMode: "natural-voice" }, { pollIntervalMs: 1, onEvent: (event) => events.push(event) });
   assert.equal(result.state, "INFORMACION");
-  assert.equal(events.filter((event) => event.type === "voice.ready").length, 1);
-  assert.equal(events.find((event) => event.type === "voice.ready").text, "respuesta hablada");
-  const audio = await client.synthesize("texto", { conversationId: "c1", requestId: "r1" });
-  assert.equal(audio.headers.get("content-type"), "audio/pcm");
-  assert.deepEqual([...new Uint8Array(await audio.arrayBuffer())], [1, 2]);
-  assert.equal(sent.at(-1).options.headers.Authorization, "Bearer firebase-token");
+  assert.equal(result.spokenText, "respuesta hablada");
+  assert.equal(events.some((event) => event.type === "voice.ready"), false);
+  assert.equal(typeof client.synthesize, "undefined");
+  assert.equal(typeof client.fastSpeech, "undefined");
+  assert.equal(typeof client.speechAudio, "undefined");
+  assert.equal(sent.some(({ url }) => url.includes("synthesize") || url.includes("speech-audio") || url.includes("fast-speech")), false);
 });
