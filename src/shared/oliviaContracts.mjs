@@ -217,15 +217,19 @@ export function defaultOliviaConfiguration(env = {}) {
     modelPolicyVersion: 2,
     routing: { toolThreshold: 6, entityThreshold: 5, rowThreshold: 500, documentThreshold: 2 },
     responseLimits: { maxOutputTokens: 2400, maxToolCalls: 12, maxRounds: 8, timeoutMs: 45000, providerTimeoutMs: 20000 },
-    voiceProtocol: "chirp",
     conversationLatency: { enabled: true, transcriptionDelay: "minimal" },
+    hybridVoice: {
+      enabled: env.OLIVIA_HYBRID_LIVE_ENABLED === "true",
+      targetUsd: 5,
+      warningUsd: 6,
+      hardLimitUsd: 10,
+      maxSessionSeconds: 600,
+      reservedUsdPerSession: 0.5,
+    },
     naturalVoice: {
       enabled: true,
-      voice: "es-US-Chirp3-HD-Aoede",
-      speakingRate: 1,
       turnEndSilenceMs: 1900,
       maxCharactersPerTurn: 1600,
-      maxMonthlyCharacters: 50000,
     },
     profiles: {
       adminDefault: {
@@ -253,8 +257,8 @@ export function defaultOliviaConfiguration(env = {}) {
     forecast: { safetyStockPercent: 20 },
   };
 }
-export function validateConfiguration(value) {
-  const defaults = defaultOliviaConfiguration();
+export function validateConfiguration(value, env = {}) {
+  const defaults = defaultOliviaConfiguration(env);
   const legacyVoiceKeys = ["voiceProtocol", "liveUsdPerMinute"];
   if (
     !value ||
@@ -264,11 +268,21 @@ export function validateConfiguration(value) {
   )
     throw oliviaError("invalid-configuration", "Configuración inválida.");
   const clean = { ...defaults, ...value };
-  // The old values remain readable so an in-flight legacy session can settle,
-  // but cannot select a conversational engine. New sessions use Chirp only.
-  clean.voiceProtocol = "chirp";
+  // Read older saved settings without retaining fields for retired TTS routes.
+  delete clean.voiceProtocol;
   clean.conversationLatency = { ...defaults.conversationLatency, ...clean.conversationLatency };
   validateSchema(clean.conversationLatency, { type: "object", additionalProperties: false, required: ["enabled", "transcriptionDelay"], properties: { enabled: { type: "boolean" }, transcriptionDelay: { type: "string", enum: ["minimal", "low"] } } });
+  clean.hybridVoice = { ...defaults.hybridVoice, ...clean.hybridVoice };
+  validateSchema(clean.hybridVoice, object({
+    enabled: { type: "boolean" },
+    targetUsd: { type: "number", minimum: 1, maximum: 100 },
+    warningUsd: { type: "number", minimum: 1, maximum: 100 },
+    hardLimitUsd: { type: "number", minimum: 1, maximum: 100 },
+    maxSessionSeconds: { type: "integer", minimum: 60, maximum: 600 },
+    reservedUsdPerSession: { type: "number", minimum: 0.005, maximum: 1 },
+  }));
+  if (clean.hybridVoice.warningUsd < clean.hybridVoice.targetUsd || clean.hybridVoice.hardLimitUsd < clean.hybridVoice.warningUsd)
+    throw oliviaError("invalid-configuration", "El objetivo, aviso y techo de Gemini deben estar en orden.");
   delete clean.liveUsdPerMinute;
   // Read-time migration only: old expensive administrative profiles cannot
   // silently survive the new policy. No production document is rewritten.
@@ -280,8 +294,11 @@ export function validateConfiguration(value) {
   validateSchema(clean.responseLimits, object({ maxOutputTokens: { type: "integer", minimum: 700, maximum: 8000 }, maxToolCalls: { type: "integer", minimum: 2, maximum: 12 }, maxRounds: { type: "integer", minimum: 2, maximum: 8 }, timeoutMs: { type: "integer", minimum: 10000, maximum: 55000 }, providerTimeoutMs: { type: "integer", minimum: 5000, maximum: 30000 } }));
   validateSchema(clean.routing, object({ toolThreshold: { type: "integer", minimum: 2, maximum: 12 }, entityThreshold: { type: "integer", minimum: 2, maximum: 100 }, rowThreshold: { type: "integer", minimum: 50, maximum: 10000 }, documentThreshold: { type: "integer", minimum: 1, maximum: 4 } }));
   clean.naturalVoice = clean.naturalVoice && { ...clean.naturalVoice };
+  delete clean.naturalVoice.voice;
+  delete clean.naturalVoice.speakingRate;
+  delete clean.naturalVoice.maxMonthlyCharacters;
   if (Number.isInteger(clean.naturalVoice?.turnEndSilenceMs) && clean.naturalVoice.turnEndSilenceMs >= 250 && clean.naturalVoice.turnEndSilenceMs <= 500) clean.naturalVoice.turnEndSilenceMs = 1900;
-  validateSchema(clean.naturalVoice, { type: "object", additionalProperties: false, required: ["enabled", "voice", "speakingRate", "turnEndSilenceMs", "maxCharactersPerTurn", "maxMonthlyCharacters"], properties: { enabled: { type: "boolean" }, voice: { type: "string", enum: ["es-US-Chirp3-HD-Aoede", "es-US-Chirp3-HD-Charon"] }, speakingRate: { type: "number", minimum: 0.9, maximum: 1.1 }, turnEndSilenceMs: { type: "integer", minimum: 1900, maximum: 4000 }, maxCharactersPerTurn: { type: "integer", minimum: 100, maximum: 3000 }, maxMonthlyCharacters: { type: "integer", minimum: 1000, maximum: 1000000 } } });
+  validateSchema(clean.naturalVoice, { type: "object", additionalProperties: false, required: ["enabled", "turnEndSilenceMs", "maxCharactersPerTurn"], properties: { enabled: { type: "boolean" }, turnEndSilenceMs: { type: "integer", minimum: 1900, maximum: 4000 }, maxCharactersPerTurn: { type: "integer", minimum: 100, maximum: 3000 } } });
   validateSchema(clean.audioLimits, { type: "object", additionalProperties: false, required: ["maxSeconds", "maxBytes"], properties: { maxSeconds: { type: "integer", minimum: 5, maximum: 60 }, maxBytes: { type: "integer", minimum: 65536, maximum: 4194304 } } });
   validateSchema(clean.forecast, { type: "object", additionalProperties: false, required: ["safetyStockPercent"], properties: { safetyStockPercent: { type: "integer", minimum: 0, maximum: 100 } } });
   if (
@@ -442,12 +459,14 @@ export function retentionDate(months, now = new Date()) {
   return date;
 }
 export function costForUsage(usage, configuration) {
-  if (usage.billingUnit === "audio-seconds") {
-    const usd = Number.isFinite(usage.durationSeconds) ? usage.durationSeconds * 0.0045 / 60 : null;
+  if (usage.billingUnit === "gemini-live-audio") {
+    const input = Number.isFinite(usage.inputAudioSeconds) ? usage.inputAudioSeconds : null;
+    const output = Number.isFinite(usage.outputAudioSeconds) ? usage.outputAudioSeconds : null;
+    const usd = input != null && output != null ? input * 0.005 / 60 + output * 0.018 / 60 : null;
     return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null };
   }
-  if (usage.billingUnit === "tts-characters") {
-    const usd = Number.isFinite(usage.characters) ? usage.characters * 30 / 1000000 : null;
+  if (usage.billingUnit === "audio-seconds") {
+    const usd = Number.isFinite(usage.durationSeconds) ? usage.durationSeconds * 0.0045 / 60 : null;
     return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null };
   }
   if (usage.modelCalls?.length) {

@@ -68,8 +68,8 @@ test("el handler real de la interfaz anuncia la pausa sin pedir micrófono ni cr
 });
 
 const composerBundle = await build({ entryPoints: ["src/gestion/olivia/OliviaComposer.jsx"], bundle: true, write: false, platform: "node", format: "esm", jsx: "automatic", plugins: [{ name: "voice-composer-render", setup(b) {
-  b.onResolve({ filter: /^react$|^react\/jsx-runtime$|design-system$/ }, args => ({ path: args.path, namespace: "qa" }));
-  b.onLoad({ filter: /.*/, namespace: "qa" }, ({ path }) => ({ contents: path === "react" ? "export const useEffect=()=>{};export const useRef=()=>({current:null});" : path === "react/jsx-runtime" ? "export const jsx=(type,props)=>({type,props});export const jsxs=jsx;" : "export const IconButton='IconButton';" }));
+  b.onResolve({ filter: /^react$|^react\/jsx-runtime$|design-system$|components\/icons$/ }, args => ({ path: args.path, namespace: "qa" }));
+  b.onLoad({ filter: /.*/, namespace: "qa" }, ({ path }) => ({ contents: path === "react" ? "export const useEffect=()=>{};export const useRef=()=>({current:null});" : path === "react/jsx-runtime" ? "export const jsx=(type,props)=>({type,props});export const jsxs=jsx;" : path.endsWith('icons') ? "export const Icon='Icon';" : "export const IconButton='IconButton';" }));
 } }] });
 const { default: Composer } = await import(`data:text/javascript;base64,${Buffer.from(composerBundle.outputFiles[0].text).toString("base64")}`);
 const elements = node => !node || typeof node !== "object" ? [] : Array.isArray(node) ? node.flatMap(elements) : [node, ...elements(node.props?.children)];
