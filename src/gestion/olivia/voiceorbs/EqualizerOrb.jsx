@@ -24,8 +24,8 @@ const EqualizerOrb = forwardRef(function EqualizerOrb2({
   state = "idle",
   size = 168,
   speed = 1,
-  colorFrom = "#38bdf8",
-  colorTo = "#818cf8",
+  colorFrom = "#b88a28",
+  colorTo = "#ead399",
   levelRef,
   label = "Assistant orb",
   className
@@ -45,7 +45,7 @@ const EqualizerOrb = forwardRef(function EqualizerOrb2({
     role="img"
     aria-label={label}
     data-state={state}
-    className={[styles.orb, className].filter(Boolean).join(" ")}
+    className={[styles.orb, styles.ivoryGold, className].filter(Boolean).join(" ")}
     style={orbVars({ size, speed, colorFrom, colorTo })}
   >
       <span className={styles.ring} />

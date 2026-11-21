@@ -1,0 +1,83 @@
+import { selectStatusTasks } from '../../shared/oliviaTaskConversation.mjs';
+const running = task => ['queued','dispatching','running'].includes(task.status);
+const aborted = () => new DOMException('La vista se cerró; las tareas persistidas se conservan.','AbortError');
+export class DelegatedTaskClient {
+  constructor({request,conversationId,onChange=()=>{},onTrace=()=>{},delay=ms=>new Promise(r=>setTimeout(r,ms)),now=()=>performance.now()}) {
+    Object.assign(this,{request,conversationId,onChange,onTrace,delay,now});this.tasks=[];this.closed=false;this.controlIds=new Map();
+  }
+  publish(tasks){this.tasks=tasks; if(!this.closed)this.onChange(tasks);}
+  async refresh(){
+    if(this.closed)throw aborted();
+    if(this.refreshing)return this.refreshing;
+    this.refreshing=this.request({operation:'delegatedTaskStatus',conversationId:this.conversationId}).then(r=>{this.refreshedAt=this.now();this.publish(r.tasks || []);return this.tasks;}).finally(()=>{this.refreshing=null;});
+    return this.refreshing;
+  }
+  async run(call,text,context={}) {
+    this.runningRequests=(this.runningRequests || 0)+1;
+    try{return await this.runTask(call,text,context);}finally{this.runningRequests--;}
+  }
+  async runTask(call,text,context={}) {
+    const args=call.args || {};
+    if(args.action==='status')return selectStatusTasks(this.refreshedAt!=null && this.now()-this.refreshedAt<1500?this.tasks:await this.refresh(),args.taskId);
+    let taskId=args.action==='new'?null:args.taskId || null;
+    if(['continue','cancel','pause','resume'].includes(args.action) && !taskId){
+      const candidates=(await this.refresh()).filter(t=>!['completed','cancelled','failed'].includes(t.status));
+      if(candidates.length!==1)return {needsClarification:true,summary:'Preguntá a cuál tarea se refiere; no se ejecutó ni canceló ninguna.',tasks:candidates};
+      taskId=candidates[0].id;
+    }
+    if(['pause','resume'].includes(args.action)){
+      const allowed=args.action==='pause'?/\b(?:pausa\w*|para despues|deja\w*.*despues)\b/:/\b(?:retoma\w*|segui|continua\w*|reanuda\w*)\b/;
+      if(!allowed.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Pedí que aclare si desea pausar o retomar; no se cambió la tarea.',tasks:this.tasks};
+      const tasks=await this.refresh(),target=tasks.find(t=>t.id===taskId);
+      if(!target || ['completed','cancelled','failed'].includes(target.status))return {needsClarification:true,summary:'Esa solicitud ya terminó o no está disponible. Preguntá cuál de las solicitudes pendientes quiere controlar; no se cambió ninguna.',tasks:tasks.filter(t=>!['completed','cancelled','failed'].includes(t.status))};
+      return this.control({action:args.action,taskId},{onAccepted:context.onAccepted});
+    }
+    if(args.action==='cancel'){
+      if(/\b(?:no cancel\w*|no quiero cancelar|sin cancelar)\b/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'No se canceló ninguna tarea. Pedí que aclare qué necesita.',tasks:this.tasks};
+      if(!/\b(?:cancel\w*|deja|dejalo|olvida\w*|detene\w*|no sigas|no continues)\b/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Pedí que aclare si desea cancelar; no se detuvo ninguna tarea.',tasks:this.tasks};
+      const candidates=(await this.refresh()).filter(t=>!['completed','cancelled','failed'].includes(t.status));
+      if(candidates.length>1 && /^(?:no )?(?:deja|dejalo|cancela|cancelalo|olvidalo)(?: por favor)?$/.test(normalizeSpeech(text)))return {needsClarification:true,summary:'Hay varias tareas. Preguntá cuál debe cancelarse.',tasks:candidates};
+      return this.control({action:'cancel',taskId},{onAccepted:context.onAccepted});
+    }
+    const identity=context.requestId || globalThis.crypto.randomUUID(),at=this.now();
+    const fastRead=!taskId && !(args.dependsOn?.length) && Boolean(quickReadPlan(text));
+    const payload={operation:'delegatedTask',conversationId:this.conversationId,requestId:identity,message:text,...(taskId?{taskId}:{}),...(fastRead?{foreground:true}:{}),...(Number.isInteger(context.collectionRevision)?{collectionRevision:context.collectionRevision}:{}),...(Number.isInteger(context.supersedesCollectionRevision)?{supersedesCollectionRevision:context.supersedesCollectionRevision}:{}),priority:args.priority || 'normal',dependsOn:args.dependsOn || [],screenContext:context.screenContext || {}};
+    let task;
+    for(let attempt=0;attempt<3;attempt++){
+      try{task=await this.request(payload);break;}catch(error){
+        if(attempt===2 || !(['olivia-network-error','olivia-timeout'].includes(error.code)||error.status>=500))throw error;
+        await this.delay(500*(attempt+1));
+      }
+    }
+    context.onAccepted?.(task);
+    this.publish([...this.tasks.filter(t=>t.id!==task.id),task]);
+    this.onTrace('task.accepted',{turnId:context.turnId,sessionId:context.sessionId,taskId:task.id,jobId:task.jobId,requestId:identity,durationMs:this.now()-at,status:task.status});
+    let pollAttempt=0;
+    const pollIntervals=[250,500,1000];
+    while(running(task)){
+      if(this.closed)throw aborted();
+      await this.delay(pollIntervals[Math.min(pollAttempt++,pollIntervals.length-1)]);
+      const tasks=await this.refresh();task=tasks.find(t=>t.id===task.id);
+      if(!task)throw new Error('La tarea ya no está disponible.');
+    }
+    this.onTrace('task.result',{turnId:context.turnId,sessionId:context.sessionId,taskId:task.id,jobId:task.jobId,requestId:identity,durationMs:this.now()-at,status:task.status});
+    return task;
+  }
+  async control(fields,hooks={}){
+    const taskState=this.tasks.find(t=>t.id===fields.taskId);
+    const key=[fields.taskId,fields.action,fields.actionId || '',...(['pause','resume'].includes(fields.action)?[taskState?.status,taskState?.updatedAt]:[])].join(':');
+    if(!this.controlIds.has(key))this.controlIds.set(key,globalThis.crypto.randomUUID());
+    const result=await this.request({operation:'delegatedTaskControl',conversationId:this.conversationId,requestId:this.controlIds.get(key),...fields});
+    const task=result.tasks?.find(t=>t.id===fields.taskId);
+    if(task)hooks.onAccepted?.(task);
+    this.publish(result.tasks || []);return {tasks:this.tasks,task};
+  }
+  close(){this.closed=true;}
+  async acknowledge({taskId,notificationKey}){
+    const result=await this.request({operation:'delegatedTaskDelivery',conversationId:this.conversationId,taskId,notificationKey});
+    if(result.acknowledged){const task=this.tasks.find(t=>t.id===taskId);if(task?.notification?.key===notificationKey)task.notification.delivered=true;}
+    return result;
+  }
+}
+import { normalizeSpeech } from '../../shared/oliviaSpeechText.mjs';
+import { quickReadPlan } from '../../shared/oliviaConversationRouter.mjs';

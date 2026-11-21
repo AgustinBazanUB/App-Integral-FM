@@ -87,7 +87,7 @@ export function taskControl(text) {
 export async function progressiveStock({ previous, initialId, message, context, run, check = () => {}, now = new Date() }) {
   const text = normalize(message);
   const start = /^(?:cargame|carga|ingresa|ingresame|agrega|agregame)\s+(\d+)\s+(?:unidades? |botellas? |bidones? )?(?:de )?(.+)$/.exec(text);
-  const continuation = previous?.intent === "prepare_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/\b(?:cliente|cancel[a-z]*|explic[a-z]*|ensen[a-z]*|queria decir|no me cargues)\b/.test(text) && !/^(ahora|consulta|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|mandame|transferi|vende|registra|crea|disena)/.test(text);
+  const continuation = previous?.intent === "prepare_stock_load" && ["collecting", "prepared"].includes(previous.status) && !/[?¿]/.test(message) && !/\b(?:cliente|cancel[a-z]*|explic[a-z]*|ensen[a-z]*|queria decir|no me cargues)\b/.test(text) && !/^(ahora|consulta|revisa|fijate|chequea|otra cosa|mostra|decime|quiero saber|como |que |quien |donde |cuanto|compara|analiza|pronostic|mandame|transferi|vende|registra|crea|disena)/.test(text);
   if (!start && !continuation) return null;
   check();
   let task = continuation ? structuredClone(previous) : { id: initialId || randomUUID(), intent: "prepare_stock_load", revision: 0, status: "collecting", slots: { locationId: context.locationId || null, productId: null, quantity: null, reason: null }, missingFields: [], ambiguities: {}, route: null, createdAt: now };
