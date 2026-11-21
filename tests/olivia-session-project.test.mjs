@@ -1,14 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { oliviaSession } from "../netlify/functions/_lib/olivia/http.mjs";
-import { hasGoogleCloudTtsCredentials } from "../src/shared/oliviaVoiceAvailability.mjs";
+import { canUseOliviaVoice, isOliviaDeployPreview } from "../src/shared/oliviaVoiceAvailability.mjs";
 
-test("voice availability rejects malformed and incomplete TTS secrets", () => {
-  for (const value of ["credentials.json", "{invalid}", "null", "{}", '{"project_id":"fixture"}']) {
-    assert.equal(hasGoogleCloudTtsCredentials({ GOOGLE_APPLICATION_CREDENTIALS_JSON: value }), false);
-  }
-  assert.equal(hasGoogleCloudTtsCredentials({ GOOGLE_APPLICATION_CREDENTIALS_JSON: JSON.stringify({ project_id: "fixture", client_email: "fixture@example.test", private_key: "fixture-key" }) }), true);
-  assert.equal(hasGoogleCloudTtsCredentials({ GOOGLE_APPLICATION_CREDENTIALS: "/server/credentials.json" }), true);
+test("Gemini Live voice is gated to the isolated paid Deploy Preview", () => {
+  const identity = { email: "fixture@example.test", profile: { active: true, role: "admin" } };
+  const base = { OLIVIA_DEPLOY_PREVIEW_CONTEXT: "deploy-preview", CONTEXT: "deploy-preview", OLIVIA_HYBRID_LIVE_ENABLED: "true", GEMINI_API_BILLING_TIER: "paid", GEMINI_API_KEY: "fixture-key", FIREBASE_PROJECT_ID: "app-integral-fm-pruebas" };
+  assert.equal(isOliviaDeployPreview(base), true);
+  assert.equal(canUseOliviaVoice(identity, base), true);
+  assert.equal(isOliviaDeployPreview({ ...base, CONTEXT: "production" }), false);
+  assert.equal(canUseOliviaVoice(identity, { ...base, FIREBASE_PROJECT_ID: "app-integral-fm" }), false);
+  assert.equal(canUseOliviaVoice(identity, { ...base, GEMINI_API_KEY: "" }), false);
 });
 
 test("Olivia binds authenticated sessions to the configured Firebase environment", async () => {

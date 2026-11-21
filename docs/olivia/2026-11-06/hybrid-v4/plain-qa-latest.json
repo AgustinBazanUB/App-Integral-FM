@@ -1,0 +1,53 @@
+{
+  "commit": "c83c051",
+  "inputMode": "text-not-microphone",
+  "cases": [
+    {
+      "input": "¿Cuál es el precio de Aceite QA PR53?",
+      "response": "Aceite QA PR53 - No despachar: $ 1.000,00 en QA PR53 - Local ficticio - No despachar.",
+      "metrics": "Modelo / razonamiento\ngpt-6-luna / none\nRuta / motivo\nquick-read / routine-operation\nTarea\n—\nTokens próximos estimados\n12529\nEntrada / salida / total de última llamada\n0 / 0 / 0\nConsumo / reservas\n235376 / 0\nÚltimo costo USD\nUS$ 0\nClick → mensaje visible (ms)\n28\nMensaje → request (ms)\n0\nRequest → primer texto (ms)\n—\nPrimer texto → completa (ms)\n—\n"
+    },
+    {
+      "input": "¿Qué pedidos están pendientes?",
+      "response": "Hay 4 pedidos pendientes de pago:\n\nWEB-068391B5 — $1.500\nWEB-A2B2F776 — $1.500\nWEB-39E937E5 — $1.000\nWEB-E0E77754 — $1.500\n\nLos registros son del 31 de octubre de 2026.",
+      "metrics": "Modelo / razonamiento\ngpt-6-luna / none\nRuta / motivo\nluna-normal / routine-operation\nTarea\n00ed0510-8536-4470-a482-2792f32c5f79\nTokens próximos estimados\n12530\nEntrada / salida / total de última llamada\n25318 / 123 / 25441\nConsumo / reservas\n260817 / 0\nÚltimo costo USD\nUS$ 0,00259\nClick → mensaje visible (ms)\n33\nMensaje → request (ms)\n0\nRequest → primer texto (ms)\n16976\nPrimer texto → completa (ms)\n2624\n"
+    },
+    {
+      "input": "¿Cuánto cuesta un producto que se llame QA-INEXISTENTE-VOZ-2026?",
+      "response": "No pude identificar ese producto en la búsqueda acotada. Decime el nombre o la presentación.",
+      "metrics": "Modelo / razonamiento\ngpt-6-luna / none\nRuta / motivo\nquick-read / routine-operation\nTarea\n—\nTokens próximos estimados\n12602\nEntrada / salida / total de última llamada\n0 / 0 / 0\nConsumo / reservas\n260817 / 0\nÚltimo costo USD\nUS$ 0\nClick → mensaje visible (ms)\n35\nMensaje → request (ms)\n0\nRequest → primer texto (ms)\n—\nPrimer texto → completa (ms)\n—\n"
+    },
+    {
+      "input": "Compará las ventas de septiembre y octubre de 2026 y resumí únicamente los datos que puedas verificar.",
+      "response": "En septiembre de 2026 no se registraron ventas; en octubre de 2026 hubo 10 operaciones, con $14.500 cobrados y un ticket promedio de $1.450. El aumento fue de 10 operaciones y $14.500; no corresponde calcular un porcentaje de variación desde una base de cero.\n\nEl total de octubre fue de 10 unidades. Los datos son del total autorizado, sin filtro de ubicación, y el reporte indica que no es parcial. Fuente: Panel de Métricas generales, del 1 de septiembre al 31 de octubre de 2026.",
+      "metrics": "Modelo / razonamiento\ngpt-6-luna / medium\nRuta / motivo\nluna-complex / analysis-or-forecast\nTarea\n08e956fc-3118-4e96-87e7-0ab3a63423ba\nTokens próximos estimados\n12629\nEntrada / salida / total de última llamada\n26307 / 541 / 26848\nConsumo / reservas\n287665 / 0\nÚltimo costo USD\nUS$ 0,0029\nClick → mensaje visible (ms)\n61\nMensaje → request (ms)\n0\nRequest → primer texto (ms)\n17614\nPrimer texto → completa (ms)\n2544\n"
+    },
+    {
+      "input": "¿Cuánto stock de Aceite QA PR53 - No despachar hay en QA PR53 - Local ficticio - No despachar?",
+      "response": "Aceite QA PR53 - No despachar: 19 unidades en QA PR53 - Local ficticio - No despachar.",
+      "metrics": "Modelo / razonamiento\ngpt-6-luna / none\nRuta / motivo\nquick-read / routine-operation\nTarea\n—\nTokens próximos estimados\n12712\nEntrada / salida / total de última llamada\n0 / 0 / 0\nConsumo / reservas\n287665 / 0\nÚltimo costo USD\nUS$ 0\nClick → mensaje visible (ms)\n41\nMensaje → request (ms)\n0\nRequest → primer texto (ms)\n—\nPrimer texto → completa (ms)\n—\n"
+    },
+    {
+      "input": "¿Cuánto stock de Aceite QA PR53 hay en una ubicación llamada QA-NO-EXISTE?",
+      "response": "No encontré una ubicación permitida con ese nombre. ¿Cuál querés consultar?",
+      "metrics": "Modelo / razonamiento\ngpt-6-luna / none\nRuta / motivo\nquick-read / routine-operation\nTarea\n—\nTokens próximos estimados\n12658\nEntrada / salida / total de última llamada\n0 / 0 / 0\nConsumo / reservas\n287665 / 0\nÚltimo costo USD\nUS$ 0\nClick → mensaje visible (ms)\n40\nMensaje → request (ms)\n0\nRequest → primer texto (ms)\n—\nPrimer texto → completa (ms)\n—\n"
+    },
+    {
+      "input": "Quiero preparar una transferencia de stock entre ubicaciones, sin ejecutarla todavía.",
+      "response": "Vamos con lo que falta. Pasame estos datos:\n\nEl nombre del depósito o ubicación de donde sale la mercadería.\nEl nombre del depósito o ubicación que recibe la mercadería.\n\nPodés decírmelo con tus palabras y seguimos desde ahí.",
+      "metrics": "Modelo / razonamiento\ngpt-6-luna / medium\nRuta / motivo\nluna-complex / cross-module\nTarea\ncf621521-ada1-4868-a9b3-86e819cf6e95\nTokens próximos estimados\n12758\nEntrada / salida / total de última llamada\n48569 / 490 / 49059\nConsumo / reservas\n336724 / 0\nÚltimo costo USD\nUS$ 0,0051\nClick → mensaje visible (ms)\n54\nMensaje → request (ms)\n0\nRequest → primer texto (ms)\n—\nPrimer texto → completa (ms)\n—\n"
+    },
+    {
+      "input": "Cancelá",
+      "response": "De acuerdo, cancelé esa tarea. ¿Con qué seguimos?",
+      "metrics": "Modelo / razonamiento\ngpt-6-luna / none\nRuta / motivo\ndeterministic / cancel\nTarea\ncf621521-ada1-4868-a9b3-86e819cf6e95\nTokens próximos estimados\n12802\nEntrada / salida / total de última llamada\n0 / 0 / 0\nConsumo / reservas\n336724 / 0\nÚltimo costo USD\nUS$ 0\nClick → mensaje visible (ms)\n55\nMensaje → request (ms)\n0\nRequest → primer texto (ms)\n—\nPrimer texto → completa (ms)\n—\n"
+    },
+    {
+      "input": "¿Cuál era el producto que consultamos y cuántas unidades tenía?",
+      "response": "Olivia no pudo realizar la solicitud. El producto no está habilitado en esta ubicación.",
+      "metrics": "Modelo / razonamiento\ngpt-6-luna / none\nRuta / motivo\ndeterministic / cancel\nTarea\ncf621521-ada1-4868-a9b3-86e819cf6e95\nTokens próximos estimados\n12802\nEntrada / salida / total de última llamada\n0 / 0 / 0\nConsumo / reservas\n336724 / 0\nÚltimo costo USD\nUS$ 0\nClick → mensaje visible (ms)\n55\nMensaje → request (ms)\n0\nRequest → primer texto (ms)\n—\nPrimer texto → completa (ms)\n—\n",
+      "outcome": "failed-safely"
+    }
+  ],
+  "chat": "OLIVIA\n\n¡Por nada! Estoy acá para lo que necesites.\n\nVOS\n\nPerfecto, gracias\n\nOLIVIA\n\n¡De nada!\n\nVOS\n\n¿Cuánto stock tenemos de Arbequina?\n\nOLIVIA\n\nVamos con lo que falta. Pasame estos datos:\n\nEl nombre de la ubicación donde vamos a trabajar; por ejemplo, Local Centro.\nEl nombre del producto y su presentación; por ejemplo, aceite Arbosana de 500 ml.\n\nPodés decírmelo con tus palabras y seguimos desde ahí.\n\nVOS\n\n¿Cuál es el precio del aceite de 500 mililitros?\n\nOLIVIA\n\nNo encuentro un precio verificable para un aceite de 500 ml: la búsqueda solo devolvió “Aceite QA PR53 - No despachar”, con precio $1.000, pero no indica presentación y parece ser un producto de prueba. Si me decís el nombre del aceite, lo busco con más precisión.\n\nVOS\n\nPerfecto, gracias\n\nOLIVIA\n\nDe nada. ¡Cualquier otra cosa que necesites, avisame!\n\nVOS\n\nHola, Olivia\n\nOLIVIA\n\n¡Hola! ¿Cómo estás? ¿En qué te puedo ayudar hoy?\n\nVOS\n\n¿Cuánto stock de Aceite QA PR53 - No despachar hay en QA PR53 - Local ficticio - No despachar?\n\nOLIVIA\n\nNo pude identificar ese producto en la búsqueda acotada. Decime el nombre o la presentación.\n\nVOS\n\nPrepará una carga de 30 unidades de Aceite QA PR53 - No despachar en QA PR53 - Local ficticio - No despachar. Solo prepará la operación para revisar; todavía no la ejecutes.\n\nOLIVIA\n\nNo pude identificar el producto. Decime su nombre o presentación.\n\nVOS\n\nEl producto es Aceite QA PR53. La ubicación es QA PR53. Son 30 unidades.\n\nOLIVIA\n\nNo pude identificar el producto. Decime su nombre o presentación.\n\nVOS\n\nAceite QA PR53\n\nOLIVIA\n\nMe falta la cantidad.\n\nVOS\n\n30 unidades\n\nOLIVIA\n\nAgregar 30 unidades de Aceite QA PR53 - No despachar en QA PR53 - Local ficticio - No despachar. Stock: 19 → 49.\n\nOLIVIA\n\nLa propuesta quedó cancelada.\n\nVOS\n\n¿Cuál es el precio de Aceite QA PR53?\n\nOLIVIA\n\nAceite QA PR53 - No despachar: $ 1.000,00 en QA PR53 - Local ficticio - No despachar.\n\nVOS\n\n¿Qué pedidos están pendientes?\n\nOLIVIA\n\nHay 4 pedidos pendientes de pago:\n\nWEB-068391B5 — $1.500\nWEB-A2B2F776 — $1.500\nWEB-39E937E5 — $1.000\nWEB-E0E77754 — $1.500\n\nLos registros son del 31 de octubre de 2026.\n\nVOS\n\n¿Cuánto cuesta un producto que se llame QA-INEXISTENTE-VOZ-2026?\n\nOLIVIA\n\nNo pude identificar ese producto en la búsqueda acotada. Decime el nombre o la presentación.\n\nVOS\n\nCompará las ventas de septiembre y octubre de 2026 y resumí únicamente los datos que puedas verificar.\n\nOLIVIA\n\nEn septiembre de 2026 no se registraron ventas; en octubre de 2026 hubo 10 operaciones, con $14.500 cobrados y un ticket promedio de $1.450. El aumento fue de 10 operaciones y $14.500; no corresponde calcular un porcentaje de variación desde una base de cero.\n\nEl total de octubre fue de 10 unidades. Los datos son del total autorizado, sin filtro de ubicación, y el reporte indica que no es parcial. Fuente: Panel de Métricas generales, del 1 de septiembre al 31 de octubre de 2026.\n\nVOS\n\n¿Cuánto stock de Aceite QA PR53 - No despachar hay en QA PR53 - Local ficticio - No despachar?\n\nOLIVIA\n\nAceite QA PR53 - No despachar: 19 unidades en QA PR53 - Local ficticio - No despachar.\n\nVOS\n\n¿Cuánto stock de Aceite QA PR53 hay en una ubicación llamada QA-NO-EXISTE?\n\nOLIVIA\n\nNo encontré una ubicación permitida con ese nombre. ¿Cuál querés consultar?\n\nVOS\n\nQuiero preparar una transferencia de stock entre ubicaciones, sin ejecutarla todavía.\n\nOLIVIA\n\nVamos con lo que falta. Pasame estos datos:\n\nEl nombre del depósito o ubicación de donde sale la mercadería.\nEl nombre del depósito o ubicación que recibe la mercadería.\n\nPodés decírmelo con tus palabras y seguimos desde ahí.\n\nVOS\n\nCancelá\n\nOLIVIA\n\nDe acuerdo, cancelé esa tarea. ¿Con qué seguimos?\n\nVOS\n\n¿Cuál era el producto que consultamos y cuántas unidades tenía?\n\nOLIVIA\n\nOlivia no pudo realizar la solicitud. El producto no está habilitado en esta ubicación."
+}

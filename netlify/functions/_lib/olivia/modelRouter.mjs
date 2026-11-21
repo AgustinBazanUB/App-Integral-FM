@@ -9,7 +9,7 @@ export function classifyIntent(message = "", module = "") {
   if (/demanda|estima.*(?:vend|venta)|cuanto.*vender/.test(text)) return "demand.forecast";
   if (/pronostic|forecast|prevision/.test(text)) return "fair.forecast";
   if (/transfer|mandame|manda |enviame.*(aceite|botella|unidades)/.test(text)) return "stock.transfer";
-  if (/cargame|ingresa|agrega/.test(text) && /stock|botella|unidades|mercaderia/.test(text)) return "stock.load";
+  if (/\b(?:carg\w*|ingres\w*|agreg\w*|suma\w*|repon\w*|prepar\w*.*carga)\b/.test(text) && /\b(?:stock|botellas?|unidades?|mercaderia|inventario|frascos?|paquetes?|bidones?)\b/.test(text)) return "stock.load";
   if (creative.test(text)) return `${["marketing", "social"].includes(module) ? module : "creative"}.creative`;
   if (/compara|comparacion/.test(text)) return "sales.compare";
   if (/stock|inventario/.test(text)) return "stock.read";
