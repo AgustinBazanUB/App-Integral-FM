@@ -23,6 +23,7 @@ export function shippingBucket(shipment) {
   return ["retirado_origen", "hacia_repositorio", "recibido_repositorio", "reparto_final"].includes(shipment.status) ? "transit" : "pending";
 }
 export function courierAction(shipment, leg = "direct") {
+  if (shipment.fulfillmentType === "pickup") return null;
   if (shipment.incident || shipment.stockCommitState !== "committed" || CLOSED_SHIPPING_STATES.includes(shipment.status)) return null;
   if (shipment.deliveryType === "repository") {
     if (leg === "origin" && shipment.status === "listo_retirar") return { action: "pickup", label: "Confirmar retiro del local/depósito", next: "hacia_repositorio" };
@@ -52,9 +53,10 @@ export function customerTrackingView(shipment) {
   };
   return {
     code: shipment.publicCode,
+    ...(shipment.fulfillmentType === "pickup" ? {fulfillmentType:"pickup"} : {}),
     status: shipment.status,
     deliveryType: shipment.deliveryType,
-    label: hasIncident ? "Flor Mía está revisando una incidencia del envío." : labels[shipment.status] || SHIPPING_STATES[shipment.status] || "En revisión",
+    label: hasIncident ? "Flor Mía está revisando una incidencia del envío." : shipment.fulfillmentType === "pickup" ? ({aprobado:"Pedido confirmado para retiro",en_preparacion:"Preparando tu pedido",listo_retirar:"Listo para retirar por el cliente",entregado:"Retirado por el cliente"}[shipment.status] || SHIPPING_STATES[shipment.status]) : labels[shipment.status] || SHIPPING_STATES[shipment.status] || "En revisión",
     hasIncident,
     updatedAt: shipment.updatedAt,
     illustrationMessage: "La ilustración muestra las etapas confirmadas del envío; no representa una ubicación en tiempo real.",

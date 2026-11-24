@@ -24,6 +24,8 @@ export default function ProductCard({ product, compact = false }) {
   const category = categoryById[display.categoryId];
   const imageAsset = getProductAsset(display.editorialId || display.id);
   const price = formatPrice(commercial?.price);
+  const compareAtPrice = formatPrice(commercial?.compareAtPrice);
+  const hasPromotion = Boolean(commercial?.promotionName && compareAtPrice && commercial.compareAtPrice > commercial.price);
   const unavailable = !commercial || commercial.commercialReady !== true || commercial.active === false;
   const format = display.formats?.[0] ?? "";
 
@@ -72,9 +74,13 @@ export default function ProductCard({ product, compact = false }) {
         <p className="product-card__description">{display.description}</p>
 
         {format ? <span className="product-card__format-text">{format}</span> : null}
+        {hasPromotion ? <span className="product-card__promotion">{commercial.promotionName}</span> : null}
 
         <div className="product-card__purchase">
-          {price ? <strong>{price}</strong> : <span>Precio no disponible</span>}
+          <div className="product-card__price-stack">
+            {price ? <strong>{price}</strong> : <span>Precio no disponible</span>}
+            {hasPromotion ? <del>{compareAtPrice}</del> : null}
+          </div>
           <button
             className={`product-card__add${added ? " is-added" : ""}`}
             type="button"

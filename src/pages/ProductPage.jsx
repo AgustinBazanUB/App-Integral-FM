@@ -127,7 +127,11 @@ export default function ProductPage() {
           <p className="eyebrow">{category.name.toUpperCase()}</p>
           <h1>{product.name}</h1>
           <p className="product-detail__description">{product.description}</p>
-          <strong className="product-detail__price">{formatPrice(product.price)}</strong>
+          {product.promotionName ? <p className="product-card__promotion">{product.promotionName}</p> : null}
+          <div className="product-detail__price-stack">
+            <strong className="product-detail__price">{formatPrice(product.price)}</strong>
+            {product.promotionName && product.compareAtPrice > product.price ? <del>{formatPrice(product.compareAtPrice)}</del> : null}
+          </div>
 
           {!product.commercialReady ? (
             <div className="pending-panel">
@@ -141,7 +145,7 @@ export default function ProductPage() {
             {Object.entries(product.attributes || {}).map(([key, value]) => (
               <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{value}</dd></div>
             ))}
-            <div><dt>Stock disponible</dt><dd>{Number.isInteger(product.stock) ? product.stock : "No disponible"}</dd></div>
+            <div><dt>Disponibilidad</dt><dd>{product.stockState === "available" ? "Disponible para comprar" : "Sin stock por el momento"}</dd></div>
           </dl>
 
           <button
@@ -154,7 +158,7 @@ export default function ProductPage() {
             {product.commercialReady ? "Agregar al carrito" : "No disponible"}
           </button>
           <ul className="product-assurances">
-            <li><Check size={16} aria-hidden="true" />Precio y stock se validan nuevamente al confirmar</li>
+            <li><Check size={16} aria-hidden="true" />Precio y disponibilidad se validan nuevamente al confirmar</li>
             <li><Check size={16} aria-hidden="true" />El checkout no emite factura ARCA</li>
           </ul>
         </div>

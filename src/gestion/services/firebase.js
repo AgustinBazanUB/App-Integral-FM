@@ -5,8 +5,9 @@ import {
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
+  connectAuthEmulator,
 } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 
 // Keep the preview client config separate from the server-only VITE_FIREBASE_*
 // values that may be marked secret in Netlify. Firebase web config is public;
@@ -48,6 +49,11 @@ if (stagingProject) {
 export const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(firebaseApp);
 export const db = getFirestore(firebaseApp);
+if (import.meta.env.VITE_FM_LOCAL_EMULATORS === "true") {
+  if (!stagingProject || !["localhost", "127.0.0.1"].includes(window.location.hostname) || !import.meta.env.DEV) throw new Error("Emuladores restringidos al entorno local de pruebas.");
+  connectAuthEmulator(auth, `http://127.0.0.1:${Number(import.meta.env.VITE_FM_AUTH_EMULATOR_PORT || 9099)}`, { disableWarnings: false });
+  connectFirestoreEmulator(db, "127.0.0.1", Number(import.meta.env.VITE_FM_FIRESTORE_EMULATOR_PORT || 8080));
+}
 
 const persistenceReady = setPersistence(auth, browserLocalPersistence).catch(() => {
   // Firebase conserva su persistencia disponible si el navegador bloquea el almacenamiento local.

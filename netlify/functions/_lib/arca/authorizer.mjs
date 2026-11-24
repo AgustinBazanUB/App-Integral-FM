@@ -178,6 +178,7 @@ export async function authorizeInvoice({
   }
 
   assertInvoiceEnvironment(current.data, env);
+  if((current.data.simulated === true || current.data.paymentEnvironment === "sandbox" || current.data.testData === true) && arcaEnvironment(env).id === "production") throw Object.assign(new Error("Una venta de prueba no puede autorizarse en producción."),{code:"ecommerce-simulation-production-fiscal-denied",status:403});
 
   if (current.data?.status === "authorized") {
     return {

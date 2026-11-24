@@ -1,3 +1,4 @@
+import { localFirebaseEmulator } from "./firebaseEmulator.mjs";
 import {
   configuredFirebaseProjectId,
   PRODUCTION_FIREBASE_PROJECT_ID,
@@ -43,7 +44,7 @@ function bearerToken(request) {
 }
 
 async function lookupFirebaseUser(idToken) {
-  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey())}`, {
+  const response = await fetch(`${localFirebaseEmulator("auth") ? localFirebaseEmulator("auth") + "/identitytoolkit.googleapis.com" : "https://identitytoolkit.googleapis.com"}/v1/accounts:lookup?key=${encodeURIComponent(apiKey())}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ idToken }),
@@ -66,7 +67,7 @@ async function lookupFirebaseUser(idToken) {
 }
 
 async function loadOwnProfile(idToken, uid, projectId) {
-  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${encodeURIComponent(uid)}`, {
+  const response = await fetch(`${localFirebaseEmulator("firestore") || "https://firestore.googleapis.com"}/v1/projects/${projectId}/databases/(default)/documents/users/${encodeURIComponent(uid)}`, {
     headers: { Authorization: `Bearer ${idToken}`, Accept: "application/json" },
   });
   if (response.status === 403) {

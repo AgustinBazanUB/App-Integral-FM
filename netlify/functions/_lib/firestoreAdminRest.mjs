@@ -1,4 +1,5 @@
 import { createSign } from "node:crypto";
+import { localFirebaseEmulator } from "./firebaseEmulator.mjs";
 import {
   assertFirebaseServiceAccountProject,
   configuredFirebaseProjectId,
@@ -29,6 +30,7 @@ function base64Url(value) {
 
 function adminConfig(env = process.env) {
   const projectId = configuredFirebaseProjectId(env);
+  if (localFirebaseEmulator("firestore", env)) return { projectId, emulator: true };
   let serviceAccount = null;
   const rawServiceAccount = env.FIREBASE_SERVICE_ACCOUNT_JSON || env.FIREBASE_SERVICE_ACCOUNT_APP_INTEGRAL_FM || "";
   if (rawServiceAccount) {
@@ -95,6 +97,7 @@ export async function firebaseAdminAccessToken({
   forceRefresh = false,
 } = {}) {
   const config = adminConfig(env);
+  if (config.emulator) return "owner";
   const cacheKey = `${config.projectId}:${config.clientEmail}`;
   if (!forceRefresh && tokenCache?.cacheKey === cacheKey && tokenCache.expiresAt - now.getTime() > 5 * 60 * 1000) {
     return tokenCache.token;
@@ -127,8 +130,8 @@ export function clearFirebaseAdminTokenCache() {
   tokenCache = null;
 }
 
-function firestoreBase(projectId) {
-  return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+function firestoreBase(projectId, env = process.env) {
+  return `${localFirebaseEmulator("firestore", env) || "https://firestore.googleapis.com"}/v1/projects/${projectId}/databases/(default)/documents`;
 }
 
 function encodePath(path) {
@@ -207,7 +210,7 @@ async function adminFetch(path, {
   }
   const config = adminConfig(env);
   const token = await firebaseAdminAccessToken({ env, fetchImpl });
-  const response = await fetchImpl(`${firestoreBase(config.projectId)}/${encodePath(path)}${query}`, {
+  const response = await fetchImpl(`${firestoreBase(config.projectId, env)}/${encodePath(path)}${query}`, {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -215,6 +218,7 @@ async function adminFetch(path, {
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
+    signal: AbortSignal.timeout(15000),
   });
   const payload = await response.json().catch(() => ({}));
   return { response, payload };
@@ -224,7 +228,7 @@ export async function adminGetDocument(path, options = {}) {
   if (options.transaction) {
     const config = adminConfig(options.env);
     const token = await firebaseAdminAccessToken(options);
-    const response = await (options.fetchImpl || fetch)(`${firestoreBase(config.projectId)}:batchGet`, {
+    const response = await (options.fetchImpl || fetch)(`${firestoreBase(config.projectId, options.env)}:batchGet`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ documents: [qualifiedDocumentName(config.projectId, path)], transaction: options.transaction }),
@@ -324,6 +328,20 @@ export async function adminListDocuments(collectionPath, {
   fetchImpl = fetch,
   transaction,
 } = {}) {
+  if (transaction) {
+    // A transactional structured query preserves the read set without the
+    // ListDocuments/read-write transaction stall observed in Chrome QA.
+    const config = adminConfig(env), token = await firebaseAdminAccessToken({env,fetchImpl});
+    const segments=collectionPath.split("/"), collectionId=segments.pop(), parent=segments.join("/");
+    const cap=Number.isFinite(maxDocuments)?maxDocuments:10000;
+    const response=await fetchImpl(`${firestoreBase(config.projectId,env)}${parent?`/${encodePath(parent)}`:""}:runQuery`,{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({transaction,structuredQuery:{from:[{collectionId}],limit:cap+1}}),signal:AbortSignal.timeout(15000)});
+    const payload=await response.json();
+    if(!response.ok)throw Object.assign(new Error("No se pudo consultar el snapshot de la transacción."),{code:"firebase-admin-read-error",status:response.status,retryable:payload.error?.status === "ABORTED"});
+    if(!Array.isArray(payload))throw Object.assign(new Error("Respuesta inválida al consultar el snapshot."),{code:"firebase-admin-read-error",status:503});
+    const documents=payload.filter(row=>row.document).map(row=>({...documentFromResponse(row.document,collectionPath).data,id:row.document.name.split("/").at(-1)}));
+    if(documents.length>cap)throw Object.assign(new Error("La consulta supera el límite permitido."),{code:"catalog-too-large",status:409});
+    return documents;
+  }
   const safePageSize = Math.min(500, Math.max(1, Number(pageSize) || 500));
   const documents = [];
   let pageToken = "";
@@ -419,7 +437,7 @@ export async function adminCommitDocuments(operations = [], {
   const token = await firebaseAdminAccessToken({ env, fetchImpl });
   const writes = operations.map((operation) => commitWriteForOperation(operation, config.projectId));
   const response = await fetchImpl(
-    `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents:commit`,
+    `${firestoreBase(config.projectId, env)}:commit`,
     {
       method: "POST",
       headers: {
@@ -428,6 +446,7 @@ export async function adminCommitDocuments(operations = [], {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ writes, ...(transaction ? { transaction } : {}) }),
+      signal: AbortSignal.timeout(15000),
     },
   );
   const payload = await response.json().catch(() => ({}));
@@ -459,10 +478,11 @@ async function runTransactionAttempt(work, { env = process.env, fetchImpl = fetc
   const config = adminConfig(env);
   const token = await firebaseAdminAccessToken({ env, fetchImpl });
   const request = async (action, body) => {
-    const response = await fetchImpl(`${firestoreBase(config.projectId)}:${action}`, {
+    const response = await fetchImpl(`${firestoreBase(config.projectId, env)}:${action}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
