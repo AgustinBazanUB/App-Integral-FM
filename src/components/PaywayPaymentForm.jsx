@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ecommercePublicEndpoint } from "../services/ecommercePublicEndpoint";
+import { ARGENTINA_PROVINCES } from "../shared/ecommerceDelivery.mjs";
 
 let sdkPromise;
 let pageClient;
@@ -128,7 +129,13 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
         <p>Completá el domicilio de facturación ficticio para la validación antifraude de esta compra de prueba.</p>
         <label className="field-label">Calle y altura de facturación<input name="payer_street" required maxLength={100} /></label>
         <label className="field-label">Localidad de facturación<input name="payer_city" required maxLength={50} /></label>
-        <label className="field-label">Provincia de facturación<select name="payer_provinceCode" required defaultValue=""><option value="">Seleccionar provincia</option>{[["C","CABA"],["B","Buenos Aires"],["K","Catamarca"],["H","Chaco"],["U","Chubut"],["X","Córdoba"],["W","Corrientes"],["E","Entre Ríos"],["P","Formosa"],["Y","Jujuy"],["L","La Pampa"],["F","La Rioja"],["M","Mendoza"],["N","Misiones"],["Q","Neuquén"],["R","Río Negro"],["A","Salta"],["J","San Juan"],["D","San Luis"],["Z","Santa Cruz"],["S","Santa Fe"],["G","Santiago del Estero"],["V","Tierra del Fuego"],["T","Tucumán"]].map(([code,name])=><option key={code} value={code}>{name}</option>)}</select></label>
+        <label className="field-label">
+          Provincia de facturación
+          <select name="payer_provinceCode" required defaultValue="">
+            <option value="">Seleccionar provincia</option>
+            {ARGENTINA_PROVINCES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+          </select>
+        </label>
         <label className="field-label">Código postal de facturación<input name="payer_postalCode" required maxLength={10} /></label>
         <p>Los datos de tarjeta se envían directamente a Payway para generar el token de pago.</p>
         <button className="button button--gold" type="submit" disabled={busy}>{busy ? "Procesando pago…" : `Pagar ${money(order.total)} con Payway`}</button>

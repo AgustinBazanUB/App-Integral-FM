@@ -1,10 +1,11 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
 import { parseAddressSearch } from "../shared/ecommerceDelivery.mjs";
 import { requestEcommerceDelivery } from "../services/ecommerceService";
 
 export default function DeliveryAddressPicker({ value, selection, onInput, onSelect, error }) {
   const listId = useId();
+  const listbox = useRef(null);
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
   const [results, setResults] = useState(null);
@@ -29,6 +30,12 @@ export default function DeliveryAddressPicker({ value, selection, onInput, onSel
       controller.abort();
     };
   }, [canSearch, open, query, retry]);
+
+  useEffect(() => {
+    if (highlighted >= 0) {
+      listbox.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+    }
+  }, [highlighted]);
 
   const state = open && canSearch && results?.query === query ? results : null;
   const options = state?.options || [];
@@ -78,6 +85,7 @@ export default function DeliveryAddressPicker({ value, selection, onInput, onSel
           onFocus={() => setOpen(true)}
           onChange={(event) => {
             onInput(event.target.value);
+            setResults(null);
             setOpen(true);
             setHighlighted(-1);
           }}
@@ -85,7 +93,7 @@ export default function DeliveryAddressPicker({ value, selection, onInput, onSel
         />
       </label>
       {expanded && (
-        <ul id={listId} role="listbox" aria-label="Direcciones encontradas" className="delivery-address-options">
+        <ul id={listId} ref={listbox} role="listbox" aria-label="Direcciones encontradas" className="delivery-address-options">
           {options.map((option, index) => (
             <li key={option.selectionToken} role="presentation">
               <button

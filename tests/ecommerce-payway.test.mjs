@@ -6,7 +6,7 @@ import { createEcommerceOrder } from "../netlify/functions/_lib/ecommerce/commer
 import { confirmEcommercePayment } from "../netlify/functions/_lib/ecommerce/paymentService.mjs";
 import { manageWebOrder } from "../netlify/functions/_lib/ecommerce/orderManagement.mjs";
 import { processPaywayPayment } from "../netlify/functions/_lib/ecommerce/paywayService.mjs";
-import { paywayConfig, paywayPublicConfig, paywayAmount, verifiedPaywayReceipt } from "../netlify/functions/_lib/ecommerce/paywayGateway.mjs";
+import { paywayConfig, paywayPublicConfig, paywayAmount, paywayRetailRisk, verifiedPaywayReceipt } from "../netlify/functions/_lib/ecommerce/paywayGateway.mjs";
 import { summarizeSales } from "../src/modules/locations/domain/saleFacts.js";
 import { ensurePendingInvoice, syncInvoiceToSale } from "../netlify/functions/_lib/arca/invoicePersistence.mjs";
 import { prepareEcommerceInvoiceFiscal } from "../netlify/functions/_lib/ecommerce/fiscalService.mjs";
@@ -44,6 +44,28 @@ async function setup(billing) {
   return { db, order: result.order, gateway, request, process, confirm, getDocument, createDocument, patchDocument,
     charges:()=>charges, payload:()=>payload };
 }
+
+test("Payway recibe la provincia del domicilio de entrega y conserva la de facturación", () => {
+  const order = {
+    customer: body.customer,
+    idempotencyKey: body.requestId,
+    shippingAmount: 1000,
+    total: 3000,
+    items: [],
+    shipping: { method: "delivery", address: { city: "Santo Tomé", province: "Santa Fe", street: "Mendoza", number: "1571", postalCode: "3016" } },
+  };
+  const context = {
+    payerAddress: { street: "Dirección de prueba", city: "CABA", provinceCode: "C", postalCode: "1000" },
+    fingerprint: "synthetic_device_001",
+    clientIp: "192.0.2.5",
+  };
+  const risk = paywayRetailRisk(order, context);
+  assert.equal(risk.bill_to.state, "C");
+  assert.equal(risk.retail_transaction_data.ship_to.state, "S");
+  assert.equal(risk.retail_transaction_data.ship_to.postal_code, "3016");
+  order.shipping.address = { ...order.shipping.address, city: "Ciudad Autónoma de Buenos Aires", province: "CABA", postalCode: "1428" };
+  assert.equal(paywayRetailRisk(order, context).retail_transaction_data.ship_to.city, "CABA");
+});
 
 test("Payway aprobado convierte una reserva en una venta y logística; sandbox excluido de ingresos", async()=>{
   const s=await setup(); const r=await s.process();

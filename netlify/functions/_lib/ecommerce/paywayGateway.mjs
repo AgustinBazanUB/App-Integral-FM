@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { commerceError } from "./commerceDomain.mjs";
 import { configuredFirebaseProjectId, assertFirebaseServiceAccountProject } from "../firebaseProject.mjs";
+import { argentinaProvinceCode } from "../../../../src/shared/ecommerceDelivery.mjs";
 
 export const PAYWAY_TOKEN_URL = "https://developers.decidir.com/api/v2";
 export const PAYWAY_SCRIPT_URL = "https://ventasonline.payway.com.ar/static/v2.6.4/decidir.js";
@@ -139,6 +140,7 @@ export function paywayRetailRisk(order, { payerAddress, fingerprint, clientIp } 
     phone_number: order.customer.phone.replace(/\D/g,""), postal_code: address.postalCode,
     state: address.provinceCode, street1: address.street };
   const destination = order.shipping.method === "delivery" ? order.shipping.address : null;
+  const destinationState = argentinaProvinceCode(destination?.province);
   const items = order.items.map(item => ({ code: item.productId, name: item.name, description: item.name,
     sku: item.productId, total_amount: paywayAmount(item.subtotal), quantity: item.quantity, unit_price: paywayAmount(item.unitPrice) }));
   if (order.shippingAmount > 0) items.push({ code: "shipping", name: "Envio", description: "Envio", sku: "shipping", total_amount: paywayAmount(order.shippingAmount), quantity: 1, unit_price: paywayAmount(order.shippingAmount) });
@@ -147,7 +149,12 @@ export function paywayRetailRisk(order, { payerAddress, fingerprint, clientIp } 
     customer_in_site: { days_in_site: 0, is_guest: true, num_of_transactions: 0 },
     retail_transaction_data: { dispatch_method: destination ? "homeDelivery" : "click and collect", days_to_delivery: "3",
       tax_voucher_required: order.billing?.mode === "fiscal", items,
-      ship_to: destination ? { ...billTo, city: destination.city, postal_code: destination.postalCode,
-        street1: `${destination.street} ${destination.number}`, state: address.provinceCode } : billTo },
+      ship_to: destination ? {
+        ...billTo,
+        city: destinationState === "C" ? "CABA" : clean(destination.city, 50),
+        postal_code: clean(destination.postalCode, 10),
+        street1: clean([destination.street, destination.number].join(" "), 100),
+        state: destinationState || billTo.state,
+      } : billTo },
   };
 }
