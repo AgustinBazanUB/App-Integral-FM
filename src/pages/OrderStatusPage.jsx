@@ -129,11 +129,9 @@ export default function OrderStatusPage() {
                 ? "Retiro en local"
                 : "Envío a domicilio"}
               :{" "}
-              {order.fulfillmentStatus === "listo_retirar" &&
-              order.deliveryMethod === "pickup"
-                ? "Listo para retirar por el cliente"
-                : SHIPPING_STATES[order.fulfillmentStatus] ||
-                  "Pendiente de confirmación"}
+              {order.fulfillmentStatus === "listo_retirar"
+                ? order.deliveryMethod === "pickup" ? "Listo para retirar" : "Listo para despacho"
+                : SHIPPING_STATES[order.fulfillmentStatus] || "Pendiente de confirmación"}
             </p>
             {order.pickupCode && (
               <p>

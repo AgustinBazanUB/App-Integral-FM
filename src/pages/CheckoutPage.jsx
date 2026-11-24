@@ -298,7 +298,7 @@ export default function CheckoutPage() {
       </section>
 
       <section className="section checkout-layout">
-        <div className="container checkout-grid">
+        <div className={`container checkout-grid${orderResult ? " checkout-grid--complete" : ""}`}>
           <div className="checkout-form-card">
             {orderResult ? (
               <div className="integration-state">
@@ -478,7 +478,7 @@ export default function CheckoutPage() {
                   </div>
                 ) : null}
 
-                <div className="checkout-actions">
+                {(!draft.pendingOrder || simulationCapability.enabled) && <div className="checkout-actions">
                   {step > 0 && !draft.pendingOrder ? (
                     <button type="button" className="button button--secondary" onClick={() => setStep((current) => current - 1)} disabled={submitState.busy}>
                       Volver
@@ -490,14 +490,14 @@ export default function CheckoutPage() {
                     </button>
                   ) : (
                     <>
-                    <button
+                    {!draft.pendingOrder && <button
                       type="button"
                       className="button button--gold"
-                      disabled={checkoutBlocked || submitState.busy || Boolean(draft.pendingOrder)}
+                      disabled={checkoutBlocked || submitState.busy}
                       onClick={() => submitOrder()}
                     >
                       {submitState.busy ? "Registrando…" : "Crear pedido y continuar al pago"}
-                    </button>
+                    </button>}
                     {simulationCapability.enabled ? (
                       <button
                         type="button"
@@ -510,7 +510,7 @@ export default function CheckoutPage() {
                     ) : null}
                     </>
                   )}
-                </div>
+                </div>}
               </>
             ) : (
               <div className="empty-state">
@@ -521,7 +521,7 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          <aside className="order-summary">
+          {!orderResult && <aside className="order-summary">
             <p className="eyebrow">RESUMEN</p>
             <h2>{unitCount} {unitCount === 1 ? "producto" : "productos"}</h2>
             <div className="order-summary__items">
@@ -543,7 +543,7 @@ export default function CheckoutPage() {
             </div>
             {draft.deliveryMethod === "delivery" && <p>Envío: {formatMoney((config.deliveryRates || []).find(rate=>rate.id===draft.rateId)?.amount || 0)}</p>}
             <p>Precio y disponibilidad se confirman al registrar tu pedido.</p>
-          </aside>
+          </aside>}
         </div>
       </section>
     </main>

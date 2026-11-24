@@ -3034,6 +3034,10 @@ input::placeholder {
   align-content: start;
 }
 
+.order-summary__items article > div:first-child {
+  grid-column: span 2;
+}
+
 .order-summary__items article > div span {
   color: var(--gold-soft);
   font-size: 9px;
@@ -3048,6 +3052,11 @@ input::placeholder {
 .order-summary__items article > span {
   color: var(--text-muted);
   font-size: 9px;
+}
+
+.checkout-grid.checkout-grid--complete {
+  grid-template-columns: minmax(0, 760px);
+  justify-content: center;
 }
 
 .order-summary__total {
