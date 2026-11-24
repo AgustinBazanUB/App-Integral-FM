@@ -158,6 +158,19 @@ export function normalizeBilling(raw = {}) {
     ...(raw.requestedClass === "A" ? { requestedClass: "A" } : {}),
   };
 }
+
+export function deliveryAddressDetails(raw = {}) {
+  const { floor, apartment, instructions, receiverName, receiverPhone } = raw || {};
+  const phone = clean(receiverPhone, 60);
+  if (phone && !isValidCustomerPhone(phone)) {
+    throw commerceError("ecommerce-customer-phone-invalid", "Ingresá un teléfono válido para quien recibe.", 400);
+  }
+  return {
+    floor: clean(floor, 150), apartment: clean(apartment, 150), instructions: clean(instructions, 500),
+    receiverName: clean(receiverName, 150), receiverPhone: phone ? normalizeCustomerPhone(phone) : "",
+  };
+}
+
 export function channelShipping(raw = {}, channel) {
   const method = raw.method || "pickup",
     notes = clean(raw.notes, 500);
@@ -185,23 +198,11 @@ export function channelShipping(raw = {}, channel) {
       "El envío no está configurado.",
       409,
     );
-  const address = Object.fromEntries(
-    [
-      "street",
-      "number",
-      "floor",
-      "apartment",
-      "city",
-      "province",
-      "postalCode",
-      "instructions",
-      "receiverName",
-      "receiverPhone",
-    ].map((key) => [
-      key,
-      clean(raw.address?.[key], key === "instructions" ? 500 : 150),
-    ]),
-  );
+  const address = {
+    ...Object.fromEntries(["street", "number", "city", "province", "postalCode"]
+      .map((key) => [key, clean(raw.address?.[key], 150)])),
+    ...deliveryAddressDetails(raw.address),
+  };
   if (
     ![
       address.street,
@@ -216,14 +217,6 @@ export function channelShipping(raw = {}, channel) {
       "Completá calle, altura, localidad, provincia y código postal.",
       400,
     );
-  if (address.receiverName && !isValidCustomerPhone(address.receiverPhone))
-    throw commerceError(
-      "ecommerce-customer-phone-invalid",
-      "Ingresá el teléfono del receptor.",
-      400,
-    );
-  if (address.receiverPhone)
-    address.receiverPhone = normalizeCustomerPhone(address.receiverPhone);
   const rate = (channel.delivery.rates || []).find(
     (entry) =>
       entry.active !== false &&

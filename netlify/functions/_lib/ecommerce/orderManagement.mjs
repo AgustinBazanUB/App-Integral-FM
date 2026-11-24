@@ -24,6 +24,7 @@ import {
   reservedStockQuantity,
 } from "../../../../src/shared/stockReservations.mjs";
 import { canAccessAdministration } from "../../../../src/gestion/permissions.js";
+import { normalizeDeliveryConfig } from "./deliveryRates.mjs";
 
 const fail = (message, status = 409) => {
   throw commerceError("ecommerce-management-blocked", message, status);
@@ -102,43 +103,7 @@ export async function configureWebChannel({
           fail("Elegí un punto de retiro real y su dirección.", 400);
         pickup.name = point.name;
       }
-      const rates = (channel.delivery?.rates || []).map((rate) => {
-        if (
-          !String(rate.province || "").trim() ||
-          !Array.isArray(rate.postalCodes) ||
-          !rate.postalCodes.length ||
-          rate.postalCodes.length > 200 ||
-          !Number.isSafeInteger(rate.amount) ||
-          rate.amount < 0
-        )
-          fail(
-            "Cada tarifa necesita provincia, códigos postales e importe entero en ARS.",
-            400,
-          );
-        if (rate.amount > 0 && ![0, 10.5, 21, 27].includes(rate.arcaVatRate))
-          fail("Configurá el IVA de cada tarifa con importe.", 400);
-        return {
-          id: id(rate.id),
-          name: String(rate.name || rate.province)
-            .trim()
-            .slice(0, 100),
-          province: String(rate.province).trim().slice(0, 100),
-          postalCodes: [
-            ...new Set(
-              rate.postalCodes.map((code) => String(code).trim().toUpperCase()),
-            ),
-          ],
-          amount: rate.amount,
-          arcaVatRate: rate.arcaVatRate ?? null,
-          active: rate.active !== false,
-        };
-      });
-      if (
-        rates.length > 30 ||
-        new Set(rates.map((rate) => rate.id)).size !== rates.length ||
-        (channel.delivery?.enabled && !rates.length)
-      )
-        fail("Configurá tarifas distintas antes de habilitar envíos.", 400);
+      const delivery = normalizeDeliveryConfig(channel.delivery || {});
       const defaultTransport = channel.defaultTransport || "repository";
       if (!["repository", "uber", "manual"].includes(defaultTransport))
         fail("Elegí un transporte predeterminado válido.", 400);
@@ -167,7 +132,7 @@ export async function configureWebChannel({
         defaultOrigin: { type: origin.type, id: origin.id },
         authorizedUserIds,
         pickup,
-        delivery: { enabled: channel.delivery?.enabled === true, rates },
+        delivery,
         updatedAt: now,
         updatedBy: session.uid,
         ...(!previous ? { createdAt: now } : {}),
@@ -219,6 +184,13 @@ export async function configureWebProduct({
     : Number(settings.priceOverride);
   const minimumRemainingStock = Number(settings.minimumRemainingStock ?? 0);
   const sourceAlertThresholds = settings.sourceAlertThresholds || {};
+  const parcel = settings.parcel == null ? null : {
+    grams: Number(settings.parcel.grams),
+    volumeCm3: Number(settings.parcel.volumeCm3),
+  };
+  if (parcel && Object.values(parcel).some((value) => !Number.isSafeInteger(value) || value <= 0))
+    fail("Completá el peso en gramos y el volumen en cm³ de la unidad embalada.", 400);
+  const parcelSettings = Object.hasOwn(settings, "parcel") ? { parcel } : {};
   if (priceOverride !== null && (!Number.isSafeInteger(priceOverride) || priceOverride <= 0))
     fail("El precio web tiene que ser un importe entero mayor que cero.", 400);
   if (!Number.isSafeInteger(minimumRemainingStock) || minimumRemainingStock < 0 || minimumRemainingStock > 1000000)
@@ -227,7 +199,7 @@ export async function configureWebProduct({
     fail("Configurá hasta cien umbrales de alerta de stock.", 400);
 
   const fingerprint = createHash("sha256")
-    .update(JSON.stringify({ productId, settings: { enabled, priceOverride, minimumRemainingStock, sourceAlertThresholds }, actor: session.uid }))
+    .update(JSON.stringify({ productId, settings: { enabled, priceOverride, minimumRemainingStock, sourceAlertThresholds, ...parcelSettings }, actor: session.uid }))
     .digest("hex");
   return runTransaction(async (transaction) => {
     const profile = (await transaction.getDocument(`users/${session.uid}`))?.data;
@@ -277,6 +249,7 @@ export async function configureWebProduct({
       priceOverride,
       minimumRemainingStock,
       sourceAlertThresholds: cleanThresholds,
+      ...parcelSettings,
       updatedAt: now,
       updatedBy: session.uid,
       ...(!previous ? { createdAt: now, createdBy: session.uid } : {}),
@@ -303,10 +276,13 @@ export async function configureWebPromotion({
   const name = String(body.promotion?.name || "").trim().slice(0, 150);
   const price = Number(body.promotion?.price);
   const active = body.promotion?.active === true;
+  const shippingPromotion = Object.hasOwn(body.promotion || {}, "freeShippingAmba")
+    ? { freeShippingAmba: body.promotion.freeShippingAmba === true }
+    : {};
   if (!name || !Number.isSafeInteger(price) || price <= 0)
     fail("La promoción necesita un nombre y un precio entero mayor que cero.", 400);
   const fingerprint = createHash("sha256")
-    .update(JSON.stringify({ productId, promotion: { name, price, active }, actor: session.uid }))
+    .update(JSON.stringify({ productId, promotion: { name, price, active, ...shippingPromotion }, actor: session.uid }))
     .digest("hex");
   return runTransaction(async (transaction) => {
     const profile = (await transaction.getDocument(`users/${session.uid}`))?.data;
@@ -347,6 +323,7 @@ export async function configureWebPromotion({
       name,
       price,
       active,
+      ...shippingPromotion,
       updatedAt: now,
       updatedBy: session.uid,
       ...(!previous ? { createdAt: now, createdBy: session.uid } : {}),

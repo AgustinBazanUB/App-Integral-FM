@@ -120,6 +120,7 @@ export default function ProductPage() {
           <h1>{product.name}</h1>
           <p className="product-detail__description">{product.description}</p>
           {product.promotionName ? <p className="product-card__promotion">{product.promotionName}</p> : null}
+          {product.freeShippingAmba && <p className="product-card__promotion">Envío sin cargo dentro del AMBA</p>}
           <div className="product-price">
             <strong>{formatPrice(product.price) ?? "Precio no disponible"}</strong>
             {product.promotionName && product.compareAtPrice > product.price ? <s>{formatPrice(product.compareAtPrice)}</s> : null}

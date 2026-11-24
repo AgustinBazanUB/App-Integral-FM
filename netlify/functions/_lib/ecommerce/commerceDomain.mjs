@@ -207,23 +207,14 @@ export function resolveRequestedPaymentStatus(rawMode) {
   );
 }
 
-export function prepareAuthoritativeCheckout({
+export function prepareAuthoritativeCart({
   requestedItems,
   productsById,
   stocksById,
-  customer,
-  shipping,
-  paymentMode = "pending",
-  env = process.env,
-  resolvedShipping = null,
   ecommerceSettingsById = {},
   promotionsByProductId = {},
 } = {}) {
   const items = normalizeCheckoutItems(requestedItems);
-  const normalizedCustomer = normalizeCustomer(customer);
-  const normalizedShipping = resolvedShipping || resolveShipping(shipping, env);
-  const paymentStatus = resolveRequestedPaymentStatus(paymentMode);
-
   const preparedItems = items.map(({ productId, quantity }) => {
     const product = productsById?.[productId];
     const stock = stocksById?.[productId];
@@ -268,6 +259,27 @@ export function prepareAuthoritativeCheckout({
   });
 
   const subtotal = preparedItems.reduce((sum, item) => sum + item.subtotal, 0);
+  return { items: preparedItems, subtotal };
+}
+
+export function prepareAuthoritativeCheckout({
+  requestedItems,
+  productsById,
+  stocksById,
+  customer,
+  shipping,
+  paymentMode = "pending",
+  env = process.env,
+  resolvedShipping = null,
+  ecommerceSettingsById = {},
+  promotionsByProductId = {},
+} = {}) {
+  const normalizedCustomer = normalizeCustomer(customer);
+  const normalizedShipping = resolvedShipping || resolveShipping(shipping, env);
+  const paymentStatus = resolveRequestedPaymentStatus(paymentMode);
+  const { items: preparedItems, subtotal } = prepareAuthoritativeCart({
+    requestedItems, productsById, stocksById, ecommerceSettingsById, promotionsByProductId,
+  });
   const discountTotal = 0;
   const shippingAmount = normalizedShipping.amount;
   const total = subtotal - discountTotal + shippingAmount;

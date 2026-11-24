@@ -1,6 +1,7 @@
 import {
   ALL_ACTIVE_STOCK,
   channelShipping,
+  deliveryAddressDetails,
   loadWebChannel,
   normalizeBilling,
   originKey,
@@ -28,9 +29,11 @@ import {
   normalizeCheckoutItems,
   normalizeCustomer,
   normalizeEcommerceRequestId,
+  prepareAuthoritativeCart,
   prepareAuthoritativeCheckout,
   resolveRequestedPaymentStatus,
 } from "./commerceDomain.mjs";
+import { assertCurrentDeliveryQuote, deliveryAddressEnabled, quotedShipping, readDeliveryQuote } from "./deliveryQuote.mjs";
 
 function slugFrom(value, fallback) {
   const normalized = String(value || "")
@@ -101,6 +104,7 @@ function publicProduct(product, stock, { locationConfigured, settings = {}, prom
           : "out",
     active: product.active !== false && product.deleted !== true && settings.enabled !== false,
     promotionName: promotion?.active === true ? promotion.name : null,
+    freeShippingAmba: promotion?.active === true && promotion.freeShippingAmba === true,
     compareAtPrice: promotion?.active === true
       ? (() => { try { return authoritativeUnitPrice(product, stock, { webPriceOverride: settings.priceOverride }); } catch { return null; } })()
       : null,
@@ -154,6 +158,57 @@ function publicEcommerceOrder(orderId, order = {}) {
   };
 }
 
+async function loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument, now }) {
+  const productsById = {};
+  const stocksById = {};
+  const ecommerceSettingsById = {};
+  const promotionsByProductId = {};
+  const sourceSnapshotsByProduct = {};
+  for (const item of requestedItems) {
+    const [product, setting, promotion, ...sourceSnapshots] = await Promise.all([
+      getDocument("products/" + item.productId, { env }),
+      getDocument("ecommerceProductSettings/" + item.productId, { env }),
+      getDocument("ecommercePromotions/" + item.productId, { env }),
+      ...origins.map((source) => getDocument(originStockPath(source, item.productId), { env })),
+    ]);
+    if (product) productsById[item.productId] = { ...product.data, id: item.productId };
+    ecommerceSettingsById[item.productId] = setting?.data || {};
+    if (promotion?.data) promotionsByProductId[item.productId] = promotion.data;
+    const sourceRows = origins.map((source, index) => ({
+      origin: source,
+      snapshot: sourceSnapshots[index],
+      available: webStockAvailability(sourceSnapshots[index]?.data, now),
+    }));
+    const preferredStock = webPricingStock(channel, sourceSnapshots.map((row) => row?.data));
+    const floor = Math.max(0, Number(setting?.data?.minimumRemainingStock) || 0);
+    stocksById[item.productId] = {
+      ...preferredStock,
+      id: item.productId,
+      currentStock: Math.max(0, sourceRows.reduce((sum, row) => sum + row.available, 0) - floor),
+    };
+    sourceSnapshotsByProduct[item.productId] = sourceRows;
+  }
+  return { productsById, stocksById, ecommerceSettingsById, promotionsByProductId, sourceSnapshotsByProduct };
+}
+
+export async function loadDeliveryQuoteCart(rawItems, {
+  env = process.env, now = new Date(), getDocument = adminGetDocument, listDocuments = adminListDocuments,
+} = {}) {
+  const requestedItems = normalizeCheckoutItems(rawItems);
+  const channel = await loadWebChannel({ env, getDocument });
+  if (channel?.delivery?.enabled !== true) {
+    throw commerceError("ecommerce-delivery-not-configured", "El envío todavía no está habilitado.", 409);
+  }
+  const origins = await configuredWebOrigins(channel, { env, getDocument, listDocuments, now });
+  const productState = await loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument, now });
+  return {
+    delivery: channel.delivery,
+    items: prepareAuthoritativeCart({ requestedItems, ...productState }).items,
+    settings: productState.ecommerceSettingsById,
+    promotions: productState.promotionsByProductId,
+  };
+}
+
 export async function createEcommerceOrder({
   body,
   env = process.env,
@@ -182,6 +237,12 @@ export async function createEcommerceOrder({
     method: body?.deliveryMethod || body?.shipping?.method || "pickup",
     notes: body?.notes || body?.shipping?.notes || "",
   };
+  const deliveryQuote = shippingRequest.method === "delivery" && shippingRequest.quoteToken
+    ? readDeliveryQuote(shippingRequest.quoteToken, env)
+    : null;
+  const confirmedShipping = deliveryQuote
+    ? quotedShipping(deliveryQuote, deliveryAddressDetails(shippingRequest.address), String(shippingRequest.notes).trim().slice(0, 500))
+    : null;
   const accessToken = String(body?.accessToken || "");
   const accessHash = /^[A-Za-z0-9_-]{32,128}$/.test(accessToken)
     ? createHash("sha256").update(accessToken).digest("hex")
@@ -193,7 +254,7 @@ export async function createEcommerceOrder({
           a.productId.localeCompare(b.productId),
         ),
         customer,
-        shippingRequest,
+        shippingRequest: confirmedShipping || shippingRequest,
         billing,
         accessHash,
       }),
@@ -223,6 +284,9 @@ export async function createEcommerceOrder({
       "No se pudo crear el acceso privado al pedido.",
       400,
     );
+  if (channel && shippingRequest.method === "delivery" && deliveryAddressEnabled(env) && !confirmedShipping) {
+    throw commerceError("ecommerce-delivery-quote-required", "Elegí una dirección y confirmá la cotización de envío.", 409);
+  }
   const origins = await configuredWebOrigins(channel, { env, getDocument, listDocuments, now });
   if (!origins.length)
     throw commerceError(
@@ -230,48 +294,23 @@ export async function createEcommerceOrder({
       "Falta configurar los orígenes de stock web.",
       409,
     );
-  const productsById = {},
-    stocksById = {},
-    ecommerceSettingsById = {},
-    promotionsByProductId = {},
-    sourceSnapshotsByProduct = {};
-  for (const item of requestedItems) {
-    const [product, setting, promotion, ...sourceSnapshots] = await Promise.all([
-      getDocument(`products/${item.productId}`, { env }),
-      getDocument(`ecommerceProductSettings/${item.productId}`, { env }),
-      getDocument(`ecommercePromotions/${item.productId}`, { env }),
-      ...origins.map((source) => getDocument(originStockPath(source, item.productId), { env })),
-    ]);
-    if (product)
-      productsById[item.productId] = { ...product.data, id: item.productId };
-    ecommerceSettingsById[item.productId] = setting?.data || {};
-    if (promotion?.data) promotionsByProductId[item.productId] = promotion.data;
-    const sourceRows = origins.map((source, index) => ({
-      origin: source,
-      snapshot: sourceSnapshots[index],
-      available: webStockAvailability(sourceSnapshots[index]?.data, now),
-    }));
-    const preferredStock = webPricingStock(channel, sourceSnapshots.map((row) => row?.data));
-    const floor = Math.max(0, Number(setting?.data?.minimumRemainingStock) || 0);
-    stocksById[item.productId] = {
-      ...preferredStock,
-      id: item.productId,
-      currentStock: Math.max(0, sourceRows.reduce((sum, row) => sum + row.available, 0) - floor),
-    };
-    sourceSnapshotsByProduct[item.productId] = sourceRows;
-  }
-  const shipping = channel ? channelShipping(shippingRequest, channel) : null;
+  const productState = await loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument, now });
+  const { sourceSnapshotsByProduct, ecommerceSettingsById, promotionsByProductId } = productState;
+  const shipping = confirmedShipping || (channel ? channelShipping(shippingRequest, channel) : null);
   const prepared = prepareAuthoritativeCheckout({
     requestedItems,
-    productsById,
-    stocksById,
+    ...productState,
     customer,
     shipping: shippingRequest,
     resolvedShipping: shipping,
-    ecommerceSettingsById,
-    promotionsByProductId,
     env,
   });
+  if (deliveryQuote) {
+    assertCurrentDeliveryQuote(deliveryQuote, {
+      delivery: channel?.delivery, items: prepared.items, settings: ecommerceSettingsById,
+      promotions: promotionsByProductId, env, now,
+    });
+  }
   const itemsWithAllocations = prepared.items.map((item) => ({
     ...item,
     stockAllocations: allocateStock(
@@ -306,7 +345,7 @@ export async function createEcommerceOrder({
     orderCode: `WEB-${requestId.slice(0, 24).toUpperCase()}`,
     status: "pending_payment",
     channelId: channel?.id || null,
-    defaultTransport: channel?.defaultTransport || "repository",
+    defaultTransport: shipping?.carrier === "andreani" ? "manual" : channel?.defaultTransport || "repository",
     stockOriginType: origin.type,
     stockOriginId: origin.id,
     stockOriginName: origin.name,
@@ -448,6 +487,7 @@ export async function loadEcommerceCatalog({
       config: {
         pickupEnabled: ecommercePickupEnabled(env),
         deliveryEnabled: false,
+        deliveryAddressEnabled: false,
         paymentProvider: "pending_payway",
       },
       products: products.map((product) =>
@@ -517,6 +557,7 @@ export async function loadEcommerceCatalog({
         ? channel.pickup?.enabled === true
         : ecommercePickupEnabled(env),
       deliveryEnabled: channel?.delivery?.enabled === true,
+      deliveryAddressEnabled: channel?.delivery?.enabled === true && deliveryAddressEnabled(env),
       pickup: channel?.pickup || null,
       deliveryRates: (channel?.delivery?.rates || []).filter(
         (rate) => rate.active !== false,

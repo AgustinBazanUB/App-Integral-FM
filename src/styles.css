@@ -2968,6 +2968,118 @@ input::placeholder {
   color: var(--text-muted);
 }
 
+.checkout-delivery-details {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.checkout-delivery-details .form-grid {
+  margin-top: 0;
+}
+
+.delivery-address-picker {
+  position: relative;
+}
+
+.delivery-address-options {
+  position: absolute;
+  z-index: 4;
+  inset-inline: 0;
+  inset-block-start: calc(100% + 6px);
+  max-height: 285px;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--border-gold);
+  border-radius: 14px;
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow);
+}
+
+.delivery-address-options button {
+  display: flex;
+  width: 100%;
+  padding: 10px 12px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+}
+
+.delivery-address-options button:hover,
+.delivery-address-options button[aria-selected="true"] {
+  background: var(--olive-deep);
+}
+
+.delivery-address-options svg {
+  flex: none;
+  color: var(--gold-soft);
+}
+
+.delivery-address-options small {
+  display: block;
+  color: var(--text-secondary);
+}
+
+.delivery-address-confirmation {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.delivery-address-confirmation dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.delivery-address-confirmation dt,
+.delivery-hint,
+.delivery-quote span {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.delivery-retry {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--gold-soft);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.delivery-quote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 14px;
+  border: 1px solid var(--border-gold);
+  border-radius: 14px;
+  background: var(--olive-deep);
+}
+
+.delivery-quote span,
+.delivery-quote small {
+  display: block;
+}
+
+.delivery-quote small {
+  flex-basis: 100%;
+  color: var(--gold-soft);
+}
+
 .integration-state {
   display: grid;
   min-height: 320px;

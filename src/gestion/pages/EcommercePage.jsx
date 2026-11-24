@@ -18,6 +18,7 @@ import {
 } from "../../services/ecommerceService";
 import { formatMoney, formatDateTime } from "../formatters";
 import SaleInvoicePanel from "../components/SaleInvoicePanel";
+import EcommerceDeliverySettings, { deliverySettingsPayload, editDeliverySettings } from "../components/EcommerceDeliverySettings";
 import { LOCATION_TYPES } from "../../modules/locations/domain/locations.js";
 
 const empty = {
@@ -45,7 +46,6 @@ export default function EcommercePage() {
     [selected, setSelected] = useState(null),
     [origin, setOrigin] = useState(""),
     [reason, setReason] = useState(""),
-    [rates, setRates] = useState(""),
     [simulation, setSimulation] = useState(false),
     [availability, setAvailability] = useState([]);
   const attempt = useRef(null),
@@ -70,6 +70,8 @@ export default function EcommercePage() {
         priceOverride: saved.priceOverride ?? "",
         minimumRemainingStock: saved.minimumRemainingStock ?? 0,
         sourceAlertThresholds: { ...(saved.sourceAlertThresholds || {}) },
+        parcelGrams: saved.parcel?.grams ?? "",
+        parcelVolume: saved.parcel?.volumeCm3 ?? "",
       }];
     })));
   }, [data?.productSettings, data?.products]);
@@ -127,41 +129,17 @@ export default function EcommercePage() {
   ];
   const edit = () => {
     const current = data.channel || empty;
-    setChannel(structuredClone(current));
-    setRates(
-      (current.delivery?.rates || [])
-        .map(
-          (rate) =>
-            `${rate.province}|${rate.postalCodes.join(",")}|${rate.amount}|${rate.arcaVatRate ?? ""}`,
-        )
-        .join("\n"),
-    );
+    setChannel({ ...structuredClone(current), delivery: editDeliverySettings(current.delivery) });
     setConfigure(!configure);
   };
   const save = () =>
-    run(JSON.stringify([channel, rates]), async (requestId) => {
-      const parsed = rates.trim()
-        ? rates
-            .trim()
-            .split("\n")
-            .map((line, index) => {
-              const [province, codes, amount, vat] = line.split("|");
-              return {
-                id: `rate_${index + 1}`,
-                name: province?.trim(),
-                province: province?.trim(),
-                postalCodes: (codes || "").split(",").map((v) => v.trim()),
-                amount: amount?.trim() ? Number(amount) : NaN,
-                arcaVatRate: vat?.trim() ? Number(vat) : null,
-              };
-            })
-        : [];
+    run(JSON.stringify(channel), async (requestId) => {
       await ecommerceAdminRequest({
         mode: "configure",
         requestId,
         channel: {
           ...channel,
-          delivery: { ...channel.delivery, rates: parsed },
+          delivery: deliverySettingsPayload(channel.delivery),
         },
       });
       setConfigure(false);
@@ -172,11 +150,12 @@ export default function EcommercePage() {
       [productId]: { ...(current[productId] || {}), [key]: value },
     }));
   const saveProduct = (productId) => {
-    const draft = productDrafts[productId] || {};
+    const { parcelGrams = "", parcelVolume = "", ...draft } = productDrafts[productId] || {};
     const settings = {
       ...draft,
       priceOverride: draft.priceOverride === "" ? null : Number(draft.priceOverride),
       minimumRemainingStock: Number(draft.minimumRemainingStock || 0),
+      parcel: parcelGrams !== "" || parcelVolume !== "" ? { grams: Number(parcelGrams), volumeCm3: Number(parcelVolume) } : null,
       sourceAlertThresholds: Object.fromEntries(
         Object.entries(draft.sourceAlertThresholds || {}).map(([key, value]) => [key, Number(value || 0)]),
       ),
@@ -187,8 +166,11 @@ export default function EcommercePage() {
   };
   const startPromotion = (promotion = null) => {
     setPromotionForm(promotion
-      ? { productId: promotion.productId || promotion.id, name: promotion.name || "", price: String(promotion.price ?? ""), active: promotion.active === true }
-      : { productId: "", name: "", price: "", active: true });
+      ? {
+          productId: promotion.productId || promotion.id, name: promotion.name || "", price: String(promotion.price ?? ""),
+          active: promotion.active === true, freeShippingAmba: promotion.freeShippingAmba === true,
+        }
+      : { productId: "", name: "", price: "", active: true, freeShippingAmba: false });
   };
   const savePromotion = () => {
     if (!promotionForm) return;
@@ -449,31 +431,10 @@ export default function EcommercePage() {
               }
             />
           </FormField>
-          <label>
-            <input
-              type="checkbox"
-              checked={channel.delivery.enabled}
-              onChange={(e) =>
-                setChannel({
-                  ...channel,
-                  delivery: { ...channel.delivery, enabled: e.target.checked },
-                })
-              }
-            />{" "}
-            Habilitar envío a domicilio
-          </label>
-          <FormField label="Tarifas de envío">
-            <textarea
-              rows={4}
-              value={rates}
-              onChange={(e) => setRates(e.target.value)}
-              placeholder="Provincia|códigos postales separados por coma|importe ARS|IVA %"
-            />
-          </FormField>
-          <p>
-            Una tarifa por línea: provincia, códigos postales importe e IVA %
-            separados por |. Ingresá únicamente tarifas comerciales verificadas.
-          </p>
+          <EcommerceDeliverySettings
+            delivery={channel.delivery}
+            onChange={(delivery) => setChannel((current) => ({ ...current, delivery }))}
+          />
           <Button loading={busy} onClick={save}>
             Guardar configuración
           </Button>
@@ -503,6 +464,10 @@ export default function EcommercePage() {
                   <label>
                     <input type="checkbox" checked={promotionForm.active} onChange={(e) => setPromotionForm({ ...promotionForm, active: e.target.checked })} /> Promoción habilitada
                   </label>
+                  <label>
+                    <input type="checkbox" checked={promotionForm.freeShippingAmba} onChange={(e) => setPromotionForm({ ...promotionForm, freeShippingAmba: e.target.checked })} />
+                    {" "}Envío sin cargo dentro del AMBA
+                  </label>
                   <div className="fm-shipping-actions">
                     <Button loading={busy} disabled={!promotionForm.productId || !promotionForm.name.trim() || !promotionForm.price} onClick={savePromotion}>Guardar promoción</Button>
                     <Button variant="secondary" onClick={() => setPromotionForm(null)}>Cancelar</Button>
@@ -516,7 +481,8 @@ export default function EcommercePage() {
                     <tbody>{Object.values(data.promotions).map((promotion) => {
                       const product = data.products.find((row) => row.id === promotion.productId || row.id === promotion.id);
                       return <tr key={promotion.id || promotion.productId}>
-                        <td>{promotion.name}</td><td>{product?.name || "Producto no disponible"}</td>
+                        <td>{promotion.name}{promotion.freeShippingAmba && <div>Envío sin cargo en el AMBA</div>}</td>
+                        <td>{product?.name || "Producto no disponible"}</td>
                         <td>{formatMoney(promotion.price)}</td><td>{promotion.active ? "Habilitada" : "Deshabilitada"}</td>
                         <td><Button variant="secondary" onClick={() => startPromotion(promotion)}>Editar</Button></td>
                       </tr>;
@@ -560,6 +526,15 @@ export default function EcommercePage() {
                             <div>Disponible para la web <strong>{webAvailable} unidades</strong></div>
                           </div>
                         </div>
+                        <fieldset className="fm-form-grid">
+                          <legend>Unidad embalada para cotizar Andreani</legend>
+                          <FormField label="Peso (gramos)">
+                            <input type="number" min="1" step="1" value={draft.parcelGrams ?? ""} onChange={(event) => updateProductDraft(product.id, "parcelGrams", event.target.value)} />
+                          </FormField>
+                          <FormField label="Volumen (cm³)">
+                            <input type="number" min="1" step="1" value={draft.parcelVolume ?? ""} onChange={(event) => updateProductDraft(product.id, "parcelVolume", event.target.value)} />
+                          </FormField>
+                        </fieldset>
                         <fieldset className="fm-ecommerce-product-config__sources">
                           <legend>Alertas por origen</legend>
                           {stockRows.length ? stockRows.map((row) => {
@@ -601,6 +576,7 @@ export default function EcommercePage() {
               ? "Retiro presencial"
               : "Envío a domicilio"}
           </p>
+          {selected.shipping?.rateName && <p>{selected.shipping.rateName} · {formatMoney(selected.shipping.amount)}</p>}
           {selected.paymentEnvironment === "sandbox" && <p><Badge>PAYWAY SANDBOX · SIN INGRESO REAL</Badge></p>}
           {selected.paywayState && <p>Payway: {selected.paywayState} · Referencia: {selected.paywayReference || "En verificación"}</p>}
           {selected.paymentIncident && <p role="alert">Cobro aprobado pendiente de conciliación comercial. No volver a cobrar ni liberar stock. Reintentá la conciliación y revisá la incidencia si persiste.</p>}

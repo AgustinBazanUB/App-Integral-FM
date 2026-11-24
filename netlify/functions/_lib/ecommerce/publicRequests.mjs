@@ -26,6 +26,7 @@ export async function limitCommerceRequest(
     env = process.env,
     now = new Date(),
     runTransaction = adminRunTransaction,
+    scope = "",
   } = {},
 ) {
   const bucket = Math.floor(now.valueOf() / 60000),
@@ -33,7 +34,8 @@ export async function limitCommerceRequest(
       context.ip ||
       request.headers.get("x-nf-client-connection-ip") ||
       "unknown";
-  const path = `ecommerceRateLimits/${createHash("sha256").update(`${ip}:${bucket}`).digest("hex")}`;
+  const key = (scope ? scope + ":" : "") + ip + ":" + bucket;
+  const path = "ecommerceRateLimits/" + createHash("sha256").update(key).digest("hex");
   await runTransaction(
     async (transaction) => {
       const row = await transaction.getDocument(path);

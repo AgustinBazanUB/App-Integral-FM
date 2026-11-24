@@ -70,6 +70,13 @@ export async function preparePaidEcommerceFulfillment({ transaction, order, sale
   const pickupCode = pickup ? randomBytes(5).toString("hex").toUpperCase() : null;
   const address = order.shipping.address;
   const displayAddress = pickup ? order.shipping.pickup.address : `${address.street} ${address.number}${address.floor ? `, piso ${address.floor}` : ""}${address.apartment ? `, depto. ${address.apartment}` : ""}, ${address.city}, ${address.province}, ${address.postalCode}`;
+  const dispatchNotes = order.shipping.carrier
+    ? [
+        address?.instructions && "Indicaciones para el repartidor: " + address.instructions,
+        order.shipping.notes && "Notas del pedido: " + order.shipping.notes,
+        address?.receiverName && ["Recibe:", address.receiverName, address.receiverPhone].filter(Boolean).join(" "),
+      ]
+    : [order.shipping.notes, address?.instructions, address?.receiverName && `Recibe: ${address.receiverName} ${address.receiverPhone || ""}`];
   const shipment = {
     id: shipmentId, shippingSchemaVersion: 1, saleId, saleCode: sale.saleCode, orderId: order.id, channelId: order.channelId,
     publicCode: order.orderCode || sale.saleCode, publicLookupId, creationSource: "ecommerce", createdBy: actor,
@@ -79,7 +86,10 @@ export async function preparePaidEcommerceFulfillment({ transaction, order, sale
     stockCommitMode: "immediate", stockCommitState: "committed", stockMovementIds: [],
     status: "aprobado", fulfillmentType: pickup ? "pickup" : "delivery", deliveryType: pickup ? "pickup" : order.defaultTransport || env.ECOMMERCE_DEFAULT_TRANSPORT || "repository",
     customerSnapshot: { name: order.customer.fullName, phone: order.customer.phone }, itemsSnapshot: sale.items,
-    destination: { displayAddress, notes: [order.shipping.notes, address?.instructions, address?.receiverName && `Recibe: ${address.receiverName} ${address.receiverPhone || ""}`].filter(Boolean).join(" · "), verified: false }, destinationRevision: 0,
+    destination: { displayAddress, notes: dispatchNotes.filter(Boolean).join(" · "), verified: false }, destinationRevision: 0,
+    ...(order.shipping.carrier ? { ecommerceDeliveryRate: {
+      name: order.shipping.rateName, carrier: order.shipping.carrier, amount: order.shipping.amount,
+    } } : {}),
     assignedPreparerIds: [], preparerNames: [], repository: pickup ? null : repository(env), incident: null,
     courierVersions: { origin: 0, final: 0, direct: 0 }, trackingVersion: 0, revision: 0,
     simulated: sale.simulated, paymentStatus: sale.paymentStatus, invoiceStatus: sale.invoiceStatus, total: sale.total,

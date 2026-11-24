@@ -41,6 +41,14 @@ El backend acepta el JSON de servicio de staging y rechaza credenciales cuyo pro
 
 La consola del proyecto está en <https://console.firebase.google.com/project/app-integral-fm-pruebas/overview>.
 
+## Entregas en el preview de la tienda
+
+Configurá una clave aleatoria en base64url de 32 bytes en `ECOMMERCE_DELIVERY_TOKEN_KEY` como secreto de Netlify para la rama del preview, disponible para Functions. El navegador usa el proxy público `/api/ecommerce/delivery`. El servicio consulta USIG y Georef para la dirección y confirma el código postal con Datos útiles de CABA o con el catálogo de localidades de Andreani cuando hay un único código verificable.
+
+En **Gestión → Configuración e-commerce → Canal y entregas** se definen CABA y los cordones 1, 2 y 3. Cada cordón acepta localidades, partidos o códigos postales y tiene su importe e IVA. El código postal tiene prioridad sobre el nombre de la localidad o el partido. **Promociones** permite marcar el envío sin cargo dentro del AMBA.
+
+La cotización de Andreani requiere usuario, contraseña, código de cliente y contrato de QA en las variables `ANDREANI_USER`, `ANDREANI_PASSWORD`, `ANDREANI_CUSTOMER` y `ANDREANI_CONTRACT`. Configurá `ANDREANI_ORIGIN_BRANCH` si el contrato exige la sucursal de origen. Guardá las credenciales en el contexto del preview. Activá **Cotizar con Andreani** y definí en **Productos y stock** el peso y volumen por unidad embalada. La cotización suma esas medidas para estimar un bulto, usa el total con IVA devuelto por el contrato y lo redondea a pesos enteros. El envío queda registrado para despacho manual en Gestión.
+
 ## Producción y despliegue automático
 
 El proyecto de producción `app-integral-fm` usa el plan Spark. Su archivo `firestore.indexes.json` mantiene los mismos índices compuestos y desactiva las políticas TTL de `shipmentAccess.expiresAt` y `shippingRateLimits.expiresAt`. La lógica de expiración sigue aplicándose, pero los documentos vencidos no se borran automáticamente. TTL administrado requiere facturación; no activar Blaze ni TTL sin aprobación.

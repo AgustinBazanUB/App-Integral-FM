@@ -9,6 +9,7 @@ import {
 } from "./helpers/shippingFixtures.mjs";
 import {
   createEcommerceOrder,
+  loadDeliveryQuoteCart,
   loadEcommerceCatalog,
 } from "../netlify/functions/_lib/ecommerce/commerceService.mjs";
 import { confirmEcommercePayment } from "../netlify/functions/_lib/ecommerce/paymentService.mjs";
@@ -36,6 +37,7 @@ import { adminListDocuments } from "../netlify/functions/_lib/firestoreAdminRest
 import { reservedStockQuantity } from "../src/shared/stockReservations.mjs";
 import { buildOperationalSalePlan } from "../src/shared/operationalWritePlans.mjs";
 import { buildStockTransferWrites } from "../src/shared/stockTransferWritePlans.mjs";
+import { publicAddressOption, quoteSelectedDelivery } from "../netlify/functions/_lib/ecommerce/deliveryQuote.mjs";
 
 const env = {
   NODE_ENV: "test",
@@ -547,6 +549,48 @@ test("envío fiscal incluye servicio con IVA en el motor existente y no añade m
     (e) => e.code === "ecommerce-simulation-production-fiscal-denied",
   );
 });
+test("la cotización firmada fija el domicilio y llega al envío con notas separadas", async () => {
+  const db = setup();
+  const signedEnv = { ...env, ECOMMERCE_DELIVERY_TOKEN_KEY: "q".repeat(43) };
+  const configured = db.documents.get("channels/ecommerce");
+  configured.delivery.rates[0].zone = "caba";
+  const draft = request("web_order_direccion");
+  const destination = {
+    street: "Calle de prueba", number: "123", city: "Ciudad Autónoma de Buenos Aires",
+    municipality: "", province: "CABA", postalCode: "1428", provider: "usig", neighborhood: "Belgrano",
+  };
+  const { selectionToken } = publicAddressOption(destination, { env: signedEnv, now });
+  const cart = await loadDeliveryQuoteCart(draft.items, {
+    env: signedEnv, now, getDocument: db.getDocument, listDocuments: db.listDocuments,
+  });
+  const result = await quoteSelectedDelivery({
+    selectionToken, ...cart, env: signedEnv, now, confirm: async () => destination,
+  });
+  const create = (body, date = now) => db.runTransaction((tx) => createEcommerceOrder({ body, env: signedEnv, now: date, ...tx }));
+  await assert.rejects(() => create(draft), { code: "ecommerce-delivery-quote-required" });
+  const body = {
+    ...draft,
+    shipping: {
+      quoteToken: result.quote.quoteToken,
+      address: { street: "Calle manipulada", postalCode: "9999", floor: "3", apartment: "A", instructions: "Tocar el timbre.", receiverName: "Receptor QA" },
+      notes: "Pedido de prueba.",
+    },
+  };
+  await assert.rejects(() => create(body, new Date(now.getTime() + 11 * 60000)), { code: "ecommerce-delivery-quote-stale" });
+  await assert.rejects(() => create({ ...body, items: [{ productId: "oil", quantity: 1 }] }), { code: "ecommerce-delivery-quote-stale" });
+  const { order } = await create(body);
+  assert.equal(order.shipping.address.postalCode, "1428");
+  assert.equal(order.shipping.address.street, destination.street);
+  assert.equal(order.shippingAmount, 500);
+  assert.equal(order.total, 2500);
+  assert.equal((await create(body, new Date(now.getTime() + 11 * 60000))).idempotent, true);
+  await approve(db, order);
+  const shipment = rows(db, "shipments")[0];
+  assert.match(shipment.destination.displayAddress, /piso 3, depto\. A/);
+  assert.equal(shipment.destination.notes, "Indicaciones para el repartidor: Tocar el timbre. · Notas del pedido: Pedido de prueba. · Recibe: Receptor QA");
+  assert.deepEqual(shipment.ecommerceDeliveryRate, { name: "CABA", carrier: "local", amount: 500 });
+});
+
 test("datos inválidos, tarifa manipulada y emulador hacia producción se rechazan", () => {
   assert.throws(() =>
     channelShipping({ method: "delivery", address: { street: "A" } }, channel),

@@ -40,6 +40,22 @@ export async function createEcommerceOrder(payload, { fetchImpl = fetch } = {}) 
   return data;
 }
 
+export async function requestEcommerceDelivery(payload, { signal, fetchImpl = fetch } = {}) {
+  const response = await fetchImpl(ecommercePublicEndpoint("delivery"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  const data = await safeJson(response);
+  if (!response.ok || data?.ok !== true) {
+    const error = new Error(data?.message || "No pudimos consultar el envío. Reintentá.");
+    error.code = data?.code || "ecommerce-delivery-request-failed";
+    throw error;
+  }
+  return data;
+}
+
 
 async function simulatedPaymentPost(payload) {
   const user = auth.currentUser;

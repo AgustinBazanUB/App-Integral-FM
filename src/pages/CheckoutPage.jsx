@@ -5,12 +5,14 @@ import { Link } from "../router";
 import PageMeta from "../components/PageMeta";
 import PaywayPaymentForm from "../components/PaywayPaymentForm";
 import PaywayInvoiceAction from "../components/PaywayInvoiceAction";
+import DeliveryAddressPicker from "../components/DeliveryAddressPicker";
 import { useCart } from "../context/CartContext";
 import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import { categoryById } from "../data/categories";
 import {
   createEcommerceOrder,
   observeEcommerceSimulationCapability,
+  requestEcommerceDelivery,
   simulateApprovedEcommercePayment,
 } from "../services/ecommerceService";
 import { trackEvent } from "../utils/analytics";
@@ -27,14 +29,12 @@ function initialDraft() {
   return {
     requestId: newRequestId(),
     accessToken: newRequestId().replaceAll("-", "") + newRequestId().replaceAll("-", ""),
-    street: "", number: "", floor: "", apartment: "", province: "", instructions: "", receiverName: "", receiverPhone: "", rateId: "", billingMode: "consumer_final", billingName: "", billingAddress: "",
+    addressSearch: "", deliverySelection: null, floor: "", apartment: "", instructions: "", receiverName: "",
+    billingMode: "consumer_final", billingName: "", billingAddress: "",
     fullName: "",
     email: "",
     phone: "",
     deliveryMethod: "pickup",
-    address: "",
-    city: "",
-    postalCode: "",
     notes: "",
     marketingConsent: false,
     fiscalCuit: "",
@@ -48,6 +48,7 @@ function readDraft() {
       ...initialDraft(),
       ...saved,
       requestId: saved.requestId || newRequestId(),
+      addressSearch: saved.addressSearch || [saved.street, saved.number].filter(Boolean).join(" "),
     };
   } catch {
     return initialDraft();
@@ -78,6 +79,8 @@ export default function CheckoutPage() {
   const [storageMessage, setStorageMessage] = useState("");
   const [submitState, setSubmitState] = useState({ busy: false, error: "" });
   const [orderResult, setOrderResult] = useState(null);
+  const [deliveryRequest, setDeliveryRequest] = useState(null);
+  const [deliveryRetry, setDeliveryRetry] = useState(0);
   const submitting = useRef(false);
   const [simulationCapability, setSimulationCapability] = useState({
     enabled: false,
@@ -113,6 +116,35 @@ export default function CheckoutPage() {
       })),
     [items],
   );
+  const cartKey = JSON.stringify(items.map(({ productId, quantity }) => ({ productId, quantity }))
+    .sort((a, b) => a.productId.localeCompare(b.productId)));
+  const selectionToken = draft.deliverySelection?.selectionToken;
+  const canQuote = step > 0 && !draft.pendingOrder && draft.deliveryMethod === "delivery"
+    && config.deliveryAddressEnabled && Boolean(selectionToken) && items.length > 0;
+  useEffect(() => {
+    if (!canQuote) return;
+    const controller = new AbortController();
+    const identity = { selectionToken, cartKey, deliveryRetry };
+    setDeliveryRequest({ ...identity, loading: true });
+    requestEcommerceDelivery({ mode: "quote", selectionToken, items: JSON.parse(cartKey) }, { signal: controller.signal })
+      .then(({ address, quote, status }) => {
+        if (!controller.signal.aborted) setDeliveryRequest({ ...identity, address, quote, status });
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setDeliveryRequest({ ...identity, error: error.message });
+      });
+    return () => controller.abort();
+  }, [canQuote, selectionToken, cartKey, deliveryRetry]);
+  const delivery = deliveryRequest?.selectionToken === selectionToken && deliveryRequest?.cartKey === cartKey
+    && deliveryRequest?.deliveryRetry === deliveryRetry ? deliveryRequest : null;
+  const quote = delivery?.quote?.expiresAt > Date.now() ? delivery.quote : null;
+  const quoting = canQuote && (!delivery || delivery.loading);
+  const shippingAmount = draft.pendingOrder?.shippingAmount ?? quote?.amount;
+
+  function changeDeliveryAddress(value, option = null) {
+    setDraft((current) => ({ ...current, addressSearch: value, deliverySelection: option }));
+    setErrors((current) => ({ ...current, addressSearch: undefined, deliveryQuote: undefined }));
+  }
 
   const updateField = (event) => {
     if (draft.pendingOrder) return;
@@ -140,8 +172,13 @@ export default function CheckoutPage() {
         nextErrors.deliveryMethod = "El retiro está PENDIENTE DE DEFINIR.";
       }
       if (draft.deliveryMethod === "delivery") {
-        if (!config.deliveryEnabled) nextErrors.deliveryMethod = "El envío aún no está habilitado.";
-        for (const key of ["street", "number", "city", "province", "postalCode", "rateId"]) if (!draft[key]?.trim()) nextErrors[key] = "Completá este dato.";
+        if (!config.deliveryEnabled || !config.deliveryAddressEnabled) {
+          nextErrors.deliveryMethod = "El envío aún no está habilitado.";
+        } else if (!selectionToken) {
+          nextErrors.addressSearch = "Elegí una dirección de la lista.";
+        } else if (!quote) {
+          nextErrors.deliveryQuote = quoting ? "Esperá la cotización del envío." : "Necesitás una tarifa confirmada para continuar.";
+        }
       }
     }
     setErrors(nextErrors);
@@ -186,7 +223,17 @@ export default function CheckoutPage() {
           address: draft.billingAddress,
           ...(draft.billingMode === "fiscal" ? { requestedClass: "A" } : {}),
         },
-        shipping: {method:draft.deliveryMethod,rateId:draft.rateId,notes:draft.notes,address:Object.fromEntries(["street","number","floor","apartment","city","province","postalCode","instructions","receiverName","receiverPhone"].map(key=>[key,draft[key]]))},
+        shipping: {
+          method: draft.deliveryMethod,
+          notes: draft.notes,
+          ...(draft.deliveryMethod === "delivery" ? {
+            quoteToken: quote?.quoteToken,
+            address: {
+              floor: draft.floor, apartment: draft.apartment,
+              instructions: draft.instructions, receiverName: draft.receiverName,
+            },
+          } : {}),
+        },
         items: items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
@@ -242,6 +289,14 @@ export default function CheckoutPage() {
         payment_status: result.order.paymentStatus,
       });
     } catch (error) {
+      if (["ecommerce-delivery-quote-required", "ecommerce-delivery-quote-stale", "ecommerce-delivery-token-invalid"].includes(error?.code)) {
+        setDeliveryRetry((current) => current + 1);
+        setErrors({ deliveryQuote: "Revisá el importe actualizado antes de continuar." });
+        setSubmitState({ busy: false, error: "" });
+        setStep(1);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       if (error?.phase === "invoice") {
         setDraft((current) => ({ ...current, pendingOrder: current.pendingOrder ? {
           ...current.pendingOrder, paymentStatus: error.payment?.status || current.pendingOrder.paymentStatus,
@@ -266,7 +321,7 @@ export default function CheckoutPage() {
     || hasPendingPrices
     || hasUnavailableItems
     || (draft.deliveryMethod === "pickup" && !config.pickupEnabled)
-    || (draft.deliveryMethod === "delivery" && !config.deliveryEnabled));
+    || (draft.deliveryMethod === "delivery" && !quote));
 
   return (
     <main id="main-content" className="page-shell checkout-page">
@@ -384,18 +439,57 @@ export default function CheckoutPage() {
                           type="radio"
                           name="deliveryMethod"
                           value="delivery"
+                          disabled={!config.deliveryEnabled || !config.deliveryAddressEnabled}
                           checked={draft.deliveryMethod === "delivery"}
                           onChange={updateField}
                         />
                         <span>
                           <strong>Envío</strong>
-                          <small>{config.deliveryEnabled ? "Consultá las zonas y tarifas disponibles." : "Envío aún no habilitado."}</small>
+                          <small>{config.deliveryEnabled && config.deliveryAddressEnabled ? "Calculamos la tarifa para tu dirección." : "Envío aún no habilitado."}</small>
                         </span>
                       </label>
                     </div>
-                    {draft.deliveryMethod === "delivery" && <div className="form-grid">
-                      {[["street","Calle"],["number","Altura"],["floor","Piso (opcional)"],["apartment","Departamento (opcional)"],["city","Ciudad o localidad"],["province","Provincia"],["postalCode","Código postal"],["instructions","Indicaciones para el repartidor (opcional)"],["receiverName","Nombre del receptor si es otra persona (opcional)"],["receiverPhone","Teléfono del receptor (opcional)"]].map(([name,label])=><label className="field-label" key={name}>{label}<input name={name} value={draft[name] || ""} onChange={updateField} aria-invalid={Boolean(errors[name])}/>{errors[name] && <span className="field-error">{errors[name]}</span>}</label>)}
-                      <label className="field-label field-label--full">Zona y tarifa de envío<select name="rateId" value={draft.rateId || ""} onChange={updateField}><option value="">Elegí una tarifa para tu destino</option>{(config.deliveryRates || []).map(rate=><option key={rate.id} value={rate.id}>{rate.name} · CP {rate.postalCodes.join(", ")} · {formatMoney(rate.amount)}</option>)}</select>{errors.rateId && <span className="field-error">{errors.rateId}</span>}</label>
+                    {draft.deliveryMethod === "delivery" && config.deliveryAddressEnabled && <div className="checkout-delivery-details">
+                      <DeliveryAddressPicker
+                        value={draft.addressSearch}
+                        selection={draft.deliverySelection}
+                        onInput={changeDeliveryAddress}
+                        onSelect={(option) => changeDeliveryAddress(option.label, option)}
+                        error={errors.addressSearch}
+                      />
+                      {draft.deliverySelection && <button type="button" className="delivery-retry" onClick={() => changeDeliveryAddress("")}>Cambiar dirección</button>}
+                      {delivery?.address && <dl className="delivery-address-confirmation">
+                        <div><dt>Ciudad o localidad</dt><dd>{delivery.address.city}{delivery.address.neighborhood ? " · " + delivery.address.neighborhood : ""}</dd></div>
+                        <div><dt>Provincia</dt><dd>{delivery.address.province}</dd></div>
+                        <div><dt>Código postal</dt><dd>{delivery.address.postalCode}</dd></div>
+                      </dl>}
+                      <div className="form-grid">
+                        <label className="field-label">Piso (opcional)<input name="floor" maxLength={30} value={draft.floor} onChange={updateField} /></label>
+                        <label className="field-label">Departamento (opcional)<input name="apartment" maxLength={50} value={draft.apartment} onChange={updateField} /></label>
+                      </div>
+                      <label className="field-label">
+                        Nombre de quien recibe (opcional)
+                        <input name="receiverName" maxLength={120} value={draft.receiverName} onChange={updateField} />
+                      </label>
+                      {quoting && <p className="delivery-hint" role="status">Confirmando dirección y tarifa…</p>}
+                      {quote && <div className="delivery-quote" role="status">
+                        <div><span>Zona y tarifa de envío</span><strong>{quote.name}</strong></div>
+                        <strong>{quote.amount === 0 ? "Sin cargo" : formatMoney(quote.amount)}</strong>
+                        {quote.promotion && <small>{quote.promotion} · Envío sin cargo dentro del AMBA</small>}
+                      </div>}
+                      {quote?.carrier === "andreani" && items.some((item) => item.product?.freeShippingAmba) && (
+                        <p className="delivery-hint">El envío sin cargo de tu promoción aplica dentro del AMBA.</p>
+                      )}
+                      {(delivery?.error || delivery?.status?.message) && (
+                        <p className="field-error" role="alert">{delivery.error || delivery.status.message}</p>
+                      )}
+                      {delivery?.error && <button type="button" className="delivery-retry" onClick={() => setDeliveryRetry((current) => current + 1)}>Reintentar cotización</button>}
+                      {delivery?.quote && !quote && <button type="button" className="delivery-retry" onClick={() => setDeliveryRetry((current) => current + 1)}>Actualizar cotización</button>}
+                      {errors.deliveryQuote && <p className="field-error" role="alert">{errors.deliveryQuote}</p>}
+                      <label className="field-label">
+                        Indicaciones para el repartidor (opcional)
+                        <textarea name="instructions" rows="2" maxLength={500} value={draft.instructions} onChange={updateField} />
+                      </label>
                     </div>}
                     {errors.deliveryMethod ? <p className="field-error">{errors.deliveryMethod}</p> : null}
                     <label className="field-label">
@@ -541,7 +635,17 @@ export default function CheckoutPage() {
               <span>Subtotal visible</span>
               <strong>{hasPendingPrices ? "No disponible" : formatMoney(knownSubtotal)}</strong>
             </div>
-            {draft.deliveryMethod === "delivery" && <p>Envío: {formatMoney((config.deliveryRates || []).find(rate=>rate.id===draft.rateId)?.amount || 0)}</p>}
+            {draft.deliveryMethod === "delivery" && (
+              <div className="order-summary__total">
+                <span>Envío</span>
+                <strong>{shippingAmount == null ? "Por calcular" : shippingAmount === 0 ? "Sin cargo" : formatMoney(shippingAmount)}</strong>
+              </div>
+            )}
+            {shippingAmount != null && draft.deliveryMethod === "delivery" && !hasPendingPrices && (
+              <div className="order-summary__total">
+                <span>Total</span><strong>{formatMoney(draft.pendingOrder?.total ?? knownSubtotal + shippingAmount)}</strong>
+              </div>
+            )}
             <p>Precio y disponibilidad se confirman al registrar tu pedido.</p>
           </aside>}
         </div>
