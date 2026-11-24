@@ -1,14 +1,16 @@
 import {
+  ALL_ACTIVE_STOCK,
   channelShipping,
   loadWebChannel,
   normalizeBilling,
+  originKey,
   originStockPath,
-  resolveChannelOrigin,
+  resolveChannelOrigins,
+  stockCollectionPath,
+  webPricingStock,
+  webStockAvailability,
 } from "./channelService.mjs";
-import {
-  reservationPatch,
-  reservedStockQuantity,
-} from "../../../../src/shared/stockReservations.mjs";
+import { reservationPatch } from "../../../../src/shared/stockReservations.mjs";
 import { prepareCommerceCustomer } from "./customerLink.mjs";
 import { createHash } from "node:crypto";
 import {
@@ -114,18 +116,9 @@ function publicProduct(product, stock, { locationConfigured, settings = {}, prom
   };
 }
 
-const stockCollectionPath = (origin) => `${origin.type === "warehouse" ? "warehouseStock" : "locationStock"}/${origin.id}/items`;
-
-async function configuredWebOrigins(channel, { env, getDocument }) {
+async function configuredWebOrigins(channel, { env, getDocument, listDocuments, now }) {
   if (channel) {
-    const requested = channel.authorizedOrigins?.length
-      ? channel.authorizedOrigins
-      : [channel.defaultOrigin].filter(Boolean);
-    if (!requested.length)
-      throw commerceError("ecommerce-location-not-configured", "Configurá al menos un local o depósito para abastecer la web.", 409);
-    const origins = await Promise.all(requested.map((origin) => resolveChannelOrigin(channel, origin, { env, getDocument })));
-    const unique = new Map(origins.map((origin) => [`${origin.type}:${origin.id}`, origin]));
-    return [...unique.values()].sort((a, b) => (a.type === channel.defaultOrigin?.type && a.id === channel.defaultOrigin?.id ? -1 : b.type === channel.defaultOrigin?.type && b.id === channel.defaultOrigin?.id ? 1 : 0));
+    return resolveChannelOrigins(channel, { env, getDocument, listDocuments, now });
   }
   const locationId = ecommerceLocationId(env);
   if (!locationId) return [];
@@ -136,11 +129,6 @@ async function configuredWebOrigins(channel, { env, getDocument }) {
   if ((snapshot.data.type || "store") !== "store")
     throw commerceError("ecommerce-location-type-not-allowed", "La página web sólo puede tomar stock de locales activos; las ferias y eventos quedan excluidos.", 409);
   return [{ ...origin, name: snapshot.data?.name || "Ecommerce" }];
-}
-
-function stockAvailability(stock, now) {
-  if (!stock || stock.active === false || stock.deleted === true || stock.productDeleted === true) return 0;
-  return Math.max(0, Number(stock.currentStock || 0) - reservedStockQuantity(stock, now));
 }
 
 function allocateStock(quantity, sourceRows, productName) {
@@ -172,6 +160,7 @@ export async function createEcommerceOrder({
   now = new Date(),
   getDocument = adminGetDocument,
   commitDocuments = adminCommitDocuments,
+  listDocuments = adminListDocuments,
 } = {}) {
   resolveRequestedPaymentStatus(body?.paymentMode);
   if (
@@ -234,9 +223,8 @@ export async function createEcommerceOrder({
       "No se pudo crear el acceso privado al pedido.",
       400,
     );
-  const origins = await configuredWebOrigins(channel, { env, getDocument });
-  const origin = origins[0];
-  if (!origin)
+  const origins = await configuredWebOrigins(channel, { env, getDocument, listDocuments, now });
+  if (!origins.length)
     throw commerceError(
       "ecommerce-location-not-configured",
       "Falta configurar los orígenes de stock web.",
@@ -261,11 +249,9 @@ export async function createEcommerceOrder({
     const sourceRows = origins.map((source, index) => ({
       origin: source,
       snapshot: sourceSnapshots[index],
-      available: stockAvailability(sourceSnapshots[index]?.data, now),
+      available: webStockAvailability(sourceSnapshots[index]?.data, now),
     }));
-    const preferredStock = sourceRows.find((row) => row.origin.id === origin.id && row.origin.type === origin.type && row.snapshot?.data && row.snapshot.data.active !== false && row.snapshot.data.deleted !== true && row.snapshot.data.productDeleted !== true)?.snapshot?.data
-      || sourceRows.find((row) => row.snapshot?.data && row.snapshot.data.active !== false && row.snapshot.data.deleted !== true)?.snapshot?.data
-      || { id: item.productId, priceMode: "default" };
+    const preferredStock = webPricingStock(channel, sourceSnapshots.map((row) => row?.data));
     const floor = Math.max(0, Number(setting?.data?.minimumRemainingStock) || 0);
     stocksById[item.productId] = {
       ...preferredStock,
@@ -294,6 +280,10 @@ export async function createEcommerceOrder({
       item.name,
     ),
   }));
+  const allocatedSourceKeys = new Set(itemsWithAllocations.flatMap((item) => item.stockAllocations.map(originKey)));
+  const origin = channel?.stockScope === ALL_ACTIVE_STOCK
+    ? origins.find((row) => allocatedSourceKeys.has(originKey(row)))
+    : origins[0];
   const reservationExpiresAt = channel
     ? new Date(now.valueOf() + 15 * 60 * 1000)
     : null;
@@ -441,7 +431,7 @@ export async function loadEcommerceCatalog({
   getDocument = adminGetDocument,
 } = {}) {
   const channel = await loadWebChannel({ env, getDocument });
-  const origins = await configuredWebOrigins(channel, { env, getDocument });
+  const origins = await configuredWebOrigins(channel, { env, getDocument, listDocuments, now });
   const origin = origins[0] || null;
   const locationId = origin?.id || (channel ? "" : ecommerceLocationId(env));
   const products = (await listDocuments("products", { env, pageSize: 500 }))
@@ -453,7 +443,7 @@ export async function loadEcommerceCatalog({
   if (!locationId) {
     return {
       ready: false,
-      pending: ["ECOMMERCE_LOCATION_ID"],
+      pending: [channel ? "ecommerce-stock-origins" : "ECOMMERCE_LOCATION_ID"],
       location: null,
       config: {
         pickupEnabled: ecommercePickupEnabled(env),
@@ -498,15 +488,12 @@ export async function loadEcommerceCatalog({
     const settings = settingsById[product.id] || {};
     const sources = stockRowsBySource.map(({ origin: source, rows }) => {
       const stock = rows.get(product.id);
-      return { origin: source, stock, available: stockAvailability(stock, now) };
+      return { stock, available: webStockAvailability(stock, now) };
     });
-    const preferred = sources.find((row) => row.origin.id === origin?.id && row.origin.type === origin?.type && row.stock && row.stock.active !== false && row.stock.deleted !== true && row.stock.productDeleted !== true)
-      || sources.find((row) => row.stock && row.stock.active !== false && row.stock.deleted !== true)
-      || null;
+    const preferred = webPricingStock(channel, sources.map((source) => source.stock));
     const pricingStock = {
-      ...(preferred?.stock || {}),
+      ...preferred,
       id: product.id,
-      priceMode: preferred?.stock?.priceMode || "default",
       currentStock: Math.max(0, sources.reduce((sum, row) => sum + row.available, 0) - Math.max(0, Number(settings.minimumRemainingStock) || 0)),
     };
     return { pricingStock, settings, promotion: promotionById[product.id] || null };

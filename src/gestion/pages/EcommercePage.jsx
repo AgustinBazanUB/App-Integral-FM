@@ -18,15 +18,20 @@ import {
 } from "../../services/ecommerceService";
 import { formatMoney, formatDateTime } from "../formatters";
 import SaleInvoicePanel from "../components/SaleInvoicePanel";
+import { LOCATION_TYPES } from "../../modules/locations/domain/locations.js";
 
 const empty = {
   active: false,
+  stockScope: "all_active",
   defaultOrigin: { type: "location", id: "" },
   authorizedOrigins: [],
+  excludedOrigins: [],
   authorizedUserIds: [],
   pickup: { enabled: false, locationId: "", address: "" },
   delivery: { enabled: false, rates: [] },
 };
+const originKey = (row) => `${row?.type}:${row?.id}`;
+const originLabel = (row) => row.type === "warehouse" ? "Depósito" : LOCATION_TYPES[row.locationType] || "Ubicación";
 export default function EcommercePage() {
   const navigate = useNavigate();
   const [data, setData] = useState(null),
@@ -106,9 +111,12 @@ export default function EcommercePage() {
   const origins = data
     ? data.stockOrigins || []
     : [];
+  const allStock = channel.stockScope === "all_active";
+  const selectionField = allStock ? "excludedOrigins" : "authorizedOrigins";
+  const selections = channel[selectionField] || [];
   const channelOriginOptions = [
     ...origins,
-    ...((channel.authorizedOrigins || [])
+    ...(selections
       .filter((item) => !origins.some((row) => row.type === item.type && row.id === item.id))
       .map((item) => {
         const source = item.type === "warehouse"
@@ -219,7 +227,7 @@ export default function EcommercePage() {
     (groups[categoryName] ||= []).push(product);
     return groups;
   }, {});
-  const configuredSourceKeys = new Set((data?.channel?.authorizedOrigins || []).map((row) => `${row.type}:${row.id}`));
+  const configuredSourceKeys = new Set((data?.configuredStockOrigins || []).map(originKey));
   const stockRowsFor = (product) => {
     const rows = data?.stockByProduct?.[product.id] || [];
     return origins.map((source) => rows.find((row) => row.type === source.type && row.originId === source.id)
@@ -330,7 +338,16 @@ export default function EcommercePage() {
               </label>
             ))}
           </fieldset>
-          <FormField label="Origen predeterminado">
+          <FormField label="Stock que abastece la tienda">
+            <Select
+              value={allStock ? "all_active" : "selected"}
+              onChange={(e) => setChannel({ ...channel, stockScope: e.target.value })}
+            >
+              <option value="all_active">Todas las ubicaciones y depósitos activos</option>
+              <option value="selected">Sólo los orígenes elegidos</option>
+            </Select>
+          </FormField>
+          <FormField label="Origen prioritario">
             <Select
               value={`${channel.defaultOrigin?.type}:${channel.defaultOrigin?.id}`}
               onChange={(e) => {
@@ -339,11 +356,12 @@ export default function EcommercePage() {
                   ...channel,
                   defaultOrigin: { type, id },
                   authorizedOrigins: [
-                    ...channel.authorizedOrigins.filter(
+                    ...(channel.authorizedOrigins || []).filter(
                       (row) => row.id !== id || row.type !== type,
                     ),
                     { type, id },
                   ],
+                  excludedOrigins: (channel.excludedOrigins || []).filter((row) => originKey(row) !== originKey({ type, id })),
                 });
               }}
             >
@@ -353,38 +371,31 @@ export default function EcommercePage() {
                   key={`${row.type}:${row.id}`}
                   value={`${row.type}:${row.id}`}
                 >
-                  {row.name} ·{" "}
-                  {row.type === "warehouse" ? "Depósito" : "Local"}
+                  {row.name} · {originLabel(row)}
                 </option>
               ))}
             </Select>
           </FormField>
           <fieldset>
-            <legend>Locales y depósitos que abastecen la web</legend>
-            <p>La disponibilidad combina el stock de los orígenes elegidos; el sitio sólo muestra si un producto está disponible, nunca sus unidades.</p>
+            <legend>Orígenes habilitados</legend>
+            <p>{allStock ? "Los nuevos orígenes activos se suman automáticamente. Desmarcá los que quieras excluir." : "Marcá las ubicaciones y depósitos que abastecen la tienda."}</p>
             {channelOriginOptions.map((row) => (
               <label key={`${row.type}:${row.id}`} style={{ display: "block" }}>
                 <input
                   type="checkbox"
-                  checked={channel.authorizedOrigins.some(
-                    (item) => item.type === row.type && item.id === row.id,
-                  )}
-                  onChange={(e) =>
+                  checked={allStock !== selections.some((item) => originKey(item) === originKey(row))}
+                  disabled={originKey(row) === originKey(channel.defaultOrigin)}
+                  onChange={(e) => {
+                    const keep = e.target.checked !== allStock;
                     setChannel({
                       ...channel,
-                      authorizedOrigins: e.target.checked
-                        ? [
-                            ...channel.authorizedOrigins,
-                            { type: row.type, id: row.id },
-                          ]
-                        : channel.authorizedOrigins.filter(
-                            (item) =>
-                              item.type !== row.type || item.id !== row.id,
-                          ),
-                    })
-                  }
+                      [selectionField]: keep
+                        ? [...selections, { type: row.type, id: row.id }]
+                        : selections.filter((item) => originKey(item) !== originKey(row)),
+                    });
+                  }}
                 />
-                {row.name}{row.disallowed ? " · origen excluido; desmarcalo" : ""}
+                {row.name} · {originLabel(row)}{row.disallowed ? " · inactivo" : ""}
               </label>
             ))}
           </fieldset>
@@ -533,8 +544,9 @@ export default function EcommercePage() {
                     {products.map((product) => {
                       const draft = productDrafts[product.id] || { enabled: true, priceOverride: "", minimumRemainingStock: 0, sourceAlertThresholds: {} };
                       const stockRows = stockRowsFor(product);
-                      const totalRemaining = stockRows.filter((row) => configuredSourceKeys.has(`${row.type}:${row.originId}`)).reduce((sum, row) => sum + Math.max(0, row.currentStock - row.reservedStock), 0);
-                      const webAvailable = Math.max(0, totalRemaining - Number(draft.minimumRemainingStock || 0));
+                      const physicalStock = stockRows.reduce((sum, row) => sum + (row.active ? Math.max(0, row.currentStock) : 0), 0);
+                      const totalRemaining = stockRows.filter((row) => row.active && configuredSourceKeys.has(`${row.type}:${row.originId}`)).reduce((sum, row) => sum + Math.max(0, row.currentStock - row.reservedStock), 0);
+                      const webAvailable = draft.enabled === false ? 0 : Math.max(0, totalRemaining - Number(draft.minimumRemainingStock || 0));
                       return <article key={product.id} className="fm-ecommerce-product-config">
                         <div className="fm-ecommerce-product-config__header">
                           <div><h3>{product.name}</h3><p>{product.abbreviation || product.categoryName || "Producto del catálogo"}</p></div>
@@ -543,7 +555,10 @@ export default function EcommercePage() {
                         <div className="fm-ecommerce-product-config__fields">
                           <FormField label="Precio web (ARS)"><input type="number" min="1" step="1" value={draft.priceOverride} placeholder={product.defaultPrice ? `Habitual: ${formatMoney(product.defaultPrice)}` : "Ingresá un precio web"} onChange={(e) => updateProductDraft(product.id, "priceOverride", e.target.value)} /></FormField>
                           <FormField label="Stock mínimo a conservar"><input type="number" min="0" step="1" value={draft.minimumRemainingStock} onChange={(e) => updateProductDraft(product.id, "minimumRemainingStock", e.target.value)} /></FormField>
-                          <div className="fm-ecommerce-product-config__availability">Stock ofrecible desde orígenes web: <strong>{webAvailable} unidades</strong></div>
+                          <div className="fm-ecommerce-product-config__availability">
+                            <div>Stock físico total activo <strong>{physicalStock} unidades</strong></div>
+                            <div>Disponible para la web <strong>{webAvailable} unidades</strong></div>
+                          </div>
                         </div>
                         <fieldset className="fm-ecommerce-product-config__sources">
                           <legend>Alertas por origen</legend>

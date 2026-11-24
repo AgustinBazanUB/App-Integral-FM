@@ -1,4 +1,5 @@
 import { INVENTORY_TYPES, PRICE_MODES, wholeInventoryQuantity } from "../modules/inventory/domain/inventory.js";
+import { reservedStockQuantity } from "./stockReservations.mjs";
 const userName = (profile) => profile.name || profile.email || "Usuario";
 // Shared deterministic plan: manual UI and Olivia commit the same domain effects.
 export function buildStockTransferWrites({ prepared, origin, destination, profile, carrierName = "", transferId: safeId, stamp, correlation = {} }) {
@@ -12,6 +13,10 @@ export function buildStockTransferWrites({ prepared, origin, destination, profil
     prepared.forEach((item) => {
       const originPrevious = Number(item.originStock.currentStock || 0);
       const originNew = originPrevious - item.quantity;
+      const reserved = reservedStockQuantity(item.originStock, stamp instanceof Date ? stamp : new Date());
+      if (reserved > 0 && originNew < reserved) {
+        throw new Error(`${item.product.name}: hay ${reserved} unidades reservadas para pedidos web.`);
+      }
       const destinationPrevious = Number(item.destinationStock?.currentStock || 0);
       const destinationNew = destinationPrevious + item.receivedQuantity;
       const outMovementRef = { id: `${safeId}_${item.productId}_out`, path: `stockMovements/${safeId}_${item.productId}_out` };

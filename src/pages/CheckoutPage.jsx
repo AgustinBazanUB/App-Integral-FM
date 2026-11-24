@@ -4,6 +4,7 @@ import { ArrowLeft, Check, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Link } from "../router";
 import PageMeta from "../components/PageMeta";
 import PaywayPaymentForm from "../components/PaywayPaymentForm";
+import PaywayInvoiceAction from "../components/PaywayInvoiceAction";
 import { useCart } from "../context/CartContext";
 import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import { categoryById } from "../data/categories";
@@ -15,7 +16,7 @@ import {
 import { trackEvent } from "../utils/analytics";
 
 const DRAFT_KEY = "flor-mia-checkout-draft-v2";
-const steps = ["Datos y contacto", "Entrega", "Pago", "Confirmación"];
+const steps = ["Datos y contacto", "Entrega", "Comprobante", "Pago"];
 
 function newRequestId() {
   if (typeof crypto?.randomUUID === "function") return crypto.randomUUID();
@@ -178,7 +179,13 @@ export default function CheckoutPage() {
       result = await createEcommerceOrder({
         requestId: draft.requestId,
         accessToken: draft.accessToken,
-        billing: {mode:draft.billingMode,cuit:draft.fiscalCuit,name:draft.billingName,address:draft.billingAddress},
+        billing: {
+          mode: draft.billingMode,
+          cuit: draft.fiscalCuit,
+          name: draft.billingName,
+          address: draft.billingAddress,
+          ...(draft.billingMode === "fiscal" ? { requestedClass: "A" } : {}),
+        },
         shipping: {method:draft.deliveryMethod,rateId:draft.rateId,notes:draft.notes,address:Object.fromEntries(["street","number","floor","apartment","city","province","postalCode","instructions","receiverName","receiverPhone"].map(key=>[key,draft[key]]))},
         items: items.map((item) => ({
           productId: item.productId,
@@ -301,7 +308,10 @@ export default function CheckoutPage() {
                 <p>Total recalculado por el backend: <strong>{formatMoney(orderResult.total)}</strong></p>
                 <p>Pago: <strong>{orderResult.paymentStatus}</strong></p>
                 {orderResult.paymentReference && <p>Referencia Payway Sandbox: <strong>{orderResult.paymentReference}</strong></p>}
-                <p>Factura: <strong>{orderResult.invoiceStatus}</strong></p>
+                {orderResult.paymentStatus === "approved" && (
+                  <PaywayInvoiceAction order={orderResult} accessToken={orderResult.accessToken}
+                    onUpdate={invoice => setOrderResult(current => ({ ...current, ...invoice }))} />
+                )}
                 {orderResult.simulation ? (
                   <>
                     <p>Venta Ecommerce: <strong>{orderResult.saleId}</strong></p>
@@ -400,17 +410,17 @@ export default function CheckoutPage() {
                     <p className="eyebrow">PASO 3 DE 4</p>
                     <h2>Pago y facturación</h2>
                     <fieldset><legend>Datos de facturación</legend>
-                      <label className="checkbox-label"><input type="radio" name="billingMode" value="consumer_final" checked={draft.billingMode === "consumer_final"} onChange={updateField}/>Consumidor final / sin datos fiscales adicionales</label>
-                      <label className="checkbox-label"><input type="radio" name="billingMode" value="fiscal" checked={draft.billingMode === "fiscal"} onChange={updateField}/>Facturar con mis datos fiscales</label>
+                      <label className="checkbox-label"><input type="radio" name="billingMode" value="consumer_final" checked={draft.billingMode === "consumer_final"} onChange={updateField}/>Consumidor final</label>
+                      <label className="checkbox-label"><input type="radio" name="billingMode" value="fiscal" checked={draft.billingMode === "fiscal"} onChange={updateField}/>Factura A</label>
                       {draft.billingMode === "fiscal" && <div className="form-grid"><label className="field-label">CUIT<input name="fiscalCuit" value={draft.fiscalCuit} onChange={updateField} inputMode="numeric"/></label><label className="field-label">Nombre o razón social<input name="billingName" value={draft.billingName} onChange={updateField}/></label><label className="field-label field-label--full">Domicilio fiscal<input name="billingAddress" value={draft.billingAddress} onChange={updateField}/></label></div>}
-                      <p>Emitiremos el comprobante que corresponda. La clase de factura se determina según la condición fiscal del emisor y del receptor.</p>
+                      <p>Para Factura A, verificamos el CUIT y su condición fiscal antes de confirmar el pedido.</p>
                     </fieldset>
                     <div className="integration-state">
                       <LockKeyhole size={30} aria-hidden="true" />
                       <h3>Pagar con Payway</h3>
                       <p>
                         Al confirmar reservaremos tus productos durante 15 minutos.
-                        Luego podrás pagar con Mastercard en Payway Sandbox. Usá exclusivamente una tarjeta oficial de prueba.
+                        Después podrás pagar en Payway Sandbox con una tarjeta oficial de prueba.
                       </p>
                     </div>
                     {simulationCapability.enabled ? (
@@ -440,7 +450,7 @@ export default function CheckoutPage() {
                       onStartNewOrder={() => { const fresh = initialDraft(); setDraft(current => ({ ...current, requestId: fresh.requestId, accessToken: fresh.accessToken, pendingOrder: null })); setStep(0); }}
                       onUpdate={order => setDraft(current => ({ ...current, pendingOrder: { ...current.pendingOrder, ...order } }))}
                       onApproved={result => {
-                        setOrderResult({ ...result.order, paymentReference: result.gateway.reference });
+                        setOrderResult({ ...result.order, paymentReference: result.gateway.reference, accessToken: draft.accessToken });
                         clearCart();
                         window.localStorage.removeItem(DRAFT_KEY);
                         setDraft(initialDraft());

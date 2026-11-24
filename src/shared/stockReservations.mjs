@@ -1,17 +1,22 @@
-// A hold changes availability, never physical stock. Expiry is checked on read;
-// each backend mutation also compacts expired entries (Spark needs no TTL job).
+function expirationMillis(expiresAt) {
+  return typeof expiresAt?.toMillis === "function"
+    ? expiresAt.toMillis()
+    : new Date(expiresAt).valueOf();
+}
+
+// A hold changes availability. Each backend mutation also compacts expired entries.
 export function activeStockReservations(
   stock = {},
   now = new Date(),
   excludeOrderId = null,
 ) {
   return Object.fromEntries(
-    Object.entries(stock.ecommerceReservations || {}).filter(
+    Object.entries(stock?.ecommerceReservations || {}).filter(
       ([key, hold]) =>
         key !== excludeOrderId &&
         Number.isSafeInteger(hold?.quantity) &&
         hold.quantity > 0 &&
-        new Date(hold.expiresAt) > now,
+        expirationMillis(hold.expiresAt) > now,
     ),
   );
 }
@@ -24,6 +29,13 @@ export function reservedStockQuantity(
     activeStockReservations(stock, now, excludeOrderId),
   ).reduce((sum, hold) => sum + hold.quantity, 0);
 }
+export function availableStockAfterReservations(stock = {}, now = new Date(), excludeOrderId = null) {
+  const quantity = Number(stock?.currentStock ?? 0);
+  return Number.isSafeInteger(quantity)
+    ? Math.max(0, quantity - reservedStockQuantity(stock, now, excludeOrderId))
+    : 0;
+}
+
 export function reservationPatch(stock, orderId, hold, now) {
   const ecommerceReservations = activeStockReservations(stock, now, orderId);
   if (hold) ecommerceReservations[orderId] = hold;
@@ -32,11 +44,11 @@ export function reservationPatch(stock, orderId, hold, now) {
       new Error("Demasiadas reservas pendientes para este producto."),
       { code: "ecommerce-reservation-limit", status: 429 },
     );
+  const entries = Object.values(ecommerceReservations);
+  const latestExpiry = Math.max(0, ...entries.map((entry) => expirationMillis(entry.expiresAt)));
   return {
     ecommerceReservations,
-    reservedQuantity: Object.values(ecommerceReservations).reduce(
-      (sum, entry) => sum + entry.quantity,
-      0,
-    ),
+    reservedQuantity: entries.reduce((sum, entry) => sum + entry.quantity, 0),
+    ecommerceReservationsExpireAt: latestExpiry ? new Date(latestExpiry) : null,
   };
 }

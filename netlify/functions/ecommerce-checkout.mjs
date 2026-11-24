@@ -1,6 +1,8 @@
 import { createEcommerceOrder } from "./_lib/ecommerce/commerceService.mjs";
 import { publicEcommerceError } from "./_lib/ecommerce/publicError.mjs";
 import { publicCommerceBody, limitCommerceRequest } from "./_lib/ecommerce/publicRequests.mjs";
+import { validatePaywayInvoiceA } from "./_lib/ecommerce/paywayFiscalService.mjs";
+import { paywayConfig } from "./_lib/ecommerce/paywayGateway.mjs";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -17,7 +19,9 @@ export default async function handler(request, context = {}) {
   }
   try {
     const body = await publicCommerceBody(request);
+    if (body.billing?.requestedClass === "A") paywayConfig();
     await limitCommerceRequest(request, context);
+    await validatePaywayInvoiceA(body?.billing);
     const result = await createEcommerceOrder({ body, env: process.env });
     return json({
       ok: true,

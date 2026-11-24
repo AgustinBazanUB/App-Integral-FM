@@ -7,11 +7,17 @@ import {
   normalizeEcommerceRequestId,
 } from "./commerceDomain.mjs";
 import {
+  ALL_ACTIVE_STOCK,
+  SELECTED_STOCK,
   WEB_CHANNEL_ID,
   checkedOrigin,
+  isActiveStockOrigin,
   loadWebChannel,
+  originKey,
   originStockPath,
   resolveChannelOrigin,
+  resolveChannelOrigins,
+  webPricingStock,
 } from "./channelService.mjs";
 import {
   reservationPatch,
@@ -55,22 +61,25 @@ export async function configureWebChannel({
         `channels/${WEB_CHANNEL_ID}`,
       );
       const channel = body.channel || {};
-      const authorizedOrigins = (channel.authorizedOrigins || []).map(
-        checkedOrigin,
-      );
-      if (!authorizedOrigins.length || authorizedOrigins.length > 20)
+      const stockScope = channel.stockScope ?? SELECTED_STOCK;
+      if (![ALL_ACTIVE_STOCK, SELECTED_STOCK].includes(stockScope))
+        fail("Elegí cómo abastecer el stock del canal web.", 400);
+      const authorizedOrigins = [...new Map((channel.authorizedOrigins || [])
+        .map(checkedOrigin).map((row) => [originKey(row), row])).values()];
+      const excludedOrigins = [...new Map((channel.excludedOrigins || [])
+        .map(checkedOrigin).map((row) => [originKey(row), row])).values()];
+      if (stockScope === SELECTED_STOCK && (!authorizedOrigins.length || authorizedOrigins.length > 20))
         fail("Habilitá entre uno y veinte orígenes.", 400);
-      const candidate = { ...channel, authorizedOrigins };
+      const candidate = { ...channel, stockScope, authorizedOrigins, excludedOrigins };
       const origin = await resolveChannelOrigin(
         candidate,
         checkedOrigin(channel.defaultOrigin),
-        { env, getDocument: transaction.getDocument },
+        { env, getDocument: transaction.getDocument, now },
       );
-      for (const entry of authorizedOrigins)
-        await resolveChannelOrigin(candidate, entry, {
-          env,
-          getDocument: transaction.getDocument,
-        });
+      if (stockScope === SELECTED_STOCK)
+        await Promise.all(authorizedOrigins.map((entry) => resolveChannelOrigin(candidate, entry, {
+          env, getDocument: transaction.getDocument, now,
+        })));
       const pickup = {
         enabled: channel.pickup?.enabled === true,
         locationId: String(channel.pickup?.locationId || ""),
@@ -86,9 +95,8 @@ export async function configureWebChannel({
           await transaction.getDocument(`locations/${id(pickup.locationId)}`)
         )?.data;
         if (
-          !point ||
-          point.active === false ||
-          point.deleted === true ||
+          !isActiveStockOrigin("location", point, now) ||
+          (point.type || "store") !== "store" ||
           !pickup.address
         )
           fail("Elegí un punto de retiro real y su dirección.", 400);
@@ -152,7 +160,9 @@ export async function configureWebChannel({
         name: "Página web / E-commerce Flor Mía",
         type: "ecommerce",
         active: channel.active === true,
+        stockScope,
         authorizedOrigins,
+        excludedOrigins,
         defaultTransport,
         defaultOrigin: { type: origin.type, id: origin.id },
         authorizedUserIds,
@@ -236,10 +246,12 @@ export async function configureWebProduct({
     ]);
     const product = productSnapshot?.data;
     if (!product || product.deleted === true) fail("El producto no existe en el catálogo.", 404);
-    const originRefs = [channelSnapshot?.data?.defaultOrigin, ...(channelSnapshot?.data?.authorizedOrigins || [])].filter(Boolean);
-    const uniqueOriginRefs = [...new Map(originRefs.map((row) => [`${row.type}:${row.id}`, row])).values()];
-    const stockSnapshots = await Promise.all(uniqueOriginRefs.map((row) => transaction.getDocument(originStockPath(row, productId))));
-    const preferredStock = stockSnapshots.find((snapshot) => snapshot?.data && snapshot.data.active !== false && snapshot.data.deleted !== true && snapshot.data.productDeleted !== true)?.data || { id: productId, priceMode: "default" };
+    const channel = channelSnapshot?.data;
+    const origins = channel && channel.stockScope !== ALL_ACTIVE_STOCK
+      ? await resolveChannelOrigins(channel, { env, ...transaction, now })
+      : [];
+    const stockSnapshots = await Promise.all(origins.map((row) => transaction.getDocument(originStockPath(row, productId))));
+    const preferredStock = webPricingStock(channel, stockSnapshots.map((row) => row?.data));
     let effectiveWebPrice = priceOverride ?? Number(product.defaultPrice);
     try {
       effectiveWebPrice = authoritativeUnitPrice({ ...product, id: productId }, { ...preferredStock, id: productId }, { webPriceOverride: priceOverride });
@@ -253,8 +265,7 @@ export async function configureWebProduct({
       if (extra.length || !["location", "warehouse"].includes(type) || !/^[A-Za-z0-9_-]{1,150}$/.test(sourceId || "") || !Number.isSafeInteger(threshold) || threshold < 0 || threshold > 1000000)
         fail("Cada alerta debe corresponder a un local o depósito y usar un entero entre 0 y 1.000.000.", 400);
       const source = (await transaction.getDocument(`${type === "warehouse" ? "warehouses" : "locations"}/${sourceId}`))?.data;
-      if (!source || source.active === false || source.deleted === true || (type === "location" && (source.type || "store") !== "store"))
-        fail("Las alertas de stock sólo pueden configurarse para locales y depósitos activos.", 400);
+      if (!source || source.deleted === true) continue;
       cleanThresholds[`${type}:${sourceId}`] = threshold;
     }
     const path = `ecommerceProductSettings/${productId}`;
@@ -313,17 +324,20 @@ export async function configureWebPromotion({
       transaction.getDocument(`channels/${WEB_CHANNEL_ID}`),
     ]);
     if (!product?.data || product.data.deleted === true) fail("El producto no existe en el catálogo.", 404);
-    const originRefs = [channel?.data?.defaultOrigin, ...(channel?.data?.authorizedOrigins || [])].filter(Boolean);
-    const uniqueOriginRefs = [...new Map(originRefs.map((row) => [`${row.type}:${row.id}`, row])).values()];
-    const stockSnapshots = await Promise.all(uniqueOriginRefs.map((row) => transaction.getDocument(originStockPath(row, productId))));
-    const pricingStock = stockSnapshots.find((snapshot) => snapshot?.data && snapshot.data.active !== false && snapshot.data.deleted !== true && snapshot.data.productDeleted !== true)?.data || { id: productId, priceMode: "default" };
+    const origins = channel?.data
+      ? await resolveChannelOrigins(channel.data, { env, ...transaction, now })
+      : [];
+    const stockSnapshots = channel?.data?.stockScope === ALL_ACTIVE_STOCK
+      ? []
+      : await Promise.all(origins.map((row) => transaction.getDocument(originStockPath(row, productId))));
+    const pricingStock = webPricingStock(channel?.data, stockSnapshots.map((row) => row?.data));
     let basePrice = Number(productSettings?.data?.priceOverride ?? product.data.defaultPrice);
     try {
       basePrice = authoritativeUnitPrice({ ...product.data, id: productId }, { ...pricingStock, id: productId }, { webPriceOverride: productSettings?.data?.priceOverride });
     } catch {}
     if (active && (!Number.isSafeInteger(basePrice) || basePrice <= 0 || price >= basePrice))
       fail("El precio promocional debe ser menor que un precio web habitual válido.", 400);
-    if (!Array.isArray(channel?.data?.authorizedOrigins) || !channel.data.authorizedOrigins.length)
+    if (!origins.length)
       fail("Configurá primero los orígenes de stock del canal web.", 409);
     const path = `ecommercePromotions/${productId}`;
     const previous = await transaction.getDocument(path);
@@ -416,6 +430,7 @@ export async function manageWebOrder({
         const origin = await resolveChannelOrigin(channel, body.origin, {
           env,
           getDocument: transaction.getDocument,
+          now,
         });
         if (origin.id === oldOrigin.id && origin.type === oldOrigin.type)
           fail("El origen elegido ya está asignado.");

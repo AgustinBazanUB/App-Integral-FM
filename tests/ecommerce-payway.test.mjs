@@ -8,7 +8,9 @@ import { manageWebOrder } from "../netlify/functions/_lib/ecommerce/orderManagem
 import { processPaywayPayment } from "../netlify/functions/_lib/ecommerce/paywayService.mjs";
 import { paywayConfig, paywayPublicConfig, paywayAmount, verifiedPaywayReceipt } from "../netlify/functions/_lib/ecommerce/paywayGateway.mjs";
 import { summarizeSales } from "../src/modules/locations/domain/saleFacts.js";
-import { ensurePendingInvoice } from "../netlify/functions/_lib/arca/invoicePersistence.mjs";
+import { ensurePendingInvoice, syncInvoiceToSale } from "../netlify/functions/_lib/arca/invoicePersistence.mjs";
+import { prepareEcommerceInvoiceFiscal } from "../netlify/functions/_lib/ecommerce/fiscalService.mjs";
+import { requestPaywayInvoice, validatePaywayInvoiceA } from "../netlify/functions/_lib/ecommerce/paywayFiscalService.mjs";
 import { reservedStockQuantity } from "../src/shared/stockReservations.mjs";
 
 const env = { CONTEXT: "deploy-preview", FIREBASE_PROJECT_ID: "app-integral-fm-pruebas", VITE_FIREBASE_PROJECT_ID: "app-integral-fm-pruebas",
@@ -21,19 +23,26 @@ const body = { requestId: "payway_qa_order_0001", accessToken, items: [{ product
   deliveryMethod: "pickup", shipping: { method: "pickup" } };
 const receipt = (payload, patch = {}) => ({ ...payload, id: 12345, site_id: env.PAYWAY_SANDBOX_SITE_ID, currency: "ars", status: "approved", ...patch });
 const rows = (db, prefix) => [...db.documents].filter(([p])=>p.startsWith(prefix+"/") && p.split("/").length===2).map(([id,data])=>({id,...data}));
-async function setup() {
+async function setup(billing) {
   const db = memoryStore();
   db.documents.get("products/oil").arcaVatRate = 21;
   db.documents.set("channels/ecommerce", { active: true, defaultOrigin: { type: "location", id: "valle" }, authorizedOrigins: [{ type: "location", id: "valle" }],
     authorizedUserIds: [admin.id], pickup: { enabled: true, locationId: "valle", address: "Dirección QA ficticia", name: "Local QA" }, delivery: { enabled: false } });
-  const result = await db.runTransaction(tx => createEcommerceOrder({ body, env, now, ...tx }));
+  const result = await db.runTransaction(tx => createEcommerceOrder({ body: { ...body, billing }, env, now, ...tx }));
   const getDocument = async p => db.documents.has(p) ? { data: structuredClone(db.documents.get(p)) } : null;
   let charges = 0, payload;
   const gateway = { charge: async p => { charges++; payload = p; return receipt(p); }, find: async () => [{ id: 12345, site_transaction_id: payload.site_transaction_id }], info: async () => receipt(payload) };
   const confirm = args => db.runTransaction(tx => confirmEcommercePayment({ ...args, now, ...tx }));
   const request = { mode: "pay", orderId: result.order.id, accessToken, token: "synthetic_token_0000000001", bin: "516844", fingerprint: "synthetic_device_00000001", payerAddress: { street: "Calle QA 123", city: "CABA", provinceCode: "C", postalCode: "1000" } };
   const process = (overrides={}) => processPaywayPayment({ body: request, env, now, runTransaction: db.runTransaction, getDocument, gateway, confirm, clientIp: "192.0.2.1", ...overrides });
-  return { db, order: result.order, gateway, request, process, confirm, getDocument, charges:()=>charges, payload:()=>payload };
+  const createDocument = (collection, id, data) => {
+    const path = `${collection}/${id}`;
+    return db.runTransaction(tx => tx.commitDocuments([{ type: "create", path, data }])).then(() => getDocument(path));
+  };
+  const patchDocument = (path, data) =>
+    db.runTransaction(tx => tx.commitDocuments([{ type: "update", path, data }])).then(() => getDocument(path));
+  return { db, order: result.order, gateway, request, process, confirm, getDocument, createDocument, patchDocument,
+    charges:()=>charges, payload:()=>payload };
 }
 
 test("Payway aprobado convierte una reserva en una venta y logística; sandbox excluido de ingresos", async()=>{
@@ -128,3 +137,95 @@ test("venta sandbox bloqueada para preparación fiscal productiva",async()=>{
   const s=await setup();const r=await s.process();
   await assert.rejects(()=>ensurePendingInvoice({sourceType:"ecommerce",sourceId:r.order.saleId,env:{...env,ARCA_ENVIRONMENT:"production",ARCA_POINT_OF_SALE:"3",ARCA_ISSUER_CUIT:"20123456786"},getDocument:s.getDocument}),{code:"ecommerce-simulation-production-fiscal-denied"});
 });
+
+const billingA = {
+  mode: "fiscal",
+  requestedClass: "A",
+  cuit: "20123456786",
+  name: "Razón social ficticia",
+  address: "Calle de pruebas 100",
+};
+const fiscalEnv = {
+  ...env,
+  ARCA_ISSUER_VAT_CONDITION: "responsable_inscripto",
+  ARCA_ISSUER_CUIT: "20123456786",
+  ARCA_POINT_OF_SALE: "3",
+};
+
+test("Factura A valida la condición fiscal del CUIT antes de reservar o cobrar", async () => {
+  const props = {
+    env: fiscalEnv,
+    checkReadiness: () => {},
+    resolveReceiver: async ({ cuit }) => {
+      assert.equal(cuit, billingA.cuit);
+      return { vatConditionId: 1 };
+    },
+  };
+  await validatePaywayInvoiceA(billingA, props);
+  await assert.rejects(() => validatePaywayInvoiceA(billingA, {
+    ...props, resolveReceiver: async () => ({ vatConditionId: 5 }),
+  }), { code: "ecommerce-invoice-a-unavailable" });
+  await assert.rejects(() => validatePaywayInvoiceA(billingA, {
+    ...props, env: { ...fiscalEnv, CONTEXT: "production" },
+  }), { code: "payway-isolation-required" });
+});
+
+for (const [billing, voucherClass] of [[{ mode: "consumer_final" }, "B"], [billingA, "A"]]) {
+  test(`Payway Sandbox prepara Factura ${voucherClass} de la venta, verifica y reutiliza el comprobante`, async () => {
+    const s = await setup(billing);
+    const paid = await s.process();
+    const orderPath = `orders/${paid.order.id}`;
+    let authorizationCount = 0;
+    let verificationCount = 0;
+    const options = {
+      orderId: paid.order.id,
+      env: fiscalEnv,
+      checkReadiness: () => {},
+      getDocument: s.getDocument,
+      prepare: async (args) => {
+        const result = await prepareEcommerceInvoiceFiscal({
+          ...args,
+          now,
+          getDocument: s.getDocument,
+          patchDocument: s.patchDocument,
+          ensureInvoiceFn: (invoiceArgs) => ensurePendingInvoice({
+            ...invoiceArgs, createDocument: s.createDocument,
+          }),
+          getTaxpayerFn: async () => ({}),
+          inferReceiverFn: () => ({ resolved: true, condition: { id: 1 } }),
+        });
+        assert.equal(result.fiscal.voucherClass, voucherClass);
+        return result;
+      },
+      authorize: async ({ invoiceId, allowCaeRequest }) => {
+        authorizationCount++;
+        assert.equal(allowCaeRequest, true);
+        const path = `invoices/${invoiceId}`;
+        const invoice = s.db.documents.get(path);
+        assert.equal(invoice.fiscalEnvironment, "homologation");
+        assert.equal(invoice.receiverSnapshot.documentNumber, billing.cuit || "0");
+        await s.patchDocument(path, { status: "authorized" });
+        return { status: "authorized" };
+      },
+      verify: async ({ invoiceId }) => {
+        verificationCount++;
+        await s.patchDocument(`invoices/${invoiceId}`, { verification: { matched: true } });
+        return { matched: true };
+      },
+      sync: (args) => syncInvoiceToSale({
+        ...args, getDocument: s.getDocument, patchDocument: s.patchDocument, now,
+      }),
+    };
+    const issue = () => requestPaywayInvoice({ ...options, order: s.db.documents.get(orderPath) });
+    assert.deepEqual(await issue(), { invoiceStatus: "authorized", documentAvailable: true });
+    assert.deepEqual(await issue(), { invoiceStatus: "authorized", documentAvailable: true });
+    assert.equal(authorizationCount, 1);
+    assert.equal(verificationCount, 1);
+    assert.equal(s.charges(), 1);
+    assert.equal(rows(s.db, "sales").length, 1);
+    assert.equal(rows(s.db, "shipments").length, 1);
+    assert.equal(rows(s.db, "stockMovements").length, 1);
+    assert.equal(rows(s.db, "invoices").length, 1);
+    assert.equal(s.db.documents.get(orderPath).invoiceStatus, "authorized");
+  });
+}

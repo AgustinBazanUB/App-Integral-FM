@@ -10,7 +10,15 @@ import {
   manageWebOrder,
 } from "./_lib/ecommerce/orderManagement.mjs";
 import { publicEcommerceError } from "./_lib/ecommerce/publicError.mjs";
-import { originStockPath } from "./_lib/ecommerce/channelService.mjs";
+import {
+  channelIncludesOrigin,
+  isActiveWebStock,
+  originStockPath,
+  physicalStockOrigins,
+  resolveChannelOrigins,
+  stockCollectionPath,
+  webStockAvailability,
+} from "./_lib/ecommerce/channelService.mjs";
 import { reservedStockQuantity } from "../../src/shared/stockReservations.mjs";
 import { canAccessAdministration } from "../../src/gestion/permissions.js";
 import { processPaywayPayment } from "./_lib/ecommerce/paywayService.mjs";
@@ -42,30 +50,21 @@ export default async function handler(request) {
           adminListDocuments("ecommerceProductSettings"),
           adminListDocuments("ecommercePromotions"),
         ]);
-      const validLocations = locations.filter(
-        (row) => row.active !== false && row.deleted !== true && (row.type || "store") === "store",
-      );
-      const validWarehouses = warehouses.filter(
-        (row) => row.active !== false && row.deleted !== true,
-      );
-      const stockOrigins = [
-        ...validLocations.map((row) => ({ ...row, type: "location" })),
-        ...validWarehouses.map((row) => ({ ...row, type: "warehouse" })),
-      ];
+      const now = new Date();
+      const stockOrigins = physicalStockOrigins(locations, warehouses, now);
       const activeProducts = products
         .filter((row) => row.active !== false && row.deleted !== true)
         .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "es"));
       const stockRowsByOrigin = await Promise.all(stockOrigins.map(async (origin) => {
-        const path = `${origin.type === "warehouse" ? "warehouseStock" : "locationStock"}/${origin.id}/items`;
-        const rows = await adminListDocuments(path, { maxDocuments: 5000 });
+        const rows = await adminListDocuments(stockCollectionPath(origin), { maxDocuments: 5000 });
         return rows.map((row) => ({
           productId: row.id,
           type: origin.type,
           originId: origin.id,
           originName: origin.name || origin.id,
           currentStock: Number(row.currentStock) || 0,
-          reservedStock: reservedStockQuantity(row, new Date()),
-          active: row.active !== false && row.deleted !== true && row.productDeleted !== true,
+          reservedStock: reservedStockQuantity(row, now),
+          active: isActiveWebStock(row),
         }));
       }));
       const stockByProduct = {};
@@ -75,12 +74,8 @@ export default async function handler(request) {
       }
       result = {
         channel: channel?.data || null,
-        locations: locations.filter(
-          (row) => row.active !== false && row.deleted !== true,
-        ),
-        warehouses: warehouses.filter(
-          (row) => row.active !== false && row.deleted !== true,
-        ),
+        locations: stockOrigins.filter((row) => row.type === "location" && row.locationType === "store"),
+        warehouses: stockOrigins.filter((row) => row.type === "warehouse"),
         users: users
           .filter((row) => row.active === true && canAccessAdministration(row))
           .map((row) => ({ id: row.id, name: row.name })),
@@ -89,6 +84,9 @@ export default async function handler(request) {
         productSettings: Object.fromEntries(productSettings.map((row) => [row.productId || row.id, row])),
         promotions: Object.fromEntries(promotions.map((row) => [row.productId || row.id, row])),
         stockOrigins,
+        configuredStockOrigins: channel?.data
+          ? stockOrigins.filter((row) => channelIncludesOrigin(channel.data, row))
+          : [],
         stockByProduct,
         orders: orders.filter((row) => row.sourceType === "ecommerce"),
         sales: sales.filter((row) => row.sourceType === "ecommerce"),
@@ -105,16 +103,12 @@ export default async function handler(request) {
           { ok: false, message: "Pedido o canal no disponible." },
           409,
         );
+      const now = new Date();
+      const origins = await resolveChannelOrigins(channel, { now });
       result = await Promise.all(
-        channel.authorizedOrigins.map(async (origin) => {
-          const source = (
-            await adminGetDocument(
-              `${origin.type === "warehouse" ? "warehouses" : "locations"}/${origin.id}`,
-            )
-          )?.data;
+        origins.map(async (origin) => {
           return {
             ...origin,
-            name: source?.name || origin.id,
             availability: await Promise.all(
               order.items.map(async (item) => {
                 const stock = (
@@ -125,17 +119,7 @@ export default async function handler(request) {
                 return {
                   name: item.name,
                   required: item.quantity,
-                  available: stock
-                    ? Math.max(
-                        0,
-                        stock.currentStock -
-                          reservedStockQuantity(
-                            stock,
-                            new Date(),
-                            body.orderId,
-                          ),
-                      )
-                    : 0,
+                  available: webStockAvailability(stock, now, body.orderId),
                 };
               }),
             ),

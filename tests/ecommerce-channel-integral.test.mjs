@@ -34,6 +34,8 @@ import {
 import { localFirebaseEmulator } from "../netlify/functions/_lib/firebaseEmulator.mjs";
 import { adminListDocuments } from "../netlify/functions/_lib/firestoreAdminRest.mjs";
 import { reservedStockQuantity } from "../src/shared/stockReservations.mjs";
+import { buildOperationalSalePlan } from "../src/shared/operationalWritePlans.mjs";
+import { buildStockTransferWrites } from "../src/shared/stockTransferWritePlans.mjs";
 
 const env = {
   NODE_ENV: "test",
@@ -233,6 +235,77 @@ test("reservas serializadas impiden dos compras del último producto y replay no
     2,
   );
 });
+test("stock total usa orígenes físicos activos nuevos, descuenta cada origen una vez y enlaza sus movimientos al envío", async () => {
+  const db = setup();
+  db.documents.set("channels/ecommerce", {
+    ...channel,
+    stockScope: "all_active",
+    authorizedOrigins: [],
+    excludedOrigins: [{ type: "location", id: "other" }],
+  });
+  const shopPath = "locationStock/valle/items/oil";
+  const warehousePath = "warehouseStock/infal/items/oil";
+  const fairPath = "locationStock/feria/items/oil";
+  Object.assign(db.documents.get(shopPath), { currentStock: 1, priceMode: "custom", priceOverride: 1900 });
+  db.documents.get(warehousePath).currentStock = 1;
+  db.documents.set("locations/future", { name: "Próximo evento QA", type: "event", active: true, scheduleStartAt: "2026-10-17T13:00:00Z" });
+  db.documents.set("locationStock/future/items/oil", { currentStock: 100, active: true });
+  db.documents.set("warehouses/closed", { name: "Depósito inactivo QA", active: false });
+  db.documents.set("warehouseStock/closed/items/oil", { currentStock: 100, active: true });
+  const purchase = request("all_stock_0001", { items: [{ productId: "oil", quantity: 3 }] });
+
+  await assert.rejects(() => checkout(db, purchase), (error) => error.code === "ecommerce-stock-insufficient");
+  db.documents.set("locations/feria", { name: "Feria activa QA", type: "fair", active: true });
+  db.documents.set(fairPath, { currentStock: 1, active: true });
+  const { order } = await checkout(db, purchase);
+  assert.equal(order.total, 3500);
+  assert.equal(order.items[0].stockAllocations, undefined);
+  for (const path of [shopPath, warehousePath, fairPath]) {
+    const stock = db.documents.get(path);
+    assert.equal(stock.currentStock, 1);
+    assert.equal(stock.reservedQuantity, 1);
+    assert.equal(stock.ecommerceReservationsExpireAt.toISOString(), "2026-10-16T15:15:00.000Z");
+  }
+  const catalog = await loadEcommerceCatalog({ env, now, getDocument: db.getDocument, listDocuments: db.listDocuments });
+  assert.equal(catalog.products[0].stockState, "out");
+  assert.equal(catalog.products[0].stock, null);
+
+  await Promise.all([approve(db, order), approve(db, order)]);
+  for (const path of [shopPath, warehousePath, fairPath]) {
+    assert.equal(db.documents.get(path).currentStock, 0);
+    assert.equal(db.documents.get(path).ecommerceReservationsExpireAt, null);
+  }
+  assert.equal(db.documents.get("warehouses/closed").active, false);
+  assert.equal(db.documents.get("locationStock/other/items/oil").currentStock, 4);
+  assert.equal(rows(db, "sales").length, 1);
+  const movements = rows(db, "stockMovements");
+  assert.equal(movements.length, 3);
+  assert.deepEqual(movements.map((row) => row.inventoryId).sort(), ["feria", "infal", "valle"]);
+  assert.deepEqual(rows(db, "shipments")[0].stockMovementIds.sort(), movements.map((row) => row.id).sort());
+});
+
+test("Venta Rápida, vendedor y transferencias respetan la última unidad web con timestamps de Firestore", () => {
+  const expiresAt = { toMillis: () => +now + 60000 };
+  const stock = {
+    currentStock: 1, active: true, ecommerceReservations: { order: { quantity: 1, expiresAt } },
+  };
+  const product = { id: "oil", name: "Aceite QA", defaultPrice: 1000 };
+  const item = { productId: product.id, name: product.name, qty: 1 };
+  const plan = {
+    profile: admin, location: { id: "valle", name: "Local QA" }, items: [item],
+    stocks: [stock], saleId: "sale-qa", movementIds: ["movement-qa"],
+    dateKey: "2026-10-16", prefix: "QA", stamp: now,
+  };
+  assert.throws(() => buildOperationalSalePlan({ ...plan, quickSaleProducts: [product] }), /reservadas para pedidos web/);
+  assert.throws(() => buildOperationalSalePlan(plan), /reservadas para pedidos web/);
+  assert.throws(() => buildStockTransferWrites({
+    prepared: [{ originStock: stock, quantity: 1, product }],
+    origin: { id: "valle", name: "Local QA" }, destination: { id: "infal", name: "Depósito QA" },
+    profile: admin, transferId: "transfer-qa", stamp: now,
+  }), /reservadas para pedidos web/);
+  assert.equal(reservedStockQuantity(stock, new Date(+now + 60001)), 0);
+});
+
 test("confirmaciones concurrentes generan una venta, una salida y una tarea logística; simulación sin ingresos", async () => {
   const db = setup(),
     { order } = await checkout(db);

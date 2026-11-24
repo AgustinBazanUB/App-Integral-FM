@@ -1,5 +1,7 @@
 const CATALOG = Object.freeze({
   "ecommerce-receiver-cuit-invalid": { status: 400, message: "Ingresá un CUIT válido o dejalo vacío para Consumidor Final." },
+  "ecommerce-invoice-a-unavailable": { status: 409, message: "La condición fiscal de ese CUIT no admite Factura A." },
+  "ecommerce-arca-homologation-unavailable": { status: 503, message: "ARCA homologación todavía no está configurada para esta prueba." },
   "ecommerce-invoice-receiver-conflict": { status: 409, message: "El receptor no coincide con la factura existente." },
   "arca-sale-invoice-conflict": { status: 409, message: "La venta ya tiene una asociación fiscal diferente." },
   "ecommerce-location-not-configured": { status: 409, message: "La ubicación de stock Ecommerce está PENDIENTE DE DEFINIR." },

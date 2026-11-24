@@ -1,7 +1,7 @@
 import { adminGetDocument, adminPatchDocument } from "../firestoreAdminRest.mjs";
 import { arcaEnvironment } from "../arca/config.mjs";
 import { assertValidCuit } from "../arca/cuit.mjs";
-import { buildAuthorizationPlan } from "../arca/authorizationPlan.mjs";
+import { buildAuthorizationPlan, resolveVoucherType } from "../arca/authorizationPlan.mjs";
 import {
   ensurePendingInvoice,
   syncInvoiceToSale,
@@ -70,6 +70,17 @@ export async function resolveEcommerceReceiver({ cuit = "" } = {}, options = {})
   if (!/^\d{2}-?\d{8}-?\d$/.test(cuit.trim())) throw commerceError("ecommerce-receiver-cuit-invalid", "Ingresá un CUIT válido o dejalo vacío.", 400);
   const digits = cuit.replace(/\D/g, "");
   return receiverForCuit(digits, options);
+}
+
+export function assertRequestedInvoiceClass(billing, receiver, env = process.env) {
+  if (billing?.requestedClass !== "A") return;
+  const { voucherClass } = resolveVoucherType({
+    issuerVatCondition: env.ARCA_ISSUER_VAT_CONDITION,
+    receiverVatConditionId: receiver.vatConditionId,
+  });
+  if (voucherClass !== "A") {
+    throw commerceError("ecommerce-invoice-a-unavailable", "El CUIT ingresado no admite Factura A.", 409);
+  }
 }
 
 function assertProductionPrepareGate(env = process.env) {
@@ -157,6 +168,7 @@ export async function prepareEcommerceInvoiceFiscal({
     getTaxpayerFn,
     inferReceiverFn,
   });
+  assertRequestedInvoiceClass(order.billing, resolvedReceiver, env);
   const receiver = { ...resolvedReceiver, ...(order.channelId && order.billing?.mode === "fiscal" ? {name:order.billing.name,address:order.billing.address} : {}) };
 
   const invoiceResult = await ensureInvoiceFn({

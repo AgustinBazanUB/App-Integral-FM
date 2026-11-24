@@ -4,6 +4,8 @@ import { commerceError } from "./commerceDomain.mjs";
 import { confirmEcommercePayment } from "./paymentService.mjs";
 import { paywayConfig, paywayAmount, createPaywayGateway, verifiedPaywayReceipt, paywayRetailRisk } from "./paywayGateway.mjs";
 import { canAccessAdministration } from "../../../../src/gestion/permissions.js";
+import { loadWebChannel, originKey, originStockPath, resolveChannelOrigin, webStockAvailability } from "./channelService.mjs";
+import { reservationPatch } from "../../../../src/shared/stockReservations.mjs";
 
 function denied() { return commerceError("ecommerce-order-access-denied", "El acceso privado al pedido no es válido.", 403); }
 export function assertPaywayOrderAccess(order, body) {
@@ -53,15 +55,25 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
       // Check every held physical allocation again before a provider call. Extend
       // the same holds while a result is uncertain; cancellation is blocked too.
       const holdUntil = new Date(now.valueOf() + 24 * 60 * 60 * 1000);
+      const channel = await loadWebChannel({ env, getDocument: tx.getDocument });
+      if (!channel) throw commerceError("ecommerce-channel-inactive", "El canal web no está habilitado.", 409);
+      const origins = new Set();
       const stocks = new Map();
       for (const item of order.items) {
         for (const allocation of item.stockAllocations || []) {
-          const path = `${allocation.type === "warehouse" ? "warehouseStock" : "locationStock"}/${allocation.id}/items/${item.productId}`;
-          if (!stocks.has(path)) stocks.set(path, await tx.getDocument(path));
+          const key = originKey(allocation);
+          if (!origins.has(key)) {
+            await resolveChannelOrigin(channel, allocation, { env, getDocument: tx.getDocument, now });
+            origins.add(key);
+          }
+          const path = originStockPath(allocation, item.productId);
+          if (stocks.has(path))
+            throw commerceError("ecommerce-reservation-invalid", "La reserva contiene una asignación repetida.", 409);
+          stocks.set(path, await tx.getDocument(path));
           const stock = stocks.get(path)?.data;
           const hold = stock?.ecommerceReservations?.[body.orderId];
-          if (!stock || stock.active === false || stock.deleted || !hold || hold.quantity !== allocation.quantity
-              || new Date(hold.expiresAt) <= now || Number(stock.currentStock) < allocation.quantity)
+          if (!hold || !Number.isSafeInteger(allocation.quantity) || allocation.quantity <= 0 || hold.quantity !== allocation.quantity
+              || new Date(hold.expiresAt) <= now || webStockAvailability(stock, now, body.orderId) < allocation.quantity)
             throw commerceError("ecommerce-reservation-invalid", "La reserva de stock ya no está disponible.", 409);
         }
         if (!item.stockAllocations?.length) throw commerceError("ecommerce-reservation-invalid", "Falta la asignación física de stock.", 409);
@@ -69,9 +81,14 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
       attempt = { state: "submitted", environment: "sandbox", siteId: config.siteId,
         operationId: `fm_${createHash("sha256").update(body.orderId).digest("hex").slice(0,32)}`,
         amount: paywayAmount(order.total), currency: "ARS", paymentMethodId, submittedAt: now, reconciliationCount: 0 };
-      const operations = [...stocks].map(([path, stock]) => ({ type: "update", path, data: {
-        ecommerceReservations: { ...stock.data.ecommerceReservations, [body.orderId]: { ...stock.data.ecommerceReservations[body.orderId], expiresAt: holdUntil } },
-      } }));
+      const operations = [...stocks].map(([path, stock]) => ({
+        type: "update",
+        path,
+        data: reservationPatch(stock.data, body.orderId, {
+          ...stock.data.ecommerceReservations[body.orderId],
+          expiresAt: holdUntil,
+        }, now),
+      }));
       operations.push({ type: "update", path: `payments/${order.paymentId}`, data: { gateway: attempt, paymentEnvironment: "sandbox", testData: true, updatedAt: now } },
         { type: "update", path: `orders/${body.orderId}`, data: { reservationExpiresAt: holdUntil, paymentEnvironment: "sandbox", testData: true, updatedAt: now } });
       await tx.commitDocuments(operations);

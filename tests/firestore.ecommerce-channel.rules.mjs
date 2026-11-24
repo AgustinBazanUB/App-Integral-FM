@@ -44,6 +44,16 @@ before(async () => {
         },
         active: true,
       });
+    await setDoc(doc(db, "warehouseStock/qa/items/expired"), {
+      productId: "expired",
+      currentStock: 5,
+      reservedQuantity: 3,
+      ecommerceReservationsExpireAt: new Date(Date.now() - 60000),
+      ecommerceReservations: {
+        qa: { quantity: 3, expiresAt: new Date(Date.now() - 60000) },
+      },
+      active: true,
+    });
     await setDoc(doc(db, "channels/ecommerce"), { active: true });
     await setDoc(doc(db, "orders/private"), {
       sourceType: "ecommerce",
@@ -72,6 +82,13 @@ for (const role of ["admin", "seller"])
         ),
       ));
   }
+test("las reglas conservan los metadatos de reserva y permiten descontar una reserva ya vencida", async () => {
+  const db = environment.authenticatedContext("admin").firestore();
+  const active = doc(db, "warehouseStock/qa/items/oil");
+  await assertFails(updateDoc(active, { ecommerceReservationsExpireAt: new Date(0) }));
+  await assertFails(updateDoc(active, { active: false }));
+  await assertSucceeds(updateDoc(doc(db, "warehouseStock/qa/items/expired"), { currentStock: 2 }));
+});
 for (const role of ["admin", "seller"])
   for (const collection of [
     "channels",

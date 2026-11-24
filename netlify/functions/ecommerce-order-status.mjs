@@ -7,6 +7,8 @@ import {
 } from "./_lib/ecommerce/publicRequests.mjs";
 import { commerceError } from "./_lib/ecommerce/commerceDomain.mjs";
 import { buildInvoicePdf } from "./_lib/arca/invoicePdf.mjs";
+import { requestPaywayInvoice } from "./_lib/ecommerce/paywayFiscalService.mjs";
+import { paywayConfig } from "./_lib/ecommerce/paywayGateway.mjs";
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -20,6 +22,7 @@ export default async function handler(request, context = {}) {
   if (request.method !== "POST") return json({ ok: false }, 405);
   try {
     const body = await publicCommerceBody(request);
+    if (body.mode === "invoice") paywayConfig();
     await limitCommerceRequest(request, context);
     if (
       !/^ecommerce_order_[A-Za-z0-9_-]{8,96}$/.test(body.orderId || "") ||
@@ -42,6 +45,10 @@ export default async function handler(request, context = {}) {
         "El acceso al pedido no es válido.",
         403,
       );
+    if (body.mode === "invoice") {
+      const invoice = await requestPaywayInvoice({ orderId: body.orderId, order });
+      return json({ ok: true, invoice });
+    }
     const shipment = order.shipmentId
       ? (await adminGetDocument(`shipments/${order.shipmentId}`))?.data
       : null;

@@ -1,45 +1,12 @@
+import { Grape, HeartHandshake, Sprout, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  BadgeCheck,
-  Check,
-  CreditCard,
-  Droplets,
-  Gift,
-  Grape,
-  HeartHandshake,
-  Leaf,
-  MapPin,
-  PackageCheck,
-  Plus,
-  Sprout,
-  Truck,
-  UsersRound,
-} from "lucide-react";
 import { Link } from "../router";
-import { assetsManifest, getCategoryAsset } from "../data/assetsManifest";
+import { assetsManifest } from "../data/assetsManifest";
 import { brand } from "../data/brand";
-import { categories } from "../data/categories";
-import { oliveProfileById } from "../data/oliveProfiles";
-import { products } from "../data/products";
-import { useCommerceCatalog } from "../context/CommerceCatalogContext";
-import { promotions } from "../data/promotions";
-import { useCart } from "../context/CartContext";
+import OliveOilGuide from "../components/OliveOilGuide";
 import PageMeta from "../components/PageMeta";
-import ProductCard from "../components/ProductCard";
-
-const categoryIcons = {
-  olive_oil: Droplets,
-  nuts: Sprout,
-  olives: Grape,
-  jams: Leaf,
-  seasoned_salts: PackageCheck,
-  gifts: Gift,
-};
-
-const promotionIcons = {
-  truck: Truck,
-  "credit-card": CreditCard,
-};
+import PromoShowcase from "../components/PromoShowcase";
+import Reveal from "../components/Reveal";
 
 const storyValues = [
   { label: "Productos mendocinos", Icon: Grape },
@@ -57,29 +24,17 @@ const tableProducts = [
   [assetsManifest.products.malbecSalt, "fm-table-scene__salt"],
 ];
 
-const intensityOptions = [
-  {
-    value: "Suave",
-    label: "SUAVE",
-    Icon: Leaf,
-    profileIds: ["arbosana", "arbequina"],
-  },
-  {
-    value: "Intermedio",
-    label: "INTERMEDIO",
-    Icon: Sprout,
-    profileIds: ["blend", "picual"],
-  },
-  {
-    value: "Intenso",
-    label: "INTENSO",
-    Icon: Grape,
-    profileIds: ["coratina", "arauco"],
-  },
+const heroImages = [
+  "/images/flor-mia/hero-1.jpg",
+  "/images/flor-mia/hero-2.jpg",
+  "/images/flor-mia/hero-3.jpg",
 ];
 
-function ResponsiveStorefront({ className = "", story = false }) {
+function ResponsiveStorefront({ className = "", story = false, heroImage = null, priority = false }) {
   const asset = story ? assetsManifest.local.story : assetsManifest.local.hero;
+  const src = heroImage || asset.src;
+  const srcSet = heroImage ? null : asset.srcSet;
+  const sizes = heroImage ? null : asset.sizes;
 
   if (story) {
     return (
@@ -97,135 +52,30 @@ function ResponsiveStorefront({ className = "", story = false }) {
 
   return (
     <picture className={className}>
-      <source srcSet={asset.srcSet} sizes={asset.sizes} type="image/webp" />
+      {srcSet ? (
+        <source srcSet={srcSet} sizes={sizes} type="image/webp" />
+      ) : null}
       <img
-        src={asset.fallback}
+        src={src || asset.fallback}
         width={asset.width}
         height={asset.height}
         alt={asset.alt}
-        fetchpriority="high"
+        fetchpriority={priority ? "high" : undefined}
         decoding="async"
       />
     </picture>
   );
 }
 
-function CategoryArtwork({ category }) {
-  const asset = getCategoryAsset(category.id);
-
-  if (category.composition) {
-    return (
-      <span className="fm-category-card__gift-collage" aria-hidden="true">
-        {category.compositionImages.map((image) => (
-          <img
-            src={image.src}
-            width={image.width}
-            height={image.height}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            key={image.src}
-          />
-        ))}
-      </span>
-    );
-  }
-
-  return asset ? (
-    <img
-      src={asset.src}
-      width={asset.width}
-      height={asset.height}
-      alt={asset.alt}
-      loading="lazy"
-      decoding="async"
-    />
-  ) : (
-    <span className="fm-category-card__missing" aria-hidden="true" />
-  );
-}
-
-function OilProfileCard({ profile }) {
-  const { addItem } = useCart();
-  const { resolveProduct } = useCommerceCatalog();
-  const [feedbackVersion, setFeedbackVersion] = useState(0);
-  const product = resolveProduct(profile.productId);
-  const added = feedbackVersion > 0;
-  const unavailable = !product || product.commercialReady !== true || product.active === false;
-
-  useEffect(() => {
-    if (!feedbackVersion) return undefined;
-    const timeout = window.setTimeout(() => setFeedbackVersion(0), 1600);
-    return () => window.clearTimeout(timeout);
-  }, [feedbackVersion]);
-
-  const handleAdd = () => {
-    if (unavailable) return;
-    if (addItem(product)) {
-      setFeedbackVersion((current) => current + 1);
-    }
-  };
-
-  return (
-    <article className="fm-variety-card">
-      <img
-        src={profile.image}
-        alt={
-          profile.imageStatus === "verified-product"
-            ? `Botella real de aceite Flor Mía variedad ${profile.name}`
-            : `Fotografía editorial de aceites Flor Mía; imagen específica de ${profile.name} pendiente`
-        }
-        width="900"
-        height="1350"
-        loading="lazy"
-        decoding="async"
-      />
-      <div className="fm-variety-card__content">
-        <h3>{profile.name}</h3>
-        <p>{profile.descriptor ?? "Perfil por validar"}</p>
-        <button
-          className={`fm-variety-card__add${added ? " is-added" : ""}`}
-          type="button"
-          onClick={handleAdd}
-          disabled={unavailable}
-          aria-label={
-            unavailable
-              ? `${profile.name} no está disponible`
-              : added
-                ? `${profile.name} agregado al carrito`
-                : `Agregar ${profile.name} de 500 cc al carrito`
-          }
-        >
-          {added ? (
-            <Check size={15} aria-hidden="true" />
-          ) : (
-            <Plus size={15} aria-hidden="true" />
-          )}
-          {unavailable
-            ? "NO DISPONIBLE"
-            : added
-              ? "AGREGADO"
-              : "AGREGAR AL CARRITO"}
-        </button>
-        <span className="sr-only" aria-live="polite" aria-atomic="true">
-          {added ? `${profile.name} agregado al carrito.` : ""}
-        </span>
-      </div>
-    </article>
-  );
-}
-
 export default function HomePage() {
-  const [selectedIntensity, setSelectedIntensity] = useState("Suave");
-  const featuredProducts = products
-    .filter((product) => product.editorialFeatured)
-    .slice(0, 6);
-  const selectedOption =
-    intensityOptions.find((option) => option.value === selectedIntensity) ??
-    intensityOptions[0];
-  const selectedProfiles = selectedOption.profileIds
-    .map((profileId) => oliveProfileById[profileId])
-    .filter(Boolean);
+  const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+    const interval = setInterval(() => {
+      setCurrentHeroIndex((prev) => (prev + 1) % heroImages.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleOilGuideScroll = () => {
     const oilGuide = document.getElementById("guia-aceites");
@@ -237,6 +87,10 @@ export default function HomePage() {
       behavior: prefersReducedMotion ? "auto" : "smooth",
       block: "start",
     });
+  };
+
+  const heroTrackStyle = {
+    transform: `translateX(-${currentHeroIndex * (100 / heroImages.length)}%)`,
   };
 
   const structuredData = {
@@ -279,7 +133,18 @@ export default function HomePage() {
 
       <main id="main-content" className="fm-home">
         <section className="fm-hero" aria-labelledby="hero-title">
-          <ResponsiveStorefront className="fm-hero__media" />
+          <div className="fm-hero__media">
+            <div className="fm-hero__track" style={heroTrackStyle}>
+              {heroImages.map((image, index) => (
+                <ResponsiveStorefront
+                  key={image}
+                  className="fm-hero__slide"
+                  heroImage={image}
+                  priority={index === 0}
+                />
+              ))}
+            </div>
+          </div>
           <div className="fm-hero__shade" aria-hidden="true" />
           <div className="fm-page fm-hero__inner">
             <div className="fm-hero__copy">
@@ -308,174 +173,12 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="fm-promotions" aria-labelledby="promotions-title">
-          <h2 className="sr-only" id="promotions-title">
-            Promociones vigentes
-          </h2>
-          <div className="fm-page fm-promotions__frame">
-            {promotions.map(({ id, icon, title, subtitle }) => {
-              const Icon = promotionIcons[icon];
-              return (
-                <article className="fm-promotion" key={id}>
-                  <Icon aria-hidden="true" strokeWidth={1.35} />
-                  <div>
-                    <h3>{title}</h3>
-                    <p>{subtitle}</p>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
+        <PromoShowcase />
 
-        <section
-          className="fm-categories"
-          id="categorias"
-          aria-labelledby="categories-title"
-        >
-          <div className="fm-page">
-            <div className="fm-rule-heading">
-              <span aria-hidden="true" />
-              <h2 id="categories-title">DESCUBRÍ NUESTRAS CATEGORÍAS</h2>
-              <span aria-hidden="true" />
-            </div>
-            <div className="fm-category-grid">
-              {categories.map((category) => {
-                const Icon = categoryIcons[category.id] ?? Leaf;
-                return (
-                  <Link
-                    className="fm-category-card"
-                    to={`/productos?categoria=${category.id}`}
-                    key={category.id}
-                  >
-                    <span className="fm-category-card__media">
-                      <CategoryArtwork category={category} />
-                    </span>
-                    <span className="fm-category-card__icon">
-                      <Icon size={20} strokeWidth={1.4} aria-hidden="true" />
-                    </span>
-                    <span className="fm-category-card__label">
-                      {category.name}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </section>
+        <OliveOilGuide />
 
-        <section
-          className="fm-featured"
-          id="destacados"
-          aria-labelledby="featured-title"
-        >
-          <div className="fm-page">
-            <div className="fm-rule-heading fm-rule-heading--dark">
-              <span aria-hidden="true" />
-              <h2 id="featured-title">PRODUCTOS DESTACADOS</h2>
-              <span aria-hidden="true" />
-            </div>
-            <div className="fm-featured-grid">
-              {featuredProducts.map((product) => (
-                <ProductCard product={product} compact key={product.id} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section
-          className="fm-oil-guide"
-          id="guia-aceites"
-          aria-labelledby="oil-guide-title"
-        >
-          <div className="fm-page fm-oil-guide__layout">
-            <div className="fm-oil-guide__intro">
-              <img
-                className="fm-oil-guide__decor"
-                src={assetsManifest.products.oliveOilTrio500cc.src}
-                width={assetsManifest.products.oliveOilTrio500cc.width}
-                height={assetsManifest.products.oliveOilTrio500cc.height}
-                alt=""
-                loading="lazy"
-                decoding="async"
-              />
-              <div className="fm-oil-guide__copy">
-                <p className="fm-kicker">ACEITES DE OLIVA SELECCIONADOS</p>
-                <h2 id="oil-guide-title">
-                  Elegí el oliva ideal para cada ocasión.
-                </h2>
-                <p>
-                  Descubrí nuestras variedades y encontrá el perfil ideal para
-                  cada momento.
-                </p>
-                <Link
-                  className="fm-button fm-button--gold"
-                  to="/productos?categoria=olive_oil"
-                >
-                  VER TODOS LOS ACEITES
-                </Link>
-              </div>
-            </div>
-
-            <div className="fm-oil-guide__selector">
-              <div className="fm-guide-title">
-                <span>GUÍA DE INTENSIDAD</span>
-                <i aria-hidden="true" />
-              </div>
-              <div
-                className="fm-intensity"
-                role="group"
-                aria-label="Filtrar aceites por intensidad"
-              >
-                {intensityOptions.map(({ value, label, Icon }) => {
-                  const isActive = selectedIntensity === value;
-                  return (
-                    <button
-                      className={`fm-intensity__button${isActive ? " is-active" : ""}`}
-                      type="button"
-                      aria-pressed={isActive}
-                      onClick={() => setSelectedIntensity(value)}
-                      key={value}
-                    >
-                      <span className="fm-intensity__label">
-                        <Icon size={16} aria-hidden="true" />
-                        {label}
-                      </span>
-                      {isActive ? (
-                        <Check
-                          className="fm-intensity__selected-icon"
-                          size={14}
-                          aria-hidden="true"
-                        />
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="sr-only" aria-live="polite" aria-atomic="true">
-                Mostrando aceites de intensidad {selectedIntensity}.
-              </p>
-              <div className="fm-variety-grid">
-                {selectedProfiles.map((profile) => (
-                  <OilProfileCard profile={profile} key={profile.id} />
-                ))}
-              </div>
-              <ul className="fm-guide-badges" aria-label="Características">
-                <li>
-                  <PackageCheck size={19} aria-hidden="true" /> Productos reales
-                </li>
-                <li>
-                  <BadgeCheck size={19} aria-hidden="true" /> Perfiles editables
-                </li>
-                <li>
-                  <MapPin size={19} aria-hidden="true" /> Selección mendocina
-                </li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <section
+        <Reveal
+          as="section"
           className="fm-table"
           id="mesa-mendocina"
           aria-labelledby="table-title"
@@ -517,9 +220,10 @@ export default function HomePage() {
               </span>
             </div>
           </div>
-        </section>
+        </Reveal>
 
-        <section
+        <Reveal
+          as="section"
           className="fm-story"
           id="historia"
           aria-labelledby="story-title"
@@ -543,7 +247,7 @@ export default function HomePage() {
               </ul>
             </div>
           </div>
-        </section>
+        </Reveal>
       </main>
     </>
   );

@@ -1,12 +1,13 @@
 import {
   loadWebChannel,
+  originKey,
   resolveChannelOrigin,
+  resolveChannelOrigins,
   originStockPath,
+  webPricingStock,
+  webStockAvailability,
 } from "./channelService.mjs";
-import {
-  reservationPatch,
-  reservedStockQuantity,
-} from "../../../../src/shared/stockReservations.mjs";
+import { reservationPatch } from "../../../../src/shared/stockReservations.mjs";
 import { preparePaidEcommerceFulfillment } from "../shipping.mjs";
 import { prepareCommerceCustomer } from "./customerLink.mjs";
 import {
@@ -40,12 +41,17 @@ async function loadAuthoritativeInputs({
   now,
   env,
   getDocument,
+  listDocuments,
 }) {
   const uniqueProductIds = [
     ...new Set(requestedItems.map((item) => item.productId)),
   ];
   const physicalStocksByPath = {};
   const allocationsByProduct = {};
+  const configuredSources = channel
+    ? await resolveChannelOrigins(channel, { env, getDocument, listDocuments, now })
+    : [origin];
+  const configuredSourceKeys = new Set(configuredSources.map(originKey));
   const entries = await Promise.all(uniqueProductIds.map(async (productId) => {
     const productSnapshot = await getDocument(`products/${productId}`, { env });
     const settingSnapshot = channel
@@ -58,40 +64,28 @@ async function loadAuthoritativeInputs({
     const allocationRows = Array.isArray(item?.stockAllocations) && item.stockAllocations.length
       ? item.stockAllocations
       : [{ type: origin?.type || "location", id: origin?.id || locationId, name: origin?.name || "", quantity: item?.quantity || 0 }];
-    if (allocationRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0) !== Number(item?.quantity || 0))
+    if (
+      allocationRows.some((row) => !Number.isSafeInteger(row.quantity) || row.quantity <= 0)
+      || new Set(allocationRows.map(originKey)).size !== allocationRows.length
+      || allocationRows.reduce((sum, row) => sum + row.quantity, 0) !== Number(item?.quantity || 0)
+    )
       throw commerceError("ecommerce-reservation-invalid", "La distribución de stock del pedido no coincide con sus cantidades.", 409);
-    const sourceRefs = channel?.authorizedOrigins?.length
-      ? channel.authorizedOrigins
-      : [{ type: origin?.type || "location", id: origin?.id || locationId, name: origin?.name || "" }];
-    const configuredSourceKeys = new Set(sourceRefs.map((row) => `${row.type}:${row.id}`));
-    if (allocationRows.some((row) => !configuredSourceKeys.has(`${row.type}:${row.id}`)))
+    if (allocationRows.some((row) => !configuredSourceKeys.has(originKey(row))))
       throw commerceError("ecommerce-origin-not-authorized", "El pedido conserva una reserva en un origen que ya no está habilitado.", 409);
-    const sourceRows = [];
-    for (const sourceRef of sourceRefs) {
-      const source = channel
-        ? await resolveChannelOrigin(channel, sourceRef, { env, getDocument })
-        : { type: sourceRef.type, id: sourceRef.id, name: sourceRef.name || origin?.name || "Ecommerce" };
+    const sourceRows = await Promise.all(configuredSources.map(async (source) => {
       const path = originStockPath(source, productId);
       const snapshot = await getDocument(path, { env });
       const stock = snapshot?.data || null;
-      const available = stock && stock.active !== false && stock.deleted !== true && stock.productDeleted !== true
-        ? Math.max(0, Number(stock.currentStock || 0) - reservedStockQuantity(stock, now, orderId))
-        : 0;
-      if (snapshot) physicalStocksByPath[path] = { snapshot, origin: source, productId };
-      sourceRows.push({ origin: source, stock, snapshot, available, path });
-    }
-    const distinctSources = new Map();
-    for (const allocation of allocationRows) {
-      const key = `${allocation.type}:${allocation.id}`;
-      distinctSources.set(key, allocation);
-    }
-    allocationsByProduct[productId] = [...distinctSources.values()];
-    const pricingRow = sourceRows.find((row) => row.origin?.id === origin?.id && row.origin?.type === origin?.type && row.stock && row.stock.active !== false && row.stock.deleted !== true && row.stock.productDeleted !== true)
-      || sourceRows.find((row) => row.stock && row.stock.active !== false && row.stock.deleted !== true)
-      || null;
+      const available = webStockAvailability(stock, now, orderId);
+      if (snapshot) physicalStocksByPath[path] = { snapshot, available };
+      return { stock, available, preferred: originKey(source) === originKey(origin) };
+    }));
+    allocationsByProduct[productId] = allocationRows;
+    const preferred = sourceRows.find((row) => row.preferred);
+    const pricingStock = webPricingStock(channel, [preferred?.stock, ...sourceRows.map((row) => row.stock)]);
     const floor = Math.max(0, Number(settingSnapshot?.data?.minimumRemainingStock) || 0);
     const aggregateStock = {
-      ...(pricingRow?.stock || { priceMode: "default" }),
+      ...pricingStock,
       id: productId,
       currentStock: Math.max(0, sourceRows.reduce((sum, row) => sum + row.available, 0) - floor),
     };
@@ -373,7 +367,7 @@ export async function confirmEcommercePayment({
       ? await resolveChannelOrigin(
           channel,
           { type: order.stockOriginType, id: order.stockOriginId },
-          { env, getDocument },
+          { env, getDocument, now: timestamp },
         )
       : { type: "location", id: order.locationId, name: order.locationName };
     if (channel && confirmation.simulated) {
@@ -442,6 +436,7 @@ export async function confirmEcommercePayment({
       now: timestamp,
       env,
       getDocument,
+      listDocuments,
     });
     const prepared = prepareAuthoritativeCheckout({
       requestedItems,
@@ -459,19 +454,21 @@ export async function confirmEcommercePayment({
       for (const item of prepared.items) {
         for (const allocation of allocationsByProduct[item.productId] || []) {
           const path = originStockPath(allocation, item.productId);
-          const stock = physicalStocksByPath[path]?.snapshot?.data;
+          const physical = physicalStocksByPath[path];
+          const stock = physical?.snapshot?.data;
           const hold = stock?.ecommerceReservations?.[safeOrderId];
           const expected = Number(allocation.quantity);
-        if (
-          !hold ||
-          hold.quantity !== expected ||
-          new Date(hold.expiresAt) <= timestamp
-        )
-          throw commerceError(
-            "ecommerce-reservation-invalid",
-            "La reserva de stock del pedido no está vigente.",
-            409,
-          );
+          if (
+            !hold ||
+            hold.quantity !== expected ||
+            new Date(hold.expiresAt) <= timestamp ||
+            physical.available < expected
+          )
+            throw commerceError(
+              "ecommerce-reservation-invalid",
+              "La reserva de stock del pedido no está vigente.",
+              409,
+            );
         }
       }
     }
@@ -594,6 +591,10 @@ export async function confirmEcommercePayment({
           .digest("hex")
           .slice(0, 20);
         const movementId = `ecommerce_${stableKey}_${safeProductId}_${safeSourceId}`;
+        if (fulfillment) {
+          const shipment = fulfillment.operations.find((operation) => operation.path === `shipments/${fulfillment.shipmentId}`);
+          shipment.data.stockMovementIds.push(movementId);
+        }
         operations.push({
           type: "update",
           path,

@@ -1,14 +1,38 @@
-import { adminGetDocument } from "../firestoreAdminRest.mjs";
+import { adminGetDocument, adminListDocuments } from "../firestoreAdminRest.mjs";
 import { commerceError } from "./commerceDomain.mjs";
 import { assertValidCuit } from "../arca/cuit.mjs";
+import { isLocationActiveNow } from "../../../../src/modules/locations/domain/locations.js";
+import { availableStockAfterReservations } from "../../../../src/shared/stockReservations.mjs";
 import {
   isValidCustomerPhone,
   normalizeCustomerPhone,
 } from "../../../../src/gestion/customers/customerDomain.js";
 
 export const WEB_CHANNEL_ID = "ecommerce";
+export const ALL_ACTIVE_STOCK = "all_active";
+export const SELECTED_STOCK = "selected";
+export const originKey = (origin) => origin && `${origin.type}:${origin.id}`;
+export const originDocumentPath = (origin) =>
+  `${origin.type === "warehouse" ? "warehouses" : "locations"}/${origin.id}`;
 export const originStockPath = (origin, productId) =>
   `${origin.type === "warehouse" ? "warehouseStock" : "locationStock"}/${origin.id}/items/${productId}`;
+export const stockCollectionPath = (origin) =>
+  `${origin.type === "warehouse" ? "warehouseStock" : "locationStock"}/${origin.id}/items`;
+
+export function isActiveWebStock(stock) {
+  return Boolean(stock && stock.active !== false && stock.deleted !== true && stock.productDeleted !== true);
+}
+
+export function webStockAvailability(stock, now, excludeOrderId) {
+  return isActiveWebStock(stock) ? availableStockAfterReservations(stock, now, excludeOrderId) : 0;
+}
+
+export function webPricingStock(channel, stocks) {
+  // An automatic stock pool may change without changing the price of a product.
+  return channel?.stockScope === ALL_ACTIVE_STOCK
+    ? { priceMode: "default" }
+    : stocks.find(isActiveWebStock) || { priceMode: "default" };
+}
 const clean = (value, max = 150) =>
   String(value || "")
     .trim()
@@ -25,6 +49,35 @@ export function checkedOrigin(value = {}) {
       400,
     );
   return origin;
+}
+
+export function isActiveStockOrigin(type, source, now = new Date()) {
+  if (!source || source.deleted === true) return false;
+  return type === "warehouse" ? source.active !== false : isLocationActiveNow(source, now);
+}
+
+export function physicalStockOrigins(locations, warehouses, now = new Date()) {
+  return [
+    ...locations.filter((row) => isActiveStockOrigin("location", row, now))
+      .map((row) => ({ ...row, type: "location", locationType: row.type || "store" })),
+    ...warehouses.filter((row) => isActiveStockOrigin("warehouse", row, now))
+      .map((row) => ({ ...row, type: "warehouse" })),
+  ];
+}
+
+export function channelIncludesOrigin(channel, origin) {
+  const key = originKey(origin);
+  return channel.stockScope === ALL_ACTIVE_STOCK
+    ? !(channel.excludedOrigins || []).some((row) => originKey(row) === key)
+    : (channel.authorizedOrigins || []).some((row) => originKey(row) === key);
+}
+
+function namedOrigin(origin, source) {
+  return {
+    ...origin,
+    name: source.name || origin.id,
+    address: source.address || "",
+  };
 }
 export async function loadWebChannel({
   env = process.env,
@@ -44,45 +97,49 @@ export async function loadWebChannel({
 export async function resolveChannelOrigin(
   channel,
   requested,
-  { env = process.env, getDocument = adminGetDocument } = {},
+  { env = process.env, getDocument = adminGetDocument, now = new Date() } = {},
 ) {
   const origin = checkedOrigin(requested || channel.defaultOrigin);
-  if (
-    !(channel.authorizedOrigins || []).some(
-      (entry) => entry.id === origin.id && entry.type === origin.type,
-    )
-  )
+  if (!channelIncludesOrigin(channel, origin))
     throw commerceError(
       "ecommerce-origin-not-authorized",
       "El origen no está autorizado para este canal.",
       403,
     );
-  const snapshot = await getDocument(
-    `${origin.type === "warehouse" ? "warehouses" : "locations"}/${origin.id}`,
-    { env },
-  );
-  if (
-    !snapshot?.data ||
-    snapshot.data.active === false ||
-    snapshot.data.deleted === true
-  )
+  const snapshot = await getDocument(originDocumentPath(origin), { env });
+  if (!isActiveStockOrigin(origin.type, snapshot?.data, now))
     throw commerceError(
       "ecommerce-location-unavailable",
       "El origen físico no está disponible.",
       409,
     );
-  if (origin.type === "location" && (snapshot.data.type || "store") !== "store") {
-    throw commerceError(
-      "ecommerce-location-type-not-allowed",
-      "La página web sólo puede tomar stock de locales activos. Las ferias y eventos quedan excluidos.",
-      409,
-    );
+  return namedOrigin(origin, snapshot.data);
+}
+
+export async function resolveChannelOrigins(channel, {
+  env = process.env, getDocument = adminGetDocument, listDocuments = adminListDocuments, now = new Date(),
+} = {}) {
+  let origins;
+  if (channel.stockScope === ALL_ACTIVE_STOCK) {
+    const [locations, warehouses] = await Promise.all([
+      listDocuments("locations", { env }),
+      listDocuments("warehouses", { env }),
+    ]);
+    origins = physicalStockOrigins(locations, warehouses, now)
+      .map((row) => namedOrigin(checkedOrigin(row), row))
+      .filter((row) => channelIncludesOrigin(channel, row));
+  } else {
+    const selected = [...new Map((channel.authorizedOrigins || []).map((row) => [originKey(row), row])).values()];
+    origins = (await Promise.all(selected.map(async (row) => {
+      const origin = checkedOrigin(row);
+      const source = (await getDocument(originDocumentPath(origin), { env }))?.data;
+      return isActiveStockOrigin(origin.type, source, now) ? namedOrigin(origin, source) : null;
+    }))).filter(Boolean);
   }
-  return {
-    ...origin,
-    name: snapshot.data.name,
-    address: snapshot.data.address || "",
-  };
+  const priority = originKey(channel.defaultOrigin);
+  return origins.sort((left, right) =>
+    Number(originKey(right) === priority) - Number(originKey(left) === priority)
+    || originKey(left).localeCompare(originKey(right)));
 }
 export function normalizeBilling(raw = {}) {
   if (!raw.mode || raw.mode === "consumer_final")
@@ -98,6 +155,7 @@ export function normalizeBilling(raw = {}) {
   return {
     mode: "fiscal",
     cuit, name, address,
+    ...(raw.requestedClass === "A" ? { requestedClass: "A" } : {}),
   };
 }
 export function channelShipping(raw = {}, channel) {

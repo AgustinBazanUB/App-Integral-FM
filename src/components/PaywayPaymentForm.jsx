@@ -99,11 +99,12 @@ export default function PaywayPaymentForm({ order, accessToken, onApproved, onUp
   const state = result?.gateway?.state;
   const canPay = checked && state === "ready" && sdkReady;
   const finalFailure = ["rejected", "cancelled"].includes(result?.order?.paymentStatus);
-  return <section className="payway-payment" aria-busy={busy}>
-    <p className="eyebrow">PAYWAY SANDBOX · ENTORNO DE PRUEBAS</p>
-    <h3>Pagar con Payway</h3>
-    <p>Pedido: <strong>{order.id}</strong></p>
-    <p>Esta compra usa dinero y stock de prueba. No se emitirá una factura fiscal productiva.</p>
+  return <section className="payway-payment" aria-busy={busy} aria-labelledby="payway-payment-title">
+    <div>
+      <p className="eyebrow">ENTORNO DE PRUEBA</p>
+      <h3 id="payway-payment-title">Pagar con Payway</h3>
+    </div>
+    <p className="payway-payment__note">Usá únicamente los datos de tarjeta provistos por Payway Sandbox.</p>
     <dl className="payway-totals">
       <div><dt>Productos</dt><dd>{money(order.subtotal)}</dd></div>
       <div><dt>Descuentos</dt><dd>{money(order.discountTotal)}</dd></div>

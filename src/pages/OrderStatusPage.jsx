@@ -4,6 +4,7 @@ import { Link } from "../router";
 import { SHIPPING_STATES } from "../shared/shippingDomain.mjs";
 import { ecommercePublicEndpoint } from "../services/ecommercePublicEndpoint";
 import PaywayPaymentForm from "../components/PaywayPaymentForm";
+import PaywayInvoiceAction from "../components/PaywayInvoiceAction";
 export default function OrderStatusPage() {
   const [access, setAccess] = useState(() => {
       try {
@@ -139,7 +140,10 @@ export default function OrderStatusPage() {
                 Código de retiro: <strong>{order.pickupCode}</strong>
               </p>
             )}
-            <p>Comprobante: {order.invoiceStatus}</p>
+            {order.paymentStatus === "approved" && order.paymentEnvironment === "sandbox" ? (
+              <PaywayInvoiceAction order={order} accessToken={access.accessToken}
+                onUpdate={invoice => setOrder(current => ({ ...current, ...invoice }))} />
+            ) : <p>Comprobante: {order.invoiceStatus}</p>}
             {order.documentAvailable && (
               <button
                 className="button button--gold"

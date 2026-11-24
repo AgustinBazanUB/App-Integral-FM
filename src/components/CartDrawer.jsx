@@ -5,14 +5,7 @@ import { categoryById } from "../data/categories";
 import { useCart } from "../context/CartContext";
 import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import { useFocusTrap } from "../hooks/useFocusTrap";
-
-function formatPrice(value) {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0));
-}
+import { formatPrice } from "../utils/format";
 
 export default function CartDrawer() {
   const {
@@ -64,7 +57,7 @@ export default function CartDrawer() {
       <aside className="cart-drawer">
         <header className="cart-drawer__header">
           <div>
-            <p className="eyebrow">TU CARRITO</p>
+            <p className="eyebrow">TU SELECCIÓN</p>
             <h2>Carrito <span>({unitCount})</span></h2>
           </div>
           <button
@@ -147,7 +140,7 @@ export default function CartDrawer() {
               {hasUnavailableItems ? (
                 <p>Hay productos que cambiaron de disponibilidad. Revisalos antes de continuar.</p>
               ) : (
-                <p>El backend vuelve a validar precio, stock y total antes de crear el pedido.</p>
+                <p>El costo de envío y el total se confirman al armar el pedido.</p>
               )}
               <Link
                 className="button button--gold button--block"

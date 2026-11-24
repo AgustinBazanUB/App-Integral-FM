@@ -6,18 +6,23 @@ import {
   useMemo,
   useState,
 } from "react";
-import { products as editorialProducts } from "../data/products";
+import { giftOccasions, products as editorialProducts } from "../data/products";
 import { fetchEcommerceCatalog } from "../services/ecommerceService";
 
 const CommerceCatalogContext = createContext(null);
 const editorialById = Object.fromEntries(editorialProducts.map((product) => [product.id, product]));
 const editorialBySlug = Object.fromEntries(editorialProducts.map((product) => [product.slug, product]));
+const editorialIdByLegacySlug = {
+  "almendras-naturales-500g": "nuts-almonds",
+  "pistachos-con-cascara-400g": "nuts-pistachios",
+};
 
 function mergeEditorial(commercial) {
   const editorial =
     (commercial.editorialId && editorialById[commercial.editorialId])
     || editorialById[commercial.id]
     || editorialBySlug[commercial.slug]
+    || editorialById[editorialIdByLegacySlug[commercial.slug]]
     || null;
 
   return {
@@ -27,7 +32,9 @@ function mergeEditorial(commercial) {
     image: editorial?.image || commercial.image || commercial.thumb || "",
     imageAlt: editorial?.imageAlt || commercial.name,
     description: editorial?.description || commercial.description || "",
-    formats: editorial?.formats?.length ? editorial.formats : [commercial.abbreviation].filter(Boolean),
+    formats: commercial.abbreviation
+      ? [commercial.abbreviation]
+      : (editorial?.formats?.slice(0, 1) || []),
     attributes: editorial?.attributes || {},
     tags: editorial?.tags || [],
     uses: editorial?.uses || [],
@@ -89,6 +96,19 @@ export function CommerceCatalogProvider({ children }) {
     [products],
   );
 
+  const browseProducts = useMemo(
+    () => [
+      ...products,
+      ...editorialProducts.filter((product) => !byEditorialId[product.id]),
+    ],
+    [byEditorialId, products],
+  );
+
+  const resolveDisplayProduct = useCallback((slug) => {
+    const editorial = editorialBySlug[slug] || editorialById[editorialIdByLegacySlug[slug]];
+    return bySlug[slug] || byEditorialId[editorial?.id] || editorial || null;
+  }, [byEditorialId, bySlug]);
+
   const resolveProduct = useCallback(
     (candidate) => {
       if (!candidate) return null;
@@ -118,20 +138,25 @@ export function CommerceCatalogProvider({ children }) {
       paymentProvider: "pending_payway",
     },
     products,
+    browseProducts,
+    giftOccasions,
     byId,
     bySlug,
     byEditorialId,
     resolveProduct,
+    resolveDisplayProduct,
     refresh,
   }), [
     state.status,
     state.error,
     state.catalog,
     products,
+    browseProducts,
     byId,
     bySlug,
     byEditorialId,
     resolveProduct,
+    resolveDisplayProduct,
     refresh,
   ]);
 
