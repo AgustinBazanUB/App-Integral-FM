@@ -153,7 +153,7 @@ export function paywayRetailRisk(order, { payerAddress, fingerprint, clientIp } 
   return { send_to_cs: true, channel: "web", device_unique_id: fingerprint, bill_to: billTo,
     purchase_totals: { currency: "ARS", amount: paywayAmount(order.total) },
     customer_in_site: { days_in_site: 0, is_guest: true, num_of_transactions: 0 },
-    retail_transaction_data: { dispatch_method: destination ? "homeDelivery" : "click and collect", days_to_delivery: "3",
+    retail_transaction_data: { dispatch_method: destination ? "homeDelivery" : "storepickup", days_to_delivery: "3",
       tax_voucher_required: order.billing?.mode === "fiscal", items,
       ship_to: destination ? {
         ...billTo,

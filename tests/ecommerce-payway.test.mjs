@@ -74,6 +74,7 @@ test("Payway aprobado convierte una reserva en una venta y logística; sandbox e
   assert.equal(s.payload().fraud_detection.send_to_cs,true);
   assert.equal(s.payload().fraud_detection.device_unique_id,s.request.fingerprint);
   assert.equal(s.payload().fraud_detection.purchase_totals.amount,200000);
+  assert.equal(s.payload().fraud_detection.retail_transaction_data.dispatch_method, "storepickup");
   assert.equal(s.db.documents.get("locationStock/valle/items/oil").currentStock,8);
   assert.equal(rows(s.db,"sales").length,1); assert.equal(rows(s.db,"shipments").length,1); assert.equal(rows(s.db,"stockMovements").length,1);
   assert.equal(rows(s.db,"sales")[0].paymentEnvironment,"sandbox");
