@@ -33,7 +33,7 @@ export default async function handler(request, context = {}) {
     if (body.mode === "address") {
       return json({ ok: true, address: await confirmSelectedAddress(body.selectionToken, { now }) });
     }
-    const cart = await loadDeliveryQuoteCart(body.items, { now });
+    const cart = await loadDeliveryQuoteCart(body.items, { now, checkoutReservation: body.checkoutReservation });
     const result = await quoteSelectedDelivery({ ...cart, selectionToken: body.selectionToken, now });
     return json({ ok: true, ...result });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { activeStockReservations, reservationPatch } from "../../../../src/shared/stockReservations.mjs";
 import { shippingError } from "../../../../src/shared/shippingDomain.mjs";
+import { checkoutReservationPath } from "./checkoutReservation.mjs";
 import {
   isActiveWebStock,
   loadWebChannel,
@@ -160,10 +161,17 @@ export async function planDeferredWebStock({ transaction, shipment, sale, origin
   }
 
   for (const [orderId, products] of reallocations) {
-    const path = "orders/" + orderId;
-    const other = (await transaction.getDocument(path))?.data;
-    assertStock(other?.stockCommitMode === "deferred" && ["active", "awaiting_origin"].includes(other.reservationStatus),
-      "Otro pedido cambió de estado. Volvé a intentar la asignación.");
+    let path = "orders/" + orderId;
+    let other = (await transaction.getDocument(path))?.data;
+    if (other) {
+      assertStock(other.stockCommitMode === "deferred" && ["active", "awaiting_origin"].includes(other.reservationStatus),
+        "Otro pedido cambió de estado. Volvé a intentar la asignación.");
+    } else {
+      path = checkoutReservationPath(orderId);
+      other = (await transaction.getDocument(path))?.data;
+      assertStock(other?.state === "active" && new Date(other.expiresAt) > now,
+        "La reserva de otro carrito cambió. Volvé a intentar la asignación.");
+    }
     const items = applyAllocationChanges(other.items, products);
     assertStock(products.size === 0, "No se pudo ubicar un producto de otro pedido reservado.");
     operations.push({ type: "update", path, data: { items, updatedAt: now } });

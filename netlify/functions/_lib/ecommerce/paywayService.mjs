@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { adminRunTransaction, adminGetDocument } from "../firestoreAdminRest.mjs";
-import { checkoutEditPath, commerceError } from "./commerceDomain.mjs";
+import { commerceError } from "./commerceDomain.mjs";
+import { releaseUnconvertedCheckout } from "./checkoutReservation.mjs";
 import { confirmEcommercePayment } from "./paymentService.mjs";
 import { paywayConfig, paywayAmount, createPaywayGateway, verifiedPaywayReceipt, paywayRetailRisk } from "./paywayGateway.mjs";
 import { canAccessAdministration } from "../../../../src/gestion/permissions.js";
@@ -42,11 +43,7 @@ async function releaseCheckoutForEditing(body, { env, now, runTransaction }) {
   return runTransaction(async (tx) => {
     const order = (await tx.getDocument(orderPath))?.data;
     if (!order) {
-      // A checkout POST may still be arriving after the browser lost its response.
-      const path = checkoutEditPath(orderId);
-      const previous = (await tx.getDocument(path))?.data;
-      if (previous && previous.accessHash !== accessHash) throw denied();
-      if (!previous) await tx.commitDocuments([{ type: "create", path, data: { accessHash, abandonedAt: now } }]);
+      await releaseUnconvertedCheckout(tx, { orderId, accessHash, now });
       return { editable: true };
     }
 

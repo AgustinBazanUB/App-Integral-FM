@@ -87,10 +87,12 @@ async function loadAuthoritativeInputs({
     const preferred = sourceRows.find((row) => row.preferred);
     const pricingStock = webPricingStock(channel, [preferred?.stock, ...sourceRows.map((row) => row.stock)]);
     const floor = Math.max(0, Number(settingSnapshot?.data?.minimumRemainingStock) || 0);
+    const available = sourceRows.reduce((sum, row) => sum + row.available, 0);
+    const reservedQuantity = stockCommitMode === "deferred" ? item.quantity : 0;
     const aggregateStock = {
       ...pricingStock,
       id: productId,
-      currentStock: Math.max(0, sourceRows.reduce((sum, row) => sum + row.available, 0) - floor),
+      currentStock: Math.max(Math.min(available, reservedQuantity), available - floor),
     };
     return [
       productId,

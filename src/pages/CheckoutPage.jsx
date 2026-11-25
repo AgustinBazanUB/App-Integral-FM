@@ -19,7 +19,10 @@ import {
 import { trackEvent } from "../utils/analytics";
 import { isValidCuit, normalizeCuit } from "../../netlify/functions/_lib/arca/cuit.mjs";
 
-const DRAFT_KEY = "flor-mia-checkout-draft-v2";
+import {
+  activeCheckoutReservation, checkoutCartKey, CHECKOUT_DRAFT_EVENT, DRAFT_KEY, initialDraft, readDraft, reserveCheckoutDraft,
+} from "../services/checkoutDraft";
+
 const steps = ["Datos y contacto", "Entrega", "Pago y facturación"];
 const paymentStep = steps.length - 1;
 
@@ -32,42 +35,6 @@ function rememberOrder(orderId, accessToken) {
   try {
     window.localStorage.setItem("flor-mia-last-order", JSON.stringify({ orderId, accessToken }));
   } catch {}
-}
-
-function newRequestId() {
-  if (typeof crypto?.randomUUID === "function") return crypto.randomUUID();
-  return `web_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
-}
-
-function initialDraft() {
-  return {
-    requestId: newRequestId(),
-    accessToken: newRequestId().replaceAll("-", "") + newRequestId().replaceAll("-", ""),
-    addressSearch: "", deliverySelection: null, residenceType: "house", floor: "", apartment: "", instructions: "", receiverName: "",
-    billingMode: "consumer_final", billingName: "", billingAddress: "",
-    fullName: "",
-    email: "",
-    phone: "",
-    deliveryMethod: "pickup",
-    notes: "",
-    marketingConsent: false,
-    fiscalCuit: "",
-  };
-}
-
-function readDraft() {
-  try {
-    const saved = JSON.parse(window.localStorage.getItem(DRAFT_KEY) ?? "{}");
-    return {
-      ...initialDraft(),
-      ...saved,
-      requestId: saved.requestId || newRequestId(),
-      residenceType: saved.residenceType || (saved.floor || saved.apartment ? "apartment" : "house"),
-      addressSearch: saved.addressSearch || [saved.street, saved.number].filter(Boolean).join(" "),
-    };
-  } catch {
-    return initialDraft();
-  }
 }
 
 function formatMoney(value) {
@@ -99,6 +66,8 @@ export default function CheckoutPage() {
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [fiscalLookup, setFiscalLookup] = useState(null);
   const [fiscalRetry, setFiscalRetry] = useState(0);
+  const [clock, setClock] = useState(Date.now);
+  const holdExpiry = draft.stockHold?.expiresAt;
   const actionLock = useRef(false);
   const paymentLock = useRef(false);
   const [simulationCapability, setSimulationCapability] = useState({
@@ -119,6 +88,25 @@ export default function CheckoutPage() {
   }, [draft]);
 
   useEffect(() => {
+    const syncDraft = () => {
+      if (!paymentLock.current && !actionLock.current && !orderResult) {
+        setDraft(readDraft());
+        setClock(Date.now());
+      }
+    };
+    window.addEventListener(CHECKOUT_DRAFT_EVENT, syncDraft);
+    return () => window.removeEventListener(CHECKOUT_DRAFT_EVENT, syncDraft);
+  }, [orderResult]);
+
+  useEffect(() => {
+    if (!holdExpiry || draft.pendingOrder) return;
+    const tick = () => setClock(Date.now());
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    return () => window.clearInterval(interval);
+  }, [holdExpiry, draft.pendingOrder]);
+
+  useEffect(() => {
     trackEvent("begin_checkout", { quantity: unitCount, value: knownSubtotal });
   }, [knownSubtotal, unitCount]);
 
@@ -135,17 +123,23 @@ export default function CheckoutPage() {
       })),
     [items],
   );
-  const cartKey = JSON.stringify(items.map(({ productId, quantity }) => ({ productId, quantity }))
-    .sort((a, b) => a.productId.localeCompare(b.productId)));
+  const cartKey = checkoutCartKey(items);
+  const holdActive = activeCheckoutReservation(draft, cartKey, Math.max(clock, Date.now()));
+  const needsStockHold = config.checkoutReserveEnabled && !draft.pendingOrder && !holdActive;
+  const holdSeconds = Math.max(0, Math.ceil((holdExpiry - clock) / 1000));
+  const countdown = Math.floor(holdSeconds / 60) + ":" + String(holdSeconds % 60).padStart(2, "0");
   const selectionToken = draft.deliverySelection?.selectionToken;
   const canQuote = step > 0 && !draft.pendingOrder && draft.deliveryMethod === "delivery"
-    && config.deliveryAddressEnabled && Boolean(selectionToken) && items.length > 0;
+    && !needsStockHold && config.deliveryAddressEnabled && Boolean(selectionToken) && items.length > 0;
   useEffect(() => {
     if (!canQuote) return;
     const controller = new AbortController();
-    const identity = { selectionToken, cartKey, deliveryRetry };
+    const identity = { selectionToken, cartKey, deliveryRetry, requestId: draft.requestId };
     setDeliveryRequest({ ...identity, loading: true });
-    requestEcommerceDelivery({ mode: "quote", selectionToken, items: JSON.parse(cartKey) }, { signal: controller.signal })
+    requestEcommerceDelivery({
+      mode: "quote", selectionToken, items: JSON.parse(cartKey),
+      ...(holdActive ? { checkoutReservation: { requestId: draft.requestId, accessToken: draft.accessToken } } : {}),
+    }, { signal: controller.signal })
       .then(({ address, quote, status }) => {
         if (!controller.signal.aborted) setDeliveryRequest({ ...identity, address, quote, status });
       })
@@ -153,9 +147,9 @@ export default function CheckoutPage() {
         if (!controller.signal.aborted) setDeliveryRequest({ ...identity, error: error.message });
       });
     return () => controller.abort();
-  }, [canQuote, selectionToken, cartKey, deliveryRetry]);
+  }, [canQuote, selectionToken, cartKey, deliveryRetry, holdActive, draft.requestId, draft.accessToken]);
   const delivery = deliveryRequest?.selectionToken === selectionToken && deliveryRequest?.cartKey === cartKey
-    && deliveryRequest?.deliveryRetry === deliveryRetry ? deliveryRequest : null;
+    && deliveryRequest?.deliveryRetry === deliveryRetry && deliveryRequest.requestId === draft.requestId ? deliveryRequest : null;
   const quote = delivery?.quote?.expiresAt > Date.now() ? delivery.quote : null;
   const quoting = canQuote && (!delivery || delivery.loading);
   const shippingAmount = draft.pendingOrder?.shippingAmount ?? quote?.amount;
@@ -277,7 +271,7 @@ export default function CheckoutPage() {
         const fresh = initialDraft();
         setDraft(current => ({
           ...current, requestId: fresh.requestId, accessToken: fresh.accessToken,
-          pendingOrder: null, checkoutStarted: false,
+          pendingOrder: null, checkoutStarted: false, stockHold: null, holdRequestedFor: null,
         }));
         setSubmitState({ busy: false, error: "" });
       } catch (error) {
@@ -292,8 +286,29 @@ export default function CheckoutPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  async function renewCheckoutHold() {
+    if (actionLock.current || paymentLock.current) return;
+    actionLock.current = true;
+    setSubmitState({ busy: true, error: "" });
+    try {
+      const saved = await reserveCheckoutDraft(draft, items);
+      setDraft(saved);
+      setClock(Date.now());
+      setSubmitState({ busy: false, error: "" });
+    } catch (error) {
+      setDraft(readDraft());
+      setSubmitState({ busy: false, error: error.message });
+      if (error.code === "ecommerce-stock-insufficient") refreshCatalog().catch(() => {});
+    } finally {
+      actionLock.current = false;
+    }
+  }
+
   async function prepareOrder() {
     if (draft.pendingOrder) return draft.pendingOrder;
+    if (config.checkoutReserveEnabled && !activeCheckoutReservation(draft, cartKey)) {
+      throw new Error("La reserva del carrito venció. Volvé a reservar antes de pagar.");
+    }
     if (draft.deliveryMethod === "delivery" && (!quote || quote.expiresAt <= Date.now())) {
       setDeliveryRetry(current => current + 1);
       throw new Error("La tarifa de envío se está actualizando. Revisala antes de pagar.");
@@ -302,7 +317,7 @@ export default function CheckoutPage() {
     if (!latestCatalog?.ready && latestCatalog?.pending?.includes("ECOMMERCE_LOCATION_ID")) {
       throw new Error("La ubicación de stock Ecommerce está PENDIENTE DE DEFINIR.");
     }
-    if (hasPendingPrices || hasUnavailableItems || !items.length) {
+    if (hasPendingPrices || (!holdActive && hasUnavailableItems) || !items.length) {
       throw new Error("El carrito cambió. Revisá precio y disponibilidad antes de confirmar.");
     }
 
@@ -316,6 +331,7 @@ export default function CheckoutPage() {
       result = await createEcommerceOrder({
         requestId: draft.requestId,
         accessToken: draft.accessToken,
+        ...(holdActive ? { checkoutReservation: true } : {}),
         billing: {
           mode: draft.billingMode,
           cuit: draft.fiscalCuit,
@@ -353,6 +369,9 @@ export default function CheckoutPage() {
         clientTotal: knownSubtotal,
       });
     } catch (error) {
+      if (["ecommerce-reservation-expired", "ecommerce-reservation-cart-changed"].includes(error.code)) {
+        setDraft(current => ({ ...current, checkoutStarted: false, stockHold: current.stockHold ? { ...current.stockHold, expiresAt: 0 } : null }));
+      }
       if (["ecommerce-delivery-quote-required", "ecommerce-delivery-quote-stale", "ecommerce-delivery-token-invalid"].includes(error.code)) {
         setDeliveryRetry(current => current + 1);
         throw new Error("Revisá la tarifa de entrega actualizada antes de pagar.");
@@ -421,7 +440,7 @@ export default function CheckoutPage() {
     }
   }
 
-  const checkoutBlocked = !draft.pendingOrder && (!catalogReady || hasPendingPrices || hasUnavailableItems
+  const checkoutBlocked = !draft.pendingOrder && (!catalogReady || hasPendingPrices || needsStockHold || (!holdActive && hasUnavailableItems)
     || (draft.deliveryMethod === "pickup" && !config.pickupEnabled)
     || (draft.deliveryMethod === "delivery" && !quote));
   const navigatingLocked = Boolean(orderResult || paymentBusy || submitState.busy);
@@ -464,6 +483,21 @@ export default function CheckoutPage() {
       <section className="section checkout-layout">
         <div className={`container checkout-grid${orderResult ? " checkout-grid--complete" : ""}`}>
           <div className="checkout-form-card">
+            {!orderResult && !draft.pendingOrder && config.checkoutReserveEnabled && items.length > 0 && (
+              <div className="pending-panel checkout-reservation">
+                {holdActive ? (
+                  <p>Carrito reservado por <strong role="timer" aria-label="Tiempo restante para pagar">{countdown}</strong></p>
+                ) : !hasCheckoutAttempt ? (
+                  <>
+                    <p>{draft.stockHold?.cartKey === cartKey ? "Venció la reserva de tu carrito." : "Reservá tu carrito por 10 minutos para completar el pago."}</p>
+                    <button className="button button--secondary" type="button" disabled={navigatingLocked} onClick={renewCheckoutHold}>
+                      {submitState.busy ? "Reservando…" : "Reservar por 10 minutos"}
+                    </button>
+                  </>
+                ) : null}
+                {step !== paymentStep && submitState.error && <p className="field-error" role="alert">{submitState.error}</p>}
+              </div>
+            )}
             {orderResult ? (
               <div className="integration-state">
                 <Check size={34} aria-hidden="true" />
@@ -488,7 +522,7 @@ export default function CheckoutPage() {
                   </>
                 ) : (
                   <p>
-                    Payway Sandbox confirmó el pago. La venta y el stock de prueba quedaron registrados. No se emitió un comprobante fiscal productivo.
+                    Payway Sandbox confirmó el pago. El pedido quedó registrado con sus unidades reservadas.
                   </p>
                 )}
                 <Link className="button button--gold" to="/productos">Seguir comprando</Link>
@@ -695,7 +729,7 @@ export default function CheckoutPage() {
                     onClick={() => changeStep(step - 1)} disabled={navigatingLocked}>
                     {step === paymentStep ? "Volver a entrega" : "Volver"}
                   </button>}
-                  {step < paymentStep && <button type="button" className="button button--gold" onClick={goNext} disabled={navigatingLocked}>
+                  {step < paymentStep && <button type="button" className="button button--gold" onClick={goNext} disabled={navigatingLocked || needsStockHold}>
                     Continuar
                   </button>}
                 </div>

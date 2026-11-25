@@ -1,4 +1,4 @@
-import { createEcommerceOrder } from "./_lib/ecommerce/commerceService.mjs";
+import { createEcommerceOrder, releaseEcommerceCheckout, reserveEcommerceCheckout } from "./_lib/ecommerce/commerceService.mjs";
 import { publicEcommerceError } from "./_lib/ecommerce/publicError.mjs";
 import { publicCommerceBody, limitCommerceRequest } from "./_lib/ecommerce/publicRequests.mjs";
 import { previewPaywayBilling, validatePaywayInvoiceA } from "./_lib/ecommerce/paywayFiscalService.mjs";
@@ -23,6 +23,11 @@ export default async function handler(request, context = {}) {
       paywayConfig();
       await limitCommerceRequest(request, context, { scope: "billing-preview" });
       return json({ ok: true, billing: await previewPaywayBilling(body.cuit) });
+    }
+    if (body?.mode === "reserve" || body?.mode === "release") {
+      await limitCommerceRequest(request, context, { scope: "checkout-reservation" });
+      const action = body.mode === "reserve" ? reserveEcommerceCheckout : releaseEcommerceCheckout;
+      return json({ ok: true, ...await action({ body }) });
     }
     if (body?.billing?.requestedClass === "A") paywayConfig();
     await limitCommerceRequest(request, context);

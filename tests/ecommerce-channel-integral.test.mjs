@@ -11,6 +11,8 @@ import {
   createEcommerceOrder,
   loadDeliveryQuoteCart,
   loadEcommerceCatalog,
+  releaseEcommerceCheckout,
+  reserveEcommerceCheckout,
 } from "../netlify/functions/_lib/ecommerce/commerceService.mjs";
 import { confirmEcommercePayment } from "../netlify/functions/_lib/ecommerce/paymentService.mjs";
 import {
@@ -142,6 +144,12 @@ const request = (requestId = "web_order_0001", extra = {}) => ({
   },
   ...extra,
 });
+const reserve = (db, body, at = now) =>
+  reserveEcommerceCheckout({ body, env, now: at, runTransaction: db.runTransaction });
+const catalogAt = (db, at = now) =>
+  loadEcommerceCatalog({ env, now: at, getDocument: db.getDocument, listDocuments: db.listDocuments });
+const checkoutAt = (db, body, at) => db.runTransaction(tx => createEcommerceOrder({ body, env, now: at, ...tx }));
+
 const checkout = (db, body = request()) =>
   db.runTransaction((tx) => createEcommerceOrder({ body, env, now, ...tx }));
 const approve = (db, order) =>
@@ -238,6 +246,87 @@ test("reservas serializadas impiden dos compras del último producto y replay no
     2,
   );
 });
+test("Ir al checkout protege las últimas unidades durante diez minutos con dos compradores concurrentes", async () => {
+  const db = setup();
+  const shop = "locationStock/valle/items/oil";
+  db.documents.get(shop).currentStock = 2;
+  db.documents.get("locationStock/other/items/oil").currentStock = 0;
+  db.documents.get("warehouseStock/infal/items/oil").currentStock = 0;
+  const first = request("carrito_temprano1");
+  const second = request("carrito_temprano2", { accessToken: "b".repeat(48) });
+  const attempts = await Promise.allSettled([reserve(db, first), reserve(db, second)]);
+  assert.equal(attempts.filter(result => result.status === "fulfilled").length, 1);
+  assert.equal(attempts.find(result => result.status === "rejected").reason.code, "ecommerce-stock-insufficient");
+  const winnerIndex = attempts.findIndex(result => result.status === "fulfilled");
+  const winner = [first, second][winnerIndex];
+  const expiry = attempts[winnerIndex].value.expiresAt;
+  assert.equal(expiry - now.valueOf(), 600000);
+  assert.equal((await reserve(db, winner, new Date(+now + 30000))).expiresAt, expiry);
+  assert.equal(rows(db, "orders").length, 0);
+  assert.equal(rows(db, "sales").length, 0);
+  assert.equal(db.documents.get(shop).currentStock, 2);
+  assert.equal((await catalogAt(db, new Date(expiry - 1))).products[0].stockState, "out");
+  assert.equal((await catalogAt(db, new Date(expiry))).products[0].stockState, "available");
+  await assert.rejects(() => checkoutAt(db, { ...winner, checkoutReservation: true }, new Date(expiry)),
+    { code: "ecommerce-reservation-expired" });
+  assert.equal(rows(db, "stockMovements").length, 0);
+});
+
+test("mínimo global de diez y precio web: vende sólo el excedente y reserva fuera del principal", async () => {
+  const db = setup();
+  const shop = "locationStock/valle/items/oil";
+  const depot = "warehouseStock/infal/items/oil";
+  db.documents.get(shop).currentStock = 10;
+  db.documents.get(depot).currentStock = 0;
+  db.documents.get("locationStock/other/items/oil").currentStock = 0;
+  db.documents.set("ecommerceProductSettings/oil", { productId: "oil", enabled: true, minimumRemainingStock: 10, priceOverride: 1200 });
+  assert.equal((await catalogAt(db)).products[0].stockState, "out");
+  db.documents.get(depot).currentStock = 2;
+  assert.equal((await catalogAt(db)).products[0].stockState, "available");
+  const body = request("carrito_excedente");
+  const hold = await reserve(db, body);
+  assert.equal(reservedStockQuantity(db.documents.get(shop), now), 0);
+  assert.equal(reservedStockQuantity(db.documents.get(depot), now), 2);
+  assert.equal((await catalogAt(db)).products[0].stockState, "out");
+  const quoteCart = await loadDeliveryQuoteCart(body.items, {
+    env, now, getDocument: db.getDocument, listDocuments: db.listDocuments, checkoutReservation: body,
+  });
+  assert.equal(quoteCart.items[0].unitPrice, 1200);
+  await assert.rejects(() => loadDeliveryQuoteCart(body.items, { env, now, getDocument: db.getDocument, listDocuments: db.listDocuments }),
+    { code: "ecommerce-stock-insufficient" });
+  await assert.rejects(() => checkout(db, { ...body, items: [{ productId: "oil", quantity: 1 }], checkoutReservation: true }),
+    { code: "ecommerce-reservation-cart-changed" });
+
+  const { order } = await checkoutAt(db, { ...body, checkoutReservation: true }, new Date(+now + 240000));
+  assert.equal(new Date(order.reservationExpiresAt).valueOf(), hold.expiresAt);
+  assert.equal(order.subtotal, 2400);
+  assert.equal(reservedStockQuantity(db.documents.get(depot), now), 2);
+  const { order: paid } = await approve(db, order);
+  assert.equal(db.documents.get(depot).currentStock, 2);
+  assert.equal(rows(db, "stockMovements").length, 0);
+  assert.equal((await catalogAt(db, new Date(+now + 720000))).products[0].stockState, "out");
+  await shipping(db, paid, "approve", { originType: "warehouse", originId: "infal" });
+  assert.equal(db.documents.get(shop).currentStock, 10);
+  assert.equal(db.documents.get(depot).currentStock, 0);
+  assert.equal((await catalogAt(db)).products[0].stockState, "out");
+  assert.equal(rows(db, "stockMovements").length, 1);
+});
+
+test("soltar el carrito restaura disponibilidad y una clave ajena no puede liberar unidades", async () => {
+  const db = setup();
+  const body = request("carrito_cancelado");
+  await reserve(db, body);
+  const release = value => releaseEcommerceCheckout({ body: value, env, now, runTransaction: db.runTransaction });
+  await assert.rejects(() => release({ ...body, accessToken: "x".repeat(48) }), { code: "ecommerce-order-access-denied" });
+  const shop = "locationStock/valle/items/oil";
+  assert.equal(reservedStockQuantity(db.documents.get(shop), now), 2);
+  await release(body);
+  assert.equal(reservedStockQuantity(db.documents.get(shop), now), 0);
+  assert.equal(db.documents.get(shop).currentStock, 10);
+  await assert.rejects(() => checkout(db, { ...body, checkoutReservation: true }), { code: "ecommerce-reservation-expired" });
+  assert.equal(rows(db, "orders").length, 0);
+});
+
 test("el total usa todos los orígenes activos y queda agotado aunque el stock físico siga reservado", async () => {
   const db = setup();
   db.documents.set("channels/ecommerce", {
@@ -267,7 +356,7 @@ test("el total usa todos los orígenes activos y queda agotado aunque el stock f
     const stock = db.documents.get(path);
     assert.equal(stock.currentStock, 1);
     assert.equal(stock.reservedQuantity, 1);
-    assert.equal(stock.ecommerceReservationsExpireAt.toISOString(), "2026-10-16T15:15:00.000Z");
+    assert.equal(stock.ecommerceReservationsExpireAt.toISOString(), "2026-10-16T15:10:00.000Z");
   }
   const catalog = await loadEcommerceCatalog({ env, now, getDocument: db.getDocument, listDocuments: db.listDocuments });
   assert.equal(catalog.products[0].stockState, "out");
@@ -296,7 +385,9 @@ test("Gestión elige local o depósito aun con todo el stock reservado y no lo d
   db.documents.get(shop).currentStock = 2;
   db.documents.get(depot).currentStock = 2;
   db.documents.get("locationStock/other/items/oil").currentStock = 0;
-  const { order: pending } = await checkout(db, request("reservado_primero"));
+  const pending = { ...request("reservado_primero"), checkoutReservation: true };
+  await reserve(db, pending);
+  const pendingOrderId = "ecommerce_order_" + pending.requestId;
   const { order: second } = await checkout(db, request("reservado_segundo"));
   const { order: paid } = await approve(db, second);
   assert.equal(db.documents.get(depot).ecommerceReservations[second.id].quantity, 2);
@@ -305,13 +396,14 @@ test("Gestión elige local o depósito aun con todo el stock reservado y no lo d
   await shipping(db, paid, "approve", { originType: "location", originId: "valle" });
   assert.equal(db.documents.get(shop).currentStock, 0);
   assert.equal(db.documents.get(depot).currentStock, 2);
-  assert.equal(db.documents.get(depot).ecommerceReservations[pending.id].quantity, 2);
-  assert.equal(db.documents.get("orders/" + pending.id).items[0].reservationAllocations[0].id, "infal");
+  assert.equal(db.documents.get(depot).ecommerceReservations[pendingOrderId].quantity, 2);
+  assert.equal(db.documents.get("ecommerceOperations/checkout_hold_" + pendingOrderId).items[0].reservationAllocations[0].id, "infal");
   assert.equal(rows(db, "stockMovements")[0].inventoryId, "valle");
   assert.equal(db.documents.get("orders/" + second.id).reservationStatus, "consumed");
   assert.equal(db.documents.get("shipments/" + paid.shipmentId).itemsSnapshot[0].stockAllocations[0].id, "valle");
 
-  const { order: firstPaid } = await approve(db, pending);
+  const { order: pendingOrder } = await checkout(db, pending);
+  const { order: firstPaid } = await approve(db, pendingOrder);
   const catalog = await loadEcommerceCatalog({ env, now, getDocument: db.getDocument, listDocuments: db.listDocuments });
   assert.equal(catalog.products[0].stockState, "out");
   await shipping(db, firstPaid, "approve", { originType: "warehouse", originId: "infal" });

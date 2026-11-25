@@ -1,11 +1,12 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
-import { Link } from "../router";
+import { Link, useNavigate } from "../router";
 import { categoryById } from "../data/categories";
 import { useCart } from "../context/CartContext";
 import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { formatPrice } from "../utils/format";
+import { CHECKOUT_DRAFT_EVENT, readDraft, reserveCheckoutDraft } from "../services/checkoutDraft";
 
 export default function CartDrawer() {
   const {
@@ -20,7 +21,10 @@ export default function CartDrawer() {
     hasPendingPrices,
     hasUnavailableItems,
   } = useCart();
-  const { products } = useCommerceCatalog();
+  const { products, config, refresh } = useCommerceCatalog();
+  const navigate = useNavigate();
+  const [reserveState, setReserveState] = useState({ busy: false, error: "" });
+  const reserveLock = useRef(false);
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
 
@@ -31,7 +35,28 @@ export default function CartDrawer() {
     onEscape: closeCart,
   });
 
+  async function startCheckout() {
+    if (reserveLock.current) return;
+    reserveLock.current = true;
+    setReserveState({ busy: true, error: "" });
+    try {
+      if (config.checkoutReserveEnabled) await reserveCheckoutDraft(readDraft(), items);
+      window.dispatchEvent(new Event(CHECKOUT_DRAFT_EVENT));
+      closeCart();
+      navigate("/checkout");
+      setReserveState({ busy: false, error: "" });
+    } catch (error) {
+      setReserveState({ busy: false, error: error.message });
+      if (error.code === "ecommerce-stock-insufficient") refresh().catch(() => {});
+    } finally {
+      reserveLock.current = false;
+    }
+  }
+
   if (!isCartOpen) return null;
+  const savedDraft = readDraft();
+  const ownsReservation = Boolean(savedDraft.pendingOrder || (savedDraft.stockHold?.expiresAt > Date.now()));
+  const checkoutDisabled = hasPendingPrices || (hasUnavailableItems && !ownsReservation);
 
   const firstCategory = items[0]?.product?.categoryId || null;
   const suggestion = products.find((product) =>
@@ -91,6 +116,7 @@ export default function CartDrawer() {
                       <button
                         type="button"
                         onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                        disabled={reserveState.busy}
                         aria-label={`Quitar una unidad de ${item.product?.name || "producto"}`}
                       >
                         <Minus size={16} aria-hidden="true" />
@@ -100,7 +126,7 @@ export default function CartDrawer() {
                         type="button"
                         onClick={() => updateQuantity(item.productId, item.quantity + 1)}
                         aria-label={`Agregar una unidad de ${item.product?.name || "producto"}`}
-                        disabled={Number.isInteger(item.product?.stock) && item.quantity >= item.product.stock}
+                        disabled={reserveState.busy || (Number.isInteger(item.product?.stock) && item.quantity >= item.product.stock)}
                       >
                         <Plus size={16} aria-hidden="true" />
                       </button>
@@ -110,6 +136,7 @@ export default function CartDrawer() {
                     type="button"
                     className="cart-line__remove"
                     onClick={() => removeItem(item.productId)}
+                    disabled={reserveState.busy}
                     aria-label={`Eliminar ${item.product?.name || "producto"}`}
                   >
                     <Trash2 size={17} aria-hidden="true" />
@@ -125,7 +152,7 @@ export default function CartDrawer() {
                   <span>También puede acompañar</span>
                   <strong>{suggestion.name}</strong>
                 </div>
-                <button type="button" onClick={() => addItem(suggestion)} aria-label={`Agregar ${suggestion.name}`}>
+                <button type="button" disabled={reserveState.busy} onClick={() => addItem(suggestion)} aria-label={`Agregar ${suggestion.name}`}>
                   <Plus size={17} aria-hidden="true" />
                   Agregar
                 </button>
@@ -137,19 +164,20 @@ export default function CartDrawer() {
                 <span>Subtotal</span>
                 <strong>{hasPendingPrices ? "No disponible" : formatPrice(knownSubtotal)}</strong>
               </div>
-              {hasUnavailableItems ? (
+              {hasUnavailableItems && !ownsReservation ? (
                 <p>Hay productos que cambiaron de disponibilidad. Revisalos antes de continuar.</p>
               ) : (
                 <p>El costo de envío y el total se confirman al armar el pedido.</p>
               )}
-              <Link
+              {reserveState.error && <p className="field-error" role="alert">{reserveState.error}</p>}
+              <button
+                type="button"
                 className="button button--gold button--block"
-                to="/checkout"
-                onClick={closeCart}
-                aria-disabled={hasPendingPrices || hasUnavailableItems}
+                onClick={startCheckout}
+                disabled={checkoutDisabled || reserveState.busy}
               >
-                Ir al checkout
-              </Link>
+                {reserveState.busy ? "Reservando carrito…" : "Ir al checkout"}
+              </button>
               <button type="button" className="text-button" onClick={closeCart}>
                 Seguir explorando
               </button>

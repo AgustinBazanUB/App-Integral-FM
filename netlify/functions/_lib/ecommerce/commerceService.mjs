@@ -10,6 +10,14 @@ import {
   webStockAvailability,
 } from "./channelService.mjs";
 import { reservationPatch } from "../../../../src/shared/stockReservations.mjs";
+import {
+  CHECKOUT_RESERVATION_MS,
+  checkoutCartFingerprint,
+  checkoutCredentials,
+  checkoutReservationPath,
+  releaseUnconvertedCheckout,
+  verifyCheckoutReservation,
+} from "./checkoutReservation.mjs";
 import { prepareCommerceCustomer } from "./customerLink.mjs";
 import { createHash } from "node:crypto";
 import {
@@ -157,7 +165,7 @@ function publicEcommerceOrder(orderId, order = {}) {
   };
 }
 
-async function loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument, now }) {
+async function loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument, now, reservationOrderId = null }) {
   const productsById = {};
   const stocksById = {};
   const ecommerceSettingsById = {};
@@ -176,22 +184,96 @@ async function loadCheckoutProducts(requestedItems, channel, origins, { env, get
     const sourceRows = origins.map((source, index) => ({
       origin: source,
       snapshot: sourceSnapshots[index],
-      available: webStockAvailability(sourceSnapshots[index]?.data, now),
+      available: webStockAvailability(sourceSnapshots[index]?.data, now, reservationOrderId),
     }));
     const preferredStock = webPricingStock(channel, sourceSnapshots.map((row) => row?.data));
-    const floor = Math.max(0, Number(setting?.data?.minimumRemainingStock) || 0);
+    let protectedUnits = Math.max(0, Number(setting?.data?.minimumRemainingStock) || 0);
+    if (!reservationOrderId) {
+      // Keep the protected balance in the channel's preferred origin first.
+      for (const row of sourceRows) {
+        const keepHere = Math.min(protectedUnits, row.available);
+        row.available -= keepHere;
+        protectedUnits -= keepHere;
+      }
+    }
     stocksById[item.productId] = {
       ...preferredStock,
       id: item.productId,
-      currentStock: Math.max(0, sourceRows.reduce((sum, row) => sum + row.available, 0) - floor),
+      currentStock: sourceRows.reduce((sum, row) => sum + row.available, 0),
     };
     sourceSnapshotsByProduct[item.productId] = sourceRows;
   }
   return { productsById, stocksById, ecommerceSettingsById, promotionsByProductId, sourceSnapshotsByProduct };
 }
 
+function makeReservationWrites(items, sourcesByProduct, orderId, expiresAt, now) {
+  return items.flatMap(item => item.reservationAllocations.map(allocation => {
+    const source = sourcesByProduct[item.productId].find(row => row.origin.type === allocation.type && row.origin.id === allocation.id)?.snapshot;
+    if (!source?.data) throw commerceError("ecommerce-stock-insufficient", "El origen reservado dejó de tener stock.", 409);
+    return {
+      type: "update", path: originStockPath(allocation, item.productId), currentUpdateTime: source.updateTime,
+      data: {
+        ...reservationPatch(source.data, orderId, { quantity: allocation.quantity, expiresAt, pooled: true }, now),
+        updatedAt: now,
+      },
+    };
+  }));
+}
+
+export async function reserveEcommerceCheckout({
+  body, env = process.env, now = new Date(), runTransaction = adminRunTransaction,
+}) {
+  const access = checkoutCredentials(body);
+  const { orderId, accessHash } = access;
+  const requestedItems = normalizeCheckoutItems(body.items);
+  return runTransaction(async tx => {
+    const path = checkoutReservationPath(orderId);
+    const previous = (await tx.getDocument(path))?.data;
+    if (previous) {
+      const hold = verifyCheckoutReservation(previous, accessHash, requestedItems, now);
+      return { expiresAt: new Date(hold.expiresAt).valueOf() };
+    }
+    if (await tx.getDocument(checkoutEditPath(orderId)) || await tx.getDocument("orders/" + orderId)) {
+      throw commerceError("ecommerce-checkout-edited", "Ese intento ya se cerró. Volvé a reservar el carrito.", 409);
+    }
+    const channel = await loadWebChannel({ env, getDocument: tx.getDocument });
+    if (!channel) throw commerceError("ecommerce-channel-inactive", "La reserva web todavía no está habilitada.", 409);
+    const origins = await configuredWebOrigins(channel, { env, ...tx, now });
+    if (!origins.length) throw commerceError("ecommerce-location-not-configured", "Falta configurar los orígenes de stock.", 409);
+    const productState = await loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument: tx.getDocument, now });
+    const { items: preparedItems } = prepareAuthoritativeCart({ requestedItems, ...productState });
+    const items = preparedItems.map(item => ({
+      productId: item.productId, quantity: item.quantity,
+      reservationAllocations: allocateStock(item.quantity, productState.sourceSnapshotsByProduct[item.productId], item.name),
+    }));
+    const expiresAt = new Date(now.valueOf() + CHECKOUT_RESERVATION_MS);
+    const operations = makeReservationWrites(items, productState.sourceSnapshotsByProduct, orderId, expiresAt, now);
+    if (operations.length > 449) throw commerceError("ecommerce-order-too-large", "El carrito usa demasiados orígenes de stock.", 400);
+    operations.push({
+      type: "create", path, data: {
+        state: "active", accessHash, cartFingerprint: checkoutCartFingerprint(requestedItems), items,
+        expiresAt, createdAt: now,
+      },
+    });
+    await tx.commitDocuments(operations);
+    return { expiresAt: expiresAt.valueOf() };
+  }, { env });
+}
+
+export async function releaseEcommerceCheckout({ body, env = process.env, now = new Date(), runTransaction = adminRunTransaction }) {
+  const access = checkoutCredentials(body);
+  return runTransaction(async tx => {
+    if (await tx.getDocument("orders/" + access.orderId)) {
+      throw commerceError("ecommerce-order-conflict", "El carrito tiene un pedido. Consultá el estado del pago.", 409);
+    }
+    await releaseUnconvertedCheckout(tx, { ...access, now });
+    return { released: true };
+  }, { env });
+}
+
 export async function loadDeliveryQuoteCart(rawItems, {
   env = process.env, now = new Date(), getDocument = adminGetDocument, listDocuments = adminListDocuments,
+  checkoutReservation,
 } = {}) {
   const requestedItems = normalizeCheckoutItems(rawItems);
   const channel = await loadWebChannel({ env, getDocument });
@@ -199,7 +281,14 @@ export async function loadDeliveryQuoteCart(rawItems, {
     throw commerceError("ecommerce-delivery-not-configured", "El envío todavía no está habilitado.", 409);
   }
   const origins = await configuredWebOrigins(channel, { env, getDocument, listDocuments, now });
-  const productState = await loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument, now });
+  let reservationOrderId = null;
+  if (checkoutReservation) {
+    const { orderId, accessHash } = checkoutCredentials(checkoutReservation);
+    const reservation = (await getDocument(checkoutReservationPath(orderId), { env }))?.data;
+    verifyCheckoutReservation(reservation, accessHash, requestedItems, now);
+    reservationOrderId = orderId;
+  }
+  const productState = await loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument, now, reservationOrderId });
   return {
     delivery: channel.delivery,
     items: prepareAuthoritativeCart({ requestedItems, ...productState }).items,
@@ -296,7 +385,14 @@ export async function createEcommerceOrder({
       "Falta configurar los orígenes de stock web.",
       409,
     );
-  const productState = await loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument, now });
+  const holdPath = checkoutReservationPath(orderId);
+  const earlierReservation = channel ? (await getDocument(holdPath, { env }))?.data : null;
+  const checkoutHold = earlierReservation || body.checkoutReservation
+    ? verifyCheckoutReservation(earlierReservation, accessHash, requestedItems, now)
+    : null;
+  const productState = await loadCheckoutProducts(requestedItems, channel, origins, {
+    env, getDocument, now, reservationOrderId: checkoutHold ? orderId : null,
+  });
   const { sourceSnapshotsByProduct, ecommerceSettingsById, promotionsByProductId } = productState;
   const shipping = confirmedShipping || (channel ? channelShipping(shippingRequest, channel) : null);
   const prepared = prepareAuthoritativeCheckout({
@@ -313,18 +409,25 @@ export async function createEcommerceOrder({
       promotions: promotionsByProductId, env, now,
     });
   }
-  const itemsWithAllocations = prepared.items.map((item) => ({
-    ...item,
-    stockAllocations: allocateStock(
-      item.quantity,
-      sourceSnapshotsByProduct[item.productId] || [],
-      item.name,
-    ),
-  }));
+  const itemsWithAllocations = prepared.items.map(item => {
+    const rows = sourceSnapshotsByProduct[item.productId] || [];
+    const stockAllocations = checkoutHold
+      ? checkoutHold.items.find(row => row.productId === item.productId)?.reservationAllocations
+      : allocateStock(item.quantity, rows, item.name);
+    if (checkoutHold && (!stockAllocations?.length || stockAllocations.reduce((total, row) => total + row.quantity, 0) !== item.quantity ||
+      stockAllocations.some(allocation => {
+        const source = rows.find(row => row.origin.type === allocation.type && row.origin.id === allocation.id);
+        const hold = source?.snapshot?.data?.ecommerceReservations?.[orderId];
+        return !hold || hold.quantity !== allocation.quantity || !(new Date(hold.expiresAt) > now) || source.available < allocation.quantity;
+      }))) {
+      throw commerceError("ecommerce-reservation-invalid", "La reserva de stock del carrito cambió.", 409);
+    }
+    return { ...item, stockAllocations };
+  });
   const origin = origins[0];
   const deferredStock = Boolean(channel);
   const reservationExpiresAt = channel
-    ? new Date(now.valueOf() + 15 * 60 * 1000)
+    ? checkoutHold ? new Date(checkoutHold.expiresAt) : new Date(now.valueOf() + CHECKOUT_RESERVATION_MS)
     : null;
   const crm = channel
     ? await prepareCommerceCustomer({
@@ -410,26 +513,10 @@ export async function createEcommerceOrder({
     ...(crm?.operations || []),
   ];
   if (channel) {
-    for (const item of itemsWithAllocations) {
-      for (const allocation of item.stockAllocations) {
-        const source = sourceSnapshotsByProduct[item.productId].find((row) => row.origin.type === allocation.type && row.origin.id === allocation.id)?.snapshot;
-        if (!source?.data)
-          throw commerceError("ecommerce-stock-insufficient", `${item.name}: el origen asignado dejó de tener stock.`, 409);
-        operations.push({
-          type: "update",
-          path: originStockPath(allocation, item.productId),
-          currentUpdateTime: source.updateTime,
-          data: {
-            ...reservationPatch(
-              source.data,
-              orderId,
-              { quantity: allocation.quantity, expiresAt: reservationExpiresAt, pooled: true },
-              now,
-            ),
-            updatedAt: now,
-          },
-        });
-      }
+    if (checkoutHold) {
+      operations.push({ type: "update", path: holdPath, data: { state: "converted", convertedAt: now } });
+    } else {
+      operations.push(...makeReservationWrites(order.items, sourceSnapshotsByProduct, orderId, reservationExpiresAt, now));
     }
     operations.push({
       type: "create",
@@ -572,6 +659,7 @@ export async function loadEcommerceCatalog({
         : ecommercePickupEnabled(env),
       deliveryEnabled: channel?.delivery?.enabled === true,
       deliveryAddressEnabled: channel?.delivery?.enabled === true && deliveryAddressEnabled(env),
+      checkoutReserveEnabled: Boolean(channel),
       pickup: channel?.pickup || null,
       deliveryRates: (channel?.delivery?.rates || []).filter(
         (rate) => rate.active !== false,

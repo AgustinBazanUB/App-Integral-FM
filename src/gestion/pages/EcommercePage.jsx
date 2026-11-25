@@ -511,7 +511,9 @@ export default function EcommercePage() {
                       const draft = productDrafts[product.id] || { enabled: true, priceOverride: "", minimumRemainingStock: 0, sourceAlertThresholds: {} };
                       const stockRows = stockRowsFor(product);
                       const physicalStock = stockRows.reduce((sum, row) => sum + (row.active ? Math.max(0, row.currentStock) : 0), 0);
-                      const totalRemaining = stockRows.filter((row) => row.active && configuredSourceKeys.has(`${row.type}:${row.originId}`)).reduce((sum, row) => sum + Math.max(0, row.currentStock - row.reservedStock), 0);
+                      const webRows = stockRows.filter(row => row.active && configuredSourceKeys.has(row.type + ":" + row.originId));
+                      const reserved = webRows.reduce((sum, row) => sum + row.reservedStock, 0);
+                      const totalRemaining = webRows.reduce((sum, row) => sum + Math.max(0, row.currentStock - row.reservedStock), 0);
                       const webAvailable = draft.enabled === false ? 0 : Math.max(0, totalRemaining - Number(draft.minimumRemainingStock || 0));
                       return <article key={product.id} className="fm-ecommerce-product-config">
                         <div className="fm-ecommerce-product-config__header">
@@ -520,9 +522,10 @@ export default function EcommercePage() {
                         </div>
                         <div className="fm-ecommerce-product-config__fields">
                           <FormField label="Precio web (ARS)"><input type="number" min="1" step="1" value={draft.priceOverride} placeholder={product.defaultPrice ? `Habitual: ${formatMoney(product.defaultPrice)}` : "Ingresá un precio web"} onChange={(e) => updateProductDraft(product.id, "priceOverride", e.target.value)} /></FormField>
-                          <FormField label="Stock mínimo a conservar"><input type="number" min="0" step="1" value={draft.minimumRemainingStock} onChange={(e) => updateProductDraft(product.id, "minimumRemainingStock", e.target.value)} /></FormField>
+                          <FormField label="Stock mínimo total protegido" hint="La tienda vende sólo el excedente. Al llegar a este total, muestra Sin stock."><input type="number" min="0" step="1" value={draft.minimumRemainingStock} onChange={(e) => updateProductDraft(product.id, "minimumRemainingStock", e.target.value)} /></FormField>
                           <div className="fm-ecommerce-product-config__availability">
                             <div>Stock físico total activo <strong>{physicalStock} unidades</strong></div>
+                            <div>Reservado para pedidos web <strong>{reserved} unidades</strong></div>
                             <div>Disponible para la web <strong>{webAvailable} unidades</strong></div>
                           </div>
                         </div>

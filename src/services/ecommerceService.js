@@ -25,6 +25,10 @@ export function fetchEcommerceBilling(cuit, options) {
   return checkoutRequest({ mode: "billing-preview", cuit }, options, "No pudimos consultar los datos fiscales.");
 }
 
+export function checkoutReservationRequest(payload) {
+  return checkoutRequest(payload, undefined, "No pudimos confirmar la reserva del carrito.");
+}
+
 export function createEcommerceOrder(payload, options) {
   return checkoutRequest(payload, options, "No se pudo crear el pedido.");
 }
