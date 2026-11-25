@@ -3,7 +3,7 @@ import { MapPin } from "lucide-react";
 import { parseAddressSearch } from "../shared/ecommerceDelivery.mjs";
 import { requestEcommerceDelivery } from "../services/ecommerceService";
 
-export default function DeliveryAddressPicker({ value, selection, onInput, onSelect, error }) {
+export default function DeliveryAddressPicker({ label = "Calle y altura", value, selection, onInput, onSelect, error }) {
   const listId = useId();
   const listbox = useRef(null);
   const [open, setOpen] = useState(false);
@@ -69,7 +69,7 @@ export default function DeliveryAddressPicker({ value, selection, onInput, onSel
       if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
     }}>
       <label className="field-label">
-        Calle y altura
+        {label}
         <input
           name="addressSearch"
           value={value}

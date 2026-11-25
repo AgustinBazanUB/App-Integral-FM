@@ -299,3 +299,7 @@ export function prepareAuthoritativeCheckout({
     stockCommitRequired: paymentStatus === "simulated_approved" || paymentStatus === "approved",
   };
 }
+
+export function checkoutEditPath(orderId) {
+  return "ecommerceOperations/checkout_edit_" + orderId;
+}

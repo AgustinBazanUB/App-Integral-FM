@@ -21,7 +21,15 @@ export async function fetchEcommerceCatalog({ fetchImpl = fetch } = {}) {
   return data.catalog;
 }
 
-export async function createEcommerceOrder(payload, { fetchImpl = fetch } = {}) {
+export function fetchEcommerceBilling(cuit, options) {
+  return checkoutRequest({ mode: "billing-preview", cuit }, options, "No pudimos consultar los datos fiscales.");
+}
+
+export function createEcommerceOrder(payload, options) {
+  return checkoutRequest(payload, options, "No se pudo crear el pedido.");
+}
+
+async function checkoutRequest(payload, { signal, fetchImpl = fetch } = {}, fallback) {
   const response = await fetchImpl(ecommercePublicEndpoint("checkout"), {
     method: "POST",
     headers: {
@@ -29,10 +37,11 @@ export async function createEcommerceOrder(payload, { fetchImpl = fetch } = {}) 
       Accept: "application/json",
     },
     body: JSON.stringify(payload),
+    signal,
   });
   const data = await safeJson(response);
   if (!response.ok || data?.ok !== true) {
-    const error = new Error(data?.message || "No se pudo crear el pedido.");
+    const error = new Error(data?.message || fallback);
     error.code = data?.code || "ecommerce-checkout-error";
     error.status = response.status;
     throw error;

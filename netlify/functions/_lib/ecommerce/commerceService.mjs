@@ -23,6 +23,7 @@ import {
 import {
   authoritativeUnitPrice,
   authoritativeVatRate,
+  checkoutEditPath,
   commerceError,
   ecommerceLocationId,
   ecommercePickupEnabled,
@@ -277,6 +278,9 @@ export async function createEcommerceOrder({
       order: publicEcommerceOrder(orderId, existing.data),
     };
   }
+  const abandoned = accessHash && await getDocument(checkoutEditPath(orderId), { env });
+  if (abandoned?.data.accessHash === accessHash)
+    throw commerceError("ecommerce-checkout-edited", "El intento anterior se cerró al editar el pedido.", 409);
   const channel = await loadWebChannel({ env, getDocument });
   if (channel && !accessHash)
     throw commerceError(

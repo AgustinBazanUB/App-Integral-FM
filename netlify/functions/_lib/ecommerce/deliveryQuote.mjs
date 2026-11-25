@@ -93,15 +93,21 @@ export async function calculateDeliveryRate({
   };
 }
 
+export async function confirmSelectedAddress(selectionToken, {
+  env = process.env, now = new Date(), confirm = confirmAddress,
+} = {}) {
+  const selection = decodeToken(selectionToken, "address", env);
+  if (selection.expiresAt <= now.getTime()) {
+    throw commerceError("ecommerce-delivery-selection-expired", "Volvé a buscar la dirección para confirmarla.", 409);
+  }
+  return confirm(selection.address, { env });
+}
+
 export async function quoteSelectedDelivery({
   selectionToken, delivery, items, settings = {}, promotions = {}, env = process.env, now = new Date(),
   confirm = confirmAddress, quoteCarrier = quoteAndreani,
 }) {
-  const selection = decodeToken(selectionToken, "address", env);
-  if (selection.expiresAt <= now.getTime()) {
-    throw commerceError("ecommerce-delivery-selection-expired", "Volvé a buscar la dirección para cotizar el envío.", 409);
-  }
-  const address = await confirm(selection.address, { env });
+  const address = await confirmSelectedAddress(selectionToken, { env, now, confirm });
   let rate;
   try {
     rate = await calculateDeliveryRate({ delivery, address, items, settings, promotions, env, quoteCarrier });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ecommercePublicEndpoint } from "../services/ecommercePublicEndpoint";
 
 const statusMessages = {
@@ -9,18 +9,23 @@ const statusMessages = {
   error: "El comprobante requiere revisión en Gestión.",
 };
 
-export default function PaywayInvoiceAction({ order, accessToken, onUpdate }) {
+export default function PaywayInvoiceAction({ order, accessToken, onUpdate, autoRequest = false }) {
+  const pending = useRef(false);
+  const automaticOrder = useRef(null);
+  const orderId = order.id;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  async function requestInvoice() {
+  const requestInvoice = useCallback(async () => {
+    if (pending.current) return;
+    pending.current = true;
     setBusy(true);
     setError("");
     try {
       const response = await fetch(ecommercePublicEndpoint("order-status"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "invoice", orderId: order.id, accessToken }),
+        body: JSON.stringify({ mode: "invoice", orderId, accessToken }),
       });
       const data = await response.json();
       if (!response.ok || !data.ok) {
@@ -30,9 +35,17 @@ export default function PaywayInvoiceAction({ order, accessToken, onUpdate }) {
     } catch (requestError) {
       setError(requestError.message || "No se pudo consultar ARCA.");
     } finally {
+      pending.current = false;
       setBusy(false);
     }
-  }
+  }, [accessToken, onUpdate, orderId]);
+
+  useEffect(() => {
+    if (!autoRequest || !accessToken || order.paymentStatus !== "approved" || order.invoiceStatus !== "pending"
+        || automaticOrder.current === orderId) return;
+    automaticOrder.current = orderId;
+    requestInvoice();
+  }, [accessToken, autoRequest, orderId, order.invoiceStatus, order.paymentStatus, requestInvoice]);
 
   return (
     <div className="integration-state">

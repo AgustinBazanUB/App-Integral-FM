@@ -1,5 +1,7 @@
 import { authorizeInvoice, reconcileInvoice, verifyAuthorizedInvoice } from "../arca/authorizer.mjs";
 import { arcaSafeStatus } from "../arca/config.mjs";
+import { assertValidCuit } from "../arca/cuit.mjs";
+import { getTaxpayer } from "../arca/registry.mjs";
 import { syncInvoiceToSale } from "../arca/invoicePersistence.mjs";
 import { adminGetDocument } from "../firestoreAdminRest.mjs";
 import { normalizeBilling } from "./channelService.mjs";
@@ -18,6 +20,31 @@ function assertHomologationReady(env, { requireCae = false } = {}) {
       (requireCae && !status.caeHomologationEnabled)) {
     throw commerceError("ecommerce-arca-homologation-unavailable", "La configuración de ARCA homologación está incompleta.", 503);
   }
+}
+
+export async function previewPaywayBilling(cuit, {
+  env = process.env,
+  checkReadiness = assertHomologationReady,
+  lookup = getTaxpayer,
+} = {}) {
+  paywayConfig(env);
+  if (typeof cuit !== "string" || !/^\d{2}-?\d{8}-?\d$/.test(cuit.trim()))
+    throw commerceError("ecommerce-receiver-cuit-invalid", "Ingresá un CUIT válido.", 400);
+  const digits = assertValidCuit(cuit);
+  checkReadiness(env);
+  const taxpayer = await lookup(digits, { env });
+  const receiver = await resolveEcommerceReceiver({ cuit: digits }, { env, getTaxpayerFn: async () => taxpayer });
+  assertRequestedInvoiceClass({ requestedClass: "A" }, receiver, env);
+  const fiscal = taxpayer.fiscalAddress;
+  return {
+    name: (taxpayer.businessName || [taxpayer.lastName, taxpayer.firstName].filter(Boolean).join(" ")).slice(0, 200),
+    address: {
+      street: fiscal?.address?.slice(0, 100) || "",
+      city: fiscal?.locality?.slice(0, 50) || "",
+      province: fiscal?.province?.slice(0, 70) || "",
+      postalCode: fiscal?.postalCode?.slice(0, 10) || "",
+    },
+  };
 }
 
 export async function validatePaywayInvoiceA(rawBilling, {

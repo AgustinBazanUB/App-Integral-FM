@@ -3990,6 +3990,41 @@ input::placeholder {
     transition-duration: 0.01ms !important;
   }
 }
+.checkout-payment {
+  display: grid;
+  gap: 20px;
+}
+
+.checkout-billing {
+  border: 1px solid var(--border);
+  padding: 16px;
+  min-width: 0;
+}
+
+.checkout-billing .form-grid {
+  margin-top: 12px;
+}
+
+.payway-billing-address {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+}
+
+.payway-billing-address .delivery-retry,
+.checkout-payment > .delivery-retry {
+  justify-self: start;
+}
+
+.payway-document {
+  margin-bottom: 10px;
+  color: var(--text-secondary);
+}
+
+.payway-document summary {
+  cursor: pointer;
+}
+
 .payway-payment {
   display: grid;
   gap: 18px;

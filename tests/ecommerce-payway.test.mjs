@@ -10,7 +10,7 @@ import { paywayConfig, paywayPublicConfig, paywayAmount, paywayRetailRisk, verif
 import { summarizeSales } from "../src/modules/locations/domain/saleFacts.js";
 import { ensurePendingInvoice, syncInvoiceToSale } from "../netlify/functions/_lib/arca/invoicePersistence.mjs";
 import { prepareEcommerceInvoiceFiscal } from "../netlify/functions/_lib/ecommerce/fiscalService.mjs";
-import { requestPaywayInvoice, validatePaywayInvoiceA } from "../netlify/functions/_lib/ecommerce/paywayFiscalService.mjs";
+import { previewPaywayBilling, requestPaywayInvoice, validatePaywayInvoiceA } from "../netlify/functions/_lib/ecommerce/paywayFiscalService.mjs";
 import { reservedStockQuantity } from "../src/shared/stockReservations.mjs";
 
 const env = { CONTEXT: "deploy-preview", FIREBASE_PROJECT_ID: "app-integral-fm-pruebas", VITE_FIREBASE_PROJECT_ID: "app-integral-fm-pruebas",
@@ -144,6 +144,66 @@ test("cancelación administrativa bloqueada con cobro incierto",async()=>{
   await assert.rejects(()=>manageWebOrder({body:{mode:"cancel",orderId:s.order.id,requestId:"cancel_payway_0001",reason:"QA"},session:session(admin),env,now,runTransaction:s.db.runTransaction}));
   assert.equal(s.db.documents.get(`orders/${s.order.id}`).status,"pending_payment");
 });
+test("volver a editar libera sólo la reserva autenticada y bloquea el cobro del pedido anterior", async () => {
+  const s = await setup();
+  const edit = { mode: "edit", orderId: s.order.id, accessToken };
+  await assert.rejects(() => s.process({ body: { ...edit, accessToken: "x".repeat(48) } }), { code: "ecommerce-order-access-denied" });
+  const stockPath = "locationStock/valle/items/oil";
+  const before = s.db.documents.get(stockPath);
+  const otherId = "ecommerce_order_other_0001";
+  before.ecommerceReservations[otherId] = { quantity: 3, expiresAt: new Date(now.valueOf() + 600000) };
+  for (let call = 0; call < 2; call += 1) {
+    assert.deepEqual(await s.process({ body: edit }), { editable: true });
+  }
+  const stock = s.db.documents.get(stockPath);
+  assert.equal(stock.currentStock, 10);
+  assert.equal(stock.ecommerceReservations[s.order.id], undefined);
+  assert.equal(stock.ecommerceReservations[otherId].quantity, 3);
+  assert.equal(s.db.documents.get("orders/" + s.order.id).cancelledForEditing, true);
+  assert.equal(s.db.documents.get("payments/" + s.order.paymentId).status, "cancelled");
+  await assert.rejects(s.process, { code: "ecommerce-reservation-expired" });
+  assert.equal(s.charges(), 0);
+  for (const collection of ["sales", "shipments", "stockMovements", "invoices"]) assert.equal(rows(s.db, collection).length, 0);
+});
+
+test("un checkout retrasado no crea una reserva si el comprador ya volvió a editar", async () => {
+  const s = await setup();
+  const laterBody = { ...body, requestId: "checkout_retrasado_0001" };
+  const orderId = "ecommerce_order_" + laterBody.requestId;
+  const edit = { mode: "edit", orderId, accessToken };
+  assert.deepEqual(await s.process({ body: edit }), { editable: true });
+  const create = () => s.db.runTransaction(tx => createEcommerceOrder({ body: laterBody, env, now, ...tx }));
+  await assert.rejects(create, { code: "ecommerce-checkout-edited" });
+  assert.equal(rows(s.db, "orders").length, 1);
+  assert.equal(s.db.documents.get("locationStock/valle/items/oil").ecommerceReservations[orderId], undefined);
+});
+
+test("la edición espera la confirmación de Payway y respeta un pago aprobado", async () => {
+  const s = await setup();
+  const edit = { mode: "edit", orderId: s.order.id, accessToken };
+  const charge = s.gateway.charge;
+  s.gateway.charge = async payload => {
+    await assert.rejects(() => s.process({ body: edit }), { code: "ecommerce-checkout-payment-unresolved" });
+    return charge(payload);
+  };
+  const confirmed = await s.process();
+  assert.equal(confirmed.order.paymentStatus, "approved");
+  await assert.rejects(() => s.process({ body: edit }), { code: "ecommerce-checkout-already-paid" });
+  assert.equal(s.charges(), 1);
+  assert.equal(rows(s.db, "sales").length, 1);
+});
+
+test("un intento rechazado por Payway admite edición y un nuevo pedido", async () => {
+  for (const status of ["rejected", "cancelled"]) {
+    const s = await setup();
+    s.gateway.charge = async payload => receipt(payload, { status });
+    await s.process();
+    const edit = { mode: "edit", orderId: s.order.id, accessToken };
+    assert.deepEqual(await s.process({ body: edit }), { editable: true });
+    assert.equal(rows(s.db, "sales").length, 0);
+  }
+});
+
 test("aislamiento falla cerrado para producción, mezcla de Firebase y ARCA productiva",()=>{
   for(const patch of [{PAYWAY_ENVIRONMENT:"production"},{CONTEXT:"production"},{FIREBASE_PROJECT_ID:"app-integral-fm"},{ARCA_ENVIRONMENT:"production"},{VITE_FIREBASE_PROJECT_ID:"app-integral-fm"}]) assert.throws(()=>paywayConfig({...env,...patch}));
   const publicConfig=paywayPublicConfig(env);assert.equal(publicConfig.enabled,true);assert.ok(!JSON.stringify(publicConfig).includes(env.PAYWAY_SANDBOX_PRIVATE_KEY));
@@ -189,6 +249,29 @@ test("Factura A valida la condición fiscal del CUIT antes de reservar o cobrar"
   }), { code: "ecommerce-invoice-a-unavailable" });
   await assert.rejects(() => validatePaywayInvoiceA(billingA, {
     ...props, env: { ...fiscalEnv, CONTEXT: "production" },
+  }), { code: "payway-isolation-required" });
+});
+
+test("el autocompletado fiscal expone sólo nombre y domicilio de un CUIT apto en homologación", async () => {
+  const profile = {
+    found: true, keyStatus: "ACTIVO", cuit: billingA.cuit, businessName: "Empresa ficticia",
+    taxes: [{ id: 30, status: "AC" }], endpoint: "interno",
+    fiscalAddress: { address: "Calle QA 321", locality: "La Plata", province: "Buenos Aires", postalCode: "1900" },
+  };
+  const options = {
+    env: fiscalEnv, checkReadiness: () => {},
+    lookup: async cuit => {
+      assert.equal(cuit, billingA.cuit);
+      return profile;
+    },
+  };
+  assert.deepEqual(await previewPaywayBilling(billingA.cuit, options), {
+    name: "Empresa ficticia",
+    address: { street: "Calle QA 321", city: "La Plata", province: "Buenos Aires", postalCode: "1900" },
+  });
+  await assert.rejects(() => previewPaywayBilling("12345678", options), { code: "ecommerce-receiver-cuit-invalid" });
+  await assert.rejects(() => previewPaywayBilling(billingA.cuit, {
+    ...options, env: { ...fiscalEnv, ARCA_ENVIRONMENT: "production" },
   }), { code: "payway-isolation-required" });
 });
 

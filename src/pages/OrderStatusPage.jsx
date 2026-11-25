@@ -139,7 +139,7 @@ export default function OrderStatusPage() {
               </p>
             )}
             {order.paymentStatus === "approved" && order.paymentEnvironment === "sandbox" ? (
-              <PaywayInvoiceAction order={order} accessToken={access.accessToken}
+              <PaywayInvoiceAction order={order} accessToken={access.accessToken} autoRequest
                 onUpdate={invoice => setOrder(current => ({ ...current, ...invoice }))} />
             ) : <p>Comprobante: {order.invoiceStatus}</p>}
             {order.documentAvailable && (
