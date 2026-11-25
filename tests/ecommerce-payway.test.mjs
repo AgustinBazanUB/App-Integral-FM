@@ -98,6 +98,27 @@ test("timeout mantiene referencia estable; consulta posterior recupera aprobaci�
   const recovered=await s.process({now:later,body:{mode:"reconcile",orderId:s.order.id,accessToken}});
   assert.equal(recovered.order.paymentStatus,"approved");assert.equal(s.charges(),1);
 });
+test("una anulación de Payway ya conciliada libera la reserva y habilita la edición", async () => {
+  const s = await setup();
+  const charge = s.gateway.charge;
+  s.gateway.charge = async payload => {
+    const value = await charge(payload);
+    return { ...value, status: "review" };
+  };
+  const pending = await s.process();
+  assert.equal(pending.gateway.state, "pending");
+  s.gateway.info = async () => receipt(s.payload(), { status: "annulled" });
+  const reconciled = await s.process({
+    now: new Date(now.valueOf() + 20000), body: { mode: "reconcile", orderId: s.order.id, accessToken },
+  });
+  assert.equal(reconciled.order.paymentStatus, "cancelled");
+  assert.equal(s.db.documents.get("orders/" + s.order.id).reservationStatus, "released");
+  assert.equal(reservedStockQuantity(s.db.documents.get("locationStock/valle/items/oil"), now), 0);
+  assert.deepEqual(await s.process({ body: { mode: "edit", orderId: s.order.id, accessToken } }), { editable: true });
+  assert.equal(s.charges(), 1);
+  for (const collection of ["sales", "shipments", "stockMovements", "invoices"]) assert.equal(rows(s.db, collection).length, 0);
+});
+
 test("consulta sin resultado nunca dispara otro cobro",async()=>{
   const s=await setup();s.gateway.charge=async()=>{throw Error("timeout")};s.gateway.find=async()=>[];
   await s.process();const r=await s.process({now:new Date(now.valueOf()+20000)});

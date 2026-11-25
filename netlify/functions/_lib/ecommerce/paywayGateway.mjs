@@ -120,7 +120,13 @@ export function verifiedPaywayReceipt(response, expected) {
       || !/^[0-9]{1,30}$/.test(String(response.id || "")))
     throw commerceError("payway-response-mismatch", "La respuesta de Payway necesita conciliación administrativa.", 409);
   const status = String(response.status || "").toLowerCase();
-  const mapped = ({ approved: "approved", rejected: "rejected", cancelled: "cancelled", canceled: "cancelled" })[status] || "pending";
+  const mapped = ({
+    approved: "approved",
+    rejected: "rejected",
+    cancelled: "cancelled",
+    canceled: "cancelled",
+    annulled: "cancelled",
+  })[status] || "pending";
   return { verified: true, environment: "sandbox", siteId: String(response.site_id), operationId: response.site_transaction_id,
     providerId: String(response.id), amount: Number(response.amount), currency: "ARS",
     status: mapped, providerStatus: status, paymentMethodId: Number(response.payment_method_id), installments: 1,
