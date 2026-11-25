@@ -1,5 +1,7 @@
 const CATALOG = Object.freeze({
   "ecommerce-receiver-cuit-invalid": { status: 400, message: "Ingresá un CUIT válido o dejalo vacío para Consumidor Final." },
+  "ecommerce-invoice-a-unavailable": { status: 409, message: "La condición fiscal de ese CUIT no admite Factura A." },
+  "ecommerce-arca-homologation-unavailable": { status: 503, message: "ARCA homologación todavía no está configurada para esta prueba." },
   "ecommerce-invoice-receiver-conflict": { status: 409, message: "El receptor no coincide con la factura existente." },
   "arca-sale-invoice-conflict": { status: 409, message: "La venta ya tiene una asociación fiscal diferente." },
   "ecommerce-location-not-configured": { status: 409, message: "La ubicación de stock Ecommerce está PENDIENTE DE DEFINIR." },
@@ -14,6 +16,7 @@ const CATALOG = Object.freeze({
   "ecommerce-stock-inactive": { status: 409, message: "Uno de los productos no está habilitado para Ecommerce." },
   "ecommerce-stock-product-mismatch": { status: 409, message: "La configuración de stock no coincide con el producto." },
   "ecommerce-stock-invalid": { status: 409, message: "El stock comercial tiene un valor inválido." },
+  "ecommerce-reservation-cart-changed": { status: 409, message: "El carrito cambió. Volvé a reservar la selección actual." },
   "ecommerce-stock-insufficient": { status: 409, message: "No hay stock suficiente para completar la operación." },
   "ecommerce-price-not-configured": { status: 409, message: "Uno de los productos no tiene un precio comercial válido." },
   "ecommerce-vat-not-configured": { status: 409, message: "Uno de los productos todavía no tiene IVA configurado." },
@@ -24,6 +27,16 @@ const CATALOG = Object.freeze({
   "ecommerce-customer-phone-invalid": { status: 400, message: "Ingresá un teléfono válido." },
   "ecommerce-pickup-not-configured": { status: 409, message: "El retiro todavía no está habilitado comercialmente." },
   "ecommerce-delivery-not-configured": { status: 409, message: "El costo y las reglas de envío están PENDIENTE DE DEFINIR." },
+  "ecommerce-delivery-lookup-unconfigured": { status: 503, message: "La consulta de envíos todavía no está habilitada." },
+  "ecommerce-delivery-request-invalid": { status: 400, message: "La consulta de envío no es válida." },
+  "ecommerce-address-query-invalid": { status: 400, message: "Ingresá calle y altura." },
+  "ecommerce-address-lookup-failed": { status: 503, message: "No pudimos buscar direcciones. Reintentá." },
+  "ecommerce-postal-lookup-failed": { status: 503, message: "No pudimos consultar el código postal. Reintentá." },
+  "ecommerce-postal-unconfirmed": { status: 409, message: "No pudimos confirmar el código postal para esa dirección. Probá otra búsqueda o elegí retiro." },
+  "ecommerce-delivery-token-invalid": { status: 409, message: "Volvé a seleccionar la dirección para confirmar el envío." },
+  "ecommerce-delivery-selection-expired": { status: 409, message: "Volvé a buscar la dirección para cotizar el envío." },
+  "ecommerce-delivery-quote-required": { status: 409, message: "Elegí una dirección y confirmá la cotización de envío." },
+  "ecommerce-delivery-quote-stale": { status: 409, message: "La cotización cambió o venció. Revisá el envío antes de pagar." },
   "ecommerce-shipping-method-invalid": { status: 400, message: "La forma de entrega no es válida." },
   "ecommerce-total-invalid": { status: 409, message: "El total Ecommerce no es válido." },
   "ecommerce-checkout-payment-authority-denied": { status: 403, message: "El checkout público sólo puede crear pagos pendientes." },
@@ -52,6 +65,9 @@ const CATALOG = Object.freeze({
   "arca-issuer-vat-condition-missing": { status: 409, message: "Falta configurar la condición IVA del emisor." },
   "arca-consumer-final-threshold-invalid": { status: 409, message: "El umbral fiscal de Consumidor Final no es válido." },
   "arca-cuit-invalid": { status: 400, message: "El CUIT ingresado no es válido." },
+  "ecommerce-checkout-already-paid": { status: 409, message: "El pedido ya está pagado. Consultá su estado para ver la confirmación." },
+  "ecommerce-checkout-payment-unresolved": { status: 409, message: "Consultá el resultado en Payway para poder editar el pedido." },
+  "ecommerce-checkout-edited": { status: 409, message: "Este intento se cerró cuando editaste el pedido. Volvé a intentarlo." },
   "ecommerce-order-conflict": { status: 409, message: "El pedido cambió durante la operación. Volvé a intentarlo." },
   "firebase-admin-config-missing": { status: 503, message: "El backend comercial no está configurado todavía." },
   "firebase-admin-token-error": { status: 503, message: "El backend comercial no pudo autenticarse." },
@@ -64,6 +80,28 @@ export function publicEcommerceError(error) {
   const code = String(error?.code || "").match(/^[A-Za-z0-9._-]{1,120}$/)?.[0] || "ecommerce-error";
   const known = CATALOG[code];
   if (known) return { code, status: known.status, message: known.message };
+  const messages = {
+    "payway-disabled":"Payway Sandbox todavía no está habilitado.",
+    "payway-isolation-required":"El entorno de pagos de prueba no está configurado correctamente.",
+    "payway-config-missing":"Falta completar la configuración segura de Payway Sandbox.",
+    "payway-token-invalid":"Revisá los datos de la tarjeta de prueba.",
+    "payway-risk-data-required":"Completá el domicilio de facturación y esperá a que cargue la validación segura.",
+    "payway-request-invalid":"La solicitud de pago no es válida.",
+    "payway-evidence-required":"El pago requiere confirmación autenticada de Payway.",
+    "ecommerce-channel-inactive":"La tienda todavía no está habilitada para pedidos.",
+    "ecommerce-address-incomplete":"Completá calle, altura, localidad, provincia y código postal.",
+    "ecommerce-delivery-coverage":"No hay una tarifa de envío habilitada para ese destino.",
+    "ecommerce-reservation-expired":"La reserva venció. Volvé a reservar el carrito.",
+    "ecommerce-reservation-invalid":"La reserva del pedido ya no está vigente.",
+    "ecommerce-billing-invalid":"Revisá la opción de facturación, razón social y domicilio fiscal.",
+    "ecommerce-rate-limit":"Demasiados intentos. Esperá un minuto y volvé a intentar.",
+    "ecommerce-order-access-denied":"El acceso privado al pedido no es válido.",
+    "ecommerce-document-pending":"El comprobante todavía no está disponible.",
+    "ecommerce-simulation-isolation-required":"La simulación requiere Firebase de pruebas y ARCA homologación.",
+    "ecommerce-origin-not-authorized":"El origen no está autorizado para este canal.",
+    "ecommerce-management-blocked":"El pedido no admite esta operación en su estado actual.",
+  };
+  if(messages[code]) return {code,status:error.status || 409,message:messages[code]};
   const status = Number(error?.status);
   return {
     code,

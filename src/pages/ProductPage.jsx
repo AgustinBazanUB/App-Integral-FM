@@ -8,6 +8,7 @@ import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import { categoryById } from "../data/categories";
 import { getProductAsset } from "../data/assetsManifest";
 import { trackEvent } from "../utils/analytics";
+import { formatPrice } from "../utils/format";
 import { useEffect } from "react";
 
 const crossSellByCategory = {
@@ -18,19 +19,10 @@ const crossSellByCategory = {
   seasoned_salts: ["olive_oil", "olives"],
 };
 
-function formatPrice(price) {
-  if (typeof price !== "number") return "Precio no disponible";
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(price);
-}
-
 export default function ProductPage() {
   const { slug } = useParams();
-  const { bySlug, products, status } = useCommerceCatalog();
-  const product = bySlug[slug] || null;
+  const { resolveDisplayProduct, browseProducts, status } = useCommerceCatalog();
+  const product = resolveDisplayProduct(slug);
   const { addItem, openCart } = useCart();
 
   useEffect(() => {
@@ -70,9 +62,11 @@ export default function ProductPage() {
   };
   const productAsset = getProductAsset(product.editorialId || product.id);
   const relatedCategories = crossSellByCategory[product.categoryId] ?? [];
-  const relatedProducts = products
+  const relatedProducts = browseProducts
     .filter((item) => item.id !== product.id && relatedCategories.includes(item.categoryId))
     .slice(0, 3);
+
+  const availability = product.commercialReady ? "Disponible" : product.stockState === "out" ? "Sin stock" : "No disponible";
 
   const addAndOpen = () => {
     if (addItem(product)) openCart();
@@ -83,7 +77,7 @@ export default function ProductPage() {
     "@type": "Product",
     name: product.name,
     description: product.description,
-    image: product.image ? `${window.location.origin}${product.image}` : undefined,
+    image: product.image ? new URL(product.image, window.location.origin).href : undefined,
     category: category.name,
     sku: product.id,
     brand: { "@type": "Brand", name: "Flor Mía" },
@@ -127,12 +121,16 @@ export default function ProductPage() {
           <p className="eyebrow">{category.name.toUpperCase()}</p>
           <h1>{product.name}</h1>
           <p className="product-detail__description">{product.description}</p>
-          <strong className="product-detail__price">{formatPrice(product.price)}</strong>
+          {product.promotionName ? <p className="product-card__promotion">{product.promotionName}</p> : null}
+          {product.freeShippingAmba && <p className="product-card__promotion">Envío sin cargo dentro del AMBA</p>}
+          <div className="product-price">
+            <strong>{formatPrice(product.price) ?? "Precio no disponible"}</strong>
+            {product.promotionName && product.compareAtPrice > product.price ? <s>{formatPrice(product.compareAtPrice)}</s> : null}
+          </div>
 
-          {!product.commercialReady ? (
+          {!product.commercialReady && product.stockState !== "out" ? (
             <div className="pending-panel">
-              <strong>Producto no disponible para checkout</strong>
-              <p>Precio, stock o dato fiscal todavía no están completamente configurados.</p>
+              <strong>Producto no disponible para compra online</strong>
             </div>
           ) : null}
 
@@ -141,7 +139,8 @@ export default function ProductPage() {
             {Object.entries(product.attributes || {}).map(([key, value]) => (
               <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{value}</dd></div>
             ))}
-            <div><dt>Stock disponible</dt><dd>{Number.isInteger(product.stock) ? product.stock : "No disponible"}</dd></div>
+            {product.formats?.length ? <div><dt>Presentación</dt><dd>{product.formats.join(", ")}</dd></div> : null}
+            <div><dt>Disponibilidad</dt><dd>{availability}</dd></div>
           </dl>
 
           <button
@@ -151,11 +150,11 @@ export default function ProductPage() {
             disabled={!product.commercialReady}
           >
             <ShoppingBag size={19} aria-hidden="true" />
-            {product.commercialReady ? "Agregar al carrito" : "No disponible"}
+            {product.commercialReady ? "Agregar al carrito" : availability}
           </button>
           <ul className="product-assurances">
-            <li><Check size={16} aria-hidden="true" />Precio y stock se validan nuevamente al confirmar</li>
-            <li><Check size={16} aria-hidden="true" />El checkout no emite factura ARCA</li>
+            <li><Check size={16} aria-hidden="true" />Precio y disponibilidad se validan nuevamente al confirmar</li>
+            <li><Check size={16} aria-hidden="true" />Elegí el comprobante durante el checkout</li>
           </ul>
         </div>
       </section>

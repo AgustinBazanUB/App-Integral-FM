@@ -1,0 +1,101 @@
+{
+  "verifiedAt": "2026-10-31T21:59:33.026Z",
+  "firebaseProject": "app-integral-fm-pruebas",
+  "order": {
+    "id": "ecommerce_order_34d35255-ab67-486c-bbde-b0ac7200056b",
+    "status": "confirmed",
+    "paymentStatus": "approved",
+    "total": 1500,
+    "shippingAmount": 500,
+    "saleId": "ecommerce_sale_34d35255-ab67-486c-bbde-b0ac7200056b",
+    "shipmentId": "shipment_ecommerce_sale_34d35255-ab67-486c-bbde-b0ac7200056b",
+    "paymentEnvironment": "sandbox",
+    "reservationStatus": "consumed",
+    "invoiceStatus": "pending",
+    "paywayState": "completed",
+    "paymentIncident": null
+  },
+  "payment": {
+    "id": "ecommerce_payment_34d35255-ab67-486c-bbde-b0ac7200056b",
+    "status": "approved",
+    "amount": 1500,
+    "currency": "ARS",
+    "gateway": {
+      "operationId": "fm_6b41e0ecb648937d738053a524736c37",
+      "amount": 150000,
+      "paymentMethodId": 1,
+      "errorCode": null,
+      "updatedAt": "2026-10-31T21:52:08.006Z",
+      "currency": "ARS",
+      "state": "completed",
+      "receipt": {
+        "verified": true,
+        "providerStatus": "approved",
+        "currency": "ARS",
+        "environment": "sandbox",
+        "installments": 1,
+        "amount": 150000,
+        "operationId": "fm_6b41e0ecb648937d738053a524736c37",
+        "providerId": "16182379",
+        "status": "approved",
+        "paymentMethodId": 1,
+        "siteId": "93146856",
+        "errorType": null
+      },
+      "siteId": "93146856",
+      "reconciliationCount": 0,
+      "environment": "sandbox",
+      "submittedAt": "2026-10-31T21:52:03.808Z"
+    }
+  },
+  "provider": {
+    "httpStatus": 200,
+    "id": 16182379,
+    "status": "approved",
+    "siteId": "93146856",
+    "operationId": "fm_6b41e0ecb648937d738053a524736c37",
+    "amount": 150000,
+    "currency": "ars",
+    "paymentMethodId": 1,
+    "date": "2026-10-31T18:52Z",
+    "error": null
+  },
+  "sale": {
+    "id": "ecommerce_sale_34d35255-ab67-486c-bbde-b0ac7200056b",
+    "count": 1,
+    "channelId": "ecommerce",
+    "sourceChannel": "ecommerce",
+    "paymentEnvironment": "sandbox",
+    "testData": true,
+    "total": 1500,
+    "paymentReference": "16182379",
+    "stockOriginId": "qa-pr53-location"
+  },
+  "stock": {
+    "currentStock": 19,
+    "movements": [
+      {
+        "id": "ecommerce_34d35255-ab67-486c-bbde-b0ac7200056b_76655a325ff7463c6921_e6e64ff3745b",
+        "qty": -1,
+        "previousStock": 20,
+        "newStock": 19,
+        "testData": true
+      }
+    ]
+  },
+  "shipment": {
+    "id": "shipment_ecommerce_sale_34d35255-ab67-486c-bbde-b0ac7200056b",
+    "creationSource": "ecommerce",
+    "status": "listo_retirar",
+    "deliveryType": "manual",
+    "paymentEnvironment": "sandbox",
+    "testData": true
+  },
+  "metrics": {
+    "sandboxSalesCount": 1,
+    "sandboxAmount": 1500,
+    "realRevenueContribution": 0,
+    "realSalesContribution": 0,
+    "excludedAsTest": true
+  }
+}

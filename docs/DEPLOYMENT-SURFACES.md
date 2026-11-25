@@ -1,5 +1,15 @@
 # Superficies y despliegues de Flor Mía
 
+## Integración revisada el 30/10/2026
+
+Actualización posterior del PR #53: el canal de staging está configurado y el catálogo devuelve `ready:true`; entrega, retiro y consulta privada se probaron contra Firebase remoto. Ver [verificación del canal remoto](ECOMMERCE-PR53-STAGING-2026-10-30.md). Las referencias `ready:false` de este documento describen la inspección anterior a esa configuración.
+
+La rama de integración incorpora `channels/ecommerce`, reservas, ventas y logística transaccionales, retiro presencial y consulta privada del pedido. Ver [auditoría](ECOMMERCE-AUDITORIA-2026-10-30.md) e [informe y pruebas](ECOMMERCE-INTEGRACION-2026-10-30.md). Las descripciones del deploy del 29/09 que siguen son antecedentes, no evidencia de que ese deploy tenga el backend actual.
+
+El sitio público conserva vacía su carpeta de Functions. Su build genera rutas `/api/ecommerce/catalog`, `/api/ecommerce/checkout` y `/api/ecommerce/order-status`, con proxies limitados a `ecommerce-catalog`, `ecommerce-checkout` y `ecommerce-order-status` cuando se configura `ECOMMERCE_BACKEND_URL` con el origen HTTPS del backend Netlify autorizado. En un Deploy Preview debe ser un backend Deploy Preview aislado. No se copian secretos y no se proxifican Functions administrativas, simulación ni ARCA. El build remoto del sitio público falla si falta esa variable.
+
+En lectura HTTP del 30/10, el sitio público separado respondió HTML de la SPA en la URL de catálogo, mientras el backend de Gestión respondió JSON con `ready:false`. Después de esa lectura se publicó y verificó un borrador independiente: https://6ae53c75ad2c6548bf636cfc--flor-mia-ecommerce-preview.netlify.app/productos, conectado a https://deploy-preview-53--appintegralflormia.netlify.app. Los tres contratos públicos responden JSON; catálogo identifica `app-integral-fm-pruebas` con `ready:false`. Falta configurar el canal remoto. La URL pública preexistente permanece sin cambios. Las rutas de origen `/.netlify/*` son reservadas y el parser las rechaza; el sitio separado usa `/api/ecommerce/*`.
+
 ## Decisión
 
 Flor Mía se mantiene en un solo repositorio, con dos artefactos web independientes:
@@ -53,7 +63,7 @@ El primer build al crear el proyecto usó temporalmente `deploy/ecommerce` como 
 
 Para verificar el sitio publicado, abrir `/`, `/productos` y `/checkout`, recargar una ruta profunda, confirmar que no aparece el gate administrativo y comprobar que `/.netlify/functions/arca-authorize` no está desplegada. En el deploy del 29/09/2026 se verificaron la portada, `/producto/aceite-oliva-5l` con recarga, `/checkout`, la página 404 de `/gestion` y la ausencia de la Function ARCA en su URL. El checkout actual es una demostración: no genera órdenes ni cobra pagos.
 
-## Estado actual honesto
+## Antecedente del despliegue separado inicial
 
 La separación de builds ya está preparada, pero el e-commerce todavía usa el catálogo editorial estático de `src/data/products.js`. El checkout no crea pedidos, no reserva stock y no procesa pagos. No debe anunciarse como tienda transaccional hasta implementar el backend público.
 

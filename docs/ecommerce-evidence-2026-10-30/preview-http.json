@@ -1,0 +1,41 @@
+{
+  "base": "https://6ae53c75ad2c6548bf636cfc--flor-mia-ecommerce-preview.netlify.app",
+  "backend": "https://deploy-preview-53--appintegralflormia.netlify.app",
+  "results": [
+    {
+      "path": "/api/ecommerce/catalog",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "ok": true,
+      "code": null,
+      "ready": false,
+      "environment": {
+        "firebaseProjectId": "app-integral-fm-pruebas"
+      }
+    },
+    {
+      "path": "/api/ecommerce/checkout",
+      "status": 405,
+      "contentType": "application/json; charset=utf-8",
+      "ok": false,
+      "code": "method-not-allowed"
+    },
+    {
+      "path": "/api/ecommerce/order-status",
+      "status": 405,
+      "contentType": "application/json",
+      "ok": false,
+      "code": null
+    },
+    {
+      "path": "/.netlify/functions/arca-authorize",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8"
+    },
+    {
+      "path": "/mi-pedido",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8"
+    }
+  ]
+}

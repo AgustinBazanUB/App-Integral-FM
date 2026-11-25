@@ -1,12 +1,13 @@
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../gestion/services/firebase";
+import { ecommercePublicEndpoint } from "./ecommercePublicEndpoint";
 
 function safeJson(response) {
   return response.json().catch(() => ({}));
 }
 
 export async function fetchEcommerceCatalog({ fetchImpl = fetch } = {}) {
-  const response = await fetchImpl("/.netlify/functions/ecommerce-catalog", {
+  const response = await fetchImpl(ecommercePublicEndpoint("catalog"), {
     method: "GET",
     headers: { Accept: "application/json" },
   });
@@ -20,20 +21,49 @@ export async function fetchEcommerceCatalog({ fetchImpl = fetch } = {}) {
   return data.catalog;
 }
 
-export async function createEcommerceOrder(payload, { fetchImpl = fetch } = {}) {
-  const response = await fetchImpl("/.netlify/functions/ecommerce-checkout", {
+export function fetchEcommerceBilling(cuit, options) {
+  return checkoutRequest({ mode: "billing-preview", cuit }, options, "No pudimos consultar los datos fiscales.");
+}
+
+export function checkoutReservationRequest(payload) {
+  return checkoutRequest(payload, undefined, "No pudimos confirmar la reserva del carrito.");
+}
+
+export function createEcommerceOrder(payload, options) {
+  return checkoutRequest(payload, options, "No se pudo crear el pedido.");
+}
+
+async function checkoutRequest(payload, { signal, fetchImpl = fetch } = {}, fallback) {
+  const response = await fetchImpl(ecommercePublicEndpoint("checkout"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
     body: JSON.stringify(payload),
+    signal,
   });
   const data = await safeJson(response);
   if (!response.ok || data?.ok !== true) {
-    const error = new Error(data?.message || "No se pudo crear el pedido.");
+    const error = new Error(data?.message || fallback);
     error.code = data?.code || "ecommerce-checkout-error";
     error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
+export async function requestEcommerceDelivery(payload, { signal, fetchImpl = fetch } = {}) {
+  const response = await fetchImpl(ecommercePublicEndpoint("delivery"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  const data = await safeJson(response);
+  if (!response.ok || data?.ok !== true) {
+    const error = new Error(data?.message || "No pudimos consultar el envío. Reintentá.");
+    error.code = data?.code || "ecommerce-delivery-request-failed";
     throw error;
   }
   return data;

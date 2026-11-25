@@ -59,7 +59,7 @@ export default async function handler(request) {
     const fiscal = await prepareEcommerceInvoiceFiscal({
       orderId,
       idempotencyKey,
-      receiverCuit: body?.receiverCuit ?? "",
+      receiverCuit: paymentResult.order.billing?.cuit || body?.receiverCuit || "",
       requestedBy: session.uid,
       requestedByName: session.profile?.name || session.email || null,
       env: process.env,

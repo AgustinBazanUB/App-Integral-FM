@@ -1,14 +1,20 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { useSearchParams } from "../router";
+import OccasionBuilder from "../components/OccasionBuilder";
+import OliveOilGuide from "../components/OliveOilGuide";
+import OilHeroSelector from "../components/OilHeroSelector";
+import OilQuiz from "../components/OilQuiz";
 import PageMeta from "../components/PageMeta";
 import ProductCard from "../components/ProductCard";
-import { categories, categoryById } from "../data/categories";
-import {
-  catalogCollections,
-  virtualCatalogCategories,
-} from "../data/catalogViews";
+import PromoShowcase from "../components/PromoShowcase";
+import Reveal from "../components/Reveal";
+import SectionHeading from "../components/SectionHeading";
+import SensoryComparison from "../components/SensoryComparison";
 import { useCommerceCatalog } from "../context/CommerceCatalogContext";
+import { categories, categoryById } from "../data/categories";
+import { catalogCollections } from "../data/catalogViews";
+import { oliveProfiles } from "../data/oliveProfiles";
 import { matchesSearch } from "../utils/search";
 import { trackEvent } from "../utils/analytics";
 
@@ -20,47 +26,63 @@ const categoryAliases = {
   sales: "seasoned_salts",
   regalos: "gifts",
   vinos: "wines",
+  packs: "bundles",
 };
 
-const occasions = [
-  ["", "Todas las ocasiones"],
-  ["picada", "Para una picada"],
-  ["breakfast", "Desayuno o merienda"],
-  ["gift", "Para regalar"],
-  ["everyday", "Todos los días"],
-];
+const oliveVarietyOrder = oliveProfiles.map((profile) => profile.productId);
+const oliveFormatOrder = { "500 cc": 0, "2 L": 1, "5 L": 2 };
+
+function oliveSortKey(product) {
+  const varietyIndex = oliveVarietyOrder.indexOf(product.editorialId || product.id);
+  if (varietyIndex !== -1) return varietyIndex;
+  const formatIndex = oliveFormatOrder[product.formats?.[0]] ?? 90;
+  return 100 + formatIndex;
+}
 
 export default function CatalogPage() {
-  const { products, status, error, ready, pending, location } = useCommerceCatalog();
+  const { browseProducts: products, giftOccasions, status, refresh } = useCommerceCatalog();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawCategory = searchParams.get("categoria") ?? "";
   const categoryId = categoryAliases[rawCategory] ?? rawCategory;
   const collectionId = searchParams.get("coleccion") ?? "";
   const query = searchParams.get("q") ?? "";
   const occasion = searchParams.get("ocasion") ?? "";
-  const activeCategory =
-    categoryById[categoryId] ?? virtualCatalogCategories[categoryId];
+  const [searchOpen, setSearchOpen] = useState(Boolean(query));
+  const searchInputRef = useRef(null);
+  const [oilMode, setOilMode] = useState("hero"); // hero, quiz, browse
+  const activeCategory = categoryById[categoryId];
   const activeCollection = catalogCollections[collectionId];
-  const collectionCategoryIds = activeCollection?.categoryIds ?? [];
+  const collectionCategoryIds = activeCollection?.categoryIds;
+
+  const isOliveOilView = categoryId === "olive_oil";
+  const isGiftsView = categoryId === "gifts";
 
   const filteredProducts = useMemo(
-    () =>
-      products.filter((product) => {
+    () => {
+      const matches = products.filter((product) => {
+        if (product.active === false) return false;
         const matchesCategory =
           !categoryId || product.categoryId === categoryId;
         const matchesCollection =
           !activeCollection || collectionCategoryIds.includes(product.categoryId);
-        const matchesOccasion =
-          !occasion || (product.occasions || []).includes(occasion);
         const matchesQuery = matchesSearch(
           product,
           categoryById[product.categoryId],
           query,
         );
-        return matchesCategory && matchesCollection && matchesOccasion && matchesQuery;
-      }),
-    [activeCollection, categoryId, collectionCategoryIds, occasion, products, query],
+        const matchesOccasion = !occasion || product.occasions?.includes(occasion);
+        return matchesCategory && matchesCollection && matchesQuery && matchesOccasion;
+      });
+      return isOliveOilView
+        ? [...matches].sort((a, b) => oliveSortKey(a) - oliveSortKey(b))
+        : matches;
+    },
+    [activeCollection, categoryId, collectionCategoryIds, isOliveOilView, occasion, products, query],
   );
+  const groupResults = !categoryId && !query && !collectionId && !occasion;
+  const catalogGroups = categories.filter((category) => category.id !== "olive_oil");
+  catalogGroups.push(categoryById.olive_oil);
+  const otherProducts = filteredProducts.filter((product) => !categoryById[product.categoryId]);
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -85,141 +107,232 @@ export default function CatalogPage() {
     setSearchParams(next, { replace: true });
   };
 
-  const updateCategory = (value) => {
-    const next = new URLSearchParams(searchParams);
-    next.delete("coleccion");
-    if (value) next.set("categoria", value);
-    else next.delete("categoria");
-    setSearchParams(next, { replace: true });
+  const openSearch = () => {
+    setSearchOpen(true);
+    requestAnimationFrame(() => searchInputRef.current?.focus());
   };
 
-  const clearCatalogView = () => {
-    const next = new URLSearchParams(searchParams);
-    next.delete("categoria");
-    next.delete("coleccion");
-    setSearchParams(next, { replace: true });
+  const closeSearch = () => {
+    updateParam("q", "");
+    setSearchOpen(false);
   };
 
-  const hasFilters = Boolean(categoryId || collectionId || query || occasion);
-  const catalogHeading =
-    activeCollection?.name ?? activeCategory?.name ?? "Toda la selección.";
-  const catalogDescription =
-    activeCollection?.description ??
-    activeCategory?.description ??
-    "Productos del catálogo maestro de Flor Mía con precio y stock validados por el backend.";
+  const isEmptyWineCategory = activeCategory?.id === "wines";
 
   return (
     <main id="main-content" className="page-shell catalog-page">
       <PageMeta
-        title={`${activeCollection?.name ?? activeCategory?.name ?? "Productos"} | Flor Mía`}
-        description="Explorá el catálogo comercial de Flor Mía con precio y disponibilidad actualizados."
+        title={
+          isOliveOilView
+            ? "Aceite de oliva | Flor Mía"
+            : isGiftsView
+              ? "Regalos | Flor Mía"
+              : `${activeCollection?.name ?? activeCategory?.name ?? "Productos"} | Flor Mía`
+        }
+        description={
+          isOliveOilView
+            ? "Guía de intensidad y varietales de aceite de oliva Flor Mía para elegir según gusto, intensidad o uso."
+            : isGiftsView
+              ? "Regalos Flor Mía para cada ocasión: selecciones individuales de productos mendocinos."
+              : "Explorá la selección de aceites de oliva, frutos secos, aceitunas, mermeladas y sales de Flor Mía."
+        }
       />
 
-      <section className="page-hero page-hero--catalog">
-        <div className="container">
-          <p className="eyebrow">CATÁLOGO FLOR MÍA</p>
-          <h1>Productos reales, con precio y stock comercial.</h1>
-          <p>
-            Las descripciones e imágenes pueden ser editoriales. El ID, precio,
-            disponibilidad y dato fiscal provienen del catálogo maestro y de la
-            ubicación Ecommerce configurada.
-          </p>
-          {!ready ? (
-            <div className="pending-panel">
-              <strong>Configuración comercial incompleta</strong>
-              <p>
-                {pending.includes("ECOMMERCE_LOCATION_ID")
-                  ? "La ubicación de stock Ecommerce está PENDIENTE DE DEFINIR."
-                  : "Algunas decisiones comerciales siguen pendientes."}
-              </p>
-            </div>
-          ) : location ? (
-            <p className="catalog-source-note">Stock Ecommerce: {location.name}</p>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="catalog-controls" aria-label="Filtros del catálogo">
-        <div className="container">
-          <div className="catalog-search">
-            <label className="field-label" htmlFor="catalog-search">
-              Buscar en el catálogo
-            </label>
-            <div className="search-field">
-              <Search size={20} aria-hidden="true" />
-              <input
-                id="catalog-search"
-                type="search"
-                value={query}
-                onChange={(event) => updateParam("q", event.target.value)}
-                placeholder="Aceite, pistachos, aceitunas…"
-              />
-            </div>
+      {isOliveOilView ? (
+        <>
+          {oilMode === "hero" && (
+            <OilHeroSelector onSelectMode={setOilMode} />
+          )}
+          {oilMode === "quiz" && (
+            <OilQuiz onComplete={() => setOilMode("browse")} />
+          )}
+          {oilMode === "browse" && (
+            <OliveOilGuide
+              id="guia-aceites"
+              introCta={false}
+              showTitle={false}
+            />
+          )}
+        </>
+      ) : isGiftsView ? (
+        <section className="page-hero page-hero--gifts">
+          <div className="container">
+            <p className="eyebrow">REGALOS FLOR MÍA</p>
+            <h1>Regalos con sabor a Mendoza.</h1>
+            <p>
+              Aceites, frutos secos, aceitunas y mermeladas pensados para
+              regalar: detalles empresariales, cumpleaños, agradecimientos,
+              reuniones y fechas especiales.
+            </p>
           </div>
+        </section>
+      ) : (
+        <section className="page-hero page-hero--catalog">
+          <div className="container">
+            <p className="eyebrow">CATÁLOGO FLOR MÍA</p>
+            <h1>Sabores mendocinos para elegir a tu manera.</h1>
+            <p>
+              Aceites de oliva, frutos secos, aceitunas, mermeladas y sales:
+              lo mejor de nuestra tierra, seleccionado para tu mesa.
+            </p>
+          </div>
+        </section>
+      )}
 
-          <div className="catalog-category-pills" aria-label="Categorías">
-            <button type="button" className={!categoryId && !collectionId ? "is-active" : ""} onClick={clearCatalogView}>
-              Todos
-            </button>
-            {categories.map((category) => (
+      {!isOliveOilView ? (
+        <section className="catalog-controls" aria-label="Buscar en el catálogo">
+          <div className="container">
+            {searchOpen ? (
+              <div className="catalog-search">
+                <div className="search-field">
+                  <Search size={18} aria-hidden="true" />
+                  <input
+                    ref={searchInputRef}
+                    id="catalog-search"
+                    type="search"
+                    value={query}
+                    onChange={(event) => updateParam("q", event.target.value)}
+                    placeholder="Aceite, pistachos, aceitunas…"
+                    aria-label="Buscar en el catálogo"
+                  />
+                  <button
+                    type="button"
+                    className="catalog-search__close"
+                    onClick={closeSearch}
+                    aria-label="Cerrar búsqueda"
+                  >
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            ) : (
               <button
                 type="button"
-                className={categoryId === category.id ? "is-active" : ""}
-                onClick={() => updateCategory(category.id)}
-                key={category.id}
+                className="catalog-search-toggle"
+                onClick={openSearch}
+                aria-label="Buscar en el catálogo"
               >
-                {category.shortName ?? category.name}
+                <Search size={18} aria-hidden="true" />
               </button>
-            ))}
+            )}
           </div>
+        </section>
+      ) : null}
 
-          <div className="catalog-secondary-filters">
-            <label className="field-label">
-              Ocasión
-              <select value={occasion} onChange={(event) => updateParam("ocasion", event.target.value)}>
-                {occasions.map(([value, label]) => <option key={value || "all"} value={value}>{label}</option>)}
-              </select>
-            </label>
-            {hasFilters ? (
-              <button className="text-button" type="button" onClick={() => setSearchParams(new URLSearchParams(), { replace: true })}>
-                <X size={16} aria-hidden="true" />
-                Limpiar filtros
-              </button>
-            ) : null}
+      {isGiftsView ? (
+        <Reveal
+          as="section"
+          className="section occasion-section"
+          aria-labelledby="occasion-title"
+        >
+          <div className="container">
+            <SectionHeading
+              eyebrow="PARA CADA OCASIÓN"
+              title="¿Qué querés regalar?"
+              body="Elegí la ocasión y te mostramos una selección de productos reales para armar tu regalo."
+              as="h2"
+            />
+            <OccasionBuilder
+              occasions={giftOccasions}
+              note="Elegí los productos que quieras; el armado y la presentación del regalo se coordinan al momento de la compra."
+            />
           </div>
-        </div>
-      </section>
+        </Reveal>
+      ) : null}
 
-      <section className="section">
+      {isOliveOilView ? (
+        <PromoShowcase promoType="oil" />
+      ) : !isGiftsView && !query && !activeCollection ? (
+        <PromoShowcase promoType="products" />
+      ) : null}
+
+      <section className="section catalog-results">
         <div className="container">
-          <div className="section-heading">
-            <p className="eyebrow">SELECCIÓN COMERCIAL</p>
-            <h2>{catalogHeading}</h2>
-            <p className="section-heading__body">{catalogDescription}</p>
-          </div>
-
-          {status === "loading" ? <div className="pending-panel"><strong>Cargando catálogo comercial…</strong></div> : null}
+          {status === "loading" ? <p role="status">Consultando el catálogo comercial…</p> : null}
           {status === "error" ? (
             <div className="pending-panel">
-              <strong>No se pudo cargar el catálogo comercial.</strong>
-              <p>{error?.message || "Reintentá cuando el backend esté disponible."}</p>
+              <p>No pudimos consultar precios y disponibilidad.</p>
+              <button className="button" type="button" onClick={() => refresh().catch(() => {})}>
+                Volver a intentar
+              </button>
             </div>
           ) : null}
-
-          {status === "ready" && filteredProducts.length ? (
-            <div className="catalog-grid">
-              {filteredProducts.map((product) => <ProductCard product={product} key={product.id} />)}
-            </div>
-          ) : null}
-
-          {status === "ready" && !filteredProducts.length ? (
+          {groupResults ? (
+            <>
+              {catalogGroups.map((category) => {
+                const categoryProducts = filteredProducts.filter((product) => product.categoryId === category.id);
+                if (!categoryProducts.length) return null;
+                return (
+                  <Reveal key={category.id} className="catalog-category-section">
+                    <h2 className="catalog-category-section__title">{category.name}</h2>
+                    <div className="catalog-grid">
+                      {categoryProducts.map((product) => (
+                        <ProductCard product={product} key={product.id} />
+                      ))}
+                    </div>
+                  </Reveal>
+                );
+              })}
+              {otherProducts.length ? (
+                <Reveal className="catalog-category-section">
+                  <h2 className="catalog-category-section__title">Más productos</h2>
+                  <div className="catalog-grid">
+                    {otherProducts.map((product) => <ProductCard product={product} key={product.id} />)}
+                  </div>
+                </Reveal>
+              ) : null}
+            </>
+          ) : filteredProducts.length ? (
+            <Reveal className="catalog-category-section">
+              {isOliveOilView ? <h2 className="catalog-category-section__title">Aceites de oliva</h2> : null}
+              <div className="catalog-grid">
+                {filteredProducts.map((product) => (
+                  <ProductCard product={product} key={product.id} />
+                ))}
+              </div>
+            </Reveal>
+          ) : isGiftsView ? null : (
             <div className="empty-state">
-              <h3>No encontramos productos con esos filtros.</h3>
-              <p>Probá otra categoría o búsqueda.</p>
+              <h2>
+                {isEmptyWineCategory
+                  ? "Los vinos todavía no están cargados."
+                  : "No encontramos productos con esos filtros."}
+              </h2>
+              <p>
+                {isEmptyWineCategory
+                  ? "Muy pronto vamos a sumar vinos a nuestra selección."
+                  : "Probá otra categoría o limpiá la búsqueda."}
+              </p>
+              <button
+                className="button"
+                type="button"
+                onClick={() => setSearchParams({}, { replace: true })}
+              >
+                Ver todo el catálogo
+              </button>
             </div>
-          ) : null}
+          )}
+
         </div>
       </section>
+
+      {isOliveOilView ? (
+        <Reveal
+          as="section"
+          className="section comparison-section"
+          aria-labelledby="comparison-title"
+        >
+          <div className="container">
+            <SectionHeading
+              eyebrow="COMPARÁ VARIETALES"
+              title="Encontrá tu perfil."
+              body="Elegí hasta tres varietales y comparalos por frutado, amargor, picor, intensidad y uso sugerido."
+              as="h2"
+            />
+            <SensoryComparison />
+          </div>
+        </Reveal>
+      ) : null}
     </main>
   );
 }

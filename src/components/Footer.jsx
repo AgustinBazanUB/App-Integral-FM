@@ -1,5 +1,13 @@
-import { Clock3, Instagram, Mail, MapPin, Phone } from "lucide-react";
+import {
+  Clock3,
+  Instagram,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Phone,
+} from "lucide-react";
 import { Link } from "../router";
+import Reveal from "./Reveal";
 import { brand, footerNavigation } from "../data/brand";
 
 export default function Footer() {
@@ -17,7 +25,7 @@ export default function Footer() {
 
   return (
     <footer className="site-footer" id="contacto">
-      <div className="container site-footer__top">
+      <Reveal className="container site-footer__top">
         <div className="footer-intro">
           <Link
             className="wordmark footer-logo"
@@ -61,7 +69,19 @@ export default function Footer() {
             className="footer-local"
             aria-labelledby="footer-local-title"
           >
-            <h2 id="footer-local-title">Retirá en nuestro local</h2>
+            <h2 id="footer-local-title">Contacto</h2>
+
+            {contact.whatsappUrl ? (
+              <a
+                className="footer-whatsapp"
+                href={contact.whatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <MessageCircle size={17} aria-hidden="true" />
+                Escribinos por WhatsApp
+              </a>
+            ) : null}
 
             {contact.address ? (
               <div className="footer-contact-item">
@@ -103,12 +123,19 @@ export default function Footer() {
               </div>
             ) : null}
 
+            <div className="footer-contact-item">
+              <Instagram size={16} aria-hidden="true" />
+              <a href={brand.instagram} target="_blank" rel="noreferrer">
+                @flormia.mdz
+              </a>
+            </div>
+
             {!hasContactInformation ? (
               <p className="footer-pending">{contact.pendingMessage}</p>
             ) : null}
           </section>
         </div>
-      </div>
+      </Reveal>
 
       <div className="container footer-legal">
         <span>© {new Date().getFullYear()} Flor Mía</span>

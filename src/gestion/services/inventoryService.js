@@ -2,6 +2,7 @@ import { buildMasterProductPayload } from "../../shared/productWritePlans.mjs";
 import { categorySubcategories } from "../../shared/productSubcategories.mjs";
 import { invalidateRuntimeCache } from "./runtimeCache";
 import { buildStockTransferWrites } from "../../shared/stockTransferWritePlans.mjs";
+import { reservedStockQuantity } from "../../shared/stockReservations.mjs";
 import {
   collection,
   doc,
@@ -628,6 +629,9 @@ export async function adjustInventoryStock({ type, inventory, product, quantity,
     const ownerSnapshot = await transaction.get(ownerReference(type, inventory.id));
     const stockSnapshot = await transaction.get(stockRef);
     if (!ownerSnapshot.exists() || ownerSnapshot.data().deleted === true || !stockSnapshot.exists() || stockSnapshot.data().deleted === true) throw new Error("El inventario ya no está disponible.");
+    if (requested < reservedStockQuantity(stockSnapshot.data())) {
+      throw new Error("El ajuste consumiría unidades reservadas para pedidos web.");
+    }
     const previousStock = wholeInventoryQuantity(stockSnapshot.data().currentStock || 0, "El stock anterior", { allowNegative: true });
     const note = String(reason || "Ajuste por conteo físico").trim() || "Ajuste por conteo físico";
     const context = type === INVENTORY_TYPES.LOCATION ? { locationId: inventory.id, locationName: ownerSnapshot.data().name } : { warehouseId: inventory.id, warehouseName: ownerSnapshot.data().name };

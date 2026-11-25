@@ -2,7 +2,7 @@ import { useId, useMemo, useRef, useState } from "react";
 import { ArrowRight, Search } from "lucide-react";
 import { Link } from "../router";
 import { categories, categoryById } from "../data/categories";
-import { products } from "../data/products";
+import { useCommerceCatalog } from "../context/CommerceCatalogContext";
 import {
   filterProducts,
   groupProductsByCategory,
@@ -26,6 +26,7 @@ export default function SearchExperience({
   onNavigate,
   showQuickFilters = true,
 }) {
+  const { browseProducts: products } = useCommerceCatalog();
   const [query, setQuery] = useState("");
   const inputRef = useRef(null);
   const searchId = useId();
@@ -35,12 +36,18 @@ export default function SearchExperience({
   const matchingProducts = useMemo(() => {
     if (!normalizedQuery) return [];
     return filterProducts(products, categoryById, normalizedQuery);
-  }, [normalizedQuery]);
+  }, [normalizedQuery, products]);
 
   const grouped = useMemo(
     () => groupProductsByCategory(matchingProducts),
     [matchingProducts],
   );
+  const searchCategories = [
+    ...categories,
+    ...Object.entries(grouped)
+      .filter(([id]) => !categoryById[id])
+      .map(([id, group]) => ({ id, name: group[0].categoryName || "Otros productos" })),
+  ];
 
   const chooseQuery = (value) => {
     setQuery(value);
@@ -104,7 +111,7 @@ export default function SearchExperience({
           aria-live="polite"
         >
           {matchingProducts.length ? (
-            categories.map((category) => {
+            searchCategories.map((category) => {
               const categoryProducts = grouped[category.id];
               if (!categoryProducts?.length) return null;
 
@@ -121,8 +128,7 @@ export default function SearchExperience({
                         <span>
                           <strong>{product.name}</strong>
                           <small>
-                            {product.formats?.[0]} ·{" "}
-                            {product.uses?.[0] ?? "Uso pendiente"}
+                            {[product.formats?.[0], product.uses?.[0]].filter(Boolean).join(" · ")}
                           </small>
                         </span>
                         <ArrowRight size={18} aria-hidden="true" />

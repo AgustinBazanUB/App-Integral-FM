@@ -4,10 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { categories } from "../src/data/categories.js";
-import {
-  catalogCollections,
-  virtualCatalogCategories,
-} from "../src/data/catalogViews.js";
+import { catalogCollections } from "../src/data/catalogViews.js";
 import { productById, products } from "../src/data/products.js";
 import { oliveProfiles } from "../src/data/oliveProfiles.js";
 import {
@@ -17,7 +14,6 @@ import {
   trustItems,
 } from "../src/data/brand.js";
 import { assetsManifest } from "../src/data/assetsManifest.js";
-import { promotions } from "../src/data/promotions.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDirectory, "..");
@@ -71,25 +67,21 @@ test("el manifiesto usa el logo, el local y los seis destacados reales", () => {
   assert.equal(assetsManifest.featured.length, 6);
 });
 
-test("la barra informativa conserva los tres mensajes aprobados", () => {
+test("la barra informativa presenta envíos y retiros sin prometer cuotas", () => {
   assert.deepEqual(announcementMessages, [
-    "ENVÍOS A TODO EL PAÍS",
+    "ENVÍOS Y RETIROS",
     "LOCAL EN CABA",
-    "CUOTAS SIN INTERÉS",
+    "PRODUCTOS MENDOCINOS",
   ]);
 });
 
-test("la navegación de escritorio conserva sus accesos actuales", () => {
+test("la navegación de escritorio ofrece las entradas principales del diseño renovado", () => {
   assert.deepEqual(
     navigation.map(({ label, to }) => [label, to]),
     [
       ["Inicio", "/tienda"],
       ["Tienda", "/productos"],
-      ["Aceites de oliva", "/productos?categoria=olive_oil"],
-      ["Frutos secos", "/productos?categoria=nuts"],
-      ["Aceitunas", "/productos?categoria=olives"],
-      ["Mermeladas", "/productos?categoria=jams"],
-      ["Regalos", "/productos?categoria=gifts"],
+      ["Aceite de oliva", "/productos?categoria=olive_oil"],
       ["Nosotros", "/nosotros"],
       ["Contacto", "/tienda#contacto"],
     ],
@@ -106,7 +98,7 @@ test("el menú mobile tiene el orden y destinos solicitados", () => {
       ["Frutos secos", "/productos?categoria=nuts"],
       ["Vinos", "/productos?categoria=wines"],
       ["Productos Regionales Mdz", "/productos?coleccion=regionales"],
-      ["Regalos pre-armados", "/productos?categoria=gifts"],
+      ["Regalos", "/productos?categoria=gifts"],
       ["Nosotros", "/nosotros"],
       ["Contacto", "/tienda#contacto"],
     ],
@@ -140,12 +132,10 @@ test("la colección regional agrupa categorías existentes sin duplicar producto
   assert.equal(new Set(regionalProductIds).size, regionalProductIds.length);
 });
 
-test("vinos conserva un estado vacío honesto", () => {
-  assert.equal(virtualCatalogCategories.wines.name, "Vinos");
-  assert.equal(
-    products.some((product) => product.categoryId === "wines"),
-    false,
-  );
+test("el vino renovado tiene ficha editorial y depende del catálogo comercial para venderse", () => {
+  assert.equal(productById["wine-bazan"].categoryId, "wines");
+  assert.equal(productById["wine-bazan"].price, null);
+  assert.equal(productById["wine-bazan"].stock, "unknown");
 });
 
 test("los CTAs y el título AOVE usan los textos aprobados", () => {
@@ -156,27 +146,22 @@ test("los CTAs y el título AOVE usan los textos aprobados", () => {
   assert.match(homePageSource, /CONOCÉ TU AOVE/);
   assert.match(homePageSource, /CONOCER MÁS PRODUCTOS/);
   assert.match(homePageSource, /fm-button--black/);
-  assert.match(
-    homePageSource,
-    /Elegí el oliva ideal para cada ocasión\./,
-  );
+  assert.match(homePageSource, /<OliveOilGuide/);
+  const guideSource = readFileSync(resolve(projectRoot, "src/components/OliveOilGuide.jsx"), "utf8");
+  assert.match(guideSource, /Elegí el oliva ideal para cada ocasión\./);
   assert.doesNotMatch(homePageSource, /Elegí el aceite que mejor va con vos\./);
   assert.match(homePageSource, /scrollIntoView/);
   assert.match(homePageSource, /prefers-reduced-motion/);
 });
 
-test("la home solo publica las dos promociones aprobadas", () => {
-  assert.deepEqual(
-    promotions.map(({ title, subtitle }) => [title, subtitle]),
-    [
-      ["¡Promociones!", "Envío sin cargo AMBA"],
-      ["3 cuotas sin interés", "Miércoles y sábados"],
-    ],
-  );
+test("el carrusel de promociones usa solo las ofertas comerciales de la API", () => {
+  const source = readFileSync(resolve(projectRoot, "src/components/PromoShowcase.jsx"), "utf8");
+  assert.match(source, /useCommerceCatalog\(\)/);
+  assert.match(source, /product\.compareAtPrice > product\.price/);
+  assert.doesNotMatch(source, /from .*data\/products/);
 });
 
 test("los seis varietales tienen intensidad y producto de 500 cc", () => {
-  assert.equal(categories.length, 6);
   assert.deepEqual(
     oliveProfiles.map((profile) => profile.name),
     ["Arbequina", "Arbosana", "Blend IG", "Coratina", "Picual", "Arauco"],

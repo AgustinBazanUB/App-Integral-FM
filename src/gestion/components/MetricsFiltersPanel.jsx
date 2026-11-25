@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { locationActivity } from "../../modules/locations/domain/locations";
 import { argentinaDateKey, argentinaMonthKey, argentinaParts } from "../../modules/locations/domain/time";
 import { Icon } from "./icons";
+import { FormField, Select } from "../../design-system";
+import { changeMetricsSection, METRICS_SECTIONS, metricsLocationChoices, metricsLocationTypes } from "../../modules/locations/domain/metricsSections";
 
 import { PAYMENT_OPTIONS } from "../../modules/locations/domain/payments";
 const paymentOptions = PAYMENT_OPTIONS.filter(option => option.value !== "multiple").map(option => [option.value, option.label]);
 
 const filterKeys = {
   locations: ["locationIds"],
+  channels: ["channelIds"],
   sellers: ["sellerIds"],
   products: ["categoryIds", "productIds"],
   discounts: ["discountIds"],
@@ -50,6 +53,7 @@ function MultiSection({
   return (
     <div className={`fm-metrics-filter-group ${open ? "is-open" : ""}`}>
       <button
+        id={id}
         ref={triggerRef}
         type="button"
         className="fm-metrics-filter-trigger"
@@ -95,14 +99,16 @@ export default function MetricsFiltersPanel({
   discounts,
   busy,
   actualPayments = [],
+  channels = [],
 }) {
   const availablePayments = new Map(paymentOptions.map(([id, label]) => [id, label]));
   actualPayments.forEach(part => availablePayments.set(part.key || part.id || part.method, part.name || part.label));
   const today = argentinaDateKey();
   const currentMonth = argentinaMonthKey();
   const currentYear = argentinaParts().year;
-  const activeLocations = locations.filter((location) => locationActivity(location).active);
-  const inactiveLocations = locations.filter((location) => !locationActivity(location).active);
+  const locationChoices = metricsLocationChoices(locations, state.locationType);
+  const activeLocations = locationChoices.filter((location) => locationActivity(location).active);
+  const inactiveLocations = locationChoices.filter((location) => !locationActivity(location).active);
   const [openFilter, setOpenFilter] = useState(null);
   const [draft, setDraft] = useState(state);
   const rootRef = useRef(null);
@@ -152,6 +158,7 @@ export default function MetricsFiltersPanel({
     setDraft({
       ...state,
       locationIds: [...state.locationIds],
+      channelIds: [...state.channelIds],
       sellerIds: [...state.sellerIds],
       categoryIds: [...state.categoryIds],
       productIds: [...state.productIds],
@@ -184,6 +191,37 @@ export default function MetricsFiltersPanel({
 
   return (
     <div ref={rootRef} className="fm-metrics-filters" aria-busy={busy || undefined}>
+      <div className={`fm-metrics-scope ${["all", "ecommerce"].includes(state.section) ? "fm-metrics-scope--single" : ""}`}>
+        <FormField label="Tipo de venta">
+          <Select value={state.section} onChange={event => { setOpenFilter(null); onChange(changeMetricsSection(state, event.target.value)); }}>
+            {METRICS_SECTIONS.map(section => <option key={section.id} value={section.id}>{section.name}</option>)}
+          </Select>
+        </FormField>
+        {state.section === "locations" ? <div className="fm-metrics-scope__locations">
+          <FormField label="Tipo de ubicación">
+            <Select value={state.locationType} onChange={event => { setOpenFilter(null); onChange({ ...state, locationType: event.target.value, locationIds: [] }); }}>
+              <option value="all">Todos los tipos</option>
+              {metricsLocationTypes(locations).map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
+            </Select>
+          </FormField>
+          <FormField label="Una o varias ubicaciones">
+            <MultiSection id="locations" title="Ubicaciones" icon="MapPin" allLabel="Todas las del tipo elegido" values={state.locationIds} open={openFilter === "locations"} disabled={busy} triggerRef={node => { triggerRefs.current.locations = node; }} onToggle={() => openOrToggleFilter("locations")} onApply={() => applyFilter("locations")} onCancel={cancelFilter}>
+              <Choice checked={!draft.locationIds.length} label="Todas las del tipo elegido" onChange={() => setDraftField("locationIds", [])} />
+              <p className="fm-metrics-group-label">Activas</p>
+              {activeLocations.map(location => <Choice key={location.id} checked={draft.locationIds.includes(location.id)} label={location.name} onChange={() => setDraftField("locationIds", toggle(draft.locationIds, location.id))} />)}
+              <p className="fm-metrics-group-label">Inactivas</p>
+              {inactiveLocations.map(location => <Choice key={location.id} checked={draft.locationIds.includes(location.id)} label={location.name} onChange={() => setDraftField("locationIds", toggle(draft.locationIds, location.id))} />)}
+              {!locationChoices.length ? <span className="fm-metrics-filter-empty">Sin ubicaciones de este tipo</span> : null}
+            </MultiSection>
+          </FormField>
+        </div> : null}
+        {state.section === "channels" ? <FormField label="Uno o varios canales">
+          <MultiSection id="channels" title="Canales" icon="Filter" allLabel="Todos los canales" values={state.channelIds} open={openFilter === "channels"} disabled={busy} triggerRef={node => { triggerRefs.current.channels = node; }} onToggle={() => openOrToggleFilter("channels")} onApply={() => applyFilter("channels")} onCancel={cancelFilter}>
+            <Choice checked={!draft.channelIds.length} label="Todos los canales" onChange={() => setDraftField("channelIds", [])} />
+            {channels.map(channel => <Choice key={channel.id} checked={draft.channelIds.includes(channel.id)} label={channel.name} onChange={() => setDraftField("channelIds", toggle(draft.channelIds, channel.id))} />)}
+          </MultiSection>
+        </FormField> : null}
+      </div>
       <div className="fm-metrics-period">
         <div className="fm-metrics-period__heading"><Icon name="CalendarRange" /><span><strong>Período</strong><small>America/Argentina/Buenos_Aires</small></span></div>
         <div className="fm-metrics-segmented" role="group" aria-label="Tipo de período">
@@ -203,26 +241,6 @@ export default function MetricsFiltersPanel({
       </div>
 
       <div className="fm-metrics-filter-grid">
-        <MultiSection
-          id="locations"
-          title="Ubicaciones"
-          icon="MapPin"
-          allLabel="Todas las ubicaciones"
-          values={state.locationIds}
-          open={openFilter === "locations"}
-          disabled={busy}
-          triggerRef={(node) => { triggerRefs.current.locations = node; }}
-          onToggle={() => openOrToggleFilter("locations")}
-          onApply={() => applyFilter("locations")}
-          onCancel={cancelFilter}
-        >
-          <Choice checked={!draft.locationIds.length} label="Todas las ubicaciones" onChange={() => setDraftField("locationIds", [])} />
-          <p className="fm-metrics-group-label">Activa</p>
-          {activeLocations.map((location) => <Choice key={location.id} checked={draft.locationIds.includes(location.id)} label={location.name} onChange={() => setDraftField("locationIds", toggle(draft.locationIds, location.id))} />)}
-          <p className="fm-metrics-group-label">Inactiva</p>
-          {inactiveLocations.length ? inactiveLocations.map((location) => <Choice key={location.id} checked={draft.locationIds.includes(location.id)} label={location.name} onChange={() => setDraftField("locationIds", toggle(draft.locationIds, location.id))} />) : <span className="fm-metrics-filter-empty">Sin ubicaciones inactivas</span>}
-        </MultiSection>
-
         <MultiSection
           id="sellers"
           title="Vendedores"

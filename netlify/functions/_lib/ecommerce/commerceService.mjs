@@ -1,3 +1,23 @@
+import {
+  channelShipping,
+  deliveryAddressDetails,
+  loadWebChannel,
+  normalizeBilling,
+  originStockPath,
+  resolveChannelOrigins,
+  stockCollectionPath,
+  webPricingStock,
+  webStockAvailability,
+} from "./channelService.mjs";
+import { reservationPatch } from "../../../../src/shared/stockReservations.mjs";
+import {
+  CHECKOUT_RESERVATION_MS,
+  checkoutCartFingerprint,
+  checkoutCredentials,
+  checkoutReservationPath,
+  releaseUnconvertedCheckout,
+  verifyCheckoutReservation,
+} from "./checkoutReservation.mjs";
 import { prepareCommerceCustomer } from "./customerLink.mjs";
 import { createHash } from "node:crypto";
 import {
@@ -9,50 +29,67 @@ import {
 import {
   authoritativeUnitPrice,
   authoritativeVatRate,
+  checkoutEditPath,
   commerceError,
   ecommerceLocationId,
   ecommercePickupEnabled,
   normalizeCheckoutItems,
   normalizeCustomer,
   normalizeEcommerceRequestId,
+  prepareAuthoritativeCart,
   prepareAuthoritativeCheckout,
   resolveRequestedPaymentStatus,
 } from "./commerceDomain.mjs";
+import { assertCurrentDeliveryQuote, deliveryAddressEnabled, quotedShipping, readDeliveryQuote } from "./deliveryQuote.mjs";
 
 function slugFrom(value, fallback) {
-  const normalized = String(value || "").trim().toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return normalized || fallback;
 }
 
-function publicProduct(product, stock, { locationConfigured }) {
+function publicProduct(product, stock, { locationConfigured, settings = {}, promotion = null }) {
   let price = null;
   let vatRate = null;
-  let stockQuantity = null;
+  const stockQuantity = Number.isInteger(stock?.currentStock)
+    ? Math.max(0, stock.currentStock)
+    : null;
   let reason = null;
   if (!locationConfigured) {
     reason = "ecommerce-location-not-configured";
   } else {
     try {
-      price = authoritativeUnitPrice(product, stock);
+      price = authoritativeUnitPrice(product, stock, {
+        webPriceOverride: settings.priceOverride,
+        promotion,
+      });
       vatRate = authoritativeVatRate(product);
-      stockQuantity = Number(stock.currentStock);
-      if (stockQuantity <= 0) reason = "out-of-stock";
+      if (settings.enabled === false) reason = "ecommerce-product-disabled";
+      else if (stockQuantity <= 0) reason = "out-of-stock";
     } catch (error) {
       reason = error?.code || "ecommerce-product-not-ready";
-      if (stock?.id && Number.isInteger(Number(stock.currentStock))) {
-        stockQuantity = Number(stock.currentStock);
-      }
-      try { price = authoritativeUnitPrice(product, stock); } catch {}
-      try { vatRate = authoritativeVatRate(product); } catch {}
+      try {
+        price = authoritativeUnitPrice(product, stock, {
+          webPriceOverride: settings.priceOverride,
+        });
+      } catch {}
+      try {
+        vatRate = authoritativeVatRate(product);
+      } catch {}
     }
   }
 
   return {
     id: product.id,
-    editorialId: String(product.ecommerceEditorialId || product.editorialId || "").trim() || null,
+    editorialId:
+      String(
+        product.ecommerceEditorialId || product.editorialId || "",
+      ).trim() || null,
     slug: slugFrom(product.ecommerceSlug || product.slug, product.id),
     name: product.name || "Producto",
     abbreviation: product.abbreviation || "",
@@ -62,89 +99,202 @@ function publicProduct(product, stock, { locationConfigured }) {
     image: product.imageUrl || stock?.imageUrl || "",
     thumb: product.thumbUrl || stock?.thumbUrl || product.imageUrl || "",
     price,
-    stock: stockQuantity,
-    stockState: stockQuantity == null ? "unknown" : stockQuantity > 0 ? "available" : "out",
-    active: product.active !== false && product.deleted !== true,
+    // The API communicates availability without publishing physical quantities.
+    stock: null,
+    stockState:
+      settings.enabled === false
+        ? "out"
+        : stockQuantity == null
+        ? "unknown"
+        : stockQuantity > 0
+          ? "available"
+          : "out",
+    active: product.active !== false && product.deleted !== true && settings.enabled !== false,
+    promotionName: promotion?.active === true ? promotion.name : null,
+    freeShippingAmba: promotion?.active === true && promotion.freeShippingAmba === true,
+    compareAtPrice: promotion?.active === true
+      ? (() => { try { return authoritativeUnitPrice(product, stock, { webPriceOverride: settings.priceOverride }); } catch { return null; } })()
+      : null,
     arcaVatRate: vatRate,
-    commercialReady: !reason && Number.isInteger(price) && price > 0 && Number.isInteger(stockQuantity) && stockQuantity > 0,
+    commercialReady:
+      !reason &&
+      Number.isInteger(price) &&
+      price > 0 &&
+      Number.isInteger(stockQuantity) &&
+      stockQuantity > 0,
     pendingReason: reason,
     dataStatus: !reason ? "ready" : "pending",
   };
 }
 
-export async function loadEcommerceCatalog({
-  env = process.env,
-  listDocuments = adminListDocuments,
-  getDocument = adminGetDocument,
-} = {}) {
+async function configuredWebOrigins(channel, { env, getDocument, listDocuments, now }) {
+  if (channel) {
+    return resolveChannelOrigins(channel, { env, getDocument, listDocuments, now });
+  }
   const locationId = ecommerceLocationId(env);
-  const products = (await listDocuments("products", { env, pageSize: 500 }))
-    .filter((product) => product.deleted !== true && product.active !== false)
-    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "es"));
-
-  if (!locationId) {
-    return {
-      ready: false,
-      pending: ["ECOMMERCE_LOCATION_ID"],
-      location: null,
-      config: {
-        pickupEnabled: ecommercePickupEnabled(env),
-        deliveryEnabled: false,
-        paymentProvider: "pending_payway",
-      },
-      products: products.map((product) => publicProduct(product, null, { locationConfigured: false })),
-    };
-  }
-
-  const locationSnapshot = await getDocument(`locations/${locationId}`, { env });
-  if (!locationSnapshot || locationSnapshot.data?.deleted === true || locationSnapshot.data?.active === false) {
+  if (!locationId) return [];
+  const origin = { type: "location", id: locationId };
+  const snapshot = await getDocument(`locations/${locationId}`, { env });
+  if (!snapshot || snapshot.data?.deleted === true || snapshot.data?.active === false)
     throw commerceError("ecommerce-location-unavailable", "La ubicación Ecommerce no está disponible.", 409);
+  if ((snapshot.data.type || "store") !== "store")
+    throw commerceError("ecommerce-location-type-not-allowed", "La página web sólo puede tomar stock de locales activos; las ferias y eventos quedan excluidos.", 409);
+  return [{ ...origin, name: snapshot.data?.name || "Ecommerce" }];
+}
+
+function allocateStock(quantity, sourceRows, productName) {
+  let remaining = quantity;
+  const allocations = [];
+  for (const row of sourceRows) {
+    const take = Math.min(remaining, row.available);
+    if (take > 0) allocations.push({ ...row.origin, quantity: take });
+    remaining -= take;
+    if (!remaining) break;
   }
+  if (remaining > 0)
+    throw commerceError("ecommerce-stock-insufficient", `No hay stock suficiente de ${productName || "uno de los productos"}.`, 409);
+  return allocations;
+}
 
-  const stocks = await Promise.all(products.map(async (product) => {
-    const stockSnapshot = await getDocument(`locationStock/${locationId}/items/${product.id}`, { env });
-    return stockSnapshot ? { ...stockSnapshot.data, id: stockSnapshot.path?.split("/").at(-1) || product.id } : null;
+function publicEcommerceOrder(orderId, order = {}) {
+  const { items = [], ...safeOrder } = order;
+  return {
+    ...safeOrder,
+    id: orderId,
+    items: items.map(({ stockAllocations, reservationAllocations, ...item }) => item),
+  };
+}
+
+async function loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument, now, reservationOrderId = null }) {
+  const productsById = {};
+  const stocksById = {};
+  const ecommerceSettingsById = {};
+  const promotionsByProductId = {};
+  const sourceSnapshotsByProduct = {};
+  for (const item of requestedItems) {
+    const [product, setting, promotion, ...sourceSnapshots] = await Promise.all([
+      getDocument("products/" + item.productId, { env }),
+      getDocument("ecommerceProductSettings/" + item.productId, { env }),
+      getDocument("ecommercePromotions/" + item.productId, { env }),
+      ...origins.map((source) => getDocument(originStockPath(source, item.productId), { env })),
+    ]);
+    if (product) productsById[item.productId] = { ...product.data, id: item.productId };
+    ecommerceSettingsById[item.productId] = setting?.data || {};
+    if (promotion?.data) promotionsByProductId[item.productId] = promotion.data;
+    const sourceRows = origins.map((source, index) => ({
+      origin: source,
+      snapshot: sourceSnapshots[index],
+      available: webStockAvailability(sourceSnapshots[index]?.data, now, reservationOrderId),
+    }));
+    const preferredStock = webPricingStock(channel, sourceSnapshots.map((row) => row?.data));
+    let protectedUnits = Math.max(0, Number(setting?.data?.minimumRemainingStock) || 0);
+    if (!reservationOrderId) {
+      // Keep the protected balance in the channel's preferred origin first.
+      for (const row of sourceRows) {
+        const keepHere = Math.min(protectedUnits, row.available);
+        row.available -= keepHere;
+        protectedUnits -= keepHere;
+      }
+    }
+    stocksById[item.productId] = {
+      ...preferredStock,
+      id: item.productId,
+      currentStock: sourceRows.reduce((sum, row) => sum + row.available, 0),
+    };
+    sourceSnapshotsByProduct[item.productId] = sourceRows;
+  }
+  return { productsById, stocksById, ecommerceSettingsById, promotionsByProductId, sourceSnapshotsByProduct };
+}
+
+function makeReservationWrites(items, sourcesByProduct, orderId, expiresAt, now) {
+  return items.flatMap(item => item.reservationAllocations.map(allocation => {
+    const source = sourcesByProduct[item.productId].find(row => row.origin.type === allocation.type && row.origin.id === allocation.id)?.snapshot;
+    if (!source?.data) throw commerceError("ecommerce-stock-insufficient", "El origen reservado dejó de tener stock.", 409);
+    return {
+      type: "update", path: originStockPath(allocation, item.productId), currentUpdateTime: source.updateTime,
+      data: {
+        ...reservationPatch(source.data, orderId, { quantity: allocation.quantity, expiresAt, pooled: true }, now),
+        updatedAt: now,
+      },
+    };
   }));
+}
 
+export async function reserveEcommerceCheckout({
+  body, env = process.env, now = new Date(), runTransaction = adminRunTransaction,
+}) {
+  const access = checkoutCredentials(body);
+  const { orderId, accessHash } = access;
+  const requestedItems = normalizeCheckoutItems(body.items);
+  return runTransaction(async tx => {
+    const path = checkoutReservationPath(orderId);
+    const previous = (await tx.getDocument(path))?.data;
+    if (previous) {
+      const hold = verifyCheckoutReservation(previous, accessHash, requestedItems, now);
+      return { expiresAt: new Date(hold.expiresAt).valueOf() };
+    }
+    if (await tx.getDocument(checkoutEditPath(orderId)) || await tx.getDocument("orders/" + orderId)) {
+      throw commerceError("ecommerce-checkout-edited", "Ese intento ya se cerró. Volvé a reservar el carrito.", 409);
+    }
+    const channel = await loadWebChannel({ env, getDocument: tx.getDocument });
+    if (!channel) throw commerceError("ecommerce-channel-inactive", "La reserva web todavía no está habilitada.", 409);
+    const origins = await configuredWebOrigins(channel, { env, ...tx, now });
+    if (!origins.length) throw commerceError("ecommerce-location-not-configured", "Falta configurar los orígenes de stock.", 409);
+    const productState = await loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument: tx.getDocument, now });
+    const { items: preparedItems } = prepareAuthoritativeCart({ requestedItems, ...productState });
+    const items = preparedItems.map(item => ({
+      productId: item.productId, quantity: item.quantity,
+      reservationAllocations: allocateStock(item.quantity, productState.sourceSnapshotsByProduct[item.productId], item.name),
+    }));
+    const expiresAt = new Date(now.valueOf() + CHECKOUT_RESERVATION_MS);
+    const operations = makeReservationWrites(items, productState.sourceSnapshotsByProduct, orderId, expiresAt, now);
+    if (operations.length > 449) throw commerceError("ecommerce-order-too-large", "El carrito usa demasiados orígenes de stock.", 400);
+    operations.push({
+      type: "create", path, data: {
+        state: "active", accessHash, cartFingerprint: checkoutCartFingerprint(requestedItems), items,
+        expiresAt, createdAt: now,
+      },
+    });
+    await tx.commitDocuments(operations);
+    return { expiresAt: expiresAt.valueOf() };
+  }, { env });
+}
+
+export async function releaseEcommerceCheckout({ body, env = process.env, now = new Date(), runTransaction = adminRunTransaction }) {
+  const access = checkoutCredentials(body);
+  return runTransaction(async tx => {
+    if (await tx.getDocument("orders/" + access.orderId)) {
+      throw commerceError("ecommerce-order-conflict", "El carrito tiene un pedido. Consultá el estado del pago.", 409);
+    }
+    await releaseUnconvertedCheckout(tx, { ...access, now });
+    return { released: true };
+  }, { env });
+}
+
+export async function loadDeliveryQuoteCart(rawItems, {
+  env = process.env, now = new Date(), getDocument = adminGetDocument, listDocuments = adminListDocuments,
+  checkoutReservation,
+} = {}) {
+  const requestedItems = normalizeCheckoutItems(rawItems);
+  const channel = await loadWebChannel({ env, getDocument });
+  if (channel?.delivery?.enabled !== true) {
+    throw commerceError("ecommerce-delivery-not-configured", "El envío todavía no está habilitado.", 409);
+  }
+  const origins = await configuredWebOrigins(channel, { env, getDocument, listDocuments, now });
+  let reservationOrderId = null;
+  if (checkoutReservation) {
+    const { orderId, accessHash } = checkoutCredentials(checkoutReservation);
+    const reservation = (await getDocument(checkoutReservationPath(orderId), { env }))?.data;
+    verifyCheckoutReservation(reservation, accessHash, requestedItems, now);
+    reservationOrderId = orderId;
+  }
+  const productState = await loadCheckoutProducts(requestedItems, channel, origins, { env, getDocument, now, reservationOrderId });
   return {
-    ready: true,
-    pending: ecommercePickupEnabled(env) ? ["DELIVERY_PRICING"] : ["PICKUP_CONFIGURATION", "DELIVERY_PRICING"],
-    location: {
-      id: locationId,
-      name: locationSnapshot.data?.name || "Ecommerce",
-    },
-    config: {
-      pickupEnabled: ecommercePickupEnabled(env),
-      deliveryEnabled: false,
-      paymentProvider: "pending_payway",
-    },
-    products: products.map((product, index) =>
-      publicProduct(product, stocks[index], { locationConfigured: true })),
+    delivery: channel.delivery,
+    items: prepareAuthoritativeCart({ requestedItems, ...productState }).items,
+    settings: productState.ecommerceSettingsById,
+    promotions: productState.promotionsByProductId,
   };
-}
-
-function checkoutRequestFingerprint(body = {}) {
-  const items = normalizeCheckoutItems(body.items)
-    .sort((a, b) => a.productId.localeCompare(b.productId));
-  const customer = normalizeCustomer(body.customer || {});
-  const shippingMethod = String(body.deliveryMethod || body.shipping?.method || "pickup")
-    .trim().toLowerCase();
-  const notes = String(body.notes || body.shipping?.notes || "").trim().slice(0, 500);
-  return createHash("sha256")
-    .update(JSON.stringify({ items, customer, shippingMethod, notes }))
-    .digest("hex");
-}
-
-function deterministicIds(requestId) {
-  return {
-    orderId: `ecommerce_order_${requestId}`,
-    paymentId: `ecommerce_payment_${requestId}`,
-    saleId: `ecommerce_sale_${requestId}`,
-  };
-}
-
-function saleCodeFor(requestId) {
-  return `WEB-${requestId.slice(0, 24).toUpperCase()}`;
 }
 
 export async function createEcommerceOrder({
@@ -153,247 +303,374 @@ export async function createEcommerceOrder({
   now = new Date(),
   getDocument = adminGetDocument,
   commitDocuments = adminCommitDocuments,
+  listDocuments = adminListDocuments,
 } = {}) {
   resolveRequestedPaymentStatus(body?.paymentMode);
-  if (getDocument === adminGetDocument && commitDocuments === adminCommitDocuments) {
-    return adminRunTransaction((transaction) => createEcommerceOrder({body, env, now, ...transaction}), {env});
-  }
-  const requestId = normalizeEcommerceRequestId(body?.requestId);
-  const requestFingerprint = checkoutRequestFingerprint(body || {});
-  const ids = deterministicIds(requestId);
-  const existing = await getDocument(`orders/${ids.orderId}`, { env });
+  if (
+    getDocument === adminGetDocument &&
+    commitDocuments === adminCommitDocuments
+  )
+    return adminRunTransaction(
+      (transaction) => createEcommerceOrder({ body, env, now, ...transaction }),
+      { env },
+    );
+  const requestId = normalizeEcommerceRequestId(body?.requestId),
+    orderId = `ecommerce_order_${requestId}`,
+    paymentId = `ecommerce_payment_${requestId}`;
+  const requestedItems = normalizeCheckoutItems(body?.items),
+    customer = normalizeCustomer(body?.customer);
+  const billing = normalizeBilling(body?.billing);
+  const shippingRequest = {
+    ...body?.shipping,
+    method: body?.deliveryMethod || body?.shipping?.method || "pickup",
+    notes: body?.notes || body?.shipping?.notes || "",
+  };
+  const deliveryQuote = shippingRequest.method === "delivery" && shippingRequest.quoteToken
+    ? readDeliveryQuote(shippingRequest.quoteToken, env)
+    : null;
+  const confirmedShipping = deliveryQuote
+    ? quotedShipping(deliveryQuote, deliveryAddressDetails(shippingRequest.address), String(shippingRequest.notes).trim().slice(0, 500))
+    : null;
+  const accessToken = String(body?.accessToken || "");
+  const accessHash = /^[A-Za-z0-9_-]{32,128}$/.test(accessToken)
+    ? createHash("sha256").update(accessToken).digest("hex")
+    : null;
+  const requestFingerprint = createHash("sha256")
+    .update(
+      JSON.stringify({
+        items: [...requestedItems].sort((a, b) =>
+          a.productId.localeCompare(b.productId),
+        ),
+        customer,
+        shippingRequest: confirmedShipping || shippingRequest,
+        billing,
+        accessHash,
+      }),
+    )
+    .digest("hex");
+  const existing = await getDocument(`orders/${orderId}`, { env });
   if (existing) {
-    if (existing.data?.requestFingerprint && existing.data.requestFingerprint !== requestFingerprint) {
+    if (
+      existing.data.requestFingerprint &&
+      existing.data.requestFingerprint !== requestFingerprint
+    )
       throw commerceError(
         "ecommerce-idempotency-conflict",
-        "La misma clave de idempotencia ya fue utilizada para otro contenido de checkout.",
+        "El intento ya corresponde a otro pedido.",
         409,
       );
-    }
     return {
       created: false,
       idempotent: true,
-      order: { ...existing.data, id: ids.orderId },
+      order: publicEcommerceOrder(orderId, existing.data),
     };
   }
-
-  const locationId = ecommerceLocationId(env);
-  if (!locationId) {
+  const abandoned = accessHash && await getDocument(checkoutEditPath(orderId), { env });
+  if (abandoned?.data.accessHash === accessHash)
+    throw commerceError("ecommerce-checkout-edited", "El intento anterior se cerró al editar el pedido.", 409);
+  const channel = await loadWebChannel({ env, getDocument });
+  if (channel && !accessHash)
+    throw commerceError(
+      "ecommerce-access-token-required",
+      "No se pudo crear el acceso privado al pedido.",
+      400,
+    );
+  if (channel && shippingRequest.method === "delivery" && deliveryAddressEnabled(env) && !confirmedShipping) {
+    throw commerceError("ecommerce-delivery-quote-required", "Elegí una dirección y confirmá la cotización de envío.", 409);
+  }
+  const origins = await configuredWebOrigins(channel, { env, getDocument, listDocuments, now });
+  if (!origins.length)
     throw commerceError(
       "ecommerce-location-not-configured",
-      "La ubicación de stock Ecommerce está PENDIENTE DE DEFINIR.",
+      "Falta configurar los orígenes de stock web.",
       409,
     );
-  }
-  const locationSnapshot = await getDocument(`locations/${locationId}`, { env });
-  if (!locationSnapshot || locationSnapshot.data?.deleted === true || locationSnapshot.data?.active === false) {
-    throw commerceError("ecommerce-location-unavailable", "La ubicación Ecommerce no está disponible.", 409);
-  }
-
-  const requestedItems = normalizeCheckoutItems(body?.items);
-  const uniqueProductIds = [...new Set(requestedItems.map((item) => item.productId))];
-  const productEntries = await Promise.all(uniqueProductIds.map(async (productId) => {
-    const [productSnapshot, stockSnapshot] = await Promise.all([
-      getDocument(`products/${productId}`, { env }),
-      getDocument(`locationStock/${locationId}/items/${productId}`, { env }),
-    ]);
-    return [
-      productId,
-      productSnapshot ? { ...productSnapshot.data, id: productId } : null,
-      stockSnapshot ? {
-        ...stockSnapshot.data,
-        id: productId,
-        __updateTime: stockSnapshot.updateTime || null,
-      } : null,
-    ];
-  }));
-  const productsById = {};
-  const stocksById = {};
-  for (const [productId, product, stock] of productEntries) {
-    if (product) productsById[productId] = product;
-    if (stock) stocksById[productId] = stock;
-  }
-
+  const holdPath = checkoutReservationPath(orderId);
+  const earlierReservation = channel ? (await getDocument(holdPath, { env }))?.data : null;
+  const checkoutHold = earlierReservation || body.checkoutReservation
+    ? verifyCheckoutReservation(earlierReservation, accessHash, requestedItems, now)
+    : null;
+  const productState = await loadCheckoutProducts(requestedItems, channel, origins, {
+    env, getDocument, now, reservationOrderId: checkoutHold ? orderId : null,
+  });
+  const { sourceSnapshotsByProduct, ecommerceSettingsById, promotionsByProductId } = productState;
+  const shipping = confirmedShipping || (channel ? channelShipping(shippingRequest, channel) : null);
   const prepared = prepareAuthoritativeCheckout({
     requestedItems,
-    productsById,
-    stocksById,
-    customer: body?.customer,
-    shipping: {
-      method: body?.deliveryMethod || body?.shipping?.method,
-      notes: body?.notes || body?.shipping?.notes,
-    },
-    paymentMode: body?.paymentMode || "pending",
+    ...productState,
+    customer,
+    shipping: shippingRequest,
+    resolvedShipping: shipping,
     env,
   });
-
-  const timestamp = now instanceof Date ? now : new Date(now);
-  const orderStatus = prepared.stockCommitRequired ? "confirmed" : "pending_payment";
-  const paymentProvider = null;
-  const saleId = prepared.stockCommitRequired ? ids.saleId : null;
-
+  if (deliveryQuote) {
+    assertCurrentDeliveryQuote(deliveryQuote, {
+      delivery: channel?.delivery, items: prepared.items, settings: ecommerceSettingsById,
+      promotions: promotionsByProductId, env, now,
+    });
+  }
+  const itemsWithAllocations = prepared.items.map(item => {
+    const rows = sourceSnapshotsByProduct[item.productId] || [];
+    const stockAllocations = checkoutHold
+      ? checkoutHold.items.find(row => row.productId === item.productId)?.reservationAllocations
+      : allocateStock(item.quantity, rows, item.name);
+    if (checkoutHold && (!stockAllocations?.length || stockAllocations.reduce((total, row) => total + row.quantity, 0) !== item.quantity ||
+      stockAllocations.some(allocation => {
+        const source = rows.find(row => row.origin.type === allocation.type && row.origin.id === allocation.id);
+        const hold = source?.snapshot?.data?.ecommerceReservations?.[orderId];
+        return !hold || hold.quantity !== allocation.quantity || !(new Date(hold.expiresAt) > now) || source.available < allocation.quantity;
+      }))) {
+      throw commerceError("ecommerce-reservation-invalid", "La reserva de stock del carrito cambió.", 409);
+    }
+    return { ...item, stockAllocations };
+  });
+  const origin = origins[0];
+  const deferredStock = Boolean(channel);
+  const reservationExpiresAt = channel
+    ? checkoutHold ? new Date(checkoutHold.expiresAt) : new Date(now.valueOf() + CHECKOUT_RESERVATION_MS)
+    : null;
+  const crm = channel
+    ? await prepareCommerceCustomer({
+        customer,
+        orderId,
+        saleId: null,
+        timestamp: now,
+        getDocument,
+        env,
+      })
+    : null;
   const order = {
-    schemaVersion: 1,
+    schemaVersion: deferredStock ? 4 : 1,
     sourceType: "ecommerce",
     requestId,
     idempotencyKey: requestId,
     requestFingerprint,
-    status: orderStatus,
-    locationId,
-    locationName: locationSnapshot.data?.name || "Ecommerce",
-    customer: prepared.customer,
-    items: prepared.items.map(({ availableStock: _availableStock, ...item }) => item),
+    orderCode: `WEB-${requestId.slice(0, 24).toUpperCase()}`,
+    status: "pending_payment",
+    channelId: channel?.id || null,
+    defaultTransport: shipping?.carrier === "andreani" ? "manual" : channel?.defaultTransport || "repository",
+    ...(deferredStock ? {
+      stockCommitMode: "deferred",
+      pricingOrigin: origin,
+      stockOriginType: null,
+      stockOriginId: null,
+      stockOriginName: null,
+      initialStockOrigin: null,
+      locationId: null,
+      locationName: "Ecommerce",
+    } : {
+      stockOriginType: origin.type,
+      stockOriginId: origin.id,
+      stockOriginName: origin.name,
+      initialStockOrigin: origin,
+      locationId: origin.type === "location" ? origin.id : null,
+      locationName: origin.name,
+    }),
+    originHistory: [],
+    customer,
+    customerId: crm?.customerId || null,
+    billing,
+    items: itemsWithAllocations.map(({ availableStock, stockAllocations, ...item }) => ({
+      ...item,
+      ...(deferredStock ? { reservationAllocations: stockAllocations } : { stockAllocations }),
+    })),
     subtotal: prepared.subtotal,
     discountTotal: prepared.discountTotal,
     shipping: prepared.shipping,
     shippingAmount: prepared.shippingAmount,
     total: prepared.total,
-    paymentId: ids.paymentId,
-    paymentStatus: prepared.paymentStatus,
-    saleId,
+    paymentId,
+    paymentStatus: "pending",
+    saleId: null,
     invoiceId: null,
     invoiceStatus: "not_requested",
-    createdAt: timestamp,
-    updatedAt: timestamp,
+    reservationStatus: channel ? "active" : "not_reserved",
+    reservationExpiresAt,
+    accessHash,
+    createdAt: now,
+    updatedAt: now,
   };
-
-  const payment = {
-    schemaVersion: 1,
-    sourceType: "ecommerce",
-    orderId: ids.orderId,
-    idempotencyKey: requestId,
-    saleId,
-    provider: paymentProvider,
-    status: prepared.paymentStatus,
-    amount: prepared.total,
-    currency: "ARS",
-    providerTransactionId: null,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
-
   const operations = [
-    { type: "create", path: `orders/${ids.orderId}`, data: order },
-    { type: "create", path: `payments/${ids.paymentId}`, data: payment },
+    { type: "create", path: `orders/${orderId}`, data: order },
+    {
+      type: "create",
+      path: `payments/${paymentId}`,
+      data: {
+        schemaVersion: 2,
+        sourceType: "ecommerce",
+        orderId,
+        idempotencyKey: requestId,
+        saleId: null,
+        provider: null,
+        status: "pending",
+        amount: order.total,
+        currency: "ARS",
+        providerTransactionId: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    },
+    ...(crm?.operations || []),
   ];
-
-  if (prepared.stockCommitRequired) {
-    const crm = await prepareCommerceCustomer({ customer: prepared.customer, saleId: ids.saleId, timestamp, getDocument, env });
-    operations.push(...crm.operations);
-    const sale = {
-      schemaVersion: 1,
-      sourceType: "ecommerce",
-      sourceChannel: "ecommerce",
-      orderId: ids.orderId,
-      locationId,
-      locationName: locationSnapshot.data?.name || "Ecommerce",
-      sellerId: null,
-      sellerName: "Ecommerce",
-      customerId: crm.customerId,
-      customerPhoneNormalized: crm.customerPhoneNormalized,
-      crmLinkStatus: crm.crmLinkStatus,
-      customerNameSnapshot: prepared.customer.fullName,
-      customerPhoneSnapshot: prepared.customer.phone,
-      customerEmailSnapshot: prepared.customer.email,
-      items: order.items.map((item) => ({
-        productId: item.productId,
-        name: item.name,
-        abbreviation: item.abbreviation,
-        qty: item.quantity,
-        unitPrice: item.unitPrice,
-        subtotal: item.subtotal,
-        arcaVatRate: item.arcaVatRate,
-      })),
-      discounts: [],
-      discountTotal: 0,
-      subtotal: prepared.subtotal,
-      shippingAmount: prepared.shippingAmount,
-      totalBeforeDiscounts: prepared.subtotal,
-      totalItems: order.items.reduce((sum, item) => sum + item.quantity, 0),
-      total: prepared.total,
-      paymentMethod: "ecommerce",
-      paymentMethodLabel: "Ecommerce",
-      payments: [{ method: "ecommerce", amount: prepared.total }],
-      paymentStatus: prepared.paymentStatus,
-      invoiceStatus: "not_requested",
-      status: "active",
-      saleCode: saleCodeFor(requestId),
-      deliveryMethod: prepared.shipping.method,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-    operations.push({ type: "create", path: `sales/${ids.saleId}`, data: sale });
-
-    for (const item of prepared.items) {
-      const stock = stocksById[item.productId];
-      const newStock = item.availableStock - item.quantity;
-      const safeProductId = item.productId.replace(/[^A-Za-z0-9_-]/g, "_");
-      const movementId = `ecommerce_${requestId}_${safeProductId}`;
-      operations.push({
-        type: "update",
-        path: `locationStock/${locationId}/items/${item.productId}`,
-        data: {
-          currentStock: newStock,
-          lastSaleId: ids.saleId,
-          lastMovementId: movementId,
-          updatedAt: timestamp,
-        },
-        currentUpdateTime: stock.__updateTime || null,
-      });
-      operations.push({
-        type: "create",
-        path: `stockMovements/${movementId}`,
-        data: {
-          sourceType: "ecommerce",
-          orderId: ids.orderId,
-          saleId: ids.saleId,
-          locationId,
-          locationName: locationSnapshot.data?.name || "Ecommerce",
-          productId: item.productId,
-          productName: item.name,
-          type: "sale",
-          qty: -item.quantity,
-          previousStock: item.availableStock,
-          newStock,
-          reason: `Venta Ecommerce ${sale.saleCode}`,
-          userId: "ecommerce-backend",
-          userName: "Ecommerce",
-          createdAt: timestamp,
-        },
-      });
+  if (channel) {
+    if (checkoutHold) {
+      operations.push({ type: "update", path: holdPath, data: { state: "converted", convertedAt: now } });
+    } else {
+      operations.push(...makeReservationWrites(order.items, sourceSnapshotsByProduct, orderId, reservationExpiresAt, now));
     }
+    operations.push({
+      type: "create",
+      path: `auditLogs/web_order_${requestId}`,
+      data: {
+        moduleId: "ecommerce",
+        action: "order.created",
+        entityId: orderId,
+        entityType: "order",
+        userId: "ecommerce-backend",
+        description:
+          "Pedido web pendiente; reserva sin salida física ni ingreso",
+        createdAt: now,
+      },
+    });
   }
-
+  if (operations.length > 450)
+    throw commerceError("ecommerce-order-too-large", "El pedido usa demasiados orígenes de stock. Reducí productos u orígenes y volvé a intentar.", 400);
   try {
     await commitDocuments(operations, { env });
   } catch (error) {
-    if (error?.retryable) throw error;
-    if (error?.code === "firebase-admin-already-exists") {
-      const existingAfterRace = await getDocument(`orders/${ids.orderId}`, { env });
-      if (existingAfterRace) {
-        if (existingAfterRace.data?.requestFingerprint && existingAfterRace.data.requestFingerprint !== requestFingerprint) {
-          throw commerceError(
-            "ecommerce-idempotency-conflict",
-            "La clave de idempotencia entró en conflicto con otro checkout.",
-            409,
-          );
-        }
+    if (error.retryable) throw error;
+    if (error.code === "firebase-admin-already-exists") {
+      const raced = await getDocument(`orders/${orderId}`, { env });
+      if (raced?.data.requestFingerprint === requestFingerprint)
         return {
           created: false,
           idempotent: true,
-          order: { ...existingAfterRace.data, id: ids.orderId },
+          order: publicEcommerceOrder(orderId, raced.data),
         };
-      }
+      throw commerceError(
+        "ecommerce-idempotency-conflict",
+        "El intento ya corresponde a otro pedido.",
+        409,
+      );
     }
-    if (error?.code === "firebase-admin-precondition-failed") {
-      throw commerceError("ecommerce-order-conflict", "El stock cambió durante la operación. Volvé a intentarlo.", 409);
-    }
+    if (error.code === "firebase-admin-precondition-failed")
+      throw commerceError(
+        "ecommerce-order-conflict",
+        "Cambió el stock; reintentá el pedido.",
+        409,
+      );
     throw error;
   }
+  return { created: true, idempotent: false, order: publicEcommerceOrder(orderId, order) };
+}
+
+export async function loadEcommerceCatalog({
+  env = process.env,
+  now = new Date(),
+  listDocuments = adminListDocuments,
+  getDocument = adminGetDocument,
+} = {}) {
+  const channel = await loadWebChannel({ env, getDocument });
+  const origins = await configuredWebOrigins(channel, { env, getDocument, listDocuments, now });
+  const origin = origins[0] || null;
+  const locationId = origin?.id || (channel ? "" : ecommerceLocationId(env));
+  const products = (await listDocuments("products", { env, pageSize: 500 }))
+    .filter((product) => product.deleted !== true && product.active !== false)
+    .sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), "es"),
+    );
+
+  if (!locationId) {
+    return {
+      ready: false,
+      pending: [channel ? "ecommerce-stock-origins" : "ECOMMERCE_LOCATION_ID"],
+      location: null,
+      config: {
+        pickupEnabled: ecommercePickupEnabled(env),
+        deliveryEnabled: false,
+        deliveryAddressEnabled: false,
+        paymentProvider: "pending_payway",
+      },
+      products: products.map((product) =>
+        publicProduct(product, null, { locationConfigured: false }),
+      ),
+    };
+  }
+
+  const locationSnapshot = await getDocument(
+    `${origin?.type === "warehouse" ? "warehouses" : "locations"}/${locationId}`,
+    { env },
+  );
+  if (
+    !locationSnapshot ||
+    locationSnapshot.data?.deleted === true ||
+    locationSnapshot.data?.active === false
+  ) {
+    throw commerceError(
+      "ecommerce-location-unavailable",
+      "La ubicación Ecommerce no está disponible.",
+      409,
+    );
+  }
+
+  const configuredOrigins = origins.length ? origins : [{ type: "location", id: locationId, name: locationSnapshot.data?.name || "Ecommerce" }];
+  const [settingsRows, promotionRows, ...stockRows] = await Promise.all([
+    listDocuments("ecommerceProductSettings", { env, pageSize: 500 }),
+    listDocuments("ecommercePromotions", { env, pageSize: 500 }),
+    ...configuredOrigins.map((source) => listDocuments(stockCollectionPath(source), { env, pageSize: 500 })),
+  ]);
+  const settingsById = Object.fromEntries(settingsRows.map((row) => [row.productId || row.id, row]));
+  const promotionById = Object.fromEntries(promotionRows.map((row) => [row.productId || row.id, row]));
+  const stockRowsBySource = configuredOrigins.map((source, index) => ({
+    origin: source,
+    rows: new Map(stockRows[index].map((row) => [row.id, row])),
+  }));
+  const computedStocks = products.map((product) => {
+    const settings = settingsById[product.id] || {};
+    const sources = stockRowsBySource.map(({ origin: source, rows }) => {
+      const stock = rows.get(product.id);
+      return { stock, available: webStockAvailability(stock, now) };
+    });
+    const preferred = webPricingStock(channel, sources.map((source) => source.stock));
+    const pricingStock = {
+      ...preferred,
+      id: product.id,
+      currentStock: Math.max(0, sources.reduce((sum, row) => sum + row.available, 0) - Math.max(0, Number(settings.minimumRemainingStock) || 0)),
+    };
+    return { pricingStock, settings, promotion: promotionById[product.id] || null };
+  });
 
   return {
-    created: true,
-    idempotent: false,
-    order: { id: ids.orderId, ...order },
+    ready: true,
+    pending: channel
+      ? []
+      : ecommercePickupEnabled(env)
+        ? ["DELIVERY_PRICING"]
+        : ["PICKUP_CONFIGURATION", "DELIVERY_PRICING"],
+    location: {
+      id: locationId,
+      name: configuredOrigins.length > 1
+        ? "Locales y depósitos configurados"
+        : locationSnapshot.data?.name || "Ecommerce",
+    },
+    config: {
+      pickupEnabled: channel
+        ? channel.pickup?.enabled === true
+        : ecommercePickupEnabled(env),
+      deliveryEnabled: channel?.delivery?.enabled === true,
+      deliveryAddressEnabled: channel?.delivery?.enabled === true && deliveryAddressEnabled(env),
+      checkoutReserveEnabled: Boolean(channel),
+      pickup: channel?.pickup || null,
+      deliveryRates: (channel?.delivery?.rates || []).filter(
+        (rate) => rate.active !== false,
+      ),
+      channelId: channel?.id || null,
+      paymentProvider: "pending_payway",
+    },
+    products: products.map((product, index) => publicProduct(product, computedStocks[index].pricingStock, {
+      locationConfigured: true,
+      settings: computedStocks[index].settings,
+      promotion: computedStocks[index].promotion,
+    })),
   };
 }
