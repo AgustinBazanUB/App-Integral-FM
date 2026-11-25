@@ -19,6 +19,10 @@ export const originStockPath = (origin, productId) =>
 export const stockCollectionPath = (origin) =>
   `${origin.type === "warehouse" ? "warehouseStock" : "locationStock"}/${origin.id}/items`;
 
+export function orderReservationAllocations(order, item) {
+  return (order.stockCommitMode === "deferred" ? item.reservationAllocations : item.stockAllocations) || [];
+}
+
 export function isActiveWebStock(stock) {
   return Boolean(stock && stock.active !== false && stock.deleted !== true && stock.productDeleted !== true);
 }
@@ -82,11 +86,12 @@ function namedOrigin(origin, source) {
 export async function loadWebChannel({
   env = process.env,
   getDocument = adminGetDocument,
+  requireActive = true,
 } = {}) {
   const snapshot = await getDocument(`channels/${WEB_CHANNEL_ID}`, { env });
   if (!snapshot) return null; // Existing deployments remain readable until configured.
   const channel = { ...snapshot.data, id: WEB_CHANNEL_ID };
-  if (channel.active !== true)
+  if (requireActive && channel.active !== true)
     throw commerceError(
       "ecommerce-channel-inactive",
       "El canal web no está habilitado.",

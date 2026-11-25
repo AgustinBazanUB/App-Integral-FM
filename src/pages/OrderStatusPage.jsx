@@ -129,7 +129,8 @@ export default function OrderStatusPage() {
                 ? "Retiro en local"
                 : "Envío a domicilio"}
               :{" "}
-              {order.fulfillmentStatus === "listo_retirar"
+              {order.paymentStatus === "approved" && order.fulfillmentStatus === "solicitud_pendiente" ? "Por preparar"
+                : order.fulfillmentStatus === "listo_retirar"
                 ? order.deliveryMethod === "pickup" ? "Listo para retirar" : "Listo para despacho"
                 : SHIPPING_STATES[order.fulfillmentStatus] || "Pendiente de confirmación"}
             </p>

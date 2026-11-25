@@ -196,7 +196,8 @@ test("canal web reserva sin salida, vincula CRM sin compra y publica disponibili
     { order } = await checkout(db);
   assert.equal(order.total, 2500);
   assert.equal(order.channelId, "ecommerce");
-  assert.equal(order.stockOriginId, "valle");
+  assert.equal(order.stockOriginId, null);
+  assert.equal(order.items[0].reservationAllocations, undefined);
   assert.equal(rows(db, "sales").length, 0);
   const stock = db.documents.get("locationStock/valle/items/oil");
   assert.equal(stock.currentStock, 10);
@@ -237,7 +238,7 @@ test("reservas serializadas impiden dos compras del último producto y replay no
     2,
   );
 });
-test("stock total usa orígenes físicos activos nuevos, descuenta cada origen una vez y enlaza sus movimientos al envío", async () => {
+test("el total usa todos los orígenes activos y queda agotado aunque el stock físico siga reservado", async () => {
   const db = setup();
   db.documents.set("channels/ecommerce", {
     ...channel,
@@ -272,18 +273,53 @@ test("stock total usa orígenes físicos activos nuevos, descuenta cada origen u
   assert.equal(catalog.products[0].stockState, "out");
   assert.equal(catalog.products[0].stock, null);
 
-  await Promise.all([approve(db, order), approve(db, order)]);
+  const [paid] = await Promise.all([approve(db, order), approve(db, order)]);
+  const afterCheckoutExpiry = new Date(now.valueOf() + 2 * 3600000);
   for (const path of [shopPath, warehousePath, fairPath]) {
-    assert.equal(db.documents.get(path).currentStock, 0);
-    assert.equal(db.documents.get(path).ecommerceReservationsExpireAt, null);
+    assert.equal(db.documents.get(path).currentStock, 1);
+    assert.equal(reservedStockQuantity(db.documents.get(path), afterCheckoutExpiry), 1);
   }
+  const after = await loadEcommerceCatalog({ env, now: afterCheckoutExpiry, getDocument: db.getDocument, listDocuments: db.listDocuments });
+  assert.equal(after.products[0].stockState, "out");
   assert.equal(db.documents.get("warehouses/closed").active, false);
   assert.equal(db.documents.get("locationStock/other/items/oil").currentStock, 4);
   assert.equal(rows(db, "sales").length, 1);
-  const movements = rows(db, "stockMovements");
-  assert.equal(movements.length, 3);
-  assert.deepEqual(movements.map((row) => row.inventoryId).sort(), ["feria", "infal", "valle"]);
-  assert.deepEqual(rows(db, "shipments")[0].stockMovementIds.sort(), movements.map((row) => row.id).sort());
+  assert.equal(rows(db, "shipments")[0].status, "solicitud_pendiente");
+  await assert.rejects(() => shipping(db, paid.order, "approve", { originType: "location", originId: "valle" }), /unidades físicas suficientes/);
+  assert.equal(rows(db, "stockMovements").length, 0);
+});
+
+test("Gestión elige local o depósito aun con todo el stock reservado y no lo descuenta dos veces", async () => {
+  const db = setup();
+  const shop = "locationStock/valle/items/oil";
+  const depot = "warehouseStock/infal/items/oil";
+  db.documents.get(shop).currentStock = 2;
+  db.documents.get(depot).currentStock = 2;
+  db.documents.get("locationStock/other/items/oil").currentStock = 0;
+  const { order: pending } = await checkout(db, request("reservado_primero"));
+  const { order: second } = await checkout(db, request("reservado_segundo"));
+  const { order: paid } = await approve(db, second);
+  assert.equal(db.documents.get(depot).ecommerceReservations[second.id].quantity, 2);
+  await assert.rejects(() => checkout(db, request("tercero_sin_stock")), { code: "ecommerce-stock-insufficient" });
+
+  await shipping(db, paid, "approve", { originType: "location", originId: "valle" });
+  assert.equal(db.documents.get(shop).currentStock, 0);
+  assert.equal(db.documents.get(depot).currentStock, 2);
+  assert.equal(db.documents.get(depot).ecommerceReservations[pending.id].quantity, 2);
+  assert.equal(db.documents.get("orders/" + pending.id).items[0].reservationAllocations[0].id, "infal");
+  assert.equal(rows(db, "stockMovements")[0].inventoryId, "valle");
+  assert.equal(db.documents.get("orders/" + second.id).reservationStatus, "consumed");
+  assert.equal(db.documents.get("shipments/" + paid.shipmentId).itemsSnapshot[0].stockAllocations[0].id, "valle");
+
+  const { order: firstPaid } = await approve(db, pending);
+  const catalog = await loadEcommerceCatalog({ env, now, getDocument: db.getDocument, listDocuments: db.listDocuments });
+  assert.equal(catalog.products[0].stockState, "out");
+  await shipping(db, firstPaid, "approve", { originType: "warehouse", originId: "infal" });
+  assert.equal(db.documents.get(depot).currentStock, 0);
+  assert.equal(db.documents.get(depot).reservedQuantity, 0);
+  assert.equal(rows(db, "stockMovements").length, 2);
+  assert.equal(rows(db, "sales").length, 2);
+  assert.equal(db.documents.get("sales/" + firstPaid.saleId).stockOriginId, "infal");
 });
 
 test("Venta Rápida, vendedor y transferencias respetan la última unidad web con timestamps de Firestore", () => {
@@ -308,12 +344,17 @@ test("Venta Rápida, vendedor y transferencias respetan la última unidad web co
   assert.equal(reservedStockQuantity(stock, new Date(+now + 60001)), 0);
 });
 
-test("confirmaciones concurrentes generan una venta, una salida y una tarea logística; simulación sin ingresos", async () => {
+test("pago concurrente registra una venta y origen concurrente imputa una sola salida", async () => {
   const db = setup(),
     { order } = await checkout(db);
-  await Promise.all([approve(db, order), approve(db, order)]);
+  const [paid] = await Promise.all([approve(db, order), approve(db, order)]);
   assert.equal(rows(db, "sales").length, 1);
+  assert.equal(rows(db, "stockMovements").length, 0);
+  const choice = { originType: "location", originId: "valle", requestId: "origin_confirm_qa" };
+  await Promise.all([shipping(db, paid.order, "approve", choice), shipping(db, paid.order, "approve", choice)]);
   assert.equal(rows(db, "stockMovements").length, 1);
+  assert.equal(rows(db, "shipments")[0].stockOriginId, "valle");
+  assert.equal(rows(db, "sales")[0].stockOriginId, "valle");
   assert.equal(rows(db, "shipments").length, 1);
   assert.equal(
     db.documents.get("locationStock/valle/items/oil").currentStock,
@@ -331,9 +372,16 @@ test("confirmaciones concurrentes generan una venta, una salida y una tarea log�
   assert.equal(rows(db, "shipments")[0].assignedPreparerIds.length, 0);
   assert.ok(rows(db, "alerts").length > 0);
 });
-test("trasladar reserva a depósito y reasignar stock pagado conserva venta histórica y movimientos compensatorios", async () => {
+test("un pedido anterior conserva la reasignación de su reserva y del stock ya descontado", async () => {
   const db = setup(),
     { order } = await checkout(db);
+  const legacy = db.documents.get("orders/" + order.id);
+  delete legacy.stockCommitMode;
+  delete legacy.pricingOrigin;
+  Object.assign(legacy, { stockOriginType: "location", stockOriginId: "valle", stockOriginName: "Local QA",
+    locationId: "valle", locationName: "Local QA" });
+  legacy.items = legacy.items.map(({ reservationAllocations, ...item }) => ({ ...item, stockAllocations: reservationAllocations }));
+  delete db.documents.get("locationStock/valle/items/oil").ecommerceReservations[order.id].pooled;
   await manage(db, order, {
     mode: "origin",
     origin: { type: "warehouse", id: "infal" },
@@ -419,6 +467,7 @@ for (const transport of ["repository", "uber", "manual"])
     await approve(db, order);
     const stored = db.documents.get(`orders/${order.id}`);
     Object.assign(order, stored);
+    await shipping(db, order, "approve", { originType: "location", originId: "valle" });
     await shipping(db, order, "assign", {
       assignedPreparerIds: [admin.id],
       reason: "Asignación QA",
@@ -495,6 +544,7 @@ test("retiro por cliente usa código y empleado autorizado; no admite repartidor
       runTransaction: db.runTransaction,
     }),
   );
+  await shipping(db, order, "approve", { originType: "location", originId: "valle" });
   await shipping(db, order, "assign", {
     assignedPreparerIds: [admin.id],
     reason: "Asignación QA",
@@ -530,7 +580,7 @@ test("envío fiscal incluye servicio con IVA en el motor existente y no añade m
   assert.equal(result.fiscal.total, 2500);
   assert.equal(result.fiscal.caeRequested, false);
   assert.equal(rows(db, "invoices")[0].saleSnapshot.items.length, 2);
-  assert.equal(rows(db, "stockMovements").length, 1);
+  assert.equal(rows(db, "stockMovements").length, 0);
   assert.equal(
     db.documents.get(
       `shipments/${db.documents.get(`orders/${order.id}`).shipmentId}`,

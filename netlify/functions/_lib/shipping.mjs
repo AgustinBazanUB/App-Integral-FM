@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { reservedStockQuantity } from "../../../src/shared/stockReservations.mjs";
+import { planDeferredWebStock } from "./ecommerce/deferredStock.mjs";
 import { adminRunTransaction, adminListDocuments } from "./firestoreAdminRest.mjs";
 import { can, canAccessAdministration, canAccessSellerPanel, effectiveSellerLocations, normalizedRole } from "../../../src/gestion/permissions.js";
 import { buildCustomerDraft, customerDocumentId } from "../../../src/gestion/customers/customerDomain.js";
@@ -54,12 +55,12 @@ function eventWrite(shipment, eventId, action, actor, previous, stamp, detail = 
   return create(`shipments/${shipment.id}/events/${eventId}`, { action, sequence: shipment.revision || 0, actorId: actor, previousStatus: previous, status: shipment.status, previousLeg: previous ? leg(previous) : null, leg: leg(shipment.status), createdAt: stamp, ...detail });
 }
 
-// The web payment already owns the Sale and stock writes. This adapter only
-// attaches the existing logistics aggregate, in that same transaction.
+// Attach logistics in the payment transaction; deferred stock is committed by shipping.
 export async function preparePaidEcommerceFulfillment({ transaction, order, sale, saleId, origin, actor, env, now }) {
   const shipmentId = `shipment_${saleId}`, pickup = order.shipping.method === "pickup";
+  const committed = sale.stockCommitState === "committed";
   const stockOrigins = new Map();
-  for (const item of order.items || []) {
+  for (const item of committed ? order.items || [] : []) {
     const allocations = item.stockAllocations?.length
       ? item.stockAllocations
       : [{ type: origin.type, id: origin.id, name: origin.name, quantity: item.quantity }];
@@ -81,10 +82,10 @@ export async function preparePaidEcommerceFulfillment({ transaction, order, sale
     id: shipmentId, shippingSchemaVersion: 1, saleId, saleCode: sale.saleCode, orderId: order.id, channelId: order.channelId,
     publicCode: order.orderCode || sale.saleCode, publicLookupId, creationSource: "ecommerce", createdBy: actor,
     commercialLocationId: sale.locationId, commercialLocationName: sale.locationName,
-    stockOriginType: origin.type, stockOriginId: origin.id, stockOriginName: origin.name,
+    stockOriginType: sale.stockOriginType, stockOriginId: sale.stockOriginId, stockOriginName: sale.stockOriginName,
     stockOrigins: [...stockOrigins.values()],
-    stockCommitMode: "immediate", stockCommitState: "committed", stockMovementIds: [],
-    status: "aprobado", fulfillmentType: pickup ? "pickup" : "delivery", deliveryType: pickup ? "pickup" : order.defaultTransport || env.ECOMMERCE_DEFAULT_TRANSPORT || "repository",
+    stockCommitMode: committed ? "immediate" : "deferred", stockCommitState: sale.stockCommitState, stockMovementIds: [],
+    status: committed ? "aprobado" : "solicitud_pendiente", fulfillmentType: pickup ? "pickup" : "delivery", deliveryType: pickup ? "pickup" : order.defaultTransport || env.ECOMMERCE_DEFAULT_TRANSPORT || "repository",
     customerSnapshot: { name: order.customer.fullName, phone: order.customer.phone }, itemsSnapshot: sale.items,
     destination: { displayAddress, notes: dispatchNotes.filter(Boolean).join(" · "), verified: false }, destinationRevision: 0,
     ...(order.shipping.carrier ? { ecommerceDeliveryRate: {
@@ -97,7 +98,10 @@ export async function preparePaidEcommerceFulfillment({ transaction, order, sale
     pickupCode, createdAt: now, saleCreatedAt: now, updatedAt: now,
   };
   if (!pickup && !TRANSPORTS[shipment.deliveryType]) throw shippingError("Configurá el transporte web predeterminado.");
-  const notices = await notifications(transaction, shipment, "web_order_unassigned", { title: "Pedido web confirmado sin preparador", critical: true, stamp: now, eventId: "created" });
+  const notices = await notifications(transaction, shipment, "web_order_unassigned", {
+    title: committed ? "Pedido web confirmado sin preparador" : "Pedido web pagado pendiente de origen",
+    critical: true, stamp: now, eventId: "created",
+  });
   return { shipmentId, pickupCode, operations: [create(`shipments/${shipmentId}`, shipment), create(`shipmentLookups/${publicLookupId}`, { shipmentId }), eventWrite(shipment, "created", "web_order_confirmed", actor, null, now), ...notices] };
 }
 
@@ -418,6 +422,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
     }
     assert(!CLOSED_SHIPPING_STATES.includes(shipment.status) || body.mode === "labels" || body.mode === "retry" && shipment.status === "no_entregado", "Este envío ya está cerrado.");
     const previous = shipment.status, changes = {}, operations = [];
+    const awaitingWebOrigin = shipment.creationSource === "ecommerce" && shipment.stockCommitMode === "deferred" && shipment.stockCommitState === "pending";
     let notice = null, result = { id: shipment.id }, detail = {}, orderChanges = null, saleChanges = null;
     const requireEdit = () => { if (!profile || !edit(profile)) forbidden(); };
     const requireApproval = () => { if (!profile || !approve(profile)) forbidden(); };
@@ -450,28 +455,39 @@ export async function shippingOperation({ body, session = null, runTransaction =
       const origin = { ...(await transaction.getDocument(`${type === "warehouse" ? "warehouses" : "locations"}/${originId}`))?.data, id: originId };
       assert(origin.name && origin.deleted !== true && (type === "warehouse" ? origin.active !== false : isLocationActiveNow(origin, now)), "El origen no está activo.");
       if (type === "warehouse" ? !can(profile, "warehouse", "edit") : !can(profile, "locations", "adjustStock")) forbidden();
-      const draft = cleanShippingDraft({ ...shipment.destination, ...body }, true);
-      const assigned = await preparers(transaction, draft.assignedPreparerIds);
-      const repo = draft.deliveryType === "repository" ? repository(env) : null;
-      const movements = [];
-      for (const item of shipment.itemsSnapshot) {
-        const path = `${type === "warehouse" ? "warehouseStock" : "locationStock"}/${originId}/items/${id(item.productId)}`;
-        const stock = (await transaction.getDocument(path))?.data;
-        assert(stock && stock.active !== false && stock.deleted !== true && stock.productDeleted !== true && Number.isSafeInteger(stock.currentStock), `${item.name}: falta configurar stock en el origen.`);
-        assert(stock.currentStock - reservedStockQuantity(stock, now) >= item.qty, `${item.name}: stock insuficiente o reservado (${stock.currentStock}). Regularizá el origen antes de aprobar.`);
-        const movementId = `shipping_approval_${shipment.id}_${item.productId}`; movements.push(movementId);
-        operations.push(update(path, { currentStock: stock.currentStock - item.qty, lastSaleId: shipment.saleId, lastMovementId: movementId, updatedAt: now }), create(`stockMovements/${movementId}`, { inventoryType: type, ...(type === "warehouse" ? { warehouseId: originId, warehouseName: origin.name } : { locationId: originId, locationName: origin.name }), productId: item.productId, productName: item.name, qty: -item.qty, previousStock: stock.currentStock, newStock: stock.currentStock - item.qty, type: "shipping_approval", saleId: shipment.saleId, shipmentId: shipment.id, userId: actor, userName: name(profile), createdAt: now, reason: "Origen aprobado para envío" }));
-      }
       const sale = (await transaction.getDocument(`sales/${shipment.saleId}`))?.data;
       assert(sale?.status === "active" && sale.stockCommitState === "pending", "La venta no está pendiente de stock.");
-      operations.push(update(`sales/${shipment.saleId}`, { stockCommitState: "committed", stockOriginType: type, stockOriginId: originId, stockOriginName: origin.name, updatedAt: now }));
-      Object.assign(changes, { status: "aprobado", approvalReview: null, stockCommitState: "committed", stockOriginType: type, stockOriginId: originId, stockOriginName: origin.name, stockMovementIds: movements, deliveryType: draft.deliveryType, assignedPreparerIds: assigned.map(user => user.id), preparerNames: assigned.map(user => user.name), repository: repo, approvedBy: actor, approvedAt: now });
-      if (draft.displayAddress !== shipment.destination.displayAddress || draft.notes !== shipment.destination.notes) {
-        changes.destination = { displayAddress: draft.displayAddress, notes: draft.notes, verified: false };
-        changes.destinationRevision = (shipment.destinationRevision || 0) + 1;
-        detail = { reason: "Destino revisado durante la aprobación", before: shipment.destination, after: changes.destination };
+      if (awaitingWebOrigin) {
+        const actualOrigin = { type, id: originId, name: origin.name };
+        const plan = await planDeferredWebStock({ transaction, shipment, sale, origin: actualOrigin, profile, env, now });
+        operations.push(...plan.operations);
+        Object.assign(changes, {
+          ...plan.originFields, status: "aprobado", approvalReview: null,
+          itemsSnapshot: plan.saleItems, stockOrigins: [actualOrigin], stockMovementIds: plan.movementIds,
+          approvedBy: actor, approvedAt: now,
+        });
+      } else {
+        const draft = cleanShippingDraft({ ...shipment.destination, ...body }, true);
+        const assigned = await preparers(transaction, draft.assignedPreparerIds);
+        const repo = draft.deliveryType === "repository" ? repository(env) : null;
+        const movements = [];
+        for (const item of shipment.itemsSnapshot) {
+          const path = `${type === "warehouse" ? "warehouseStock" : "locationStock"}/${originId}/items/${id(item.productId)}`;
+          const stock = (await transaction.getDocument(path))?.data;
+          assert(stock && stock.active !== false && stock.deleted !== true && stock.productDeleted !== true && Number.isSafeInteger(stock.currentStock), `${item.name}: falta configurar stock en el origen.`);
+          assert(stock.currentStock - reservedStockQuantity(stock, now) >= item.qty, `${item.name}: stock insuficiente o reservado (${stock.currentStock}). Regularizá el origen antes de aprobar.`);
+          const movementId = `shipping_approval_${shipment.id}_${item.productId}`; movements.push(movementId);
+          operations.push(update(path, { currentStock: stock.currentStock - item.qty, lastSaleId: shipment.saleId, lastMovementId: movementId, updatedAt: now }), create(`stockMovements/${movementId}`, { inventoryType: type, ...(type === "warehouse" ? { warehouseId: originId, warehouseName: origin.name } : { locationId: originId, locationName: origin.name }), productId: item.productId, productName: item.name, qty: -item.qty, previousStock: stock.currentStock, newStock: stock.currentStock - item.qty, type: "shipping_approval", saleId: shipment.saleId, shipmentId: shipment.id, userId: actor, userName: name(profile), createdAt: now, reason: "Origen aprobado para envío" }));
+        }
+        operations.push(update(`sales/${shipment.saleId}`, { stockCommitState: "committed", stockOriginType: type, stockOriginId: originId, stockOriginName: origin.name, updatedAt: now }));
+        Object.assign(changes, { status: "aprobado", approvalReview: null, stockCommitState: "committed", stockOriginType: type, stockOriginId: originId, stockOriginName: origin.name, stockMovementIds: movements, deliveryType: draft.deliveryType, assignedPreparerIds: assigned.map(user => user.id), preparerNames: assigned.map(user => user.name), repository: repo, approvedBy: actor, approvedAt: now });
+        if (draft.displayAddress !== shipment.destination.displayAddress || draft.notes !== shipment.destination.notes) {
+          changes.destination = { displayAddress: draft.displayAddress, notes: draft.notes, verified: false };
+          changes.destinationRevision = (shipment.destinationRevision || 0) + 1;
+          detail = { reason: "Destino revisado durante la aprobación", before: shipment.destination, after: changes.destination };
+        }
+        notice = { event: "preparation_assigned", title: "Tenés un pedido para preparar", assigned: true };
       }
-      notice = { event: "preparation_assigned", title: "Tenés un pedido para preparar", assigned: true };
     } else if (["start_preparing", "ready"].includes(body.mode)) {
       if (!profile || !shipment.assignedPreparerIds.includes(actor)) forbidden();
       assert(!shipment.incident && shipment.stockCommitState === "committed", "Resolvé la incidencia antes de preparar.");
@@ -492,7 +508,7 @@ export async function shippingOperation({ body, session = null, runTransaction =
       detail = { reason: reason(), incident: shipment.incident }; changes.incident = null;
       for (const path of shipment.incident.alertPaths || []) operations.push(update(path, { active: false, status: "resolved", resolvedBy: actor, updatedAt: now }));
     } else if (body.mode === "reject") {
-      requireApproval(); assert(shipment.status === "solicitud_pendiente", "La solicitud ya no está pendiente.");
+      requireApproval(); assert(shipment.status === "solicitud_pendiente" && !awaitingWebOrigin, "Sólo se pueden rechazar solicitudes de envío pendientes de venta.");
       changes.status = "rechazado"; detail.reason = reason();
     } else if (body.mode === "review") {
       requireApproval(); assert(shipment.status === "solicitud_pendiente", "La solicitud ya no está pendiente.");

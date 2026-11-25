@@ -66,6 +66,8 @@ export default function ProductPage() {
     .filter((item) => item.id !== product.id && relatedCategories.includes(item.categoryId))
     .slice(0, 3);
 
+  const availability = product.commercialReady ? "Disponible" : product.stockState === "out" ? "Sin stock" : "No disponible";
+
   const addAndOpen = () => {
     if (addItem(product)) openCart();
   };
@@ -126,7 +128,7 @@ export default function ProductPage() {
             {product.promotionName && product.compareAtPrice > product.price ? <s>{formatPrice(product.compareAtPrice)}</s> : null}
           </div>
 
-          {!product.commercialReady ? (
+          {!product.commercialReady && product.stockState !== "out" ? (
             <div className="pending-panel">
               <strong>Producto no disponible para compra online</strong>
             </div>
@@ -138,7 +140,7 @@ export default function ProductPage() {
               <div key={key}><dt>{key.replaceAll("_", " ")}</dt><dd>{value}</dd></div>
             ))}
             {product.formats?.length ? <div><dt>Presentación</dt><dd>{product.formats.join(", ")}</dd></div> : null}
-            <div><dt>Disponibilidad</dt><dd>{product.commercialReady ? "Disponible" : "No disponible"}</dd></div>
+            <div><dt>Disponibilidad</dt><dd>{availability}</dd></div>
           </dl>
 
           <button
@@ -148,7 +150,7 @@ export default function ProductPage() {
             disabled={!product.commercialReady}
           >
             <ShoppingBag size={19} aria-hidden="true" />
-            {product.commercialReady ? "Agregar al carrito" : "No disponible"}
+            {product.commercialReady ? "Agregar al carrito" : availability}
           </button>
           <ul className="product-assurances">
             <li><Check size={16} aria-hidden="true" />Precio y disponibilidad se validan nuevamente al confirmar</li>

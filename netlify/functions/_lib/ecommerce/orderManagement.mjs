@@ -13,6 +13,7 @@ import {
   checkedOrigin,
   isActiveStockOrigin,
   loadWebChannel,
+  orderReservationAllocations,
   originKey,
   originStockPath,
   resolveChannelOrigin,
@@ -394,6 +395,8 @@ export async function manageWebOrder({
       if (paywayAttempt && !paid && !["rejected", "cancelled"].includes(paywayAttempt.receipt?.status))
         fail("El pago Payway debe conciliarse antes de modificar el pedido.");
       if (body.mode === "origin") {
+        if (order.stockCommitMode === "deferred")
+          fail("El origen físico de este pedido se confirma en Gestión de envíos.");
         const allocatedOrigins = new Map();
         for (const item of order.items || [])
           for (const allocation of item.stockAllocations || [])
@@ -569,9 +572,8 @@ export async function manageWebOrder({
         )
           fail("La reserva aún no venció.");
         for (const item of order.items) {
-          const allocations = Array.isArray(item.stockAllocations) && item.stockAllocations.length
-            ? item.stockAllocations
-            : [{ ...oldOrigin, quantity: item.quantity }];
+          const reserved = orderReservationAllocations(order, item);
+          const allocations = reserved.length ? reserved : [{ ...oldOrigin, quantity: item.quantity }];
           for (const allocation of allocations) {
             const path = originStockPath(allocation, item.productId);
             const stock = await transaction.getDocument(path);

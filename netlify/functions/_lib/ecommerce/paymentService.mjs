@@ -1,5 +1,6 @@
 import {
   loadWebChannel,
+  orderReservationAllocations,
   originKey,
   resolveChannelOrigin,
   resolveChannelOrigins,
@@ -22,7 +23,7 @@ import {
   normalizeEcommerceRequestId,
   prepareAuthoritativeCheckout,
 } from "./commerceDomain.mjs";
-import { createHash } from "node:crypto";
+import { ecommerceMovementId } from "./deferredStock.mjs";
 import { confirmPayment } from "./paymentContract.mjs";
 import { normalizedRole } from "../../../../src/gestion/permissions.js";
 import { paywayConfig, paywayAmount } from "./paywayGateway.mjs";
@@ -37,6 +38,7 @@ async function loadAuthoritativeInputs({
   origin,
   channel,
   orderItems,
+  stockCommitMode,
   orderId,
   now,
   env,
@@ -61,8 +63,9 @@ async function loadAuthoritativeInputs({
       ? await getDocument(`ecommercePromotions/${productId}`, { env })
       : null;
     const item = orderItems.find((row) => row.productId === productId);
-    const allocationRows = Array.isArray(item?.stockAllocations) && item.stockAllocations.length
-      ? item.stockAllocations
+    const reserved = orderReservationAllocations({ stockCommitMode }, item || {});
+    const allocationRows = reserved.length || stockCommitMode === "deferred"
+      ? reserved
       : [{ type: origin?.type || "location", id: origin?.id || locationId, name: origin?.name || "", quantity: item?.quantity || 0 }];
     if (
       allocationRows.some((row) => !Number.isSafeInteger(row.quantity) || row.quantity <= 0)
@@ -358,15 +361,17 @@ export async function confirmEcommercePayment({
   );
   const operations = [];
   let saleId = null;
+  const deferredStock = order.stockCommitMode === "deferred";
 
   if (approved) {
     const channel = order.channelId
       ? await loadWebChannel({ env, getDocument })
       : null;
+    if (deferredStock && !channel) throw commerceError("ecommerce-channel-inactive", "El canal de la reserva ya no está disponible.", 409);
     const origin = channel
       ? await resolveChannelOrigin(
           channel,
-          { type: order.stockOriginType, id: order.stockOriginId },
+          deferredStock ? order.pricingOrigin : { type: order.stockOriginType, id: order.stockOriginId },
           { env, getDocument, now: timestamp },
         )
       : { type: "location", id: order.locationId, name: order.locationName };
@@ -432,6 +437,7 @@ export async function confirmEcommercePayment({
       origin,
       channel,
       orderItems: order.items || [],
+      stockCommitMode: order.stockCommitMode,
       orderId: safeOrderId,
       now: timestamp,
       env,
@@ -492,13 +498,13 @@ export async function confirmEcommercePayment({
       channelId: order.channelId || null,
       simulated: confirmation.simulated,
       billing: order.billing || null,
-      stockOriginType: origin.type,
-      stockOriginId: origin.id,
-      stockOriginName: origin.name,
-      stockCommitState: "committed",
+      stockOriginType: deferredStock ? null : origin.type,
+      stockOriginId: deferredStock ? null : origin.id,
+      stockOriginName: deferredStock ? null : origin.name,
+      stockCommitState: deferredStock ? "pending" : "committed",
       orderId: safeOrderId,
       idempotencyKey: stableKey,
-      locationId: origin.type === "location" ? locationId : null,
+      locationId: !deferredStock && origin.type === "location" ? locationId : null,
       locationName:
         order.locationName || locationSnapshot.data?.name || "Ecommerce",
       sellerId: null,
@@ -518,7 +524,7 @@ export async function confirmEcommercePayment({
         subtotal: item.subtotal,
         arcaVatRate: item.arcaVatRate,
         promotionName: item.promotionName || null,
-        stockAllocations: allocationsByProduct[item.productId] || [],
+        ...(!deferredStock ? { stockAllocations: allocationsByProduct[item.productId] || [] } : {}),
       })),
       discounts: [],
       discountTotal: 0,
@@ -581,16 +587,22 @@ export async function confirmEcommercePayment({
         const stock = snapshot?.data;
         if (!stock || stock.active === false || stock.deleted === true || stock.productDeleted === true)
           throw commerceError("ecommerce-stock-inactive", `${item.name}: el stock de ${allocation.name || allocation.id} dejó de estar disponible.`, 409);
+        if (deferredStock) {
+          // A paid unit stays reserved until shipping consumes it at the chosen origin.
+          // Keep a finite Firestore timestamp so existing physical stock guards apply.
+          const hold = {
+            quantity: allocation.quantity, pooled: true,
+            expiresAt: new Date("9999-12-31T23:59:59.000Z"),
+          };
+          operations.push({
+            type: "update", path,
+            currentUpdateTime: snapshot.updateTime || null,
+            data: { ...reservationPatch(stock, safeOrderId, hold, timestamp), updatedAt: timestamp },
+          });
+          continue;
+        }
         const newStock = Number(stock.currentStock) - Number(allocation.quantity);
-        const safeSourceId = createHash("sha256")
-          .update(`${allocation.type}:${allocation.id}`)
-          .digest("hex")
-          .slice(0, 12);
-        const safeProductId = createHash("sha256")
-          .update(item.productId)
-          .digest("hex")
-          .slice(0, 20);
-        const movementId = `ecommerce_${stableKey}_${safeProductId}_${safeSourceId}`;
+        const movementId = ecommerceMovementId(stableKey, item.productId, allocation);
         if (fulfillment) {
           const shipment = fulfillment.operations.find((operation) => operation.path === `shipments/${fulfillment.shipmentId}`);
           shipment.data.stockMovementIds.push(movementId);
@@ -645,7 +657,7 @@ export async function confirmEcommercePayment({
 
   if (!approved && sandboxPayment && ["rejected", "cancelled"].includes(confirmation.paymentStatus)) {
     const paths = new Set();
-    for (const item of order.items || []) for (const allocation of item.stockAllocations || []) paths.add(originStockPath(allocation, item.productId));
+    for (const item of order.items || []) for (const allocation of orderReservationAllocations(order, item)) paths.add(originStockPath(allocation, item.productId));
     for (const path of paths) {
       const snapshot = await getDocument(path, { env });
       if (snapshot) operations.push({ type: "update", path, data: reservationPatch(snapshot.data, safeOrderId, null, timestamp), currentUpdateTime: snapshot.updateTime || null });
@@ -662,7 +674,9 @@ export async function confirmEcommercePayment({
         entityType: "order",
         userId: actor.uid || "backend",
         simulated: confirmation.simulated,
-        description: "Venta, stock y logística registrados en una transacción",
+        description: deferredStock
+          ? "Venta y envío registrados con stock reservado hasta confirmar origen"
+          : "Venta, stock y logística registrados en una transacción",
         createdAt: timestamp,
       },
     });
@@ -703,7 +717,8 @@ export async function confirmEcommercePayment({
       ...(!approved && sandboxPayment ? { reservationStatus: "released" } : {}),
       ...(order.channelId && approved
         ? {
-            reservationStatus: "consumed",
+            reservationStatus: deferredStock ? "awaiting_origin" : "consumed",
+            ...(deferredStock ? { reservationExpiresAt: null, stockCommitState: "pending" } : {}),
             shipmentId: order.shipmentId,
             fulfillmentId: order.fulfillmentId,
             pickupCode: order.pickupCode,

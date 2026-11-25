@@ -593,7 +593,8 @@ export default function EcommercePage() {
                 allowGenerate={false}
               />
             )}
-          <FormField label="Origen físico del pedido">
+          {selected.reservationStatus === "awaiting_origin" && <p>Stock reservado. Confirmá el origen físico en Gestión de envíos.</p>}
+          {selected.stockCommitMode !== "deferred" && <FormField label="Origen físico del pedido">
             <Select value={origin} onChange={(e) => setOrigin(e.target.value)}>
               {(availability.length ? availability : origins).map((row) => (
                 <option
@@ -607,21 +608,21 @@ export default function EcommercePage() {
                 </option>
               ))}
             </Select>
-          </FormField>
-          <FormField label="Motivo del cambio o cancelación">
+          </FormField>}
+          {(selected.status === "pending_payment" || selected.stockCommitMode !== "deferred") && <FormField label="Motivo del cambio o cancelación">
             <input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               maxLength={1000}
             />
-          </FormField>
+          </FormField>}
           <div className="fm-shipping-actions">
-            <Button
+            {selected.stockCommitMode !== "deferred" && <Button
               disabled={busy || reason.trim().length < 4}
               onClick={() => action("origin")}
             >
               Cambiar origen
-            </Button>
+            </Button>}
             {selected.status === "pending_payment" && (
               <>
                 <Button

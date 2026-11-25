@@ -4,7 +4,7 @@ import { checkoutEditPath, commerceError } from "./commerceDomain.mjs";
 import { confirmEcommercePayment } from "./paymentService.mjs";
 import { paywayConfig, paywayAmount, createPaywayGateway, verifiedPaywayReceipt, paywayRetailRisk } from "./paywayGateway.mjs";
 import { canAccessAdministration } from "../../../../src/gestion/permissions.js";
-import { loadWebChannel, originKey, originStockPath, resolveChannelOrigin, webStockAvailability } from "./channelService.mjs";
+import { loadWebChannel, orderReservationAllocations, originKey, originStockPath, resolveChannelOrigin, webStockAvailability } from "./channelService.mjs";
 import { reservationPatch } from "../../../../src/shared/stockReservations.mjs";
 
 function denied() { return commerceError("ecommerce-order-access-denied", "El acceso privado al pedido no es válido.", 403); }
@@ -68,7 +68,8 @@ async function releaseCheckoutForEditing(body, { env, now, runTransaction }) {
 
     const operations = [];
     for (const item of order.items) {
-      const allocations = item.stockAllocations?.length ? item.stockAllocations : [{
+      const reserved = orderReservationAllocations(order, item);
+      const allocations = reserved.length ? reserved : [{
         type: order.stockOriginType || "location",
         id: order.stockOriginId || order.locationId,
       }];
@@ -132,7 +133,9 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
       const origins = new Set();
       const stocks = new Map();
       for (const item of order.items) {
-        for (const allocation of item.stockAllocations || []) {
+        const reservations = orderReservationAllocations(order, item);
+        if (!reservations.length) throw commerceError("ecommerce-reservation-invalid", "Falta la reserva de stock.", 409);
+        for (const allocation of reservations) {
           const key = originKey(allocation);
           if (!origins.has(key)) {
             await resolveChannelOrigin(channel, allocation, { env, getDocument: tx.getDocument, now });
@@ -148,7 +151,6 @@ export async function processPaywayPayment({ body, env = process.env, now = new 
               || new Date(hold.expiresAt) <= now || webStockAvailability(stock, now, body.orderId) < allocation.quantity)
             throw commerceError("ecommerce-reservation-invalid", "La reserva de stock ya no está disponible.", 409);
         }
-        if (!item.stockAllocations?.length) throw commerceError("ecommerce-reservation-invalid", "Falta la asignación física de stock.", 409);
       }
       attempt = { state: "submitted", environment: "sandbox", siteId: config.siteId,
         operationId: `fm_${createHash("sha256").update(body.orderId).digest("hex").slice(0,32)}`,

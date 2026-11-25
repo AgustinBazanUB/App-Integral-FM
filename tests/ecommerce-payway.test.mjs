@@ -75,17 +75,21 @@ test("Payway aprobado convierte una reserva en una venta y logística; sandbox e
   assert.equal(s.payload().fraud_detection.device_unique_id,s.request.fingerprint);
   assert.equal(s.payload().fraud_detection.purchase_totals.amount,200000);
   assert.equal(s.payload().fraud_detection.retail_transaction_data.dispatch_method, "storepickup");
-  assert.equal(s.db.documents.get("locationStock/valle/items/oil").currentStock,8);
-  assert.equal(rows(s.db,"sales").length,1); assert.equal(rows(s.db,"shipments").length,1); assert.equal(rows(s.db,"stockMovements").length,1);
+  const stock = s.db.documents.get("locationStock/valle/items/oil");
+  assert.equal(stock.currentStock, 10);
+  assert.equal(reservedStockQuantity(stock, new Date(+now + 2 * 86400000)), 2);
+  assert.equal(rows(s.db,"sales").length,1); assert.equal(rows(s.db,"shipments").length,1); assert.equal(rows(s.db,"stockMovements").length,0);
+  assert.equal(rows(s.db,"shipments")[0].stockOriginId, null);
+  assert.equal(rows(s.db,"shipments")[0].stockCommitState, "pending");
   assert.equal(rows(s.db,"sales")[0].paymentEnvironment,"sandbox");
   assert.equal(rows(s.db,"shipments")[0].testData,true);
   assert.equal(summarizeSales(rows(s.db,"sales")).total,0);
   assert.equal(rows(s.db,"invoices").length,0);
   assert.ok(!JSON.stringify([...s.db.documents]).includes(s.request.token));
 });
-test("doble clic concurrente, recarga y reintento conservan un cobro/venta/salida",async()=>{
+test("doble clic concurrente, recarga y reintento conservan un cobro, una venta y su reserva",async()=>{
   const s=await setup(); await Promise.all([s.process(),s.process(),s.process()]); await s.process();
-  assert.equal(s.charges(),1); assert.equal(rows(s.db,"sales").length,1); assert.equal(rows(s.db,"stockMovements").length,1);
+  assert.equal(s.charges(),1); assert.equal(rows(s.db,"sales").length,1); assert.equal(rows(s.db,"stockMovements").length,0);
 });
 for(const status of ["rejected","cancelled"]) test(`Payway ${status} no genera venta ni stock y no vuelve a cobrar`,async()=>{
   const s=await setup();s.gateway.charge=async p=>receipt(p,{status}); const r=await s.process();await s.process();
@@ -351,7 +355,7 @@ for (const [billing, voucherClass] of [[{ mode: "consumer_final" }, "B"], [billi
     assert.equal(s.charges(), 1);
     assert.equal(rows(s.db, "sales").length, 1);
     assert.equal(rows(s.db, "shipments").length, 1);
-    assert.equal(rows(s.db, "stockMovements").length, 1);
+    assert.equal(rows(s.db, "stockMovements").length, 0);
     assert.equal(rows(s.db, "invoices").length, 1);
     assert.equal(s.db.documents.get(orderPath).invoiceStatus, "authorized");
   });

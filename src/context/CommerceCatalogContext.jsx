@@ -70,6 +70,11 @@ export function CommerceCatalogProvider({ children }) {
 
   useEffect(() => {
     refresh().catch(() => {});
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") refresh().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    return () => document.removeEventListener("visibilitychange", refreshOnReturn);
   }, [refresh]);
 
   const products = useMemo(

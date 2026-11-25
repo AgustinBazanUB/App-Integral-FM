@@ -1,10 +1,8 @@
 import {
-  ALL_ACTIVE_STOCK,
   channelShipping,
   deliveryAddressDetails,
   loadWebChannel,
   normalizeBilling,
-  originKey,
   originStockPath,
   resolveChannelOrigins,
   stockCollectionPath,
@@ -155,7 +153,7 @@ function publicEcommerceOrder(orderId, order = {}) {
   return {
     ...safeOrder,
     id: orderId,
-    items: items.map(({ stockAllocations, ...item }) => item),
+    items: items.map(({ stockAllocations, reservationAllocations, ...item }) => item),
   };
 }
 
@@ -323,10 +321,8 @@ export async function createEcommerceOrder({
       item.name,
     ),
   }));
-  const allocatedSourceKeys = new Set(itemsWithAllocations.flatMap((item) => item.stockAllocations.map(originKey)));
-  const origin = channel?.stockScope === ALL_ACTIVE_STOCK
-    ? origins.find((row) => allocatedSourceKeys.has(originKey(row)))
-    : origins[0];
+  const origin = origins[0];
+  const deferredStock = Boolean(channel);
   const reservationExpiresAt = channel
     ? new Date(now.valueOf() + 15 * 60 * 1000)
     : null;
@@ -341,7 +337,7 @@ export async function createEcommerceOrder({
       })
     : null;
   const order = {
-    schemaVersion: channel ? 3 : 1,
+    schemaVersion: deferredStock ? 4 : 1,
     sourceType: "ecommerce",
     requestId,
     idempotencyKey: requestId,
@@ -350,17 +346,31 @@ export async function createEcommerceOrder({
     status: "pending_payment",
     channelId: channel?.id || null,
     defaultTransport: shipping?.carrier === "andreani" ? "manual" : channel?.defaultTransport || "repository",
-    stockOriginType: origin.type,
-    stockOriginId: origin.id,
-    stockOriginName: origin.name,
-    initialStockOrigin: origin,
+    ...(deferredStock ? {
+      stockCommitMode: "deferred",
+      pricingOrigin: origin,
+      stockOriginType: null,
+      stockOriginId: null,
+      stockOriginName: null,
+      initialStockOrigin: null,
+      locationId: null,
+      locationName: "Ecommerce",
+    } : {
+      stockOriginType: origin.type,
+      stockOriginId: origin.id,
+      stockOriginName: origin.name,
+      initialStockOrigin: origin,
+      locationId: origin.type === "location" ? origin.id : null,
+      locationName: origin.name,
+    }),
     originHistory: [],
-    locationId: origin.type === "location" ? origin.id : null,
-    locationName: origin.name,
     customer,
     customerId: crm?.customerId || null,
     billing,
-    items: itemsWithAllocations.map(({ availableStock, ...item }) => item),
+    items: itemsWithAllocations.map(({ availableStock, stockAllocations, ...item }) => ({
+      ...item,
+      ...(deferredStock ? { reservationAllocations: stockAllocations } : { stockAllocations }),
+    })),
     subtotal: prepared.subtotal,
     discountTotal: prepared.discountTotal,
     shipping: prepared.shipping,
@@ -413,7 +423,7 @@ export async function createEcommerceOrder({
             ...reservationPatch(
               source.data,
               orderId,
-              { quantity: allocation.quantity, expiresAt: reservationExpiresAt },
+              { quantity: allocation.quantity, expiresAt: reservationExpiresAt, pooled: true },
               now,
             ),
             updatedAt: now,
