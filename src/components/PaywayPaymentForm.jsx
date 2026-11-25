@@ -63,7 +63,6 @@ export default function PaywayPaymentForm({
   const [result, setResult] = useState(null);
   const [checked, setChecked] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
-  const [holderDocument, setHolderDocument] = useState("");
 
   const apply = (value) => {
     setResult(value);
@@ -125,7 +124,6 @@ export default function PaywayPaymentForm({
         Object.assign(tokenData, { paymentMethodId, fingerprint: sdk.device_unique_identifier, payerAddress });
         // Card data stays at Payway and is cleared before the order request.
         for (const input of form.current?.querySelectorAll("input[data-decidir]:not([type=hidden])") || []) input.value = "";
-        setHolderDocument("");
         if (!payableOrder) {
           payableOrder = await prepareOrder();
           preparedOrderId.current = payableOrder.id;
@@ -178,15 +176,15 @@ export default function PaywayPaymentForm({
           <label className="field-label">Año de vencimiento<input inputMode="numeric" data-decidir="card_expiration_year" placeholder="AA" required pattern="[0-9]{2}" maxLength={2} /></label>
           <label className="field-label">Código de seguridad<input type="password" inputMode="numeric" data-decidir="security_code" required minLength={3} maxLength={4} autoComplete="off" /></label>
         </div>
-        <label className="field-label">Titular de la tarjeta<input data-decidir="card_holder_name" required maxLength={100} /></label>
-        <details className="payway-document">
-          <summary>DNI del titular (opcional)</summary>
-          {holderDocument && <input type="hidden" data-decidir="card_holder_doc_type" value="dni" />}
-          <label className="field-label">DNI del titular de la tarjeta
-            <input inputMode="numeric" data-decidir={holderDocument ? "card_holder_doc_number" : undefined}
-              pattern="[0-9]{7,8}" maxLength={8} value={holderDocument} onChange={event => setHolderDocument(event.target.value)} />
+        <div className="form-grid">
+          <label className="field-label">Titular de la tarjeta
+            <input data-decidir="card_holder_name" required maxLength={100} />
           </label>
-        </details>
+          <input type="hidden" data-decidir="card_holder_doc_type" value="dni" />
+          <label className="field-label">DNI del titular de la tarjeta
+            <input inputMode="numeric" data-decidir="card_holder_doc_number" required pattern="[0-9]{7,8}" maxLength={8} />
+          </label>
+        </div>
         <PaywayBillingAddress suggestedAddress={suggestedAddress || result?.order?.deliveryAddress} allowLookup={allowAddressLookup} />
         {error && <p className="field-error" role="alert">{error}</p>}
         <button className="button button--gold" type="submit" disabled={busy || submitDisabled}>

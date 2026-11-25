@@ -4016,15 +4016,6 @@ input::placeholder {
   justify-self: start;
 }
 
-.payway-document {
-  margin-bottom: 10px;
-  color: var(--text-secondary);
-}
-
-.payway-document summary {
-  cursor: pointer;
-}
-
 .payway-payment {
   display: grid;
   gap: 18px;
