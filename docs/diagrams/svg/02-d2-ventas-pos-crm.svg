@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 967.3423749999998 740.5" width="967.3423749999998" height="740.5" style="--bg:#ffffff;--fg:#1f2328;--line:#8793A3;--accent:#0969da;--muted:#59636e;background:var(--bg)">
+<style>
+
+  text { font-family: 'Arial', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="navegador" data-label="En tu navegador o celular">
+  <rect x="285.8198333333332" y="24" width="629.4031249999998" height="441.30000000000007" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="285.8198333333332" y="24" width="629.4031249999998" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="297.8198333333332" y="38" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">En tu navegador o celular</text>
+</g>
+<g class="subgraph" data-id="servidor" data-label="En el servidor seguro">
+  <rect x="24" y="575.6000000000001" width="228.819" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="24" y="575.6000000000001" width="228.819" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="36" y="589.6000000000001" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">En el servidor seguro</text>
+</g>
+<g class="subgraph" data-id="datos" data-label="Base de datos">
+  <rect x="282.81899999999996" y="605.6000000000001" width="657.1899999999998" height="110.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="282.81899999999996" y="605.6000000000001" width="657.1899999999998" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="294.81899999999996" y="619.6000000000001" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Base de datos</text>
+</g>
+<polyline class="edge" data-from="fidelidad" data-to="clientes" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Consulta fichas y compras" points="794.1444583333331,449.30000000000007 794.144458333333,513.3000000000001 867.5383749999997,513.3000000000001 867.5383749999997,587.6000000000001 821.3526666666664,587.6000000000001 821.3526666666664,649.6000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="confirmar" data-to="clientes" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Identifica al cliente" points="599.1167083333331,449.30000000000007 599.1167083333331,513.3000000000001 707.2754999999997,513.3000000000001 707.2754999999997,587.6000000000001 718.6963333333332,587.6000000000001 718.6963333333332,649.6000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="confirmar" data-to="acciones" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Pide la operación cuando corresponde" points="479.21820833333317,449.30000000000007 479.2182083333331,483.3000000000002 138.40949999999998,483.3000000000002 138.40949999999998,619.6000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="confirmar" data-to="ventas" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Registra venta y descuenta stock" points="539.1674583333331,449.30000000000007 539.1674583333331,513.3000000000001 461.78489583333317,513.3000000000001 461.78489583333317,587.6000000000001 442.42949999999996,587.6000000000001 442.42949999999996,649.6000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="rapida" data-to="confirmar" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Envía el cobro confirmado" points="607.7823333333331,277.1 607.7823333333331,370.40000000000003 539.1674583333331,370.40000000000003 539.1674583333331,412.40000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="panel" data-to="memoria" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Guarda si pierde conexión" points="516.2442916666664,104.9 516.2442916666664,116.9 410.6033333333331,116.9 410.6033333333331,240.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="memoria" data-to="confirmar" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Reintenta al volver internet" points="410.6033333333331,291.1 410.6033333333331,370.40000000000003 479.2182083333331,370.40000000000003 479.2182083333331,412.40000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="panel" data-to="confirmar" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Confirma en línea" points="562.0906249999998,104.9 562.0906249999998,116.9 742.6778333333332,116.9 742.6778333333332,382.40000000000003 599.1167083333331,382.40000000000003 599.1167083333331,412.40000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="fidelidad" data-to="clientes" data-label="Consulta fichas y compras">
+  <rect x="797.0383749999999" y="520.3000000000001" width="140.60800000000003" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="867.3423749999998" y="535.45" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Consulta fichas y compras</text>
+</g>
+<g class="edge-label" data-from="confirmar" data-to="clientes" data-label="Identifica al cliente">
+  <rect x="656.2754999999997" y="520.3000000000001" width="101.99800000000003" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="707.2744999999998" y="535.45" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Identifica al cliente</text>
+</g>
+<g class="edge-label" data-from="confirmar" data-to="acciones" data-label="Pide la operación cuando corresponde">
+  <rect x="37.409499999999994" y="490.3000000000002" width="201.79000000000005" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="138.30450000000002" y="505.45000000000016" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Pide la operación cuando corresponde</text>
+</g>
+<g class="edge-label" data-from="confirmar" data-to="ventas" data-label="Registra venta y descuenta stock">
+  <rect x="374.78489583333317" y="520.3000000000001" width="173.27800000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="461.4238958333332" y="535.45" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Registra venta y descuenta stock</text>
+</g>
+<g class="edge-label" data-from="rapida" data-to="confirmar" data-label="Envía el cobro confirmado">
+  <rect x="536.2823333333331" y="333.1" width="142.98400000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="607.7743333333331" y="348.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Envía el cobro confirmado</text>
+</g>
+<g class="edge-label" data-from="panel" data-to="memoria" data-label="Guarda si pierde conexión">
+  <rect x="339.6033333333331" y="153.9" width="141.796" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="410.50133333333315" y="169.05" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Guarda si pierde conexión</text>
+</g>
+<g class="edge-label" data-from="memoria" data-to="confirmar" data-label="Reintenta al volver internet">
+  <rect x="339.6033333333331" y="333.1" width="141.79600000000005" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="410.50133333333315" y="348.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Reintenta al volver internet</text>
+</g>
+<g class="edge-label" data-from="panel" data-to="confirmar" data-label="Confirma en línea">
+  <rect x="692.1778333333332" y="243.49999999999997" width="100.81000000000003" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="742.5828333333332" y="258.65" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Confirma en línea</text>
+</g>
+<g class="node" data-id="rapida" data-label="Venta rápida" data-shape="rectangle">
+  <rect x="549.3868333333331" y="240.2" width="116.79099999999998" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="607.7823333333331" y="258.65" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Venta rápida</text>
+</g>
+<g class="node" data-id="memoria" data-label="Ventas guardadas sin internet" data-shape="cylinder">
+  <rect x="301.8198333333332" y="247.2" width="217.56699999999995" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="301.8198333333332" y1="247.2" x2="301.8198333333332" y2="284.1" stroke="#92400E" stroke-width="2px" />
+  <line x1="519.3868333333331" y1="247.2" x2="519.3868333333331" y2="284.1" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="410.6033333333331" cy="284.1" rx="108.78349999999998" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="410.6033333333331" cy="247.2" rx="108.78349999999998" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="410.6033333333331" y="265.65" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Ventas guardadas sin internet</text>
+</g>
+<g class="node" data-id="confirmar" data-label="Confirmar venta y origen del stock" data-shape="rectangle">
+  <rect x="419.26895833333316" y="412.40000000000003" width="239.79699999999994" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="539.1674583333331" y="430.85" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Confirmar venta y origen del stock</text>
+</g>
+<g class="node" data-id="fidelidad" data-label="Clientes, zonas y fidelización" data-shape="rectangle">
+  <rect x="689.0659583333331" y="412.40000000000003" width="210.15699999999995" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="794.1444583333331" y="430.85" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Clientes, zonas y fidelización</text>
+</g>
+<g class="node" data-id="panel" data-label="Panel Vendedor" data-shape="rectangle">
+  <rect x="470.3979583333331" y="68" width="137.539" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="539.1674583333331" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Panel Vendedor</text>
+</g>
+<g class="node" data-id="acciones" data-label="Anulación, factura o envío" data-shape="rectangle">
+  <rect x="40" y="619.6000000000001" width="196.819" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="138.40949999999998" y="638.0500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Anulación, factura o envío</text>
+</g>
+<g class="node" data-id="clientes" data-label="Fichas de clientes y condiciones comerciales" data-shape="cylinder">
+  <rect x="616.04" y="656.6000000000001" width="307.9689999999999" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="616.04" y1="656.6000000000001" x2="616.04" y2="693.5000000000001" stroke="#92400E" stroke-width="2px" />
+  <line x1="924.0089999999998" y1="656.6000000000001" x2="924.0089999999998" y2="693.5000000000001" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="770.0244999999999" cy="693.5000000000001" rx="153.98449999999994" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="770.0244999999999" cy="656.6000000000001" rx="153.98449999999994" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="770.0244999999999" y="675.0500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Fichas de clientes y condiciones comerciales</text>
+</g>
+<g class="node" data-id="ventas" data-label="Ventas numeradas y movimientos de stock" data-shape="cylinder">
+  <rect x="298.81899999999996" y="656.6000000000001" width="287.22099999999995" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="298.81899999999996" y1="656.6000000000001" x2="298.81899999999996" y2="693.5000000000001" stroke="#92400E" stroke-width="2px" />
+  <line x1="586.04" y1="656.6000000000001" x2="586.04" y2="693.5000000000001" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="442.42949999999996" cy="693.5000000000001" rx="143.61049999999997" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="442.42949999999996" cy="656.6000000000001" rx="143.61049999999997" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="442.42949999999996" y="675.0500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Ventas numeradas y movimientos de stock</text>
+</g>
+</svg>

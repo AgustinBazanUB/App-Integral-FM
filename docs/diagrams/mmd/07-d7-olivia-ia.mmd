@@ -1,0 +1,38 @@
+flowchart TB
+    %% Olivia conversa, usa recursos y aplica límites a sus acciones.
+    subgraph navegador["En tu navegador o celular"]
+        olivia["Ventana de Olivia en Gestión y Ventas"]:::integral
+        ajustes["Ajustes de Olivia"]:::integral
+    end
+    subgraph servidor["En el servidor seguro"]
+        chat["Conversación y tareas autorizadas"]:::shared
+        voz["Reconocer y responder por voz"]:::shared
+        documentos["Adjuntos y biblioteca de consulta"]:::shared
+        limpiar["Limpieza periódica de datos vencidos"]:::shared
+    end
+    subgraph recursos["Base de datos y servicios externos"]
+        historial[("Charlas, archivos y registros de Olivia")]:::db
+        ia(["OpenAI"]):::external
+        google(["Voz natural de Google"]):::external
+        cotizacion(["Cotización del Banco Nación"]):::external
+        falta["Canal de voz anterior retirado y preparación de envíos bloqueada"]:::debt
+    end
+    chat -->|"Guarda conversaciones y tareas"| historial
+    olivia -->|"Adjunta un archivo"| documentos
+    chat -->|"Consulta el tipo de cambio"| cotizacion
+    olivia -->|"Envía lo que decís"| voz
+    voz -->|"Pide una respuesta hablada"| google
+    documentos -->|"Prepara archivos para buscar contenido"| ia
+    chat -.->|"Bloquea acciones de preparación de envíos"| falta
+    chat -->|"Pide una respuesta"| ia
+    olivia -->|"Inicia la conversación"| chat
+    ajustes -->|"Gestiona la biblioteca"| documentos
+    limpiar -->|"Elimina datos vencidos"| historial
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

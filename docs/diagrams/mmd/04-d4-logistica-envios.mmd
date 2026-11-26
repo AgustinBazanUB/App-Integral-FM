@@ -1,0 +1,35 @@
+flowchart TB
+    %% El tablero y los portales confirman los cambios de cada envío.
+    subgraph navegador["En tu navegador o celular"]
+        preparador["Preparador de pedidos"]:::integral
+        gestion["Tablero de envíos"]:::integral
+        cliente["Seguimiento para el cliente"]:::actor
+        repartidor["Repartidor"]:::actor
+    end
+    subgraph servidor["En el servidor seguro"]
+        recorrido["Control de cada etapa del envío"]:::shared
+        limpiar["Limpieza de ubicaciones vencidas"]:::shared
+    end
+    subgraph recursos["Base de datos y servicios externos"]
+        reversa["Sin reversa de stock, caja ni factura"]:::debt
+        historial[("Envíos, novedades y sesiones de reparto")]:::db
+        mapas(["Mapas y navegación"]):::external
+        desconectado["Avisos automáticos y conexión con Uber pendientes"]:::debt
+    end
+    repartidor -->|"Marca salida y entrega"| recorrido
+    gestion -->|"Abre dirección y recorrido"| mapas
+    gestion -->|"Crea y aprueba el envío"| recorrido
+    preparador -->|"Confirma la preparación"| recorrido
+    recorrido -.->|"Si un envío se devuelve o cancela"| reversa
+    cliente -->|"Consulta el avance"| recorrido
+    recorrido -->|"Guarda el estado y las novedades"| historial
+    limpiar -->|"Borra posiciones vencidas"| historial
+    recorrido -.->|"Deja pendiente el envío automático de avisos"| desconectado
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

@@ -1,0 +1,35 @@
+flowchart TB
+    %% Interfaces, tareas en el dispositivo y tareas del servidor.
+    subgraph navegador["Navegador o celular"]
+        memoria[("Ventas guardadas sin internet")]:::db
+        portales["Portales de envío: preparador, repartidor y cliente"]:::integral
+        vendedor["Panel Vendedor"]:::integral
+        tienda["Tienda online"]:::ecommerce
+        olivia["Asistente IA Olivia"]:::shared
+        aislada["Tienda aislada sin servidor"]:::debt
+        admin["Panel Administrador"]:::integral
+    end
+    subgraph servidor["En el servidor seguro"]
+        operaciones["Servidor de Flor Mía"]:::shared
+    end
+    subgraph nube["En la nube"]
+        datos[("Base de datos de Flor Mía")]:::db
+    end
+    vendedor -->|"Registra ventas directo"| datos
+    olivia -->|"Envía consultas y tareas"| operaciones
+    operaciones -->|"Lee y guarda operaciones"| datos
+    tienda -.->|"Pierde conexión en versión aislada"| aislada
+    admin -->|"Guarda cambios directo"| datos
+    vendedor -->|"Guarda al perder conexión"| memoria
+    admin -->|"Envía facturas ARCA"| operaciones
+    memoria -->|"Sincroniza al volver internet"| datos
+    tienda -->|"Envía pedidos web"| operaciones
+    portales -->|"Consulta y actualiza envíos"| operaciones
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

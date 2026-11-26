@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1306.3321666666666 782.5" width="1306.3321666666666" height="782.5" style="--bg:#ffffff;--fg:#1f2328;--line:#8793A3;--accent:#0969da;--muted:#59636e;background:var(--bg)">
+<style>
+
+  text { font-family: 'Arial', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="navegador" data-label="Navegador o celular">
+  <rect x="52.3674166666666" y="24" width="1229.96475" height="276.1" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="52.3674166666666" y="24" width="1229.96475" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="64.3674166666666" y="38" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Navegador o celular</text>
+</g>
+<g class="subgraph" data-id="servidor" data-label="En el servidor seguro">
+  <rect x="652.828" y="440.40000000000003" width="199.92" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="652.828" y="440.40000000000003" width="199.92" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="664.828" y="454.40000000000003" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">En el servidor seguro</text>
+</g>
+<g class="subgraph" data-id="nube" data-label="En la nube">
+  <rect x="183.47199999999998" y="647.5999999999999" width="229.56" height="110.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="183.47199999999998" y="647.5999999999999" width="229.56" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="195.47199999999998" y="661.5999999999999" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">En la nube</text>
+</g>
+<polyline class="edge" data-from="vendedor" data-to="datos" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Registra ventas directo" points="114.21374999999978,104.9 114.21374999999978,116.9 77.24516666666659,116.9 77.24516666666659,585.3 83.49999999999989,585.3 83.49999999999989,629.5999999999999 238.98399999999992,629.5999999999999 238.98399999999992,691.5999999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="olivia" data-to="operaciones" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Envía consultas y tareas" points="960.7401666666665,277.1 960.7401666666665,378.1 931.6586666666666,378.1 931.6586666666666,422.40000000000003 803.1639999999999,422.40000000000003 803.1639999999999,484.40000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="operaciones" data-to="datos" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Lee y guarda operaciones" points="752.788,521.3000000000001 752.788,629.5999999999999 357.52,629.5999999999999 357.52,691.5999999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="admin" data-to="datos" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Guarda cambios directo" points="389.5624999999999,277.1 389.5624999999998,378.1 370.0579999999999,378.1 370.0579999999999,617.5999999999999 318.0079999999998,617.5999999999999 318.0079999999998,691.5999999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="admin" data-to="operaciones" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Envía facturas ARCA" points="443.3128333333333,277.1 443.3128333333332,378.1 449.9376666666665,378.1 449.9376666666665,422.40000000000003 702.4119999999998,422.40000000000003 702.4119999999998,484.40000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="memoria" data-to="datos" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Sincroniza al volver internet" points="197.0286666666666,291.1 197.0286666666666,555.3 226.4459999999999,555.3 226.4459999999999,617.5999999999999 278.49599999999987,617.5999999999999 278.49599999999987,691.5999999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="tienda" data-to="operaciones" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Envía pedidos web" points="1000.7207499999998,104.9 1000.7207499999998,116.9 876.8951666666665,116.9 876.8951666666665,348.1 804.5326666666666,348.1 804.5326666666666,410.40000000000003 769.5799999999999,410.40000000000003 769.5799999999999,484.40000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="portales" data-to="operaciones" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Consulta y actualiza envíos" points="696.9791666666665,277.1 696.9791666666665,348.1 669.5031666666666,348.1 669.5031666666666,410.40000000000003 735.9959999999999,410.40000000000003 735.9959999999999,484.40000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="tienda" data-to="aislada" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="Pierde conexión en versión aislada" points="1041.1330833333332,104.9 1041.1330833333332,116.9 1164.9586666666664,116.9 1164.9586666666664,240.2" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="vendedor" data-to="memoria" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Guarda al perder conexión" points="160.0600833333333,104.9 160.0600833333333,116.9 197.0286666666667,116.9 197.0286666666667,240.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="vendedor" data-to="datos" data-label="Registra ventas directo">
+  <rect x="19.999999999999886" y="592.3" width="126.946" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="83.47299999999989" y="607.4499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Registra ventas directo</text>
+</g>
+<g class="edge-label" data-from="olivia" data-to="operaciones" data-label="Envía consultas y tareas">
+  <rect x="862.6586666666666" y="385.1" width="137.04400000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="931.1806666666666" y="400.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Envía consultas y tareas</text>
+</g>
+<g class="edge-label" data-from="operaciones" data-to="datos" data-label="Lee y guarda operaciones">
+  <rect x="681.288" y="592.3" width="142.98400000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="752.78" y="607.4499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Lee y guarda operaciones</text>
+</g>
+<g class="edge-label" data-from="admin" data-to="datos" data-label="Guarda cambios directo">
+  <rect x="305.0579999999999" y="562.3" width="129.322" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="369.7189999999999" y="577.4499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Guarda cambios directo</text>
+</g>
+<g class="edge-label" data-from="admin" data-to="operaciones" data-label="Envía facturas ARCA">
+  <rect x="389.9376666666665" y="385.1" width="119.81800000000001" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="449.84666666666647" y="400.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Envía facturas ARCA</text>
+</g>
+<g class="edge-label" data-from="memoria" data-to="datos" data-label="Sincroniza al volver internet">
+  <rect x="150.9459999999999" y="562.3" width="150.11200000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="226.00199999999992" y="577.4499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Sincroniza al volver internet</text>
+</g>
+<g class="edge-label" data-from="tienda" data-to="operaciones" data-label="Envía pedidos web">
+  <rect x="749.5326666666666" y="355.1" width="109.12600000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="804.0956666666666" y="370.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Envía pedidos web</text>
+</g>
+<g class="edge-label" data-from="portales" data-to="operaciones" data-label="Consulta y actualiza envíos">
+  <rect x="595.0031666666665" y="355.1" width="148.92400000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="669.4651666666665" y="370.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Consulta y actualiza envíos</text>
+</g>
+<g class="edge-label" data-from="tienda" data-to="aislada" data-label="Pierde conexión en versión aislada">
+  <rect x="1072.9586666666664" y="153.9" width="183.97000000000003" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="1164.9436666666666" y="169.05" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Pierde conexión en versión aislada</text>
+</g>
+<g class="edge-label" data-from="vendedor" data-to="memoria" data-label="Guarda al perder conexión">
+  <rect x="124.52866666666671" y="153.9" width="144.17200000000003" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="196.61466666666672" y="169.05" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Guarda al perder conexión</text>
+</g>
+<g class="node" data-id="memoria" data-label="Ventas guardadas sin internet" data-shape="cylinder">
+  <rect x="88.2451666666667" y="247.2" width="217.56699999999995" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="88.2451666666667" y1="247.2" x2="88.2451666666667" y2="284.1" stroke="#92400E" stroke-width="2px" />
+  <line x1="305.81216666666666" y1="247.2" x2="305.81216666666666" y2="284.1" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="197.02866666666668" cy="284.1" rx="108.78349999999998" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="197.02866666666668" cy="247.2" rx="108.78349999999998" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="197.02866666666668" y="265.65" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Ventas guardadas sin internet</text>
+</g>
+<g class="node" data-id="portales" data-label="Portales de envío: preparador, repartidor y cliente" data-shape="rectangle">
+  <rect x="527.0631666666667" y="240.2" width="339.83199999999994" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="696.9791666666666" y="258.65" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Portales de envío: preparador, repartidor y cliente</text>
+</g>
+<g class="node" data-id="vendedor" data-label="Panel Vendedor" data-shape="rectangle">
+  <rect x="68.3674166666666" y="68" width="137.539" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="137.1369166666666" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Panel Vendedor</text>
+</g>
+<g class="node" data-id="tienda" data-label="Tienda online" data-shape="rectangle">
+  <rect x="960.3084166666666" y="68" width="121.237" height="36.900000000000006" rx="0" ry="0" fill="#047857" stroke="#065F46" stroke-width="2px" />
+  <text x="1020.9269166666667" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Tienda online</text>
+</g>
+<g class="node" data-id="olivia" data-label="Asistente IA Olivia" data-shape="rectangle">
+  <rect x="887.8951666666666" y="240.2" width="145.69" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="960.7401666666666" y="258.65" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Asistente IA Olivia</text>
+</g>
+<g class="node" data-id="aislada" data-label="Tienda aislada sin servidor" data-shape="rectangle">
+  <rect x="1063.5851666666667" y="240.2" width="202.74699999999999" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="1164.9586666666667" y="258.65" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Tienda aislada sin servidor</text>
+</g>
+<g class="node" data-id="admin" data-label="Panel Administrador" data-shape="rectangle">
+  <rect x="335.8121666666667" y="240.2" width="161.251" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="416.4376666666667" y="258.65" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Panel Administrador</text>
+</g>
+<g class="node" data-id="operaciones" data-label="Servidor de Flor Mía" data-shape="rectangle">
+  <rect x="668.828" y="484.40000000000003" width="167.92" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="752.788" y="502.85" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Servidor de Flor Mía</text>
+</g>
+<g class="node" data-id="datos" data-label="Base de datos de Flor Mía" data-shape="cylinder">
+  <rect x="199.47199999999998" y="698.5999999999999" width="197.56" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="199.47199999999998" y1="698.5999999999999" x2="199.47199999999998" y2="735.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <line x1="397.032" y1="698.5999999999999" x2="397.032" y2="735.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="298.25199999999995" cy="735.4999999999999" rx="98.78" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="298.25199999999995" cy="698.5999999999999" rx="98.78" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="298.25199999999995" y="717.05" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Base de datos de Flor Mía</text>
+</g>
+</svg>

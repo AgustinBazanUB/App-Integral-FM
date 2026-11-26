@@ -1,0 +1,11 @@
+{
+  "name": "flor-mia-diagram-renderer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "beautiful-mermaid": "1.1.3"
+  }
+}

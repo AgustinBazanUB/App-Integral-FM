@@ -1,0 +1,32 @@
+flowchart TB
+    %% La cola del dispositivo conserva ventas hasta volver a estar en línea.
+    subgraph navegador["En tu navegador o celular"]
+        rapida["Venta rápida"]:::integral
+        memoria[("Ventas guardadas sin internet")]:::db
+        confirmar["Confirmar venta y origen del stock"]:::integral
+        fidelidad["Clientes, zonas y fidelización"]:::integral
+        panel["Panel Vendedor"]:::integral
+    end
+    subgraph servidor["En el servidor seguro"]
+        acciones["Anulación, factura o envío"]:::shared
+    end
+    subgraph datos["Base de datos"]
+        clientes[("Fichas de clientes y condiciones comerciales")]:::db
+        ventas[("Ventas numeradas y movimientos de stock")]:::db
+    end
+    rapida -->|"Envía el cobro confirmado"| confirmar
+    fidelidad -->|"Consulta fichas y compras"| clientes
+    confirmar -->|"Identifica al cliente"| clientes
+    confirmar -->|"Pide la operación cuando corresponde"| acciones
+    panel -->|"Guarda si pierde conexión"| memoria
+    memoria -->|"Reintenta al volver internet"| confirmar
+    confirmar -->|"Registra venta y descuenta stock"| ventas
+    panel -->|"Confirma en línea"| confirmar
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

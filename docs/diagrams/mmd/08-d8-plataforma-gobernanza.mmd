@@ -1,0 +1,37 @@
+flowchart TB
+    %% Cada rol tiene permisos y la versión de revisión usa datos aislados.
+    subgraph navegador["En tu navegador o celular"]
+        usuarios["Administrar usuarios"]:::integral
+        acceso["Ingreso y acceso desde el dispositivo"]:::integral
+        pagos["Ajustes de pago solo informativos"]:::debt
+        falta["Sin editor de permisos y alta desigual entre administradores"]:::debt
+        actividad["Alertas, actividad y auditoría"]:::integral
+    end
+    subgraph servidor["En el servidor seguro"]
+        version["Revisión de una versión antes de publicarla"]:::shared
+        roles["Control de acceso por perfil y rol"]:::shared
+        comprobar["Comprobación del entorno de pruebas"]:::shared
+    end
+    subgraph recursos["Base de datos y servicios externos"]
+        identidad(["Servicio de identificación"]):::external
+        registros[("Alertas y registro de cambios")]:::db
+        pruebas[("Base separada para pruebas")]:::db
+        perfiles[("Perfiles y reglas de acceso")]:::db
+    end
+    acceso -->|"Revisa que el perfil esté activo"| roles
+    pagos -.->|"Muestra el estado según los permisos"| roles
+    acceso -->|"Verifica la identidad"| identidad
+    actividad -->|"Lee novedades y cambios"| registros
+    version -->|"Pide validar el destino"| comprobar
+    comprobar -->|"Confirma que esté aislada"| pruebas
+    usuarios -->|"Solicita administrar una cuenta"| roles
+    roles -->|"Aplica permisos del perfil"| perfiles
+    usuarios -.->|"Limita el alta y la edición de permisos"| falta
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

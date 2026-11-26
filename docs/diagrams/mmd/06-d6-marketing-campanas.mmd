@@ -1,0 +1,37 @@
+flowchart TB
+    %% Registro, planeamiento, mensajes y etapas pendientes de publicación.
+    subgraph navegador["En tu navegador o celular"]
+        marketing["Campañas generales en borrador"]:::debt
+        redes["Contactos de redes sociales"]:::integral
+        anuncios["Plan y piezas para anuncios en Meta"]:::integral
+        mensajes["Campañas de WhatsApp"]:::integral
+    end
+    subgraph servidor["En el servidor seguro"]
+        preparar["Preparar estrategia y plan de anuncios"]:::shared
+        archivos["Autorizar acceso a archivos"]:::shared
+    end
+    subgraph recursos["Base de datos y servicios externos"]
+        falta["Validación, generación final, publicación y resultados pendientes"]:::debt
+        whatsapp(["Complemento de WhatsApp para Chrome"]):::external
+        ia(["OpenAI"]):::external
+        registro[("Contactos y campañas generales")]:::db
+        destinatarios[("Campañas de WhatsApp y destinatarios")]:::db
+        drive(["Google Drive"]):::external
+    end
+    anuncios -.->|"Se detiene antes de publicar"| falta
+    anuncios -->|"Pide preparar una estrategia"| preparar
+    mensajes -->|"Filtra clientes y guarda la campaña"| destinatarios
+    marketing -->|"Conserva los borradores"| registro
+    archivos -->|"Conecta y consulta archivos"| drive
+    anuncios -->|"Pide vincular archivos"| archivos
+    mensajes -->|"Entrega mensajes al complemento"| whatsapp
+    preparar -->|"Pide ayuda para redactar el plan"| ia
+    redes -->|"Guarda los contactos recibidos"| registro
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

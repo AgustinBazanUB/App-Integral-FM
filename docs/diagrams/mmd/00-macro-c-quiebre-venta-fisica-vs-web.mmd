@@ -1,0 +1,30 @@
+flowchart TB
+    %% Una venta en local y un pedido web avanzan por caminos distintos.
+    subgraph local["Venta en local o asistida"]
+        vendedor["Vendedor confirma la venta"]:::integral
+        venta[("Venta registrada y stock descontado si es directa")]:::db
+        impacto["Facturación, ingresos y envíos"]:::shared
+        devolucion["Sin reversa automática de stock, caja ni factura"]:::debt
+        vendedor -->|"Registra en línea o al volver internet"| venta
+        venta -->|"Suma ingresos y habilita factura y envío"| impacto
+        impacto -.->|"Si un envío se devuelve o cancela"| devolucion
+    end
+    subgraph web["Compra en tienda web"]
+        retiro["El cliente confirma retiro"]:::ecommerce
+        pendiente[("Pedido pendiente sin reservar stock")]:::db
+        falta["Falta cobro online con Payway y envío a domicilio"]:::debt
+        prueba["Prueba local de administrador"]:::shared
+        cierre[("Venta registrada, stock descontado y borrador fiscal")]:::db
+        retiro -->|"Guarda el pedido pendiente"| pendiente
+        pendiente -.->|"Se frena antes del cobro"| falta
+        pendiente -.->|"Solo la prueba local simula el pago"| prueba
+        prueba -->|"Registra la venta y prepara el borrador fiscal"| cierre
+    end
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

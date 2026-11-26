@@ -1,0 +1,39 @@
+flowchart TB
+    %% Los números de gestión y la facturación tienen recorridos distintos.
+    subgraph navegador["En tu navegador o celular"]
+        resumen["Resumen del negocio"]:::integral
+        metricas["Métricas de ventas"]:::integral
+        caja["Finanzas y movimientos de caja"]:::integral
+        factura["Solicitar factura o nota de crédito"]:::integral
+    end
+    subgraph servidor["En el servidor seguro"]
+        receptor["Validar datos del cliente"]:::shared
+        emitir["Autorizar y preparar el comprobante"]:::shared
+    end
+    subgraph recursos["Base de datos y servicios externos"]
+        numeros[("Ventas y movimientos financieros")]:::db
+        documentos[("Comprobantes y numeración fiscal")]:::db
+        arca(["ARCA"]):::external
+        correo(["Correo del comprobante"]):::external
+        falta["Métricas sin exportación"]:::debt
+        turnos["Sin turnos de caja"]:::debt
+    end
+    emitir -->|"Solicita autorización fiscal"| arca
+    metricas -->|"Consulta ventas por período"| numeros
+    metricas -.->|"No permite exportar"| falta
+    emitir -->|"Envía por correo si está configurado"| correo
+    emitir -->|"Guarda el número y el documento"| documentos
+    factura -->|"Pide revisar al comprador"| receptor
+    caja -.->|"No gestiona turnos"| turnos
+    receptor -->|"Consulta el padrón"| arca
+    resumen -->|"Resume ingresos y actividad"| numeros
+    factura -->|"Pide emitir o anular"| emitir
+    caja -->|"Consulta ingresos y egresos"| numeros
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

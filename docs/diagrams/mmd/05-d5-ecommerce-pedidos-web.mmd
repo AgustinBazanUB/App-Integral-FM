@@ -1,0 +1,40 @@
+flowchart TB
+    %% La tienda consulta existencias y guarda un pedido pendiente.
+    subgraph navegador["En tu navegador o celular"]
+        carrito["Carrito y confirmación para retiro"]:::ecommerce
+        gestion["Consulta de los últimos 40 pedidos"]:::integral
+        oferta["Portada, catálogo y ficha de producto"]:::ecommerce
+        aislada["Tienda aislada sin servidor"]:::debt
+        memoria[("Carrito y borrador en tu dispositivo")]:::db
+    end
+    subgraph servidor["En el servidor seguro"]
+        catalogo["Consulta de productos disponibles"]:::shared
+        recibir["Recepción de pedidos web"]:::shared
+    end
+    subgraph datos["Base de datos y pasos pendientes"]
+        stock[("Productos y stock de un local")]:::db
+        pendiente[("Pedido pendiente de pago")]:::db
+        falta["Sin reserva de stock, Payway ni envío a domicilio"]:::debt
+    end
+    subgraph prueba["Solo en una prueba local"]
+        venta[("Venta, salida de stock y borrador fiscal")]:::db
+        simular["Prueba local de administrador"]:::shared
+    end
+    oferta -.->|"Pierde conexión en versión aislada"| aislada
+    carrito -->|"Recuerda la selección y los datos"| memoria
+    recibir -->|"Guarda el pedido sin cobrar"| pendiente
+    carrito -->|"Confirma el retiro"| recibir
+    pendiente -.->|"Permite simular el pago solo en local"| simular
+    gestion -->|"Lee pedidos recientes"| pendiente
+    oferta -->|"Pide los productos y su disponibilidad"| catalogo
+    simular -->|"Registra venta y prepara borrador"| venta
+    pendiente -.->|"Se detiene antes del cobro"| falta
+    catalogo -->|"Lee existencias de un local"| stock
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1226.0258749999998 633.3" width="1226.0258749999998" height="633.3" style="--bg:#ffffff;--fg:#1f2328;--line:#8793A3;--accent:#0969da;--muted:#59636e;background:var(--bg)">
+<style>
+
+  text { font-family: 'Arial', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="navegador" data-label="En tu navegador o celular">
+  <rect x="130.58280000000008" y="24" width="757.371" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="130.58280000000008" y="24" width="757.371" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="142.58280000000008" y="38" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">En tu navegador o celular</text>
+</g>
+<g class="subgraph" data-id="servidor" data-label="En el servidor seguro">
+  <rect x="24" y="261.20000000000005" width="534.184" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="24" y="261.20000000000005" width="534.184" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="36" y="275.20000000000005" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">En el servidor seguro</text>
+</g>
+<g class="subgraph" data-id="recursos" data-label="Base de datos y servicios externos">
+  <rect x="28.953875000000068" y="498.40000000000003" width="1173.072" height="110.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="28.953875000000068" y="498.40000000000003" width="1173.072" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="40.95387500000007" y="512.4000000000001" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Base de datos y servicios externos</text>
+</g>
+<polyline class="edge" data-from="repartidor" data-to="recorrido" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Marca salida y entrega" points="199.42080000000007,104.9 199.42080000000004,168.9 221.45512499999998,168.9 221.45512499999998,243.20000000000002 359.83119999999997,243.20000000000002 359.8312,305.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="gestion" data-to="mapas" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Abre dirección y recorrido" points="820.9204666666667,104.9 820.9204666666667,406.09999999999997 965.3405083333332,406.09999999999997 965.3405083333332,480.40000000000003 1103.9183750000002,480.40000000000003 1103.918375,542.4000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="gestion" data-to="recorrido" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Crea y aprueba el envío" points="769.8871333333334,104.9 769.8871333333334,198.9 742.0407166666666,198.9 742.0407166666666,243.20000000000002 496.5958,243.20000000000002 496.5958,305.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="preparador" data-to="recorrido" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Confirma la preparación" points="372.1468000000001,104.9 372.1468000000001,168.9 394.18112499999995,168.9 394.18112499999995,243.20000000000002 405.4194,243.20000000000002 405.4194,305.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="recorrido" data-to="reversa" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="Si un envío se devuelve o cancela" points="428.21349999999995,342.1 428.21349999999995,406.1 490.594875,406.1 490.594875,542.4000000000001" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="cliente" data-to="recorrido" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Consulta el avance" points="590.4443000000001,104.9 590.4443000000001,231.20000000000002 451.00759999999997,231.20000000000002 451.00759999999997,305.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="recorrido" data-to="historial" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Guarda el estado y las novedades" points="371.22825,342.1 371.22825,406.1 308.84687499999995,406.1 308.84687499999995,480.40000000000003 238.41054166666666,480.40000000000003 238.41054166666672,542.4000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="limpiar" data-to="historial" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Borra posiciones vencidas" points="162.1215,342.1 162.1215,406.1 121.5664999999999,406.1 121.5664999999999,480.40000000000003 141.6822083333334,480.40000000000003 141.6822083333334,542.4000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="recorrido" data-to="desconectado" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="Deja pendiente el envío automático de avisos" points="485.19874999999996,342.1 485.1987499999999,394.1 758.3718749999999,394.1 758.3718749999999,480.40000000000003 818.9308749999999,480.40000000000003 818.930875,542.4000000000001" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="repartidor" data-to="recorrido" data-label="Marca salida y entrega">
+  <rect x="158.45512499999998" y="175.9" width="125.75800000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="221.334125" y="191.05" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Marca salida y entrega</text>
+</g>
+<g class="edge-label" data-from="gestion" data-to="mapas" data-label="Abre dirección y recorrido">
+  <rect x="892.8405083333332" y="413.1" width="144.17200000000003" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="964.9265083333332" y="428.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Abre dirección y recorrido</text>
+</g>
+<g class="edge-label" data-from="gestion" data-to="recorrido" data-label="Crea y aprueba el envío">
+  <rect x="675.5407166666666" y="205.9" width="132.88600000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="741.9837166666666" y="221.05" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Crea y aprueba el envío</text>
+</g>
+<g class="edge-label" data-from="preparador" data-to="recorrido" data-label="Confirma la preparación">
+  <rect x="328.68112499999995" y="175.9" width="130.51000000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="393.93612499999995" y="191.05" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Confirma la preparación</text>
+</g>
+<g class="edge-label" data-from="recorrido" data-to="reversa" data-label="Si un envío se devuelve o cancela">
+  <rect x="400.594875" y="413.1" width="179.21800000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="490.20387500000004" y="428.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Si un envío se devuelve o cancela</text>
+</g>
+<g class="edge-label" data-from="cliente" data-to="recorrido" data-label="Consulta el avance">
+  <rect x="536.9443000000001" y="175.9" width="106.75000000000003" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="590.3193000000001" y="191.05" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Consulta el avance</text>
+</g>
+<g class="edge-label" data-from="recorrido" data-to="historial" data-label="Guarda el estado y las novedades">
+  <rect x="220.34687499999995" y="413.1" width="176.24800000000005" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="308.470875" y="428.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Guarda el estado y las novedades</text>
+</g>
+<g class="edge-label" data-from="limpiar" data-to="historial" data-label="Borra posiciones vencidas">
+  <rect x="48.566499999999905" y="413.1" width="145.95400000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="121.54349999999992" y="428.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Borra posiciones vencidas</text>
+</g>
+<g class="edge-label" data-from="recorrido" data-to="desconectado" data-label="Deja pendiente el envío automático de avisos">
+  <rect x="644.3718749999999" y="413.1" width="227.92600000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="758.3348749999999" y="428.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Deja pendiente el envío automático de avisos</text>
+</g>
+<g class="node" data-id="preparador" data-label="Preparador de pedidos" data-shape="rectangle">
+  <rect x="282.25880000000006" y="68" width="179.77599999999998" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="372.14680000000004" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Preparador de pedidos</text>
+</g>
+<g class="node" data-id="gestion" data-label="Tablero de envíos" data-shape="rectangle">
+  <rect x="718.8538000000001" y="68" width="153.1" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="795.4038" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Tablero de envíos</text>
+</g>
+<g class="node" data-id="cliente" data-label="Seguimiento para el cliente" data-shape="rectangle">
+  <rect x="492.0348000000001" y="68" width="196.81899999999996" height="36.900000000000006" rx="0" ry="0" fill="#1E293B" stroke="#64748B" stroke-width="2px" />
+  <text x="590.4443000000001" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Seguimiento para el cliente</text>
+</g>
+<g class="node" data-id="repartidor" data-label="Repartidor" data-shape="rectangle">
+  <rect x="146.58280000000008" y="68" width="105.676" height="36.900000000000006" rx="0" ry="0" fill="#1E293B" stroke="#64748B" stroke-width="2px" />
+  <text x="199.42080000000007" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Repartidor</text>
+</g>
+<g class="node" data-id="recorrido" data-label="Control de cada etapa del envío" data-shape="rectangle">
+  <rect x="314.243" y="305.20000000000005" width="227.94099999999997" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="428.21349999999995" y="323.65000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Control de cada etapa del envío</text>
+</g>
+<g class="node" data-id="limpiar" data-label="Limpieza de ubicaciones vencidas" data-shape="rectangle">
+  <rect x="40" y="305.20000000000005" width="244.243" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="162.1215" y="323.65000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Limpieza de ubicaciones vencidas</text>
+</g>
+<g class="node" data-id="reversa" data-label="Sin reversa de stock, caja ni factura" data-shape="rectangle">
+  <rect x="365.138875" y="542.4000000000001" width="250.91199999999995" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="490.59487499999994" y="560.8500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Sin reversa de stock, caja ni factura</text>
+</g>
+<g class="node" data-id="historial" data-label="Envíos, novedades y sesiones de reparto" data-shape="cylinder">
+  <rect x="44.95387500000007" y="549.4000000000001" width="290.18499999999995" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="44.95387500000007" y1="549.4000000000001" x2="44.95387500000007" y2="586.3000000000001" stroke="#92400E" stroke-width="2px" />
+  <line x1="335.138875" y1="549.4000000000001" x2="335.138875" y2="586.3000000000001" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="190.04637500000004" cy="586.3000000000001" rx="145.09249999999997" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="190.04637500000004" cy="549.4000000000001" rx="145.09249999999997" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="190.04637500000004" y="567.8500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Envíos, novedades y sesiones de reparto</text>
+</g>
+<g class="node" data-id="mapas" data-label="Mapas y navegación" data-shape="stadium">
+  <rect x="1021.810875" y="542.4000000000001" width="164.21499999999997" height="36.900000000000006" rx="18.450000000000003" ry="18.450000000000003" fill="#475569" stroke="#334155" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="1103.918375" y="560.8500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Mapas y navegación</text>
+</g>
+<g class="node" data-id="desconectado" data-label="Avisos automáticos y conexión con Uber pendientes" data-shape="rectangle">
+  <rect x="646.050875" y="542.4000000000001" width="345.76" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="818.930875" y="560.8500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Avisos automáticos y conexión con Uber pendientes</text>
+</g>
+</svg>
