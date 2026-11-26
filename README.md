@@ -8,6 +8,8 @@ Repositorio único para la tienda y la gestión integral de Flor Mía, con build
 - Vista de tienda para administradores: <https://appintegralflormia.netlify.app/tienda>
 - Repositorio: <https://github.com/AgustinBazanUB/App-Integral-FM>
 
+**[Arquitectura visual de Flor Mía](docs/architecture/README.md)** · Mapas, visor interactivo y diseño técnico de la plataforma.
+
 ## Qué incluye
 
 - Acceso inicial privado en `/`, con autenticación persistente y navegación según rol y permisos.
