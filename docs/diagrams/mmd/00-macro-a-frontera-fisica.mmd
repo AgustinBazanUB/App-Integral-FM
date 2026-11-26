@@ -1,0 +1,40 @@
+flowchart LR
+    %% La superficie elegida determina qué código y Functions están disponibles.
+    personal(["Equipo Flor Mía · 12 roles"]):::actor
+    participantes(["Preparador · repartidor · cliente de envío"]):::actor
+    comprador(["Comprador invitado"]):::actor
+
+    subgraph navegador["Navegador"]
+        gestion["/gestion/* · /vendedor · Olivia"]:::integral
+        portales["/e/:lookupId · /reparto · /seguimiento"]:::integral
+        unificado["Storefront unificado · /tienda"]:::ecommerce
+        separado["INCOMPLETO · dist/ecommerce sin Functions"]:::debt
+    end
+
+    subgraph servidor["Servidor · Netlify"]
+        api["30 Functions · 4 cron incluidos"]:::shared
+    end
+
+    subgraph persistencia["Persistencia"]
+        firebase[("Firebase Auth · Firestore")]:::db
+        pendientes[("IndexedDB · seller_pending_sales")]:::db
+    end
+
+    personal --> gestion
+    participantes --> portales
+    comprador --> unificado
+    comprador -.-> separado
+    gestion --> api
+    portales --> api
+    unificado --> api
+    api --> firebase
+    gestion -->|Firebase SDK| firebase
+    gestion --> pendientes
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

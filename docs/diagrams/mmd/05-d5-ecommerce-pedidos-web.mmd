@@ -1,0 +1,37 @@
+flowchart TB
+    %% Flujo del macro-dominio verificado contra el corte d0f1225.
+    subgraph navegador["Navegador · E-Commerce y Gestión"]
+        oferta["/tienda · /productos · /producto/:slug"]:::ecommerce
+        checkout["Carrito y /checkout · retiro"]:::ecommerce
+        local[("localStorage · carrito y borrador")]:::db
+        gestion["/gestion/ecommerce · consulta de hasta 40"]:::integral
+        separado["INCOMPLETO · dist/ecommerce sin Functions"]:::debt
+    end
+
+    subgraph servidor["Servidor · app unificada"]
+        catalogo["ecommerce-catalog"]:::shared
+        crear["ecommerce-checkout"]:::shared
+        simular["ecommerce-simulated-payment · admin local"]:::shared
+    end
+
+    subgraph persistencia["Persistencia · Firestore"]
+        stock[("products · locationStock de un origen")]:::db
+        pedido[("orders · payments pendientes")]:::db
+        faltante["INCOMPLETO · Sin Payway, domicilio ni reserva"]:::debt
+        cierre[("sales · stock · invoices sin CAE")]:::db
+    end
+
+    oferta --> catalogo --> stock
+    checkout --> local
+    checkout --> crear --> pedido
+    gestion -->|Lee orders| pedido
+    pedido -.-> faltante
+    checkout -.->|Admin local habilitado| simular --> cierre
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

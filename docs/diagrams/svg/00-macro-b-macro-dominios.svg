@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 857.3559999999998 613.1999999999999" width="857.3559999999998" height="613.1999999999999" style="--bg:#ffffff;--fg:#1f2328;--line:#8793A3;--accent:#0969da;--muted:#59636e;background:var(--bg)">
+<style>
+
+  text { font-family: 'Arial', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="dominios" data-label="Navegador y servidor · dominios del monorepo">
+  <rect x="24" y="24" width="274.0199999999999" height="565.1999999999999" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="24" y="24" width="274.0199999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="36" y="38" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Navegador y servidor · dominios del monorepo</text>
+</g>
+<g class="subgraph" data-id="recursos" data-label="Persistencia y servicios externos">
+  <rect x="621.5799999999999" y="217.69999999999993" width="211.77599999999998" height="177.8" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="621.5799999999999" y="217.69999999999993" width="211.77599999999998" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="633.5799999999999" y="231.69999999999993" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Persistencia y servicios externos</text>
+</g>
+<polyline class="edge" data-from="inventario" data-to="acceso" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="259.049,86.45 338.2104999999999,86.45 338.2104999999999,317.09999999999997 364.0199999999999,317.09999999999997" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="ventas" data-to="acceso" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="251.63899999999995,153.34999999999997 338.2104999999999,153.34999999999997 338.2104999999999,317.09999999999997 364.0199999999999,317.09999999999997" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="finanzas" data-to="acceso" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="299.804,220.25 338.2104999999999,220.25 338.2104999999999,317.09999999999997 364.0199999999999,317.09999999999997" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="logistica" data-to="acceso" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="256.0849999999999,287.15 338.2104999999999,287.15 338.2104999999999,317.09999999999997 364.0199999999999,317.09999999999997" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="web" data-to="acceso" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="312.4009999999999,354.04999999999995 338.2104999999999,354.04999999999995 338.2104999999999,317.09999999999997 364.0199999999999,317.09999999999997" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="marketing" data-to="acceso" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="297.5809999999999,420.95 338.2104999999999,420.95 338.2104999999999,317.09999999999997 364.0199999999999,317.09999999999997" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="olivia" data-to="acceso" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="282.0199999999999,487.84999999999997 338.2104999999999,487.84999999999997 338.2104999999999,317.09999999999997 364.0199999999999,317.09999999999997" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="gobierno" data-to="acceso" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="287.207,554.75 338.2104999999999,554.75 338.2104999999999,317.09999999999997 364.0199999999999,317.09999999999997" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="acceso" data-to="firestore" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="561.5799999999999,317.09999999999997 599.5799999999999,317.09999999999997 599.5799999999999,354.0499999999999 637.5799999999999,354.0499999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="acceso" data-to="servicios" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="561.5799999999999,317.09999999999997 599.5799999999999,317.09999999999997 599.5799999999999,280.1499999999999 637.5799999999999,280.1499999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="node" data-id="acceso" data-label="Acceso · SDK y Functions" data-shape="rectangle">
+  <rect x="364.0199999999999" y="298.65" width="197.55999999999995" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="462.7999999999999" y="317.09999999999997" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Acceso · SDK y Functions</text>
+</g>
+<g class="node" data-id="inventario" data-label="D1 · Catálogo e inventario" data-shape="rectangle">
+  <rect x="70.38099999999997" y="68" width="188.668" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="164.71499999999997" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">D1 · Catálogo e inventario</text>
+</g>
+<g class="node" data-id="ventas" data-label="D2 · Ventas POS y CRM" data-shape="rectangle">
+  <rect x="70.38099999999997" y="134.89999999999998" width="181.25799999999998" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="161.00999999999996" y="153.34999999999997" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">D2 · Ventas POS y CRM</text>
+</g>
+<g class="node" data-id="finanzas" data-label="D3 · Finanzas, métricas y ARCA" data-shape="rectangle">
+  <rect x="70.38099999999997" y="201.79999999999998" width="229.423" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="185.09249999999997" y="220.25" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">D3 · Finanzas, métricas y ARCA</text>
+</g>
+<g class="node" data-id="logistica" data-label="D4 · Logística y envíos" data-shape="rectangle">
+  <rect x="70.38099999999997" y="268.7" width="185.70399999999998" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="163.23299999999995" y="287.15" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">D4 · Logística y envíos</text>
+</g>
+<g class="node" data-id="web" data-label="D5 · E-Commerce · INCOMPLETO" data-shape="rectangle">
+  <rect x="70.38099999999997" y="335.59999999999997" width="242.01999999999992" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="191.39099999999993" y="354.04999999999995" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">D5 · E-Commerce · INCOMPLETO</text>
+</g>
+<g class="node" data-id="marketing" data-label="D6 · Marketing · INCOMPLETO" data-shape="rectangle">
+  <rect x="70.38099999999997" y="402.5" width="227.19999999999993" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="183.98099999999994" y="420.95" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">D6 · Marketing · INCOMPLETO</text>
+</g>
+<g class="node" data-id="olivia" data-label="D7 · Olivia IA" data-shape="rectangle">
+  <rect x="165.22899999999993" y="469.4" width="116.791" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="223.62449999999993" y="487.84999999999997" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">D7 · Olivia IA</text>
+</g>
+<g class="node" data-id="gobierno" data-label="D8 · Plataforma y gobernanza" data-shape="rectangle">
+  <rect x="70.38099999999997" y="536.3" width="216.82600000000002" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="178.79399999999998" y="554.75" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">D8 · Plataforma y gobernanza</text>
+</g>
+<g class="node" data-id="servicios" data-label="15 conexiones externas" data-shape="stadium">
+  <rect x="637.5799999999999" y="261.69999999999993" width="179.77599999999998" height="36.900000000000006" rx="18.450000000000003" ry="18.450000000000003" fill="#475569" stroke="#334155" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="727.468" y="280.1499999999999" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">15 conexiones externas</text>
+</g>
+<g class="node" data-id="firestore" data-label="Firestore · 91 rutas" data-shape="cylinder">
+  <rect x="637.5799999999999" y="335.5999999999999" width="153.841" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="637.5799999999999" y1="335.5999999999999" x2="637.5799999999999" y2="372.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <line x1="791.4209999999999" y1="335.5999999999999" x2="791.4209999999999" y2="372.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="714.5004999999999" cy="372.4999999999999" rx="76.9205" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="714.5004999999999" cy="335.5999999999999" rx="76.9205" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="714.5004999999999" y="354.0499999999999" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Firestore · 91 rutas</text>
+</g>
+</svg>

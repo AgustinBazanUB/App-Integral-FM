@@ -1,0 +1,37 @@
+flowchart LR
+    %% Flujo del macro-dominio verificado contra el corte d0f1225.
+    subgraph navegador["Navegador · acceso y control"]
+        login["Login · PWA · Service Worker"]:::integral
+        usuarios["INCOMPLETO · /gestion/administration · sin editor de permisos"]:::debt
+        actividad["/gestion/alerts · /gestion/actividad · /gestion/audit"]:::integral
+        configuracion["SOLO UI · /gestion/settings · estado de pagos"]:::debt
+        permisos["RBAC · 12 roles · permissions.js"]:::shared
+        diferencia["INCOMPLETO · admin y general_admin difieren en altas"]:::debt
+    end
+
+    subgraph servidor["Servidor y automatización"]
+        pipeline["GitHub Actions · Netlify Deploy Preview"]:::shared
+        verificador["preview-firebase-status"]:::shared
+    end
+
+    subgraph persistencia["Persistencia y servicios externos"]
+        auth(["Firebase Authentication"]):::external
+        perfiles[("users · firestore.rules")]:::db
+        registros[("alerts · auditLogs")]:::db
+        staging[("Firebase de pruebas · aislamiento del preview")]:::db
+    end
+
+    login --> auth
+    login --> permisos --> perfiles
+    usuarios --> permisos
+    usuarios -.-> diferencia
+    actividad --> registros
+    pipeline --> verificador --> staging
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

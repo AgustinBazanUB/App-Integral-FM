@@ -1,0 +1,44 @@
+flowchart TB
+    %% Una venta POS confirmada produce una salida de stock. Crear un pedido web no la produce.
+    subgraph fisica["Venta física"]
+        subgraph posNavegador["Navegador · POS"]
+            pos["Venta Rápida o Vendedor"]:::integral
+            transaccion["SDK directo · reintento desde IndexedDB"]:::shared
+        end
+        subgraph posDatos["Persistencia · venta y stock"]
+            venta[("sales + movimientos de stock")]:::db
+        end
+        subgraph posServidor["Servidor y Gestión · efectos vinculados"]
+            impacto["ARCA · Envíos · Finanzas"]:::shared
+            devolucion["INCOMPLETO · Sin reversa automática de stock, caja y CAE"]:::debt
+        end
+    end
+
+    subgraph compra["Checkout web"]
+        subgraph webNavegador["Navegador · E-Commerce"]
+            checkout["/checkout · retiro habilitado"]:::ecommerce
+        end
+        subgraph webServidor["Servidor · camino comercial"]
+            registrar["ecommerce-checkout"]:::shared
+        end
+        subgraph webDatos["Persistencia · intención de compra"]
+            pendiente[("orders y payments · pending_payment")]:::db
+            corte["INCOMPLETO · Sin reserva ni cobro Payway"]:::debt
+        end
+        subgraph ensayo["Simulación local · servidor y persistencia"]
+            local["ecommerce-simulated-payment · admin local"]:::shared
+            simulacion[("sales + salida de stock · plan fiscal sin CAE")]:::db
+        end
+    end
+
+    pos --> transaccion --> venta --> impacto -.-> devolucion
+    checkout --> registrar --> pendiente -.-> corte
+    pendiente -.-> local --> simulacion
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

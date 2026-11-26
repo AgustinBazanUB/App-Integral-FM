@@ -1,0 +1,38 @@
+flowchart LR
+    %% Flujo del macro-dominio verificado contra el corte d0f1225.
+    subgraph navegador["Navegador · Gestión"]
+        social["INCOMPLETO · /gestion/social · alta y consulta"]:::debt
+        general["INCOMPLETO · /gestion/marketing · borrador"]:::debt
+        whatsapp["INCOMPLETO · /gestion/marketing/whatsapp"]:::debt
+        meta["INCOMPLETO · /gestion/marketing/meta-ads"]:::debt
+    end
+
+    subgraph servidor["Servidor · Functions"]
+        plan["theory-compiler · campaign-planner"]:::shared
+        drives["google-drive · google-drive-callback"]:::shared
+    end
+
+    subgraph persistencia["Persistencia y servicios externos"]
+        registro[("socialLeads · campaigns")]:::db
+        campanias[("whatsappCampaigns")]:::db
+        extension(["Extensión privada Chrome · WhatsApp"]):::external
+        ia(["OpenAI"]):::external
+        drive(["Google Drive · OAuth y archivos"]):::external
+        falta["SOLO UI · Validación, render, publicación y resultados"]:::debt
+    end
+
+    social --> registro
+    general --> registro
+    whatsapp --> campanias
+    whatsapp -.->|postMessage| extension
+    meta --> plan --> ia
+    meta --> drives --> drive
+    meta -.->|Sin Meta Graph API| falta
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

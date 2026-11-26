@@ -1,0 +1,40 @@
+flowchart LR
+    %% Flujo del macro-dominio verificado contra el corte d0f1225.
+    subgraph navegador["Navegador · App Integral FM"]
+        asistente["Overlay Olivia · Gestión y Vendedor"]:::integral
+        ajustes["Administración · /gestion/settings"]:::integral
+    end
+
+    subgraph servidor["Servidor · 12 Functions vigentes"]
+        chat["olivia · SSE · olivia-chat-background"]:::shared
+        voz["Voz natural · olivia-live-transcribe"]:::shared
+        archivos["olivia-attachment · olivia-knowledge"]:::shared
+        retencion["Tres cron de retención y limpieza"]:::shared
+    end
+
+    subgraph persistencia["Persistencia y servicios externos"]
+        datos[("Firestore · 24 rutas olivia")]:::db
+        openAI(["OpenAI · modelos, transcripción y vectores"]):::external
+        chirp(["Google Cloud Text-to-Speech · Chirp"]):::external
+        cotizacion(["Banco Nación · PyME Nación"]):::external
+        legado["INCOMPLETO · GPT-Live 410 · herramientas de envío bloqueadas"]:::debt
+    end
+
+    asistente --> chat
+    asistente --> voz
+    asistente --> archivos
+    ajustes --> archivos
+    chat --> datos
+    retencion --> datos
+    archivos --> openAI
+    voz --> chirp
+    chat -.-> cotizacion
+    chat -.-> legado
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

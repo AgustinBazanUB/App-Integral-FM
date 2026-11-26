@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1006.1882499999999 754.8000000000001" width="1006.1882499999999" height="754.8000000000001" style="--bg:#ffffff;--fg:#1f2328;--line:#8793A3;--accent:#0969da;--muted:#59636e;background:var(--bg)">
+<style>
+
+  text { font-family: 'Arial', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="navegador" data-label="Navegador · E-Commerce y Gestión">
+  <rect x="24" y="24" width="958.1882499999999" height="201.8" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="24" y="24" width="958.1882499999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="36" y="38" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Navegador · E-Commerce y Gestión</text>
+</g>
+<g class="subgraph" data-id="servidor" data-label="Servidor · app unificada">
+  <rect x="96.75125000000014" y="366.1" width="715.0609999999998" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="96.75125000000014" y="366.1" width="715.0609999999998" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="108.75125000000014" y="380.1" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Servidor · app unificada</text>
+</g>
+<g class="subgraph" data-id="persistencia" data-label="Persistencia · Firestore">
+  <rect x="103.68075000000019" y="529" width="857.3329999999999" height="201.8" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="103.68075000000019" y="529" width="857.3329999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="115.68075000000019" y="543" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Persistencia · Firestore</text>
+</g>
+<polyline class="edge" data-from="oferta" data-to="catalogo" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="524.36025,202.8 524.36025,348.1 518.74875,348.1 518.7487500000001,410.1" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="catalogo" data-to="stock" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="518.7487500000001,447 518.74875,511.00000000000006 510.85825000000017,511.00000000000006 510.8582500000002,573.0000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="checkout" data-to="crear" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="531.8817499999999,104.9 531.8817499999999,116.9 663.52125,116.9 663.52125,348.1 711.4817499999999,348.1 711.48175,410.1" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="crear" data-to="pedido" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="711.48175,447 711.48175,511.00000000000006 744.8880833333334,511.00000000000006 744.8880833333336,573.0000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="gestion" data-to="pedido" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Lee orders" points="820.35475,202.8 820.35475,273.8 821.81225,273.8 821.81225,511.00000000000006 817.904416666667,511.00000000000006 817.904416666667,573.0000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="checkout" data-to="simular" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="Admin local habilitado" points="482.3064999999999,104.9 482.3064999999999,128.9 384.19925,128.9 384.19925,273.8 323.60275,273.8 323.60275,348.1 261.5487500000001,348.1 261.5487500000001,410.1" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="simular" data-to="cierre" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="261.5487500000001,447 261.5487500000001,511.00000000000006 234.76275000000018,511.00000000000006 234.76275000000018,573.0000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="checkout" data-to="local" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="432.73124999999993,104.9 432.73124999999993,116.9 256.15324999999996,116.9 256.15324999999996,165.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="pedido" data-to="faltante" data-style="dotted" data-arrow-start="false" data-arrow-end="true" points="781.3962500000002,623.9 781.3962500000002,677.9" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="gestion" data-to="pedido" data-label="Lee orders">
+  <rect x="785.81225" y="280.8" width="71.70400000000001" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="821.6642499999999" y="295.95" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Lee orders</text>
+</g>
+<g class="edge-label" data-from="checkout" data-to="simular" data-label="Admin local habilitado">
+  <rect x="264.60275" y="280.8" width="117.44200000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="323.32375" y="295.95" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Admin local habilitado</text>
+</g>
+<g class="node" data-id="oferta" data-label="/tienda · /productos · /producto/:slug" data-shape="rectangle">
+  <rect x="395.19925" y="165.9" width="258.32199999999995" height="36.900000000000006" rx="0" ry="0" fill="#047857" stroke="#065F46" stroke-width="2px" />
+  <text x="524.36025" y="184.35000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">/tienda · /productos · /producto/:slug</text>
+</g>
+<g class="node" data-id="checkout" data-label="Carrito y /checkout · retiro" data-shape="rectangle">
+  <rect x="383.15599999999995" y="68" width="198.30099999999996" height="36.900000000000006" rx="0" ry="0" fill="#047857" stroke="#065F46" stroke-width="2px" />
+  <text x="482.3064999999999" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Carrito y /checkout · retiro</text>
+</g>
+<g class="node" data-id="local" data-label="localStorage · carrito y borrador" data-shape="cylinder">
+  <rect x="138.10724999999996" y="172.9" width="236.092" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="138.10724999999996" y1="172.9" x2="138.10724999999996" y2="209.8" stroke="#92400E" stroke-width="2px" />
+  <line x1="374.19925" y1="172.9" x2="374.19925" y2="209.8" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="256.15324999999996" cy="209.8" rx="118.046" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="256.15324999999996" cy="172.9" rx="118.046" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="256.15324999999996" y="191.35000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">localStorage · carrito y borrador</text>
+</g>
+<g class="node" data-id="gestion" data-label="/gestion/ecommerce · consulta de hasta 40" data-shape="rectangle">
+  <rect x="674.52125" y="165.9" width="291.667" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="820.35475" y="184.35000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">/gestion/ecommerce · consulta de hasta 40</text>
+</g>
+<g class="node" data-id="separado" data-label="INCOMPLETO · dist/ecommerce sin Functions" data-shape="rectangle">
+  <rect x="40" y="68" width="313.15599999999995" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="196.57799999999997" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">INCOMPLETO · dist/ecommerce sin Functions</text>
+</g>
+<g class="node" data-id="catalogo" data-label="ecommerce-catalog" data-shape="rectangle">
+  <rect x="440.34625000000005" y="410.1" width="156.805" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="518.7487500000001" y="428.55" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">ecommerce-catalog</text>
+</g>
+<g class="node" data-id="crear" data-label="ecommerce-checkout" data-shape="rectangle">
+  <rect x="627.15125" y="410.1" width="168.66099999999997" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="711.48175" y="428.55" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">ecommerce-checkout</text>
+</g>
+<g class="node" data-id="simular" data-label="ecommerce-simulated-payment · admin local" data-shape="rectangle">
+  <rect x="112.75125000000014" y="410.1" width="297.5949999999999" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="261.5487500000001" y="428.55" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">ecommerce-simulated-payment · admin local</text>
+</g>
+<g class="node" data-id="stock" data-label="products · locationStock de un origen" data-shape="cylinder">
+  <rect x="379.8447500000002" y="580" width="262.027" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="379.8447500000002" y1="580" x2="379.8447500000002" y2="616.9" stroke="#92400E" stroke-width="2px" />
+  <line x1="641.8717500000002" y1="580" x2="641.8717500000002" y2="616.9" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="510.8582500000002" cy="616.9" rx="131.0135" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="510.8582500000002" cy="580" rx="131.0135" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="510.8582500000002" y="598.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">products · locationStock de un origen</text>
+</g>
+<g class="node" data-id="pedido" data-label="orders · payments pendientes" data-shape="cylinder">
+  <rect x="671.8717500000002" y="580" width="219.04899999999998" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="671.8717500000002" y1="580" x2="671.8717500000002" y2="616.9" stroke="#92400E" stroke-width="2px" />
+  <line x1="890.9207500000002" y1="580" x2="890.9207500000002" y2="616.9" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="781.3962500000002" cy="616.9" rx="109.52449999999999" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="781.3962500000002" cy="580" rx="109.52449999999999" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="781.3962500000002" y="598.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">orders · payments pendientes</text>
+</g>
+<g class="node" data-id="faltante" data-label="INCOMPLETO · Sin Payway, domicilio ni reserva" data-shape="rectangle">
+  <rect x="617.7787500000003" y="677.9" width="327.23499999999984" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="781.3962500000002" y="696.35" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">INCOMPLETO · Sin Payway, domicilio ni reserva</text>
+</g>
+<g class="node" data-id="cierre" data-label="sales · stock · invoices sin CAE" data-shape="cylinder">
+  <rect x="119.68075000000019" y="580" width="230.164" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="119.68075000000019" y1="580" x2="119.68075000000019" y2="616.9" stroke="#92400E" stroke-width="2px" />
+  <line x1="349.8447500000002" y1="580" x2="349.8447500000002" y2="616.9" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="234.76275000000018" cy="616.9" rx="115.082" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="234.76275000000018" cy="580" rx="115.082" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="234.76275000000018" y="598.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">sales · stock · invoices sin CAE</text>
+</g>
+</svg>

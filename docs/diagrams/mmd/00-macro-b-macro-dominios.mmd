@@ -1,0 +1,38 @@
+flowchart LR
+    %% Los ocho dominios convergen en una base de datos común con guardas propias.
+    subgraph dominios["Navegador y servidor · dominios del monorepo"]
+        inventario["D1 · Catálogo e inventario"]:::integral
+        ventas["D2 · Ventas POS y CRM"]:::integral
+        finanzas["D3 · Finanzas, métricas y ARCA"]:::integral
+        logistica["D4 · Logística y envíos"]:::integral
+        web["D5 · E-Commerce · INCOMPLETO"]:::debt
+        marketing["D6 · Marketing · INCOMPLETO"]:::debt
+        olivia["D7 · Olivia IA"]:::shared
+        gobierno["D8 · Plataforma y gobernanza"]:::shared
+    end
+
+    acceso["Acceso · SDK y Functions"]:::shared
+
+    subgraph recursos["Persistencia y servicios externos"]
+        servicios(["15 conexiones externas"]):::external
+        firestore[("Firestore · 91 rutas")]:::db
+    end
+
+    inventario --> acceso
+    ventas --> acceso
+    finanzas --> acceso
+    logistica --> acceso
+    web --> acceso
+    marketing --> acceso
+    olivia --> acceso
+    gobierno --> acceso
+    acceso --> firestore
+    acceso --> servicios
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

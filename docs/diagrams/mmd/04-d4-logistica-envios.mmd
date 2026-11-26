@@ -1,0 +1,38 @@
+flowchart LR
+    %% Flujo del macro-dominio verificado contra el corte d0f1225.
+    subgraph navegador["Navegador · preparación y entrega"]
+        tablero["Tablero · /gestion/shipping"]:::integral
+        preparar["Preparación · /e/:lookupId"]:::integral
+        reparto["Reparto · /reparto"]:::actor
+        tracking["Cliente · /seguimiento"]:::actor
+    end
+
+    subgraph servidor["Servidor · Netlify"]
+        shipping["shipping · 13 estados definidos"]:::shared
+        limpieza["shipping-retention · horario"]:::shared
+    end
+
+    subgraph persistencia["Persistencia y servicios externos"]
+        envios[("shipments · events · deliverySessions")]:::db
+        mapas(["OpenStreetMap · Google Maps"]):::external
+        outbox["INCOMPLETO · shippingOutbox desactivado · Uber sin API"]:::debt
+        reversa["INCOMPLETO · Devolución sin reversa automática"]:::debt
+    end
+
+    tablero --> shipping
+    preparar --> shipping
+    reparto --> shipping
+    tracking --> shipping
+    shipping --> envios
+    limpieza -->|Ubicación residual vencida| envios
+    tablero -.-> mapas
+    shipping -.-> outbox
+    shipping -.-> reversa
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

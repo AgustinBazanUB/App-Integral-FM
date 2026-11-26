@@ -1,0 +1,38 @@
+flowchart LR
+    %% Flujo del macro-dominio verificado contra el corte d0f1225.
+    subgraph navegador["Navegador · Gestión"]
+        productos["Productos · /gestion/products"]:::integral
+        ubicacion["/gestion/locations/:locationId"]:::integral
+        depositos["Depósitos · /gestion/warehouse"]:::integral
+        proveedores["INCOMPLETO · /gestion/suppliers"]:::debt
+        operaciones["SDK · ingreso, ajuste y transferencia"]:::shared
+    end
+
+    subgraph servidor["Servidor · Netlify"]
+        merge["catalog-merge"]:::shared
+    end
+
+    subgraph persistencia["Persistencia · Firestore"]
+        maestro[("products · productCategories")]:::db
+        existencias[("locationStock e items · warehouseStock e items")]:::db
+        movimientos[("stockMovements · stockTransfers")]:::db
+        fichas[("suppliers")]:::db
+        compras["INCOMPLETO · purchases solo en backend"]:::debt
+    end
+
+    productos --> merge --> maestro
+    productos -->|Alta y edición SDK| maestro
+    ubicacion --> operaciones
+    depositos --> operaciones
+    operaciones --> existencias
+    operaciones --> movimientos
+    proveedores --> fichas
+    proveedores -.->|Compra sin pantalla| compras
+
+    classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
+    classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
+    classDef ecommerce fill:#047857,stroke:#065F46,color:#FFFFFF,stroke-width:2px
+    classDef shared fill:#6D28D9,stroke:#5B21B6,color:#FFFFFF,stroke-width:2px
+    classDef db fill:#B45309,stroke:#92400E,color:#FFFFFF,stroke-width:2px
+    classDef external fill:#475569,stroke:#334155,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
+    classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4

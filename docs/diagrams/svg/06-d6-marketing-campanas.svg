@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1238.7269999999996 521.3916666666667" width="1238.7269999999996" height="521.3916666666667" style="--bg:#ffffff;--fg:#1f2328;--line:#8793A3;--accent:#0969da;--muted:#59636e;background:var(--bg)">
+<style>
+
+  text { font-family: 'Arial', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="navegador" data-label="Navegador · Gestión">
+  <rect x="24" y="53.48333333333335" width="375.8249999999999" height="297.6" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="24" y="53.48333333333335" width="375.8249999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="36" y="67.48333333333335" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Navegador · Gestión</text>
+</g>
+<g class="subgraph" data-id="servidor" data-label="Servidor · Functions">
+  <rect x="465.8249999999999" y="257.44166666666666" width="289.5809999999999" height="163.8" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="465.8249999999999" y="257.44166666666666" width="289.5809999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="477.8249999999999" y="271.44166666666666" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Servidor · Functions</text>
+</g>
+<g class="subgraph" data-id="persistencia" data-label="Persistencia y servicios externos">
+  <rect x="821.4059999999997" y="24" width="393.32099999999986" height="459.4" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="821.4059999999997" y="24" width="393.32099999999986" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="833.4059999999997" y="38" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Persistencia y servicios externos</text>
+</g>
+<polyline class="edge" data-from="social" data-to="registro" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="367.97599999999983,182.83333333333337 602.6909999999998,182.83333333333337 602.6909999999998,241.25 837.4059999999997,241.25" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="general" data-to="registro" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="362.04799999999983,249.73333333333335 602.6909999999998,249.73333333333335 602.6909999999998,241.25 837.4059999999997,241.25" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="whatsapp" data-to="campanias" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="355.3789999999999,109.78333333333335 803.4059999999997,109.78333333333336 803.4059999999997,101.61666666666667 803.4059999999997,101.61666666666667 803.4059999999997,93.44999999999999 837.4059999999997,93.45" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="whatsapp" data-to="extension" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="postMessage" points="355.3789999999999,122.08333333333336 675.0099999999998,122.08333333333336 675.0099999999998,167.35 837.4059999999997,167.35" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="meta" data-to="plan" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="351.6739999999999,307.40833333333336 371.8249999999999,307.40833333333336 371.8249999999999,306.6333333333334 447.8249999999999,306.6333333333334 447.8249999999999,319.89166666666665 483.12174999999985,319.89166666666665" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="plan" data-to="ia" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="735.5157499999998,319.89166666666665 803.4059999999997,319.89166666666665 803.4059999999997,315.15 837.4059999999997,315.15" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="meta" data-to="drives" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="351.6739999999999,316.6333333333334 435.8249999999999,316.6333333333334 435.8249999999999,386.7916666666667 483.12174999999985,386.7916666666667" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="drives" data-to="drive" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="740.7027499999997,386.7916666666667 803.4059999999997,386.7916666666667 803.4059999999997,382.05 837.4059999999997,382.05" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="meta" data-to="falta" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="Sin Meta Graph API" points="351.6739999999999,325.85833333333335 371.8249999999999,325.85833333333335 371.8249999999999,326.6333333333334 423.8249999999999,326.6333333333334 423.8249999999999,462.2416666666667 803.4059999999997,462.2416666666667 803.4059999999997,448.95 837.4059999999997,448.95" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="whatsapp" data-to="extension" data-label="postMessage">
+  <rect x="683.0099999999998" y="151.35" width="82.39600000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="724.2079999999997" y="166.5" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">postMessage</text>
+</g>
+<g class="edge-label" data-from="meta" data-to="falta" data-label="Sin Meta Graph API">
+  <rect x="657.4679999999998" y="446.2416666666667" width="107.93800000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="711.4369999999999" y="461.39166666666665" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Sin Meta Graph API</text>
+</g>
+<g class="node" data-id="social" data-label="INCOMPLETO · /gestion/social · alta y consulta" data-shape="rectangle">
+  <rect x="48.150999999999954" y="164.38333333333335" width="319.8249999999999" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="208.0634999999999" y="182.83333333333337" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">INCOMPLETO · /gestion/social · alta y consulta</text>
+</g>
+<g class="node" data-id="general" data-label="INCOMPLETO · /gestion/marketing · borrador" data-shape="rectangle">
+  <rect x="48.150999999999954" y="231.28333333333336" width="313.8969999999999" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="205.0994999999999" y="249.73333333333335" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">INCOMPLETO · /gestion/marketing · borrador</text>
+</g>
+<g class="node" data-id="whatsapp" data-label="INCOMPLETO · /gestion/marketing/whatsapp" data-shape="rectangle">
+  <rect x="48.150999999999954" y="97.48333333333335" width="307.22799999999995" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="201.76499999999993" y="115.93333333333335" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">INCOMPLETO · /gestion/marketing/whatsapp</text>
+</g>
+<g class="node" data-id="meta" data-label="INCOMPLETO · /gestion/marketing/meta-ads" data-shape="rectangle">
+  <rect x="48.150999999999954" y="298.1833333333334" width="303.52299999999997" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="199.91249999999994" y="316.6333333333334" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">INCOMPLETO · /gestion/marketing/meta-ads</text>
+</g>
+<g class="node" data-id="plan" data-label="theory-compiler · campaign-planner" data-shape="rectangle">
+  <rect x="483.12174999999985" y="301.44166666666666" width="252.39399999999998" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="609.3187499999998" y="319.89166666666665" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">theory-compiler · campaign-planner</text>
+</g>
+<g class="node" data-id="drives" data-label="google-drive · google-drive-callback" data-shape="rectangle">
+  <rect x="483.12174999999985" y="368.3416666666667" width="257.5809999999999" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="611.9122499999999" y="386.7916666666667" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">google-drive · google-drive-callback</text>
+</g>
+<g class="node" data-id="registro" data-label="socialLeads · campaigns" data-shape="cylinder">
+  <rect x="837.4059999999997" y="222.8" width="191.63199999999995" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="837.4059999999997" y1="222.8" x2="837.4059999999997" y2="259.70000000000005" stroke="#92400E" stroke-width="2px" />
+  <line x1="1029.0379999999996" y1="222.8" x2="1029.0379999999996" y2="259.70000000000005" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="933.2219999999998" cy="259.70000000000005" rx="95.81599999999997" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="933.2219999999998" cy="222.8" rx="95.81599999999997" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="933.2219999999998" y="241.25" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">socialLeads · campaigns</text>
+</g>
+<g class="node" data-id="campanias" data-label="whatsappCampaigns" data-shape="cylinder">
+  <rect x="837.4059999999997" y="75" width="163.474" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="837.4059999999997" y1="75" x2="837.4059999999997" y2="111.9" stroke="#92400E" stroke-width="2px" />
+  <line x1="1000.8799999999997" y1="75" x2="1000.8799999999997" y2="111.9" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="919.1429999999997" cy="111.9" rx="81.737" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="919.1429999999997" cy="75" rx="81.737" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="919.1429999999997" y="93.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">whatsappCampaigns</text>
+</g>
+<g class="node" data-id="extension" data-label="Extensión privada Chrome · WhatsApp" data-shape="stadium">
+  <rect x="837.4059999999997" y="148.89999999999998" width="269.437" height="36.900000000000006" rx="18.450000000000003" ry="18.450000000000003" fill="#475569" stroke="#334155" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="972.1244999999997" y="167.34999999999997" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Extensión privada Chrome · WhatsApp</text>
+</g>
+<g class="node" data-id="ia" data-label="OpenAI" data-shape="stadium">
+  <rect x="837.4059999999997" y="296.7" width="84.928" height="36.900000000000006" rx="18.450000000000003" ry="18.450000000000003" fill="#475569" stroke="#334155" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="879.8699999999997" y="315.15" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">OpenAI</text>
+</g>
+<g class="node" data-id="drive" data-label="Google Drive · OAuth y archivos" data-shape="stadium">
+  <rect x="837.4059999999997" y="363.6" width="230.905" height="36.900000000000006" rx="18.450000000000003" ry="18.450000000000003" fill="#475569" stroke="#334155" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="952.8584999999997" y="382.05" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Google Drive · OAuth y archivos</text>
+</g>
+<g class="node" data-id="falta" data-label="SOLO UI · Validación, render, publicación y resultados" data-shape="rectangle">
+  <rect x="837.4059999999997" y="430.5" width="361.32099999999986" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="1018.0664999999997" y="448.95" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">SOLO UI · Validación, render, publicación y resultados</text>
+</g>
+</svg>
