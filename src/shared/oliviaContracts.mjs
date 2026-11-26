@@ -219,6 +219,14 @@ export function defaultOliviaConfiguration(env = {}) {
     responseLimits: { maxOutputTokens: 2400, maxToolCalls: 12, maxRounds: 8, timeoutMs: 45000, providerTimeoutMs: 20000 },
     voiceProtocol: "chirp",
     conversationLatency: { enabled: true, transcriptionDelay: "minimal" },
+    hybridVoice: {
+      enabled: env.OLIVIA_HYBRID_LIVE_ENABLED === "true",
+      targetUsd: 5,
+      warningUsd: 6,
+      hardLimitUsd: 10,
+      maxSessionSeconds: 600,
+      reservedUsdPerSession: 0.5,
+    },
     naturalVoice: {
       enabled: true,
       voice: "es-US-Chirp3-HD-Aoede",
@@ -253,8 +261,8 @@ export function defaultOliviaConfiguration(env = {}) {
     forecast: { safetyStockPercent: 20 },
   };
 }
-export function validateConfiguration(value) {
-  const defaults = defaultOliviaConfiguration();
+export function validateConfiguration(value, env = {}) {
+  const defaults = defaultOliviaConfiguration(env);
   const legacyVoiceKeys = ["voiceProtocol", "liveUsdPerMinute"];
   if (
     !value ||
@@ -269,6 +277,17 @@ export function validateConfiguration(value) {
   clean.voiceProtocol = "chirp";
   clean.conversationLatency = { ...defaults.conversationLatency, ...clean.conversationLatency };
   validateSchema(clean.conversationLatency, { type: "object", additionalProperties: false, required: ["enabled", "transcriptionDelay"], properties: { enabled: { type: "boolean" }, transcriptionDelay: { type: "string", enum: ["minimal", "low"] } } });
+  clean.hybridVoice = { ...defaults.hybridVoice, ...clean.hybridVoice };
+  validateSchema(clean.hybridVoice, object({
+    enabled: { type: "boolean" },
+    targetUsd: { type: "number", minimum: 1, maximum: 100 },
+    warningUsd: { type: "number", minimum: 1, maximum: 100 },
+    hardLimitUsd: { type: "number", minimum: 1, maximum: 100 },
+    maxSessionSeconds: { type: "integer", minimum: 60, maximum: 600 },
+    reservedUsdPerSession: { type: "number", minimum: 0.005, maximum: 1 },
+  }));
+  if (clean.hybridVoice.warningUsd < clean.hybridVoice.targetUsd || clean.hybridVoice.hardLimitUsd < clean.hybridVoice.warningUsd)
+    throw oliviaError("invalid-configuration", "El objetivo, aviso y techo de Gemini deben estar en orden.");
   delete clean.liveUsdPerMinute;
   // Read-time migration only: old expensive administrative profiles cannot
   // silently survive the new policy. No production document is rewritten.
@@ -442,6 +461,12 @@ export function retentionDate(months, now = new Date()) {
   return date;
 }
 export function costForUsage(usage, configuration) {
+  if (usage.billingUnit === "gemini-live-audio") {
+    const input = Number.isFinite(usage.inputAudioSeconds) ? usage.inputAudioSeconds : null;
+    const output = Number.isFinite(usage.outputAudioSeconds) ? usage.outputAudioSeconds : null;
+    const usd = input != null && output != null ? input * 0.005 / 60 + output * 0.018 / 60 : null;
+    return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null };
+  }
   if (usage.billingUnit === "audio-seconds") {
     const usd = Number.isFinite(usage.durationSeconds) ? usage.durationSeconds * 0.0045 / 60 : null;
     return { actualCostUsd: usd, actualCostArs: usd != null && configuration.officialDollarSellRate ? usd * configuration.officialDollarSellRate * 1.05 : null };

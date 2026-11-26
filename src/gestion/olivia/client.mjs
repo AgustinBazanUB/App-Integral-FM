@@ -169,6 +169,7 @@ export function createOliviaTransport({ getToken, fetchImpl = globalThis.fetch, 
       return send("/.netlify/functions/olivia", payload, options);
     },
     knowledge: (payload, options) => send("/.netlify/functions/olivia-knowledge", payload, options),
+    hybridLive: (payload, options) => send("/.netlify/functions/olivia-gemini-live", payload, options),
     liveTranscription: (payload, options) => send("/.netlify/functions/olivia-live-transcribe",payload,options),
     fastSpeech: (payload, options) => send("/.netlify/functions/olivia-fast-speech",payload,options),
     speechAudio: async (payload,{signal}={}) => {

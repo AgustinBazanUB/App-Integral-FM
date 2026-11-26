@@ -75,6 +75,20 @@ function voiceFixture({ denied = false, adaptiveEndpointing = false } = {}) {
   return { voice, turns, levels, errors, tracks, context, trackEvents, contextEvents, requested: () => requested, tick(t, a) { now = t; amplitude = a; frames.shift()?.(); } };
 }
 
+test('microphone capture becomes available while the live provider is still connecting', async () => {
+  const f = voiceFixture(); let resolveProvider;
+  f.voice.createTranscriber = () => new Promise(resolve => { resolveProvider = resolve; });
+  await f.voice.start();
+  assert.equal(f.requested(), 1);
+  assert.equal(f.voice.closed, false);
+  assert.equal(f.voice.recorder.state, 'recording');
+  assert.equal(f.voice.transcriber, undefined);
+  resolveProvider({ handlesTurns: true, ready: true, close() { this.closed = true; } });
+  await f.voice.transcriberReady;
+  assert.equal(f.voice.transcriber.handlesTurns, true);
+  f.voice.close();
+});
+
 test('browser revocation or suspended audio ends capture truthfully and permits a fresh explicit session', async () => {
   for (const cause of ['track-ended', 'suspended']) {
     const f = voiceFixture(); await f.voice.start();
@@ -107,21 +121,21 @@ test('natural pauses stay in one turn, acoustic continuations extend to 3–4s, 
 test('incomplete live partials extend silence and final live text bypasses duplicate file transcription',async()=>{
   const f=voiceFixture();let commits=0;
   f.voice.createTranscriber=async(_stream,onPartial)=>{onPartial('Necesito el stock de');return {closed:false,beginTurn(){onPartial('Necesito el stock de');},commit:async()=>{commits++;return {text:'Necesito el stock de aceite',itemId:'item-a'};},close(){this.closed=true;}};};
-  await f.voice.start();f.tick(100,.1);f.tick(2200,0);assert.equal(f.turns.length,0);f.tick(4200,0);await new Promise(resolve=>setImmediate(resolve));
+  await f.voice.start();await f.voice.transcriberReady;f.tick(100,.1);f.tick(2200,0);assert.equal(f.turns.length,0);f.tick(4200,0);await new Promise(resolve=>setImmediate(resolve));
   assert.equal(commits,1);assert.equal(f.turns[0].metadata.transcript.text,'Necesito el stock de aceite');assert.equal(f.requested(),1);f.voice.close();
 });
 
 test('live setup failure preserves the same authorized capture and releases setup when ended',async()=>{
   const f=voiceFixture(),notices=[];
   f.voice.createTranscriber=async()=>{throw Error('Unavailable');};f.voice.onNotice=text=>notices.push(text);
-  await f.voice.start();assert.equal(f.requested(),1);assert.equal(f.voice.closed,false);assert.equal(notices.length,1);
+  await f.voice.start();await f.voice.transcriberReady;assert.equal(f.requested(),1);assert.equal(f.voice.closed,false);assert.equal(notices.length,1);
   f.tick(100,.1);f.voice.finishTurn();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.turns.length,1);assert.equal(f.turns[0].metadata.transcript,undefined);f.voice.close();
 });
 
 test('out-of-order live finals are delivered chronologically and mute discards provider input',async()=>{
   const f=voiceFixture(),resolvers=[];let discards=0;
   f.voice.createTranscriber=async()=>({closed:false,beginTurn(){},commit:()=>new Promise(resolve=>resolvers.push(resolve)),discardTurn(){discards++;},close(){this.closed=true;}});
-  await f.voice.start();f.tick(100,.1);f.voice.finishTurn();f.tick(200,.1);f.voice.finishTurn();
+  await f.voice.start();await f.voice.transcriberReady;f.tick(100,.1);f.voice.finishTurn();f.tick(200,.1);f.voice.finishTurn();
   resolvers[1]({text:'Después cliente'});await new Promise(resolve=>setImmediate(resolve));assert.equal(f.turns.length,0);
   resolvers[0]({text:'Primero stock'});await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(f.turns.map(x=>x.metadata.transcript.text),['Primero stock','Después cliente']);
   f.tick(300,.1);f.voice.setMuted(true);assert.ok(discards>0);assert.equal(f.tracks[0].enabled,false);f.voice.close();
