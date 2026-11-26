@@ -1,32 +1,35 @@
 flowchart TB
-    %% Flujo del macro-dominio verificado contra el corte d0f1225.
-    subgraph navegador["Navegador · E-Commerce y Gestión"]
-        oferta["/tienda · /productos · /producto/:slug"]:::ecommerce
-        checkout["Carrito y /checkout · retiro"]:::ecommerce
-        local[("localStorage · carrito y borrador")]:::db
-        gestion["/gestion/ecommerce · consulta de hasta 40"]:::integral
-        separado["INCOMPLETO · dist/ecommerce sin Functions"]:::debt
+    %% La tienda consulta existencias y guarda un pedido pendiente.
+    subgraph navegador["En tu navegador o celular"]
+        carrito["Carrito y confirmación para retiro"]:::ecommerce
+        gestion["Consulta de los últimos 40 pedidos"]:::integral
+        oferta["Portada, catálogo y ficha de producto"]:::ecommerce
+        aislada["Tienda aislada sin servidor"]:::debt
+        memoria[("Carrito y borrador en tu dispositivo")]:::db
     end
-
-    subgraph servidor["Servidor · app unificada"]
-        catalogo["ecommerce-catalog"]:::shared
-        crear["ecommerce-checkout"]:::shared
-        simular["ecommerce-simulated-payment · admin local"]:::shared
+    subgraph servidor["En el servidor seguro"]
+        catalogo["Consulta de productos disponibles"]:::shared
+        recibir["Recepción de pedidos web"]:::shared
     end
-
-    subgraph persistencia["Persistencia · Firestore"]
-        stock[("products · locationStock de un origen")]:::db
-        pedido[("orders · payments pendientes")]:::db
-        faltante["INCOMPLETO · Sin Payway, domicilio ni reserva"]:::debt
-        cierre[("sales · stock · invoices sin CAE")]:::db
+    subgraph datos["Base de datos y pasos pendientes"]
+        stock[("Productos y stock de un local")]:::db
+        pendiente[("Pedido pendiente de pago")]:::db
+        falta["Sin reserva de stock, Payway ni envío a domicilio"]:::debt
     end
-
-    oferta --> catalogo --> stock
-    checkout --> local
-    checkout --> crear --> pedido
-    gestion -->|Lee orders| pedido
-    pedido -.-> faltante
-    checkout -.->|Admin local habilitado| simular --> cierre
+    subgraph prueba["Solo en una prueba local"]
+        venta[("Venta, salida de stock y borrador fiscal")]:::db
+        simular["Prueba local de administrador"]:::shared
+    end
+    oferta -.->|"Pierde conexión en versión aislada"| aislada
+    carrito -->|"Recuerda la selección y los datos"| memoria
+    recibir -->|"Guarda el pedido sin cobrar"| pendiente
+    carrito -->|"Confirma el retiro"| recibir
+    pendiente -.->|"Permite simular el pago solo en local"| simular
+    gestion -->|"Lee pedidos recientes"| pendiente
+    oferta -->|"Pide los productos y su disponibilidad"| catalogo
+    simular -->|"Registra venta y prepara borrador"| venta
+    pendiente -.->|"Se detiene antes del cobro"| falta
+    catalogo -->|"Lee existencias de un local"| stock
 
     classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
     classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px

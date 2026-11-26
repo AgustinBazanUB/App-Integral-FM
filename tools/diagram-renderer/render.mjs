@@ -4,18 +4,18 @@ import { renderMermaidSVG, THEMES } from "beautiful-mermaid";
 const diagrams = [
   [
     "00-macro-a-frontera-fisica",
-    "Frontera física",
-    "Dónde se ejecuta cada superficie y qué servicios alcanza."
+    "Pantallas, servidor y datos",
+    "Qué se guarda en el celular, qué se envía al servidor y qué llega a la nube."
   ],
   [
     "00-macro-b-macro-dominios",
-    "Mapa de macrodominios",
-    "Ocho áreas de trabajo sobre la persistencia y los servicios de Flor Mía."
+    "Cómo se conectan las áreas",
+    "Cómo comparten productos, ventas, envíos y datos las áreas de Flor Mía."
   ],
   [
     "00-macro-c-quiebre-venta-fisica-vs-web",
-    "Venta física y pedido web",
-    "Qué se registra y cuándo cambia el stock por cada canal."
+    "Venta en local y compra en tienda web",
+    "El pedido web queda pendiente antes del cobro y sin reservar stock."
   ],
   [
     "01-d1-catalogo-inventario",
@@ -24,7 +24,7 @@ const diagrams = [
   ],
   [
     "02-d2-ventas-pos-crm",
-    "Ventas POS y CRM",
+    "Ventas y clientes",
     "Cómo se registra una venta y se recupera una operación sin conexión."
   ],
   [
@@ -39,7 +39,7 @@ const diagrams = [
   ],
   [
     "05-d5-ecommerce-pedidos-web",
-    "E-Commerce y pedidos web",
+    "Tienda online y pedidos web",
     "Dónde se interrumpe el pedido y qué permite la simulación local."
   ],
   [
@@ -49,7 +49,7 @@ const diagrams = [
   ],
   [
     "07-d7-olivia-ia",
-    "Olivia IA",
+    "Asistente IA Olivia",
     "Cómo se conectan conversación, voz, conocimiento y retención."
   ],
   [
@@ -114,6 +114,12 @@ for (const [id, title, description] of diagrams) {
   if (labels.length < 1 || labels.length > 12 || labels.sort().join("\n") !== renderedLabels.sort().join("\n")) {
     throw new Error(id + ": hay nodos omitidos, etiquetas alteradas o más de 12 nodos.");
   }
+  const sourceArrows = [...source.matchAll(/(?:-->|-\.->)\|"([^"]+)"\|/g)];
+  const svgArrows = [...svg.matchAll(/<polyline class="edge" [^>]*>/g)];
+  if (sourceArrows.length !== svgArrows.length || svgArrows.some(([edge]) => !/data-label="[^"]+"/.test(edge))) {
+    throw new Error(id + ": faltan etiquetas en una o más flechas.");
+  }
+
   const [, width, height] = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/) || [];
   if (!(Number(width) > 0 && Number(height) > 0)) throw new Error(id + ": viewBox inválido.");
 

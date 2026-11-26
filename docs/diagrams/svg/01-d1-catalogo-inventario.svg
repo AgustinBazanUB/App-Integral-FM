@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1249.174 469.2416666666667" width="1249.174" height="469.2416666666667" style="--bg:#ffffff;--fg:#1f2328;--line:#8793A3;--accent:#0969da;--muted:#59636e;background:var(--bg)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1267.8279999999997 798.5" width="1267.8279999999997" height="798.5" style="--bg:#ffffff;--fg:#1f2328;--line:#8793A3;--accent:#0969da;--muted:#59636e;background:var(--bg)">
 <style>
 
   text { font-family: 'Arial', system-ui, sans-serif; }
@@ -26,96 +26,124 @@
     <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
   </marker>
 </defs>
-<g class="subgraph" data-id="navegador" data-label="Navegador · Gestión">
-  <rect x="24" y="85.875" width="561.8889999999999" height="264.15000000000003" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
-  <rect x="24" y="85.875" width="561.8889999999999" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
-  <text x="36" y="99.875" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Navegador · Gestión</text>
+<g class="subgraph" data-id="navegador" data-label="En tu navegador o celular">
+  <rect x="255.59899999999982" y="24" width="807.7225" height="262.1" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="255.59899999999982" y="24" width="807.7225" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="267.5989999999998" y="38" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">En tu navegador o celular</text>
 </g>
-<g class="subgraph" data-id="servidor" data-label="Servidor · Netlify">
-  <rect x="651.8889999999999" y="24" width="157.683" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
-  <rect x="651.8889999999999" y="24" width="157.683" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
-  <text x="663.8889999999999" y="38" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Servidor · Netlify</text>
+<g class="subgraph" data-id="servidor" data-label="En el servidor seguro">
+  <rect x="451.8209999999999" y="426.40000000000003" width="229.55999999999997" height="96.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="451.8209999999999" y="426.40000000000003" width="229.55999999999997" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="463.8209999999999" y="440.40000000000003" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">En el servidor seguro</text>
 </g>
-<g class="subgraph" data-id="persistencia" data-label="Persistencia · Firestore">
-  <rect x="875.5719999999999" y="24.74166666666666" width="349.602" height="420.5" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
-  <rect x="875.5719999999999" y="24.74166666666666" width="349.602" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
-  <text x="887.5719999999999" y="38.74166666666666" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Persistencia · Firestore</text>
+<g class="subgraph" data-id="datos" data-label="Base de datos">
+  <rect x="24" y="663.5999999999999" width="1219.8279999999997" height="110.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="24" y="663.5999999999999" width="1219.8279999999997" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="36" y="677.5999999999999" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Base de datos</text>
 </g>
-<polyline class="edge" data-from="productos" data-to="merge" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="556.9214999999999,142.175 633.8889999999999,142.175 633.8889999999999,86.44999999999999 667.8889999999999,86.44999999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
-<polyline class="edge" data-from="merge" data-to="maestro" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="793.5719999999999,86.45 857.5719999999999,86.45 857.5719999999999,85.70833333333334 891.5719999999999,85.70833333333333" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
-<polyline class="edge" data-from="productos" data-to="maestro" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Alta y edición SDK" points="556.9214999999999,154.47500000000002 708.9799999999999,154.47500000000002 708.9799999999999,161.9 857.5719999999999,161.9 857.5719999999999,102.67500000000001 891.5719999999999,102.67500000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
-<polyline class="edge" data-from="operaciones" data-to="existencias" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="565.0725,282.125 728.3222499999999,282.125 728.3222499999999,322.8916666666667 891.5719999999999,322.8916666666667" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
-<polyline class="edge" data-from="operaciones" data-to="movimientos" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="565.0725,282.125 728.3222499999999,282.125 728.3222499999999,403.7916666666667 891.5719999999999,403.7916666666667" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
-<polyline class="edge" data-from="proveedores" data-to="fichas" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="582.8564999999999,209.07500000000002 857.5719999999999,209.07500000000002 857.5719999999999,182.20000000000002 857.5719999999999,182.20000000000002 857.5719999999999,175.0916666666667 891.5719999999999,175.0916666666667" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
-<polyline class="edge" data-from="proveedores" data-to="compras" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="Compra sin pantalla" points="582.8564999999999,221.375 702.4459999999998,221.375 702.4459999999998,248.25 857.5719999999999,248.25 857.5719999999999,248.99166666666667 891.5719999999999,248.99166666666667" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
-<polyline class="edge" data-from="ubicacion" data-to="operaciones" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="259.41949999999997,248.675 309.02,248.675 309.02,282.125 337.13149999999996,282.125" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
-<polyline class="edge" data-from="depositos" data-to="operaciones" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="280.9085,315.575 309.02,315.575 309.02,282.125 337.13149999999996,282.125" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
-<g class="edge-label" data-from="productos" data-to="maestro" data-label="Alta y edición SDK">
-  <rect x="716.9799999999999" y="145.9" width="102.592" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
-  <text x="768.276" y="161.05" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Alta y edición SDK</text>
+<polyline class="edge" data-from="productos" data-to="unir" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Solicita la unión" points="636.4318333333331,270.1 636.4318333333332,334.1 566.6009999999999,334.1 566.6009999999999,470.40000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="cambios" data-to="historial" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Deja constancia de cada cambio" points="400.72083333333313,270.1 400.72083333333313,396.40000000000003 158.05083333333323,396.40000000000003 158.05083333333323,645.5999999999999 164.71499999999997,645.5999999999999 164.71499999999992,707.5999999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="cambios" data-to="cantidad" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Actualiza cantidades" points="471.26716666666647,270.1 471.2671666666665,408.40000000000003 364.87733333333324,408.40000000000003 364.87733333333324,645.5999999999999 433.02999999999986,645.5999999999999 433.02999999999986,707.5999999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="productos" data-to="catalogo" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Guarda altas y cambios" points="701.0501666666664,270.1 701.0501666666665,571.3 770.8809999999999,571.3 770.8809999999999,645.5999999999999 699.4446666666665,645.5999999999999 699.4446666666665,707.5999999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="unir" data-to="catalogo" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Consolida las fichas" points="566.6009999999999,507.30000000000007 566.6009999999999,645.5999999999999 638.0373333333332,645.5999999999999 638.0373333333332,707.5999999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="proveedores" data-to="compras" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="No permite gestionar compras" points="879.5528333333331,270.1 879.5528333333332,571.3 945.9401666666665,571.3 945.9401666666665,645.5999999999999 903.7109999999998,645.5999999999999 903.7109999999999,707.5999999999999" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="proveedores" data-to="fichas" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Muestra las fichas" points="963.4371666666664,270.1 963.4371666666664,571.3 1129.8041666666663,571.3 1129.8041666666663,645.5999999999999 1137.1989999999996,645.5999999999999 1137.1989999999996,707.5999999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="depositos" data-to="cambios" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Permite ingresar o trasladar" points="348.14899999999983,104.9 348.1489999999998,191.2 400.7208333333332,191.2 400.7208333333332,233.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="locales" data-to="cambios" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Permite mover o ajustar" points="523.8389999999998,104.9 523.8389999999998,191.2 471.2671666666665,191.2 471.2671666666665,233.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="productos" data-to="unir" data-label="Solicita la unión">
+  <rect x="521.1009999999999" y="341.1" width="90.11800000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="566.1599999999999" y="356.25" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Solicita la unión</text>
 </g>
-<g class="edge-label" data-from="proveedores" data-to="compras" data-label="Compra sin pantalla">
-  <rect x="710.4459999999998" y="232.25" width="109.12600000000003" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
-  <text x="765.0089999999998" y="247.4" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Compra sin pantalla</text>
+<g class="edge-label" data-from="cambios" data-to="historial" data-label="Deja constancia de cada cambio">
+  <rect x="74.05083333333324" y="578.3" width="167.33800000000005" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="157.71983333333327" y="593.4499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Deja constancia de cada cambio</text>
 </g>
-<g class="node" data-id="productos" data-label="Productos · /gestion/products" data-shape="rectangle">
-  <rect x="337.13149999999996" y="129.875" width="219.79" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
-  <text x="447.02649999999994" y="148.325" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Productos · /gestion/products</text>
+<g class="edge-label" data-from="cambios" data-to="cantidad" data-label="Actualiza cantidades">
+  <rect x="306.87733333333324" y="578.3" width="115.66000000000001" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="364.7073333333332" y="593.4499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Actualiza cantidades</text>
 </g>
-<g class="node" data-id="ubicacion" data-label="/gestion/locations/:locationId" data-shape="rectangle">
-  <rect x="50.744500000000016" y="230.22500000000002" width="208.67499999999995" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
-  <text x="155.082" y="248.675" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">/gestion/locations/:locationId</text>
+<g class="edge-label" data-from="productos" data-to="catalogo" data-label="Guarda altas y cambios">
+  <rect x="707.3809999999999" y="578.3" width="126.35200000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="770.5569999999999" y="593.4499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Guarda altas y cambios</text>
 </g>
-<g class="node" data-id="depositos" data-label="Depósitos · /gestion/warehouse" data-shape="rectangle">
-  <rect x="50.744500000000016" y="297.125" width="230.164" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
-  <text x="165.8265" y="315.575" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Depósitos · /gestion/warehouse</text>
+<g class="edge-label" data-from="unir" data-to="catalogo" data-label="Consolida las fichas">
+  <rect x="510.60099999999983" y="578.3" width="111.50200000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="566.3519999999999" y="593.4499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Consolida las fichas</text>
 </g>
-<g class="node" data-id="proveedores" data-label="INCOMPLETO · /gestion/suppliers" data-shape="rectangle">
-  <rect x="337.13149999999996" y="196.775" width="245.72499999999994" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
-  <text x="459.9939999999999" y="215.22500000000002" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">INCOMPLETO · /gestion/suppliers</text>
+<g class="edge-label" data-from="proveedores" data-to="compras" data-label="No permite gestionar compras">
+  <rect x="866.9401666666665" y="578.3" width="157.24000000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="945.5601666666665" y="593.4499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">No permite gestionar compras</text>
 </g>
-<g class="node" data-id="operaciones" data-label="SDK · ingreso, ajuste y traslado" data-shape="rectangle">
-  <rect x="337.13149999999996" y="263.675" width="227.94099999999997" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
-  <text x="451.102" y="282.125" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">SDK · ingreso, ajuste y traslado</text>
+<g class="edge-label" data-from="proveedores" data-to="fichas" data-label="Muestra las fichas">
+  <rect x="1077.8041666666663" y="578.3" width="103.78000000000003" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="1129.6941666666664" y="593.4499999999999" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Muestra las fichas</text>
 </g>
-<g class="node" data-id="merge" data-label="catalog-merge" data-shape="rectangle">
-  <rect x="667.8889999999999" y="68" width="125.68299999999999" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
-  <text x="730.7304999999999" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">catalog-merge</text>
+<g class="edge-label" data-from="depositos" data-to="cambios" data-label="Permite ingresar o trasladar">
+  <rect x="272.6489999999998" y="153.9" width="150.11200000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="347.7049999999998" y="169.05" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Permite ingresar o trasladar</text>
 </g>
-<g class="node" data-id="maestro" data-label="products · productCategories" data-shape="cylinder">
-  <rect x="891.5719999999999" y="75.74166666666666" width="218.308" height="36.900000000000006" fill="#B45309" stroke="none" />
-  <line x1="891.5719999999999" y1="75.74166666666666" x2="891.5719999999999" y2="112.64166666666667" stroke="#92400E" stroke-width="2px" />
-  <line x1="1109.8799999999999" y1="75.74166666666666" x2="1109.8799999999999" y2="112.64166666666667" stroke="#92400E" stroke-width="2px" />
-  <ellipse cx="1000.7259999999999" cy="112.64166666666667" rx="109.154" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
-  <ellipse cx="1000.7259999999999" cy="75.74166666666666" rx="109.154" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
-  <text x="1000.7259999999999" y="94.19166666666666" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">products · productCategories</text>
+<g class="edge-label" data-from="locales" data-to="cambios" data-label="Permite mover o ajustar">
+  <rect x="459.8389999999999" y="153.9" width="127.54000000000003" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="523.6089999999999" y="169.05" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Permite mover o ajustar</text>
 </g>
-<g class="node" data-id="existencias" data-label="locationStock e items · warehouseStock e items" data-shape="cylinder">
-  <rect x="891.5719999999999" y="304.4416666666667" width="317.602" height="36.900000000000006" fill="#B45309" stroke="none" />
-  <line x1="891.5719999999999" y1="304.4416666666667" x2="891.5719999999999" y2="341.3416666666667" stroke="#92400E" stroke-width="2px" />
-  <line x1="1209.174" y1="304.4416666666667" x2="1209.174" y2="341.3416666666667" stroke="#92400E" stroke-width="2px" />
-  <ellipse cx="1050.3729999999998" cy="341.3416666666667" rx="158.801" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
-  <ellipse cx="1050.3729999999998" cy="304.4416666666667" rx="158.801" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
-  <text x="1050.3729999999998" y="322.8916666666667" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">locationStock e items · warehouseStock e items</text>
+<g class="node" data-id="depositos" data-label="Stock de depósitos" data-shape="rectangle">
+  <rect x="271.5989999999998" y="68" width="153.1" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="348.14899999999983" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Stock de depósitos</text>
 </g>
-<g class="node" data-id="movimientos" data-label="stockMovements · stockTransfers" data-shape="cylinder">
-  <rect x="891.5719999999999" y="385.3416666666667" width="247.20699999999997" height="36.900000000000006" fill="#B45309" stroke="none" />
-  <line x1="891.5719999999999" y1="385.3416666666667" x2="891.5719999999999" y2="422.2416666666667" stroke="#92400E" stroke-width="2px" />
-  <line x1="1138.7789999999998" y1="385.3416666666667" x2="1138.7789999999998" y2="422.2416666666667" stroke="#92400E" stroke-width="2px" />
-  <ellipse cx="1015.1754999999998" cy="422.2416666666667" rx="123.60349999999998" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
-  <ellipse cx="1015.1754999999998" cy="385.3416666666667" rx="123.60349999999998" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
-  <text x="1015.1754999999998" y="403.7916666666667" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">stockMovements · stockTransfers</text>
+<g class="node" data-id="proveedores" data-label="Pantalla de proveedores incompleta" data-shape="rectangle">
+  <rect x="795.6684999999998" y="233.2" width="251.65299999999996" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="921.4949999999998" y="251.64999999999998" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Pantalla de proveedores incompleta</text>
 </g>
-<g class="node" data-id="fichas" data-label="suppliers" data-shape="cylinder">
-  <rect x="891.5719999999999" y="156.64166666666665" width="98.266" height="36.900000000000006" fill="#B45309" stroke="none" />
-  <line x1="891.5719999999999" y1="156.64166666666665" x2="891.5719999999999" y2="193.54166666666666" stroke="#92400E" stroke-width="2px" />
-  <line x1="989.8379999999999" y1="156.64166666666665" x2="989.8379999999999" y2="193.54166666666666" stroke="#92400E" stroke-width="2px" />
-  <ellipse cx="940.7049999999999" cy="193.54166666666666" rx="49.133" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
-  <ellipse cx="940.7049999999999" cy="156.64166666666665" rx="49.133" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
-  <text x="940.7049999999999" y="175.09166666666664" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">suppliers</text>
+<g class="node" data-id="productos" data-label="Cargar y editar productos" data-shape="rectangle">
+  <rect x="571.8134999999999" y="233.2" width="193.855" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="668.7409999999999" y="251.64999999999998" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Cargar y editar productos</text>
 </g>
-<g class="node" data-id="compras" data-label="INCOMPLETO · purchases solo en backend" data-shape="rectangle">
-  <rect x="891.5719999999999" y="230.54166666666669" width="302.782" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
-  <text x="1042.963" y="248.99166666666667" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">INCOMPLETO · purchases solo en backend</text>
+<g class="node" data-id="cambios" data-label="Ingresos, ajustes y traslados" data-shape="rectangle">
+  <rect x="330.17449999999985" y="233.2" width="211.639" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="435.99399999999986" y="251.64999999999998" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Ingresos, ajustes y traslados</text>
+</g>
+<g class="node" data-id="locales" data-label="Stock de locales" data-shape="rectangle">
+  <rect x="454.69899999999984" y="68" width="138.28" height="36.900000000000006" rx="0" ry="0" fill="#1D4ED8" stroke="#1E40AF" stroke-width="2px" />
+  <text x="523.8389999999998" y="86.45" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Stock de locales</text>
+</g>
+<g class="node" data-id="unir" data-label="Unir productos duplicados" data-shape="rectangle">
+  <rect x="467.8209999999999" y="470.40000000000003" width="197.55999999999997" height="36.900000000000006" rx="0" ry="0" fill="#6D28D9" stroke="#5B21B6" stroke-width="2px" />
+  <text x="566.6009999999999" y="488.85" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Unir productos duplicados</text>
+</g>
+<g class="node" data-id="compras" data-label="Compras sin pantalla de gestión" data-shape="rectangle">
+  <rect x="790.8519999999999" y="707.5999999999999" width="225.718" height="36.900000000000006" rx="0" ry="0" fill="#B91C1C" stroke="#7F1D1D" stroke-dasharray="5 4" stroke-width="2px" />
+  <text x="903.7109999999999" y="726.05" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Compras sin pantalla de gestión</text>
+</g>
+<g class="node" data-id="cantidad" data-label="Existencias por local y depósito" data-shape="cylinder">
+  <rect x="319.42999999999995" y="714.5999999999999" width="227.19999999999996" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="319.42999999999995" y1="714.5999999999999" x2="319.42999999999995" y2="751.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <line x1="546.6299999999999" y1="714.5999999999999" x2="546.6299999999999" y2="751.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="433.0299999999999" cy="751.4999999999999" rx="113.59999999999998" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="433.0299999999999" cy="714.5999999999999" rx="113.59999999999998" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="433.0299999999999" y="733.05" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Existencias por local y depósito</text>
+</g>
+<g class="node" data-id="catalogo" data-label="Productos y categorías" data-shape="cylinder">
+  <rect x="576.6299999999999" y="714.5999999999999" width="184.22199999999998" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="576.6299999999999" y1="714.5999999999999" x2="576.6299999999999" y2="751.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <line x1="760.8519999999999" y1="714.5999999999999" x2="760.8519999999999" y2="751.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="668.7409999999999" cy="751.4999999999999" rx="92.11099999999999" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="668.7409999999999" cy="714.5999999999999" rx="92.11099999999999" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="668.7409999999999" y="733.05" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Productos y categorías</text>
+</g>
+<g class="node" data-id="fichas" data-label="Fichas de proveedores" data-shape="cylinder">
+  <rect x="1046.5699999999997" y="714.5999999999999" width="181.25799999999998" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="1046.5699999999997" y1="714.5999999999999" x2="1046.5699999999997" y2="751.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <line x1="1227.8279999999997" y1="714.5999999999999" x2="1227.8279999999997" y2="751.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="1137.1989999999996" cy="751.4999999999999" rx="90.62899999999999" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="1137.1989999999996" cy="714.5999999999999" rx="90.62899999999999" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="1137.1989999999996" y="733.05" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Fichas de proveedores</text>
+</g>
+<g class="node" data-id="historial" data-label="Historial de movimientos y traslados" data-shape="cylinder">
+  <rect x="40" y="714.5999999999999" width="249.42999999999995" height="36.900000000000006" fill="#B45309" stroke="none" />
+  <line x1="40" y1="714.5999999999999" x2="40" y2="751.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <line x1="289.42999999999995" y1="714.5999999999999" x2="289.42999999999995" y2="751.4999999999999" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="164.71499999999997" cy="751.4999999999999" rx="124.71499999999997" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <ellipse cx="164.71499999999997" cy="714.5999999999999" rx="124.71499999999997" ry="7" fill="#B45309" stroke="#92400E" stroke-width="2px" />
+  <text x="164.71499999999997" y="733.05" text-anchor="middle" font-size="13" font-weight="500" fill="#FFFFFF" dy="4.55">Historial de movimientos y traslados</text>
 </g>
 </svg>

@@ -18,47 +18,42 @@ La suite describe la operación del corte auditado. Parte del [Relevamiento func
 | `external` | `#475569` | Servicios externos · borde punteado |
 | `debt` | `#B91C1C` | Brecha o flujo incompleto · borde punteado |
 
-Las flechas sólidas representan una invocación o un camino de datos. Las punteadas indican un camino condicionado, de enlace o una brecha. La etiqueta `INCOMPLETO` conserva el estado `[INCOMPLETO]` del relevamiento. Las agrupaciones corresponden a superficies o responsabilidades del código.
+Las flechas muestran acciones. Las líneas punteadas marcan caminos condicionados o pasos pendientes. Las cajas rojas señalan brechas del flujo.
 
 ## Visión global
 
-### 00A · Frontera física
+### 00A · Pantallas, servidor y datos
 
 [Fuente Mermaid](diagrams/mmd/00-macro-a-frontera-fisica.mmd) · [SVG](diagrams/svg/00-macro-a-frontera-fisica.svg) · [Visor](diagrams/index.html#00-macro-a-frontera-fisica)
 
 ```mermaid
-flowchart LR
-    %% La superficie elegida determina qué código y Functions están disponibles.
-    personal(["Equipo Flor Mía · 12 roles"]):::actor
-    participantes(["Preparador · repartidor · cliente de envío"]):::actor
-    comprador(["Comprador invitado"]):::actor
-
-    subgraph navegador["Navegador"]
-        gestion["/gestion/* · /vendedor · Olivia"]:::integral
-        portales["/e/:lookupId · /reparto · /seguimiento"]:::integral
-        unificado["Storefront unificado · /tienda"]:::ecommerce
-        separado["INCOMPLETO · dist/ecommerce sin Functions"]:::debt
+flowchart TB
+    %% Interfaces, tareas en el dispositivo y tareas del servidor.
+    subgraph navegador["Navegador o celular"]
+        memoria[("Ventas guardadas sin internet")]:::db
+        portales["Portales de envío: preparador, repartidor y cliente"]:::integral
+        vendedor["Panel Vendedor"]:::integral
+        tienda["Tienda online"]:::ecommerce
+        olivia["Asistente IA Olivia"]:::shared
+        aislada["Tienda aislada sin servidor"]:::debt
+        admin["Panel Administrador"]:::integral
     end
-
-    subgraph servidor["Servidor · Netlify"]
-        api["30 Functions · 4 cron incluidos"]:::shared
+    subgraph servidor["En el servidor seguro"]
+        operaciones["Servidor de Flor Mía"]:::shared
     end
-
-    subgraph persistencia["Persistencia"]
-        firebase[("Firebase Auth · Firestore")]:::db
-        pendientes[("IndexedDB · seller_pending_sales")]:::db
+    subgraph nube["En la nube"]
+        datos[("Base de datos de Flor Mía")]:::db
     end
-
-    personal --> gestion
-    participantes --> portales
-    comprador --> unificado
-    comprador -.-> separado
-    gestion --> api
-    portales --> api
-    unificado --> api
-    api --> firebase
-    gestion -->|Firebase SDK| firebase
-    gestion --> pendientes
+    vendedor -->|"Registra ventas directo"| datos
+    olivia -->|"Envía consultas y tareas"| operaciones
+    operaciones -->|"Lee y guarda operaciones"| datos
+    tienda -.->|"Pierde conexión en versión aislada"| aislada
+    admin -->|"Guarda cambios directo"| datos
+    vendedor -->|"Guarda al perder conexión"| memoria
+    admin -->|"Envía facturas ARCA"| operaciones
+    memoria -->|"Sincroniza al volver internet"| datos
+    tienda -->|"Envía pedidos web"| operaciones
+    portales -->|"Consulta y actualiza envíos"| operaciones
 
     classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
     classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
@@ -69,54 +64,52 @@ flowchart LR
     classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
 ```
 
-> **Lectura rápida:** La app unificada sirve Gestión y el storefront con Functions. El paquete independiente publica la interfaz de la tienda sin las Functions que el catálogo y el checkout buscan en el mismo origen.
+> **Lectura rápida:** Cada persona usa su propio panel. El vendedor puede guardar una venta en su dispositivo hasta que vuelva internet. Facturas, envíos, Olivia y pedidos de tienda pasan por el servidor.
 
-| Nodo | Ruta real en el repo |
+| Caja en el diagrama | Artefactos técnicos reales en el código |
 | --- | --- |
-| Equipo Flor Mía · 12 roles | [`src/gestion/permissions.js`](../src/gestion/permissions.js) · [`src/gestion/AuthContext.jsx`](../src/gestion/AuthContext.jsx) |
-| Panel Admin, Vendedor y Olivia | [`src/gestion/ManagementApp.jsx`](../src/gestion/ManagementApp.jsx) · [`src/gestion/olivia/OliviaMount.jsx`](../src/gestion/olivia/OliviaMount.jsx) |
-| Preparador, repartidor y seguimiento | [`src/gestion/shipping/ShippingPublicApp.jsx`](../src/gestion/shipping/ShippingPublicApp.jsx) · [`src/gestion/shipping/CourierPortal.jsx`](../src/gestion/shipping/CourierPortal.jsx) |
-| Comprador invitado y Storefront | [`src/Storefront.jsx`](../src/Storefront.jsx) · [`src/surfaces/EcommerceSurface.jsx`](../src/surfaces/EcommerceSurface.jsx) · [`src/gestion/StorePreviewGate.jsx`](../src/gestion/StorePreviewGate.jsx) |
-| 30 Functions, cuatro programadas | [`netlify/functions/`](../netlify/functions/) · [`netlify.toml`](../netlify.toml) |
-| Firebase SDK e IndexedDB | [`src/gestion/services/firebase.js`](../src/gestion/services/firebase.js) · [`src/gestion/seller/offlineSales.js`](../src/gestion/seller/offlineSales.js) |
-| Paquete separado y directorio vacío | [`vite.config.js`](../vite.config.js) · [`deploy/ecommerce/netlify.toml`](../deploy/ecommerce/netlify.toml) · [`deploy/ecommerce/functions/.gitkeep`](../deploy/ecommerce/functions/.gitkeep) · [`src/services/ecommerceService.js`](../src/services/ecommerceService.js) |
+| Panel Administrador | `/gestion/*`, `ManagementApp` · [`src/gestion/ManagementApp.jsx`](../src/gestion/ManagementApp.jsx) · [`src/gestion/olivia/OliviaMount.jsx`](../src/gestion/olivia/OliviaMount.jsx) |
+| Panel Vendedor | `/vendedor` · [`src/gestion/seller/SellerPanel.jsx`](../src/gestion/seller/SellerPanel.jsx) |
+| Ventas guardadas sin internet | `IndexedDB`, `seller_pending_sales` · [`src/gestion/seller/offlineSales.js`](../src/gestion/seller/offlineSales.js) |
+| Asistente IA Olivia | `OliviaMount`, `olivia` · [`src/gestion/olivia/OliviaMount.jsx`](../src/gestion/olivia/OliviaMount.jsx) · [`netlify/functions/olivia.mjs`](../netlify/functions/olivia.mjs) |
+| Portales de envío: preparador, repartidor y cliente | `/e/:lookupId`, `/reparto`, `/seguimiento` · [`src/gestion/shipping/ShippingPublicApp.jsx`](../src/gestion/shipping/ShippingPublicApp.jsx) · [`src/gestion/shipping/CourierPortal.jsx`](../src/gestion/shipping/CourierPortal.jsx) |
+| Tienda online | `/tienda` · [`src/Storefront.jsx`](../src/Storefront.jsx) · [`src/surfaces/EcommerceSurface.jsx`](../src/surfaces/EcommerceSurface.jsx) · [`src/gestion/StorePreviewGate.jsx`](../src/gestion/StorePreviewGate.jsx) |
+| Tienda aislada sin servidor | `dist/ecommerce`, `ecommerce-catalog`, `ecommerce-checkout` · [`vite.config.js`](../vite.config.js) · [`deploy/ecommerce/netlify.toml`](../deploy/ecommerce/netlify.toml) · [`deploy/ecommerce/functions/.gitkeep`](../deploy/ecommerce/functions/.gitkeep) · [`src/services/ecommerceService.js`](../src/services/ecommerceService.js) |
+| Servidor de Flor Mía | `30 Functions con 4 ejecuciones programadas` · [`netlify/functions/`](../netlify/functions/) · [`netlify.toml`](../netlify.toml) |
+| Base de datos de Flor Mía | `Cloud Firestore`, `Firebase Authentication` · [`src/gestion/services/firebase.js`](../src/gestion/services/firebase.js) · [`firestore.rules`](../firestore.rules) |
 
-Roles exactos de `ROLE_TEMPLATES` en este corte: `admin`, `general_admin`, `operational_admin`, `seller`, `location_manager`, `warehouse_manager`, `marketing_manager`, `ecommerce_manager`, `shipping_manager`, `supplier_manager`, `financial_manager` y `analyst`. El preparador depende de asignación, el repartidor externo y el cliente de envío usan accesos acotados, y el comprador del storefront público opera como invitado. El storefront unificado tiene gate de administrador salvo configuración pública. Los cuatro cron son `shipping-retention`, `olivia-retention`, `olivia-resource-retention` y `olivia-voice-cleanup`.
-
-### 00B · Macrodominios
+### 00B · Cómo se conectan las áreas
 
 [Fuente Mermaid](diagrams/mmd/00-macro-b-macro-dominios.mmd) · [SVG](diagrams/svg/00-macro-b-macro-dominios.svg) · [Visor](diagrams/index.html#00-macro-b-macro-dominios)
 
 ```mermaid
-flowchart LR
-    %% Los ocho dominios convergen en una base de datos común con guardas propias.
-    subgraph dominios["Dominios · navegador y servidor"]
-        inventario["D1 · Catálogo e inventario"]:::integral
-        ventas["D2 · Ventas POS y CRM"]:::integral
-        finanzas["D3 · Finanzas, métricas y ARCA"]:::integral
-        logistica["D4 · Logística y envíos"]:::integral
-        web["D5 · E-Commerce · INCOMPLETO"]:::debt
-        marketing["D6 · Marketing · INCOMPLETO"]:::debt
-        olivia["D7 · Olivia IA"]:::shared
-        gobierno["D8 · Plataforma y gobernanza"]:::shared
-        acceso["Acceso · SDK y Functions"]:::shared
+flowchart TB
+    %% Los dominios intercambian información y comparten infraestructura.
+    subgraph operaciones["Áreas de trabajo"]
+        marketing["Marketing y redes · incompleto"]:::debt
+        tienda["Tienda online · incompleta"]:::debt
+        ventas["Ventas en local y clientes"]:::integral
+        logistica["Logística y envíos"]:::integral
+        finanzas["Finanzas, métricas y ARCA"]:::integral
+        inventario["Catálogo e inventario"]:::integral
     end
-
-    subgraph recursos["Persistencia y servicios externos"]
-        servicios(["15 conexiones externas"]):::external
-        firestore[("Firestore · 91 rutas")]:::db
+    olivia["Asistente IA Olivia"]:::shared
+    plataforma["Plataforma y permisos"]:::shared
+    subgraph respaldo["Datos y servicios externos"]
+        datos[("Base de datos central")]:::db
+        servicios(["ARCA, OpenAI, Drive y WhatsApp"]):::external
     end
-
-    inventario --> acceso
-    ventas --> acceso
-    finanzas --> acceso
-    logistica --> acceso
-    web --> acceso
-    marketing --> acceso
-    olivia --> acceso
-    gobierno --> acceso
-    acceso --> firestore
-    acceso --> servicios
+    tienda -->|"Muestra productos y stock de un local"| inventario
+    tienda -.->|"Solo con prueba local genera venta"| ventas
+    ventas -->|"Descuenta stock"| inventario
+    ventas -->|"Crea pedido de envío"| logistica
+    ventas -->|"Suma ingresos y pide factura"| finanzas
+    logistica -->|"Descuenta al aprobar si el stock sigue pendiente"| inventario
+    marketing -->|"Usa catálogo y lista de clientes"| ventas
+    olivia -.->|"Consulta y ejecuta acciones aprobadas"| operaciones
+    operaciones -->|"Piden acceso según el rol"| plataforma
+    operaciones -->|"Leen y guardan operaciones"| datos
+    operaciones -->|"Usan servicios conectados"| servicios
 
     classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
     classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
@@ -127,59 +120,50 @@ flowchart LR
     classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
 ```
 
-> **Lectura rápida:** Los ocho dominios agrupan capacidades que comparten Firestore y servicios. El nodo de acceso resume los caminos del SDK cliente y las Functions. D5 y D6 concentran flujos comerciales sin cierre en este corte.
+> **Lectura rápida:** La tienda, las ventas y los envíos usan el mismo inventario. Al aprobar un envío, logística descuenta las existencias si la venta estaba pendiente de stock. Marketing toma productos del catálogo y elige destinatarios de la lista de clientes. Olivia consulta y actúa con los permisos y confirmaciones de cada operación.
 
-| Nodo | Ruta real en el repo |
+| Caja en el diagrama | Artefactos técnicos reales en el código |
 | --- | --- |
-| D1 · Catálogo e inventario | [`src/gestion/services/inventoryService.js`](../src/gestion/services/inventoryService.js) |
-| D2 · Ventas POS y CRM | [`src/gestion/services/sellerService.js`](../src/gestion/services/sellerService.js) · [`src/gestion/customers/crmService.js`](../src/gestion/customers/crmService.js) |
-| D3 · Finanzas, métricas y ARCA | [`src/gestion/pages/FinancePage.jsx`](../src/gestion/pages/FinancePage.jsx) · [`src/gestion/pages/SalesMetricsPage.jsx`](../src/gestion/pages/SalesMetricsPage.jsx) · [`netlify/functions/arca-invoice.mjs`](../netlify/functions/arca-invoice.mjs) |
-| D4 · Logística y envíos | [`netlify/functions/shipping.mjs`](../netlify/functions/shipping.mjs) |
-| D5 · E-Commerce | [`src/Storefront.jsx`](../src/Storefront.jsx) · [`netlify/functions/ecommerce-checkout.mjs`](../netlify/functions/ecommerce-checkout.mjs) |
-| D6 · Marketing | [`src/gestion/pages/WhatsAppCampaignsPage.jsx`](../src/gestion/pages/WhatsAppCampaignsPage.jsx) · [`src/gestion/pages/MetaAdsPage.jsx`](../src/gestion/pages/MetaAdsPage.jsx) |
-| D7 · Olivia IA | [`netlify/functions/olivia.mjs`](../netlify/functions/olivia.mjs) |
-| D8 · Plataforma y gobernanza | [`src/gestion/permissions.js`](../src/gestion/permissions.js) · [`firestore.rules`](../firestore.rules) · [`.github/workflows/`](../.github/workflows/) |
-| 91 rutas Firestore y 15 conexiones externas | [`firestore.rules`](../firestore.rules) · [`netlify/functions/`](../netlify/functions/) · [`src/gestion/services/firebase.js`](../src/gestion/services/firebase.js) · [Relevamiento funcional del PR #69](https://github.com/AgustinBazanUB/App-Integral-FM/blob/40ad5f8d208c5788416827dc7ddaffda4b801a75/docs/00-relevamiento-funcional-actual.md) |
+| Marketing y redes · incompleto | `/gestion/social`, `/gestion/marketing/whatsapp`, `/gestion/marketing/meta-ads` · [`src/gestion/pages/WhatsAppCampaignsPage.jsx`](../src/gestion/pages/WhatsAppCampaignsPage.jsx) · [`src/gestion/pages/MetaAdsPage.jsx`](../src/gestion/pages/MetaAdsPage.jsx) · [`src/gestion/marketing/metaAds/knowledgeService.js`](../src/gestion/marketing/metaAds/knowledgeService.js) · [`src/gestion/marketing/whatsapp/campaignService.js`](../src/gestion/marketing/whatsapp/campaignService.js) |
+| Tienda online · incompleta | `ecommerce-catalog`, `ecommerce-checkout`, `ecommerce-simulated-payment` · [`src/Storefront.jsx`](../src/Storefront.jsx) · [`netlify/functions/ecommerce-checkout.mjs`](../netlify/functions/ecommerce-checkout.mjs) |
+| Ventas en local y clientes | `/vendedor`, `/gestion/quick-sales`, `/gestion/loyal-customers`, `sales`, `customers` · [`src/gestion/services/sellerService.js`](../src/gestion/services/sellerService.js) · [`src/gestion/customers/crmService.js`](../src/gestion/customers/crmService.js) |
+| Logística y envíos | `shipments`, `stockCommitState: pending → committed` · [`netlify/functions/shipping.mjs`](../netlify/functions/shipping.mjs) · [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) |
+| Finanzas, métricas y ARCA | `/gestion/finance`, `/gestion/metrics/sales`, `financialEntries` · [`src/gestion/pages/FinancePage.jsx`](../src/gestion/pages/FinancePage.jsx) · [`src/gestion/pages/SalesMetricsPage.jsx`](../src/gestion/pages/SalesMetricsPage.jsx) · [`netlify/functions/arca-invoice.mjs`](../netlify/functions/arca-invoice.mjs) |
+| Catálogo e inventario | `products`, `locationStock`, `warehouseStock`, `stockMovements` · [`src/gestion/services/inventoryService.js`](../src/gestion/services/inventoryService.js) |
+| Asistente IA Olivia | `olivia`, `acciones sujetas a confirmación y permisos` · [`netlify/functions/olivia.mjs`](../netlify/functions/olivia.mjs) · [`src/shared/oliviaCapabilities.mjs`](../src/shared/oliviaCapabilities.mjs) |
+| Plataforma y permisos | `roles de aplicación` · [`src/gestion/permissions.js`](../src/gestion/permissions.js) · [`firestore.rules`](../firestore.rules) · [`.github/workflows/`](../.github/workflows/) |
+| Base de datos central | `Cloud Firestore`, `91 rutas entre colecciones y subcolecciones` · [`firestore.rules`](../firestore.rules) |
+| ARCA, OpenAI, Drive y WhatsApp | `ARCA (WSAA, WSFE y Padrón)`, `OpenAI`, `Google Drive OAuth`, `extensión WhatsApp` · [`netlify/functions/`](../netlify/functions/) · [`src/gestion/marketing/whatsapp/extensionBridge.js`](../src/gestion/marketing/whatsapp/extensionBridge.js) |
 
-Las 91 rutas incluyen colecciones y subcolecciones, entre ellas las de acceso exclusivo del servidor. Las 15 conexiones inventariadas comprenden Firebase Authentication, Cloud Firestore, Netlify, GitHub Actions, ARCA, SMTP, Google Drive/OAuth, OpenAI, Google Cloud Text-to-Speech, Banco Nación, PyME Nación, WhatsApp/extensión, Instagram, OpenStreetMap y Google Maps. El conteo incluye plataforma y enlaces externos.
+El inventario del corte registra 91 rutas de Firestore y 15 conexiones, incluidas las de infraestructura y navegación externa. [Relevamiento del PR #69](https://github.com/AgustinBazanUB/App-Integral-FM/blob/40ad5f8d208c5788416827dc7ddaffda4b801a75/docs/00-relevamiento-funcional-actual.md)
 
-### 00C · Venta física y pedido web
+### 00C · Venta en local y compra en tienda web
 
 [Fuente Mermaid](diagrams/mmd/00-macro-c-quiebre-venta-fisica-vs-web.mmd) · [SVG](diagrams/svg/00-macro-c-quiebre-venta-fisica-vs-web.svg) · [Visor](diagrams/index.html#00-macro-c-quiebre-venta-fisica-vs-web)
 
 ```mermaid
 flowchart TB
-    %% Una venta POS confirmada produce una salida de stock. Crear un pedido web no la produce.
-    subgraph posNavegador["Navegador · POS"]
-        pos["Venta Rápida o Vendedor"]:::integral
-        transaccion["SDK directo · reintento desde IndexedDB"]:::shared
+    %% Una venta en local y un pedido web avanzan por caminos distintos.
+    subgraph local["Venta en local o asistida"]
+        vendedor["Vendedor confirma la venta"]:::integral
+        venta[("Venta registrada y stock descontado si es directa")]:::db
+        impacto["Facturación, ingresos y envíos"]:::shared
+        devolucion["Sin reversa automática de stock, caja ni factura"]:::debt
+        vendedor -->|"Registra en línea o al volver internet"| venta
+        venta -->|"Suma ingresos y habilita factura y envío"| impacto
+        impacto -.->|"Si un envío se devuelve o cancela"| devolucion
     end
-    subgraph posDatos["Persistencia · venta y stock"]
-        venta[("sales + movimientos de stock")]:::db
+    subgraph web["Compra en tienda web"]
+        retiro["El cliente confirma retiro"]:::ecommerce
+        pendiente[("Pedido pendiente sin reservar stock")]:::db
+        falta["Falta cobro online con Payway y envío a domicilio"]:::debt
+        prueba["Prueba local de administrador"]:::shared
+        cierre[("Venta registrada, stock descontado y borrador fiscal")]:::db
+        retiro -->|"Guarda el pedido pendiente"| pendiente
+        pendiente -.->|"Se frena antes del cobro"| falta
+        pendiente -.->|"Solo la prueba local simula el pago"| prueba
+        prueba -->|"Registra la venta y prepara el borrador fiscal"| cierre
     end
-    subgraph posServidor["Servidor y Gestión · efectos vinculados"]
-        impacto["ARCA · Envíos · Finanzas"]:::shared
-        devolucion["INCOMPLETO · Sin reversa automática de stock, caja y CAE"]:::debt
-    end
-
-    subgraph webNavegador["Navegador · E-Commerce"]
-        checkout["/checkout · retiro habilitado"]:::ecommerce
-    end
-    subgraph webServidor["Servidor · checkout web"]
-        registrar["ecommerce-checkout"]:::shared
-    end
-    subgraph webDatos["Persistencia · intención de compra"]
-        pendiente[("orders y payments · pending_payment")]:::db
-        corte["INCOMPLETO · Sin reserva ni cobro Payway"]:::debt
-    end
-    subgraph ensayo["Simulación local · servidor y persistencia"]
-        local["ecommerce-simulated-payment · admin local"]:::shared
-        simulacion[("sales + salida de stock · plan fiscal sin CAE")]:::db
-    end
-
-    pos --> transaccion --> venta --> impacto -.-> devolucion
-    checkout --> registrar --> pendiente -.-> corte
-    pendiente -.-> local --> simulacion
 
     classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
     classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
@@ -190,17 +174,19 @@ flowchart TB
     classDef debt fill:#B91C1C,stroke:#7F1D1D,color:#FFFFFF,stroke-width:2px,stroke-dasharray:5 4
 ```
 
-> **Lectura rápida:** Una venta POS confirmada escribe la venta y su movimiento de stock según el caso. Registrar un pedido web genera pedido y pago pendientes. La confirmación de pago solo se ensaya como administrador en un runtime local habilitado.
+> **Lectura rápida:** Una venta directa registra y descuenta stock. Si el envío requiere aprobar el origen, el descuento espera esa aprobación. En la tienda, confirmar el retiro deja un pedido pendiente sin reservar stock. La prueba local es el único camino del corte auditado que simula el pago y prepara el borrador fiscal.
 
-| Nodo | Ruta real en el repo |
+| Caja en el diagrama | Artefactos técnicos reales en el código |
 | --- | --- |
-| POS y sincronización | [`src/gestion/pages/QuickSalesPage.jsx`](../src/gestion/pages/QuickSalesPage.jsx) · [`src/gestion/seller/SellerPanel.jsx`](../src/gestion/seller/SellerPanel.jsx) · [`src/gestion/seller/offlineSales.js`](../src/gestion/seller/offlineSales.js) · [`src/gestion/services/sellerService.js`](../src/gestion/services/sellerService.js) |
-| Venta y efectos vinculados | [`src/shared/operationalWritePlans.mjs`](../src/shared/operationalWritePlans.mjs) · [`netlify/functions/arca-invoice.mjs`](../netlify/functions/arca-invoice.mjs) · [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) · [`src/gestion/pages/FinancePage.jsx`](../src/gestion/pages/FinancePage.jsx) |
-| Pedido y pago pendiente | [`src/pages/CheckoutPage.jsx`](../src/pages/CheckoutPage.jsx) · [`netlify/functions/ecommerce-checkout.mjs`](../netlify/functions/ecommerce-checkout.mjs) · [`netlify/functions/_lib/ecommerce/commerceService.mjs`](../netlify/functions/_lib/ecommerce/commerceService.mjs) |
-| Simulación y plan fiscal | [`netlify/functions/ecommerce-simulated-payment.mjs`](../netlify/functions/ecommerce-simulated-payment.mjs) · [`netlify/functions/_lib/ecommerce/paymentContract.mjs`](../netlify/functions/_lib/ecommerce/paymentContract.mjs) · [`netlify/functions/_lib/ecommerce/fiscalService.mjs`](../netlify/functions/_lib/ecommerce/fiscalService.mjs) |
-| Cierre de envío y reversa | [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) · [`netlify/functions/_lib/arca/saleCancellation.mjs`](../netlify/functions/_lib/arca/saleCancellation.mjs) |
-
-La solicitud de envío originada en el Panel Vendedor puede dejar la imputación del stock pendiente hasta aprobación. La devolución logística deja la restitución de stock, el reembolso y el tratamiento fiscal en operaciones separadas. La simulación de pagos queda bloqueada en producción, Deploy Preview y branch deploy.
+| Vendedor confirma la venta | `/gestion/quick-sales`, `/vendedor`, `IndexedDB`, `seller_pending_sales` · [`src/gestion/pages/QuickSalesPage.jsx`](../src/gestion/pages/QuickSalesPage.jsx) · [`src/gestion/seller/SellerPanel.jsx`](../src/gestion/seller/SellerPanel.jsx) · [`src/gestion/seller/offlineSales.js`](../src/gestion/seller/offlineSales.js) · [`src/gestion/services/sellerService.js`](../src/gestion/services/sellerService.js) |
+| Venta registrada y stock descontado si es directa | `sales`, `stockMovements`, `locationStock`, `warehouseStock` · [`src/shared/operationalWritePlans.mjs`](../src/shared/operationalWritePlans.mjs) · [`netlify/functions/arca-invoice.mjs`](../netlify/functions/arca-invoice.mjs) · [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) · [`src/gestion/pages/FinancePage.jsx`](../src/gestion/pages/FinancePage.jsx) |
+| Facturación, ingresos y envíos | `financialEntries`, `arca-invoice`, `shipments` · [`src/shared/operationalWritePlans.mjs`](../src/shared/operationalWritePlans.mjs) · [`netlify/functions/arca-invoice.mjs`](../netlify/functions/arca-invoice.mjs) · [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) · [`src/gestion/pages/FinancePage.jsx`](../src/gestion/pages/FinancePage.jsx) |
+| Sin reversa automática de stock, caja ni factura | `shipments`, `cancelado/devuelto`, `sale-cancel`, `CAE` · [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) · [`netlify/functions/_lib/arca/saleCancellation.mjs`](../netlify/functions/_lib/arca/saleCancellation.mjs) |
+| El cliente confirma retiro | `/checkout`, `ecommerce-checkout` · [`src/pages/CheckoutPage.jsx`](../src/pages/CheckoutPage.jsx) · [`netlify/functions/ecommerce-checkout.mjs`](../netlify/functions/ecommerce-checkout.mjs) · [`netlify/functions/_lib/ecommerce/commerceService.mjs`](../netlify/functions/_lib/ecommerce/commerceService.mjs) |
+| Pedido pendiente sin reservar stock | `orders`, `payments`, `pending_payment` · [`src/pages/CheckoutPage.jsx`](../src/pages/CheckoutPage.jsx) · [`netlify/functions/ecommerce-checkout.mjs`](../netlify/functions/ecommerce-checkout.mjs) · [`netlify/functions/_lib/ecommerce/commerceService.mjs`](../netlify/functions/_lib/ecommerce/commerceService.mjs) |
+| Falta cobro online con Payway y envío a domicilio | `Payway sin integrar`, `retiro únicamente` · [`src/pages/CheckoutPage.jsx`](../src/pages/CheckoutPage.jsx) · [`netlify/functions/_lib/ecommerce/paymentContract.mjs`](../netlify/functions/_lib/ecommerce/paymentContract.mjs) |
+| Prueba local de administrador | `ecommerce-simulated-payment`, `solo administrador en local` · [`netlify/functions/ecommerce-simulated-payment.mjs`](../netlify/functions/ecommerce-simulated-payment.mjs) · [`netlify/functions/_lib/ecommerce/paymentContract.mjs`](../netlify/functions/_lib/ecommerce/paymentContract.mjs) · [`netlify/functions/_lib/ecommerce/fiscalService.mjs`](../netlify/functions/_lib/ecommerce/fiscalService.mjs) |
+| Venta registrada, stock descontado y borrador fiscal | `sales`, `stockMovements`, `invoices (borrador sin CAE)` · [`netlify/functions/ecommerce-simulated-payment.mjs`](../netlify/functions/ecommerce-simulated-payment.mjs) · [`netlify/functions/_lib/ecommerce/paymentContract.mjs`](../netlify/functions/_lib/ecommerce/paymentContract.mjs) · [`netlify/functions/_lib/ecommerce/fiscalService.mjs`](../netlify/functions/_lib/ecommerce/fiscalService.mjs) |
 
 ## Índice WBS
 
@@ -223,14 +209,21 @@ La solicitud de envío originada en el Panel Vendedor puede dejar la imputación
 
 ![D1 · Catálogo e inventario](diagrams/svg/01-d1-catalogo-inventario.svg)
 
-> **Lectura rápida:** La ficha maestra se asocia a los saldos de cada ubicación o depósito. Las transacciones de inventario producen saldos, movimientos y transferencias. Proveedores registra fichas y la compra queda como contrato de datos.
+> **Lectura rápida:** Las fichas de producto se comparten entre locales y depósitos. Cada ajuste o traslado cambia la cantidad y deja un registro. Proveedores permite registrar fichas. La gestión de compras sigue pendiente.
 
-| Nodo | Ruta real en el repo |
+| Caja en el diagrama | Artefactos técnicos reales en el código |
 | --- | --- |
-| Productos, categorías y unificación | [`src/gestion/pages/ProductsPage.jsx`](../src/gestion/pages/ProductsPage.jsx) · [`netlify/functions/catalog-merge.mjs`](../netlify/functions/catalog-merge.mjs) · [`netlify/functions/_lib/catalogMerge.mjs`](../netlify/functions/_lib/catalogMerge.mjs) |
-| Ubicaciones y depósitos | [`src/gestion/pages/LocationDetailPage.jsx`](../src/gestion/pages/LocationDetailPage.jsx) · [`src/gestion/pages/WarehousePage.jsx`](../src/gestion/pages/WarehousePage.jsx) |
-| SDK, existencias y movimientos | [`src/gestion/services/inventoryService.js`](../src/gestion/services/inventoryService.js) · [`src/shared/stockTransferWritePlans.mjs`](../src/shared/stockTransferWritePlans.mjs) |
-| Proveedores y purchases | [`src/gestion/modules.js`](../src/gestion/modules.js) · [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`firestore.rules`](../firestore.rules) |
+| Cargar y editar productos | `/gestion/products` · [`src/gestion/pages/ProductsPage.jsx`](../src/gestion/pages/ProductsPage.jsx) · [`netlify/functions/catalog-merge.mjs`](../netlify/functions/catalog-merge.mjs) · [`netlify/functions/_lib/catalogMerge.mjs`](../netlify/functions/_lib/catalogMerge.mjs) |
+| Stock de locales | `/gestion/locations/:locationId`, `locationStock/{locationId}/items` · [`src/gestion/pages/LocationDetailPage.jsx`](../src/gestion/pages/LocationDetailPage.jsx) · [`src/gestion/pages/WarehousePage.jsx`](../src/gestion/pages/WarehousePage.jsx) |
+| Stock de depósitos | `/gestion/warehouse`, `warehouseStock/{warehouseId}/items` · [`src/gestion/pages/LocationDetailPage.jsx`](../src/gestion/pages/LocationDetailPage.jsx) · [`src/gestion/pages/WarehousePage.jsx`](../src/gestion/pages/WarehousePage.jsx) |
+| Ingresos, ajustes y traslados | `Firebase SDK`, `transacciones de ajustes y traslados` · [`src/gestion/services/inventoryService.js`](../src/gestion/services/inventoryService.js) · [`src/shared/stockTransferWritePlans.mjs`](../src/shared/stockTransferWritePlans.mjs) |
+| Pantalla de proveedores incompleta | `/gestion/suppliers` · [`src/gestion/modules.js`](../src/gestion/modules.js) · [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`firestore.rules`](../firestore.rules) |
+| Unir productos duplicados | `catalog-merge` · [`src/gestion/pages/ProductsPage.jsx`](../src/gestion/pages/ProductsPage.jsx) · [`netlify/functions/catalog-merge.mjs`](../netlify/functions/catalog-merge.mjs) · [`netlify/functions/_lib/catalogMerge.mjs`](../netlify/functions/_lib/catalogMerge.mjs) |
+| Productos y categorías | `products`, `productCategories` · [`src/gestion/pages/ProductsPage.jsx`](../src/gestion/pages/ProductsPage.jsx) · [`netlify/functions/catalog-merge.mjs`](../netlify/functions/catalog-merge.mjs) · [`netlify/functions/_lib/catalogMerge.mjs`](../netlify/functions/_lib/catalogMerge.mjs) |
+| Existencias por local y depósito | `locationStock`, `warehouseStock` · [`src/gestion/services/inventoryService.js`](../src/gestion/services/inventoryService.js) · [`src/shared/stockTransferWritePlans.mjs`](../src/shared/stockTransferWritePlans.mjs) |
+| Historial de movimientos y traslados | `stockMovements`, `stockTransfers` · [`src/gestion/services/inventoryService.js`](../src/gestion/services/inventoryService.js) · [`src/shared/stockTransferWritePlans.mjs`](../src/shared/stockTransferWritePlans.mjs) |
+| Fichas de proveedores | `suppliers` · [`src/gestion/modules.js`](../src/gestion/modules.js) · [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`firestore.rules`](../firestore.rules) |
+| Compras sin pantalla de gestión | `purchases (sin pantalla propia)` · [`src/gestion/modules.js`](../src/gestion/modules.js) · [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`firestore.rules`](../firestore.rules) |
 
 ### D2 · Ventas POS y CRM
 
@@ -238,15 +231,18 @@ La solicitud de envío originada en el Panel Vendedor puede dejar la imputación
 
 ![D2 · Ventas POS y CRM](diagrams/svg/02-d2-ventas-pos-crm.svg)
 
-> **Lectura rápida:** Los dos paneles usan sellerService para las ventas directas. El Panel Vendedor conserva pendientes de venta en IndexedDB y reintenta la misma operación. Factura, envío y anulación usan sus Functions cuando corresponde.
+> **Lectura rápida:** Las ventas rápidas y las del vendedor registran el cobro, el cliente y los movimientos de stock cuando corresponde. Si se pierde la conexión, el Panel Vendedor guarda la operación y reintenta al recuperarla.
 
-| Nodo | Ruta real en el repo |
+| Caja en el diagrama | Artefactos técnicos reales en el código |
 | --- | --- |
-| Venta Rápida y origen de stock | [`src/gestion/pages/QuickSalesPage.jsx`](../src/gestion/pages/QuickSalesPage.jsx) · [`src/gestion/services/quickSaleStockService.js`](../src/gestion/services/quickSaleStockService.js) |
-| Panel Vendedor y pendientes | [`src/gestion/seller/SellerPanel.jsx`](../src/gestion/seller/SellerPanel.jsx) · [`src/gestion/seller/offlineSales.js`](../src/gestion/seller/offlineSales.js) |
-| Venta, contador, stock y cliente | [`src/gestion/services/sellerService.js`](../src/gestion/services/sellerService.js) · [`src/shared/operationalWritePlans.mjs`](../src/shared/operationalWritePlans.mjs) |
-| CRM, zonas y fidelización | [`src/gestion/pages/LoyalCustomersPage.jsx`](../src/gestion/pages/LoyalCustomersPage.jsx) · [`src/gestion/services/customerService.js`](../src/gestion/services/customerService.js) · [`src/gestion/customers/crmService.js`](../src/gestion/customers/crmService.js) |
-| Operaciones de servidor | [`netlify/functions/sale-cancel.mjs`](../netlify/functions/sale-cancel.mjs) · [`netlify/functions/arca-invoice.mjs`](../netlify/functions/arca-invoice.mjs) · [`netlify/functions/shipping.mjs`](../netlify/functions/shipping.mjs) |
+| Venta rápida | `/gestion/quick-sales` · [`src/gestion/pages/QuickSalesPage.jsx`](../src/gestion/pages/QuickSalesPage.jsx) · [`src/gestion/services/quickSaleStockService.js`](../src/gestion/services/quickSaleStockService.js) |
+| Panel Vendedor | `/vendedor` · [`src/gestion/seller/SellerPanel.jsx`](../src/gestion/seller/SellerPanel.jsx) · [`src/gestion/seller/offlineSales.js`](../src/gestion/seller/offlineSales.js) |
+| Ventas guardadas sin internet | `IndexedDB`, `seller_pending_sales` · [`src/gestion/seller/SellerPanel.jsx`](../src/gestion/seller/SellerPanel.jsx) · [`src/gestion/seller/offlineSales.js`](../src/gestion/seller/offlineSales.js) |
+| Confirmar venta y origen del stock | `sellerService`, `Firebase SDK (transacción)` · [`src/gestion/services/sellerService.js`](../src/gestion/services/sellerService.js) · [`src/shared/operationalWritePlans.mjs`](../src/shared/operationalWritePlans.mjs) |
+| Clientes, zonas y fidelización | `/gestion/loyal-customers` · [`src/gestion/pages/LoyalCustomersPage.jsx`](../src/gestion/pages/LoyalCustomersPage.jsx) · [`src/gestion/services/customerService.js`](../src/gestion/services/customerService.js) · [`src/gestion/customers/crmService.js`](../src/gestion/customers/crmService.js) |
+| Anulación, factura o envío | `sale-cancel`, `arca-invoice`, `shipping` · [`netlify/functions/sale-cancel.mjs`](../netlify/functions/sale-cancel.mjs) · [`netlify/functions/arca-invoice.mjs`](../netlify/functions/arca-invoice.mjs) · [`netlify/functions/shipping.mjs`](../netlify/functions/shipping.mjs) |
+| Ventas numeradas y movimientos de stock | `sales`, `counters`, `stockMovements` · [`src/gestion/services/sellerService.js`](../src/gestion/services/sellerService.js) · [`src/shared/operationalWritePlans.mjs`](../src/shared/operationalWritePlans.mjs) |
+| Fichas de clientes y condiciones comerciales | `customers`, `customerZones`, `settings` · [`src/gestion/pages/LoyalCustomersPage.jsx`](../src/gestion/pages/LoyalCustomersPage.jsx) · [`src/gestion/services/customerService.js`](../src/gestion/services/customerService.js) · [`src/gestion/customers/crmService.js`](../src/gestion/customers/crmService.js) |
 
 ### D3 · Finanzas, métricas y ARCA
 
@@ -254,15 +250,22 @@ La solicitud de envío originada en el Panel Vendedor puede dejar la imputación
 
 ![D3 · Finanzas, métricas y ARCA](diagrams/svg/03-d3-finanzas-metricas-arca.svg)
 
-> **Lectura rápida:** Las ventas alimentan las vistas comerciales y financieras. El comprobante vincula la venta al circuito fiscal. El estado del comprobante condiciona la descarga, el correo y la posible nota de crédito al anular.
+> **Lectura rápida:** Los números de las ventas se reflejan en el resumen, las métricas y Finanzas. Pedir un comprobante abre otro recorrido con validación, autorización de ARCA y entrega por correo si está configurado.
 
-| Nodo | Ruta real en el repo |
+| Caja en el diagrama | Artefactos técnicos reales en el código |
 | --- | --- |
-| Panel, Métricas y falta de exportación | [`src/gestion/pages/DashboardPage.jsx`](../src/gestion/pages/DashboardPage.jsx) · [`src/gestion/pages/SalesMetricsPage.jsx`](../src/gestion/pages/SalesMetricsPage.jsx) |
-| Finanzas y contrato cashSessions | [`src/gestion/pages/FinancePage.jsx`](../src/gestion/pages/FinancePage.jsx) · [`src/gestion/finance/financeService.js`](../src/gestion/finance/financeService.js) · [`firestore.rules`](../firestore.rules) |
-| Preparación, receptor y Padrón | [`netlify/functions/arca-receiver.mjs`](../netlify/functions/arca-receiver.mjs) · [`netlify/functions/arca-invoice.mjs`](../netlify/functions/arca-invoice.mjs) · [`netlify/functions/arca-taxpayer.mjs`](../netlify/functions/arca-taxpayer.mjs) |
-| Autorización y secuencia | [`netlify/functions/arca-authorize.mjs`](../netlify/functions/arca-authorize.mjs) · [`netlify/functions/_lib/arca/sequenceLock.mjs`](../netlify/functions/_lib/arca/sequenceLock.mjs) · [`netlify/functions/_lib/arca/config.mjs`](../netlify/functions/_lib/arca/config.mjs) |
-| Documento, correo y nota de crédito | [`netlify/functions/arca-document.mjs`](../netlify/functions/arca-document.mjs) · [`netlify/functions/_lib/arca/invoiceEmail.mjs`](../netlify/functions/_lib/arca/invoiceEmail.mjs) · [`netlify/functions/sale-cancel.mjs`](../netlify/functions/sale-cancel.mjs) · [`netlify/functions/_lib/arca/creditNotePlan.mjs`](../netlify/functions/_lib/arca/creditNotePlan.mjs) |
+| Resumen del negocio | `/gestion` · [`src/gestion/pages/DashboardPage.jsx`](../src/gestion/pages/DashboardPage.jsx) · [`src/gestion/pages/SalesMetricsPage.jsx`](../src/gestion/pages/SalesMetricsPage.jsx) |
+| Métricas de ventas | `/gestion/metrics/sales` · [`src/gestion/pages/DashboardPage.jsx`](../src/gestion/pages/DashboardPage.jsx) · [`src/gestion/pages/SalesMetricsPage.jsx`](../src/gestion/pages/SalesMetricsPage.jsx) |
+| Finanzas y movimientos de caja | `/gestion/finance` · [`src/gestion/pages/FinancePage.jsx`](../src/gestion/pages/FinancePage.jsx) · [`src/gestion/finance/financeService.js`](../src/gestion/finance/financeService.js) · [`firestore.rules`](../firestore.rules) |
+| Solicitar factura o nota de crédito | `arca-invoice`, `sale-cancel` · [`netlify/functions/arca-document.mjs`](../netlify/functions/arca-document.mjs) · [`netlify/functions/_lib/arca/invoiceEmail.mjs`](../netlify/functions/_lib/arca/invoiceEmail.mjs) · [`netlify/functions/sale-cancel.mjs`](../netlify/functions/sale-cancel.mjs) · [`netlify/functions/_lib/arca/creditNotePlan.mjs`](../netlify/functions/_lib/arca/creditNotePlan.mjs) · [`netlify/functions/arca-invoice.mjs`](../netlify/functions/arca-invoice.mjs) |
+| Validar datos del cliente | `arca-receiver`, `arca-taxpayer`, `Padrón` · [`netlify/functions/arca-receiver.mjs`](../netlify/functions/arca-receiver.mjs) · [`netlify/functions/arca-invoice.mjs`](../netlify/functions/arca-invoice.mjs) · [`netlify/functions/arca-taxpayer.mjs`](../netlify/functions/arca-taxpayer.mjs) |
+| Autorizar y preparar el comprobante | `arca-authorize`, `arca-document`, `sale-cancel` · [`netlify/functions/arca-authorize.mjs`](../netlify/functions/arca-authorize.mjs) · [`netlify/functions/_lib/arca/sequenceLock.mjs`](../netlify/functions/_lib/arca/sequenceLock.mjs) · [`netlify/functions/_lib/arca/config.mjs`](../netlify/functions/_lib/arca/config.mjs) · [`netlify/functions/arca-document.mjs`](../netlify/functions/arca-document.mjs) · [`netlify/functions/sale-cancel.mjs`](../netlify/functions/sale-cancel.mjs) |
+| Ventas y movimientos financieros | `sales`, `financialEntries` · [`src/gestion/pages/FinancePage.jsx`](../src/gestion/pages/FinancePage.jsx) · [`src/gestion/finance/financeService.js`](../src/gestion/finance/financeService.js) · [`firestore.rules`](../firestore.rules) |
+| Comprobantes y numeración fiscal | `invoices`, `arcaSequenceLocks` · [`netlify/functions/arca-authorize.mjs`](../netlify/functions/arca-authorize.mjs) · [`netlify/functions/_lib/arca/sequenceLock.mjs`](../netlify/functions/_lib/arca/sequenceLock.mjs) · [`netlify/functions/_lib/arca/config.mjs`](../netlify/functions/_lib/arca/config.mjs) |
+| ARCA | `WSAA`, `WSFE`, `Padrón` · [`netlify/functions/arca-receiver.mjs`](../netlify/functions/arca-receiver.mjs) · [`netlify/functions/arca-invoice.mjs`](../netlify/functions/arca-invoice.mjs) · [`netlify/functions/arca-taxpayer.mjs`](../netlify/functions/arca-taxpayer.mjs) · [`netlify/functions/_lib/arca/config.mjs`](../netlify/functions/_lib/arca/config.mjs) |
+| Correo del comprobante | `SMTP`, `PDF autorizado` · [`netlify/functions/arca-document.mjs`](../netlify/functions/arca-document.mjs) · [`netlify/functions/_lib/arca/invoiceEmail.mjs`](../netlify/functions/_lib/arca/invoiceEmail.mjs) · [`netlify/functions/sale-cancel.mjs`](../netlify/functions/sale-cancel.mjs) · [`netlify/functions/_lib/arca/creditNotePlan.mjs`](../netlify/functions/_lib/arca/creditNotePlan.mjs) |
+| Métricas sin exportación | `Métricas sin exportación` · [`src/gestion/pages/DashboardPage.jsx`](../src/gestion/pages/DashboardPage.jsx) · [`src/gestion/pages/SalesMetricsPage.jsx`](../src/gestion/pages/SalesMetricsPage.jsx) · [`src/gestion/pages/SalesMetricsPage.jsx`](../src/gestion/pages/SalesMetricsPage.jsx) |
+| Sin turnos de caja | `cashSessions (sin circuito operativo)` · [`src/gestion/pages/FinancePage.jsx`](../src/gestion/pages/FinancePage.jsx) · [`src/gestion/finance/financeService.js`](../src/gestion/finance/financeService.js) · [`firestore.rules`](../firestore.rules) |
 
 ### D4 · Logística y envíos
 
@@ -270,17 +273,20 @@ La solicitud de envío originada en el Panel Vendedor puede dejar la imputación
 
 ![D4 · Logística y envíos](diagrams/svg/04-d4-logistica-envios.svg)
 
-> **Lectura rápida:** El servidor aplica el siguiente paso según asignación, credencial y estado. El mapa sirve para editar el punto de entrega o abrir navegación externa. El seguimiento público muestra hitos confirmados.
+> **Lectura rápida:** Preparadores y repartidores confirman las etapas. El cliente consulta el avance registrado. Los mapas ayudan con direcciones y navegación. La devolución o cancelación del envío no revierte por sí sola sus efectos en stock, caja y factura.
 
-| Nodo | Ruta real en el repo |
+| Caja en el diagrama | Artefactos técnicos reales en el código |
 | --- | --- |
-| Tablero y portales | [`src/gestion/pages/ShippingPage.jsx`](../src/gestion/pages/ShippingPage.jsx) · [`src/gestion/shipping/ShippingPublicApp.jsx`](../src/gestion/shipping/ShippingPublicApp.jsx) · [`src/gestion/shipping/CourierPortal.jsx`](../src/gestion/shipping/CourierPortal.jsx) |
-| 13 estados, shipments y events | [`src/shared/shippingDomain.mjs`](../src/shared/shippingDomain.mjs) · [`netlify/functions/shipping.mjs`](../netlify/functions/shipping.mjs) · [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) |
-| Limpieza de posiciones residuales | [`netlify/functions/shipping-retention.mjs`](../netlify/functions/shipping-retention.mjs) · [`netlify/functions/_lib/shippingRetention.mjs`](../netlify/functions/_lib/shippingRetention.mjs) |
-| OpenStreetMap y Google Maps | [`src/gestion/shipping/ShippingMap.jsx`](../src/gestion/shipping/ShippingMap.jsx) · [`src/gestion/shipping/ShipmentDetail.jsx`](../src/gestion/shipping/ShipmentDetail.jsx) · [`src/gestion/shipping/CourierPortal.jsx`](../src/gestion/shipping/CourierPortal.jsx) |
-| Outbox, Uber y devoluciones | [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) · [`src/shared/shippingDomain.mjs`](../src/shared/shippingDomain.mjs) |
-
-Estados definidos por `SHIPPING_STATES`: `solicitud_pendiente`, `aprobado`, `en_preparacion`, `listo_retirar`, `retirado_origen`, `hacia_repositorio`, `recibido_repositorio`, `reparto_final`, `entregado`, `devuelto`, `cancelado`, `no_entregado` y `rechazado`. La existencia de un estado en el dominio no prueba que se produzca en todas las modalidades.
+| Tablero de envíos | `/gestion/shipping` · [`src/gestion/pages/ShippingPage.jsx`](../src/gestion/pages/ShippingPage.jsx) · [`src/gestion/shipping/ShippingPublicApp.jsx`](../src/gestion/shipping/ShippingPublicApp.jsx) · [`src/gestion/shipping/CourierPortal.jsx`](../src/gestion/shipping/CourierPortal.jsx) |
+| Preparador de pedidos | `/e/:lookupId` · [`src/gestion/pages/ShippingPage.jsx`](../src/gestion/pages/ShippingPage.jsx) · [`src/gestion/shipping/ShippingPublicApp.jsx`](../src/gestion/shipping/ShippingPublicApp.jsx) · [`src/gestion/shipping/CourierPortal.jsx`](../src/gestion/shipping/CourierPortal.jsx) |
+| Repartidor | `/reparto` · [`src/gestion/pages/ShippingPage.jsx`](../src/gestion/pages/ShippingPage.jsx) · [`src/gestion/shipping/ShippingPublicApp.jsx`](../src/gestion/shipping/ShippingPublicApp.jsx) · [`src/gestion/shipping/CourierPortal.jsx`](../src/gestion/shipping/CourierPortal.jsx) |
+| Seguimiento para el cliente | `/seguimiento` · [`src/gestion/pages/ShippingPage.jsx`](../src/gestion/pages/ShippingPage.jsx) · [`src/gestion/shipping/ShippingPublicApp.jsx`](../src/gestion/shipping/ShippingPublicApp.jsx) · [`src/gestion/shipping/CourierPortal.jsx`](../src/gestion/shipping/CourierPortal.jsx) |
+| Control de cada etapa del envío | `shipping`, `13 estados`, `aprobación con stockCommitState: pending` · [`src/shared/shippingDomain.mjs`](../src/shared/shippingDomain.mjs) · [`netlify/functions/shipping.mjs`](../netlify/functions/shipping.mjs) · [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) |
+| Limpieza de ubicaciones vencidas | `shipping-retention` · [`netlify/functions/shipping-retention.mjs`](../netlify/functions/shipping-retention.mjs) · [`netlify/functions/_lib/shippingRetention.mjs`](../netlify/functions/_lib/shippingRetention.mjs) |
+| Envíos, novedades y sesiones de reparto | `shipments`, `shipments/{shipmentId}/events`, `deliverySessions` · [`src/shared/shippingDomain.mjs`](../src/shared/shippingDomain.mjs) · [`netlify/functions/shipping.mjs`](../netlify/functions/shipping.mjs) · [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) |
+| Mapas y navegación | `OpenStreetMap`, `Google Maps` · [`src/gestion/shipping/ShippingMap.jsx`](../src/gestion/shipping/ShippingMap.jsx) · [`src/gestion/shipping/ShipmentDetail.jsx`](../src/gestion/shipping/ShipmentDetail.jsx) · [`src/gestion/shipping/CourierPortal.jsx`](../src/gestion/shipping/CourierPortal.jsx) |
+| Avisos automáticos y conexión con Uber pendientes | `shippingOutbox`, `adapter: disabled`, `Uber sin integración con su API` · [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) · [`src/shared/shippingDomain.mjs`](../src/shared/shippingDomain.mjs) |
+| Sin reversa de stock, caja ni factura | `shipments (cancelación o devolución)`, `sin reversa automática de stock, caja ni CAE` · [`netlify/functions/_lib/shipping.mjs`](../netlify/functions/_lib/shipping.mjs) · [`src/shared/shippingDomain.mjs`](../src/shared/shippingDomain.mjs) |
 
 ### D5 · E-Commerce y pedidos web
 
@@ -288,15 +294,22 @@ Estados definidos por `SHIPPING_STATES`: `solicitud_pendiente`, `aprobado`, `en_
 
 ![D5 · E-Commerce y pedidos web](diagrams/svg/05-d5-ecommerce-pedidos-web.svg)
 
-> **Lectura rápida:** La app unificada consulta el catálogo comercial y registra retiro cuando el backend está configurado. Gestión puede listar hasta 40 pedidos recientes. El build independiente carece de las Functions que solicita el storefront.
+> **Lectura rápida:** La tienda muestra stock de un local y guarda el pedido para retiro. Gestión consulta los últimos 40 pedidos. Al publicar la tienda aislada, faltan los servicios que atienden el catálogo y los pedidos.
 
-| Nodo | Ruta real en el repo |
+| Caja en el diagrama | Artefactos técnicos reales en el código |
 | --- | --- |
-| Portada, catálogo y ficha | [`src/Storefront.jsx`](../src/Storefront.jsx) · [`src/pages/HomePage.jsx`](../src/pages/HomePage.jsx) · [`src/pages/CatalogPage.jsx`](../src/pages/CatalogPage.jsx) · [`src/pages/ProductPage.jsx`](../src/pages/ProductPage.jsx) |
-| Carrito, borrador y checkout | [`src/context/CartContext.jsx`](../src/context/CartContext.jsx) · [`src/pages/CheckoutPage.jsx`](../src/pages/CheckoutPage.jsx) |
-| Catálogo comercial y stock de un origen | [`netlify/functions/ecommerce-catalog.mjs`](../netlify/functions/ecommerce-catalog.mjs) · [`netlify/functions/_lib/ecommerce/commerceService.mjs`](../netlify/functions/_lib/ecommerce/commerceService.mjs) |
-| Registro y simulación | [`netlify/functions/ecommerce-checkout.mjs`](../netlify/functions/ecommerce-checkout.mjs) · [`netlify/functions/ecommerce-simulated-payment.mjs`](../netlify/functions/ecommerce-simulated-payment.mjs) · [`netlify/functions/_lib/ecommerce/paymentContract.mjs`](../netlify/functions/_lib/ecommerce/paymentContract.mjs) |
-| Pedidos en Gestión y paquete separado | [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`src/gestion/services/managementService.js`](../src/gestion/services/managementService.js) · [`deploy/ecommerce/netlify.toml`](../deploy/ecommerce/netlify.toml) |
+| Portada, catálogo y ficha de producto | `/tienda`, `/productos`, `/producto/:slug` · [`src/Storefront.jsx`](../src/Storefront.jsx) · [`src/pages/HomePage.jsx`](../src/pages/HomePage.jsx) · [`src/pages/CatalogPage.jsx`](../src/pages/CatalogPage.jsx) · [`src/pages/ProductPage.jsx`](../src/pages/ProductPage.jsx) |
+| Carrito y confirmación para retiro | `/checkout (retiro)` · [`src/context/CartContext.jsx`](../src/context/CartContext.jsx) · [`src/pages/CheckoutPage.jsx`](../src/pages/CheckoutPage.jsx) |
+| Carrito y borrador en tu dispositivo | `localStorage`, `carrito y borrador` · [`src/context/CartContext.jsx`](../src/context/CartContext.jsx) · [`src/pages/CheckoutPage.jsx`](../src/pages/CheckoutPage.jsx) |
+| Consulta de los últimos 40 pedidos | `/gestion/ecommerce`, `orders`, `límite de 40 (solo lectura)` · [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`src/gestion/services/managementService.js`](../src/gestion/services/managementService.js) · [`deploy/ecommerce/netlify.toml`](../deploy/ecommerce/netlify.toml) |
+| Tienda aislada sin servidor | `dist/ecommerce`, `deploy/ecommerce/functions/.gitkeep` · [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`src/gestion/services/managementService.js`](../src/gestion/services/managementService.js) · [`deploy/ecommerce/netlify.toml`](../deploy/ecommerce/netlify.toml) |
+| Consulta de productos disponibles | `ecommerce-catalog` · [`netlify/functions/ecommerce-catalog.mjs`](../netlify/functions/ecommerce-catalog.mjs) · [`netlify/functions/_lib/ecommerce/commerceService.mjs`](../netlify/functions/_lib/ecommerce/commerceService.mjs) |
+| Recepción de pedidos web | `ecommerce-checkout` · [`netlify/functions/ecommerce-checkout.mjs`](../netlify/functions/ecommerce-checkout.mjs) · [`netlify/functions/ecommerce-simulated-payment.mjs`](../netlify/functions/ecommerce-simulated-payment.mjs) · [`netlify/functions/_lib/ecommerce/paymentContract.mjs`](../netlify/functions/_lib/ecommerce/paymentContract.mjs) |
+| Prueba local de administrador | `ecommerce-simulated-payment` · [`netlify/functions/ecommerce-checkout.mjs`](../netlify/functions/ecommerce-checkout.mjs) · [`netlify/functions/ecommerce-simulated-payment.mjs`](../netlify/functions/ecommerce-simulated-payment.mjs) · [`netlify/functions/_lib/ecommerce/paymentContract.mjs`](../netlify/functions/_lib/ecommerce/paymentContract.mjs) |
+| Productos y stock de un local | `products`, `locationStock de un único origen` · [`netlify/functions/ecommerce-catalog.mjs`](../netlify/functions/ecommerce-catalog.mjs) · [`netlify/functions/_lib/ecommerce/commerceService.mjs`](../netlify/functions/_lib/ecommerce/commerceService.mjs) |
+| Pedido pendiente de pago | `orders`, `payments`, `pending_payment` · [`netlify/functions/ecommerce-checkout.mjs`](../netlify/functions/ecommerce-checkout.mjs) · [`netlify/functions/ecommerce-simulated-payment.mjs`](../netlify/functions/ecommerce-simulated-payment.mjs) · [`netlify/functions/_lib/ecommerce/paymentContract.mjs`](../netlify/functions/_lib/ecommerce/paymentContract.mjs) |
+| Sin reserva de stock, Payway ni envío a domicilio | `Payway sin integrar`, `sin envío a domicilio ni reserva` · [`netlify/functions/ecommerce-checkout.mjs`](../netlify/functions/ecommerce-checkout.mjs) · [`netlify/functions/ecommerce-simulated-payment.mjs`](../netlify/functions/ecommerce-simulated-payment.mjs) · [`netlify/functions/_lib/ecommerce/paymentContract.mjs`](../netlify/functions/_lib/ecommerce/paymentContract.mjs) |
+| Venta, salida de stock y borrador fiscal | `sales`, `stockMovements`, `invoices sin CAE` · [`netlify/functions/ecommerce-checkout.mjs`](../netlify/functions/ecommerce-checkout.mjs) · [`netlify/functions/ecommerce-simulated-payment.mjs`](../netlify/functions/ecommerce-simulated-payment.mjs) · [`netlify/functions/_lib/ecommerce/paymentContract.mjs`](../netlify/functions/_lib/ecommerce/paymentContract.mjs) · [`netlify/functions/_lib/ecommerce/fiscalService.mjs`](../netlify/functions/_lib/ecommerce/fiscalService.mjs) |
 
 ### D6 · Marketing y campañas
 
@@ -304,15 +317,22 @@ Estados definidos por `SHIPPING_STATES`: `solicitud_pendiente`, `aprobado`, `en_
 
 ![D6 · Marketing y campañas](diagrams/svg/06-d6-marketing-campanas.svg)
 
-> **Lectura rápida:** WhatsApp envía el trabajo de campaña a la extensión Chrome mediante postMessage. Meta Ads prepara estrategia, creatividad y archivos en Drive. Validación, render, publicación y resultados siguen anunciados en la interfaz.
+> **Lectura rápida:** WhatsApp entrega el trabajo de campaña a un complemento de Chrome. En Meta se prepara la estrategia y el material. La validación final, la publicación y los resultados siguen pendientes.
 
-| Nodo | Ruta real en el repo |
+| Caja en el diagrama | Artefactos técnicos reales en el código |
 | --- | --- |
-| Redes, Marketing y sus registros | [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`src/gestion/modules.js`](../src/gestion/modules.js) |
-| WhatsApp, campañas y extensión | [`src/gestion/pages/WhatsAppCampaignsPage.jsx`](../src/gestion/pages/WhatsAppCampaignsPage.jsx) · [`src/gestion/marketing/whatsapp/extensionBridge.js`](../src/gestion/marketing/whatsapp/extensionBridge.js) · [`src/gestion/marketing/whatsapp/campaignService.js`](../src/gestion/marketing/whatsapp/campaignService.js) |
-| Meta Ads y etapas futuras | [`src/gestion/pages/MetaAdsPage.jsx`](../src/gestion/pages/MetaAdsPage.jsx) · [`src/gestion/pages/MetaAdsCreativeWorkspace.jsx`](../src/gestion/pages/MetaAdsCreativeWorkspace.jsx) |
-| Compilación y planificación | [`netlify/functions/theory-compiler.mjs`](../netlify/functions/theory-compiler.mjs) · [`netlify/functions/campaign-planner.mjs`](../netlify/functions/campaign-planner.mjs) |
-| Google Drive y callback OAuth | [`netlify/functions/google-drive.mjs`](../netlify/functions/google-drive.mjs) · [`netlify/functions/google-drive-callback.mjs`](../netlify/functions/google-drive-callback.mjs) |
+| Contactos de redes sociales | `/gestion/social`, `socialLeads` · [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`src/gestion/modules.js`](../src/gestion/modules.js) |
+| Campañas generales en borrador | `/gestion/marketing`, `campaigns` · [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`src/gestion/modules.js`](../src/gestion/modules.js) |
+| Campañas de WhatsApp | `/gestion/marketing/whatsapp` · [`src/gestion/pages/WhatsAppCampaignsPage.jsx`](../src/gestion/pages/WhatsAppCampaignsPage.jsx) · [`src/gestion/marketing/whatsapp/extensionBridge.js`](../src/gestion/marketing/whatsapp/extensionBridge.js) · [`src/gestion/marketing/whatsapp/campaignService.js`](../src/gestion/marketing/whatsapp/campaignService.js) |
+| Plan y piezas para anuncios en Meta | `/gestion/marketing/meta-ads`, `Workspace Creativo` · [`src/gestion/pages/MetaAdsPage.jsx`](../src/gestion/pages/MetaAdsPage.jsx) · [`src/gestion/pages/MetaAdsCreativeWorkspace.jsx`](../src/gestion/pages/MetaAdsCreativeWorkspace.jsx) |
+| Preparar estrategia y plan de anuncios | `theory-compiler`, `campaign-planner` · [`netlify/functions/theory-compiler.mjs`](../netlify/functions/theory-compiler.mjs) · [`netlify/functions/campaign-planner.mjs`](../netlify/functions/campaign-planner.mjs) |
+| Autorizar acceso a archivos | `google-drive`, `google-drive-callback`, `OAuth` · [`netlify/functions/google-drive.mjs`](../netlify/functions/google-drive.mjs) · [`netlify/functions/google-drive-callback.mjs`](../netlify/functions/google-drive-callback.mjs) |
+| Contactos y campañas generales | `socialLeads`, `campaigns` · [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`src/gestion/modules.js`](../src/gestion/modules.js) |
+| Campañas de WhatsApp y destinatarios | `whatsappCampaigns`, `customers (segmentación y consentimiento)` · [`src/gestion/pages/WhatsAppCampaignsPage.jsx`](../src/gestion/pages/WhatsAppCampaignsPage.jsx) · [`src/gestion/marketing/whatsapp/extensionBridge.js`](../src/gestion/marketing/whatsapp/extensionBridge.js) · [`src/gestion/marketing/whatsapp/campaignService.js`](../src/gestion/marketing/whatsapp/campaignService.js) |
+| Complemento de WhatsApp para Chrome | `postMessage`, `extensión Chrome externa` · [`src/gestion/pages/WhatsAppCampaignsPage.jsx`](../src/gestion/pages/WhatsAppCampaignsPage.jsx) · [`src/gestion/marketing/whatsapp/extensionBridge.js`](../src/gestion/marketing/whatsapp/extensionBridge.js) · [`src/gestion/marketing/whatsapp/campaignService.js`](../src/gestion/marketing/whatsapp/campaignService.js) |
+| OpenAI | `OpenAI` · [`netlify/functions/theory-compiler.mjs`](../netlify/functions/theory-compiler.mjs) · [`netlify/functions/campaign-planner.mjs`](../netlify/functions/campaign-planner.mjs) |
+| Google Drive | `Google Drive` · [`netlify/functions/google-drive.mjs`](../netlify/functions/google-drive.mjs) · [`netlify/functions/google-drive-callback.mjs`](../netlify/functions/google-drive-callback.mjs) |
+| Validación, generación final, publicación y resultados pendientes | `SOLO UI`, `sin Meta Graph API` · [`src/gestion/pages/MetaAdsPage.jsx`](../src/gestion/pages/MetaAdsPage.jsx) · [`src/gestion/pages/MetaAdsCreativeWorkspace.jsx`](../src/gestion/pages/MetaAdsCreativeWorkspace.jsx) |
 
 ### D7 · Olivia IA
 
@@ -320,18 +340,23 @@ Estados definidos por `SHIPPING_STATES`: `solicitud_pendiente`, `aprobado`, `en_
 
 ![D7 · Olivia IA](diagrams/svg/07-d7-olivia-ia.svg)
 
-> **Lectura rápida:** Chat, voz, documentos y retención tienen caminos propios. Firestore conserva el estado y uso autorizados. El modo GPT-Live conversacional anterior devuelve 410 y las herramientas de preparación de envíos siguen bloqueadas.
+> **Lectura rápida:** Olivia conversa, responde por voz y consulta documentos. Sus acciones dependen de permisos y confirmaciones. La preparación de envíos sigue bloqueada.
 
-| Nodo | Ruta real en el repo |
+| Caja en el diagrama | Artefactos técnicos reales en el código |
 | --- | --- |
-| Overlay y administración | [`src/gestion/olivia/OliviaMount.jsx`](../src/gestion/olivia/OliviaMount.jsx) · [`src/gestion/olivia/OliviaSettings.jsx`](../src/gestion/olivia/OliviaSettings.jsx) |
-| Chat, stream y background | [`netlify/functions/olivia.mjs`](../netlify/functions/olivia.mjs) · [`netlify/functions/olivia-chat-background.mjs`](../netlify/functions/olivia-chat-background.mjs) · [`netlify/functions/_lib/olivia/stream.mjs`](../netlify/functions/_lib/olivia/stream.mjs) |
-| Voz natural y transcripción | [`netlify/functions/olivia-live-transcribe.mjs`](../netlify/functions/olivia-live-transcribe.mjs) · [`netlify/functions/olivia-synthesize.mjs`](../netlify/functions/olivia-synthesize.mjs) · [`netlify/functions/olivia-transcribe.mjs`](../netlify/functions/olivia-transcribe.mjs) · [`netlify/functions/olivia-fast-speech.mjs`](../netlify/functions/olivia-fast-speech.mjs) · [`netlify/functions/olivia-speech-audio.mjs`](../netlify/functions/olivia-speech-audio.mjs) |
-| Adjuntos, biblioteca y cotización | [`netlify/functions/olivia-attachment.mjs`](../netlify/functions/olivia-attachment.mjs) · [`netlify/functions/olivia-knowledge.mjs`](../netlify/functions/olivia-knowledge.mjs) · [`netlify/functions/_lib/olivia/knowledge.mjs`](../netlify/functions/_lib/olivia/knowledge.mjs) · [`netlify/functions/_lib/olivia/pricing.mjs`](../netlify/functions/_lib/olivia/pricing.mjs) |
-| Retención y 24 rutas de datos | [`netlify/functions/olivia-retention.mjs`](../netlify/functions/olivia-retention.mjs) · [`netlify/functions/olivia-resource-retention.mjs`](../netlify/functions/olivia-resource-retention.mjs) · [`netlify/functions/olivia-voice-cleanup.mjs`](../netlify/functions/olivia-voice-cleanup.mjs) · [Relevamiento funcional del PR #69](https://github.com/AgustinBazanUB/App-Integral-FM/blob/40ad5f8d208c5788416827dc7ddaffda4b801a75/docs/00-relevamiento-funcional-actual.md) |
-| 410 y bloqueo de prepare_shipment_create / prepare_shipment_update | [`netlify/functions/olivia-voice-meter-background.mjs`](../netlify/functions/olivia-voice-meter-background.mjs) · [`src/shared/oliviaCapabilities.mjs`](../src/shared/oliviaCapabilities.mjs) |
+| Ventana de Olivia en Gestión y Ventas | `OliviaMount`, `/gestion/*`, `/vendedor` · [`src/gestion/olivia/OliviaMount.jsx`](../src/gestion/olivia/OliviaMount.jsx) · [`src/gestion/olivia/OliviaSettings.jsx`](../src/gestion/olivia/OliviaSettings.jsx) |
+| Ajustes de Olivia | `/gestion/settings`, `OliviaSettings` · [`src/gestion/olivia/OliviaMount.jsx`](../src/gestion/olivia/OliviaMount.jsx) · [`src/gestion/olivia/OliviaSettings.jsx`](../src/gestion/olivia/OliviaSettings.jsx) |
+| Conversación y tareas autorizadas | `olivia`, `SSE`, `olivia-chat-background` · [`netlify/functions/olivia.mjs`](../netlify/functions/olivia.mjs) · [`netlify/functions/olivia-chat-background.mjs`](../netlify/functions/olivia-chat-background.mjs) · [`netlify/functions/_lib/olivia/stream.mjs`](../netlify/functions/_lib/olivia/stream.mjs) |
+| Reconocer y responder por voz | `olivia-live-transcribe`, `olivia-synthesize`, `olivia-transcribe`, `olivia-fast-speech`, `olivia-speech-audio` · [`netlify/functions/olivia-live-transcribe.mjs`](../netlify/functions/olivia-live-transcribe.mjs) · [`netlify/functions/olivia-synthesize.mjs`](../netlify/functions/olivia-synthesize.mjs) · [`netlify/functions/olivia-transcribe.mjs`](../netlify/functions/olivia-transcribe.mjs) · [`netlify/functions/olivia-fast-speech.mjs`](../netlify/functions/olivia-fast-speech.mjs) · [`netlify/functions/olivia-speech-audio.mjs`](../netlify/functions/olivia-speech-audio.mjs) |
+| Adjuntos y biblioteca de consulta | `olivia-attachment`, `olivia-knowledge` · [`netlify/functions/olivia-attachment.mjs`](../netlify/functions/olivia-attachment.mjs) · [`netlify/functions/olivia-knowledge.mjs`](../netlify/functions/olivia-knowledge.mjs) · [`netlify/functions/_lib/olivia/knowledge.mjs`](../netlify/functions/_lib/olivia/knowledge.mjs) · [`netlify/functions/_lib/olivia/pricing.mjs`](../netlify/functions/_lib/olivia/pricing.mjs) |
+| Limpieza periódica de datos vencidos | `olivia-retention`, `olivia-resource-retention`, `olivia-voice-cleanup` · [`netlify/functions/olivia-retention.mjs`](../netlify/functions/olivia-retention.mjs) · [`netlify/functions/olivia-resource-retention.mjs`](../netlify/functions/olivia-resource-retention.mjs) · [`netlify/functions/olivia-voice-cleanup.mjs`](../netlify/functions/olivia-voice-cleanup.mjs) · [Relevamiento funcional del PR #69](https://github.com/AgustinBazanUB/App-Integral-FM/blob/40ad5f8d208c5788416827dc7ddaffda4b801a75/docs/00-relevamiento-funcional-actual.md) |
+| Charlas, archivos y registros de Olivia | `24 rutas olivia*`, `oliviaConversations/{conversationId}/messages` · [`netlify/functions/olivia-retention.mjs`](../netlify/functions/olivia-retention.mjs) · [`netlify/functions/olivia-resource-retention.mjs`](../netlify/functions/olivia-resource-retention.mjs) · [`netlify/functions/olivia-voice-cleanup.mjs`](../netlify/functions/olivia-voice-cleanup.mjs) · [Relevamiento funcional del PR #69](https://github.com/AgustinBazanUB/App-Integral-FM/blob/40ad5f8d208c5788416827dc7ddaffda4b801a75/docs/00-relevamiento-funcional-actual.md) |
+| OpenAI | `OpenAI (modelos, transcripción y vectores)` · [`netlify/functions/olivia-attachment.mjs`](../netlify/functions/olivia-attachment.mjs) · [`netlify/functions/olivia-knowledge.mjs`](../netlify/functions/olivia-knowledge.mjs) · [`netlify/functions/_lib/olivia/knowledge.mjs`](../netlify/functions/_lib/olivia/knowledge.mjs) · [`netlify/functions/_lib/olivia/pricing.mjs`](../netlify/functions/_lib/olivia/pricing.mjs) · [`netlify/functions/olivia.mjs`](../netlify/functions/olivia.mjs) |
+| Voz natural de Google | `Google Cloud Text-to-Speech`, `Chirp` · [`netlify/functions/olivia-live-transcribe.mjs`](../netlify/functions/olivia-live-transcribe.mjs) · [`netlify/functions/olivia-synthesize.mjs`](../netlify/functions/olivia-synthesize.mjs) · [`netlify/functions/olivia-transcribe.mjs`](../netlify/functions/olivia-transcribe.mjs) · [`netlify/functions/olivia-fast-speech.mjs`](../netlify/functions/olivia-fast-speech.mjs) · [`netlify/functions/olivia-speech-audio.mjs`](../netlify/functions/olivia-speech-audio.mjs) |
+| Cotización del Banco Nación | `Banco Nación`, `PyME Nación` · [`netlify/functions/olivia-attachment.mjs`](../netlify/functions/olivia-attachment.mjs) · [`netlify/functions/olivia-knowledge.mjs`](../netlify/functions/olivia-knowledge.mjs) · [`netlify/functions/_lib/olivia/knowledge.mjs`](../netlify/functions/_lib/olivia/knowledge.mjs) · [`netlify/functions/_lib/olivia/pricing.mjs`](../netlify/functions/_lib/olivia/pricing.mjs) |
+| Canal de voz anterior retirado y preparación de envíos bloqueada | `olivia-voice-meter-background (410)`, `prepare_shipment_create`, `prepare_shipment_update` · [`netlify/functions/olivia-voice-meter-background.mjs`](../netlify/functions/olivia-voice-meter-background.mjs) · [`src/shared/oliviaCapabilities.mjs`](../src/shared/oliviaCapabilities.mjs) |
 
-Las 12 Functions vigentes de Olivia incluyen sus tres cron. La ruta residual `olivia-voice-meter-background` también está presente en el árbol y responde `410`. Las 24 rutas de persistencia incluyen `oliviaConversations/{conversationId}/messages`.
+El corte registra 12 Functions activas de Olivia, incluidas sus tres tareas programadas. La ruta retirada se contabiliza aparte.
 
 ### D8 · Plataforma y gobernanza
 
@@ -339,16 +364,22 @@ Las 12 Functions vigentes de Olivia incluyen sus tres cron. La ruta residual `ol
 
 ![D8 · Plataforma y gobernanza](diagrams/svg/08-d8-plataforma-gobernanza.svg)
 
-> **Lectura rápida:** El acceso exige sesión y perfil activo, con comprobaciones en cliente, reglas y servidor. Administración y el servicio de usuarios aplican guardas diferentes a general_admin. Deploy Previews tienen comprobación de aislamiento en Firebase.
+> **Lectura rápida:** El perfil activo y el rol definen qué puede hacer cada persona. Antes de revisar un cambio, se comprueba que el sistema apunte a una base de pruebas separada.
 
-| Nodo | Ruta real en el repo |
+| Caja en el diagrama | Artefactos técnicos reales en el código |
 | --- | --- |
-| Login, PWA y Service Worker | [`src/gestion/pages/LoginPage.jsx`](../src/gestion/pages/LoginPage.jsx) · [`src/main.jsx`](../src/main.jsx) · [`public/service-worker.js`](../public/service-worker.js) |
-| RBAC y diferencia en alta de usuarios | [`src/gestion/permissions.js`](../src/gestion/permissions.js) · [`src/gestion/services/managementService.js`](../src/gestion/services/managementService.js) · [`netlify/functions/_lib/firebaseAuth.mjs`](../netlify/functions/_lib/firebaseAuth.mjs) · [`firestore.rules`](../firestore.rules) |
-| Administración sin editor de permisos | [`src/gestion/pages/AdministrationPage.jsx`](../src/gestion/pages/AdministrationPage.jsx) |
-| Alertas, Actividad y Auditoría | [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`src/gestion/pages/ActivityPage.jsx`](../src/gestion/pages/ActivityPage.jsx) · [`src/gestion/pages/AuditPage.jsx`](../src/gestion/pages/AuditPage.jsx) |
-| Configuración y estado informativo de pagos | [`src/gestion/pages/SettingsPage.jsx`](../src/gestion/pages/SettingsPage.jsx) |
-| CI/CD y aislamiento de Firebase | [`netlify/functions/preview-firebase-status.mjs`](../netlify/functions/preview-firebase-status.mjs) · [`scripts/validate-preview-firebase.mjs`](../scripts/validate-preview-firebase.mjs) · [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) · [`.github/workflows/arca-ci.yml`](../.github/workflows/arca-ci.yml) · [`.github/workflows/deploy-firestore.yml`](../.github/workflows/deploy-firestore.yml) |
+| Ingreso y acceso desde el dispositivo | `/gestion/login`, `PWA`, `Service Worker` · [`src/gestion/pages/LoginPage.jsx`](../src/gestion/pages/LoginPage.jsx) · [`src/main.jsx`](../src/main.jsx) · [`public/service-worker.js`](../public/service-worker.js) |
+| Administrar usuarios | `/gestion/administration` · [`src/gestion/pages/AdministrationPage.jsx`](../src/gestion/pages/AdministrationPage.jsx) |
+| Alertas, actividad y auditoría | `/gestion/alerts`, `/gestion/actividad`, `/gestion/audit` · [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`src/gestion/pages/ActivityPage.jsx`](../src/gestion/pages/ActivityPage.jsx) · [`src/gestion/pages/AuditPage.jsx`](../src/gestion/pages/AuditPage.jsx) |
+| Ajustes de pago solo informativos | `/gestion/settings`, `pagos solo informativos` · [`src/gestion/pages/SettingsPage.jsx`](../src/gestion/pages/SettingsPage.jsx) |
+| Sin editor de permisos y alta desigual entre administradores | `admin`, `general_admin`, `sin editor de permisos` · [`src/gestion/permissions.js`](../src/gestion/permissions.js) · [`src/gestion/services/managementService.js`](../src/gestion/services/managementService.js) · [`netlify/functions/_lib/firebaseAuth.mjs`](../netlify/functions/_lib/firebaseAuth.mjs) · [`firestore.rules`](../firestore.rules) · [`src/gestion/pages/AdministrationPage.jsx`](../src/gestion/pages/AdministrationPage.jsx) |
+| Control de acceso por perfil y rol | `permissions.js`, `RBAC de 12 roles` · [`src/gestion/permissions.js`](../src/gestion/permissions.js) · [`src/gestion/services/managementService.js`](../src/gestion/services/managementService.js) · [`netlify/functions/_lib/firebaseAuth.mjs`](../netlify/functions/_lib/firebaseAuth.mjs) · [`firestore.rules`](../firestore.rules) |
+| Revisión de una versión antes de publicarla | `GitHub Actions`, `Netlify Deploy Preview` · [`netlify/functions/preview-firebase-status.mjs`](../netlify/functions/preview-firebase-status.mjs) · [`scripts/validate-preview-firebase.mjs`](../scripts/validate-preview-firebase.mjs) · [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) · [`.github/workflows/arca-ci.yml`](../.github/workflows/arca-ci.yml) · [`.github/workflows/deploy-firestore.yml`](../.github/workflows/deploy-firestore.yml) |
+| Comprobación del entorno de pruebas | `preview-firebase-status`, `validate-preview-firebase` · [`netlify/functions/preview-firebase-status.mjs`](../netlify/functions/preview-firebase-status.mjs) · [`scripts/validate-preview-firebase.mjs`](../scripts/validate-preview-firebase.mjs) · [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) · [`.github/workflows/arca-ci.yml`](../.github/workflows/arca-ci.yml) · [`.github/workflows/deploy-firestore.yml`](../.github/workflows/deploy-firestore.yml) |
+| Servicio de identificación | `Firebase Authentication` · [`src/gestion/pages/LoginPage.jsx`](../src/gestion/pages/LoginPage.jsx) · [`src/main.jsx`](../src/main.jsx) · [`public/service-worker.js`](../public/service-worker.js) · [`src/gestion/services/firebase.js`](../src/gestion/services/firebase.js) |
+| Perfiles y reglas de acceso | `users`, `firestore.rules` · [`src/gestion/permissions.js`](../src/gestion/permissions.js) · [`src/gestion/services/managementService.js`](../src/gestion/services/managementService.js) · [`netlify/functions/_lib/firebaseAuth.mjs`](../netlify/functions/_lib/firebaseAuth.mjs) · [`firestore.rules`](../firestore.rules) |
+| Alertas y registro de cambios | `alerts`, `auditLogs` · [`src/gestion/pages/GenericModulePage.jsx`](../src/gestion/pages/GenericModulePage.jsx) · [`src/gestion/pages/ActivityPage.jsx`](../src/gestion/pages/ActivityPage.jsx) · [`src/gestion/pages/AuditPage.jsx`](../src/gestion/pages/AuditPage.jsx) |
+| Base separada para pruebas | `app-integral-fm-pruebas` · [`netlify/functions/preview-firebase-status.mjs`](../netlify/functions/preview-firebase-status.mjs) · [`scripts/validate-preview-firebase.mjs`](../scripts/validate-preview-firebase.mjs) · [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) · [`.github/workflows/arca-ci.yml`](../.github/workflows/arca-ci.yml) · [`.github/workflows/deploy-firestore.yml`](../.github/workflows/deploy-firestore.yml) |
 
 ## Regenerar la suite
 

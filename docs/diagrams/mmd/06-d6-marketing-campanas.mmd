@@ -1,33 +1,32 @@
-flowchart LR
-    %% Flujo del macro-dominio verificado contra el corte d0f1225.
-    subgraph navegador["Navegador · Gestión"]
-        social["INCOMPLETO · /gestion/social · alta y consulta"]:::debt
-        general["INCOMPLETO · /gestion/marketing · borrador"]:::debt
-        whatsapp["INCOMPLETO · /gestion/marketing/whatsapp"]:::debt
-        meta["INCOMPLETO · /gestion/marketing/meta-ads"]:::debt
+flowchart TB
+    %% Registro, planeamiento, mensajes y etapas pendientes de publicación.
+    subgraph navegador["En tu navegador o celular"]
+        marketing["Campañas generales en borrador"]:::debt
+        redes["Contactos de redes sociales"]:::integral
+        anuncios["Plan y piezas para anuncios en Meta"]:::integral
+        mensajes["Campañas de WhatsApp"]:::integral
     end
-
-    subgraph servidor["Servidor · Functions"]
-        plan["theory-compiler · campaign-planner"]:::shared
-        drives["google-drive · google-drive-callback"]:::shared
+    subgraph servidor["En el servidor seguro"]
+        preparar["Preparar estrategia y plan de anuncios"]:::shared
+        archivos["Autorizar acceso a archivos"]:::shared
     end
-
-    subgraph persistencia["Persistencia y servicios externos"]
-        registro[("socialLeads · campaigns")]:::db
-        campanias[("whatsappCampaigns")]:::db
-        extension(["Extensión privada Chrome · WhatsApp"]):::external
+    subgraph recursos["Base de datos y servicios externos"]
+        falta["Validación, generación final, publicación y resultados pendientes"]:::debt
+        whatsapp(["Complemento de WhatsApp para Chrome"]):::external
         ia(["OpenAI"]):::external
-        drive(["Google Drive · OAuth y archivos"]):::external
-        falta["SOLO UI · Validación, render, publicación y resultados"]:::debt
+        registro[("Contactos y campañas generales")]:::db
+        destinatarios[("Campañas de WhatsApp y destinatarios")]:::db
+        drive(["Google Drive"]):::external
     end
-
-    social --> registro
-    general --> registro
-    whatsapp --> campanias
-    whatsapp -.->|postMessage| extension
-    meta --> plan --> ia
-    meta --> drives --> drive
-    meta -.->|Sin Meta Graph API| falta
+    anuncios -.->|"Se detiene antes de publicar"| falta
+    anuncios -->|"Pide preparar una estrategia"| preparar
+    mensajes -->|"Filtra clientes y guarda la campaña"| destinatarios
+    marketing -->|"Conserva los borradores"| registro
+    archivos -->|"Conecta y consulta archivos"| drive
+    anuncios -->|"Pide vincular archivos"| archivos
+    mensajes -->|"Entrega mensajes al complemento"| whatsapp
+    preparar -->|"Pide ayuda para redactar el plan"| ia
+    redes -->|"Guarda los contactos recibidos"| registro
 
     classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
     classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px

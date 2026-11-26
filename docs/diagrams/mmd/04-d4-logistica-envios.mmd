@@ -1,33 +1,30 @@
-flowchart LR
-    %% Flujo del macro-dominio verificado contra el corte d0f1225.
-    subgraph navegador["Navegador · preparación y entrega"]
-        tablero["Tablero · /gestion/shipping"]:::integral
-        preparar["Preparación · /e/:lookupId"]:::integral
-        reparto["Reparto · /reparto"]:::actor
-        tracking["Cliente · /seguimiento"]:::actor
+flowchart TB
+    %% El tablero y los portales confirman los cambios de cada envío.
+    subgraph navegador["En tu navegador o celular"]
+        preparador["Preparador de pedidos"]:::integral
+        gestion["Tablero de envíos"]:::integral
+        cliente["Seguimiento para el cliente"]:::actor
+        repartidor["Repartidor"]:::actor
     end
-
-    subgraph servidor["Servidor · Netlify"]
-        shipping["shipping · 13 estados definidos"]:::shared
-        limpieza["shipping-retention · horario"]:::shared
+    subgraph servidor["En el servidor seguro"]
+        recorrido["Control de cada etapa del envío"]:::shared
+        limpiar["Limpieza de ubicaciones vencidas"]:::shared
     end
-
-    subgraph persistencia["Persistencia y servicios externos"]
-        envios[("shipments · events · deliverySessions")]:::db
-        mapas(["OpenStreetMap · Google Maps"]):::external
-        outbox["INCOMPLETO · shippingOutbox desactivado · Uber sin API"]:::debt
-        reversa["INCOMPLETO · Devolución sin reversa automática"]:::debt
+    subgraph recursos["Base de datos y servicios externos"]
+        reversa["Sin reversa de stock, caja ni factura"]:::debt
+        historial[("Envíos, novedades y sesiones de reparto")]:::db
+        mapas(["Mapas y navegación"]):::external
+        desconectado["Avisos automáticos y conexión con Uber pendientes"]:::debt
     end
-
-    tablero --> shipping
-    preparar --> shipping
-    reparto --> shipping
-    tracking --> shipping
-    shipping --> envios
-    limpieza -->|Ubicación residual vencida| envios
-    tablero -.-> mapas
-    shipping -.-> outbox
-    shipping -.-> reversa
+    repartidor -->|"Marca salida y entrega"| recorrido
+    gestion -->|"Abre dirección y recorrido"| mapas
+    gestion -->|"Crea y aprueba el envío"| recorrido
+    preparador -->|"Confirma la preparación"| recorrido
+    recorrido -.->|"Si un envío se devuelve o cancela"| reversa
+    cliente -->|"Consulta el avance"| recorrido
+    recorrido -->|"Guarda el estado y las novedades"| historial
+    limpiar -->|"Borra posiciones vencidas"| historial
+    recorrido -.->|"Deja pendiente el envío automático de avisos"| desconectado
 
     classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
     classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px

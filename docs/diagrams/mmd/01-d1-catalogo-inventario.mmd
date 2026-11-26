@@ -1,33 +1,31 @@
-flowchart LR
-    %% Flujo del macro-dominio verificado contra el corte d0f1225.
-    subgraph navegador["Navegador · Gestión"]
-        productos["Productos · /gestion/products"]:::integral
-        ubicacion["/gestion/locations/:locationId"]:::integral
-        depositos["Depósitos · /gestion/warehouse"]:::integral
-        proveedores["INCOMPLETO · /gestion/suppliers"]:::debt
-        operaciones["SDK · ingreso, ajuste y traslado"]:::shared
+flowchart TB
+    %% Administración del catálogo y de las existencias.
+    subgraph navegador["En tu navegador o celular"]
+        depositos["Stock de depósitos"]:::integral
+        proveedores["Pantalla de proveedores incompleta"]:::debt
+        productos["Cargar y editar productos"]:::integral
+        cambios["Ingresos, ajustes y traslados"]:::integral
+        locales["Stock de locales"]:::integral
     end
-
-    subgraph servidor["Servidor · Netlify"]
-        merge["catalog-merge"]:::shared
+    subgraph servidor["En el servidor seguro"]
+        unir["Unir productos duplicados"]:::shared
     end
-
-    subgraph persistencia["Persistencia · Firestore"]
-        maestro[("products · productCategories")]:::db
-        existencias[("locationStock e items · warehouseStock e items")]:::db
-        movimientos[("stockMovements · stockTransfers")]:::db
-        fichas[("suppliers")]:::db
-        compras["INCOMPLETO · purchases solo en backend"]:::debt
+    subgraph datos["Base de datos"]
+        compras["Compras sin pantalla de gestión"]:::debt
+        cantidad[("Existencias por local y depósito")]:::db
+        catalogo[("Productos y categorías")]:::db
+        fichas[("Fichas de proveedores")]:::db
+        historial[("Historial de movimientos y traslados")]:::db
     end
-
-    productos --> merge --> maestro
-    productos -->|Alta y edición SDK| maestro
-    ubicacion --> operaciones
-    depositos --> operaciones
-    operaciones --> existencias
-    operaciones --> movimientos
-    proveedores --> fichas
-    proveedores -.->|Compra sin pantalla| compras
+    productos -->|"Solicita la unión"| unir
+    cambios -->|"Deja constancia de cada cambio"| historial
+    cambios -->|"Actualiza cantidades"| cantidad
+    depositos -->|"Permite ingresar o trasladar"| cambios
+    locales -->|"Permite mover o ajustar"| cambios
+    productos -->|"Guarda altas y cambios"| catalogo
+    unir -->|"Consolida las fichas"| catalogo
+    proveedores -.->|"No permite gestionar compras"| compras
+    proveedores -->|"Muestra las fichas"| fichas
 
     classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
     classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px

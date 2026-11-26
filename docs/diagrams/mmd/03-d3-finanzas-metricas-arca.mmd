@@ -1,36 +1,34 @@
-flowchart LR
-    %% Flujo del macro-dominio verificado contra el corte d0f1225.
-    subgraph navegador["Navegador · Gestión"]
-        panel["Panel general · /gestion"]:::integral
-        metricas["Métricas · /gestion/metrics/sales"]:::integral
-        finanzas["Finanzas · /gestion/finance"]:::integral
-        fiscal["Facturación desde POS y Configuración"]:::integral
+flowchart TB
+    %% Los números de gestión y la facturación tienen recorridos distintos.
+    subgraph navegador["En tu navegador o celular"]
+        resumen["Resumen del negocio"]:::integral
+        metricas["Métricas de ventas"]:::integral
+        caja["Finanzas y movimientos de caja"]:::integral
+        factura["Solicitar factura o nota de crédito"]:::integral
     end
-
-    subgraph servidor["Servidor · Functions"]
-        preparar["arca-receiver · arca-invoice · arca-taxpayer"]:::shared
-        resolver["arca-authorize · arca-document · sale-cancel"]:::shared
+    subgraph servidor["En el servidor seguro"]
+        receptor["Validar datos del cliente"]:::shared
+        emitir["Autorizar y preparar el comprobante"]:::shared
     end
-
-    subgraph persistencia["Persistencia y servicios externos"]
-        movimientos[("sales · financialEntries")]:::db
-        comprobantes[("invoices · arcaSequenceLocks")]:::db
-        arca(["ARCA · WSAA, WSFE y Padrón"]):::external
-        smtp(["SMTP · PDF autorizado"]):::external
-        faltantes["INCOMPLETO · Exportación y sesiones cashSessions"]:::debt
+    subgraph recursos["Base de datos y servicios externos"]
+        numeros[("Ventas y movimientos financieros")]:::db
+        documentos[("Comprobantes y numeración fiscal")]:::db
+        arca(["ARCA"]):::external
+        correo(["Correo del comprobante"]):::external
+        falta["Métricas sin exportación"]:::debt
+        turnos["Sin turnos de caja"]:::debt
     end
-
-    panel --> movimientos
-    metricas --> movimientos
-    finanzas --> movimientos
-    metricas -.-> faltantes
-    finanzas -.-> faltantes
-    fiscal --> preparar
-    fiscal --> resolver
-    preparar --> arca
-    resolver --> comprobantes
-    resolver -->|CAE y nota de crédito| arca
-    resolver -.-> smtp
+    emitir -->|"Solicita autorización fiscal"| arca
+    metricas -->|"Consulta ventas por período"| numeros
+    metricas -.->|"No permite exportar"| falta
+    emitir -->|"Envía por correo si está configurado"| correo
+    emitir -->|"Guarda el número y el documento"| documentos
+    factura -->|"Pide revisar al comprador"| receptor
+    caja -.->|"No gestiona turnos"| turnos
+    receptor -->|"Consulta el padrón"| arca
+    resumen -->|"Resume ingresos y actividad"| numeros
+    factura -->|"Pide emitir o anular"| emitir
+    caja -->|"Consulta ingresos y egresos"| numeros
 
     classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
     classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px

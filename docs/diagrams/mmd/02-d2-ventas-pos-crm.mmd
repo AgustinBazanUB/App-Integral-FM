@@ -1,29 +1,27 @@
 flowchart TB
-    %% Flujo del macro-dominio verificado contra el corte d0f1225.
-    subgraph navegador["Navegador · App Integral FM"]
-        rapido["Venta Rápida · /gestion/quick-sales"]:::integral
-        vendedor["Panel Vendedor · /vendedor"]:::integral
-        offline[("IndexedDB · seller_pending_sales")]:::db
-        ventasService["sellerService · transacción Firestore SDK"]:::shared
-        crm["Clientes · /gestion/loyal-customers"]:::integral
+    %% La cola del dispositivo conserva ventas hasta volver a estar en línea.
+    subgraph navegador["En tu navegador o celular"]
+        rapida["Venta rápida"]:::integral
+        memoria[("Ventas guardadas sin internet")]:::db
+        confirmar["Confirmar venta y origen del stock"]:::integral
+        fidelidad["Clientes, zonas y fidelización"]:::integral
+        panel["Panel Vendedor"]:::integral
     end
-
-    subgraph servidor["Servidor · Functions"]
-        funciones["sale-cancel · arca-invoice · shipping"]:::shared
+    subgraph servidor["En el servidor seguro"]
+        acciones["Anulación, factura o envío"]:::shared
     end
-
-    subgraph persistencia["Persistencia · Firestore"]
-        venta[("sales · counters · stockMovements")]:::db
-        clientes[("customers · customerZones · settings")]:::db
+    subgraph datos["Base de datos"]
+        clientes[("Fichas de clientes y condiciones comerciales")]:::db
+        ventas[("Ventas numeradas y movimientos de stock")]:::db
     end
-
-    rapido --> ventasService
-    vendedor -->|En línea| ventasService
-    vendedor -->|Sin red| offline -->|Sincroniza| ventasService
-    ventasService --> venta
-    ventasService -->|Según la operación| funciones
-    ventasService -->|Identifica cliente| clientes
-    crm --> clientes
+    rapida -->|"Envía el cobro confirmado"| confirmar
+    fidelidad -->|"Consulta fichas y compras"| clientes
+    confirmar -->|"Identifica al cliente"| clientes
+    confirmar -->|"Pide la operación cuando corresponde"| acciones
+    panel -->|"Guarda si pierde conexión"| memoria
+    memoria -->|"Reintenta al volver internet"| confirmar
+    confirmar -->|"Registra venta y descuenta stock"| ventas
+    panel -->|"Confirma en línea"| confirmar
 
     classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
     classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px

@@ -1,32 +1,30 @@
-flowchart LR
-    %% Los ocho dominios convergen en una base de datos común con guardas propias.
-    subgraph dominios["Dominios · navegador y servidor"]
-        inventario["D1 · Catálogo e inventario"]:::integral
-        ventas["D2 · Ventas POS y CRM"]:::integral
-        finanzas["D3 · Finanzas, métricas y ARCA"]:::integral
-        logistica["D4 · Logística y envíos"]:::integral
-        web["D5 · E-Commerce · INCOMPLETO"]:::debt
-        marketing["D6 · Marketing · INCOMPLETO"]:::debt
-        olivia["D7 · Olivia IA"]:::shared
-        gobierno["D8 · Plataforma y gobernanza"]:::shared
-        acceso["Acceso · SDK y Functions"]:::shared
+flowchart TB
+    %% Los dominios intercambian información y comparten infraestructura.
+    subgraph operaciones["Áreas de trabajo"]
+        marketing["Marketing y redes · incompleto"]:::debt
+        tienda["Tienda online · incompleta"]:::debt
+        ventas["Ventas en local y clientes"]:::integral
+        logistica["Logística y envíos"]:::integral
+        finanzas["Finanzas, métricas y ARCA"]:::integral
+        inventario["Catálogo e inventario"]:::integral
     end
-
-    subgraph recursos["Persistencia y servicios externos"]
-        servicios(["15 conexiones externas"]):::external
-        firestore[("Firestore · 91 rutas")]:::db
+    olivia["Asistente IA Olivia"]:::shared
+    plataforma["Plataforma y permisos"]:::shared
+    subgraph respaldo["Datos y servicios externos"]
+        datos[("Base de datos central")]:::db
+        servicios(["ARCA, OpenAI, Drive y WhatsApp"]):::external
     end
-
-    inventario --> acceso
-    ventas --> acceso
-    finanzas --> acceso
-    logistica --> acceso
-    web --> acceso
-    marketing --> acceso
-    olivia --> acceso
-    gobierno --> acceso
-    acceso --> firestore
-    acceso --> servicios
+    tienda -->|"Muestra productos y stock de un local"| inventario
+    tienda -.->|"Solo con prueba local genera venta"| ventas
+    ventas -->|"Descuenta stock"| inventario
+    ventas -->|"Crea pedido de envío"| logistica
+    ventas -->|"Suma ingresos y pide factura"| finanzas
+    logistica -->|"Descuenta al aprobar si el stock sigue pendiente"| inventario
+    marketing -->|"Usa catálogo y lista de clientes"| ventas
+    olivia -.->|"Consulta y ejecuta acciones aprobadas"| operaciones
+    operaciones -->|"Piden acceso según el rol"| plataforma
+    operaciones -->|"Leen y guardan operaciones"| datos
+    operaciones -->|"Usan servicios conectados"| servicios
 
     classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
     classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px

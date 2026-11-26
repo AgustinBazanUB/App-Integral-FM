@@ -1,35 +1,25 @@
 flowchart TB
-    %% Una venta POS confirmada produce una salida de stock. Crear un pedido web no la produce.
-    subgraph posNavegador["Navegador · POS"]
-        pos["Venta Rápida o Vendedor"]:::integral
-        transaccion["SDK directo · reintento desde IndexedDB"]:::shared
+    %% Una venta en local y un pedido web avanzan por caminos distintos.
+    subgraph local["Venta en local o asistida"]
+        vendedor["Vendedor confirma la venta"]:::integral
+        venta[("Venta registrada y stock descontado si es directa")]:::db
+        impacto["Facturación, ingresos y envíos"]:::shared
+        devolucion["Sin reversa automática de stock, caja ni factura"]:::debt
+        vendedor -->|"Registra en línea o al volver internet"| venta
+        venta -->|"Suma ingresos y habilita factura y envío"| impacto
+        impacto -.->|"Si un envío se devuelve o cancela"| devolucion
     end
-    subgraph posDatos["Persistencia · venta y stock"]
-        venta[("sales + movimientos de stock")]:::db
+    subgraph web["Compra en tienda web"]
+        retiro["El cliente confirma retiro"]:::ecommerce
+        pendiente[("Pedido pendiente sin reservar stock")]:::db
+        falta["Falta cobro online con Payway y envío a domicilio"]:::debt
+        prueba["Prueba local de administrador"]:::shared
+        cierre[("Venta registrada, stock descontado y borrador fiscal")]:::db
+        retiro -->|"Guarda el pedido pendiente"| pendiente
+        pendiente -.->|"Se frena antes del cobro"| falta
+        pendiente -.->|"Solo la prueba local simula el pago"| prueba
+        prueba -->|"Registra la venta y prepara el borrador fiscal"| cierre
     end
-    subgraph posServidor["Servidor y Gestión · efectos vinculados"]
-        impacto["ARCA · Envíos · Finanzas"]:::shared
-        devolucion["INCOMPLETO · Sin reversa automática de stock, caja y CAE"]:::debt
-    end
-
-    subgraph webNavegador["Navegador · E-Commerce"]
-        checkout["/checkout · retiro habilitado"]:::ecommerce
-    end
-    subgraph webServidor["Servidor · checkout web"]
-        registrar["ecommerce-checkout"]:::shared
-    end
-    subgraph webDatos["Persistencia · intención de compra"]
-        pendiente[("orders y payments · pending_payment")]:::db
-        corte["INCOMPLETO · Sin reserva ni cobro Payway"]:::debt
-    end
-    subgraph ensayo["Simulación local · servidor y persistencia"]
-        local["ecommerce-simulated-payment · admin local"]:::shared
-        simulacion[("sales + salida de stock · plan fiscal sin CAE")]:::db
-    end
-
-    pos --> transaccion --> venta --> impacto -.-> devolucion
-    checkout --> registrar --> pendiente -.-> corte
-    pendiente -.-> local --> simulacion
 
     classDef actor fill:#1E293B,stroke:#64748B,color:#FFFFFF,stroke-width:2px
     classDef integral fill:#1D4ED8,stroke:#1E40AF,color:#FFFFFF,stroke-width:2px
