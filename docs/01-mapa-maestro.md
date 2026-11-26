@@ -90,7 +90,7 @@ Roles exactos de `ROLE_TEMPLATES` en este corte: `admin`, `general_admin`, `oper
 ```mermaid
 flowchart LR
     %% Los ocho dominios convergen en una base de datos común con guardas propias.
-    subgraph dominios["Navegador y servidor · dominios del monorepo"]
+    subgraph dominios["Dominios · navegador y servidor"]
         inventario["D1 · Catálogo e inventario"]:::integral
         ventas["D2 · Ventas POS y CRM"]:::integral
         finanzas["D3 · Finanzas, métricas y ARCA"]:::integral
@@ -99,9 +99,8 @@ flowchart LR
         marketing["D6 · Marketing · INCOMPLETO"]:::debt
         olivia["D7 · Olivia IA"]:::shared
         gobierno["D8 · Plataforma y gobernanza"]:::shared
+        acceso["Acceso · SDK y Functions"]:::shared
     end
-
-    acceso["Acceso · SDK y Functions"]:::shared
 
     subgraph recursos["Persistencia y servicios externos"]
         servicios(["15 conexiones externas"]):::external
@@ -151,35 +150,31 @@ Las 91 rutas incluyen colecciones y subcolecciones, entre ellas las de acceso ex
 ```mermaid
 flowchart TB
     %% Una venta POS confirmada produce una salida de stock. Crear un pedido web no la produce.
-    subgraph fisica["Venta física"]
-        subgraph posNavegador["Navegador · POS"]
-            pos["Venta Rápida o Vendedor"]:::integral
-            transaccion["SDK directo · reintento desde IndexedDB"]:::shared
-        end
-        subgraph posDatos["Persistencia · venta y stock"]
-            venta[("sales + movimientos de stock")]:::db
-        end
-        subgraph posServidor["Servidor y Gestión · efectos vinculados"]
-            impacto["ARCA · Envíos · Finanzas"]:::shared
-            devolucion["INCOMPLETO · Sin reversa automática de stock, caja y CAE"]:::debt
-        end
+    subgraph posNavegador["Navegador · POS"]
+        pos["Venta Rápida o Vendedor"]:::integral
+        transaccion["SDK directo · reintento desde IndexedDB"]:::shared
+    end
+    subgraph posDatos["Persistencia · venta y stock"]
+        venta[("sales + movimientos de stock")]:::db
+    end
+    subgraph posServidor["Servidor y Gestión · efectos vinculados"]
+        impacto["ARCA · Envíos · Finanzas"]:::shared
+        devolucion["INCOMPLETO · Sin reversa automática de stock, caja y CAE"]:::debt
     end
 
-    subgraph compra["Checkout web"]
-        subgraph webNavegador["Navegador · E-Commerce"]
-            checkout["/checkout · retiro habilitado"]:::ecommerce
-        end
-        subgraph webServidor["Servidor · camino comercial"]
-            registrar["ecommerce-checkout"]:::shared
-        end
-        subgraph webDatos["Persistencia · intención de compra"]
-            pendiente[("orders y payments · pending_payment")]:::db
-            corte["INCOMPLETO · Sin reserva ni cobro Payway"]:::debt
-        end
-        subgraph ensayo["Simulación local · servidor y persistencia"]
-            local["ecommerce-simulated-payment · admin local"]:::shared
-            simulacion[("sales + salida de stock · plan fiscal sin CAE")]:::db
-        end
+    subgraph webNavegador["Navegador · E-Commerce"]
+        checkout["/checkout · retiro habilitado"]:::ecommerce
+    end
+    subgraph webServidor["Servidor · checkout web"]
+        registrar["ecommerce-checkout"]:::shared
+    end
+    subgraph webDatos["Persistencia · intención de compra"]
+        pendiente[("orders y payments · pending_payment")]:::db
+        corte["INCOMPLETO · Sin reserva ni cobro Payway"]:::debt
+    end
+    subgraph ensayo["Simulación local · servidor y persistencia"]
+        local["ecommerce-simulated-payment · admin local"]:::shared
+        simulacion[("sales + salida de stock · plan fiscal sin CAE")]:::db
     end
 
     pos --> transaccion --> venta --> impacto -.-> devolucion

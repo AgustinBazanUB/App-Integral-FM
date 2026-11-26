@@ -1,6 +1,6 @@
 flowchart LR
     %% Los ocho dominios convergen en una base de datos común con guardas propias.
-    subgraph dominios["Navegador y servidor · dominios del monorepo"]
+    subgraph dominios["Dominios · navegador y servidor"]
         inventario["D1 · Catálogo e inventario"]:::integral
         ventas["D2 · Ventas POS y CRM"]:::integral
         finanzas["D3 · Finanzas, métricas y ARCA"]:::integral
@@ -9,9 +9,8 @@ flowchart LR
         marketing["D6 · Marketing · INCOMPLETO"]:::debt
         olivia["D7 · Olivia IA"]:::shared
         gobierno["D8 · Plataforma y gobernanza"]:::shared
+        acceso["Acceso · SDK y Functions"]:::shared
     end
-
-    acceso["Acceso · SDK y Functions"]:::shared
 
     subgraph recursos["Persistencia y servicios externos"]
         servicios(["15 conexiones externas"]):::external
